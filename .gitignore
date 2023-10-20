@@ -1,0 +1,78 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+#*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+#*.a
+#*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Gradle
+captures/
+build/
+
+
+# Android
+.gradle
+.externalNativeBuild
+local.properties
+
+# IDEA Projects
+!.idea
+**/.idea/*
+!**/.idea/fileTemplates/
+!**/.idea/misc.xml
+
+/third_party
+/out
+cmake-build-*
+node_modules
+Build/
+test/out/
+DerivedData/
+xcuserdata
+xcshareddata
+*.xcworkspace
+.DS_Store
+.temp
+Pods/
+Podfile.lock
+Adobe After Effects Auto-Save/
+.cxx
+/.sync_deps.cmake
+/build.yml
+.vs
+win/Win32Demo/x64
+win/x64
+win/build
+win/libtgfx
+win/Debug/
+win/Release/
+win/Win32Demo/Debug/
+win/Win32Demo/Release/
+QTCMAKE.cfg
+test/baseline/.cache
+/result
+
+
+vendor_tools/
+.vscode

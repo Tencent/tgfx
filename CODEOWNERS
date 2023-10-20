@@ -1,0 +1,12 @@
+# Default owners:
+*       @domchen @lvpengwei @luckyzhliu
+
+*.js    @domchen @lvpengwei @luckyzhliu
+*.ts    @domchen @lvpengwei @luckyzhliu
+*.sh    @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/*      @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/web/    @domchen @lvpengwei @luckyzhliu
+/.github/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/test/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/linux/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/win/   @FusionXu @kevingpqi123 @domchen @lvpengwei @luckyzhliu

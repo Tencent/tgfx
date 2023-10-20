@@ -1,0 +1,7 @@
+---
+blank_issues_enabled: false
+contact_links:
+  -
+    about: "Please use Discussions to ask usage questions or suggest new features"
+    name: Question & Feature Request
+    url: "https://github.com/libpag/tgfx/discussions/1"

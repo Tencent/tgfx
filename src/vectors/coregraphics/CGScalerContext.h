@@ -1,0 +1,59 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include "CGTypeface.h"
+#include "core/PixelBuffer.h"
+#include "tgfx/core/ImageInfo.h"
+
+namespace tgfx {
+class CGScalerContextRec {
+ public:
+  float textSize = 12.f;
+  float skewX = 0.f;
+  float fauxBoldSize = 0.f;
+  bool verticalText = false;
+};
+
+class CGScalerContext {
+ public:
+  static std::unique_ptr<CGScalerContext> Make(std::shared_ptr<Typeface> typeface, float size,
+                                               bool fauxBold = false, bool fauxItalic = false,
+                                               bool verticalText = false);
+  ~CGScalerContext();
+
+  FontMetrics generateFontMetrics();
+
+  GlyphMetrics generateGlyphMetrics(GlyphID glyphID);
+
+  Point getVerticalOffset(GlyphID glyphID) const;
+
+  bool generatePath(GlyphID glyphID, Path* path);
+
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, Matrix* matrix);
+
+ private:
+  CGScalerContext(std::shared_ptr<Typeface> typeface, CGScalerContextRec);
+
+  std::shared_ptr<Typeface> _typeface;
+  CGScalerContextRec rec;
+  CTFontRef ctFont = nullptr;
+  CGAffineTransform transform = CGAffineTransformIdentity;
+};
+}  // namespace tgfx
