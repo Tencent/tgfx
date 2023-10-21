@@ -13,8 +13,9 @@ geometries, and images. It provides high-performance APIs that work across a var
 software platforms. TGFX was initially created as a core component of the [PAG](https://pag.art) 
 project and has since become the default graphics engine for the [libpag](https://github.com/Tencent/libpag) 
 library, starting from version 4.0. Its main objective is to offer a compelling alternative to the 
-Skia graphics library while maintaining a smaller binary size. Over time, it has found its way into 
-many other products, such as [Tencent Docs](https://docs.qq.com) and various video-editing apps.
+Skia graphics library while maintaining a much smaller binary size. Over time, it has found its way 
+into many other products, such as [Hippy](https://github.com/Tencent/Hippy),
+[Tencent Docs](https://docs.qq.com) and various video-editing apps.
 
 ## Platform Support
 
