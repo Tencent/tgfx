@@ -71,23 +71,25 @@ jobs:
           ./sync_deps.sh
         shell: bash
 
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r19c
+
       - name: Build Third-Party Cache
         if: github.event_name == 'push'
         run: |
           node build_vendor -p ios
           node build_vendor -p android
           node build_vendor -p web
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Build iOS
         if: github.event_name == 'pull_request'
         run: |
           chmod +x build
           node build -p ios
-
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r19c
 
       - name: Build Android
         if: github.event_name == 'pull_request'
