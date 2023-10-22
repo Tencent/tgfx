@@ -43,8 +43,14 @@ jobs:
             third_party
             vendor_tools
             test/baseline/.cache
-          key: third_party-autotest-01-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third_party-autotest-
+          key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-autotest-
+
+      - name: Run depsync
+        run: |
+          chmod +x sync_deps.sh
+          ./sync_deps.sh
+        shell: bash
 
       - name: Check Code Format
         run: |
@@ -52,13 +58,7 @@ jobs:
           ./codeformat.sh
         shell: bash
 
-      - name: Run sync_deps script
-        run: |
-          chmod +x sync_deps.sh
-          ./sync_deps.sh
-        shell: bash
-
-      - name: Build Third-Party cache
+      - name: Update Baseline
         if: github.event_name == 'push'
         run: |
           node build_vendor -p mac
@@ -105,7 +105,7 @@ jobs:
             third_party
             vendor_tools
             test/baseline/.cache
-          key: third_party-autotest-01-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}

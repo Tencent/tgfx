@@ -1,0 +1,274 @@
+name: build
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  build_ios_android_web:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Get Environment Cache
+        id: environment-cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            /usr/local/Cellar/ninja
+            /usr/local/Cellar/icu4c
+            /usr/local/bin/ninja
+            /usr/local/Cellar/node
+            /usr/local/bin/node
+            /usr/local/Cellar/yasm
+            /usr/local/bin/yasm
+            /usr/local/bin/depsync
+            /usr/local/lib/node_modules/depsync
+            /usr/local/Cellar/emsdk
+            /usr/local/Cellar/emsdk/upstream/emscripten
+            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
+            /usr/local/bin/em++
+            /usr/local/bin/em-config
+            /usr/local/bin/emar
+            /usr/local/bin/embuilder
+            /usr/local/bin/emcc
+            /usr/local/bin/emcmake
+            /usr/local/bin/emconfigure
+            /usr/local/bin/emdump
+            /usr/local/bin/emdwp
+            /usr/local/bin/emmake
+            /usr/local/bin/emnm
+            /usr/local/bin/emrun
+            /usr/local/bin/emprofile
+            /usr/local/bin/emscons
+            /usr/local/bin/emsize
+            /usr/local/bin/emstrip
+            /usr/local/bin/emsymbolizer
+            /usr/local/bin/emcc.py
+            /usr/local/bin/emcmake.py
+            /usr/local/bin/emar.py            
+          key: tgfx-environment-macos-20231022
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-macos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-macos-
+
+      - name: Run depsync
+        run: |
+          chmod +x sync_deps.sh
+          ./sync_deps.sh
+        shell: bash
+
+      - name: Build Third-Party Cache
+        if: github.event_name == 'push'
+        run: |
+          node build_vendor -p ios
+          node build_vendor -p android
+          node build_vendor -p web
+
+      - name: Build iOS
+        if: github.event_name == 'pull_request'
+        run: |
+          chmod +x build
+          node build -p ios
+
+      - name: Build Android
+        if: github.event_name == 'pull_request'
+        run: |
+          chmod +x build
+          node build -p android
+
+      - name: Build Web
+        if: github.event_name == 'pull_request'
+        run: |
+          chmod +x build
+          node build -p web
+
+      - name: Save Environment Cache
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            /usr/local/Cellar/ninja
+            /usr/local/Cellar/icu4c
+            /usr/local/bin/ninja
+            /usr/local/Cellar/node
+            /usr/local/bin/node
+            /usr/local/Cellar/yasm
+            /usr/local/bin/yasm
+            /usr/local/bin/depsync
+            /usr/local/lib/node_modules/depsync
+            /usr/local/Cellar/emsdk
+            /usr/local/Cellar/emsdk/upstream/emscripten
+            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
+            /usr/local/bin/em++
+            /usr/local/bin/em-config
+            /usr/local/bin/emar
+            /usr/local/bin/embuilder
+            /usr/local/bin/emcc
+            /usr/local/bin/emcmake
+            /usr/local/bin/emconfigure
+            /usr/local/bin/emdump
+            /usr/local/bin/emdwp
+            /usr/local/bin/emmake
+            /usr/local/bin/emnm
+            /usr/local/bin/emrun
+            /usr/local/bin/emprofile
+            /usr/local/bin/emscons
+            /usr/local/bin/emsize
+            /usr/local/bin/emstrip
+            /usr/local/bin/emsymbolizer
+            /usr/local/bin/emcc.py
+            /usr/local/bin/emcmake.py
+            /usr/local/bin/emar.py
+          key: tgfx-environment-macos-20231022
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-macos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
+
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-windows-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+
+      - name: Build Third-Party Cache
+        if: github.event_name == 'push'
+        run: |
+          node build_vendor -p win
+
+      - name: Build Windows
+        if: github.event_name == 'pull_request'
+        run: |
+          chmod +x build
+          node build -p win
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
+
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-linux-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+        
+      - name: Run depsync
+        run: |
+          chmod +x sync_deps.sh
+          ./sync_deps.sh
+        shell: bash
+
+      - name: Build Third-Party Cache
+        if: github.event_name == 'push'
+        run: |
+          node build_vendor -p linux
+
+      - name: Build Linux
+        if: github.event_name == 'pull_request'
+        run: |
+          chmod +x build
+          node build -p linux
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
