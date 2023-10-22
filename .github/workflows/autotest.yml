@@ -32,6 +32,7 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
+            /usr/local/bin/clang-format
             /usr/local/Cellar/emsdk
             /usr/local/Cellar/emsdk/upstream/emscripten
             /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
@@ -98,7 +99,7 @@ jobs:
         uses: codecov/codecov-action@v2.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: tgfx/result/coverage.xml
+          file: result/coverage.xml
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
