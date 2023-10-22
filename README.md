@@ -3,8 +3,8 @@
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](https://github.com/libpag/tgfx/blob/master/LICENSE.txt)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/libpag/tgfx/pulls)
 [![codecov](https://codecov.io/gh/libpag/tgfx/branch/main/graph/badge.svg)](https://codecov.io/gh/libpag/tgfx)
-[![build](https://github.com/libpag/tgfx/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/libpag/tgfx/actions/workflows/build.yml)
 [![autotest](https://github.com/libpag/tgfx/actions/workflows/autotest.yml/badge.svg?branch=main)](https://github.com/libpag/tgfx/actions/workflows/autotest.yml)
+[![build](https://github.com/libpag/tgfx/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/libpag/tgfx/actions/workflows/build.yml)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/libpag/tgfx)](https://github.com/libpag/tgfx/releases)
 
 ## Introduction
