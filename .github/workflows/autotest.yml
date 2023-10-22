@@ -56,7 +56,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py            
-          key: tgfx-environment-autotest-20221018
+          key: tgfx-environment-autotest-20231023
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -140,7 +140,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: tgfx-environment-autotest-20221018
+          key: tgfx-environment-autotest-20231023
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
