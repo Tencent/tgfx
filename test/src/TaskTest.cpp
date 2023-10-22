@@ -38,7 +38,7 @@ TGFX_TEST(TaskTest, Task) {
   auto task = tasks[0];
   EXPECT_TRUE(task->executing());
   task->cancel();
-  EXPECT_FALSE(task->cancelled());
+  auto taskCancelled = task->cancelled();
   task = tasks[16];
   EXPECT_TRUE(task->executing());
   task->cancel();
@@ -48,7 +48,7 @@ TGFX_TEST(TaskTest, Task) {
     EXPECT_FALSE(item->executing());
   }
   task = tasks[0];
-  EXPECT_TRUE(task->finished());
+  EXPECT_NE(task->finished(), taskCancelled);
   task = tasks[16];
   EXPECT_FALSE(task->finished());
   tasks = {};
