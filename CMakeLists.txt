@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.10)
 project(TGFX)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)

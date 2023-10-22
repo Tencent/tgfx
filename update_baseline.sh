@@ -48,6 +48,11 @@
   ./UpdateBaseline
   cd ..
 
+  if [[ $1 == "1" ]]; then
+    gcovr -r . -f='src/' -f='include/' --html -o ./result/coverage.html
+    gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
+  fi
+
   git switch $CURRENT_BRANCH --quiet
   if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
     git stash pop --index --quiet
