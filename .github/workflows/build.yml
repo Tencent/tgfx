@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build_ios_android_web:
+  ios-android-web:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
@@ -84,11 +84,18 @@ jobs:
           chmod +x build
           node build -p ios
 
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r19c
+
       - name: Build Android
         if: github.event_name == 'pull_request'
         run: |
           chmod +x build
           node build -p android
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Build Web
         if: github.event_name == 'pull_request'
@@ -156,7 +163,7 @@ jobs:
           name: result
           path: result
 
-  build_windows:
+  windows:
     runs-on: windows-latest
     steps:
       - name: Check Out Repo
@@ -214,7 +221,7 @@ jobs:
           name: result
           path: result
 
-  build_linux:
+  linux:
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
@@ -234,7 +241,7 @@ jobs:
           restore-keys: third-party-linux-
 
       - uses: seanmiddleditch/gha-setup-ninja@master
-        
+
       - name: Run depsync
         run: |
           chmod +x sync_deps.sh
