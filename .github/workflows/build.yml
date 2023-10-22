@@ -75,6 +75,7 @@ jobs:
         id: setup-ndk
         with:
           ndk-version: r19c
+          local-cache: true
 
       - name: Build Third-Party Cache
         if: github.event_name == 'push'
