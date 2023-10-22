@@ -80,20 +80,20 @@ jobs:
           ./sync_deps.sh
         shell: bash
 
-      - name: Build Third-Party cache（push）
+      - name: Build Third-Party cache
         if: github.event_name == 'push'
         run: |
           node build_vendor -p mac
           chmod +x update_baseline.sh
           ./update_baseline.sh 1
 
-      - name: Run Autotest (pull_request)
+      - name: Run Autotest
         if: github.event_name == 'pull_request'
         run: |
           chmod +x autotest.sh
           ./autotest.sh
 
-      - name: Update Codecov (push)
+      - name: Update Codecov
         if: github.event_name == 'push'
         uses: codecov/codecov-action@v2.1.0
         with:
@@ -141,7 +141,7 @@ jobs:
             /usr/local/bin/emar.py
           key: tgfx-environment-autotest-20221018
 
-      - name: Save Third-Party Cache (push)
+      - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
         with:

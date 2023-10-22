@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
+#include "base/TGFXTest.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
@@ -236,14 +237,16 @@ static void CreateFolder(const std::string& path) {
 
 void Baseline::TearDown() {
 #ifdef UPDATE_BASELINE
-  CreateFolder(CACHE_MD5_PATH);
-  std::ofstream outMD5File(CACHE_MD5_PATH);
-  outMD5File << std::setw(4) << OutputMD5 << std::endl;
-  outMD5File.close();
-  CreateFolder(CACHE_VERSION_PATH);
-  std::ofstream outVersionFile(CACHE_VERSION_PATH);
-  outVersionFile << std::setw(4) << BaselineVersion << std::endl;
-  outVersionFile.close();
+  if (!TGFXTest::HasFailure()) {
+    CreateFolder(CACHE_MD5_PATH);
+    std::ofstream outMD5File(CACHE_MD5_PATH);
+    outMD5File << std::setw(4) << OutputMD5 << std::endl;
+    outMD5File.close();
+    CreateFolder(CACHE_VERSION_PATH);
+    std::ofstream outVersionFile(CACHE_VERSION_PATH);
+    outVersionFile << std::setw(4) << BaselineVersion << std::endl;
+    outVersionFile.close();
+  }
 #else
   std::filesystem::remove(OUT_MD5_PATH);
   if (!OutputMD5.empty()) {

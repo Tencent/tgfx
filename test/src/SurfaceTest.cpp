@@ -23,7 +23,7 @@
 
 namespace tgfx {
 
-GTEST_TEST(SurfaceTest, ImageSnapshot) {
+TGFX_TEST(SurfaceTest, ImageSnapshot) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);

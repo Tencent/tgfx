@@ -1,7 +1,7 @@
 #!/bin/sh
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
-  if [ -f "$CACHE_VERSION_FILE" ]; then
+  if [[ $1 != "1" ]] && [ -f "$CACHE_VERSION_FILE" ]; then
     HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
     if [[ ${HAS_DIFF} == "" ]]; then
       exit 0
@@ -49,20 +49,29 @@
 
   $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
   ./UpdateBaseline
-  cd ..
 
-  if [[ $1 == "1" ]]; then
-    mkdir result
-    cp -r test/baseline result
-    gcovr -r . -f='src/' -f='include/' --html -o ./result/coverage.html
-    gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
+  if test $? -eq 0; then
+     echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
+  else
+    echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest Failed~~~~~~~~~~~~~~~~~~"
+    COMPLIE_RESULT=false
   fi
+
+  cd ..
 
   git switch $CURRENT_BRANCH --quiet
   if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
     git stash pop --index --quiet
   fi
 
-  echo "~~~~~~~~~~~~~~~~~~~Update Baseline END~~~~~~~~~~~~~~~~~~~~~"
-  exit
+  if [[ $1 == "1" ]]; then
+    mkdir result
+    cp -r test/out result
+    gcovr -r . -f='src/' -f='include/' --html -o ./result/coverage.html
+    gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
+  fi
+
+  if [ "$COMPLIE_RESULT" == false ]; then
+    exit 1
+  fi
 }

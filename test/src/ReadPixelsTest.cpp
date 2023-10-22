@@ -33,7 +33,7 @@ namespace tgfx {
     EXPECT_TRUE(Baseline::Compare(bm, "ReadPixelsTest/" + std::string(key))); \
   }
 
-GTEST_TEST(ReadPixelsTest, PixelMap) {
+TGFX_TEST(ReadPixelsTest, PixelMap) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width();
@@ -155,7 +155,7 @@ GTEST_TEST(ReadPixelsTest, PixelMap) {
   CHECK_PIXELS(BGRAInfo, pixelsB.data(), "PixelMap_alpha_to_BGRA");
 }
 
-GTEST_TEST(ReadPixelsTest, Surface) {
+TGFX_TEST(ReadPixelsTest, Surface) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);
   Bitmap bitmap(codec->width(), codec->height(), false, false);
@@ -260,7 +260,7 @@ GTEST_TEST(ReadPixelsTest, Surface) {
   bitmap.unlockPixels();
 }
 
-GTEST_TEST(ReadPixelsTest, PngCodec) {
+TGFX_TEST(ReadPixelsTest, PngCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 1280);
@@ -321,7 +321,7 @@ GTEST_TEST(ReadPixelsTest, PngCodec) {
   CHECK_PIXELS(RGB565Info, pixels, "PngCodec_Encode_RGB565");
 }
 
-GTEST_TEST(ReadPixelsTest, WebpCodec) {
+TGFX_TEST(ReadPixelsTest, WebpCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.webp");
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 110);
@@ -380,7 +380,7 @@ GTEST_TEST(ReadPixelsTest, WebpCodec) {
   CHECK_PIXELS(RGB565Info, pixels, "WebpCodec_Encode_RGB565");
 }
 
-GTEST_TEST(ReadPixelsTest, JpegCodec) {
+TGFX_TEST(ReadPixelsTest, JpegCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 4032);

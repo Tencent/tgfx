@@ -16,41 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <thread>
-#include "tgfx/utils/Task.h"
-#include "utils/Log.h"
-#include "utils/TestUtils.h"
+#pragma once
+
+#include "gtest/gtest.h"
 
 namespace tgfx {
+class TGFXTest : public testing::Test {
+ public:
+  static bool HasFailure();
 
-TGFX_TEST(TaskTest, Task) {
-  std::vector<std::shared_ptr<Task>> tasks = {};
-  for (int i = 0; i < 17; i++) {
-    auto task = Task::Run([=] {
-      LOGI("Task %d is executing...", i);
-      std::this_thread::sleep_for(std::chrono::milliseconds(20));
-      LOGI("Task %d is finished", i);
-    });
-    tasks.push_back(task);
-  }
-  // Wait a little moment for the tasks to be executed.
-  std::this_thread::yield();
-  auto task = tasks[0];
-  EXPECT_TRUE(task->executing());
-  task->cancel();
-  EXPECT_FALSE(task->cancelled());
-  task = tasks[16];
-  EXPECT_TRUE(task->executing());
-  task->cancel();
-  EXPECT_TRUE(task->cancelled());
-  for (auto& item : tasks) {
-    item->wait();
-    EXPECT_FALSE(item->executing());
-  }
-  task = tasks[0];
-  EXPECT_TRUE(task->finished());
-  task = tasks[16];
-  EXPECT_FALSE(task->finished());
-  tasks = {};
-}
+  void SetUp() override;
+
+  void TearDown() override;
+};
+
+#define TGFX_TEST(test_case_name, test_name)             \
+  GTEST_TEST_(test_case_name, test_name, tgfx::TGFXTest, \
+              ::testing::internal::GetTypeId<tgfx::TGFXTest>())
 }  // namespace tgfx

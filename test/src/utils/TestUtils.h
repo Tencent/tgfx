@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "base/TGFXTest.h"
 #include "core/PixelBuffer.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Image.h"

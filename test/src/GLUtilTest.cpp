@@ -71,7 +71,7 @@ void glGetShaderPrecisionFormatMock(unsigned, unsigned, int* range, int* precisi
   *precision = 32;
 }
 
-GTEST_TEST(GLUtilTest, Version) {
+TGFX_TEST(GLUtilTest, Version) {
   auto glVersion = GetGLVersion(nullptr);
   EXPECT_EQ(glVersion.majorVersion, -1);
   EXPECT_EQ(glVersion.minorVersion, -1);
@@ -95,7 +95,7 @@ GTEST_TEST(GLUtilTest, Version) {
   EXPECT_EQ(glVersion.minorVersion, 0);
 }
 
-GTEST_TEST(GLUtilTest, Caps) {
+TGFX_TEST(GLUtilTest, Caps) {
   {
     GLInfo info(glGetStringMock, nullptr, getIntegervMock, glGetInternalformativMock,
                 glGetShaderPrecisionFormatMock);

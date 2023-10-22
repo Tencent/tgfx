@@ -24,7 +24,7 @@
 #include "vectors/freetype/FTMask.h"
 
 namespace tgfx {
-GTEST_TEST(MaskTest, Rasterize) {
+TGFX_TEST(MaskTest, Rasterize) {
   Path path = {};
   path.addRect(100, 100, 400, 400);
   path.addRoundRect(Rect::MakeLTRB(150, 150, 350, 350), 30, 20, true);
