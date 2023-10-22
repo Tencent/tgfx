@@ -74,6 +74,11 @@ jobs:
             test/baseline/.cache
           key: third_party-autotest-01-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third_party-autotest-
+      - name: Run codeformat script
+        run: |
+          chmod +x codeformat.sh
+          ./codeformat.sh
+        shell: bash
       - name: Run sync_deps script
         run: |
           chmod +x sync_deps.sh
