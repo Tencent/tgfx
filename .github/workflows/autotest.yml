@@ -17,6 +17,7 @@ jobs:
           lfs: true
 
       - name: Get Environment Cache
+        id: environment-cache
         uses: actions/cache/restore@v3
         with:
           path: |
@@ -57,6 +58,7 @@ jobs:
           key: tgfx-environment-autotest-20221018
 
       - name: Get Third-Party Cache
+        id: third-party-cache
         uses: actions/cache/restore@v3
         with:
           path: |
@@ -82,13 +84,8 @@ jobs:
         if: github.event_name == 'push'
         run: |
           node build_vendor -p mac
-          if [ ! $(which gcovr) ]; then
-            brew install gcovr
-          fi
           chmod +x update_baseline.sh
           ./update_baseline.sh 1
-          mkdir result
-          cp -r test/baseline result
 
       - name: Run Autotest (pull_request)
         if: github.event_name == 'pull_request'
@@ -104,7 +101,7 @@ jobs:
           file: tgfx/result/coverage.xml
 
       - name: Save Environment Cache
-        if: github.event_name == 'push'
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
         with:
           path: |
@@ -145,7 +142,7 @@ jobs:
           key: tgfx-environment-autotest-20221018
 
       - name: Save Third-Party Cache (push)
-        if: github.event_name == 'push'
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
         with:
           path: |

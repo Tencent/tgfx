@@ -16,6 +16,9 @@
 
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
+    if [ ! $(which gcovr) ]; then
+        brew install gcovr
+    fi
   else
     BUILD_DIR=cmake-build-debug
   fi
@@ -50,6 +53,7 @@
 
   if [[ $1 == "1" ]]; then
     mkdir result
+    cp -r test/baseline result
     gcovr -r . -f='src/' -f='include/' --html -o ./result/coverage.html
     gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
   fi
