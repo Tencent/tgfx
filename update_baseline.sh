@@ -44,8 +44,8 @@
     $CMAKE_COMMAND -DCMAKE_BUILD_TYPE=Debug ../
   fi
 
-  $CMAKE_COMMAND --build . --target TGFXBaseline -- -j 12
-  ./TGFXBaseline
+  $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
+  ./UpdateBaseline
   cd ..
 
   git switch $CURRENT_BRANCH --quiet

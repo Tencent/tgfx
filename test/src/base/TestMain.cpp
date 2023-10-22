@@ -16,18 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterYUVBuffer.h"
+#include "TestEnvironment.h"
 
-namespace tgfx {
-RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
-                                 YUVColorSpace colorSpace)
-    : data(std::move(data)), colorSpace(colorSpace), format(format) {
+int main(int argc, char** argv) {
+  printf("Running main() from %s\n", __FILE__);
+  AddGlobalTestEnvironment(new tgfx::TestEnvironment());
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
-
-std::shared_ptr<Texture> RasterYUVBuffer::onMakeTexture(Context* context, bool) const {
-  if (format == YUVPixelFormat::NV12) {
-    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
-  }
-  return YUVTexture::MakeI420(context, data.get(), colorSpace);
-}
-}  // namespace tgfx

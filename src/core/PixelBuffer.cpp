@@ -97,7 +97,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (tryHardware) {
     auto hardwareBuffer = HardwareBufferAllocate(width, height, alphaOnly);
     auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
-    tgfx::HardwareBufferRelease(hardwareBuffer);
+    HardwareBufferRelease(hardwareBuffer);
     if (pixelBuffer != nullptr) {
       return pixelBuffer;
     }
@@ -119,7 +119,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuf
   return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
 }
 
-PixelBuffer::PixelBuffer(const tgfx::ImageInfo& info) : _info(info) {
+PixelBuffer::PixelBuffer(const ImageInfo& info) : _info(info) {
 }
 
 void* PixelBuffer::lockPixels() {

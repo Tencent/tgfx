@@ -45,8 +45,7 @@ class RasterYUVBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context,
-                                               bool mipMapped) const override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
 
  private:
   std::shared_ptr<YUVData> data = nullptr;

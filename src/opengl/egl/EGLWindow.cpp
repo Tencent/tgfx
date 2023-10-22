@@ -72,10 +72,10 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
 
-  tgfx::GLFrameBufferInfo frameBuffer = {};
+  GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  tgfx::BackendRenderTarget renderTarget = {frameBuffer, width, height};
+  BackendRenderTarget renderTarget = {frameBuffer, width, height};
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

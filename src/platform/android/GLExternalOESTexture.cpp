@@ -27,10 +27,10 @@ std::shared_ptr<GLExternalOESTexture> GLExternalOESTexture::Make(Context* contex
   if (context == nullptr || width < 1 || height < 1) {
     return nullptr;
   }
-  auto gl = tgfx::GLFunctions::Get(context);
+  auto gl = GLFunctions::Get(context);
   auto sampler = std::make_unique<GLSampler>();
   sampler->target = GL_TEXTURE_EXTERNAL_OES;
-  sampler->format = tgfx::PixelFormat::RGBA_8888;
+  sampler->format = PixelFormat::RGBA_8888;
   gl->genTextures(1, &sampler->id);
   if (sampler->id == 0) {
     return nullptr;

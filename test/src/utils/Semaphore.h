@@ -16,18 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterYUVBuffer.h"
+#pragma once
+
+#include <mutex>
 
 namespace tgfx {
-RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
-                                 YUVColorSpace colorSpace)
-    : data(std::move(data)), colorSpace(colorSpace), format(format) {
-}
-
-std::shared_ptr<Texture> RasterYUVBuffer::onMakeTexture(Context* context, bool) const {
-  if (format == YUVPixelFormat::NV12) {
-    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
+class Semaphore {
+ public:
+  explicit Semaphore(int count) : count(count) {
   }
-  return YUVTexture::MakeI420(context, data.get(), colorSpace);
-}
+
+  void signal();
+
+  void wait();
+
+ private:
+  int count = 0;
+  std::mutex locker = {};
+  std::condition_variable condition = {};
+};
 }  // namespace tgfx

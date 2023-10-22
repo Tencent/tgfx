@@ -16,18 +16,44 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterYUVBuffer.h"
+#pragma once
+
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
-                                 YUVColorSpace colorSpace)
-    : data(std::move(data)), colorSpace(colorSpace), format(format) {
-}
+class PositionedGlyphs {
+ public:
+  PositionedGlyphs() = default;
 
-std::shared_ptr<Texture> RasterYUVBuffer::onMakeTexture(Context* context, bool) const {
-  if (format == YUVPixelFormat::NV12) {
-    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
+  explicit PositionedGlyphs(
+      std::vector<std::tuple<std::shared_ptr<Typeface>, GlyphID, uint32_t>> glyphs)
+      : glyphs(std::move(glyphs)) {
   }
-  return YUVTexture::MakeI420(context, data.get(), colorSpace);
-}
+
+  std::shared_ptr<Typeface> getTypeface(size_t atIndex) const {
+    return std::get<0>(glyphs[atIndex]);
+  }
+
+  GlyphID getGlyphID(size_t atIndex) const {
+    return std::get<1>(glyphs[atIndex]);
+  }
+
+  uint32_t getStringIndex(size_t atIndex) const {
+    return std::get<2>(glyphs[atIndex]);
+  }
+
+  size_t glyphCount() const {
+    return glyphs.size();
+  }
+
+ private:
+  std::vector<std::tuple<std::shared_ptr<Typeface>, GlyphID, uint32_t>> glyphs;
+};
+
+class TextShaper {
+ public:
+  static PositionedGlyphs Shape(const std::string& text, std::shared_ptr<Typeface> typeface);
+
+  static void PurgeCaches();
+};
 }  // namespace tgfx

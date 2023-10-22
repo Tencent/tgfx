@@ -16,18 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterYUVBuffer.h"
+#pragma once
+
+#include "core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
-RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
-                                 YUVColorSpace colorSpace)
-    : data(std::move(data)), colorSpace(colorSpace), format(format) {
-}
+class Baseline {
+ public:
+  static bool Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key);
 
-std::shared_ptr<Texture> RasterYUVBuffer::onMakeTexture(Context* context, bool) const {
-  if (format == YUVPixelFormat::NV12) {
-    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
-  }
-  return YUVTexture::MakeI420(context, data.get(), colorSpace);
-}
+  static bool Compare(std::shared_ptr<Surface> surface, const std::string& key);
+
+  static bool Compare(const Bitmap& bitmap, const std::string& key);
+
+  static bool Compare(const Pixmap& pixmap, const std::string& key);
+
+  static bool Compare(std::shared_ptr<Data> data, const std::string& key);
+
+ private:
+  static void SetUp();
+
+  static void TearDown();
+
+  friend class TestEnvironment;
+};
 }  // namespace tgfx

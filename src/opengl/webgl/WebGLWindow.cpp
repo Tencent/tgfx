@@ -45,7 +45,7 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
     LOGE("WebGLWindow::onCreateSurface() Can not create a Surface with zero size.");
     return nullptr;
   }
-  tgfx::GLFrameBufferInfo glInfo = {};
+  GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
   return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft);

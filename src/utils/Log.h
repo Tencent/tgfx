@@ -22,10 +22,10 @@
 #include "tgfx/platform/Print.h"
 
 namespace tgfx {
-#define ABORT(msg)                                                              \
-  do {                                                                          \
-    tgfx::PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
-    ::abort();                                                                  \
+#define ABORT(msg)                                                        \
+  do {                                                                    \
+    PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
+    ::abort();                                                            \
   } while (false)
 
 #ifdef NO_LOG
@@ -36,8 +36,8 @@ namespace tgfx {
 
 #else
 
-#define LOGI(...) tgfx::PrintLog(__VA_ARGS__)
-#define LOGE(...) tgfx::PrintError(__VA_ARGS__)
+#define LOGI(...) PrintLog(__VA_ARGS__)
+#define LOGE(...) PrintError(__VA_ARGS__)
 #define ASSERT(assertion) \
   if (!(assertion)) {     \
     ABORT(#assertion);    \

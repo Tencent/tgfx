@@ -16,18 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterYUVBuffer.h"
+#pragma once
+#include <string>
 
 namespace tgfx {
-RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
-                                 YUVColorSpace colorSpace)
-    : data(std::move(data)), colorSpace(colorSpace), format(format) {
-}
+class ProjectPath {
+ public:
+  static std::string Absolute(const std::string& relativePath);
+};
 
-std::shared_ptr<Texture> RasterYUVBuffer::onMakeTexture(Context* context, bool) const {
-  if (format == YUVPixelFormat::NV12) {
-    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
-  }
-  return YUVTexture::MakeI420(context, data.get(), colorSpace);
-}
 }  // namespace tgfx

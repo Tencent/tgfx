@@ -16,18 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterYUVBuffer.h"
+#pragma once
+
+#include "core/PixelBuffer.h"
+#include "gtest/gtest.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Pixmap.h"
+#include "tgfx/utils/Clock.h"
+#include "utils/Baseline.h"
+#include "utils/ProjectPath.h"
 
 namespace tgfx {
-RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
-                                 YUVColorSpace colorSpace)
-    : data(std::move(data)), colorSpace(colorSpace), format(format) {
-}
 
-std::shared_ptr<Texture> RasterYUVBuffer::onMakeTexture(Context* context, bool) const {
-  if (format == YUVPixelFormat::NV12) {
-    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
-  }
-  return YUVTexture::MakeI420(context, data.get(), colorSpace);
-}
+bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture);
+
+std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);
+
+std::shared_ptr<Image> MakeImage(const std::string& path);
+
+std::shared_ptr<Data> ReadFile(const std::string& path);
+
+void SaveFile(std::shared_ptr<Data> data, const std::string& key);
+
+void SaveImage(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key);
+
+void SaveImage(const Bitmap& bitmap, const std::string& key);
+
+void SaveImage(const Pixmap& pixmap, const std::string& key);
+
+void RemoveImage(const std::string& key);
 }  // namespace tgfx

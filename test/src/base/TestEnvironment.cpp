@@ -16,18 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterYUVBuffer.h"
+#include "TestEnvironment.h"
+#include "utils/Baseline.h"
 
 namespace tgfx {
-RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
-                                 YUVColorSpace colorSpace)
-    : data(std::move(data)), colorSpace(colorSpace), format(format) {
+void TestEnvironment::SetUp() {
+  Baseline::SetUp();
 }
 
-std::shared_ptr<Texture> RasterYUVBuffer::onMakeTexture(Context* context, bool) const {
-  if (format == YUVPixelFormat::NV12) {
-    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
-  }
-  return YUVTexture::MakeI420(context, data.get(), colorSpace);
+void TestEnvironment::TearDown() {
+  Baseline::TearDown();
 }
+
 }  // namespace tgfx

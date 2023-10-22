@@ -51,6 +51,11 @@
         "dir": "third_party/freetype"
       },
       {
+        "url": "https://github.com/harfbuzz/harfbuzz.git",
+        "commit": "f1f2be776bcd994fa9262622e1a7098a066e5cf7",
+        "dir": "third_party/harfbuzz"
+      },
+      {
         "url": "https://github.com/google/googletest.git",
         "commit": "e2239ee6043f73722e7aa812a459f54a28552929",
         "dir": "third_party/googletest"

@@ -401,8 +401,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
   if (image == nullptr) {
     return;
   }
-  auto mipMapMode = image->hasMipmaps() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, mipMapMode);
+  auto mipMapMode = image->hasMipmaps() ? MipMapMode::Linear : MipMapMode::None;
+  SamplingOptions sampling(FilterMode::Linear, mipMapMode);
   drawImage(std::move(image), sampling, paint);
 }
 

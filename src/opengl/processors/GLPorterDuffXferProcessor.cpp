@@ -24,7 +24,7 @@ std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlendMode
   return std::unique_ptr<PorterDuffXferProcessor>(new GLPorterDuffXferProcessor(blend));
 }
 
-GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(tgfx::BlendMode blend)
+GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(BlendMode blend)
     : PorterDuffXferProcessor(blend) {
 }
 

@@ -53,7 +53,7 @@ UniformBuffer::UniformBuffer(std::vector<Uniform> uniformList) : uniforms(std::m
   }
 }
 
-void UniformBuffer::setData(const std::string& name, const tgfx::Matrix& matrix) {
+void UniformBuffer::setData(const std::string& name, const Matrix& matrix) {
   float values[6];
   matrix.get6(values);
   float data[] = {values[0], values[3], 0, values[1], values[4], 0, values[2], values[5], 1};

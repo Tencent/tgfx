@@ -32,7 +32,7 @@ class GLExternalOESTexture : public Texture {
     return sampler.get();
   }
 
-  tgfx::Point getTextureCoord(float x, float y) const override;
+  Point getTextureCoord(float x, float y) const override;
 
   BackendTexture getBackendTexture() const override;
 

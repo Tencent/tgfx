@@ -29,8 +29,8 @@ std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(
 
 GLClampedGradientEffect::GLClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                                                  std::unique_ptr<FragmentProcessor> gradLayout,
-                                                 tgfx::Color leftBorderColor,
-                                                 tgfx::Color rightBorderColor, bool makePremultiply)
+                                                 Color leftBorderColor, Color rightBorderColor,
+                                                 bool makePremultiply)
     : ClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
                             rightBorderColor, makePremultiply) {
 }

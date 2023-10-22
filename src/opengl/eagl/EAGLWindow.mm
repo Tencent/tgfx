@@ -27,7 +27,7 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
     return nullptr;
   }
   if (device == nullptr) {
-    device = tgfx::GLDevice::MakeWithFallback();
+    device = GLDevice::MakeWithFallback();
   }
   if (device == nullptr) {
     return nullptr;

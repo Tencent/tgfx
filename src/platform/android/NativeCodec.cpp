@@ -280,7 +280,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     LOGE("NativeCodec::readPixels() Failed to lockPixels() of a Java Bitmap!");
     return false;
   }
-  auto result = tgfx::Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
+  auto result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
   AndroidBitmap_unlockPixels(env, bitmap);
   return result;
 }

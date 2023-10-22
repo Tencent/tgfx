@@ -60,7 +60,7 @@ class EmptyTypeface : public Typeface {
     return nullptr;
   }
 
-  std::shared_ptr<Data> copyTableData(tgfx::FontTableTag) const override {
+  std::shared_ptr<Data> copyTableData(FontTableTag) const override {
     return nullptr;
   }
 
@@ -157,12 +157,12 @@ GlyphID FTTypeface::getGlyphID(const std::string& name) const {
   if (name.empty()) {
     return 0;
   }
-  auto count = tgfx::UTF::CountUTF8(name.c_str(), name.size());
+  auto count = UTF::CountUTF8(name.c_str(), name.size());
   if (count > 1 || count <= 0) {
     return 0;
   }
   const char* start = &(name[0]);
-  auto unichar = tgfx::UTF::NextUTF8(&start, start + name.size());
+  auto unichar = UTF::NextUTF8(&start, start + name.size());
   return FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(unichar));
 }
 

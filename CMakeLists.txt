@@ -26,6 +26,16 @@ elseif (NOT ANDROID)
     option(TGFX_USE_WEBP_ENCODE "Enable embedded WEBP encoding support" ON)
 endif ()
 
+get_directory_property(HasParent PARENT_DIRECTORY)
+if (MACOS AND NOT HasParent)
+    # CLion project needs test targets.
+    option(TGFX_BUILD_TESTS "Build tgfx tests" ON)
+endif ()
+
+if (TGFX_BUILD_TESTS)
+    set(TGFX_USE_FREETYPE ON)
+endif ()
+
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
 message("TGFX_USE_QT: ${TGFX_USE_QT}")
 message("TGFX_USE_SWIFTSHADER: ${TGFX_USE_SWIFTSHADER}")
@@ -36,6 +46,7 @@ message("TGFX_USE_JPEG_DECODE: ${TGFX_USE_JPEG_DECODE}")
 message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
+message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -342,3 +353,53 @@ add_library(tgfx STATIC ${TGFX_VENDOR_TARGET} ${PLATFORM_VENDOR_TARGETS} ${TGFX_
 target_include_directories(tgfx PUBLIC include PRIVATE ${TGFX_INCLUDES} ${GPU_PLATFORM_INCLUDES})
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_PLATFORM_SHARED_LIBS} ${GPU_PLATFORM_SHARED_LIBS})
+
+if (TGFX_BUILD_TESTS)
+    execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/HEAD "${HEAD_COMMIT}")
+    set(CacheVersionFile ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/version.json)
+    if (EXISTS ${CacheVersionFile})
+        execute_process(COMMAND git diff -G. --name-only origin/main:test/baseline/version.json ${CacheVersionFile} OUTPUT_VARIABLE HAS_DIFF)
+    else ()
+        set(HAS_DIFF ON)
+    endif ()
+    if (HAS_DIFF)
+        message(WARNING "The local md5 cache is out of date! Please run the 'update_baseline.sh' to regenerate the cache.")
+    endif ()
+
+    file(GLOB_RECURSE TGFX_TEST_FILES test/src/*.*)
+    list(APPEND TEST_PLATFORM_LIBS tgfx ${TGFX_PLATFORM_SHARED_LIBS})
+    list(APPEND TEST_INCLUDES ${TGFX_INCLUDES} test/src third_party/json/include)
+
+    add_vendor_target(TEST STATIC_VENDORS harfbuzz googletest)
+    list(APPEND TEST_PLATFORM_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
+    list(APPEND TEST_INCLUDES
+            third_party/harfbuzz/src
+            third_party/googletest/googletest
+            third_party/googletest/googletest/include)
+
+    # used to update the local md5 data for baseline testing.
+    add_executable(UpdateBaseline ${TEST_VENDOR_TARGET} ${TGFX_TEST_FILES})
+    target_include_directories(UpdateBaseline PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(UpdateBaseline PUBLIC UPDATE_BASELINE)
+    target_link_libraries(UpdateBaseline ${TEST_PLATFORM_LIBS})
+    set_target_properties(UpdateBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+
+    # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
+    add_executable(GenerateImages ${TEST_VENDOR_TARGET} ${TGFX_TEST_FILES})
+    target_include_directories(GenerateImages PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(GenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
+    target_link_libraries(GenerateImages ${TEST_PLATFORM_LIBS})
+    set_target_properties(GenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+
+    add_executable(TGFXUnitTest ${TEST_VENDOR_TARGET} ${TGFX_TEST_FILES})
+    target_include_directories(TGFXUnitTest PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(TGFXUnitTest PUBLIC SKIP_FRAME_COMPARE)
+    target_link_libraries(TGFXUnitTest ${TEST_PLATFORM_LIBS})
+    set_target_properties(TGFXUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+
+    add_executable(TGFXFullTest ${TEST_VENDOR_TARGET} ${TGFX_TEST_FILES})
+    target_include_directories(TGFXFullTest PUBLIC ${TEST_INCLUDES})
+    target_link_libraries(TGFXFullTest ${TEST_PLATFORM_LIBS})
+    set_target_properties(TGFXFullTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+endif ()

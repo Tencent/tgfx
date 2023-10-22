@@ -236,11 +236,11 @@ void EAGLDevice::finish() {
 
 @implementation TGFXAppMonitor
 + (void)applicationWillResignActive:(NSNotification*)notification {
-  tgfx::ApplicationWillResignActive();
+  ApplicationWillResignActive();
 }
 
 + (void)applicationDidBecomeActive:(NSNotification*)notification {
-  tgfx::ApplicationDidBecomeActive();
+  ApplicationDidBecomeActive();
 }
 @end
 
