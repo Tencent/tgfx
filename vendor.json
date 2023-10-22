@@ -146,18 +146,6 @@
       }
     },
     {
-      "name": "swiftshader",
-      "cmake": {
-        "targets": [
-          "libEGL",
-          "libGLESv2"
-        ],
-        "platforms": [
-          "linux"
-        ]
-      }
-    },
-    {
       "name": "googletest",
       "cmake": {
         "targets": [

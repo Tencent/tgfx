@@ -21,11 +21,6 @@
         "dir": "third_party/skcms"
       },
       {
-        "url": "${PAG_GROUP}/swiftshader.git",
-        "commit": "040ee43bfeba9b6b532dbd8222df737aac2d55b1",
-        "dir": "third_party/swiftshader"
-      },
-      {
         "url": "https://github.com/madler/zlib.git",
         "commit": "cacf7f1d4e3d44d871b605da3b647f07d718623f",
         "dir": "third_party/zlib"
