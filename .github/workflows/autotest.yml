@@ -32,8 +32,7 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-            /usr/local/bin/clang-format
-          key: tgfx-environment-autotest-20231022
+          key: tgfx-environment-autotest-20231023
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -61,7 +60,6 @@ jobs:
       - name: Update Baseline
         if: github.event_name == 'push'
         run: |
-          node build_vendor -p mac
           chmod +x update_baseline.sh
           ./update_baseline.sh 1
 
@@ -94,8 +92,7 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-            /usr/local/bin/clang-format
-          key: tgfx-environment-autotest-20231022
+          key: tgfx-environment-autotest-20231023
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

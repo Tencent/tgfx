@@ -28,13 +28,15 @@ endif ()
 
 string(FIND ${CMAKE_COMMAND} "/CLion.app/" CLionPosition)
 get_directory_property(HasParent PARENT_DIRECTORY)
-if (CLionPosition GREATER -1 AND NOT HasParent)
+if (MACOS AND CLionPosition GREATER -1 AND NOT HasParent)
     # CLion project needs test targets.
     option(TGFX_BUILD_TESTS "Build tgfx tests" ON)
 endif ()
 
 if (TGFX_BUILD_TESTS)
     set(TGFX_USE_FREETYPE ON)
+else ()
+    set(TGFX_BUILD_TESTS OFF)
 endif ()
 
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
@@ -345,7 +347,6 @@ add_vendor_target(TGFX STATIC_VENDORS ${TGFX_STATIC_VENDORS} SHARED_VENDORS ${TG
 list(APPEND TGFX_PLATFORM_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})
 list(APPEND TGFX_PLATFORM_SHARED_LIBS ${TGFX_VENDOR_SHARED_LIBRARIES})
 
-get_directory_property(HasParent PARENT_DIRECTORY)
 if (HasParent)
     set(TGFX_PLATFORM_STATIC_LIBS ${TGFX_PLATFORM_STATIC_LIBS} PARENT_SCOPE)
 endif ()
