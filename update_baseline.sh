@@ -14,6 +14,8 @@
   STASH_LIST_AFTER=$(git stash list)
   git switch main --quiet
 
+  depsync
+
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
   else
