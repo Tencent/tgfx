@@ -51,6 +51,13 @@ class Device {
    */
   void unlock();
 
+  /**
+   * Returns the native context of the device.
+   */
+  virtual void* getNativeContext() const {
+    return nullptr;
+  }
+
  protected:
   std::mutex locker = {};
   Context* context = nullptr;

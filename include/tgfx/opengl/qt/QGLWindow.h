@@ -64,8 +64,6 @@ class QGLWindow : public DoubleBufferedWindow {
   bool textureInvalid = true;
   QQuickItem* quickItem = nullptr;
   QSGTexture* outTexture = nullptr;
-  std::shared_ptr<Texture> frontTexture = nullptr;
-  std::shared_ptr<Texture> backTexture = nullptr;
 
   QGLWindow(std::shared_ptr<Device> device, QQuickItem* quickItem);
   void invalidateTexture();

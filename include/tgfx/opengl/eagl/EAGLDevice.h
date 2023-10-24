@@ -33,6 +33,10 @@ class EAGLDevice : public GLDevice {
 
   bool sharableWith(void* nativeHandle) const override;
 
+  void* getNativeContext() const override {
+    return eaglContext();
+  }
+
   EAGLContext* eaglContext() const;
 
   CVOpenGLESTextureCacheRef getTextureCache();

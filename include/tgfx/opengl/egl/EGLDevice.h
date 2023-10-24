@@ -43,6 +43,10 @@ class EGLDevice : public GLDevice {
 
   bool sharableWith(void* nativeHandle) const override;
 
+  void* getNativeContext() const override {
+    return eglContext;
+  }
+
  protected:
   bool onMakeCurrent() override;
   void onClearCurrent() override;

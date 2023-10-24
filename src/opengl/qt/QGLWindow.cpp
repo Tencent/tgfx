@@ -44,8 +44,6 @@ QGLWindow::QGLWindow(std::shared_ptr<Device> device, QQuickItem* quickItem)
 }
 
 QGLWindow::~QGLWindow() {
-  frontTexture = nullptr;
-  backTexture = nullptr;
   delete outTexture;
 }
 
@@ -60,13 +58,15 @@ QSGTexture* QGLWindow::getTexture() {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
-  if (textureInvalid && frontTexture) {
+  if (textureInvalid && frontSurface && backSurface) {
     textureInvalid = false;
     if (outTexture) {
       delete outTexture;
       outTexture = nullptr;
     }
-    auto textureID = static_cast<const GLSampler*>(frontTexture->getSampler())->id;
+    GLTextureInfo frontTextureInfo;
+    frontSurface->getBackendTexture().getGLTextureInfo(&frontTextureInfo);
+    auto textureID = frontTextureInfo.id;
     auto width = static_cast<int>(ceil(quickItem->width()));
     auto height = static_cast<int>(ceil(quickItem->height()));
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -91,8 +91,6 @@ void QGLWindow::invalidateTexture() {
 }
 
 std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
-  frontTexture = nullptr;
-  backTexture = nullptr;
   auto nativeWindow = quickItem->window();
   auto pixelRatio = nativeWindow ? nativeWindow->devicePixelRatio() : 1.0f;
   auto width = static_cast<int>(ceil(quickItem->width() * pixelRatio));
@@ -100,15 +98,15 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  frontTexture = Texture::MakeRGBA(context, width, height);
-  backTexture = Texture::MakeRGBA(context, width, height);
-  frontSurface = Surface::MakeFrom(frontTexture);
-  backSurface = Surface::MakeFrom(backTexture);
+  frontSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
+  backSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
+  if (frontSurface == nullptr || backSurface == nullptr) {
+    return nullptr;
+  }
   return backSurface;
 }
 
 void QGLWindow::onSwapSurfaces(Context*) {
-  std::swap(frontTexture, backTexture);
   invalidateTexture();
 }
 }  // namespace tgfx

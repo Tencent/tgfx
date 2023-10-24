@@ -39,6 +39,10 @@ class CGLHardwareTexture : public Texture {
     return sampler.get();
   }
 
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
+  }
+
  protected:
   void computeScratchKey(BytesKey* scratchKey) const override;
 
