@@ -1,7 +1,7 @@
 #!/bin/sh
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
-  if [[ $1 != "1" ]] && [ -f "$CACHE_VERSION_FILE" ]; then
+  if [ -f "$CACHE_VERSION_FILE" ]; then
     HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
     if [[ ${HAS_DIFF} == "" ]]; then
       exit 0
@@ -16,9 +16,6 @@
 
   if [[ $1 == "1" ]]; then
     BUILD_DIR=build
-    if [ ! $(which gcovr) ]; then
-        brew install gcovr
-    fi
   else
     BUILD_DIR=cmake-build-debug
   fi
@@ -53,7 +50,7 @@
   if test $? -eq 0; then
      echo "~~~~~~~~~~~~~~~~~~~Update Baseline Success~~~~~~~~~~~~~~~~~~~~~"
   else
-    echo "~~~~~~~~~~~~~~~~~~~TGFXFullTest Failed~~~~~~~~~~~~~~~~~~"
+    echo "~~~~~~~~~~~~~~~~~~~Update Baseline Failed~~~~~~~~~~~~~~~~~~"
     COMPLIE_RESULT=false
   fi
 
@@ -62,11 +59,6 @@
   git switch $CURRENT_BRANCH --quiet
   if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
     git stash pop --index --quiet
-  fi
-
-  if [[ $1 == "1" ]]; then
-    mkdir -p result
-    gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
   fi
 
   if [ "$COMPLIE_RESULT" == false ]; then

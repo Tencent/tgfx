@@ -78,20 +78,17 @@ jobs:
           ./codeformat.sh
         shell: bash
 
-      - name: Update Baseline
-        if: github.event_name == 'push'
-        run: |
-          chmod +x update_baseline.sh
-          ./update_baseline.sh 1
-
       - name: Run Autotest
-        if: github.event_name == 'pull_request'
         run: |
           chmod +x autotest.sh
           ./autotest.sh
 
-      - name: Update Codecov
-        if: github.event_name == 'push'
+      - name: Run Codecov
+        run: |
+          chmod +x codecov.sh
+          ./codecov.sh
+
+      - name: Upload Codecov
         uses: codecov/codecov-action@v2.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
