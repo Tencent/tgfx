@@ -28,13 +28,15 @@ endif ()
 
 string(FIND ${CMAKE_COMMAND} "/CLion.app/" CLionPosition)
 get_directory_property(HasParent PARENT_DIRECTORY)
-if (CLionPosition GREATER -1 AND NOT HasParent)
+if (MACOS AND CLionPosition GREATER -1 AND NOT HasParent)
     # CLion project needs test targets.
     option(TGFX_BUILD_TESTS "Build tgfx tests" ON)
 endif ()
 
 if (TGFX_BUILD_TESTS)
     set(TGFX_USE_FREETYPE ON)
+else ()
+    set(TGFX_BUILD_TESTS OFF)
 endif ()
 
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")

@@ -230,7 +230,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -p linux
+          node build_tgfx -DTGFX_USE_SWIFTSHADER=ON -p linux
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
