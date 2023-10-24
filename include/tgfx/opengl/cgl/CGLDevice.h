@@ -33,10 +33,6 @@ class CGLDevice : public GLDevice {
 
   bool sharableWith(void* nativeHandle) const override;
 
-  void* getNativeContext() const override {
-    return cglContext();
-  }
-
   CGLContextObj cglContext() const;
 
  protected:

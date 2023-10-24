@@ -33,10 +33,6 @@ class WebGLDevice : public GLDevice {
 
   bool sharableWith(void* nativeHandle) const override;
 
-  void* getNativeContext() const override {
-    return context;
-  }
-
  protected:
   bool onMakeCurrent() override;
   void onClearCurrent() override;

@@ -53,10 +53,6 @@ class QGLDevice : public GLDevice {
 
   bool sharableWith(void* nativeHandle) const override;
 
-  void* getNativeContext() const override {
-    return glContext();
-  }
-
   /**
    * Returns the native OpenGL context.
    */
