@@ -24,12 +24,12 @@ jobs:
             /usr/local/Cellar/ninja
             /usr/local/Cellar/icu4c
             /usr/local/bin/ninja
-            /usr/local/Cellar/node
-            /usr/local/bin/node
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
+            /usr/local/Cellar/gcovr
+            /usr/local/bin/gcovr
             /usr/local/Cellar/emsdk
             /usr/local/Cellar/emsdk/upstream/emscripten
             /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
@@ -52,8 +52,8 @@ jobs:
             /usr/local/bin/emsymbolizer
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
-            /usr/local/bin/emar.py            
-          key: tgfx-environment-macos-20231022
+            /usr/local/bin/emar.py
+          key: tgfx-environment-macos-20231024
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -99,12 +99,12 @@ jobs:
             /usr/local/Cellar/ninja
             /usr/local/Cellar/icu4c
             /usr/local/bin/ninja
-            /usr/local/Cellar/node
-            /usr/local/bin/node
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
+            /usr/local/Cellar/gcovr
+            /usr/local/bin/gcovr
             /usr/local/Cellar/emsdk
             /usr/local/Cellar/emsdk/upstream/emscripten
             /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
@@ -128,7 +128,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: tgfx-environment-macos-20231022
+          key: tgfx-environment-macos-20231024
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
