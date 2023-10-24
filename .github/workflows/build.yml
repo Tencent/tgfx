@@ -53,6 +53,7 @@ jobs:
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
           key: tgfx-environment-macos-20231024
+          restore-keys: tgfx-environment-macos-
 
       - name: Get Third-Party Cache
         id: third-party-cache
