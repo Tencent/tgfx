@@ -31,7 +31,6 @@ cd $WORKSPACE
 make_dir result
 make_dir build
 
-./update_baseline.sh 1
 cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
 cd build

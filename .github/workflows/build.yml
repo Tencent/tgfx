@@ -151,7 +151,7 @@ jobs:
           name: result
           path: result
 
-  windows:
+  Windows:
     runs-on: windows-latest
     steps:
       - name: Check Out Repo
@@ -201,7 +201,7 @@ jobs:
           name: result
           path: result
 
-  linux:
+  Linux:
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
