@@ -13,7 +13,6 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
           lfs: true
 
       - name: Get Environment Cache
@@ -157,7 +156,6 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
           lfs: true
 
       - name: Get Third-Party Cache
@@ -207,7 +205,6 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
           lfs: true
 
       - name: Get Third-Party Cache
