@@ -23,6 +23,7 @@
 #include "tgfx/core/Stroke.h"
 
 using namespace emscripten;
+using namespace tgfx;
 
 EMSCRIPTEN_BINDINGS(tgfx) {
   class_<Matrix>("TGFXMatrix").function("_get", &Matrix::get).function("_set", &Matrix::set);

@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  ios-android-web:
+  macOS:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
@@ -77,34 +77,19 @@ jobs:
           ndk-version: r19c
           local-cache: true
 
-      - name: Build Third-Party Cache
-        if: github.event_name == 'push'
-        run: |
-          node build_vendor -p ios
-          node build_vendor -p android
-          node build_vendor -p web
-        env:
-          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-
       - name: Build iOS
-        if: github.event_name == 'pull_request'
         run: |
-          chmod +x build
-          node build -p ios
+          node build_tgfx -p ios -x
 
       - name: Build Android
-        if: github.event_name == 'pull_request'
         run: |
-          chmod +x build
-          node build -p android
+          node build_tgfx -p android
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Build Web
-        if: github.event_name == 'pull_request'
         run: |
-          chmod +x build
-          node build -p web
+          node build_tgfx -p web
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -191,17 +176,9 @@ jobs:
           depsync
         shell: bash
 
-
-      - name: Build Third-Party Cache
-        if: github.event_name == 'push'
-        run: |
-          node build_vendor -p win
-
       - name: Build Windows
-        if: github.event_name == 'pull_request'
         run: |
-          chmod +x build
-          node build -p win
+          node build_tgfx -p win
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -251,16 +228,9 @@ jobs:
           ./sync_deps.sh
         shell: bash
 
-      - name: Build Third-Party Cache
-        if: github.event_name == 'push'
-        run: |
-          node build_vendor -p linux
-
       - name: Build Linux
-        if: github.event_name == 'pull_request'
         run: |
-          chmod +x build
-          node build -p linux
+          node build_tgfx -p linux
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
