@@ -20,109 +20,56 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-class DoubleBufferedWindowExternal : public DoubleBufferedWindow {
+class DoubleBufferedWindowOffscreen : public DoubleBufferedWindow {
  public:
-  DoubleBufferedWindowExternal(std::shared_ptr<Device> device, HardwareBufferRef frontBuffer,
-                               HardwareBufferRef backBuffer)
-      : DoubleBufferedWindow(std::move(device)), frontBuffer(frontBuffer), backBuffer(backBuffer) {
-    HardwareBufferRetain(frontBuffer);
-    HardwareBufferRetain(backBuffer);
-  }
-
-  ~DoubleBufferedWindowExternal() override {
-    HardwareBufferRelease(frontBuffer);
-    HardwareBufferRelease(backBuffer);
-  }
-
-  bool isFront(HardwareBufferRef buffer) const override {
-    return frontBuffer == buffer;
+  DoubleBufferedWindowOffscreen(std::shared_ptr<Device> device, int width, int height,
+                                bool tryHardware)
+      : DoubleBufferedWindow(std::move(device)), width(width), height(height),
+        tryHardware(tryHardware) {
   }
 
  private:
+  std::shared_ptr<Surface> makeSurface(Context* context) const {
+    if (tryHardware) {
+      auto buffer = HardwareBufferAllocate(width, height);
+      auto surface = Surface::MakeFrom(context, buffer);
+      HardwareBufferRelease(buffer);
+      return surface;
+    } else {
+#ifdef __APPLE__
+      return Surface::Make(context, width, height, tgfx::ColorType::BGRA_8888);
+#else
+      return Surface::Make(context, width, height);
+#endif
+    }
+  }
+
   std::shared_ptr<Surface> onCreateSurface(Context* context) override {
     if (frontSurface == nullptr) {
-      frontSurface = Surface::MakeFrom(context, frontBuffer);
+      frontSurface = makeSurface(context);
     }
     if (backSurface == nullptr) {
-      backSurface = Surface::MakeFrom(context, backBuffer);
+      backSurface = makeSurface(context);
+    }
+    if (frontSurface == nullptr || backSurface == nullptr) {
+      return nullptr;
     }
     return backSurface;
   }
 
-  void onSwapSurfaces(Context*) override {
-    std::swap(frontBuffer, backBuffer);
-  }
-
-  HardwareBufferRef frontBuffer = nullptr;
-  HardwareBufferRef backBuffer = nullptr;
-};
-
-class DoubleBufferedWindowTexture : public DoubleBufferedWindow {
- public:
-  DoubleBufferedWindowTexture(std::shared_ptr<Device> device,
-                              const BackendTexture& frontBackendTexture,
-                              const BackendTexture& backBackendTexture)
-      : DoubleBufferedWindow(std::move(device)), frontBackendTexture(frontBackendTexture),
-        backBackendTexture(backBackendTexture) {
-  }
-
-  bool isFront(const BackendTexture& texture) const override {
-    if (!texture.isValid() || !frontBackendTexture.isValid()) {
-      return false;
-    }
-    if (texture.backend() != Backend::OPENGL) {
-      return false;
-    }
-    GLTextureInfo info1;
-    texture.getGLTextureInfo(&info1);
-    GLTextureInfo info2;
-    frontBackendTexture.getGLTextureInfo(&info2);
-    if (info1.format != info2.format) {
-      return false;
-    }
-    if (info1.target != info2.target) {
-      return false;
-    }
-    return info1.id != info2.id;
-  }
-
- private:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override {
-    if (frontSurface == nullptr) {
-      frontSurface = Surface::MakeFrom(context, frontBackendTexture, ImageOrigin::TopLeft);
-    }
-    if (backSurface == nullptr) {
-      backSurface = Surface::MakeFrom(context, backBackendTexture, ImageOrigin::TopLeft);
-    }
-    return backSurface;
-  }
-
-  void onSwapSurfaces(Context*) override {
-    std::swap(frontBackendTexture, backBackendTexture);
-  }
-
-  BackendTexture frontBackendTexture;
-  BackendTexture backBackendTexture;
+  int width;
+  int height;
+  bool tryHardware;
 };
 
 std::shared_ptr<DoubleBufferedWindow> DoubleBufferedWindow::Make(std::shared_ptr<Device> device,
-                                                                 HardwareBufferRef frontBuffer,
-                                                                 HardwareBufferRef backBuffer) {
-  if (device == nullptr || frontBuffer == nullptr || backBuffer == nullptr) {
+                                                                 int width, int height,
+                                                                 bool tryHardware) {
+  if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
   return std::shared_ptr<DoubleBufferedWindow>(
-      new DoubleBufferedWindowExternal(std::move(device), frontBuffer, backBuffer));
-}
-
-std::shared_ptr<DoubleBufferedWindow> DoubleBufferedWindow::Make(
-    std::shared_ptr<Device> device, const BackendTexture& frontBackendTexture,
-    const BackendTexture& backBackendTexture) {
-  if (device == nullptr || !frontBackendTexture.isValid() || !backBackendTexture.isValid()) {
-    return nullptr;
-  }
-  return std::shared_ptr<DoubleBufferedWindow>(
-      new DoubleBufferedWindowTexture(std::move(device), frontBackendTexture, backBackendTexture));
+      new DoubleBufferedWindowOffscreen(std::move(device), width, height, tryHardware));
 }
 
 DoubleBufferedWindow::DoubleBufferedWindow(std::shared_ptr<Device> device)

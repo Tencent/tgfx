@@ -23,24 +23,15 @@
 namespace tgfx {
 class DoubleBufferedWindow : public Window {
  public:
-  static std::shared_ptr<DoubleBufferedWindow> Make(std::shared_ptr<Device> device,
-                                                    const BackendTexture& frontBackendTexture,
-                                                    const BackendTexture& backBackendTexture);
+  static std::shared_ptr<DoubleBufferedWindow> Make(std::shared_ptr<Device> device, int width,
+                                                    int height, bool tryHardware);
 
-  static std::shared_ptr<DoubleBufferedWindow> Make(std::shared_ptr<Device> device,
-                                                    HardwareBufferRef frontBuffer,
-                                                    HardwareBufferRef backBuffer);
+  std::shared_ptr<Surface> getFrontSurface() const {
+    return frontSurface;
+  }
 
   std::shared_ptr<Surface> getBackSurface() const {
     return backSurface;
-  }
-
-  virtual bool isFront(const BackendTexture&) const {
-    return false;
-  }
-
-  virtual bool isFront(HardwareBufferRef) const {
-    return false;
   }
 
   ~DoubleBufferedWindow() override;
@@ -50,7 +41,8 @@ class DoubleBufferedWindow : public Window {
 
   void onPresent(Context* context, int64_t presentationTime) override;
 
-  virtual void onSwapSurfaces(Context*) = 0;
+  virtual void onSwapSurfaces(Context*) {
+  }
 
   std::shared_ptr<Surface> frontSurface;
   std::shared_ptr<Surface> backSurface;
