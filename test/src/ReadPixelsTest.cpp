@@ -41,7 +41,7 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
   auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
   auto byteSize = RGBAInfo.byteSize();
   Buffer pixelsA(byteSize);
-  Buffer pixelsB(byteSize * 2);
+  Buffer pixelsB(byteSize * 3);
   auto result = codec->readPixels(RGBAInfo, pixelsA.data());
   EXPECT_TRUE(result);
 
@@ -65,7 +65,10 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
   CHECK_PIXELS(Gray8Info, pixelsB.data(), "PixelMap_RGBA_to_Gray8");
 
   pixelsB.clear();
-  auto RGBAF16Info = RGBAInfo.makeColorType(ColorType::RGBA_F16);
+  // Set the rowByte != width * 8 to force the RGBA_F16 PixelMap converted to RGBA_8888 when doing
+  // baseline comparing. Otherwise, the RGBA_F16 data may have floating error when compared.
+  auto f16RowBytes = (width + 1) * 8;
+  auto RGBAF16Info = RGBAInfo.makeColorType(ColorType::RGBA_F16, f16RowBytes);
   result = RGBAMap.readPixels(RGBAF16Info, pixelsB.data());
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBAF16Info, pixelsB.data(), "PixelMap_RGBA_to_RGBA_F16");
