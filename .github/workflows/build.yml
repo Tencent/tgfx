@@ -182,7 +182,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
-          version: '5.13.0'
+          
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
