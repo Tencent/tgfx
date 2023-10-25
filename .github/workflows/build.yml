@@ -328,7 +328,7 @@ jobs:
           path: out/release
 
   qt:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
@@ -345,6 +345,8 @@ jobs:
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-qt-
 
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
       - name: Run depsync
         run: |
           npm install depsync -g
@@ -354,9 +356,8 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
-          host: 'windows'
+          host: 'linux'
           target: 'desktop'
-          arch: 'win64_msvc2019_64'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
           cache: 'true'
@@ -364,7 +365,7 @@ jobs:
 
       - name: Build QT
         run: |
-          node build_tgfx -DTGFX_USE_QT=ON -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake/" -p win
+          node build_tgfx -DTGFX_USE_QT=ON -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake/" -p linux
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
