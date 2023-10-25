@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  autotest:
+  mac:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo

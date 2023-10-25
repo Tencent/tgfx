@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  iOS:
+  ios:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
@@ -91,7 +91,7 @@ jobs:
           name: result
           path: out/release
 
-  Android:
+  android:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
@@ -183,7 +183,7 @@ jobs:
           name: result
           path: out/release
 
-  Web:
+  web:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
@@ -311,7 +311,7 @@ jobs:
           name: result
           path: out/release
 
-  Windows:
+  win:
     runs-on: windows-latest
     steps:
       - name: Check Out Repo
@@ -360,7 +360,7 @@ jobs:
           name: result
           path: out/release
 
-  QT:
+  qt:
     runs-on: windows-latest
     steps:
       - name: Check Out Repo
@@ -420,7 +420,7 @@ jobs:
           name: result
           path: out/release
 
-  Linux:
+  linux:
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
