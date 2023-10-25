@@ -66,7 +66,8 @@ jobs:
           restore-keys: third-party-macos-
 
       - name: Get Build Cache
-        uses: actions/cache@v3
+        id: build-cache
+        uses: actions/cache/restore@v3
         with:
           path: |
             out/release
@@ -146,6 +147,14 @@ jobs:
             third_party
             vendor_tools
           key: third-party-macos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Save Build Cache
+        if: ${{ (github.event_name == 'push') && (steps.build-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            out/release
+          key: tgfx-build-cache-macos-${{ github.sha }}
 
       - name: Job Failed
         if: ${{ failure() }}
