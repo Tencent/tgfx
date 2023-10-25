@@ -83,12 +83,12 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_ios_arm64
           path: out/release
 
       - uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_ios_arm64
           path: out/release
 
   android:
@@ -142,12 +142,12 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_android_arm64v8a
           path: out/release
 
       - uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_android_arm64v8a
           path: out/release
 
   web:
@@ -270,12 +270,12 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_web_wasm
           path: out/release
 
       - uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_web_wasm
           path: out/release
 
   win:
@@ -319,12 +319,12 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_win_x64
           path: out/release
 
       - uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_win_x64
           path: out/release
 
   qt:
@@ -379,12 +379,12 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_qt_x64
           path: out/release
 
       - uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_qt_x64
           path: out/release
 
   linux:
@@ -430,10 +430,10 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_linux_x64
           path: out/release
 
       - uses: actions/upload-artifact@v3
         with:
-          name: result
+          name: tgfx_linux_x64
           path: out/release
