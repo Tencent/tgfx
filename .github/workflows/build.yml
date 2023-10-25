@@ -92,27 +92,12 @@ jobs:
           path: out/release
 
   android:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
         with:
           lfs: true
-
-      - name: Get Environment Cache
-        id: environment-cache
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
-          key: tgfx-environment-android-20231025
-          restore-keys: tgfx-environment-android-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -124,11 +109,7 @@ jobs:
           key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-android-
 
-      - name: Install Build Tools
-        run: |
-          chmod +x install_tools.sh
-          ./install_tools.sh
-        shell: bash
+      - uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Run depsync
         run: |
@@ -147,20 +128,6 @@ jobs:
           node build_tgfx -p android
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-
-      - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            /usr/local/Cellar/ninja
-            /usr/local/Cellar/icu4c
-            /usr/local/bin/ninja
-            /usr/local/Cellar/yasm
-            /usr/local/bin/yasm
-            /usr/local/bin/depsync
-            /usr/local/lib/node_modules/depsync
-          key: tgfx-environment-android-20231025
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
