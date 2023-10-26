@@ -8,7 +8,8 @@ on:
 
 jobs:
   mac:
-    runs-on: macos-latest
+    # the macos-latest may randomly give us macos-12.6.9 or macos-12.7.0 which may break the autotest.
+    runs-on: macos-13
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v3
