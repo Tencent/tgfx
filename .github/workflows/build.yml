@@ -84,12 +84,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: tgfx_ios_arm64
-          path: out/release
+          path: out
 
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_ios_arm64
-          path: out/release
+          path: out
 
   android:
     runs-on: ubuntu-latest
@@ -143,12 +143,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: tgfx_android_arm64v8a
-          path: out/release
+          path: out
 
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_android_arm64v8a
-          path: out/release
+          path: out
 
   web:
     runs-on: macos-latest
@@ -271,12 +271,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: tgfx_web_wasm
-          path: out/release
+          path: out
 
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_web_wasm
-          path: out/release
+          path: out
 
   win:
     runs-on: windows-latest
@@ -320,12 +320,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: tgfx_win_x64
-          path: out/release
+          path: out
 
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_win_x64
-          path: out/release
+          path: out
 
   linux:
     runs-on: ubuntu-latest
@@ -371,12 +371,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: tgfx_linux_x64
-          path: out/release
+          path: out
 
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_linux_x64
-          path: out/release
+          path: out
 
   qt:
     runs-on: ubuntu-latest
@@ -432,9 +432,9 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: tgfx_qt_x64
-          path: out/release
+          path: out
 
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_qt_x64
-          path: out/release
+          path: out
