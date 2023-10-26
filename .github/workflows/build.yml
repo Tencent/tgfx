@@ -304,7 +304,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -p win -d
+          node build_tgfx -p win -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -325,6 +325,57 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_win_x64
+          path: out/release
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v3
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: third-party-linux-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build Linux
+        run: |
+          node build_tgfx -DTGFX_USE_SWIFTSHADER=ON -p linux
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: tgfx_linux_x64
+          path: out/release
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: tgfx_linux_x64
           path: out/release
 
   qt:
@@ -386,55 +437,4 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_qt_x64
-          path: out/release
-
-  linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check Out Repo
-        uses: actions/checkout@v3
-        with:
-          lfs: true
-
-      - name: Get Third-Party Cache
-        id: third-party-cache
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            third_party
-            vendor_tools
-          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: third-party-linux-
-
-      - uses: seanmiddleditch/gha-setup-ninja@master
-
-      - name: Run depsync
-        run: |
-          npm install depsync -g
-          depsync
-        shell: bash
-
-      - name: Build Linux
-        run: |
-          node build_tgfx -DTGFX_USE_SWIFTSHADER=ON -p linux
-
-      - name: Save Third-Party Cache
-        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            third_party
-            vendor_tools
-          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
-
-      - name: Job Failed
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_linux_x64
-          path: out/release
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_linux_x64
           path: out/release
