@@ -31,7 +31,11 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: tgfx-environment-autotest-20231025
+            /usr/local/Cellar/python-lxml
+            /usr/local/Cellar/python-markupsafe
+            /usr/local/lib/python3.12/site-packages/lxml
+            /usr/local/lib/python3.12/site-packages/markupsafe
+          key: tgfx-environment-autotest-20231027
           restore-keys: tgfx-environment-autotest-
 
       - name: Get Third-Party Cache
@@ -87,7 +91,11 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: tgfx-environment-autotest-20231025
+            /usr/local/Cellar/python-lxml
+            /usr/local/Cellar/python-markupsafe
+            /usr/local/lib/python3.12/site-packages/lxml
+            /usr/local/lib/python3.12/site-packages/markupsafe
+          key: tgfx-environment-autotest-20231027
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
