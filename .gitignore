@@ -43,6 +43,7 @@ local.properties
 !**/.idea/misc.xml
 
 /third_party
+/vendor_tools
 /out
 cmake-build-*
 node_modules
