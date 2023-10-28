@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(TGFX)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
-include(./vendor_tools/vendor.cmake)
+include(./third_party/vendor_tools/vendor.cmake)
 
 # Options for building tgfx
 option(TGFX_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
