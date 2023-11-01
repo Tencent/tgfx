@@ -1,11 +1,11 @@
 <img src="resources/readme/TGFX.jpg" alt="TGFX Logo" width="992"/>
 
-[![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](https://github.com/libpag/tgfx/blob/master/LICENSE.txt)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/libpag/tgfx/pulls)
-[![codecov](https://codecov.io/gh/libpag/tgfx/branch/main/graph/badge.svg)](https://codecov.io/gh/libpag/tgfx)
-[![autotest](https://github.com/libpag/tgfx/actions/workflows/autotest.yml/badge.svg?branch=main)](https://github.com/libpag/tgfx/actions/workflows/autotest.yml)
-[![build](https://github.com/libpag/tgfx/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/libpag/tgfx/actions/workflows/build.yml)
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/libpag/tgfx)](https://github.com/libpag/tgfx/releases)
+[![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](https://github.com/Tencent/tgfx/blob/master/LICENSE.txt)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/tgfx/pulls)
+[![codecov](https://codecov.io/gh/Tencent/tgfx/branch/main/graph/badge.svg)](https://codecov.io/gh/Tencent/tgfx)
+[![autotest](https://github.com/Tencent/tgfx/actions/workflows/autotest.yml/badge.svg?branch=main)](https://github.com/Tencent/tgfx/actions/workflows/autotest.yml)
+[![build](https://github.com/Tencent/tgfx/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/Tencent/tgfx/actions/workflows/build.yml)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/tgfx)](https://github.com/Tencent/tgfx/releases)
 
 ## Introduction
 
@@ -115,12 +115,12 @@ If you find TGFX is helpful, please give us a **Star**. We sincerely appreciate 
 
 TGFX is licensed under the [BSD-3-Clause License](./LICENSE.txt)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=libpag/tgfx&type=Date)](https://star-history.com/#libpag/tgfx&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Tencent/tgfx&type=Date)](https://star-history.com/#Tencent/tgfx&Date)
 
 ## Contribution
 
 If you have any ideas or suggestions to improve TGFX, welcome to open
-a [discussion](https://github.com/libpag/tgfx/discussions/new/choose)
-/ [issue](https://github.com/libpag/tgfx/issues/new/choose)
-/ [pull request](https://github.com/libpag/tgfx/pulls). Before making a pull request or issue,
+a [discussion](https://github.com/Tencent/tgfx/discussions/new/choose)
+/ [issue](https://github.com/Tencent/tgfx/issues/new/choose)
+/ [pull request](https://github.com/Tencent/tgfx/pulls). Before making a pull request or issue,
 please make sure to read [Contributing Guide](./CONTRIBUTING.md).
