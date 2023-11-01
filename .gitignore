@@ -74,3 +74,4 @@ QTCMAKE.cfg
 test/baseline/.cache
 /result
 .vscode
+ios/tgfx
