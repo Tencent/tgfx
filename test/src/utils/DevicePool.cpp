@@ -16,18 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TestEnvironment.h"
-#include "utils/Baseline.h"
-#include "utils/DevicePool.h"
+#include "DevicePool.h"
+#include <thread>
 
 namespace tgfx {
-void TestEnvironment::SetUp() {
-  Baseline::SetUp();
+static std::mutex threadCacheLocker = {};
+static std::unordered_map<std::thread::id, std::shared_ptr<tgfx::GLDevice>> threadCacheMap = {};
+
+std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
+  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
+  auto threadID = std::this_thread::get_id();
+  auto result = threadCacheMap.find(threadID);
+  if (result != threadCacheMap.end()) {
+    return result->second;
+  }
+  auto device = tgfx::GLDevice::Make();
+  if (device != nullptr) {
+    threadCacheMap[threadID] = device;
+  }
+  return device;
 }
 
-void TestEnvironment::TearDown() {
-  Baseline::TearDown();
-  DevicePool::CleanAll();
+void DevicePool::CleanAll() {
+  std::lock_guard<std::mutex> autoLock(threadCacheLocker);
+  threadCacheMap = {};
 }
-
 }  // namespace tgfx

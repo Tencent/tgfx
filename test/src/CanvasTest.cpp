@@ -36,7 +36,7 @@
 namespace tgfx {
 
 TGFX_TEST(CanvasTest, ColorMatrixFilter) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -61,7 +61,7 @@ TGFX_TEST(CanvasTest, ColorMatrixFilter) {
 }
 
 TGFX_TEST(CanvasTest, Blur) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -133,7 +133,7 @@ TGFX_TEST(CanvasTest, Blur) {
 }
 
 TGFX_TEST(CanvasTest, DropShadow) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -174,7 +174,7 @@ TGFX_TEST(CanvasTest, DropShadow) {
 }
 
 TGFX_TEST(CanvasTest, clip) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -208,7 +208,7 @@ TGFX_TEST(CanvasTest, clip) {
 }
 
 TGFX_TEST(CanvasTest, TileMode) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -228,7 +228,7 @@ TGFX_TEST(CanvasTest, TileMode) {
 }
 
 TGFX_TEST(CanvasTest, merge_draw_call_rect) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -265,7 +265,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
 }
 
 TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -312,7 +312,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
 }
 
 TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -353,7 +353,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
 }
 
 TGFX_TEST(CanvasTest, merge_draw_clear_op) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -451,7 +451,7 @@ TGFX_TEST(CanvasTest, textShape) {
   }
   height += lineHeight;
 
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -479,7 +479,7 @@ TGFX_TEST(CanvasTest, textShape) {
 }
 
 TGFX_TEST(CanvasTest, filterMode) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -499,7 +499,7 @@ TGFX_TEST(CanvasTest, filterMode) {
 }
 
 TGFX_TEST(CanvasTest, mipmap) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -548,7 +548,7 @@ TGFX_TEST(CanvasTest, mipmap) {
 }
 
 TGFX_TEST(CanvasTest, hardwareMipMap) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -579,7 +579,7 @@ TGFX_TEST(CanvasTest, hardwareMipMap) {
 }
 
 TGFX_TEST(CanvasTest, shape) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -613,7 +613,7 @@ TGFX_TEST(CanvasTest, shape) {
 }
 
 TGFX_TEST(CanvasTest, image) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -725,7 +725,7 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
 }
 
 TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -748,7 +748,7 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
 }
 
 TGFX_TEST(CanvasTest, NothingToDraw) {
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);

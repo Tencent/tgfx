@@ -16,18 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TestEnvironment.h"
-#include "utils/Baseline.h"
-#include "utils/DevicePool.h"
+#pragma once
+
+#include "tgfx/opengl/GLDevice.h"
 
 namespace tgfx {
-void TestEnvironment::SetUp() {
-  Baseline::SetUp();
-}
+class DevicePool {
+ public:
+  static std::shared_ptr<tgfx::GLDevice> Make();
 
-void TestEnvironment::TearDown() {
-  Baseline::TearDown();
-  DevicePool::CleanAll();
-}
-
+  static void CleanAll();
+};
 }  // namespace tgfx
