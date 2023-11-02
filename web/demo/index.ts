@@ -9,4 +9,11 @@ window.onload = async () => {
   document.getElementById('container')!.style.display = 'block';
   TGFXModule.ScalerContext.isEmoji('测试');
   TGFXModule.ScalerContext.isEmoji('👍');
+  if (TGFXModule.TGFXView) {
+    const view = TGFXModule.TGFXView._Make('#tgfx');
+    document.getElementById('tgfx')!.onclick = () => {
+      view.draw();
+    };
+    view.draw();
+  }
 };

@@ -21,6 +21,10 @@ emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_B
 
 cmake --build $BUILD_DIR --target tgfx
 
+if [[ $@ == *demo* ]]; then
+  DEMO_FILE=$SOURCE_DIR/web/demo/TGFXDemoBindings.cpp
+fi
+
 emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
   -I$SOURCE_DIR/src/ \
@@ -39,6 +43,7 @@ emcc $RELEASE_CONF -std=c++17 \
   -s ENVIRONMENT="web,worker" \
   -s EXPORT_ES6=1 \
   -s USE_ES6_IMPORT_META=0 \
+  $DEMO_FILE \
   -o ../src/wasm/tgfx.js
 
 if test $? -eq 0; then
