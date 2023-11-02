@@ -26,6 +26,7 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/utils/Clock.h"
 #include "utils/Baseline.h"
+#include "utils/DevicePool.h"
 #include "utils/ProjectPath.h"
 
 namespace tgfx {

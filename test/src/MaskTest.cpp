@@ -38,7 +38,7 @@ TGFX_TEST(MaskTest, Rasterize) {
   auto maskBuffer = std::static_pointer_cast<PixelBuffer>(mask->makeBuffer());
   EXPECT_TRUE(Baseline::Compare(maskBuffer, "MaskTest/rasterize_path"));
 
-  auto device = GLDevice::Make();
+  auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
