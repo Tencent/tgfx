@@ -549,7 +549,7 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
 
 void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
-  if (nothingToDraw(paint)) {
+  if (nothingToDraw(paint) || glyphCount == 0) {
     return;
   }
   auto scaleX = state->matrix.getScaleX();
@@ -565,11 +565,11 @@ void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_
   save();
   concat(Matrix::MakeScale(1.f / scale));
   if (scaledFont.getTypeface()->hasColor()) {
-    drawColorGlyphs(glyphIDs, &scaledPositions[0], glyphCount, scaledFont, scaledPaint);
+    drawColorGlyphs(glyphIDs, scaledPositions.data(), glyphCount, scaledFont, scaledPaint);
     restore();
     return;
   }
-  auto textBlob = TextBlob::MakeFrom(glyphIDs, &scaledPositions[0], glyphCount, scaledFont);
+  auto textBlob = TextBlob::MakeFrom(glyphIDs, scaledPositions.data(), glyphCount, scaledFont);
   if (textBlob) {
     drawMaskGlyphs(textBlob.get(), scaledPaint);
   }

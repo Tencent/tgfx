@@ -53,7 +53,7 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   static auto eglGlobals = EGLGlobals::Get();
   auto eglContext = EGL_NO_CONTEXT;
   auto eglSurface = eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig,
-                                            &eglGlobals->pbufferSurfaceAttributes[0]);
+                                            eglGlobals->pbufferSurfaceAttributes.data());
   if (eglSurface == nullptr) {
     LOGE("GLDevice::Make() eglCreatePbufferSurface error=%d", eglGetError());
     return nullptr;
@@ -81,8 +81,9 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurf
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext) {
   static auto eglGlobals = EGLGlobals::Get();
-  auto eglSurface = eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig,
-                                           nativeWindow, &eglGlobals->windowSurfaceAttributes[0]);
+  auto eglSurface =
+      eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
+                             eglGlobals->windowSurfaceAttributes.data());
   if (eglSurface == nullptr) {
     LOGE("EGLDevice::MakeFrom() eglCreateWindowSurface error=%d", eglGetError());
     return nullptr;

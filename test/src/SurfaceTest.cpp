@@ -25,6 +25,7 @@ namespace tgfx {
 
 TGFX_TEST(SurfaceTest, ImageSnapshot) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   GLTextureInfo textureInfo;

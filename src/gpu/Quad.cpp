@@ -25,7 +25,7 @@ Quad Quad::MakeFromRect(const Rect& rect, const Matrix& matrix) {
   points.push_back(Point::Make(rect.left, rect.bottom));
   points.push_back(Point::Make(rect.right, rect.top));
   points.push_back(Point::Make(rect.right, rect.bottom));
-  matrix.mapPoints(&points[0], 4);
+  matrix.mapPoints(points.data(), 4);
   return Quad(points);
 }
 

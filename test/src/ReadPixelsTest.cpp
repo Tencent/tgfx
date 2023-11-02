@@ -166,6 +166,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   ASSERT_TRUE(result);
 
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = Image::MakeFrom(bitmap);

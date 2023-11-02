@@ -107,7 +107,7 @@ bool FTPath::finalizeOutline(FreetypeOutline* outline, int startPointIndex) cons
   auto endPointIndex = outline->contours[outline->contours.size() - 1];
   outline->outline.points = const_cast<FT_Vector*>(&(points[startPointIndex]));
   outline->outline.tags = const_cast<char*>(&(tags[startPointIndex]));
-  outline->outline.contours = const_cast<int16_t*>(&(outline->contours[0]));
+  outline->outline.contours = const_cast<int16_t*>(outline->contours.data());
   outline->outline.n_points = static_cast<int16_t>(endPointIndex + 1);
   outline->outline.n_contours = static_cast<int16_t>(outline->contours.size());
   switch (getFillType()) {

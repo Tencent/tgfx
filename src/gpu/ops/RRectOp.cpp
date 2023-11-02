@@ -260,8 +260,8 @@ void RRectOp::onPrepare(Gpu* gpu) {
       indices.emplace_back(gStandardRRectIndices[j] + offset);
     }
   }
-  indexBuffer =
-      GpuBuffer::Make(context, BufferType::Index, &(indices[0]), indices.size() * sizeof(uint16_t));
+  indexBuffer = GpuBuffer::Make(context, BufferType::Index, indices.data(),
+                                indices.size() * sizeof(uint16_t));
 }
 
 void RRectOp::onExecute(RenderPass* renderPass) {

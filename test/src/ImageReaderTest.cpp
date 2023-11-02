@@ -29,6 +29,7 @@ namespace tgfx {
 
 TGFX_TEST(ImageReaderTest, updateMask) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto mask = Mask::Make(100, 50, false);
@@ -64,6 +65,7 @@ TGFX_TEST(ImageReaderTest, updateMask) {
 
 TGFX_TEST(ImageReaderTest, updateBitmap) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   Bitmap bitmap(300, 150);

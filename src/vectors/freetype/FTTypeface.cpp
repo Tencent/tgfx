@@ -161,7 +161,7 @@ GlyphID FTTypeface::getGlyphID(const std::string& name) const {
   if (count > 1 || count <= 0) {
     return 0;
   }
-  const char* start = &(name[0]);
+  const char* start = name.data();
   auto unichar = UTF::NextUTF8(&start, start + name.size());
   return FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(unichar));
 }

@@ -171,7 +171,7 @@ static std::unique_ptr<FragmentProcessor> MakeGradient(const Context* context,
   }
   // All gradients are colorized the same way, regardless of layout
   std::unique_ptr<FragmentProcessor> colorizer =
-      MakeColorizer(context, &(shader.originalColors[0]), &(shader.originalPositions[0]),
+      MakeColorizer(context, shader.originalColors.data(), shader.originalPositions.data(),
                     static_cast<int>(shader.originalColors.size()));
   if (colorizer == nullptr) {
     return nullptr;

@@ -35,7 +35,7 @@ class RasterYUVData : public YUVData {
 
   ~RasterYUVData() override {
     if (releaseProc != nullptr) {
-      releaseProc(releaseContext, &data[0], data.size());
+      releaseProc(releaseContext, data.data(), data.size());
     }
   }
 

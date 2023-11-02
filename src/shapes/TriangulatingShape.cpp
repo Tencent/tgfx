@@ -41,7 +41,7 @@ std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix
   if (count == 0) {
     return nullptr;
   }
-  buffer = GpuBuffer::Make(paint->context, BufferType::Vertex, &vertices[0],
+  buffer = GpuBuffer::Make(paint->context, BufferType::Vertex, vertices.data(),
                            vertices.size() * sizeof(float));
   if (buffer == nullptr) {
     return nullptr;

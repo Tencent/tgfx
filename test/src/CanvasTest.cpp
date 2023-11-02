@@ -37,6 +37,7 @@ namespace tgfx {
 
 TGFX_TEST(CanvasTest, ColorMatrixFilter) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/test_timestretch.png");
@@ -61,6 +62,7 @@ TGFX_TEST(CanvasTest, ColorMatrixFilter) {
 
 TGFX_TEST(CanvasTest, Blur) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -132,6 +134,7 @@ TGFX_TEST(CanvasTest, Blur) {
 
 TGFX_TEST(CanvasTest, DropShadow) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/image_as_mask.png");
@@ -172,6 +175,7 @@ TGFX_TEST(CanvasTest, DropShadow) {
 
 TGFX_TEST(CanvasTest, clip) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto width = 1080;
@@ -205,6 +209,7 @@ TGFX_TEST(CanvasTest, clip) {
 
 TGFX_TEST(CanvasTest, TileMode) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -224,6 +229,7 @@ TGFX_TEST(CanvasTest, TileMode) {
 
 TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
@@ -260,6 +266,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
 
 TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -306,6 +313,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
 
 TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
@@ -346,6 +354,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
 
 TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
@@ -443,6 +452,7 @@ TGFX_TEST(CanvasTest, textShape) {
   height += lineHeight;
 
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface =
@@ -460,8 +470,8 @@ TGFX_TEST(CanvasTest, textShape) {
   Paint paint;
   paint.setColor(Color::Black());
   for (const auto& textRun : textRuns) {
-    canvas->drawGlyphs(&(textRun.ids[0]), &(textRun.positions[0]), textRun.ids.size(), textRun.font,
-                       paint);
+    canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                       textRun.font, paint);
   }
   canvas->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
@@ -470,6 +480,7 @@ TGFX_TEST(CanvasTest, textShape) {
 
 TGFX_TEST(CanvasTest, filterMode) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -489,6 +500,7 @@ TGFX_TEST(CanvasTest, filterMode) {
 
 TGFX_TEST(CanvasTest, mipmap) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -537,6 +549,7 @@ TGFX_TEST(CanvasTest, mipmap) {
 
 TGFX_TEST(CanvasTest, hardwareMipMap) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
@@ -567,6 +580,7 @@ TGFX_TEST(CanvasTest, hardwareMipMap) {
 
 TGFX_TEST(CanvasTest, shape) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 500, 500);
@@ -600,6 +614,7 @@ TGFX_TEST(CanvasTest, shape) {
 
 TGFX_TEST(CanvasTest, image) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 500);
@@ -711,6 +726,7 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
 
 TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto sampler = CreateRectangleTexture(context, 110, 110);
@@ -733,6 +749,7 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
 
 TGFX_TEST(CanvasTest, NothingToDraw) {
   auto device = GLDevice::Make();
+  ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 100, 100);

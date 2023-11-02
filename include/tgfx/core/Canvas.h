@@ -186,7 +186,7 @@ class Canvas {
                  const Paint* paint = nullptr);
 
   /**
-   * Draw array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.
+   * Draw an array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.
    */
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint);
