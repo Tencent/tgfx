@@ -35,7 +35,8 @@
       "cmake": {
         "targets": [
           "webp",
-          "webpdemux"
+          "webpdemux",
+          "sharpyuv"
         ]
       }
     },
