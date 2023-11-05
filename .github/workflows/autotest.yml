@@ -35,7 +35,11 @@ jobs:
             /usr/local/Cellar/python-markupsafe
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
-          key: tgfx-environment-autotest-20231027
+            /usr/local/bin/clang-format
+            /usr/local/bin/git-clang-format
+            /usr/local/bin/clang-format-diff.py
+            /usr/local/lib/python3.12/site-packages/clang_format
+          key: tgfx-environment-autotest-20231105
           restore-keys: tgfx-environment-autotest-
 
       - name: Get Third-Party Cache
@@ -77,7 +81,7 @@ jobs:
           file: result/coverage.xml
 
       - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+#        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
         with:
           path: |
@@ -94,7 +98,11 @@ jobs:
             /usr/local/Cellar/python-markupsafe
             /usr/local/lib/python3.12/site-packages/lxml
             /usr/local/lib/python3.12/site-packages/markupsafe
-          key: tgfx-environment-autotest-20231027
+            /usr/local/bin/clang-format
+            /usr/local/bin/git-clang-format
+            /usr/local/bin/clang-format-diff.py
+            /usr/local/lib/python3.12/site-packages/clang_format
+          key: tgfx-environment-autotest-20231105
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
