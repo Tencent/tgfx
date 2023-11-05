@@ -81,7 +81,7 @@ jobs:
           file: result/coverage.xml
 
       - name: Save Environment Cache
-#        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
         with:
           path: |
