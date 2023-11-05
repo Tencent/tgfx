@@ -60,8 +60,11 @@ jobs:
 
       - name: Check Code Format
         run: |
-          ls /usr/local/lib/
-          ls /usr/local/lib/python3.12/site-packages/
+          ls /usr/local/bin/
+          echo "ls /usr/local/lib/python3.10/site-packages/"
+          ls /usr/local/lib/python3.10/site-packages/
+          echo "ls /usr/local/lib/python3.11/site-packages/"
+          ls /usr/local/lib/python3.11/site-packages/
           chmod +x codeformat.sh
           ./codeformat.sh
         shell: bash
