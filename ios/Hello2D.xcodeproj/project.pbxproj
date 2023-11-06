@@ -18,7 +18,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		E61EC8122AF1FCAE00C82F9E /* TGFXDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TGFXDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E61EC8122AF1FCAE00C82F9E /* Hello2D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hello2D.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E61EC8152AF1FCAE00C82F9E /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		E61EC8162AF1FCAE00C82F9E /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		E61EC8182AF1FCAE00C82F9E /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
@@ -48,7 +48,7 @@
 		E61EC8092AF1FCAE00C82F9E = {
 			isa = PBXGroup;
 			children = (
-				E61EC8142AF1FCAE00C82F9E /* TGFXDemo */,
+				E61EC8142AF1FCAE00C82F9E /* Hello2D */,
 				E61EC8132AF1FCAE00C82F9E /* Products */,
 				E61EC82E2AF1FEAE00C82F9E /* Frameworks */,
 			);
@@ -57,12 +57,12 @@
 		E61EC8132AF1FCAE00C82F9E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E61EC8122AF1FCAE00C82F9E /* TGFXDemo.app */,
+				E61EC8122AF1FCAE00C82F9E /* Hello2D.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		E61EC8142AF1FCAE00C82F9E /* TGFXDemo */ = {
+		E61EC8142AF1FCAE00C82F9E /* Hello2D */ = {
 			isa = PBXGroup;
 			children = (
 				E61EC8152AF1FCAE00C82F9E /* AppDelegate.h */,
@@ -77,7 +77,7 @@
 				E61EC8262AF1FCB000C82F9E /* Info.plist */,
 				E61EC8272AF1FCB000C82F9E /* main.m */,
 			);
-			path = TGFXDemo;
+			path = Hello2D;
 			sourceTree = "<group>";
 		};
 		E61EC82E2AF1FEAE00C82F9E /* Frameworks */ = {
@@ -91,9 +91,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E61EC8112AF1FCAE00C82F9E /* TGFXDemo */ = {
+		E61EC8112AF1FCAE00C82F9E /* Hello2D */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E61EC82B2AF1FCB000C82F9E /* Build configuration list for PBXNativeTarget "TGFXDemo" */;
+			buildConfigurationList = E61EC82B2AF1FCB000C82F9E /* Build configuration list for PBXNativeTarget "Hello2D" */;
 			buildPhases = (
 				E61EC80E2AF1FCAE00C82F9E /* Sources */,
 				E61EC80F2AF1FCAE00C82F9E /* Frameworks */,
@@ -103,9 +103,9 @@
 			);
 			dependencies = (
 			);
-			name = TGFXDemo;
-			productName = TGFXDemo;
-			productReference = E61EC8122AF1FCAE00C82F9E /* TGFXDemo.app */;
+			name = Hello2D;
+			productName = Hello2D;
+			productReference = E61EC8122AF1FCAE00C82F9E /* Hello2D.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -122,7 +122,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E61EC80D2AF1FCAE00C82F9E /* Build configuration list for PBXProject "TGFXDemo" */;
+			buildConfigurationList = E61EC80D2AF1FCAE00C82F9E /* Build configuration list for PBXProject "Hello2D" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -135,7 +135,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E61EC8112AF1FCAE00C82F9E /* TGFXDemo */,
+				E61EC8112AF1FCAE00C82F9E /* Hello2D */,
 			);
 		};
 /* End PBXProject section */
@@ -322,7 +322,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "";
-				INFOPLIST_FILE = TGFXDemo/Info.plist;
+				INFOPLIST_FILE = Hello2D/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -335,7 +335,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "tgfx/**";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.pag.TGFXDemo;
+				PRODUCT_BUNDLE_IDENTIFIER = io.pag.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = PAG_Development;
@@ -359,7 +359,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = "GLES_SILENCE_DEPRECATION=1";
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "";
-				INFOPLIST_FILE = TGFXDemo/Info.plist;
+				INFOPLIST_FILE = Hello2D/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -372,7 +372,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "tgfx/**";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.pag.TGFXDemo;
+				PRODUCT_BUNDLE_IDENTIFIER = io.pag.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = PAG_Development;
@@ -386,7 +386,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E61EC80D2AF1FCAE00C82F9E /* Build configuration list for PBXProject "TGFXDemo" */ = {
+		E61EC80D2AF1FCAE00C82F9E /* Build configuration list for PBXProject "Hello2D" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E61EC8292AF1FCB000C82F9E /* Debug */,
@@ -395,7 +395,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E61EC82B2AF1FCB000C82F9E /* Build configuration list for PBXNativeTarget "TGFXDemo" */ = {
+		E61EC82B2AF1FCB000C82F9E /* Build configuration list for PBXNativeTarget "Hello2D" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E61EC82C2AF1FCB000C82F9E /* Debug */,
