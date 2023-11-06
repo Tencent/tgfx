@@ -16,9 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <UIKit/UIKit.h>
+#pragma once
 
-@interface AppDelegate : UIResponder <UIApplicationDelegate>
+#import <UIKit/UIKit.h>
+#include "tgfx/core/Canvas.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/opengl/eagl/EAGLWindow.h"
+
+@interface TGFXView : UIView
+
+- (void)draw;
 
 @end
-
