@@ -16,5 +16,5 @@ Run the following script within the project's ios/ directory:
 ./generate.sh
 ```
 
-Next, open the ios/Hello2D.xcworkspace using XCode, and you are good to go!
+Next, open the ios/Hello2D.xcworkspace using XCode, and you'll be good to go!
 
