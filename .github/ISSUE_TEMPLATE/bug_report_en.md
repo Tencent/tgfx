@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve TGFX
+about: Create a report to help us improve tgfx
 title: ''
 labels: ''
 assignees: 'domchen'
@@ -9,12 +9,12 @@ assignees: 'domchen'
 
 <!--
 Please note: We currently use the Issues only to track bugs. If it is a usage question or feature 
-request, please go to the Discussions. Please help us make TGFX better by filling everything below 
+request, please go to the Discussions. Please help us make tgfx better by filling everything below 
 out with as much information as you can, so we can try to reproduce and fix the bug! 
 -->
 
 
-## Which Version of TGFX are you using?
+## Which Version of tgfx are you using?
 
 1.0.0
 

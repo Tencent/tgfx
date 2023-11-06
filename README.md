@@ -90,7 +90,7 @@ Git account and password may be required during synchronizing. Please make sure 
 ## Build & Run
 
 We recommend using CLion IDE on the macOS platform for development. After the synchronization, you 
-can open the project with CLion and build the TGFX library.
+can open the project with CLion and build the tgfx library.
 
 **For macOS platform：**
 
@@ -109,7 +109,7 @@ version and try again.**
 
 ## Support Us
 
-If you find TGFX is helpful, please give us a **Star**. We sincerely appreciate your support :)
+If you find tgfx is helpful, please give us a **Star**. We sincerely appreciate your support :)
 
 
 ## License
@@ -120,7 +120,7 @@ TGFX is licensed under the [BSD-3-Clause License](./LICENSE.txt)
 
 ## Contribution
 
-If you have any ideas or suggestions to improve TGFX, welcome to open
+If you have any ideas or suggestions to improve tgfx, welcome to open
 a [discussion](https://github.com/Tencent/tgfx/discussions/new/choose)
 / [issue](https://github.com/Tencent/tgfx/issues/new/choose)
 / [pull request](https://github.com/Tencent/tgfx/pulls). Before making a pull request or issue,
