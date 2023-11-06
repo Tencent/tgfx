@@ -1,11 +1,10 @@
-#!/usr/bin/env bash
-
-set -eo pipefail
+#!/bin/bash -e
+cd $(dirname $0)
 
 ../sync_deps.sh
 
 # generate tgfx's xcode project.
-cmake ../CMakeLists.txt -G Xcode -B tgfx -DCMAKE_TOOLCHAIN_FILE=../third-party/vendor_tools/ios.toolchain.cmake -DPLATFORM=OS64 -DENABLE_ARC=OFF -DENABLE_BITCODE=OFF
+cmake -G Xcode -B tgfx .. -DCMAKE_TOOLCHAIN_FILE=../../third_party/vendor_tools/ios.toolchain.cmake -DPLATFORM=OS64 -DENABLE_ARC=OFF
 
 # Prepare the workspace in the TEMP directory
 NAME="TGFXDemo.xcworkspace"

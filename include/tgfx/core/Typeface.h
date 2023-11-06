@@ -121,8 +121,6 @@ class Typeface {
 
   /**
    * Returns the advance for specified glyph. The value is specified in glyph space units.
-   * @param glyphID The id of specified glyph.
-   * @param vertical The intended drawing orientation of the glyph.
    */
   virtual float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                                 bool verticalText) const = 0;
