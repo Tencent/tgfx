@@ -21,6 +21,15 @@ video-editing apps.
 
 ## Platform Support
 
+- iOS 9.0 or later
+- Android 4.4 or later
+- macOS 10.13 or later
+- Windows 7.0 or later
+- Chrome 69.0 or later (Web)
+- Safari 11.3 or later (Web)
+
+## Backing Renderers
+
 | Vector Backend |  GPU Backend   |      Target Platforms        |    Status     |
 |:--------------:|:--------------:|:----------------------------:|:-------------:|
 |    FreeType    |  OpenGL        |  All                         |   complete    |
@@ -36,15 +45,6 @@ video-editing apps.
 - The branches under `release/` are our stable milestone branches which are fully tested. We will
   periodically cut a `release/{version}` branch from the `main` branch. After one `release/{version}`
   branch is cut, only high-priority fixes are checked into it.
-
-## System Requirements
-
-- iOS 9.0 or later
-- Android 4.4 or later
-- macOS 10.13 or later
-- Windows 7.0 or later
-- Chrome 69.0 or later (Web)
-- Safari 11.3 or later (Web)
 
 ## Build Prerequisites
 
