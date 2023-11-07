@@ -82,7 +82,8 @@ void NativeCodec::JNIInit(JNIEnv* env) {
   } else {
     env->ExceptionClear();
     LOGE(
-        "NativeCodec.InitJNI(): \"androidx/exifinterface/media/ExifInterface\" is not found! We may be unable to determine image origins.");
+        "NativeCodec.InitJNI(): \"androidx/exifinterface/media/ExifInterface\" is not found! We "
+        "may be unable to determine image origins.");
   }
   BitmapFactoryClass = env->FindClass("android/graphics/BitmapFactory");
   BitmapFactory_decodeFile = env->GetStaticMethodID(
