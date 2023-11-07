@@ -1,6 +1,6 @@
-# Hello2D-iOS
+# Hello2D-Android
 
-A minimal project that demonstrates how to integrate the tgfx library into your iOS project.
+A minimal project that demonstrates how to integrate the tgfx library into your Android project.
 
 ## Prerequisites
 
@@ -10,11 +10,5 @@ you through the necessary steps to configure your development environment.
 
 ## Build & Run
 
-Run the following script within the project's ios/ directory:
-
-```
-./generate.sh
-```
-
-Next, open the ios/Hello2D.xcworkspace using XCode, and you'll be good to go!
+Simply open the android/ directory using Android Studio, and then you'll be good to go!
 
