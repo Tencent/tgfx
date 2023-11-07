@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+const XCode = require("../third_party/vendor_tools/lib/XCode");
+const path = require('path');
+let outPath = __dirname;
+let sourcePath = path.resolve(outPath, "../");
+XCode.Generate(sourcePath, outPath, "ios");

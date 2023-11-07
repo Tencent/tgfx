@@ -13,8 +13,12 @@ you through the necessary steps to configure your development environment.
 Run the following command in the ios/ directory:
 
 ```
-./generate
+./gen_project -a [arch]
 ```
+
+The [arch] option can take one of the following values: arm64, x64, arm64-simulator. The 'x64' and 
+'arm64-simulator' arches are intended for building simulators. If no architecture is specified, the 
+script will default to 'arm64'.
 
 Next, open the ios/Hello2D.xcworkspace using XCode, and you'll be good to go!
 
