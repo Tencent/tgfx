@@ -10,5 +10,5 @@ you through the necessary steps to configure your development environment.
 
 ## Build & Run
 
-Simply open the android/ directory using Android Studio, and then you'll be good to go!
+To get started, just open the android/ directory in Android Studio, and you'll be all set!
 
