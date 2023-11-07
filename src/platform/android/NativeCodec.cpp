@@ -72,12 +72,18 @@ void NativeCodec::JNIInit(JNIEnv* env) {
   ByteArrayInputStream_Constructor =
       env->GetMethodID(ByteArrayInputStreamClass.get(), "<init>", "([B)V");
   ExifInterfaceClass = env->FindClass("androidx/exifinterface/media/ExifInterface");
-  ExifInterface_Constructor_Path =
-      env->GetMethodID(ExifInterfaceClass.get(), "<init>", "(Ljava/lang/String;)V");
-  ExifInterface_Constructor_Stream =
-      env->GetMethodID(ExifInterfaceClass.get(), "<init>", "(Ljava/io/InputStream;)V");
-  ExifInterfaceClass_getAttributeInt =
-      env->GetMethodID(ExifInterfaceClass.get(), "getAttributeInt", "(Ljava/lang/String;I)I");
+  if (ExifInterfaceClass.get() != nullptr) {
+    ExifInterface_Constructor_Path =
+        env->GetMethodID(ExifInterfaceClass.get(), "<init>", "(Ljava/lang/String;)V");
+    ExifInterface_Constructor_Stream =
+        env->GetMethodID(ExifInterfaceClass.get(), "<init>", "(Ljava/io/InputStream;)V");
+    ExifInterfaceClass_getAttributeInt =
+        env->GetMethodID(ExifInterfaceClass.get(), "getAttributeInt", "(Ljava/lang/String;I)I");
+  } else {
+    env->ExceptionClear();
+    LOGE(
+        "NativeCodec.InitJNI(): \"androidx/exifinterface/media/ExifInterface\" is not found! We may be unable to determine image origins.");
+  }
   BitmapFactoryClass = env->FindClass("android/graphics/BitmapFactory");
   BitmapFactory_decodeFile = env->GetStaticMethodID(
       BitmapFactoryClass.get(), "decodeFile",
@@ -158,8 +164,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     LOGE("NativeCodec::readPixels(): Failed to get the size of the image!");
     return nullptr;
   }
-  auto exifInterface =
-      env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
+  jobject exifInterface = nullptr;
+  if (ExifInterfaceClass.get() != nullptr) {
+    exifInterface =
+        env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
+  }
   auto origin = GetEncodedOrigin(env, exifInterface);
   auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imagePath = filePath;
@@ -198,8 +207,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   }
   auto inputStream =
       env->NewObject(ByteArrayInputStreamClass.get(), ByteArrayInputStream_Constructor, byteArray);
-  auto exifInterface =
-      env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
+  jobject exifInterface = nullptr;
+  if (ExifInterfaceClass.get() != nullptr) {
+    exifInterface =
+        env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
+  }
   auto origin = GetEncodedOrigin(env, exifInterface);
   auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imageBytes = imageBytes;
