@@ -10,10 +10,10 @@ you through the necessary steps to configure your development environment.
 
 ## Build & Run
 
-Run the following script within the project's ios/ directory:
+Run the following command in the ios/ directory:
 
 ```
-./generate.sh
+./generate
 ```
 
 Next, open the ios/Hello2D.xcworkspace using XCode, and you'll be good to go!
