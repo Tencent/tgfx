@@ -4,11 +4,12 @@ plugins {
 }
 
 android {
-    namespace = "io.pag.tgfxdemo"
+    namespace = "org.tgfx.hello2d"
+    ndkVersion = "19.2.5345600"
     compileSdk = 33
 
     defaultConfig {
-        applicationId = "io.pag.tgfxdemo"
+        applicationId = "org.tgfx.hello2d"
         minSdk = 24
         targetSdk = 33
         versionCode = 1
@@ -41,7 +42,7 @@ android {
     }
     externalNativeBuild {
         cmake {
-            path("src/main/cpp/CMakeLists.txt")
+            path("./CMakeLists.txt")
             version = "3.22.1"
         }
     }
@@ -63,12 +64,16 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    sourceSets.getByName("main") {
+        assets.setSrcDirs(listOf("../../resources/assets"))
+    }
 }
 
 dependencies {
     implementation("androidx.core:core-ktx:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
     implementation("androidx.activity:activity-compose:1.7.2")
+    implementation("androidx.exifinterface:exifinterface:1.3.3")
     implementation(platform("androidx.compose:compose-bom:2023.03.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")

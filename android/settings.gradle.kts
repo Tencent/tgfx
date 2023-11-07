@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TGFXDemo"
+rootProject.name = "Hello2D"
 include(":app")

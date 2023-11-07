@@ -1,4 +1,4 @@
-package io.pag.tgfxdemo
+package org.tgfx.hello2d
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("io.pag.tgfxdemo", appContext.packageName)
+        assertEquals("org.tgfx.hello2d", appContext.packageName)
     }
 }

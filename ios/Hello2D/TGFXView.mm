@@ -120,10 +120,10 @@
                                                 {cyan, magenta, yellow, cyan}, {});
   tgfx::Paint paint = {};
   paint.setShader(shader);
-  auto size = static_cast<int>(256 * [UIScreen mainScreen].scale);
+  auto size = static_cast<int>(256 * scale);
   auto rect = tgfx::Rect::MakeXYWH((_width - size) / 2, (_height - size) / 2, size, size);
   tgfx::Path path = {};
-  path.addRoundRect(rect, 20*scale, 20*scale);
+  path.addRoundRect(rect, 20 * scale, 20 * scale);
   canvas->drawPath(path, paint);
 };
 
@@ -136,7 +136,7 @@
   auto size = static_cast<int>(256 * scale);
   auto rect = tgfx::Rect::MakeXYWH((_width - size) / 2, (_height - size) / 2, size, size);
   tgfx::Path path = {};
-  path.addRoundRect(rect, 20*scale, 20*scale);
+  path.addRoundRect(rect, 20 * scale, 20 * scale);
   NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
   auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
   canvas->drawImage(image, (_width - image->width()) / 2, (_height - image->height()) / 2, &paint);

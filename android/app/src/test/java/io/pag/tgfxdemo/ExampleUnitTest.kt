@@ -1,4 +1,4 @@
-package io.pag.tgfxdemo
+package org.tgfx.hello2d
 
 import org.junit.Test
 
