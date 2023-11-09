@@ -13,12 +13,19 @@ you through the necessary steps to configure your development environment.
 Run the following command in the ios/ directory:
 
 ```
-./gen_project -a [arch]
+./gen_project [-a arm64|x64|arm64-simulator] [-Dcmake_variable=value]...
 ```
 
-The [arch] option can take one of the following values: arm64, x64, arm64-simulator. The 'x64' and 
-'arm64-simulator' arches are intended for building simulators. If no architecture is specified, the 
-script will default to 'arm64'.
+The `-a` option is used to specify the project architecture. It accepts one of the following values: 
+`arm64`, `x64`, `arm64-simulator`. The `x64` and `arm64-simulator` arches are intended for building 
+simulators. If no architecture is specified, the script will default to `arm64`. Additionally, you 
+can pass cmake options using the `-D` option. For example, if you want to generate a project with 
+webp encoding support for the arm64 simulator, you can execute the following command:
 
-Next, open the ios/Hello2D.xcworkspace using XCode, and you'll be good to go!
+```
+./gen_project -a arm64-simulator -DTGFX_USE_WEBP_ENCODE=ON
+```
+
+And then, launch XCode and open the ios/Hello2D.xcworkspace. Once you've done that, you'll be all 
+set and ready to go!
 
