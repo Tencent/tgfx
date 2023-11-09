@@ -1,0 +1,15 @@
+comment:
+  behavior: default
+  hide_project_coverage: false
+  layout: ' diff, flags, files'
+  require_base: false
+  require_changes: false
+  require_head: false
+coverage:
+  status:
+    patch:
+      default:
+        informational: false
+    project:
+      default:
+        informational: false

@@ -13,5 +13,5 @@ if [[ `uname` == 'Darwin' ]]; then
   fi
 fi
 
-mkdir -p result
+mkdir -p resultcodecov copy
 gcovr -r . -f='src/' -f='include/' --xml-pretty -o ./result/coverage.xml
