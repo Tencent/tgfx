@@ -135,7 +135,7 @@ bool WebMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const M
 }
 
 void WebMask::aboutToFill() {
-  if (buffer.unique()) {
+  if (buffer.use_count() == 1) {
     return;
   }
   auto canvas = val::module_property("tgfx").call<val>("createCanvas2D", width(), height());
