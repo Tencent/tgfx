@@ -18,6 +18,7 @@
 
 #include "DevicePool.h"
 #include <thread>
+#include <unordered_map>
 
 namespace tgfx {
 static std::mutex threadCacheLocker = {};
