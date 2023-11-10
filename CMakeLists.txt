@@ -355,6 +355,7 @@ add_library(tgfx STATIC ${TGFX_VENDOR_TARGET} ${PLATFORM_VENDOR_TARGETS} ${TGFX_
 target_include_directories(tgfx PUBLIC include PRIVATE ${TGFX_INCLUDES} ${GPU_PLATFORM_INCLUDES})
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_PLATFORM_SHARED_LIBS} ${GPU_PLATFORM_SHARED_LIBS})
+set_target_properties(tgfx PROPERTIES PREFIX "")
 
 if (TGFX_BUILD_TESTS)
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
