@@ -14,7 +14,7 @@
 		E61EC8222AF1FCB000C82F9E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E61EC8212AF1FCB000C82F9E /* Assets.xcassets */; };
 		E61EC8252AF1FCB000C82F9E /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E61EC8232AF1FCB000C82F9E /* LaunchScreen.storyboard */; };
 		E61EC8282AF1FCB000C82F9E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = E61EC8272AF1FCB000C82F9E /* main.m */; };
-		F2272B672AF87D96004DEF8D /* libtgfx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2272B662AF87D96004DEF8D /* libtgfx.a */; };
+		F20A4C162AFEA367004CDE2A /* tgfx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F20A4C152AFEA367004CDE2A /* tgfx.a */; };
 		F25AD0712AF90ECD0017339D /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F25AD0702AF90ECD0017339D /* bridge.jpg */; };
 		F276A9802AF8D42200E482B7 /* TGFXView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F276A97F2AF8D42200E482B7 /* TGFXView.mm */; };
 /* End PBXBuildFile section */
@@ -32,7 +32,7 @@
 		E61EC8242AF1FCB000C82F9E /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		E61EC8262AF1FCB000C82F9E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E61EC8272AF1FCB000C82F9E /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		F2272B662AF87D96004DEF8D /* libtgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libtgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		F20A4C152AFEA367004CDE2A /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; name = tgfx.a; path = "tgfx/Debug-iphoneos/tgfx.a"; sourceTree = "<group>"; };
 		F25AD0702AF90ECD0017339D /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = bridge.jpg; sourceTree = "<group>"; };
 		F276A97E2AF8D3EB00E482B7 /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
 		F276A97F2AF8D42200E482B7 /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
@@ -43,7 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F2272B672AF87D96004DEF8D /* libtgfx.a in Frameworks */,
+				F20A4C162AFEA367004CDE2A /* tgfx.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,7 +91,7 @@
 		E61EC82E2AF1FEAE00C82F9E /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				F2272B662AF87D96004DEF8D /* libtgfx.a */,
+				F20A4C152AFEA367004CDE2A /* tgfx.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
