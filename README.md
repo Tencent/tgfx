@@ -23,7 +23,7 @@ video-editing apps.
 
 - iOS 9.0 or later
 - Android 4.4 or later
-- macOS 10.13 or later
+- macOS 10.15 or later
 - Windows 7.0 or later
 - Chrome 69.0 or later (Web)
 - Safari 11.3 or later (Web)
