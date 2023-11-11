@@ -297,7 +297,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -p win -a x64
+          node build_tgfx -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -346,7 +346,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -DTGFX_USE_SWIFTSHADER=ON -p linux
+          node build_tgfx -DTGFX_USE_SWIFTSHADER=ON
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -405,7 +405,7 @@ jobs:
 
       - name: Build QT
         run: |
-          node build_tgfx -DTGFX_USE_QT=ON -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake/" -p linux
+          node build_tgfx -DTGFX_USE_QT=ON -DCMAKE_PREFIX_PATH="${{env.Qt5_Dir}}/lib/cmake/" -o out/release/qt
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
