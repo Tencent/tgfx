@@ -39,7 +39,7 @@ static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache/version.j
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
 static const std::string OUT_MD5_PATH = OUT_ROOT + "/md5.json";
 static const std::string OUT_VERSION_PATH = OUT_ROOT + "/version.json";
-static const std::string GIT_HEAD_PATH = "./HEAD";
+static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache/HEAD";
 
 static nlohmann::json BaselineVersion = {};
 static nlohmann::json CacheVersion = {};
