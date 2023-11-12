@@ -4,6 +4,11 @@ project(TGFX)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./third_party/vendor_tools/vendor.cmake)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+cmake_policy(SET CMP0063 NEW)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+
 # Options for building tgfx
 option(TGFX_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
 option(TGFX_USE_QT "Allow build with QT frameworks." OFF)
@@ -51,27 +56,6 @@ message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-cmake_policy(SET CMP0063 NEW)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
-endif ()
-
-if (MSVC)
-    list(APPEND TGFX_COMPILE_OPTIONS "/utf-8")
-    list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
-    list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
-endif (MSVC)
-
-# Sets flags
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    list(APPEND TGFX_DEFINES DEBUG)
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
-endif ()
-
 # collects tgfx common files.
 list(APPEND TGFX_INCLUDES src)
 file(GLOB_RECURSE SRC_FILES
@@ -88,6 +72,22 @@ file(GLOB PLATFORM_COMMON_FILES
         src/vectors/*.*
         src/platform/*.*)
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
+endif ()
+
+if (MSVC)
+    list(APPEND TGFX_COMPILE_OPTIONS "/utf-8")
+    list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
+    list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
+endif (MSVC)
+
+# Sets flags
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    list(APPEND TGFX_DEFINES DEBUG)
+    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g -O1")
+endif ()
 
 if (TGFX_USE_QT)
     set(TGFX_USE_SWIFTSHADER OFF)
