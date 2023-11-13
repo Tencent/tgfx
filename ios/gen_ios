@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// run 'gen -h" to print help message
 const path = require('path');
 
 process.argv.push(path.resolve(__dirname, "../"));
