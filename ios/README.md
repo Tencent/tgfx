@@ -16,7 +16,7 @@ Run the following command in the ios/ directory or simply double-click on it:
 ./gen_ios
 ```
 
-This will generate an XCode project for iphoneos devices. If you want to generate a project for the 
+This will generate an XCode project for iPhone devices. If you prefer to generate a project for the
 simulator, use the following command instead:
 
 ```
