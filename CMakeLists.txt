@@ -56,6 +56,20 @@ message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 
+if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    if (DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
+    elseif (MACOS)
+        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+        else ()
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+        endif ()
+    elseif (IOS)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+    endif ()
+endif ()
+
 # collects tgfx common files.
 list(APPEND TGFX_INCLUDES src)
 file(GLOB_RECURSE SRC_FILES
@@ -408,9 +422,6 @@ if (TGFX_BUILD_TESTS)
 
     list(APPEND TGFX_TEST_COMPILE_OPTIONS ${TGFX_COMPILE_OPTIONS} -fno-access-control)
     list(APPEND TGFX_TEST_DEFINES ${TGFX_DEFINES})
-    if (MACOS AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
-        list(APPEND TGFX_TEST_LINK_OPTIONS "-ld_classic")
-    endif ()
 
     foreach (FILE_PATH ${TGFX_TEST_FILES})
         get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
