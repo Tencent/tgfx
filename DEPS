@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "c50ae515208325c3a65827829e73167235f17cc6",
+        "commit": "09c35d13cb8c0db2dabd4d0e3e864388c6c24868",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -67,10 +67,6 @@
       {
         "command": "depsync --clean",
         "dir": "third_party"
-      },
-      {
-        "command": "git lfs pull",
-        "dir": "./"
       }
     ]
   }

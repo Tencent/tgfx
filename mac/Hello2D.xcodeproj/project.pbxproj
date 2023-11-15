@@ -1,0 +1,381 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		857B02A82455D81100E533CF /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02A72455D81100E533CF /* AppDelegate.m */; };
+		857B02AD2455D81200E533CF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AC2455D81200E533CF /* Assets.xcassets */; };
+		857B02B02455D81200E533CF /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AE2455D81200E533CF /* Main.storyboard */; };
+		857B02B32455D81200E533CF /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02B22455D81200E533CF /* main.m */; };
+		F201BD722B046BB30020C0FA /* tgfx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F201BD712B046BB30020C0FA /* tgfx.a */; };
+		F201BD752B0471C00020C0FA /* TGFXView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F201BD742B0471C00020C0FA /* TGFXView.mm */; };
+		F201BD772B0472B40020C0FA /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F201BD762B0472B40020C0FA /* bridge.jpg */; };
+		F2B5D47B2B0484E8000A1CEC /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D4792B0484E8000A1CEC /* ViewController.mm */; };
+		F2B5D47C2B0484E8000A1CEC /* WindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D47A2B0484E8000A1CEC /* WindowController.mm */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		7785F05025ADB58D004D5CE9 /* WindowController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WindowController.h; sourceTree = "<group>"; };
+		857B02A32455D81100E533CF /* Hello2D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hello2D.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		857B02A62455D81100E533CF /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
+		857B02A72455D81100E533CF /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
+		857B02A92455D81100E533CF /* ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
+		857B02AC2455D81200E533CF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		857B02AF2455D81200E533CF /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		857B02B12455D81200E533CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		857B02B22455D81200E533CF /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		857B02B42455D81200E533CF /* Hello2D.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Hello2D.entitlements; sourceTree = "<group>"; };
+		F201BD712B046BB30020C0FA /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = tgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		F201BD732B0471C00020C0FA /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
+		F201BD742B0471C00020C0FA /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
+		F201BD762B0472B40020C0FA /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = bridge.jpg; path = ../../resources/assets/bridge.jpg; sourceTree = "<group>"; };
+		F2B5D4792B0484E8000A1CEC /* ViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
+		F2B5D47A2B0484E8000A1CEC /* WindowController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WindowController.mm; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		857B02A02455D81100E533CF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F201BD722B046BB30020C0FA /* tgfx.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		857B029A2455D81100E533CF = {
+			isa = PBXGroup;
+			children = (
+				857B02A52455D81100E533CF /* Hello2D */,
+				857B02A42455D81100E533CF /* Products */,
+				EBC250D9EF61A8E129790DCC /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		857B02A42455D81100E533CF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				857B02A32455D81100E533CF /* Hello2D.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		857B02A52455D81100E533CF /* Hello2D */ = {
+			isa = PBXGroup;
+			children = (
+				F201BD762B0472B40020C0FA /* bridge.jpg */,
+				857B02A62455D81100E533CF /* AppDelegate.h */,
+				857B02A72455D81100E533CF /* AppDelegate.m */,
+				F201BD732B0471C00020C0FA /* TGFXView.h */,
+				F201BD742B0471C00020C0FA /* TGFXView.mm */,
+				857B02A92455D81100E533CF /* ViewController.h */,
+				F2B5D4792B0484E8000A1CEC /* ViewController.mm */,
+				F2B5D47A2B0484E8000A1CEC /* WindowController.mm */,
+				7785F05025ADB58D004D5CE9 /* WindowController.h */,
+				857B02AC2455D81200E533CF /* Assets.xcassets */,
+				857B02AE2455D81200E533CF /* Main.storyboard */,
+				857B02B12455D81200E533CF /* Info.plist */,
+				857B02B22455D81200E533CF /* main.m */,
+				857B02B42455D81200E533CF /* Hello2D.entitlements */,
+			);
+			path = Hello2D;
+			sourceTree = "<group>";
+		};
+		EBC250D9EF61A8E129790DCC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F201BD712B046BB30020C0FA /* tgfx.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		857B02A22455D81100E533CF /* Hello2D */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 857B02B72455D81200E533CF /* Build configuration list for PBXNativeTarget "Hello2D" */;
+			buildPhases = (
+				857B029F2455D81100E533CF /* Sources */,
+				857B02A02455D81100E533CF /* Frameworks */,
+				857B02A12455D81100E533CF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Hello2D;
+			productName = Hello2D;
+			productReference = 857B02A32455D81100E533CF /* Hello2D.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		857B029B2455D81100E533CF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				ORGANIZATIONNAME = org.tgfx;
+				TargetAttributes = {
+					857B02A22455D81100E533CF = {
+						CreatedOnToolsVersion = 11.2;
+					};
+				};
+			};
+			buildConfigurationList = 857B029E2455D81100E533CF /* Build configuration list for PBXProject "Hello2D" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 857B029A2455D81100E533CF;
+			productRefGroup = 857B02A42455D81100E533CF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				857B02A22455D81100E533CF /* Hello2D */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		857B02A12455D81100E533CF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F201BD772B0472B40020C0FA /* bridge.jpg in Resources */,
+				857B02AD2455D81200E533CF /* Assets.xcassets in Resources */,
+				857B02B02455D81200E533CF /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		857B029F2455D81100E533CF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F2B5D47B2B0484E8000A1CEC /* ViewController.mm in Sources */,
+				F2B5D47C2B0484E8000A1CEC /* WindowController.mm in Sources */,
+				F201BD752B0471C00020C0FA /* TGFXView.mm in Sources */,
+				857B02B32455D81200E533CF /* main.m in Sources */,
+				857B02A82455D81100E533CF /* AppDelegate.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		857B02AE2455D81200E533CF /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				857B02AF2455D81200E533CF /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		857B02B52455D81200E533CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = NO;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = c17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		857B02B62455D81200E533CF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = NO;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = c17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		857B02B82455D81200E533CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CODE_SIGN_ENTITLEMENTS = Hello2D/Hello2D.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					GL_SILENCE_DEPRECATION,
+				);
+				INFOPLIST_FILE = Hello2D/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				USER_HEADER_SEARCH_PATHS = ../include;
+			};
+			name = Debug;
+		};
+		857B02B92455D81200E533CF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CODE_SIGN_ENTITLEMENTS = Hello2D/Hello2D.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = GL_SILENCE_DEPRECATION;
+				INFOPLIST_FILE = Hello2D/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				USER_HEADER_SEARCH_PATHS = ../include;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		857B029E2455D81100E533CF /* Build configuration list for PBXProject "Hello2D" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				857B02B52455D81200E533CF /* Debug */,
+				857B02B62455D81200E533CF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		857B02B72455D81200E533CF /* Build configuration list for PBXNativeTarget "Hello2D" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				857B02B82455D81200E533CF /* Debug */,
+				857B02B92455D81200E533CF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 857B029B2455D81100E533CF /* Project object */;
+}

@@ -23,6 +23,14 @@ simulator, use the following command instead:
 ./gen_simulator
 ```
 
+This will generate a simulator project for the native architecture, for example, `arm64` for
+Apple Silicon Macs and `x64` for Intel Macs. If you want to generate a project for the specific
+architecture, you can use the `-a` option, for example:
+
+```
+./gen_simulator -a x64
+```
+
 Additionally, you can pass cmake options using the `-D` option. For example, if you want to generate
 a project with webp encoding support, please run the following command:
 
