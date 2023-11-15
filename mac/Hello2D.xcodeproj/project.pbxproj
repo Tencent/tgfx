@@ -322,7 +322,10 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
-				OTHER_LDFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-w",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				USER_HEADER_SEARCH_PATHS = ../include;
@@ -347,7 +350,10 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				OTHER_CPLUSPLUSFLAGS = "$(OTHER_CFLAGS)";
-				OTHER_LDFLAGS = "$(inherited)";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-w",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				USER_HEADER_SEARCH_PATHS = ../include;
