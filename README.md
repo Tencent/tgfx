@@ -50,8 +50,10 @@ video-editing apps.
 
 - Xcode 11.0+
 - GCC 8.0+
-- CMake 3.10.2+
 - Visual Studio 2019
+- NodeJS 14.14.0+
+- Ninja 1.9.0+
+- CMake 3.10.2+ (**Recommended to always use the latest version to avoid building errors.**)
 - NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
 
 ## Dependency Management
