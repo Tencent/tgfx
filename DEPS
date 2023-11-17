@@ -1,5 +1,5 @@
 {
-  "version": "1.3.9",
+  "version": "1.3.11",
   "vars": {
     "PAG_GROUP": "https://github.com/libpag"
   },
