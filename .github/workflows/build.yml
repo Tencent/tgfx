@@ -27,7 +27,7 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: tgfx-environment-ios-20231025
+          key: tgfx-environment-ios-20231117
           restore-keys: tgfx-environment-ios-
 
       - name: Get Third-Party Cache
@@ -67,7 +67,7 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
-          key: tgfx-environment-ios-20231025
+          key: tgfx-environment-ios-20231117
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -191,7 +191,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: tgfx-environment-web-20231025
+          key: tgfx-environment-web-20231117
           restore-keys: tgfx-environment-web-
 
       - name: Get Third-Party Cache
@@ -250,7 +250,7 @@ jobs:
             /usr/local/bin/emcc.py
             /usr/local/bin/emcmake.py
             /usr/local/bin/emar.py
-          key: tgfx-environment-web-20231025
+          key: tgfx-environment-web-20231117
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

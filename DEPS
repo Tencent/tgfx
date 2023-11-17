@@ -1,5 +1,5 @@
 {
-  "version": "1.3.1",
+  "version": "1.3.8",
   "vars": {
     "PAG_GROUP": "https://github.com/libpag"
   },
@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "ae10b51442051a2c8099439d42c96db17c608ffc",
+        "commit": "58d424b08c6a801fc5562076b41b3ba22b6bfa2e",
         "dir": "third_party/vendor_tools"
       },
       {
