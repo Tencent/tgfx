@@ -12,7 +12,7 @@ fi
 RELEASE_CONF="-Oz -s"
 CMAKE_BUILD_TYPE=Relese
 
-if [[ $@ == *debug* ]]; then
+if [ $@ == *debug* ]; then
   CMAKE_BUILD_TYPE=Debug
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
 fi
@@ -21,7 +21,7 @@ emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_B
 
 cmake --build $BUILD_DIR --target tgfx
 
-if [[ $@ == *demo* ]]; then
+if [ $@ == *demo* ]; then
   DEMO_FILE=$SOURCE_DIR/web/demo/TGFXDemoBindings.cpp
 fi
 
@@ -66,7 +66,7 @@ if [ ! -d "../node_modules" ]; then
   npm install
 fi
 
-if [[ ! $@ == *debug* ]]; then
+if [ ! $@ == *debug* ]; then
   npm run build
 fi
 
