@@ -134,7 +134,7 @@ Java_org_tgfx_hello2d_TGFXView_nativeRelease(JNIEnv* env, jobject thiz) {
 }
 
 JNIEXPORT void JNICALL
-Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(JNIEnv* env, jobject thiz) {
+Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(JNIEnv* env, jobject ) {
   auto clazz = env->FindClass("org/tgfx/hello2d/TGFXView");
   hello2d::TGFXView_nativePtr = env->GetFieldID(clazz, "nativePtr", "J");
 }
