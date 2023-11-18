@@ -138,6 +138,13 @@ To access additional details and options, execute the command along with the `-h
 node build_tgfx -h
 ```
 
+## Integration
+
+We offer concise demos for different platforms, demonstrating the seamless integration of the tgfx
+library into your project. For more information, please refer to the README.md documentation within
+each demo directory. If you are looking for guidance on API usage, consider exploring the test cases 
+found in the `test/` directory. They may provide valuable insights and assistance.
+
 ## Development
 
 We recommend using CLion IDE on the macOS platform for development. After the synchronization, you
