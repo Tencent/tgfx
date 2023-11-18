@@ -47,7 +47,7 @@ various video-editing apps.
 
 ## Build Prerequisites
 
-TGFX utilizes the C++17 features for development. Below are the minimum tools needed for building tgfx on different platforms:
+TGFX utilizes the **C++17** features for development. Below are the minimum tools needed for building tgfx on different platforms:
 
 - Xcode 11.0+
 - GCC 8.0+
@@ -96,7 +96,7 @@ depsync
 Git account and password may be required during synchronizing. Please make sure you have enabled the
 `git-credential-store` so that `CMakeList.txt` can trigger synchronizing automatically next time.
 
-## Build
+## Build TGFX
 
 TGFX uses a set of [build tools](https://github.com/libpag/vendor_tools) written in NodeJS, enabling
 a unified approach to build tgfx across all platforms.
