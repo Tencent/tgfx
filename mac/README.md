@@ -28,7 +28,7 @@ Additionally, you can pass cmake options using the `-D` option. For example, if 
 a project with webp encoding support, please run the following command:
 
 ```
-./gen_mac -DPAG_USE_WEBP_ENCODE=ON
+./gen_mac -DTGFX_USE_WEBP_ENCODE=ON
 ```
 
 At last, launch XCode and open the mac/Hello2D.xcworkspace. You'll be ready to go!

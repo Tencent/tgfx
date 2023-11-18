@@ -9,15 +9,14 @@
 
 ## Introduction
 
-TGFX (Tencent Graphics) is a lightweight 2D graphics library designed for rendering texts, 
-geometries, and images. It provides high-performance APIs that work across a variety of GPU hardware 
-and software platforms, including iOS, Android, macOS, Windows, Linux, Web, and more. TGFX was 
-initially created as a core component of the [PAG](https://pag.art) project and has since become the
-default graphics engine for the [libpag](https://github.com/Tencent/libpag) library, starting from 
-version 4.0. Its main objective is to offer a compelling alternative to the Skia graphics library 
-while maintaining a much smaller binary size. Over time, it has found its way into many other products, 
-such as [Hippy](https://github.com/Tencent/Hippy), [Tencent Docs](https://docs.qq.com) and various 
-video-editing apps.
+TGFX (Tencent Graphics) is a lightweight 2D graphics library designed for rendering texts,
+geometries, and images. It provides high-performance APIs that work across a variety of GPU hardware
+and software platforms, including iOS, Android, macOS, Windows, Linux, Web, and more. TGFX was
+originally designed to serve as the default graphics engine for the [PAG](https://pag.art) project
+starting from version 4.0. Its main objective is to offer a compelling alternative to the Skia graphics
+library while maintaining a much smaller binary size. Over time, it has found its way into many other
+products, such as [Hippy](https://github.com/Tencent/Hippy), [Tencent Docs](https://docs.qq.com) and
+various video-editing apps.
 
 ## Platform Support
 
@@ -48,13 +47,22 @@ video-editing apps.
 
 ## Build Prerequisites
 
+TGFX utilizes the C++17 features for development. Below are the minimum tools needed for building tgfx on different platforms:
+
 - Xcode 11.0+
 - GCC 8.0+
 - Visual Studio 2019
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
-- CMake 3.10.2+ (**Recommended to always use the latest version to avoid building errors.**)
-- NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
+- CMake 3.10.2+
+- NDK 19.2.5345600
+
+Please pay attention to the following additional notices:
+
+- Make sure you have installed at least the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
+- It is highly recommended to **use the latest version of CMake**, Numerous outdated versions of CMake may carry various bugs across different platforms.
+- Please use NDK version **`19.2.5345600`** to avoid potential failures. You can place the NDK in the default location or set environment variables
+  (`NDK_HOME`, `NDK_PATH`, `ANDROID_NDK_HOME`, `ANDROID_NDK`) for tgfx to locate it.
 
 ## Dependency Management
 
@@ -88,25 +96,62 @@ depsync
 Git account and password may be required during synchronizing. Please make sure you have enabled the
 `git-credential-store` so that `CMakeList.txt` can trigger synchronizing automatically next time.
 
+## Build
 
-## Build & Run
+TGFX uses a set of [build tools](https://github.com/libpag/vendor_tools) written in NodeJS, enabling
+a unified approach to build tgfx across all platforms.
 
-We recommend using CLion IDE on the macOS platform for development. After the synchronization, you 
+To quickly get started, simply execute the following command in the root directory:
+
+```
+node build_tgfx
+```
+
+This command will build the release version of the tgfx library for the native platform. After the
+execution, you will locate the compiled tgfx libraries in the `out/release` directory. If you wish to
+target a specific platform, simply use the `-p [--platform]` option. The supported platform names
+are as follows: `win`, `mac`, `ios`, `linux`, `android`, `web`.
+
+```
+node build_tgfx -p ios
+```
+
+When working with apple platforms, you have the additional `-x [--xcframework]` option at your disposal,
+which allows you to effortlessly create xcframeworks.
+
+```
+node build_tgfx -p mac -x
+```
+
+After the execution, you will locate the `tgfx.xcframework` in the `out/release/mac` directory.
+
+Additionally, you can pass cmake options using the `-D` prefix. For example, if you want to build
+tgfx with the freetype option enabled, please run the following command:
+
+```
+node build_tgfx -DTGFX_USE_FREETYPE=ON
+```
+
+To access additional details and options, execute the command along with the `-h [--help]` option:
+
+```
+node build_tgfx -h
+```
+
+## Development
+
+We recommend using CLion IDE on the macOS platform for development. After the synchronization, you
 can open the project with CLion and build the tgfx library.
 
 **For macOS platform：**
 
-There are no extra configurations of CLion required.
+- There are no extra configurations of CLion required.
 
 **For Windows platform：**
 
-Please follow the following steps to configure the CLion environment correctly:
-
-- Make sure you have installed at least the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
 - Open the **File->Setting** panel, and go to **Build, Execution, Deployment->ToolChains**, then set the toolchain of CLion to **Visual Studio** with **amd64 (Recommended)** or **x86** architecture.
 
-**Note: If anything goes wrong during cmake building, please update the cmake commandline tool to the latest
-version and try again.** 
+And then, launch CLion and open the tgfx project. You'll be good to go!
 
 
 ## Support Us
