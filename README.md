@@ -158,12 +158,11 @@ And then, launch CLion and open the tgfx project. You'll be good to go!
 
 If you find tgfx is helpful, please give us a **Star**. We sincerely appreciate your support :)
 
+[![Star History Chart](https://api.star-history.com/svg?repos=Tencent/tgfx&type=Date)](https://star-history.com/#Tencent/tgfx&Date)
 
 ## License
 
 TGFX is licensed under the [BSD-3-Clause License](./LICENSE.txt)
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Tencent/tgfx&type=Date)](https://star-history.com/#Tencent/tgfx&Date)
 
 ## Contribution
 
