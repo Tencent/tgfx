@@ -126,7 +126,6 @@
                                               tgfx::Color::Black());
   tgfx::Paint paint = {};
   paint.setImageFilter(filter);
-  auto size = static_cast<int>(256 * scale);
   NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
   auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
   canvas->drawImage(image, (_width - image->width()) / 2, (_height - image->height()) / 2, &paint);
