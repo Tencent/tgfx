@@ -102,8 +102,16 @@ std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, in
   return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
 }
 
-std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* data, size_t length, int ttcIndex) {
-  return FTTypeface::Make(FTFontData(data, length, ttcIndex));
+std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* bytes, size_t length, int ttcIndex) {
+  auto data = Data::MakeWithCopy(bytes, length);
+  return MakeFromData(std::move(data), ttcIndex);
+}
+
+std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int ttcIndex) {
+  if (data == nullptr || data->empty()) {
+    return nullptr;
+  }
+  return FTTypeface::Make(FTFontData(std::move(data), ttcIndex));
 }
 
 std::shared_ptr<Typeface> Typeface::MakeDefault() {
