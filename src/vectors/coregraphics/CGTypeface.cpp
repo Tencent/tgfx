@@ -88,7 +88,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* bytes, size_t leng
   return MakeFromData(std::move(data), ttcIndex);
 }
 
-std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int ttcIndex) {
+std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int) {
   if (data == nullptr || data->empty()) {
     return nullptr;
   }
