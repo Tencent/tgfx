@@ -26,8 +26,7 @@ struct FTFontData {
   FTFontData(std::string path, int ttcIndex) : path(std::move(path)), ttcIndex(ttcIndex) {
   }
 
-  FTFontData(const void* data, size_t length, int ttcIndex)
-      : data(Data::MakeWithCopy(data, length)), ttcIndex(ttcIndex) {
+  FTFontData(std::shared_ptr<Data> data, int ttcIndex) : data(std::move(data)), ttcIndex(ttcIndex) {
   }
 
   std::string path;

@@ -37,6 +37,10 @@ std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void*, size_t, int) {
   return nullptr;
 }
 
+std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data>, int) {
+  return nullptr;
+}
+
 std::shared_ptr<Typeface> Typeface::MakeDefault() {
   return WebTypeface::Make("Arial");
 }

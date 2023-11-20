@@ -59,7 +59,13 @@ class Typeface {
    * Creates a new typeface for the given file bytes and ttc index. Returns nullptr if the typeface
    * can't be created.
    */
-  static std::shared_ptr<Typeface> MakeFromBytes(const void* data, size_t length, int ttcIndex = 0);
+  static std::shared_ptr<Typeface> MakeFromBytes(const void* bytes, size_t length, int ttcIndex = 0);
+
+  /**
+   * Creates a new typeface for the given file data and ttc index. Returns nullptr if the typeface
+   * can't be created.
+   */
+  static std::shared_ptr<Typeface> MakeFromData(std::shared_ptr<Data> data, int ttcIndex = 0);
 
   virtual ~Typeface() = default;
 

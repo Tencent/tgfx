@@ -83,14 +83,18 @@ std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, in
   return typeface;
 }
 
-std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* data, size_t length, int) {
-  auto copyData = Data::MakeWithCopy(data, length);
-  if (copyData->size() == 0) {
+std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* bytes, size_t length, int ttcIndex) {
+  auto data = Data::MakeWithCopy(bytes, length);
+  return MakeFromData(std::move(data), ttcIndex);
+}
+
+std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int) {
+  if (data == nullptr || data->empty()) {
     return nullptr;
   }
   auto cfData =
-      CFDataCreateWithBytesNoCopy(kCFAllocatorNull, static_cast<const UInt8*>(copyData->data()),
-                                  static_cast<CFIndex>(copyData->size()), kCFAllocatorNull);
+      CFDataCreateWithBytesNoCopy(kCFAllocatorNull, static_cast<const UInt8*>(data->data()),
+                                  static_cast<CFIndex>(data->size()), kCFAllocatorNull);
   if (cfData == nullptr) {
     return nullptr;
   }
@@ -99,7 +103,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* data, size_t lengt
   if (cfDesc) {
     auto ctFont = CTFontCreateWithFontDescriptor(cfDesc, 0, nullptr);
     if (ctFont) {
-      typeface = CGTypeface::Make(ctFont, std::move(copyData));
+      typeface = CGTypeface::Make(ctFont, std::move(data));
       CFRelease(ctFont);
     }
     CFRelease(cfDesc);
