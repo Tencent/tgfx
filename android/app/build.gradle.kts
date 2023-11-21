@@ -26,8 +26,12 @@ android {
             }
         }
         ndk {
-            abiFilters.add("armeabi-v7a")
-            abiFilters.add("arm64-v8a")
+            if (project.hasProperty("arm64-only")) {
+                abiFilters.add("arm64-v8a")
+            } else {
+                abiFilters.add("armeabi-v7a")
+                abiFilters.add("arm64-v8a")
+            }
         }
     }
 
