@@ -108,6 +108,14 @@ jobs:
           key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-android-
 
+      - name: Get JDK Cache
+        id: jdk-cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.JAVA_HOME_17_X64 }}
+          key: ${{ runner.os }}-jdk-17
+          restore-keys: ${{ runner.os }}-jdk-
+
       - uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Run depsync
@@ -121,8 +129,10 @@ jobs:
         with:
           ndk-version: r19c
           local-cache: true
-          
-      - uses: actions/setup-java@v3
+
+      - name: Install Java
+        if: ${{ steps.jdk-cache.outputs.cache-hit != 'true' }}
+        uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '17'
