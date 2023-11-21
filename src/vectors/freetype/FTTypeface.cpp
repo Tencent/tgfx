@@ -52,7 +52,7 @@ class EmptyTypeface : public Typeface {
     return false;
   }
 
-  GlyphID getGlyphID(const std::string&) const override {
+  GlyphID getGlyphID(Unichar) const override {
     return 0;
   }
 

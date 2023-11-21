@@ -36,6 +36,7 @@
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/utils/UTF.h"
 #include "utils/MathExtra.h"
+#include "utils/SimpleTextShaper.h"
 
 namespace tgfx {
 static uint32_t NextClipID() {
@@ -550,7 +551,7 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
                             const tgfx::Paint& paint) {
-  auto [glyphIDs, positions] = ShapeSimpleText(text, font);
+  auto [glyphIDs, positions] = SimpleTextShaper::Shape(text, font);
   for (auto& position : positions) {
     position.offset(x, y);
   }
