@@ -53,7 +53,9 @@ jobs:
 
       - name: Build iOS
         run: |
-          node build_tgfx -p ios -a arm64
+          cd ios
+          node gen_ios
+          xcodebuild -workspace Hello2D.xcworkspace -scheme Hello2D -configuration Release -sdk iphoneos -arch arm64
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
