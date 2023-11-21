@@ -23,6 +23,13 @@
         "text_shape": "d010fb8",
         "tileMode": "d010fb8"
     },
+    "DrawersTest": {
+        "GridBackground": "5a1fb11",
+        "ImageWithMipmap": "5a1fb11",
+        "ImageWithShadow": "5a1fb11",
+        "SimpleText": "5a1fb11",
+        "SweepGradient": "5a1fb11"
+    },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
         "update_mask": "d010fb8"

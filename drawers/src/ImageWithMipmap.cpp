@@ -16,21 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-package org.tgfx.hello2d
+#include "base/Drawers.h"
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-
-class MainActivity : ComponentActivity() {
-
-    private var drawIndex: Int = 0;
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        val view = findViewById<TGFXView>(R.id.tgfx_view)
-        view.setOnClickListener {
-            drawIndex++;
-            view.draw(drawIndex)
-        }
-    }
+namespace tdraw {
+void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const {
+  auto scale = host->density();
+  auto width = host->width();
+  auto height = host->height();
+  auto screenSize = std::min(width, height);
+  auto size = screenSize - static_cast<int>(150 * scale);
+  size = std::max(size, 50);
+  auto image = host->getImage("bridge");
+  image = image->makeMipMapped();
+  auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
+  auto matrix = tgfx::Matrix::MakeScale(imageScale);
+  matrix.postTranslate(static_cast<float>(width - size) / 2, static_cast<float>(height - size) / 2);
+  canvas->concat(matrix);
+  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipMapMode::Linear);
+  canvas->drawImage(image, sampling);
 }
+}  // namespace tdraw

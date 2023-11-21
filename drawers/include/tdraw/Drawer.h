@@ -16,21 +16,51 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-package org.tgfx.hello2d
+#pragma once
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
+#include "tdraw/AppHost.h"
+#include "tgfx/core/Canvas.h"
 
-class MainActivity : ComponentActivity() {
+namespace tdraw {
+class Drawer {
+ public:
+  /**
+   * Returns the number of drawers.
+   */
+  static int Count();
 
-    private var drawIndex: Int = 0;
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        val view = findViewById<TGFXView>(R.id.tgfx_view)
-        view.setOnClickListener {
-            drawIndex++;
-            view.draw(drawIndex)
-        }
-    }
-}
+  /**
+   * Returns the names of all drawers.
+   */
+  static const std::vector<std::string>& Names();
+
+  /**
+   * Returns the drawer with the given index.
+   */
+  static const Drawer* GetByIndex(int index);
+
+  /**
+   * Returns the drawer with the given name.
+   */
+  static const Drawer* GetByName(const std::string& name);
+
+  explicit Drawer(std::string name);
+
+  virtual ~Drawer() = default;
+
+  std::string name() const {
+    return _name;
+  }
+
+  /**
+   * Draws the contents to the given canvas.
+   */
+  void draw(tgfx::Canvas* canvas, const AppHost* host) const;
+
+ protected:
+  virtual void onDraw(tgfx::Canvas* canvas, const AppHost* host) const = 0;
+
+ private:
+  std::string _name;
+};
+}  // namespace tdraw

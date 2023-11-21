@@ -18,13 +18,14 @@
 
 #import "TGFXView.h"
 #include <cmath>
+#include "tdraw/Drawer.h"
 
 @implementation TGFXView {
   int _width;
   int _height;
   std::shared_ptr<tgfx::EAGLWindow> window;
   std::shared_ptr<tgfx::Surface> surface;
-  int drawCount;
+  std::unique_ptr<tdraw::AppHost> appHost;
 }
 
 + (Class)layerClass {
@@ -61,6 +62,17 @@
   _width = static_cast<int>(roundf(width));
   _height = static_cast<int>(roundf(height));
   surface = nullptr;
+  if (appHost == nullptr) {
+    appHost = std::make_unique<tdraw::AppHost>();
+    NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
+    auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
+    appHost->addImage("bridge", image);
+    auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
+    appHost->addTypeface("default", typeface);
+    typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
+    appHost->addTypeface("emoji", typeface);
+  }
+  appHost->updateScreen(_width, _height, self.layer.contentsScale);
 }
 
 - (void)createSurface {
@@ -82,7 +94,7 @@
   device->unlock();
 }
 
-- (void)draw {
+- (void)draw:(int)index {
   if (surface == nullptr) {
     [self createSurface];
   }
@@ -97,66 +109,17 @@
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  [self drawBackground:canvas];
-  if (drawCount % 2 == 0) {
-    [self drawShape:canvas];
-  } else {
-    [self drawImage:canvas];
-  }
+  auto numDrawers = tdraw::Drawer::Count() - 1;
+  index = (index % numDrawers) + 1;
+  auto drawer = tdraw::Drawer::GetByName("GridBackground");
+  drawer->draw(canvas, appHost.get());
+  drawer = tdraw::Drawer::GetByIndex(index);
+  drawer->draw(canvas, appHost.get());
   canvas->restore();
-  drawCount++;
   surface->flush();
   context->submit();
   window->present(context);
   device->unlock();
 }
 
-- (void)drawShape:(tgfx::Canvas*)canvas {
-  auto scale = [UIScreen mainScreen].scale;
-  tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
-  tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
-  tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
-  auto shader = tgfx::Shader::MakeSweepGradient(tgfx::Point::Make(_width / 2, _height / 2), 0, 360,
-                                                {cyan, magenta, yellow, cyan}, {});
-  tgfx::Paint paint = {};
-  paint.setShader(shader);
-  auto size = static_cast<int>(256 * scale);
-  auto rect = tgfx::Rect::MakeXYWH((_width - size) / 2, (_height - size) / 2, size, size);
-  tgfx::Path path = {};
-  path.addRoundRect(rect, 20 * scale, 20 * scale);
-  canvas->drawPath(path, paint);
-};
-
-- (void)drawImage:(tgfx::Canvas*)canvas {
-  auto scale = [UIScreen mainScreen].scale;
-  auto filter = tgfx::ImageFilter::DropShadow(5 * scale, 5 * scale, 50 * scale, 50 * scale,
-                                              tgfx::Color::Black());
-  tgfx::Paint paint = {};
-  paint.setImageFilter(filter);
-  auto size = static_cast<int>(256 * scale);
-  auto rect = tgfx::Rect::MakeXYWH((_width - size) / 2, (_height - size) / 2, size, size);
-  tgfx::Path path = {};
-  path.addRoundRect(rect, 20 * scale, 20 * scale);
-  NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
-  auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
-  canvas->drawImage(image, (_width - image->width()) / 2, (_height - image->height()) / 2, &paint);
-};
-
-- (void)drawBackground:(tgfx::Canvas*)canvas {
-  tgfx::Paint paint;
-  paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
-  int tileSize = 8 * [UIScreen mainScreen].scale;
-  for (int y = 0; y < _height; y += tileSize) {
-    bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < _width; x += tileSize) {
-      if (draw) {
-        auto rect =
-            tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
-                                 static_cast<float>(tileSize), static_cast<float>(tileSize));
-        canvas->drawRect(rect, paint);
-      }
-      draw = !draw;
-    }
-  }
-}
 @end

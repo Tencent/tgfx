@@ -143,7 +143,7 @@ node build_tgfx -h
 We offer concise demos for different platforms, demonstrating the seamless integration of the tgfx
 library into your project. For more information, please refer to the README.md documentation within
 each demo directory. If you are looking for guidance on API usage, consider exploring the test cases 
-found in the `test/` directory. They may provide valuable insights and assistance.
+found in the `test/` and `drawers/` directories. They may provide valuable insights and assistance.
 
 ## Development
 

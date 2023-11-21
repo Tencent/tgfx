@@ -16,21 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-package org.tgfx.hello2d
+#include "base/Drawers.h"
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-
-class MainActivity : ComponentActivity() {
-
-    private var drawIndex: Int = 0;
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        val view = findViewById<TGFXView>(R.id.tgfx_view)
-        view.setOnClickListener {
-            drawIndex++;
-            view.draw(drawIndex)
-        }
+namespace tdraw {
+void GridBackground::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const {
+  tgfx::Paint paint;
+  paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
+  int tileSize = 8 * static_cast<int>(host->density());
+  auto width = host->width();
+  auto height = host->height();
+  for (int y = 0; y < height; y += tileSize) {
+    bool draw = (y / tileSize) % 2 == 1;
+    for (int x = 0; x < width; x += tileSize) {
+      if (draw) {
+        auto rect =
+            tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                 static_cast<float>(tileSize), static_cast<float>(tileSize));
+        canvas->drawRect(rect, paint);
+      }
+      draw = !draw;
     }
+  }
 }
+}  // namespace tdraw

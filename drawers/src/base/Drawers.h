@@ -16,21 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-package org.tgfx.hello2d
+#pragma once
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
+#include "tdraw/Drawer.h"
 
-class MainActivity : ComponentActivity() {
+namespace tdraw {
+#define DEFINE_DRAWER(DrawerName)                                                 \
+  class DrawerName : public tdraw::Drawer {                                       \
+   public:                                                                        \
+    DrawerName() : tdraw::Drawer(#DrawerName) {                                   \
+    }                                                                             \
+                                                                                  \
+   protected:                                                                     \
+    void onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const override; \
+  }
 
-    private var drawIndex: Int = 0;
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        val view = findViewById<TGFXView>(R.id.tgfx_view)
-        view.setOnClickListener {
-            drawIndex++;
-            view.draw(drawIndex)
-        }
-    }
-}
+DEFINE_DRAWER(GridBackground);
+DEFINE_DRAWER(SweepGradient);
+DEFINE_DRAWER(ImageWithMipmap);
+DEFINE_DRAWER(ImageWithShadow);
+DEFINE_DRAWER(SimpleText);
+
+}  // namespace tdraw

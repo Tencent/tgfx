@@ -21,9 +21,12 @@
 
 @interface ViewController ()
 @property(weak, nonatomic) IBOutlet TGFXView* tgfxView;
+@property(nonatomic) int drawCount;
 @end
 
-@implementation ViewController
+@implementation ViewController {
+  int drawIndex;
+}
 
 - (void)viewDidLoad {
   [super viewDidLoad];
@@ -33,12 +36,13 @@
   [self.tgfxView addGestureRecognizer:tap];
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
                  dispatch_get_main_queue(), ^{
-                   [self.tgfxView draw];
+                   [self.tgfxView draw:self.drawCount];
                  });
 }
 
 - (void)tgfxViewClicked {
-  [self.tgfxView draw];
+  self.drawCount++;
+  [self.tgfxView draw:self.drawCount];
 }
 
 @end
