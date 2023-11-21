@@ -121,6 +121,12 @@ jobs:
         with:
           ndk-version: r19c
           local-cache: true
+          
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
 
       - name: Build Android
         run: |
