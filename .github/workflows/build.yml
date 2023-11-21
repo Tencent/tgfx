@@ -83,13 +83,8 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: tgfx_ios_arm64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_ios_arm64
-          path: out
+          name: ios_build
+          path: ios
 
   android:
     runs-on: ubuntu-latest
@@ -147,13 +142,8 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: tgfx_android_arm64v8a
-          path: android/app/build/outputs
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_android_arm64v8a
-          path: android/app/build/outputs
+          name: android_build
+          path: android/app/build
 
   web:
     runs-on: macos-latest
@@ -273,12 +263,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: tgfx_web_wasm
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_web_wasm
+          name: web_build
           path: out
 
   win:
@@ -320,12 +305,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: tgfx_win_x64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_win_x64
+          name: win_build
           path: out
 
   linux:
@@ -369,12 +349,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: tgfx_linux_x64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_linux_x64
+          name: linux_build
           path: out
 
   qt:
@@ -428,10 +403,5 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: tgfx_qt_x64
-          path: out
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tgfx_qt_x64
+          name: qt_build
           path: out
