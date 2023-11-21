@@ -37,6 +37,8 @@ std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);
 
 std::shared_ptr<Image> MakeImage(const std::string& path);
 
+std::shared_ptr<Typeface> MakeTypeface(const std::string& path);
+
 std::shared_ptr<Data> ReadFile(const std::string& path);
 
 void SaveFile(std::shared_ptr<Data> data, const std::string& key);

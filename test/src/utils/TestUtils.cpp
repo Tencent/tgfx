@@ -54,6 +54,10 @@ std::shared_ptr<Image> MakeImage(const std::string& path) {
   return Image::MakeFromFile(ProjectPath::Absolute(path));
 }
 
+std::shared_ptr<Typeface> MakeTypeface(const std::string& path) {
+  return Typeface::MakeFromPath(ProjectPath::Absolute(path));
+}
+
 std::shared_ptr<Data> ReadFile(const std::string& path) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute(path));
   if (stream == nullptr) {

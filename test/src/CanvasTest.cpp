@@ -28,7 +28,6 @@
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
 #include "tgfx/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"

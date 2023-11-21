@@ -23,17 +23,16 @@
 #include <android/native_window_jni.h>
 #include "tgfx/gpu/Window.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
+#include "tdraw/Drawer.h"
 
 namespace hello2d {
 class JTGFXView {
  public:
   explicit JTGFXView(ANativeWindow* nativeWindow,
-                     std::shared_ptr<tgfx::Window> window,
-                     std::shared_ptr<tgfx::Data> imageBytes, float density)
+                     std::shared_ptr<tgfx::Window> window, std::unique_ptr<tdraw::AppHost> appHost)
       : nativeWindow(nativeWindow),
         window(std::move(window)),
-        imageBytes(std::move(imageBytes)),
-        density(density) {
+        appHost(std::move(appHost)) {
     updateSize();
   }
 
@@ -43,22 +42,16 @@ class JTGFXView {
 
   void updateSize();
 
-  void draw();
+  void draw(int index);
 
  private:
   void createSurface();
 
-  void drawBackground(tgfx::Canvas* canvas);
-  void drawShape(tgfx::Canvas* canvas);
-  void drawImage(tgfx::Canvas* canvas);
-
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
   std::shared_ptr<tgfx::Surface> surface;
-  std::shared_ptr<tgfx::Data> imageBytes;
+  std::shared_ptr<tdraw::AppHost> appHost;
   int _width = 0;
   int _height = 0;
-  float density = 1.0f;
-  int drawCount = 0;
 };
 }

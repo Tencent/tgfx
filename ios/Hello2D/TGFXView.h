@@ -26,6 +26,6 @@
 
 @interface TGFXView : UIView
 
-- (void)draw;
+- (void)draw:(int)index;
 
 @end

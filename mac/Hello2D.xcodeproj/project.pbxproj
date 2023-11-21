@@ -16,6 +16,7 @@
 		F201BD772B0472B40020C0FA /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F201BD762B0472B40020C0FA /* bridge.jpg */; };
 		F2B5D47B2B0484E8000A1CEC /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D4792B0484E8000A1CEC /* ViewController.mm */; };
 		F2B5D47C2B0484E8000A1CEC /* WindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D47A2B0484E8000A1CEC /* WindowController.mm */; };
+		F2F2CEFC2B0B5C510092BD3B /* tgfx-drawers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEFB2B0B5C510092BD3B /* tgfx-drawers.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +36,7 @@
 		F201BD762B0472B40020C0FA /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = bridge.jpg; path = ../../resources/assets/bridge.jpg; sourceTree = "<group>"; };
 		F2B5D4792B0484E8000A1CEC /* ViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
 		F2B5D47A2B0484E8000A1CEC /* WindowController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WindowController.mm; sourceTree = "<group>"; };
+		F2F2CEFB2B0B5C510092BD3B /* tgfx-drawers.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-drawers.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,6 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F2F2CEFC2B0B5C510092BD3B /* tgfx-drawers.a in Frameworks */,
 				F201BD722B046BB30020C0FA /* tgfx.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -90,6 +93,7 @@
 		EBC250D9EF61A8E129790DCC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				F2F2CEFB2B0B5C510092BD3B /* tgfx-drawers.a */,
 				F201BD712B046BB30020C0FA /* tgfx.a */,
 			);
 			name = Frameworks;
@@ -328,7 +332,10 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				USER_HEADER_SEARCH_PATHS = ../include;
+				USER_HEADER_SEARCH_PATHS = (
+					../include,
+					../drawers/include,
+				);
 			};
 			name = Debug;
 		};
@@ -356,7 +363,10 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = org.tgfx.hello2d;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				USER_HEADER_SEARCH_PATHS = ../include;
+				USER_HEADER_SEARCH_PATHS = (
+					../include,
+					../drawers/include,
+				);
 			};
 			name = Release;
 		};
