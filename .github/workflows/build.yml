@@ -131,7 +131,7 @@ jobs:
       - name: Build Android
         run: |
           cd android
-          ./gradlew assembleRelease -Parmeabi-v7a
+          ./gradlew assembleRelease -Parm64-only
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
@@ -148,12 +148,12 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: tgfx_android_arm64v8a
-          path: out
+          path: android/app/build/outputs
 
       - uses: actions/upload-artifact@v3
         with:
           name: tgfx_android_arm64v8a
-          path: out
+          path: android/app/build/outputs
 
   web:
     runs-on: macos-latest
