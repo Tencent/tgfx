@@ -52,7 +52,7 @@ class EmptyTypeface : public Typeface {
     return false;
   }
 
-  GlyphID getGlyphID(const std::string&) const override {
+  GlyphID getGlyphID(Unichar) const override {
     return 0;
   }
 
@@ -161,16 +161,7 @@ bool FTTypeface::hasColor() const {
   return FT_HAS_COLOR(_face->face);
 }
 
-GlyphID FTTypeface::getGlyphID(const std::string& name) const {
-  if (name.empty()) {
-    return 0;
-  }
-  auto count = UTF::CountUTF8(name.c_str(), name.size());
-  if (count > 1 || count <= 0) {
-    return 0;
-  }
-  const char* start = name.data();
-  auto unichar = UTF::NextUTF8(&start, start + name.size());
+GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
   return FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(unichar));
 }
 

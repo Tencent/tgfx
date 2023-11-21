@@ -185,11 +185,9 @@ static size_t ToUTF16(int32_t uni, uint16_t utf16[2]) {
   return 1 + extra;
 }
 
-GlyphID CGTypeface::getGlyphID(const std::string& name) const {
-  const char* start = &(name[0]);
-  auto uni = UTF::NextUTF8(&start, start + name.size());
+GlyphID CGTypeface::getGlyphID(Unichar unichar) const {
   UniChar utf16[2] = {0, 0};
-  auto srcCount = ToUTF16(uni, utf16);
+  auto srcCount = ToUTF16(unichar, utf16);
   GlyphID macGlyphs[2] = {0, 0};
   CTFontGetGlyphsForCharacters(ctFont, utf16, macGlyphs, static_cast<CFIndex>(srcCount));
   return macGlyphs[0];

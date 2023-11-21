@@ -25,9 +25,14 @@
 
 namespace tgfx {
 /**
- * 16 bit unsigned integer to hold a glyph index
+ * 16 bit unsigned integer to hold a glyph index.
  */
 typedef uint16_t GlyphID;
+
+/**
+ * 32-bit signed integer to hold a UTF-32 code unit.
+ */
+typedef int32_t Unichar;
 
 typedef uint32_t FontTableTag;
 
@@ -101,9 +106,15 @@ class Typeface {
 
   /**
    * Returns the glyph ID corresponds to the specified glyph name. The glyph name must be in utf-8
-   * encoding. Returns 0 if the glyph name is not associated with this typeface.
+   * encoding. Returns 0 if the glyph name is not in this typeface.
    */
-  virtual GlyphID getGlyphID(const std::string& name) const = 0;
+  GlyphID getGlyphID(const std::string& name) const;
+
+  /**
+   * Returns the glyph ID corresponds to the specified unicode code point. Returns 0 if the code
+   * point is not in this typeface.
+   */
+  virtual GlyphID getGlyphID(Unichar unichar) const = 0;
 
   virtual std::shared_ptr<Data> getBytes() const = 0;
 

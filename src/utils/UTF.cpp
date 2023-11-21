@@ -107,4 +107,29 @@ int32_t UTF::NextUTF8(const char** ptr, const char* end) {
   *ptr = (char*)p + 1;
   return c;
 }
+
+std::string UTF::ToUTF8(int32_t unichar) {
+  if ((uint32_t)unichar > 0x10FFFF) {
+    return "";
+  }
+  if (unichar <= 127) {
+    return {(char)unichar};
+  }
+  char tmp[4];
+  char* p = tmp;
+  size_t count = 1;
+  while (unichar > 0x7F >> count) {
+    *p++ = (char)(0x80 | (unichar & 0x3F));
+    unichar >>= 6;
+    count += 1;
+  }
+  char utf8[4];
+  p = tmp;
+  char* to = utf8 + count;
+  while (p < tmp + count - 1) {
+    *--to = *p++;
+  }
+  *--to = (char)(~(0xFF >> count) | unichar);
+  return {utf8, count};
+}
 }  // namespace tgfx

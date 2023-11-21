@@ -186,6 +186,15 @@ class Canvas {
                  const Paint* paint = nullptr);
 
   /**
+   * Draws text, with origin at (x, y), using clip, matrix, font, and paint. The text must be in
+   * utf-8 encoding. This function uses the default character-to-glyph mapping from the Typeface in
+   * font. It does not perform typeface fallback for characters not found in the Typeface. Glyphs
+   * are positioned based on their default advances.
+   */
+  void drawSimpleText(const std::string& text, float x, float y, const Font& font,
+                      const Paint& paint);
+
+  /**
    * Draw an array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.
    */
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,

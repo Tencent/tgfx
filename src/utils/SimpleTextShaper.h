@@ -18,30 +18,12 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
+#include "tgfx/core/Font.h"
 
 namespace tgfx {
-class UTF {
+class SimpleTextShaper {
  public:
-  /**
-   * Given a sequence of UTF-8 bytes, return the number of unicode codepoints. If the sequence is
-   * invalid UTF-8, return -1.
-   */
-  static int CountUTF8(const char* utf8, size_t byteLength);
-
-  /**
-   * Given a sequence of UTF-8 bytes, return the first unicode codepoint. The pointer will be
-   * incremented to point at the next codepoint's start.  If invalid UTF-8 is encountered, set *ptr
-   * to end and return -1.
-   */
-  static int32_t NextUTF8(const char** ptr, const char* end);
-
-  /**
-   * Given a unicode codepoint, return the UTF-8 string.
-   */
-  static std::string ToUTF8(int32_t unichar);
+  static std::pair<std::vector<GlyphID>, std::vector<Point>> Shape(const std::string& text,
+                                                                   const Font& font);
 };
-
 }  // namespace tgfx

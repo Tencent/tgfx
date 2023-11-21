@@ -103,10 +103,18 @@ class Font {
 
   /**
    * Returns the glyph ID corresponds to the specified glyph name. The glyph name must be in utf-8
-   * encoding. Returns 0 if the glyph name is not associated with this typeface.
+   * encoding. Returns 0 if the glyph name is not in this Font.
    */
   GlyphID getGlyphID(const std::string& name) const {
     return typeface->getGlyphID(name);
+  }
+
+  /**
+   * Returns the glyph ID corresponds to the specified unicode code point. Returns 0 if the code
+   * point is not in this Font.
+   */
+  GlyphID getGlyphID(Unichar unichar) const {
+    return typeface->getGlyphID(unichar);
   }
 
   /**

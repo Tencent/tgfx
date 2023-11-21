@@ -16,32 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <cstddef>
-#include <cstdint>
-#include <string>
+#include "SimpleTextShaper.h"
+#include "tgfx/utils/UTF.h"
 
 namespace tgfx {
-class UTF {
- public:
-  /**
-   * Given a sequence of UTF-8 bytes, return the number of unicode codepoints. If the sequence is
-   * invalid UTF-8, return -1.
-   */
-  static int CountUTF8(const char* utf8, size_t byteLength);
-
-  /**
-   * Given a sequence of UTF-8 bytes, return the first unicode codepoint. The pointer will be
-   * incremented to point at the next codepoint's start.  If invalid UTF-8 is encountered, set *ptr
-   * to end and return -1.
-   */
-  static int32_t NextUTF8(const char** ptr, const char* end);
-
-  /**
-   * Given a unicode codepoint, return the UTF-8 string.
-   */
-  static std::string ToUTF8(int32_t unichar);
-};
-
+std::pair<std::vector<GlyphID>, std::vector<Point>> SimpleTextShaper::Shape(
+    const std::string& text, const tgfx::Font& font) {
+  const char* textStart = text.data();
+  const char* textStop = textStart + text.size();
+  std::vector<GlyphID> glyphs = {};
+  std::vector<Point> positions = {};
+  auto emptyGlyphID = font.getGlyphID(" ");
+  auto emptyAdvance = font.getAdvance(emptyGlyphID);
+  float xOffset = 0;
+  while (textStart < textStop) {
+    auto unichar = UTF::NextUTF8(&textStart, textStop);
+    auto glyphID = font.getGlyphID(unichar);
+    if (glyphID > 0) {
+      glyphs.push_back(glyphID);
+      positions.push_back(Point::Make(xOffset, 0.0f));
+      auto advance = font.getAdvance(glyphID);
+      xOffset += advance;
+    } else {
+      xOffset += emptyAdvance;
+    }
+  }
+  return {glyphs, positions};
+}
 }  // namespace tgfx

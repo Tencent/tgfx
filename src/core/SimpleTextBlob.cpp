@@ -18,8 +18,21 @@
 
 #include "core/SimpleTextBlob.h"
 #include "tgfx/core/PathEffect.h"
+#include "utils/SimpleTextShaper.h"
 
 namespace tgfx {
+std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const tgfx::Font& font) {
+  auto [glyphIDs, positions] = SimpleTextShaper::Shape(text, font);
+  if (glyphIDs.empty()) {
+    return nullptr;
+  }
+  auto textBlob = std::make_shared<SimpleTextBlob>();
+  textBlob->glyphIDs = std::move(glyphIDs);
+  textBlob->positions = std::move(positions);
+  textBlob->font = font;
+  return textBlob;
+}
+
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
                                              size_t glyphCount, const Font& font) {
   if (glyphCount == 0) {
