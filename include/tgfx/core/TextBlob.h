@@ -29,6 +29,14 @@ namespace tgfx {
 class TextBlob {
  public:
   /**
+   * Creates a new TextBlob from the given text. The text must be in utf-8 encoding. This function
+   * uses the default character-to-glyph mapping from the Typeface in font. It does not perform
+   * typeface fallback for characters not found in the Typeface. Glyphs are positioned based on
+   * their default advances.
+   */
+  static std::shared_ptr<TextBlob> MakeFrom(const std::string& text, const Font& font);
+
+  /**
    * Creates a new TextBlob from the given glyphs, positions and text font.
    */
   static std::shared_ptr<TextBlob> MakeFrom(const GlyphID glyphIDs[], const Point positions[],

@@ -55,7 +55,7 @@ class WebTypeface : public Typeface {
 
   std::string getText(GlyphID glyphID) const;
 
-  GlyphID getGlyphID(const std::string&) const override;
+  GlyphID getGlyphID(Unichar unichar) const override;
 
   std::shared_ptr<Data> getBytes() const override;
 

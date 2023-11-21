@@ -53,7 +53,7 @@ class FTTypeface : public Typeface {
 
   bool hasColor() const override;
 
-  GlyphID getGlyphID(const std::string& name) const override;
+  GlyphID getGlyphID(Unichar unichar) const override;
 
   std::shared_ptr<Data> getBytes() const override;
 

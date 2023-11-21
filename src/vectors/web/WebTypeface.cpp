@@ -19,6 +19,7 @@
 #include "WebTypeface.h"
 #include <vector>
 #include "platform/web/WebImageBuffer.h"
+#include "tgfx/utils/UTF.h"
 #include "utils/UniqueID.h"
 
 using namespace emscripten;
@@ -74,24 +75,25 @@ bool WebTypeface::hasColor() const {
 }
 
 // The web side does not involve multithreading and does not require locking.
-static std::unordered_map<std::string, std::vector<std::string>>& GlyphsMap() {
-  static auto& glyphs = *new std::unordered_map<std::string, std::vector<std::string>>;
+static std::unordered_map<std::string, std::vector<Unichar>>& GlyphsMap() {
+  static auto& glyphs = *new std::unordered_map<std::string, std::vector<Unichar>>;
   return glyphs;
 }
 
-GlyphID WebTypeface::getGlyphID(const std::string& text) const {
+GlyphID WebTypeface::getGlyphID(Unichar unichar) const {
+  auto text = UTF::ToUTF8(unichar);
   if (!hasColor() && scalerContextClass.call<bool>("isEmoji", text)) {
     return 0;
   }
   auto& glyphs = GlyphsMap()[webFontFamily];
-  auto iter = std::find(glyphs.begin(), glyphs.end(), text);
+  auto iter = std::find(glyphs.begin(), glyphs.end(), unichar);
   if (iter != glyphs.end()) {
     return iter - glyphs.begin() + 1;
   }
   if (glyphs.size() >= UINT16_MAX) {
     return 0;
   }
-  glyphs.push_back(text);
+  glyphs.push_back(unichar);
   return glyphs.size();
 }
 
@@ -107,7 +109,8 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   if (glyphID > glyphs.size()) {
     return "";
   }
-  return glyphs.at(glyphID - 1);
+  auto unichar = glyphs.at(glyphID - 1);
+  return UTF::ToUTF8(unichar);
 }
 
 Point WebTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,

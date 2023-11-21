@@ -34,6 +34,7 @@
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/Surface.h"
+#include "tgfx/utils/UTF.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -545,6 +546,15 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
   auto op = FillRectOp::Make(glPaint.color, bounds, state->matrix, localMatrix);
   draw(std::move(op), std::move(glPaint));
   setMatrix(oldMatrix);
+}
+
+void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
+                            const tgfx::Paint& paint) {
+  auto [glyphIDs, positions] = ShapeSimpleText(text, font);
+  for (auto& position : positions) {
+    position.offset(x, y);
+  }
+  drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
 }
 
 void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
