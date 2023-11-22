@@ -19,4 +19,4 @@ file(GLOB_RECURSE HELLO_2D_FILES src/main/cpp/*.*)
 
 add_library(hello2d SHARED ${HELLO_2D_FILES})
 target_include_directories(hello2d PRIVATE ${HELLO_2D_INCLUDES})
-target_link_libraries(hello2d tgfx tgfx-drawers ${HELLO_2D_SHARED_LIBS})
+target_link_libraries(hello2d tgfx-drawers tgfx ${HELLO_2D_SHARED_LIBS})

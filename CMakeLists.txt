@@ -419,7 +419,7 @@ if (TGFX_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE TGFX_TEST_FILES test/src/*.*)
-    list(APPEND TGFX_TEST_LIBS tgfx tgfx-drawers ${TGFX_SHARED_LIBS})
+    list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES ${TGFX_INCLUDES} test/src third_party/json/include)
 
     add_vendor_target(TEST STATIC_VENDORS harfbuzz googletest)
