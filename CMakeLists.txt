@@ -400,7 +400,7 @@ if (TGFX_BUILD_DRAWERS)
     add_library(tgfx-drawers STATIC ${DRAWER_FILES})
     set_target_properties(tgfx-drawers PROPERTIES PREFIX "")
     target_include_directories(tgfx-drawers PUBLIC drawers/include PRIVATE include drawers/src)
-    target_link_libraries(tgfx-drawers tgfx)
+    target_link_libraries(tgfx-drawers)
 endif ()
 
 if (TGFX_BUILD_TESTS)
