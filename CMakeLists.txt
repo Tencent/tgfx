@@ -210,12 +210,12 @@ file(GLOB_RECURSE EGL_PLATFORM_FILES src/opengl/egl/*.*)
 
 if (TGFX_USE_QT)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
-    # set(CMAKE_PREFIX_PATH /Users/username/Qt5.13.0/5.13.0/clang_64/lib/cmake)
-    find_package(Qt5OpenGL REQUIRED)
-    find_package(Qt5Gui REQUIRED)
-    find_package(Qt5Quick REQUIRED)
-    list(APPEND TGFX_SHARED_LIBS ${Qt5OpenGL_LIBRARIES} ${Qt5Gui_LIBRARIES} ${Qt5Quick_LIBRARIES})
-    list(APPEND TGFX_INCLUDES ${Qt5OpenGL_INCLUDE_DIRS} ${Qt5Gui_INCLUDE_DIRS} ${Qt5Quick_INCLUDE_DIRS})
+    # set(CMAKE_PREFIX_PATH /Users/username/Qt/6.6.1/macos/lib/cmake)
+    find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets OpenGL Quick)
+    list(APPEND TGFX_SHARED_LIBS Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::OpenGL
+            Qt${QT_VERSION_MAJOR}::Quick)
+
     file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/qt/*.*)
     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     if (MACOS)
