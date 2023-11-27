@@ -54,7 +54,7 @@ TGFX utilizes the **C++17** features for development. Below are the minimum tool
 - Visual Studio 2019
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
-- CMake 3.10.2+
+- CMake 3.13.0+
 - NDK 19.2.5345600
 
 Please pay attention to the following additional notices:
