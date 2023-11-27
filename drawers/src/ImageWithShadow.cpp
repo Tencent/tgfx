@@ -19,8 +19,8 @@
 #include "base/Drawers.h"
 #include "tgfx/gpu/Surface.h"
 
-namespace tdraw {
-void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const {
+namespace drawers {
+void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
   auto scale = host->density();
   auto width = host->width();
   auto height = host->height();
@@ -48,4 +48,4 @@ void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) c
   canvas->drawImage(scaledImage, static_cast<float>(width - size) / 2,
                     static_cast<float>(height - size) / 2, &paint);
 }
-}  // namespace tdraw
+}  // namespace drawers

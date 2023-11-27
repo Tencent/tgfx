@@ -1,15 +1,19 @@
 {
   "name": "tgfx",
-  "version": "4.0.0",
+  "version": "1.0.0",
   "description": "Tencent Graphics",
   "main": "lib/tgfx.cjs.js",
   "module": "lib/tgfx.esm.js",
   "browser": "lib/tgfx.umd.js",
   "typings": "types/tgfx.d.ts",
   "scripts": {
-    "dev": "rollup -c ./script/rollup.config.dev.js -w",
-    "server": "http-server -p 8081 . -c-1 --cors",
-    "build": "rimraf lib/*.js lib/*.map types/* && tsc -p ./tsconfig.type.json && rollup -c ./script/rollup.config.js"
+    "clean:tgfx": "rimraf lib/ types/",
+    "clean": "npm run clean:tgfx && rimraf demo/build demo/wasm demo/*.js demo/*.map demo/cmake-build-*",
+    "build:tgfx": "npm run clean:tgfx && tsc -p ./tsconfig.type.json && rollup -c ./script/rollup.tgfx.js",
+    "build": "node script/build.demo.js && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
+    "build:debug": "node script/build.demo.js --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
+    "dev": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w",
+    "server": "http-server -p 8081 ../ -g -c-1 --cors -o web/demo"
   },
   "repository": {
     "type": "git",
@@ -43,9 +47,5 @@
     "src"
   ],
   "license": "BSD-3-Clause",
-  "contributors": [
-    "zenoslin",
-    "lvpengwei"
-  ],
   "author": "Tencent"
 }

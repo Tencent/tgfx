@@ -18,8 +18,8 @@
 
 #include "base/Drawers.h"
 
-namespace tdraw {
-void SweepGradient::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const {
+namespace drawers {
+void SweepGradient::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
   auto scale = host->density();
   auto width = host->width();
   auto height = host->height();
@@ -39,4 +39,4 @@ void SweepGradient::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) con
   canvas->drawPath(path, paint);
 }
 
-}  // namespace tdraw
+}  // namespace drawers

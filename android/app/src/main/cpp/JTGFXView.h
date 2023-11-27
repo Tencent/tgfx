@@ -23,13 +23,13 @@
 #include <android/native_window_jni.h>
 #include "tgfx/gpu/Window.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
-#include "tdraw/Drawer.h"
+#include "drawers/Drawer.h"
 
 namespace hello2d {
 class JTGFXView {
  public:
   explicit JTGFXView(ANativeWindow* nativeWindow,
-                     std::shared_ptr<tgfx::Window> window, std::unique_ptr<tdraw::AppHost> appHost)
+                     std::shared_ptr<tgfx::Window> window, std::unique_ptr<drawers::AppHost> appHost)
       : nativeWindow(nativeWindow),
         window(std::move(window)),
         appHost(std::move(appHost)) {
@@ -50,8 +50,6 @@ class JTGFXView {
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
   std::shared_ptr<tgfx::Surface> surface;
-  std::shared_ptr<tdraw::AppHost> appHost;
-  int _width = 0;
-  int _height = 0;
+  std::shared_ptr<drawers::AppHost> appHost;
 };
 }

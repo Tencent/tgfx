@@ -25,7 +25,7 @@ using namespace emscripten;
 
 namespace tgfx {
 std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeFrom(emscripten::val nativeImage) {
-  if (nativeImage.isNull()) {
+  if (!nativeImage.as<bool>()) {
     return nullptr;
   }
   auto size = val::module_property("tgfx").call<val>("getSourceSize", nativeImage);

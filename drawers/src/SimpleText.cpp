@@ -18,36 +18,53 @@
 
 #include "base/Drawers.h"
 
-namespace tdraw {
-void SimpleText::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const {
-  std::string text = "HelloTGFX";
+namespace drawers {
+void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
   auto scale = host->density();
   auto width = static_cast<float>(host->width());
   auto height = static_cast<float>(host->height());
+  auto screenWidth = width - (100.0f * scale);
+  screenWidth = std::max(screenWidth, 300.0f);
+
+  std::string text = "HelloTGFX";
   auto typeface = host->getTypeface("default");
   tgfx::Font font(typeface, 40 * scale);
   font.setFauxBold(true);
   auto textBlob = tgfx::TextBlob::MakeFrom(text, font);
   auto bounds = textBlob->getBounds();
-  auto matrix =
-      tgfx::Matrix::MakeTrans((width - bounds.width()) / 2, height / 2 - bounds.centerY());
-  auto screenWidth = width - (100.0f * scale);
-  screenWidth = std::max(screenWidth, 300.0f);
   auto textScale = screenWidth / bounds.width();
+  auto matrix =
+      tgfx::Matrix::MakeTrans((width - bounds.width()) / 2, height / 2 - bounds.bottom * 1.2f);
   matrix.postScale(textScale, textScale, width / 2, height / 2);
-  tgfx::Paint paint = {};
-  std::vector<tgfx::Color> colors = {{0.0f, 0.85f, 0.35f, 1.0f}, {0.0f, 0.35f, 0.85f, 1.0f}};
-  auto startPoint = tgfx::Point::Make(bounds.left, 0.0f);
-  auto endPoint = tgfx::Point::Make(bounds.right, 0.0f);
-  auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, colors, {});
-  paint.setShader(shader);
+  auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
+  tgfx::Paint paint = {};
+  tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
+  tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
+  tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
+  auto startPoint = tgfx::Point::Make(0.0f, 0.0f);
+  auto endPoint = tgfx::Point::Make(screenWidth, 0.0f);
+  auto shader =
+      tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
+  paint.setShader(shader);
   canvas->drawSimpleText(text, 0, 0, font, paint);
   paint.setShader(nullptr);
   paint.setColor({1.0f, 1.0f, 1.0f, 1.0f});
   paint.setStyle(tgfx::PaintStyle::Stroke);
   paint.setStrokeWidth(scale);
   canvas->drawSimpleText(text, 0, 0, font, paint);
+  canvas->setMatrix(oldMatrix);
+
+  std::string emojis = "🤡👻🐠🤩😃🤪🙈🙊🐒";
+  typeface = host->getTypeface("emoji");
+  font.setTypeface(typeface);
+  textBlob = tgfx::TextBlob::MakeFrom(emojis, font);
+  bounds = textBlob->getBounds();
+  textScale = screenWidth / bounds.width();
+  matrix = tgfx::Matrix::MakeTrans((width - bounds.width()) / 2, height / 2 - bounds.top * 1.2f);
+  matrix.postScale(textScale, textScale, width / 2, height / 2);
+  canvas->concat(matrix);
+  canvas->drawSimpleText(emojis, 0, 0, font, {});
 }
 
-}  // namespace tdraw
+}  // namespace drawers

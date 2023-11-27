@@ -24,10 +24,10 @@
         "tileMode": "d010fb8"
     },
     "DrawersTest": {
-        "GridBackground": "5a1fb11",
+        "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "5a1fb11",
-        "SimpleText": "5a1fb11",
+        "SimpleText": "2ae64df",
         "SweepGradient": "5a1fb11"
     },
     "ImageReaderTest": {

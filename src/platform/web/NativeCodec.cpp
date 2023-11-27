@@ -32,7 +32,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     auto data = val::module_property("tgfx")
                     .call<val>("getBytesFromPath", val::module_property("module"), filePath)
                     .await();
-    if (data.isNull()) {
+    if (!data.as<bool>()) {
       return nullptr;
     }
     auto byteOffset = reinterpret_cast<void*>(data["byteOffset"].as<int>());
@@ -64,7 +64,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
-  if (nativeImage.isNull()) {
+  if (!nativeImage.as<bool>()) {
     return nullptr;
   }
   auto size = val::module_property("tgfx").call<val>("getSourceSize", nativeImage);
@@ -93,7 +93,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   auto image = nativeImage;
-  if (image.isNull()) {
+  if (!image.as<bool>()) {
     auto bytes =
         val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
     image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes).await();
@@ -101,7 +101,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 
   auto data = val::module_property("tgfx").call<val>(
       "readImagePixels", val::module_property("module"), image, dstInfo.width(), dstInfo.height());
-  if (data.isNull()) {
+  if (!data.as<bool>()) {
     return false;
   }
   auto pixels = reinterpret_cast<void*>(data["byteOffset"].as<int>());
@@ -115,7 +115,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
   auto image = nativeImage;
   bool usePromise = false;
-  if (image.isNull()) {
+  if (!image.as<bool>()) {
     auto bytes =
         val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
     image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);

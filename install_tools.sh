@@ -25,4 +25,4 @@ for TOOL in ${NODE_REQUIRED_TOOLS[@]}; do
   fi
 done
 
-npm update -g depsync --silent
+npm install -g depsync

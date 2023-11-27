@@ -18,14 +18,12 @@
 
 #import "TGFXView.h"
 #include <cmath>
-#include "tdraw/Drawer.h"
+#include "drawers/Drawer.h"
 
 @implementation TGFXView {
-  int _width;
-  int _height;
   std::shared_ptr<tgfx::EAGLWindow> window;
   std::shared_ptr<tgfx::Surface> surface;
-  std::unique_ptr<tdraw::AppHost> appHost;
+  std::unique_ptr<drawers::AppHost> appHost;
 }
 
 + (Class)layerClass {
@@ -57,13 +55,11 @@
 }
 
 - (void)updateSize {
-  auto width = self.layer.bounds.size.width * self.layer.contentsScale;
-  auto height = self.layer.bounds.size.height * self.layer.contentsScale;
-  _width = static_cast<int>(roundf(width));
-  _height = static_cast<int>(roundf(height));
+  auto width = static_cast<int>(roundf(self.layer.bounds.size.width * self.layer.contentsScale));
+  auto height = static_cast<int>(roundf(self.layer.bounds.size.height * self.layer.contentsScale));
   surface = nullptr;
   if (appHost == nullptr) {
-    appHost = std::make_unique<tdraw::AppHost>();
+    appHost = std::make_unique<drawers::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
@@ -72,11 +68,11 @@
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
     appHost->addTypeface("emoji", typeface);
   }
-  appHost->updateScreen(_width, _height, self.layer.contentsScale);
+  appHost->updateScreen(width, height, self.layer.contentsScale);
 }
 
 - (void)createSurface {
-  if (_width <= 0 || _height <= 0) {
+  if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
   if (window == nullptr) {
@@ -108,14 +104,12 @@
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  auto numDrawers = tdraw::Drawer::Count() - 1;
+  auto numDrawers = drawers::Drawer::Count() - 1;
   index = (index % numDrawers) + 1;
-  auto drawer = tdraw::Drawer::GetByName("GridBackground");
+  auto drawer = drawers::Drawer::GetByName("GridBackground");
   drawer->draw(canvas, appHost.get());
-  drawer = tdraw::Drawer::GetByIndex(index);
+  drawer = drawers::Drawer::GetByIndex(index);
   drawer->draw(canvas, appHost.get());
-  canvas->restore();
   surface->flush();
   context->submit();
   window->present(context);

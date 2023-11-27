@@ -17,9 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/HardwareBuffer.h"
+#include "platform/web/TGFXWasmBindings.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
+// Force TGFXBindInit to be linked.
+static auto bind = TGFXBindInit();
+
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
   return nullptr;
 }
