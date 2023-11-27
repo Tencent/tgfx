@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(Hello2D)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(HELLO_2D_INCLUDES
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../include
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../drawers/include)
