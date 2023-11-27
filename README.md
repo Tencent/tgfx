@@ -109,7 +109,7 @@ directories. They may provide valuable insights and assistance.
 
 Before you begin building the demo projects, please make sure to carefully follow the instructions
 provided above in the [**Build Prerequisites**](#build-prerequisites) and 
-[**Dependencies**](#dependency-management) sections. They will guide you through the 
+[**Dependencies**](#dependencies) sections. They will guide you through the 
 necessary steps to configure your development environment.
 
 ### Android Demo
@@ -238,7 +238,7 @@ usually ignore the `.wasm` file. Moreover, remember to upload the `.wasm` file t
 users to access it from the network.
 
 
-## Build Libraries
+## Build TGFX
 
 Aside from directly integrating the source code of tgfx into your project, you also have the option
 of embedding the precompiled libraries. TGFX utilizes the [**vendor_tools**](https://github.com/libpag/vendor_tools)
