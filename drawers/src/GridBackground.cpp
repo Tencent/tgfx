@@ -18,8 +18,9 @@
 
 #include "base/Drawers.h"
 
-namespace tdraw {
-void GridBackground::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const {
+namespace drawers {
+void GridBackground::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
+  canvas->clear(tgfx::Color::White());
   tgfx::Paint paint;
   paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   int tileSize = 8 * static_cast<int>(host->density());
@@ -38,4 +39,4 @@ void GridBackground::onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) co
     }
   }
 }
-}  // namespace tdraw
+}  // namespace drawers

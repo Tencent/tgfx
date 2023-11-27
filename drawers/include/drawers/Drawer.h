@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "tdraw/AppHost.h"
+#include "drawers/AppHost.h"
 #include "tgfx/core/Canvas.h"
 
-namespace tdraw {
+namespace drawers {
 class Drawer {
  public:
   /**
@@ -63,4 +63,4 @@ class Drawer {
  private:
   std::string _name;
 };
-}  // namespace tdraw
+}  // namespace drawers

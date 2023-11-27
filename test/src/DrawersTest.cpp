@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tdraw/Drawer.h"
+#include "drawers/Drawer.h"
 #include "utils/Log.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
 TGFX_TEST(DrawersTest, Compare) {
-  tdraw::AppHost appHost(720, 720, 2.0f);
+  drawers::AppHost appHost(720, 720, 2.0f);
   appHost.addImage("bridge", MakeImage("resources/assets/bridge.jpg"));
   appHost.addTypeface("default", MakeTypeface("resources/font/NotoSansSC-Regular.otf"));
   appHost.addTypeface("emoji", MakeTypeface("resources/font/NotoColorEmoji.ttf"));
@@ -33,9 +33,9 @@ TGFX_TEST(DrawersTest, Compare) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
-  auto drawerNames = tdraw::Drawer::Names();
+  auto drawerNames = drawers::Drawer::Names();
   for (auto& name : drawerNames) {
-    auto drawer = tdraw::Drawer::GetByName(name);
+    auto drawer = drawers::Drawer::GetByName(name);
     ASSERT_TRUE(drawer != nullptr);
     canvas->clear();
     drawer->draw(canvas, &appHost);

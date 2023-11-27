@@ -23,21 +23,21 @@ const banner = `////////////////////////////////////////////////////////////////
 `;
 
 const plugins = [
-  esbuild({ tsconfig: "tsconfig.json", minify: false }),
-  json(),
-  resolve(),
-  commonJs(),
+    esbuild({tsconfig: "tsconfig.json", minify: false}),
+    json(),
+    resolve(),
+    commonJs(),
 ];
 
 export default [
-  {
-    input: 'demo/index.ts',
-    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
-    plugins: plugins,
-  },
-  {
-    input: 'src/main.ts',
-    output: { name: 'tgfx', banner, file: 'demo/tgfx.js', format: 'umd', exports: 'named', sourcemap: true },
-    plugins: plugins,
-  },
+    {
+        input: 'demo/index.ts',
+        output: {
+            banner,
+            file: 'demo/index.js',
+            format: 'esm',
+            sourcemap: true
+        },
+        plugins: plugins,
+    }
 ];

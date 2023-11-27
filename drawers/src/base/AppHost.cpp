@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tdraw/AppHost.h"
+#include "drawers/AppHost.h"
 #include "tgfx/platform/Print.h"
 
-namespace tdraw {
+namespace drawers {
 AppHost::AppHost(int width, int height, float density)
     : _width(width), _height(height), _density(density) {
 }
@@ -45,7 +45,7 @@ void AppHost::updateScreen(int width, int height, float density) {
     tgfx::PrintError("AppContext::updateScreen() width or height is invalid!");
     return;
   }
-  if (density <= 1.0) {
+  if (density < 1.0) {
     tgfx::PrintError("AppContext::updateScreen() density is invalid!");
     return;
   }
@@ -86,4 +86,4 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
   }
   typefaces[name] = std::move(typeface);
 }
-}  // namespace tdraw
+}  // namespace drawers

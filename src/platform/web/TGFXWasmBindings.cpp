@@ -15,6 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #include <emscripten/bind.h>
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/ImageInfo.h"
@@ -23,9 +24,9 @@
 #include "tgfx/core/Stroke.h"
 
 using namespace emscripten;
-using namespace tgfx;
 
-EMSCRIPTEN_BINDINGS(tgfx) {
+namespace tgfx {
+bool TGFXBindInit() {
   class_<Matrix>("TGFXMatrix").function("_get", &Matrix::get).function("_set", &Matrix::set);
 
   value_object<Point>("TGFXPoint").field("x", &Point::x).field("y", &Point::y);
@@ -35,8 +36,6 @@ EMSCRIPTEN_BINDINGS(tgfx) {
       .field("top", &Rect::top)
       .field("right", &Rect::right)
       .field("bottom", &Rect::bottom);
-
-  register_vector<Point>("VectorTGFXPoint");
 
   class_<ImageInfo>("TGFXImageInfo")
       .property("width", &ImageInfo::width)
@@ -71,4 +70,10 @@ EMSCRIPTEN_BINDINGS(tgfx) {
       .value("Miter", LineJoin::Miter)
       .value("Round", LineJoin::Round)
       .value("Bevel", LineJoin::Bevel);
+
+  register_vector<Point>("VectorTGFXPoint");
+  register_vector<std::string>("VectorString");
+  register_vector<int>("VectorInt");
+  return true;
 }
+}  // namespace tgfx

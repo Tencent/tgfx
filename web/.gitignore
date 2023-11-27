@@ -3,4 +3,5 @@ lib
 types
 *.js.map
 demo/*.js
+demo/wasm
 src/wasm

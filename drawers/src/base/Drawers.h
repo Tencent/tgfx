@@ -18,17 +18,17 @@
 
 #pragma once
 
-#include "tdraw/Drawer.h"
+#include "drawers/Drawer.h"
 
-namespace tdraw {
-#define DEFINE_DRAWER(DrawerName)                                                 \
-  class DrawerName : public tdraw::Drawer {                                       \
-   public:                                                                        \
-    DrawerName() : tdraw::Drawer(#DrawerName) {                                   \
-    }                                                                             \
-                                                                                  \
-   protected:                                                                     \
-    void onDraw(tgfx::Canvas* canvas, const tdraw::AppHost* host) const override; \
+namespace drawers {
+#define DEFINE_DRAWER(DrawerName)                                                   \
+  class DrawerName : public drawers::Drawer {                                       \
+   public:                                                                          \
+    DrawerName() : drawers::Drawer(#DrawerName) {                                   \
+    }                                                                               \
+                                                                                    \
+   protected:                                                                       \
+    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const override; \
   }
 
 DEFINE_DRAWER(GridBackground);
@@ -37,4 +37,4 @@ DEFINE_DRAWER(ImageWithMipmap);
 DEFINE_DRAWER(ImageWithShadow);
 DEFINE_DRAWER(SimpleText);
 
-}  // namespace tdraw
+}  // namespace drawers

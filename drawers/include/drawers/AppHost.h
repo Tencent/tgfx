@@ -23,7 +23,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Typeface.h"
 
-namespace tdraw {
+namespace drawers {
 /**
  * AppHost provides information about the current app context.
  */
@@ -89,4 +89,4 @@ class AppHost {
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
 };
-}  // namespace tdraw
+}  // namespace drawers

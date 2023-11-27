@@ -16,23 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/Drawers.h"
+#pragma once
 
-namespace drawers {
-void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
-  auto scale = host->density();
-  auto width = host->width();
-  auto height = host->height();
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
-  size = std::max(size, 50);
-  auto image = host->getImage("bridge");
-  image = image->makeMipMapped();
-  auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
-  auto matrix = tgfx::Matrix::MakeScale(imageScale);
-  matrix.postTranslate(static_cast<float>(width - size) / 2, static_cast<float>(height - size) / 2);
-  canvas->concat(matrix);
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipMapMode::Linear);
-  canvas->drawImage(image, sampling);
-}
-}  // namespace drawers
+namespace tgfx {
+bool TGFXBindInit();
+}  // namespace tgfx

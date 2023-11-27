@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tdraw/Drawer.h"
+#include "drawers/Drawer.h"
 #include <unordered_map>
 #include "base/Drawers.h"
 #include "tgfx/platform/Print.h"
 
-namespace tdraw {
+namespace drawers {
 static std::vector<Drawer*> drawers = {new GridBackground(), new SweepGradient(),
                                        new ImageWithMipmap(), new ImageWithShadow(),
                                        new SimpleText()};
@@ -76,11 +76,11 @@ void Drawer::draw(tgfx::Canvas* canvas, const AppHost* host) const {
     return;
   }
   if (host == nullptr) {
-    tgfx::PrintError("Drawer::draw() context is nullptr!");
+    tgfx::PrintError("Drawer::draw() appHost is nullptr!");
     return;
   }
   canvas->save();
   onDraw(canvas, host);
   canvas->restore();
 }
-}  // namespace tdraw
+}  // namespace drawers

@@ -162,6 +162,9 @@ std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float s
   }
   auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
   auto bounds = scalerContext.call<Rect>("getTextBounds", getText(glyphID));
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
   auto buffer = scalerContext.call<val>("generateImage", getText(glyphID), bounds);
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
