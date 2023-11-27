@@ -255,7 +255,7 @@ users to access it from the network.
 ## Build TGFX
 
 Aside from directly integrating the source code of tgfx into your project, you also have the option
-of embedding the precompiled libraries. TGFX utilizes the [**vendor_tools**](https://github.com/libpag/vendor_tools)
+of linking with the precompiled libraries. TGFX utilizes the [**vendor_tools**](https://github.com/libpag/vendor_tools)
 project as its build system, enabling a unified approach to build the tgfx library across all platforms.
 
 To quickly get started, execute the following command in the root directory:
@@ -299,8 +299,8 @@ node build_tgfx -h
 ## Development
 
 We recommend using the [**CLion**](https://www.jetbrains.com/clion/) IDE on the macOS platform for 
-development. After the `depsync` synchronization, you can open the project with CLion and build the
-tgfx library.
+development. After synchronizing with `depsync`, there are a few configurations that need to be set
+up before opening the project in CLion.
 
 ### macOS
 
@@ -320,13 +320,13 @@ these steps:
 - Open the `Settings` panel in CLion and go to `Build, Execution, Deployment` > `CMake`. Create a new build target.
 - Set the `CMake options` to the following value:
 
-    ```
-    DCMAKE_TOOLCHAIN_FILE="path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake"
-    ```
+```
+DCMAKE_TOOLCHAIN_FILE="path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake"
+```
 
 - After creating the build target, modify the `Configurations` located before the `Run / Debug` buttons to match the newly created build target.
 
-With these steps completed, you will be able to build the tgfx library directly in CLion.
+Once you've completed these steps, you'll have the ability to build the tgfx library and conduct debugging in CLion.
 
 
 ## Contribution
