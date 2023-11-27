@@ -119,10 +119,24 @@ version, which has been fully tested with the tgfx library. You can download it 
 [NDK Downloads](https://developer.android.com/ndk/downloads) or by Android Studio.
 
 If you choose to manually download the Android NDK, please extract it to the default location. 
-On macOS, this would be `/Users/yourname/Library/Android/sdk/ndk/19.2.5345600`. On Windows, it would
-be `C:\Users\yourname\AppData\Local\Android\Sdk\ndk\19.2.5345600`. Alternatively, you can set one of 
-the following environment variables for tgfx to locate the NDK: `ANDROID_NDK_HOME`, 
-`ANDROID_NDK_ROOT`, `ANDROID_NDK`, `NDK_HOME`, `NDK_ROOT`, `NDK_PATH`.
+On macOS, this would be：
+
+```
+/Users/yourname/Library/Android/sdk/ndk/19.2.5345600
+```
+
+On Windows, it would be：
+
+```
+C:\Users\yourname\AppData\Local\Android\Sdk\ndk\19.2.5345600
+```
+
+Alternatively, you can set one of 
+the following environment variables for tgfx to locate the NDK: 
+
+```
+["ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK", "NDK_HOME", "NDK_ROOT", "NDK_PATH"]
+```
 
 To get started, open the `android/` directory in Android Studio, and you'll be all set! If you 
 encounter any issues during Gradle synchronization, please ensure that you haven't accidentally 
