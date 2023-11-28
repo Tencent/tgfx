@@ -4,6 +4,8 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 
+childProcess.execSync("depsync");
+
 let sourceDir = path.resolve(__dirname, "../demo");
 let buildDir = path.resolve(sourceDir, "cmake-build-release");
 let buildType = "Release";
