@@ -123,13 +123,13 @@ jobs:
           path: android/local.properties
           write-mode: overwrite
           contents: |
-            ndk.dir=${{ steps.setup-ndk.outputs.ndk-path }}
+            ndk.dir='${{ steps.setup-ndk.outputs.ndk-path }}'
 
       - name: Build Android
         run: |
           cd android
           ./gradlew assembleRelease -Parm64-only
-       
+
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v3
