@@ -117,17 +117,10 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Set NDK Path
-        uses: "DamianReeves/write-file-action@master"
-        with:
-          path: android/local.properties
-          write-mode: overwrite
-          contents: |
-            ndk.dir='${{ steps.setup-ndk.outputs.ndk-path }}'
-
       - name: Build Android
         run: |
           cd android
+          echo "ndk.dir=${{ steps.setup-ndk.outputs.ndk-path }}" >> local.properties
           ./gradlew assembleRelease -Parm64-only
 
       - name: Save Third-Party Cache
@@ -143,7 +136,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: android_build
-          path: android/app/build
+          path: android
 
   web:
     runs-on: windows-latest
