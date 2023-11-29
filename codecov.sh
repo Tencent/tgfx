@@ -2,8 +2,8 @@
 cd $(dirname $0)
 
 if [[ `uname` == 'Darwin' ]]; then
-  if [ ! $(gcovr --version) ]; then
-    if [ ! $(brew --version) ]; then
+  if [ ! $(which gcovr) ]; then
+    if [ ! $(which brew) ]; then
       echo "Homebrew not found. Trying to install..."
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi

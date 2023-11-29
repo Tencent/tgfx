@@ -1,20 +1,23 @@
-#!/bin/bash -e
-cd $(dirname $0)
-
+#!/usr/bin/env bash
 if [[ $(uname) == 'Darwin' ]]; then
-  if [[ $(clang-format --version) =~ "14." ]]
-  then
-      echo "----`clang-format --version`----"
-  else
-      if [ ! $(python3 --version) ]; then
-          if [ ! $(brew --version) ]; then
-            echo "Homebrew not found. Trying to install..."
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          fi
-          echo "python3 not found. Trying to install..."
-          brew install python3
+  MAC_REQUIRED_TOOLS="python3"
+  for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
+    if [ ! $(which $TOOL) ]; then
+      if [ ! $(which brew) ]; then
+        echo "Homebrew not found. Trying to install..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ||
+          exit 1
       fi
-      echo "clang-format 14.0.0 not found. Trying to install..."
+      echo "$TOOL not found. Trying to install..."
+      brew install $TOOL || exit 1
+    fi
+  done
+  clangformat=`clang-format --version`
+  if [[ $clangformat =~ "14." ]]
+  then
+      echo "----$clangformat----"
+  else
+      echo "----install clang-format----"
       pip3 install clang-format==14
   fi
 fi
