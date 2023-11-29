@@ -4,15 +4,15 @@ cd $(dirname $0)
 ./install_tools.sh
 
 if [[ `uname` == 'Darwin' ]]; then
-  if [ ! $(which emcc) ]; then
+  if [ ! $(emcc --version) ]; then
       echo "emscripten not found. Trying to install..."
       ./web/script/install-emscripten.sh
   fi
 fi
 
-if [ ! $(which depsync) ]; then
+if [ ! $(depsync -v) ]; then
   echo "depsync not found. Trying to install..."
-  npm install -g depsync > /dev/null
+  npm install -g depsync
 else
   npm update -g depsync --silent
 fi

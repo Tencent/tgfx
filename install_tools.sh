@@ -6,7 +6,7 @@ if [[ `uname` == 'Darwin' ]]; then
   MAC_REQUIRED_TOOLS="node cmake ninja yasm git-lfs"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
     if [ ! $(which $TOOL) ]; then
-      if [ ! $(which brew) ]; then
+      if [ ! $(brew --version) ]; then
         echo "Homebrew not found. Trying to install..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
       fi

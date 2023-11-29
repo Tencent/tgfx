@@ -208,7 +208,12 @@ At last, launch XCode and open the `mac/Hello2D.xcworkspace`. You'll be ready to
 
 The web demo project requires the **Emscripten SDK**. You can download and install
 it from the [official website](https://emscripten.org/). We recommend using the **3.1.20** version,
-which has been fully tested with the tgfx library.
+which has been fully tested with the tgfx library. If you are on macOS, you can also install it
+using the following command:
+
+```
+brew install emscripten
+```
 
 To begin, navigate to the `web/` directory and execute the following command to install the 
 necessary node modules:
