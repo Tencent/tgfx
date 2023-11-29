@@ -118,12 +118,13 @@ jobs:
           cache: 'gradle'
 
       - name: Build Android
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           cd android
-          echo "ndk.dir=$ANDROID_NDK_HOME" >> local.properties
+          NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
+          NDK_PATH="${NDK_PATH//\\//}"
+          echo "ndk.dir=$NDK_PATH" >> local.properties
           ./gradlew assembleRelease -Parm64-only
+        shell: bash
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
