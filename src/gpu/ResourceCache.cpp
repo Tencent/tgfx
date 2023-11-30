@@ -70,7 +70,10 @@ void ResourceCache::detachFromCurrentThread() {
   // strongReferences 保护已经开启，这时候不会再有任何外部的 Resource 会触发
   // NotifyReferenceReachedZero()。
   std::vector<Resource*> pendingResources = {};
-  std::swap(pendingResources, pendingPurgeableResources);
+  {
+    std::lock_guard lockGuard(removeLocker);
+    std::swap(pendingResources, pendingPurgeableResources);
+  }
   for (auto& resource : pendingResources) {
     processUnreferencedResource(resource);
   }
