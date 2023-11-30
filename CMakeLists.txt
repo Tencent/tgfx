@@ -32,9 +32,14 @@ elseif (NOT ANDROID)
     option(TGFX_USE_WEBP_ENCODE "Enable embedded WEBP encoding support" ON)
 endif ()
 
-string(FIND ${CMAKE_COMMAND} "/CLion.app/" CLionPosition)
+
+if ($ENV{CLION_IDE})
+    set(CLION_IDE ON)
+else ()
+    set(CLION_IDE OFF)
+endif ()
 get_directory_property(HasParent PARENT_DIRECTORY)
-if (MACOS AND CLionPosition GREATER -1 AND NOT HasParent)
+if (MACOS AND CLION_IDE AND NOT HasParent)
     # CLion project needs test targets.
     option(TGFX_BUILD_TESTS "Build tgfx tests" ON)
 endif ()

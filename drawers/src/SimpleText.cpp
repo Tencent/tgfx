@@ -39,19 +39,18 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) cons
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   tgfx::Paint paint = {};
+  paint.setColor({1.0f, 1.0f, 1.0f, 1.0f});
+  paint.setStyle(tgfx::PaintStyle::Stroke);
+  paint.setStrokeWidth(2 * scale);
+  canvas->drawSimpleText(text, 0, 0, font, paint);
+  paint.setStyle(tgfx::PaintStyle::Fill);
   tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
   auto startPoint = tgfx::Point::Make(0.0f, 0.0f);
   auto endPoint = tgfx::Point::Make(screenWidth, 0.0f);
-  auto shader =
-      tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
+  auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
   paint.setShader(shader);
-  canvas->drawSimpleText(text, 0, 0, font, paint);
-  paint.setShader(nullptr);
-  paint.setColor({1.0f, 1.0f, 1.0f, 1.0f});
-  paint.setStyle(tgfx::PaintStyle::Stroke);
-  paint.setStrokeWidth(scale);
   canvas->drawSimpleText(text, 0, 0, font, paint);
   canvas->setMatrix(oldMatrix);
 

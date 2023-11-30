@@ -115,8 +115,9 @@ necessary steps to configure your development environment.
 ### Android Demo
 
 The android demo project requires the **Android NDK**. We recommend using the **19.2.5345600** 
-version, which has been fully tested with the tgfx library. You can download it from 
-[NDK Downloads](https://developer.android.com/ndk/downloads) or by Android Studio.
+version, which has been fully tested with the tgfx library. If you open the project with Android
+Studio, it will automatically download the NDK during Gradle synchronization. Alternatively, you
+can download it from the [NDK Downloads](https://developer.android.com/ndk/downloads) page.
 
 If you choose to manually download the Android NDK, please extract it to the default location. 
 On macOS, this would be：
@@ -131,8 +132,7 @@ On Windows, it would be：
 C:\Users\yourname\AppData\Local\Android\Sdk\ndk\19.2.5345600
 ```
 
-Alternatively, you can set one of 
-the following environment variables for tgfx to locate the NDK: 
+Alternatively, you can set one of the following environment variables for tgfx to locate the NDK: 
 
 ```
 ["ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK", "NDK_HOME", "NDK_ROOT", "NDK_PATH"]
@@ -209,10 +209,10 @@ At last, launch XCode and open the `mac/Hello2D.xcworkspace`. You'll be ready to
 The web demo project requires the **Emscripten SDK**. You can download and install
 it from the [official website](https://emscripten.org/). We recommend using the **3.1.20** version,
 which has been fully tested with the tgfx library. If you are on macOS, you can also install it
-using the following command:
+using the following script:
 
 ```
-brew install emscripten
+web/script/install-emscripten.sh
 ```
 
 To begin, navigate to the `web/` directory and execute the following command to install the 
