@@ -7,6 +7,9 @@
       "cmake": {
         "targets": [
           "skcms"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ]
       }
     },
@@ -15,6 +18,9 @@
       "cmake": {
         "targets": [
           "pathkit"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ]
       }
     },
@@ -23,6 +29,9 @@
       "cmake": {
         "targets": [
           "zlibstatic"
+        ],
+        "arguments": [
+          "-DCMAKE_C_FLAGS=\"-w\""
         ],
         "includes": [
           "${SOURCE_DIR}/zlib.h",
@@ -129,7 +138,8 @@
         ],
         "arguments": [
           "-DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE",
-          "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE"
+          "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE",
+          "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
     },
@@ -142,7 +152,8 @@
         "arguments": [
           "-DHB_HAVE_FREETYPE=OFF",
           "-DHB_HAVE_CORETEXT=OFF",
-          "-DCMAKE_CXX_FLAGS=\"-DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\""
+          "-Wno-dev",
+          "-DCMAKE_CXX_FLAGS=\"-w -DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\""
         ]
       }
     },
