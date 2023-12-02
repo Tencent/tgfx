@@ -7,6 +7,9 @@
       "cmake": {
         "targets": [
           "skcms"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ]
       }
     },
@@ -15,6 +18,9 @@
       "cmake": {
         "targets": [
           "pathkit"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ]
       }
     },
@@ -132,7 +138,8 @@
         ],
         "arguments": [
           "-DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE",
-          "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE"
+          "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE",
+          "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
     },
