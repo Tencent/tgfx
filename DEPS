@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "468c59a1337e53a4a063ac5413ee1ea4add6cc69",
+        "commit": "628ca1bfc801ec22714faeb0c7b9ceada4efe121",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -17,7 +17,7 @@
       },
       {
         "url": "${PAG_GROUP}/skcms.git",
-        "commit": "0209dc05212250058860b56b221c7f59d98dbdc8",
+        "commit": "8ca9333954230146f663b8890db634d2e7a30500",
         "dir": "third_party/skcms"
       },
       {
