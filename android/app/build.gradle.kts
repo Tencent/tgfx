@@ -23,6 +23,7 @@ android {
             } else {
                 abiFilters.add("armeabi-v7a")
                 abiFilters.add("arm64-v8a")
+                abiFilters.add("x86_64")
             }
         }
     }
