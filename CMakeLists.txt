@@ -78,7 +78,6 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
 endif ()
 
 # collects tgfx common files.
-list(APPEND TGFX_INCLUDES src)
 file(GLOB_RECURSE SRC_FILES
         src/core/*.*
         src/effects/*.*
@@ -395,7 +394,8 @@ endif ()
 add_library(tgfx STATIC ${TGFX_VENDOR_TARGETS} ${TGFX_FILES})
 target_compile_definitions(tgfx PUBLIC ${TGFX_DEFINES})
 target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
-target_include_directories(tgfx PUBLIC include PRIVATE ${TGFX_INCLUDES})
+target_include_directories(tgfx PUBLIC include PRIVATE src)
+target_include_directories(tgfx SYSTEM PRIVATE ${TGFX_INCLUDES})
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_SHARED_LIBS})
 set_target_properties(tgfx PROPERTIES PREFIX "")
@@ -425,7 +425,7 @@ if (TGFX_BUILD_TESTS)
 
     file(GLOB_RECURSE TGFX_TEST_FILES test/src/*.*)
     list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
-    list(APPEND TGFX_TEST_INCLUDES ${TGFX_INCLUDES} test/src third_party/json/include)
+    list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
 
     add_vendor_target(TEST STATIC_VENDORS harfbuzz googletest)
     list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
