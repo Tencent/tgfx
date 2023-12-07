@@ -56,11 +56,11 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   return device;
 }
 
-std::shared_ptr<CGLDevice> CGLDevice::MakeAdopted(CGLContextObj cglContext) {
+std::shared_ptr<CGLDevice> CGLDevice::MakeFrom(CGLContextObj cglContext) {
   return CGLDevice::Wrap(cglContext, true);
 }
 
-std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool isAdopted) {
+std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool externallyOwned) {
   if (cglContext == nil) {
     return nullptr;
   }
@@ -76,7 +76,7 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool isAdop
     }
   }
   auto device = std::shared_ptr<CGLDevice>(new CGLDevice(cglContext));
-  device->isAdopted = isAdopted;
+  device->externallyOwned = externallyOwned;
   device->weakThis = device;
   if (oldCGLContext != cglContext) {
     CGLSetCurrentContext(oldCGLContext);
@@ -112,8 +112,8 @@ CGLContextObj CGLDevice::cglContext() const {
 CVOpenGLTextureCacheRef CGLDevice::getTextureCache() {
   if (!textureCache) {
     auto pixelFormatObj = CGLGetPixelFormat(glContext.CGLContextObj);
-    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, glContext.CGLContextObj, pixelFormatObj,
-                               NULL, &textureCache);
+    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, glContext.CGLContextObj, pixelFormatObj,
+                               nil, &textureCache);
   }
   return textureCache;
 }

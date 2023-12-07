@@ -30,10 +30,13 @@ namespace tgfx {
 class EGLDevice : public GLDevice {
  public:
   /**
-   * Creates an EGL device with adopted EGLDisplay, EGLSurface and EGLContext.
+   * Creates an EGLDevice with the existing EGLDisplay, EGLSurface, and EGLContext. If adopted is
+   * true, the EGLDevice will take ownership of the EGLDisplay, EGLSurface, and EGLContext and
+   * destroy them when the EGLDevice is destroyed. The caller should not destroy the EGLDisplay,
+   * EGLSurface, and EGLContext in this case.
    */
-  static std::shared_ptr<EGLDevice> MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
-                                                EGLContext eglContext);
+  static std::shared_ptr<EGLDevice> MakeFrom(EGLDisplay eglDisplay, EGLSurface eglSurface,
+                                             EGLContext eglContext, bool adopted = false);
 
   ~EGLDevice() override;
 
@@ -63,7 +66,7 @@ class EGLDevice : public GLDevice {
 
   static std::shared_ptr<EGLDevice> Wrap(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                          EGLContext eglContext, EGLContext shareContext,
-                                         bool isAdopted = false);
+                                         bool externallyOwned);
 
   explicit EGLDevice(void* nativeHandle);
   void swapBuffers(int64_t timestamp = INT64_MIN);

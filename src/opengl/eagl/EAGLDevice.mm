@@ -82,14 +82,14 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   return device;
 }
 
-std::shared_ptr<EAGLDevice> EAGLDevice::MakeAdopted(EAGLContext* eaglContext) {
+std::shared_ptr<EAGLDevice> EAGLDevice::MakeFrom(EAGLContext* eaglContext) {
   if (appInBackground) {
     return nullptr;
   }
   return EAGLDevice::Wrap(eaglContext, true);
 }
 
-std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool isAdopted) {
+std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool externallyOwned) {
   if (eaglContext == nil) {
     return nullptr;
   }
@@ -107,7 +107,7 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool isAd
   }
   auto device = std::shared_ptr<EAGLDevice>(new EAGLDevice(eaglContext),
                                             EAGLDevice::NotifyReferenceReachedZero);
-  device->isAdopted = isAdopted;
+  device->externallyOwned = externallyOwned;
   device->weakThis = device;
   if (oldEAGLContext != eaglContext) {
     [EAGLContext setCurrentContext:oldEAGLContext];

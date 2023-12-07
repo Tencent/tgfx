@@ -67,8 +67,7 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID) 
   return WebGLDevice::Wrap(context);
 }
 
-std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE webglContext,
-                                               bool isAdopted) {
+std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE webglContext) {
   if (webglContext == 0) {
     return nullptr;
   }
@@ -84,7 +83,7 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
     }
   }
   auto device = std::shared_ptr<WebGLDevice>(new WebGLDevice(webglContext));
-  device->isAdopted = isAdopted;
+  device->externallyOwned = false;
   device->context = webglContext;
   device->weakThis = device;
   if (oldContext != webglContext) {
@@ -102,9 +101,6 @@ WebGLDevice::WebGLDevice(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle)
 
 WebGLDevice::~WebGLDevice() {
   releaseAll();
-  if (isAdopted) {
-    return;
-  }
   emscripten_webgl_destroy_context(context);
 }
 

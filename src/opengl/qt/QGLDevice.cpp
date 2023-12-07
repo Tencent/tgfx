@@ -65,12 +65,13 @@ std::shared_ptr<QGLDevice> QGLDevice::Make(QOpenGLContext* sharedContext, QSurfa
   return device;
 }
 
-std::shared_ptr<QGLDevice> QGLDevice::MakeAdopted(QOpenGLContext* context, QSurface* surface) {
-  return QGLDevice::Wrap(context, surface, true);
+std::shared_ptr<QGLDevice> QGLDevice::MakeFrom(QOpenGLContext* context, QSurface* surface,
+                                               bool adopted) {
+  return QGLDevice::Wrap(context, surface, !adopted);
 }
 
 std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* qtSurface,
-                                           bool isAdopted) {
+                                           bool externallyOwned) {
   auto glContext = GLDevice::Get(qtContext);
   if (glContext) {
     return std::static_pointer_cast<QGLDevice>(glContext);
@@ -86,7 +87,7 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
     }
   }
   auto device = std::shared_ptr<QGLDevice>(new QGLDevice(qtContext));
-  device->isAdopted = isAdopted;
+  device->externallyOwned = externallyOwned;
   device->qtContext = qtContext;
   device->qtSurface = qtSurface;
   device->weakThis = device;
@@ -110,7 +111,7 @@ QGLDevice::~QGLDevice() {
     textureCache = nil;
   }
 #endif
-  if (isAdopted) {
+  if (externallyOwned) {
     return;
   }
   delete qtContext;

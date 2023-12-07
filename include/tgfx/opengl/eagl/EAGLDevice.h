@@ -25,9 +25,9 @@ namespace tgfx {
 class EAGLDevice : public GLDevice {
  public:
   /**
-   * Creates an EAGL device with adopted EAGL context.
+   * Creates an EAGLDevice with an existing EAGLContext.
    */
-  static std::shared_ptr<EAGLDevice> MakeAdopted(EAGLContext* eaglContext);
+  static std::shared_ptr<EAGLDevice> MakeFrom(EAGLContext* eaglContext);
 
   ~EAGLDevice() override;
 
@@ -49,7 +49,7 @@ class EAGLDevice : public GLDevice {
   CVOpenGLESTextureCacheRef textureCache = nil;
   size_t cacheArrayIndex = 0;
 
-  static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool isAdopted);
+  static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool externallyOwned);
   static void NotifyReferenceReachedZero(EAGLDevice* device);
 
   explicit EAGLDevice(EAGLContext* eaglContext);

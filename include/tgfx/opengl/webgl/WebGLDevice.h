@@ -25,7 +25,7 @@ namespace tgfx {
 class WebGLDevice : public GLDevice {
  public:
   /**
-   * Creates a new WebGLDevice from a canvas.
+   * Creates a WebGLDevice from the id of an existing HTMLCanvasElement.
    */
   static std::shared_ptr<WebGLDevice> MakeFrom(const std::string& canvasID);
 
@@ -41,8 +41,7 @@ class WebGLDevice : public GLDevice {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context = 0;
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE oldContext = 0;
 
-  static std::shared_ptr<WebGLDevice> Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
-                                           bool isAdopted = false);
+  static std::shared_ptr<WebGLDevice> Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context);
 
   explicit WebGLDevice(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle);
 
