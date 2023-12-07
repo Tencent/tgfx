@@ -33,7 +33,7 @@ namespace tgfx {
 class QGLDevice : public GLDevice {
  public:
   /**
-   * Creates a offscreen QT device with specified format and shared context. If format is not
+   * Creates an offscreen QT device with specified format and shared context. If the format is not
    * specified, QSurfaceFormat::defaultFormat() will be used.
    * Note: Due to the fact that QOffscreenSurface is backed by a QWindow on some platforms,
    * cross-platform applications must ensure that this method is only called on the main (GUI)
@@ -45,9 +45,13 @@ class QGLDevice : public GLDevice {
                                          QSurfaceFormat* format = nullptr);
 
   /**
-   * Creates an QT device with adopted EGLDisplay, EGLSurface and EGLContext.
+   * Creates an QGLDevice with the existing QOpenGLContext, and QSurface. If adopted is true, the
+   * QGLDevice will take ownership of the QOpenGLContext and QSurface and destroy them when the
+   * QGLDevice is destroyed. The caller should not destroy the QOpenGLContext and QSurface in this
+   * case.
    */
-  static std::shared_ptr<QGLDevice> MakeAdopted(QOpenGLContext* context, QSurface* surface);
+  static std::shared_ptr<QGLDevice> MakeFrom(QOpenGLContext* context, QSurface* surface,
+                                             bool adopted = false);
 
   ~QGLDevice() override;
 
@@ -77,7 +81,7 @@ class QGLDevice : public GLDevice {
   QSurface* oldSurface = nullptr;
 
   static std::shared_ptr<QGLDevice> Wrap(QOpenGLContext* context, QSurface* surface,
-                                         bool isAdopted);
+                                         bool externallyOwned);
 
   explicit QGLDevice(void* nativeHandle);
 

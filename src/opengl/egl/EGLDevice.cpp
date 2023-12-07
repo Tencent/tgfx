@@ -73,9 +73,9 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   return device;
 }
 
-std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
-                                                  EGLContext eglContext) {
-  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, true);
+std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLDisplay eglDisplay, EGLSurface eglSurface,
+                                               EGLContext eglContext, bool adopted) {
+  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, !adopted);
 }
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -103,7 +103,7 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
 
 std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                            EGLContext eglContext, EGLContext shareContext,
-                                           bool isAdopted) {
+                                           bool externallyOwned) {
   auto glContext = GLDevice::Get(eglContext);
   if (glContext) {
     return std::static_pointer_cast<EGLDevice>(glContext);
@@ -126,7 +126,7 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
     }
   }
   auto device = std::shared_ptr<EGLDevice>(new EGLDevice(eglContext));
-  device->isAdopted = isAdopted;
+  device->externallyOwned = externallyOwned;
   device->eglDisplay = eglDisplay;
   device->eglSurface = eglSurface;
   device->eglContext = eglContext;
@@ -146,7 +146,7 @@ EGLDevice::EGLDevice(void* nativeHandle) : GLDevice(nativeHandle) {
 
 EGLDevice::~EGLDevice() {
   releaseAll();
-  if (isAdopted) {
+  if (externallyOwned) {
     return;
   }
   eglDestroyContext(eglDisplay, eglContext);

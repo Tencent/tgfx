@@ -25,9 +25,9 @@ namespace tgfx {
 class CGLDevice : public GLDevice {
  public:
   /**
-   * Creates an CGL device with adopted CGL context.
+   * Creates a CGLDevice with an existing CGLContext.
    */
-  static std::shared_ptr<CGLDevice> MakeAdopted(CGLContextObj cglContext);
+  static std::shared_ptr<CGLDevice> MakeFrom(CGLContextObj cglContext);
 
   ~CGLDevice() override;
 
@@ -44,7 +44,7 @@ class CGLDevice : public GLDevice {
   CGLContextObj oldContext = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool isAdopted = false);
+  static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool externallyOwned);
 
   explicit CGLDevice(CGLContextObj cglContext);
 

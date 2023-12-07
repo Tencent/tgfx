@@ -63,7 +63,7 @@ class GLDevice : public Device {
 
  protected:
   void* nativeHandle = nullptr;
-  bool isAdopted = false;
+  bool externallyOwned = false;
 
   explicit GLDevice(void* nativeHandle);
   bool onLockContext() override;
