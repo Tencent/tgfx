@@ -35,23 +35,20 @@ class QGLWindow : public DoubleBufferedWindow {
   ~QGLWindow() override;
 
   /**
-   * Creates a new QGLWindow from specified QQuickItem and shared context.
-   * Note: Due to the fact that QOffscreenSurface is backed by a QWindow on some platforms,
-   * cross-platform applications must ensure that this method is only called on the main (GUI)
-   * thread. The returned QGLWindow is then safe to be used on other threads after calling
-   * moveToThread(), but the initialization and destruction must always happen on the main (GUI)
-   * thread.
+   * Creates a new QGLWindow from specified QQuickItem and shared context. This method can be called
+   * from any thread. After creation, you can use moveToThread() to move this object to the render
+   * thread you created.
    */
-  static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem,
-                                             QOpenGLContext* sharedContext = nullptr);
+  static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem);
 
   /**
    * Changes the thread affinity for this object and its children.
    */
-  void moveToThread(QThread* targetThread);
+  void moveToThread(QThread* renderThread);
 
   /**
-   * Returns the current QSGTexture for displaying.
+   * Returns the current QSGTexture for displaying. This method can only be called from the QSG
+   * render thread.
    */
   QSGTexture* getTexture();
 
@@ -61,11 +58,16 @@ class QGLWindow : public DoubleBufferedWindow {
 
  private:
   std::mutex locker = {};
+  std::weak_ptr<QGLWindow> weakThis;
+  bool deviceChecked = false;
   bool textureInvalid = true;
+  QThread* renderThread = nullptr;
   QQuickItem* quickItem = nullptr;
   QSGTexture* outTexture = nullptr;
 
-  QGLWindow(std::shared_ptr<Device> device, QQuickItem* quickItem);
+  explicit QGLWindow(QQuickItem* quickItem);
+  void checkDevice(QQuickWindow* window);
+  void createDevice(QOpenGLContext* context);
   void invalidateTexture();
 };
 }  // namespace tgfx

@@ -26,36 +26,38 @@
 #include "tgfx/opengl/GLFunctions.h"
 
 namespace tgfx {
-
-std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem,
-                                               QOpenGLContext* sharedContext) {
+std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem) {
   if (quickItem == nullptr) {
     return nullptr;
   }
-  auto device = QGLDevice::Make(sharedContext);
-  if (device == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<QGLWindow>(new QGLWindow(device, quickItem));
+  auto window = std::shared_ptr<QGLWindow>(new QGLWindow(quickItem));
+  window->weakThis = window;
+  return window;
 }
 
-QGLWindow::QGLWindow(std::shared_ptr<Device> device, QQuickItem* quickItem)
-    : DoubleBufferedWindow(std::move(device)), quickItem(quickItem) {
+QGLWindow::QGLWindow(QQuickItem* quickItem) : DoubleBufferedWindow(nullptr), quickItem(quickItem) {
 }
 
 QGLWindow::~QGLWindow() {
   delete outTexture;
 }
 
-void QGLWindow::moveToThread(QThread* targetThread) {
+void QGLWindow::moveToThread(QThread* thread) {
   std::lock_guard<std::mutex> autoLock(locker);
-  static_cast<QGLDevice*>(device.get())->moveToThread(targetThread);
+  renderThread = thread;
+  if (device != nullptr) {
+    static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
+  }
 }
 
 QSGTexture* QGLWindow::getTexture() {
   std::lock_guard<std::mutex> autoLock(locker);
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
+    return nullptr;
+  }
+  if (device == nullptr) {
+    checkDevice(nativeWindow);
     return nullptr;
   }
   if (textureInvalid && frontSurface && backSurface) {
@@ -83,6 +85,45 @@ QSGTexture* QGLWindow::getTexture() {
 #endif
   }
   return outTexture;
+}
+
+void QGLWindow::checkDevice(QQuickWindow* window) {
+  if (deviceChecked) {
+    return;
+  }
+  deviceChecked = true;
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  auto shareContext = reinterpret_cast<QOpenGLContext*>(window->rendererInterface()->getResource(
+      window, QSGRendererInterface::OpenGLContextResource));
+#else
+  auto shareContext = window->openglContext();
+#endif
+  // Creating a context that shares with a context that is current on another thread is not safe,
+  // some drivers on windows can reject this. So we have to create the context here on the QSG
+  // render thread.
+  auto context = new QOpenGLContext();
+  context->setFormat(shareContext->format());
+  context->setShareContext(shareContext);
+  context->create();
+  auto app = QApplication::instance();
+  context->moveToThread(app->thread());
+  QMetaObject::invokeMethod(
+      app,
+      [self = weakThis.lock(), context] {
+        std::lock_guard<std::mutex> autoLock(self->locker);
+        self->createDevice(context);
+      },
+      Qt::QueuedConnection);
+}
+
+void QGLWindow::createDevice(QOpenGLContext* context) {
+  auto surface = new QOffscreenSurface();
+  surface->setFormat(context->format());
+  surface->create();
+  device = QGLDevice::MakeFrom(context, surface, true);
+  if (renderThread != nullptr) {
+    static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
+  }
 }
 
 void QGLWindow::invalidateTexture() {

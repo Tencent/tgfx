@@ -31,17 +31,18 @@ class DoubleBufferedWindowOffscreen : public DoubleBufferedWindow {
  private:
   std::shared_ptr<Surface> makeSurface(Context* context) const {
     if (tryHardware) {
-      auto buffer = HardwareBufferAllocate(width, height);
-      auto surface = Surface::MakeFrom(context, buffer);
-      HardwareBufferRelease(buffer);
-      return surface;
-    } else {
-#ifdef __APPLE__
-      return Surface::Make(context, width, height, tgfx::ColorType::BGRA_8888);
-#else
-      return Surface::Make(context, width, height);
-#endif
+      auto hardwareBuffer = tgfx::HardwareBufferAllocate(width, height);
+      auto surface = tgfx::Surface::MakeFrom(context, hardwareBuffer);
+      tgfx::HardwareBufferRelease(hardwareBuffer);
+      if (surface != nullptr) {
+        return surface;
+      }
     }
+#ifdef __APPLE__
+    return tgfx::Surface::Make(context, width, height, tgfx::ColorType::BGRA_8888);
+#else
+    return tgfx::Surface::Make(context, width, height);
+#endif
   }
 
   std::shared_ptr<Surface> onCreateSurface(Context* context) override {
