@@ -67,6 +67,7 @@ class QGLWindow : public Window {
   QThread* renderThread = nullptr;
   bool textureInvalid = false;
   std::shared_ptr<Surface> surfaceInDisplay = nullptr;
+  std::shared_ptr<Surface> fontSurface = nullptr;
   QSGTexture* outTexture = nullptr;
   QGLDeviceCreator* deviceCreator = nullptr;
 
