@@ -58,7 +58,7 @@ class QGLDeviceCreator : public QObject {
                SLOT(handleWindowChanged(QQuickWindow*)));
     if (nativeWindow != nullptr) {
       auto shareContext = getShareContext();
-      if (shareContext->thread() == QThread::currentThread()) {
+      if (shareContext && shareContext->thread() == QThread::currentThread()) {
         // We are on the same thread as the QSG render thread, so we can create the device here.
         createDevice(shareContext);
       } else {
@@ -138,32 +138,35 @@ QSGTexture* QGLWindow::getQSGTexture() {
     return nullptr;
   }
   if (textureInvalid || outTexture == nullptr) {
+    if (surface == nullptr) {
+      return nullptr;
+    }
     textureInvalid = false;
     if (outTexture) {
       delete outTexture;
       outTexture = nullptr;
     }
-    if (surface != nullptr) {
-      GLTextureInfo frontTextureInfo;
-      surface->getBackendTexture().getGLTextureInfo(&frontTextureInfo);
-      auto textureID = frontTextureInfo.id;
-      auto width = static_cast<int>(ceil(quickItem->width()));
-      auto height = static_cast<int>(ceil(quickItem->height()));
+    GLTextureInfo frontTextureInfo;
+    surface->getBackendTexture().getGLTextureInfo(&frontTextureInfo);
+    auto textureID = frontTextureInfo.id;
+    auto width = static_cast<int>(ceil(quickItem->width()));
+    auto height = static_cast<int>(ceil(quickItem->height()));
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-      outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
-          textureID, nativeWindow, QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
+    outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
+        textureID, nativeWindow, QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
 
 #elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-      outTexture = nativeWindow->createTextureFromNativeObject(
-          QQuickWindow::NativeObjectTexture, &textureID, 0, QSize(width, height),
-          QQuickWindow::TextureHasAlphaChannel);
+    outTexture = nativeWindow->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
+                                                             &textureID, 0, QSize(width, height),
+                                                             QQuickWindow::TextureHasAlphaChannel);
 #else
-      outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
-                                                     QQuickWindow::TextureHasAlphaChannel);
+    outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
+                                                   QQuickWindow::TextureHasAlphaChannel);
 #endif
-      if (!singleBufferMode) {
-        std::swap(surfaceInDisplay, surface);
-      }
+    // Keep the surface alive until the next getQSGTexture() call.
+    surfaceInDisplay = surface;
+    if (!singleBufferMode) {
+      std::swap(fontSurface, surface);
     }
   }
   return outTexture;
@@ -181,14 +184,14 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   if (!singleBufferMode) {
-    surfaceInDisplay = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
-    if (surfaceInDisplay == nullptr) {
+    fontSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
+    if (fontSurface == nullptr) {
       return nullptr;
     }
   }
   auto backSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
   if (backSurface == nullptr) {
-    surfaceInDisplay = nullptr;
+    fontSurface = nullptr;
     return nullptr;
   }
   sizeInvalid = false;
@@ -201,9 +204,9 @@ void QGLWindow::onPresent(Context*, int64_t) {
 }
 
 void QGLWindow::onFreeSurface() {
-  surfaceInDisplay = nullptr;
-  surface = nullptr;
-  textureInvalid = true;
+  // TODO: Uncomment the following code when fix the multi-thread issue.
+  //  fontSurface = nullptr;
+  //  surface = nullptr;
 }
 
 void QGLWindow::initDevice() {

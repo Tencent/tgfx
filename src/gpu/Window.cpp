@@ -34,8 +34,11 @@ std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOn
   if (!checkContext(context)) {
     return nullptr;
   }
-  if ((surface != nullptr && !sizeInvalid) || queryOnly) {
+  if (surface != nullptr && !sizeInvalid) {
     return surface;
+  }
+  if (queryOnly) {
+    return nullptr;
   }
   surface = onCreateSurface(context);
   sizeInvalid = false;
