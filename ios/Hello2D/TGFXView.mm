@@ -22,7 +22,6 @@
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> window;
-  std::shared_ptr<tgfx::Surface> surface;
   std::unique_ptr<drawers::AppHost> appHost;
 }
 
@@ -57,7 +56,6 @@
 - (void)updateSize {
   auto width = static_cast<int>(roundf(self.layer.bounds.size.width * self.layer.contentsScale));
   auto height = static_cast<int>(roundf(self.layer.bounds.size.height * self.layer.contentsScale));
-  surface = nullptr;
   if (appHost == nullptr) {
     appHost = std::make_unique<drawers::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
@@ -68,10 +66,13 @@
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
     appHost->addTypeface("emoji", typeface);
   }
-  appHost->updateScreen(width, height, self.layer.contentsScale);
+  auto sizeChanged = appHost->updateScreen(width, height, self.layer.contentsScale);
+  if (sizeChanged && window != nullptr) {
+    window->invalidSize();
+  }
 }
 
-- (void)createSurface {
+- (void)draw:(int)index {
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
@@ -86,20 +87,9 @@
   if (context == nullptr) {
     return;
   }
-  surface = window->createSurface(context);
-  device->unlock();
-}
-
-- (void)draw:(int)index {
+  auto surface = window->getSurface(context);
   if (surface == nullptr) {
-    [self createSurface];
-  }
-  if (window == nullptr) {
-    return;
-  }
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
+    device->unlock();
     return;
   }
   auto canvas = surface->getCanvas();
