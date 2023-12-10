@@ -25,10 +25,11 @@
 @implementation WindowController
 
 - (void)windowDidLoad {
-    [super windowDidLoad];
-    
-    self.window.colorSpace = [NSColorSpace extendedSRGBColorSpace];
-    // Implement this method to handle any initialization after your window controller's window has been loaded from its nib file.
+  [super windowDidLoad];
+
+  self.window.colorSpace = [NSColorSpace extendedSRGBColorSpace];
+  // Implement this method to handle any initialization after your window controller's window has
+  // been loaded from its nib file.
 }
 
 @end

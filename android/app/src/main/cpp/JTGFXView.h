@@ -18,21 +18,19 @@
 
 #pragma once
 
-#include <string>
-#include <jni.h>
 #include <android/native_window_jni.h>
+#include <jni.h>
+#include <string>
+#include "drawers/Drawer.h"
 #include "tgfx/gpu/Window.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
-#include "drawers/Drawer.h"
 
 namespace hello2d {
 class JTGFXView {
  public:
-  explicit JTGFXView(ANativeWindow* nativeWindow,
-                     std::shared_ptr<tgfx::Window> window, std::unique_ptr<drawers::AppHost> appHost)
-      : nativeWindow(nativeWindow),
-        window(std::move(window)),
-        appHost(std::move(appHost)) {
+  explicit JTGFXView(ANativeWindow* nativeWindow, std::shared_ptr<tgfx::Window> window,
+                     std::unique_ptr<drawers::AppHost> appHost)
+      : nativeWindow(nativeWindow), window(std::move(window)), appHost(std::move(appHost)) {
     updateSize();
   }
 
@@ -52,4 +50,4 @@ class JTGFXView {
   std::shared_ptr<tgfx::Surface> surface;
   std::shared_ptr<drawers::AppHost> appHost;
 };
-}
+}  // namespace hello2d
