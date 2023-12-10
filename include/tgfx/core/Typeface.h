@@ -64,7 +64,8 @@ class Typeface {
    * Creates a new typeface for the given file bytes and ttc index. Returns nullptr if the typeface
    * can't be created.
    */
-  static std::shared_ptr<Typeface> MakeFromBytes(const void* bytes, size_t length, int ttcIndex = 0);
+  static std::shared_ptr<Typeface> MakeFromBytes(const void* bytes, size_t length,
+                                                 int ttcIndex = 0);
 
   /**
    * Creates a new typeface for the given file data and ttc index. Returns nullptr if the typeface
@@ -133,14 +134,13 @@ class Typeface {
    * Returns the bounding box of the specified glyph. The bounds is specified in glyph space
    * units.
    */
-  virtual Rect getBounds(GlyphID glyphID, float size, bool fauxBold,
-                              bool fauxItalic) const = 0;
+  virtual Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const = 0;
 
   /**
    * Returns the advance for specified glyph. The value is specified in glyph space units.
    */
   virtual float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                                bool verticalText) const = 0;
+                           bool verticalText) const = 0;
 
   /**
    * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path
@@ -148,14 +148,14 @@ class Typeface {
    * The points in path are specified in glyph space units.
    */
   virtual bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                            Path* path) const = 0;
+                       Path* path) const = 0;
 
   /**
    * Creates an image buffer capturing the content of the specified glyph. The returned matrix
    * should apply to the glyph image when drawing.
    */
   virtual std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                                      bool fauxItalic, Matrix* matrix) const = 0;
+                                                     bool fauxItalic, Matrix* matrix) const = 0;
 
   /**
    * Calculates the offset from the default (horizontal) origin to the vertical origin for specified

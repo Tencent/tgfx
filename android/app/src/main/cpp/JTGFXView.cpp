@@ -69,11 +69,11 @@ void JTGFXView::createSurface() {
   surface = window->createSurface(context);
   device->unlock();
 }
-}
+}  // namespace hello2d
 
 static hello2d::JTGFXView* GetJTGFXView(JNIEnv* env, jobject thiz) {
-  return reinterpret_cast<hello2d::JTGFXView*>(env->GetLongField(thiz,
-                                                                 hello2d::TGFXView_nativePtr));
+  return reinterpret_cast<hello2d::JTGFXView*>(
+      env->GetLongField(thiz, hello2d::TGFXView_nativePtr));
 }
 
 static std::unique_ptr<drawers::AppHost> CreateAppHost(ANativeWindow* nativeWindow, float density) {
@@ -81,10 +81,9 @@ static std::unique_ptr<drawers::AppHost> CreateAppHost(ANativeWindow* nativeWind
   auto width = ANativeWindow_getWidth(nativeWindow);
   auto height = ANativeWindow_getHeight(nativeWindow);
   host->updateScreen(width, height, density);
-  static const std::string FallbackFontFileNames[] =
-      {"/system/fonts/NotoSansCJK-Regular.ttc",
-       "/system/fonts/NotoSansSC-Regular.otf",
-       "/system/fonts/DroidSansFallback.ttf"};
+  static const std::string FallbackFontFileNames[] = {"/system/fonts/NotoSansCJK-Regular.ttc",
+                                                      "/system/fonts/NotoSansSC-Regular.otf",
+                                                      "/system/fonts/DroidSansFallback.ttf"};
   for (auto& fileName : FallbackFontFileNames) {
     auto typeface = tgfx::Typeface::MakeFromPath(fileName);
     if (typeface != nullptr) {
@@ -100,24 +99,20 @@ static std::unique_ptr<drawers::AppHost> CreateAppHost(ANativeWindow* nativeWind
 }
 
 extern "C" {
-JNIEXPORT void JNICALL
-Java_org_tgfx_hello2d_TGFXView_nativeRelease(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeRelease(JNIEnv* env, jobject thiz) {
   auto jTGFXView =
       reinterpret_cast<hello2d::JTGFXView*>(env->GetLongField(thiz, hello2d::TGFXView_nativePtr));
   delete jTGFXView;
 }
 
-JNIEXPORT void JNICALL
-Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(JNIEnv* env, jobject) {
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(JNIEnv* env,
+                                                                                jobject) {
   auto clazz = env->FindClass("org/tgfx/hello2d/TGFXView");
   hello2d::TGFXView_nativePtr = env->GetFieldID(clazz, "nativePtr", "J");
 }
 
-JNIEXPORT jlong JNICALL
-Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(JNIEnv* env, jobject,
-                                                               jobject surface,
-                                                               jbyteArray imageBytes,
-                                                               jfloat density) {
+JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
+    JNIEnv* env, jobject, jobject surface, jbyteArray imageBytes, jfloat density) {
   if (surface == nullptr) {
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
@@ -137,13 +132,12 @@ Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(JNIEnv* env, jobj
   if (image) {
     appHost->addImage("bridge", std::move(image));
   }
-  return reinterpret_cast<jlong>(new hello2d::JTGFXView(nativeWindow,
-                                                        std::move(window),
-                                                        std::move(appHost)));
+  return reinterpret_cast<jlong>(
+      new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost)));
 }
 
-JNIEXPORT void JNICALL
-Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz, jint drawIndex) {
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
+                                                                 jint drawIndex) {
   auto* view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;
@@ -151,8 +145,7 @@ Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz, jint drawIn
   view->draw(drawIndex);
 }
 
-JNIEXPORT void JNICALL
-Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {
   auto* view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;

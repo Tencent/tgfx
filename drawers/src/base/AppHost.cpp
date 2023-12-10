@@ -40,31 +40,35 @@ std::shared_ptr<tgfx::Typeface> AppHost::getTypeface(const std::string& name) co
   return nullptr;
 }
 
-void AppHost::updateScreen(int width, int height, float density) {
+bool AppHost::updateScreen(int width, int height, float density) {
   if (width <= 0 || height <= 0) {
-    tgfx::PrintError("AppContext::updateScreen() width or height is invalid!");
-    return;
+    tgfx::PrintError("AppHost::updateScreen() width or height is invalid!");
+    return false;
   }
   if (density < 1.0) {
-    tgfx::PrintError("AppContext::updateScreen() density is invalid!");
-    return;
+    tgfx::PrintError("AppHost::updateScreen() density is invalid!");
+    return false;
+  }
+  if (width == _width && height == _height && density == _density) {
+    return false;
   }
   _width = width;
   _height = height;
   _density = density;
+  return true;
 }
 
 void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> image) {
   if (name.empty()) {
-    tgfx::PrintError("AppContext::setImage() name is empty!");
+    tgfx::PrintError("AppHost::addImage() name is empty!");
     return;
   }
   if (image == nullptr) {
-    tgfx::PrintError("AppContext::setImage() image is nullptr!");
+    tgfx::PrintError("AppHost::addImage() image is nullptr!");
     return;
   }
   if (images.count(name) > 0) {
-    tgfx::PrintError("AppContext::setImage() image with name %s already exists!", name.c_str());
+    tgfx::PrintError("AppHost::addImage() image with name %s already exists!", name.c_str());
     return;
   }
   images[name] = std::move(image);
@@ -72,16 +76,15 @@ void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> ima
 
 void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface) {
   if (name.empty()) {
-    tgfx::PrintError("AppContext::setTypeface() name is empty!");
+    tgfx::PrintError("AppHost::addTypeface() name is empty!");
     return;
   }
   if (typeface == nullptr) {
-    tgfx::PrintError("AppContext::setTypeface() typeface is nullptr!");
+    tgfx::PrintError("AppHost::addTypeface() typeface is nullptr!");
     return;
   }
   if (typefaces.count(name) > 0) {
-    tgfx::PrintError("AppContext::setTypeface() typeface with name %s already exists!",
-                     name.c_str());
+    tgfx::PrintError("AppHost::addTypeface() typeface with name %s already exists!", name.c_str());
     return;
   }
   typefaces[name] = std::move(typeface);

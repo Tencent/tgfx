@@ -30,7 +30,8 @@ namespace drawers {
 class AppHost {
  public:
   /**
-   * Creates an AppHost with the given width, height and density.
+   * Creates an AppHost with the given width, height and density. The width and height are in
+   * pixels, and the density is the ratio of physical pixels to logical pixels.
    */
   explicit AppHost(int width = 1280, int height = 720, float density = 1.0f);
 
@@ -68,9 +69,11 @@ class AppHost {
   std::shared_ptr<tgfx::Typeface> getTypeface(const std::string& name) const;
 
   /**
-   * Updates the screen size and density. The default values are 1280x720 and 1.0.
+   * Updates the screen size and density. The default values are 1280x720 and 1.0. The width and
+   * height are in pixels, and the density is the ratio of physical pixels to logical pixels.
+   * Returns true if the screen size or density has changed.
    */
-  void updateScreen(int width, int height, float density);
+  bool updateScreen(int width, int height, float density);
 
   /**
    * Add an image for the given resource name.

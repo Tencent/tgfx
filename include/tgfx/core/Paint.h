@@ -19,10 +19,10 @@
 #pragma once
 
 #include "tgfx/core/Color.h"
-#include "tgfx/core/Stroke.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 /**

@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "tgfx/utils/BytesKey.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/Device.h"
+#include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
 class ProgramCache;
