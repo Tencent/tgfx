@@ -24,22 +24,25 @@
 #include <QSGTexture>
 #pragma clang diagnostic pop
 #include "QGLDevice.h"
-#include "tgfx/gpu/DoubleBufferedWindow.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 class Texture;
 class GLRenderTarget;
+class QGLDeviceCreator;
 
-class QGLWindow : public DoubleBufferedWindow {
+class QGLWindow : public Window {
  public:
   ~QGLWindow() override;
 
   /**
    * Creates a new QGLWindow from specified QQuickItem and shared context. This method can be called
    * from any thread. After creation, you can use moveToThread() to move this object to the render
-   * thread you created.
+   * thread you created. If the drawing process is only performed within the updatePaintNode()
+   * method, you can set singleBufferMode to true to reduce the memory usage. However, if you intend
+   * to perform drawing in other threads, you must set singleBufferMode to false.
    */
-  static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem);
+  static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem, bool singleBufferMode = false);
 
   /**
    * Changes the thread affinity for this object and its children.
@@ -50,24 +53,27 @@ class QGLWindow : public DoubleBufferedWindow {
    * Returns the current QSGTexture for displaying. This method can only be called from the QSG
    * render thread.
    */
-  QSGTexture* getTexture();
+  QSGTexture* getQSGTexture();
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onSwapSurfaces(Context*) override;
+  void onPresent(Context* context, int64_t presentationTime) override;
+  void onFreeSurface() override;
 
  private:
-  std::mutex locker = {};
   std::weak_ptr<QGLWindow> weakThis;
-  bool deviceChecked = false;
-  bool textureInvalid = true;
-  QThread* renderThread = nullptr;
   QQuickItem* quickItem = nullptr;
+  bool singleBufferMode = false;
+  QThread* renderThread = nullptr;
+  bool textureInvalid = false;
+  std::shared_ptr<Surface> surfaceInDisplay = nullptr;
   QSGTexture* outTexture = nullptr;
+  QGLDeviceCreator* deviceCreator = nullptr;
 
-  explicit QGLWindow(QQuickItem* quickItem);
-  void checkDevice(QQuickWindow* window);
+  explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false);
+  void initDevice();
   void createDevice(QOpenGLContext* context);
-  void invalidateTexture();
+
+  friend class QGLDeviceCreator;
 };
 }  // namespace tgfx

@@ -32,11 +32,8 @@ class TGFXView {
   void draw(int drawIndex);
 
  private:
-  void createSurface();
-
   std::string canvasID;
   std::shared_ptr<tgfx::Window> window;
-  std::shared_ptr<tgfx::Surface> surface;
   std::shared_ptr<drawers::AppHost> appHost;
 };
 }  // namespace hello2d

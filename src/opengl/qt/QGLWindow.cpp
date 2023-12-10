@@ -26,20 +26,101 @@
 #include "tgfx/opengl/GLFunctions.h"
 
 namespace tgfx {
-std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem) {
+class QGLDeviceCreator : public QObject {
+  Q_OBJECT
+ public:
+  QGLDeviceCreator(QQuickItem* item, QGLWindow* window) : item(item), window(window) {
+    auto nativeWindow = item->window();
+    if (nativeWindow != nullptr) {
+      handleWindowChanged(nativeWindow);
+    } else {
+      connect(item, SIGNAL(windowChanged(QQuickWindow*)), this,
+              SLOT(handleWindowChanged(QQuickWindow*)));
+    }
+  }
+
+  ~QGLDeviceCreator() override {
+    disconnect(item, SIGNAL(windowChanged(QQuickWindow*)), this,
+               SLOT(handleWindowChanged(QQuickWindow*)));
+    auto nativeWindow = item->window();
+    if (nativeWindow != nullptr) {
+      disconnect(nativeWindow, SIGNAL(beforeRendering()), this, SLOT(onBeforeRendering()));
+    }
+  }
+
+ private:
+  QQuickItem* item = nullptr;
+  QGLWindow* window = nullptr;
+
+  Q_SLOT
+  void handleWindowChanged(QQuickWindow* nativeWindow) {
+    disconnect(item, SIGNAL(windowChanged(QQuickWindow*)), this,
+               SLOT(handleWindowChanged(QQuickWindow*)));
+    if (nativeWindow != nullptr) {
+      auto shareContext = getShareContext();
+      if (shareContext->thread() == QThread::currentThread()) {
+        // We are on the same thread as the QSG render thread, so we can create the device here.
+        createDevice(shareContext);
+      } else {
+        connect(nativeWindow, SIGNAL(beforeRendering()), this, SLOT(onBeforeRendering()));
+        QMetaObject::invokeMethod(item, "update", Qt::AutoConnection);
+      }
+    }
+  }
+
+  Q_SLOT
+  void onBeforeRendering() {
+    disconnect(item->window(), SIGNAL(beforeRendering()), this, SLOT(onBeforeRendering()));
+    auto shareContext = getShareContext();
+    createDevice(shareContext);
+  }
+
+  QOpenGLContext* getShareContext() {
+    auto nativeWindow = item->window();
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    return reinterpret_cast<QOpenGLContext*>(nativeWindow->rendererInterface()->getResource(
+        nativeWindow, QSGRendererInterface::OpenGLContextResource));
+#else
+    return nativeWindow->openglContext();
+#endif
+  }
+
+  void createDevice(QOpenGLContext* shareContext) {
+    // Creating a context that shares with a context that is current on another thread is not safe,
+    // some drivers on windows can reject this. So we have to create the context here on the QSG
+    // render thread.
+    auto context = new QOpenGLContext();
+    context->setFormat(shareContext->format());
+    context->setShareContext(shareContext);
+    context->create();
+    auto app = QApplication::instance();
+    context->moveToThread(app->thread());
+    QMetaObject::invokeMethod(
+        app, [self = window->weakThis.lock(), context] { self->createDevice(context); },
+        Qt::AutoConnection);
+  }
+};
+
+std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode) {
   if (quickItem == nullptr) {
     return nullptr;
   }
-  auto window = std::shared_ptr<QGLWindow>(new QGLWindow(quickItem));
+  auto window = std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode));
   window->weakThis = window;
+  window->initDevice();
   return window;
 }
 
-QGLWindow::QGLWindow(QQuickItem* quickItem) : DoubleBufferedWindow(nullptr), quickItem(quickItem) {
+QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode)
+    : quickItem(quickItem), singleBufferMode(singleBufferMode) {
+  if (QThread::currentThread() != QApplication::instance()->thread()) {
+    renderThread = QThread::currentThread();
+  }
 }
 
 QGLWindow::~QGLWindow() {
   delete outTexture;
+  delete deviceCreator;
 }
 
 void QGLWindow::moveToThread(QThread* thread) {
@@ -50,73 +131,87 @@ void QGLWindow::moveToThread(QThread* thread) {
   }
 }
 
-QSGTexture* QGLWindow::getTexture() {
+QSGTexture* QGLWindow::getQSGTexture() {
   std::lock_guard<std::mutex> autoLock(locker);
   auto nativeWindow = quickItem->window();
-  if (nativeWindow == nullptr) {
+  if (nativeWindow == nullptr || device == nullptr) {
     return nullptr;
   }
-  if (device == nullptr) {
-    checkDevice(nativeWindow);
-    return nullptr;
-  }
-  if (textureInvalid && frontSurface && backSurface) {
+  if (textureInvalid || outTexture == nullptr) {
     textureInvalid = false;
     if (outTexture) {
       delete outTexture;
       outTexture = nullptr;
     }
-    GLTextureInfo frontTextureInfo;
-    frontSurface->getBackendTexture().getGLTextureInfo(&frontTextureInfo);
-    auto textureID = frontTextureInfo.id;
-    auto width = static_cast<int>(ceil(quickItem->width()));
-    auto height = static_cast<int>(ceil(quickItem->height()));
+    if (surface != nullptr) {
+      GLTextureInfo frontTextureInfo;
+      surface->getBackendTexture().getGLTextureInfo(&frontTextureInfo);
+      auto textureID = frontTextureInfo.id;
+      auto width = static_cast<int>(ceil(quickItem->width()));
+      auto height = static_cast<int>(ceil(quickItem->height()));
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-    outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
-        textureID, nativeWindow, QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
+      outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
+          textureID, nativeWindow, QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
 
 #elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-    outTexture = nativeWindow->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
-                                                             &textureID, 0, QSize(width, height),
-                                                             QQuickWindow::TextureHasAlphaChannel);
+      outTexture = nativeWindow->createTextureFromNativeObject(
+          QQuickWindow::NativeObjectTexture, &textureID, 0, QSize(width, height),
+          QQuickWindow::TextureHasAlphaChannel);
 #else
-    outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
-                                                   QQuickWindow::TextureHasAlphaChannel);
+      outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
+                                                     QQuickWindow::TextureHasAlphaChannel);
 #endif
+      if (!singleBufferMode) {
+        std::swap(surfaceInDisplay, surface);
+      }
+    }
   }
   return outTexture;
 }
 
-void QGLWindow::checkDevice(QQuickWindow* window) {
-  if (deviceChecked) {
-    return;
+std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
+  auto nativeWindow = quickItem->window();
+  if (nativeWindow == nullptr) {
+    return nullptr;
   }
-  deviceChecked = true;
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  auto shareContext = reinterpret_cast<QOpenGLContext*>(window->rendererInterface()->getResource(
-      window, QSGRendererInterface::OpenGLContextResource));
-#else
-  auto shareContext = window->openglContext();
-#endif
-  // Creating a context that shares with a context that is current on another thread is not safe,
-  // some drivers on windows can reject this. So we have to create the context here on the QSG
-  // render thread.
-  auto context = new QOpenGLContext();
-  context->setFormat(shareContext->format());
-  context->setShareContext(shareContext);
-  context->create();
-  auto app = QApplication::instance();
-  context->moveToThread(app->thread());
-  QMetaObject::invokeMethod(
-      app,
-      [self = weakThis.lock(), context] {
-        std::lock_guard<std::mutex> autoLock(self->locker);
-        self->createDevice(context);
-      },
-      Qt::QueuedConnection);
+  auto pixelRatio = nativeWindow->devicePixelRatio();
+  auto width = static_cast<int>(ceil(quickItem->width() * pixelRatio));
+  auto height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  if (!singleBufferMode) {
+    surfaceInDisplay = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
+    if (surfaceInDisplay == nullptr) {
+      return nullptr;
+    }
+  }
+  auto backSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
+  if (backSurface == nullptr) {
+    surfaceInDisplay = nullptr;
+    return nullptr;
+  }
+  sizeInvalid = false;
+  return backSurface;
+}
+
+void QGLWindow::onPresent(Context*, int64_t) {
+  textureInvalid = true;
+  QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
+}
+
+void QGLWindow::onFreeSurface() {
+  surfaceInDisplay = nullptr;
+  surface = nullptr;
+  textureInvalid = true;
+}
+
+void QGLWindow::initDevice() {
+  deviceCreator = new QGLDeviceCreator(quickItem, this);
 }
 
 void QGLWindow::createDevice(QOpenGLContext* context) {
+  std::lock_guard<std::mutex> autoLock(locker);
   auto surface = new QOffscreenSurface();
   surface->setFormat(context->format());
   surface->create();
@@ -124,30 +219,8 @@ void QGLWindow::createDevice(QOpenGLContext* context) {
   if (renderThread != nullptr) {
     static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
   }
-}
-
-void QGLWindow::invalidateTexture() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  textureInvalid = true;
-}
-
-std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
-  auto nativeWindow = quickItem->window();
-  auto pixelRatio = nativeWindow ? nativeWindow->devicePixelRatio() : 1.0f;
-  auto width = static_cast<int>(ceil(quickItem->width() * pixelRatio));
-  auto height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  frontSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
-  backSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
-  if (frontSurface == nullptr || backSurface == nullptr) {
-    return nullptr;
-  }
-  return backSurface;
-}
-
-void QGLWindow::onSwapSurfaces(Context*) {
-  invalidateTexture();
+  QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 }  // namespace tgfx
+
+#include "QGLWindow.moc"

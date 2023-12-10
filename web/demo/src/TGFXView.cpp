@@ -37,38 +37,14 @@ void TGFXView::updateSize(float devicePixelRatio) {
     int width = 0;
     int height = 0;
     emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-    appHost->updateScreen(width, height, devicePixelRatio);
-    surface = nullptr;
+    auto sizeChanged = appHost->updateScreen(width, height, devicePixelRatio);
+    if (sizeChanged) {
+      window->invalidSize();
+    }
   }
 }
 
 void TGFXView::draw(int drawIndex) {
-  if (surface == nullptr) {
-    createSurface();
-  }
-  if (surface == nullptr) {
-    return;
-  }
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  surface->flush();
-  context->submit();
-  window->present(context);
-  device->unlock();
-}
-
-void TGFXView::createSurface() {
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
@@ -83,7 +59,22 @@ void TGFXView::createSurface() {
   if (context == nullptr) {
     return;
   }
-  surface = window->createSurface(context);
+  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
+    device->unlock();
+    return;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto numDrawers = drawers::Drawer::Count() - 1;
+  auto index = (drawIndex % numDrawers) + 1;
+  auto drawer = drawers::Drawer::GetByName("GridBackground");
+  drawer->draw(canvas, appHost.get());
+  drawer = drawers::Drawer::GetByIndex(index);
+  drawer->draw(canvas, appHost.get());
+  surface->flush();
+  context->submit();
+  window->present(context);
   device->unlock();
 }
 }  // namespace hello2d

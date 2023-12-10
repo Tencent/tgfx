@@ -43,11 +43,8 @@ class JTGFXView {
   void draw(int index);
 
  private:
-  void createSurface();
-
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
-  std::shared_ptr<tgfx::Surface> surface;
   std::shared_ptr<drawers::AppHost> appHost;
 };
 }  // namespace hello2d

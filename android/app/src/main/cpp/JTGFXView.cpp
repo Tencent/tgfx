@@ -25,20 +25,24 @@ static jfieldID TGFXView_nativePtr;
 void JTGFXView::updateSize() {
   auto width = ANativeWindow_getWidth(nativeWindow);
   auto height = ANativeWindow_getHeight(nativeWindow);
-  appHost->updateScreen(width, height, appHost->density());
-  surface = nullptr;
+  auto sizeChanged = appHost->updateScreen(width, height, appHost->density());
+  if (sizeChanged) {
+    window->invalidSize();
+  }
 }
 
 void JTGFXView::draw(int index) {
-  if (surface == nullptr) {
-    createSurface();
-  }
-  if (surface == nullptr) {
+  if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
+    return;
+  }
+  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
+    device->unlock();
     return;
   }
   auto canvas = surface->getCanvas();
@@ -54,19 +58,6 @@ void JTGFXView::draw(int index) {
   surface->flush();
   context->submit();
   window->present(context);
-  device->unlock();
-}
-
-void JTGFXView::createSurface() {
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
-  }
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
-  }
-  surface = window->createSurface(context);
   device->unlock();
 }
 }  // namespace hello2d
