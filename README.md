@@ -256,6 +256,18 @@ pack the generated `.wasm` file into the final web program. This is because comm
 usually ignore the `.wasm` file. Moreover, remember to upload the `.wasm` file to a server, enabling 
 users to access it from the network.
 
+### QT Demo
+
+For **macOS** users, to begin, please open the `qt/` folder in CLion. Then, navigate to the 
+`qt/QTCMAKE.cfg` file to modify the QT path with your local QT installation path. Once done, you can
+proceed to build and run the `Hello2D` target.
+
+For Windows users, ensure that the ToolChain of CLion is set to Visual Studio with `amd64`
+architecture. Then, navigate to the `qt/` folder in CLion and find the `qt/QTCMAKE.cfg` file.
+Modify the QT path to match your local QT installation path. Afterward, access the configuration 
+panel of the `Hello2D` target in CLion. Enter the local QT DLL library path in the 
+`Environment Variables` row, e.g., `PATH=C:\Qt\6.6.1\msvc2019_64\bin`. Finally, you're ready to 
+build and run the `Hello2D` target.
 
 ## Build TGFX
 
