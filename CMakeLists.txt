@@ -213,6 +213,7 @@ endif ()
 file(GLOB_RECURSE EGL_PLATFORM_FILES src/opengl/egl/*.*)
 
 if (TGFX_USE_QT)
+    set(CMAKE_AUTOMOC ON)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
     # set(CMAKE_PREFIX_PATH /Users/username/Qt/6.6.1/macos/lib/cmake)
     find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
