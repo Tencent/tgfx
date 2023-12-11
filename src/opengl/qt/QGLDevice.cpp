@@ -115,7 +115,13 @@ QGLDevice::~QGLDevice() {
     return;
   }
   delete qtContext;
-  delete qtSurface;
+  auto app = QApplication::instance();
+  if (app != nullptr) {
+    // Always delete the surface on the main thread.
+    QMetaObject::invokeMethod(app, [surface = qtSurface] { delete surface; });
+  } else {
+    delete qtSurface;
+  }
 }
 
 bool QGLDevice::sharableWith(void* nativeContext) const {

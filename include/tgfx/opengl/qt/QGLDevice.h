@@ -37,9 +37,8 @@ class QGLDevice : public GLDevice {
    * specified, QSurfaceFormat::defaultFormat() will be used.
    * Note: Due to the fact that QOffscreenSurface is backed by a QWindow on some platforms,
    * cross-platform applications must ensure that this method is only called on the main (GUI)
-   * thread. The returned QGLDevice is then safe to be used on other threads after calling
-   * moveToThread(), but the initialization and destruction must always happen on the main (GUI)
-   * thread.
+   * thread. The returned QGLDevice is then safe to be used or destructed on other threads after
+   * calling moveToThread().
    */
   static std::shared_ptr<QGLDevice> Make(QOpenGLContext* sharedContext = nullptr,
                                          QSurfaceFormat* format = nullptr);
@@ -67,7 +66,7 @@ class QGLDevice : public GLDevice {
   /**
    * Changes the thread affinity for this object and its children.
    */
-  void moveToThread(QThread* targetThread);
+  void moveToThread(QThread* renderThread);
 
  protected:
   bool onMakeCurrent() override;

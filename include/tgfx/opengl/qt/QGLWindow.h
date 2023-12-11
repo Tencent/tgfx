@@ -37,10 +37,11 @@ class QGLWindow : public Window {
 
   /**
    * Creates a new QGLWindow from specified QQuickItem and shared context. This method can be called
-   * from any thread. After creation, you can use moveToThread() to move this object to the render
-   * thread you created. If the drawing process is only performed within the updatePaintNode()
-   * method, you can set singleBufferMode to true to reduce the memory usage. However, if you intend
-   * to perform drawing in other threads, you must set singleBufferMode to false.
+   * from any thread. And the returned QGLWindow is safe to be used or destructed on other threads
+   * after calling moveToThread(). If the drawing process is only performed within the
+   * updatePaintNode() method, you can set singleBufferMode to true to reduce the memory usage.
+   * However, if you intend to perform drawing in other threads, you must set singleBufferMode to
+   * false.
    */
   static std::shared_ptr<QGLWindow> MakeFrom(QQuickItem* quickItem, bool singleBufferMode = false);
 

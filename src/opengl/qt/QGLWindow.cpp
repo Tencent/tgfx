@@ -62,7 +62,8 @@ class QGLDeviceCreator : public QObject {
         // We are on the same thread as the QSG render thread, so we can create the device here.
         createDevice(shareContext);
       } else {
-        connect(nativeWindow, SIGNAL(beforeRendering()), this, SLOT(onBeforeRendering()));
+        connect(nativeWindow, SIGNAL(beforeRendering()), this, SLOT(onBeforeRendering()),
+                Qt::DirectConnection);
         QMetaObject::invokeMethod(item, "update", Qt::AutoConnection);
       }
     }
