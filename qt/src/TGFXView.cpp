@@ -45,6 +45,8 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     // Do not set singleBufferMode to true if you want to draw in a different thread than the QSG
     // render thread.
     tgfxWindow = tgfx::QGLWindow::MakeFrom(this, true);
+    connect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()),
+            Qt::DirectConnection);
   }
   auto pixelRatio = window()->devicePixelRatio();
   auto screenWidth = static_cast<int>(ceil(width() * pixelRatio));
@@ -66,6 +68,13 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     node->setRect(boundingRect());
   }
   return node;
+}
+
+void TGFXView::onSceneGraphInvalidated() {
+  disconnect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()));
+  // Release the tgfxWindow on the QSG render thread or call tgfxWindow->moveToThread() to move it. Otherwise,
+  // destroying the tgfxWindow in the main thread will cause an error.
+  tgfxWindow = nullptr;
 }
 
 void TGFXView::createAppHost() {

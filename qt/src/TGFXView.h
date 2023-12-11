@@ -42,5 +42,8 @@ class TGFXView : public QQuickItem {
 
   void createAppHost();
   void draw();
+
+  Q_SLOT
+  void onSceneGraphInvalidated();
 };
 }  // namespace hello2d
