@@ -50,7 +50,7 @@ various video-editing apps.
 TGFX utilizes the **C++17** features for development. Below are the minimum tools needed for building tgfx on different platforms:
 
 - Xcode 11.0+
-- GCC 8.0+
+- GCC 9.0+
 - Visual Studio 2019+
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
