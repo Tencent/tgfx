@@ -295,11 +295,11 @@ ready to go!
 
 ### QT
 
-For **macOS** users, to begin, please open the `qt/` folder in CLion. Then, navigate to the 
-`qt/QTCMAKE.cfg` file to modify the QT path with your local QT installation path. Once done, you can
-proceed to build and run the `Hello2D` target.
+For **macOS** users, just open the `qt/` directory in CLion. Then, navigate to the `qt/QTCMAKE.cfg` 
+file to modify the QT path with your local QT installation path. Once done, you can proceed to build 
+and run the `Hello2D` target.
 
-For Windows users, ensure that the ToolChain of CLion is set to Visual Studio with `amd64`
+For **Windows** users, ensure that the ToolChain of CLion is set to `Visual Studio` with `amd64`
 architecture. Then, navigate to the `qt/` folder in CLion and find the `qt/QTCMAKE.cfg` file.
 Modify the QT path to match your local QT installation path. Afterward, access the configuration 
 panel of the `Hello2D` target in CLion. Enter the local QT DLL library path in the 
