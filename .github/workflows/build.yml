@@ -240,7 +240,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -a x64
+          node build_tgfx -s ./win Hello2D -o ./out/release/win -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

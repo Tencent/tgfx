@@ -20,6 +20,8 @@
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include <android/native_window.h>
+#elif defined(_WIN32)
+#include <WinUser.h>
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
@@ -55,13 +57,19 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   EGLint width = 0;
   EGLint height = 0;
 
-  // If the rendering size changes，eglQuerySurface based on ANativeWindow may give the wrong size.
-#if defined(__ANDROID__) || defined(ANDROID)
   if (nativeWindow) {
+    // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
+#if defined(__ANDROID__) || defined(ANDROID)
     width = ANativeWindow_getWidth(nativeWindow);
     height = ANativeWindow_getHeight(nativeWindow);
-  }
+#elif defined(_WIN32)
+    RECT rect;
+    GetClientRect(nativeWindow, &rect);
+    width = static_cast<int>(rect.right - rect.left);
+    height = static_cast<int>(rect.bottom - rect.top);
 #endif
+  }
+
   if (width <= 0 || height <= 0) {
     auto eglDevice = static_cast<EGLDevice*>(device.get());
     eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
