@@ -112,7 +112,7 @@ provided above in the [**Build Prerequisites**](#build-prerequisites) and
 [**Dependencies**](#dependencies) sections. They will guide you through the 
 necessary steps to configure your development environment.
 
-### Android Demo
+### Android
 
 The android demo project requires the **Android NDK**. We recommend using the **19.2.5345600** 
 version, which has been fully tested with the tgfx library. If you open the project with Android
@@ -146,7 +146,7 @@ please search for a solution on Google. However, if you believe the problem is a
 project configuration, you can open an [Issue](https://github.com/Tencent/tgfx/issues/new/choose)
 to address it.
 
-### iOS Demo
+### iOS
 
 Run the following command in the `ios/` directory or double-click on it:
 
@@ -178,7 +178,7 @@ generate a project with webp encoding support, please run the following command:
 
 Finally, open XCode and launch the `ios/Hello2D.xcworkspace` to build and run the demo project.
 
-### macOS Demo
+### macOS
 
 
 Run the following command in the `mac/` directory or double-click on it:
@@ -204,7 +204,7 @@ a project with freetype support, please run the following command:
 
 At last, launch XCode and open the `mac/Hello2D.xcworkspace`. You'll be ready to go!
 
-### Web Demo
+### Web
 
 The web demo project requires the **Emscripten SDK**. You can download and install
 it from the [official website](https://emscripten.org/). We recommend using the **3.1.20** version,
@@ -251,25 +251,62 @@ npm run build:debug
 
 With these steps completed, you will be able to debug C++ files directly within Chrome DevTools.
 
+To build the demo project in CLion, please Open the `Settings` panel in CLion and go to 
+`Build, Execution, Deployment` > `CMake`. Create a new build target. And then set the `CMake options`
+to the following value:
+
+```
+DCMAKE_TOOLCHAIN_FILE="path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake"
+```
+
+Once you have created the build target, make sure to adjust the `Configurations` accordingly to 
+align with the newly created build target. By doing so, you will gain the ability to build the tgfx 
+library in CLion.
+
 Additionally, please note that when using `ESModule` for your project, it is necessary to manually 
 pack the generated `.wasm` file into the final web program. This is because common packing tools 
 usually ignore the `.wasm` file. Moreover, remember to upload the `.wasm` file to a server, enabling 
 users to access it from the network.
 
-### QT Demo
+### Windows
 
-For **macOS** users, to begin, please open the `qt/` folder in CLion. Then, navigate to the 
-`qt/QTCMAKE.cfg` file to modify the QT path with your local QT installation path. Once done, you can
-proceed to build and run the `Hello2D` target.
+To start, open the `win/` directory in CLion.  Next, open the `File->Setting` panel and navigate to 
+`Build, Execution, Deployment->ToolChains`. Set the toolchain of CLion to `Visual Studio` with either
+`amd64` (Recommended) or `x86` architecture. Once done, you'll be able to build and run the `Hello2D`
+target.
 
-For Windows users, ensure that the ToolChain of CLion is set to Visual Studio with `amd64`
+If you prefer to use the VS Studio IDE, you can open the `x64 Native Tools Command Prompt for VS 2019` 
+and execute the following command in the `win/` directory:
+
+```
+cmake -G "Visual Studio 16 2019" -A x64 -B ./build-x64
+```
+
+This will generate a project for the `x64` architecture. If you want to generate a project for the
+`x86` architecture, open the `x86 Native Tools Command Prompt for VS 2019` and run the following 
+command instead:
+
+```
+cmake -G "Visual Studio 16 2019" -A Win32 -B ./build-x86
+```
+
+Finally, go to the `build-x64/` or `build-x86/` directory and open the `Hello2D.sln` file. You'll be
+ready to go!
+
+### QT
+
+For **macOS** users, just open the `qt/` directory in CLion. Then, navigate to the `qt/QTCMAKE.cfg` 
+file to modify the QT path with your local QT installation path. Once done, you can proceed to build 
+and run the `Hello2D` target.
+
+For **Windows** users, ensure that the ToolChain of CLion is set to `Visual Studio` with `amd64`
 architecture. Then, navigate to the `qt/` folder in CLion and find the `qt/QTCMAKE.cfg` file.
 Modify the QT path to match your local QT installation path. Afterward, access the configuration 
 panel of the `Hello2D` target in CLion. Enter the local QT DLL library path in the 
 `Environment Variables` row, e.g., `PATH=C:\Qt\6.6.1\msvc2019_64\bin`. Finally, you're ready to 
 build and run the `Hello2D` target.
 
-## Build TGFX
+## Build Library
 
 Aside from directly integrating the source code of tgfx into your project, you also have the option
 of linking with the precompiled libraries. TGFX utilizes the [**vendor_tools**](https://github.com/libpag/vendor_tools)
@@ -312,38 +349,6 @@ To access more details and options, execute the command along with the `-h [--he
 ```
 node build_tgfx -h
 ```
-
-## Development
-
-We recommend using the [**CLion**](https://www.jetbrains.com/clion/) IDE on the macOS platform for 
-development. After synchronizing with `depsync`, there are a few configurations that need to be set
-up before opening the project in CLion.
-
-### macOS
-
-No additional configurations of CLion are necessary. **Please note that currently, the unit test 
-targets for tgfx can only be accessed on macOS**.
-
-### Windows
-
-Open the **File->Setting** panel, and go to **Build, Execution, Deployment->ToolChains**, then set 
-the toolchain of CLion to **Visual Studio** with **amd64 (Recommended)** or **x86** architecture.
-
-### Web
-
-If you wish to target the web platform, you'll need to install the **Emscripten SDK** and follow 
-these steps:
-
-- Open the `Settings` panel in CLion and go to `Build, Execution, Deployment` > `CMake`. Create a new build target.
-- Set the `CMake options` to the following value:
-
-```
-DCMAKE_TOOLCHAIN_FILE="path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake"
-```
-
-- After creating the build target, modify the `Configurations` located before the `Run / Debug` buttons to match the newly created build target.
-
-Once you've completed these steps, you'll have the ability to build the tgfx library and conduct debugging in CLion.
 
 
 ## Contribution
