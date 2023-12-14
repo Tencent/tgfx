@@ -256,6 +256,31 @@ pack the generated `.wasm` file into the final web program. This is because comm
 usually ignore the `.wasm` file. Moreover, remember to upload the `.wasm` file to a server, enabling 
 users to access it from the network.
 
+### Windows Demo
+
+To begin, open the `win/` directory in CLion. Then, open the **File->Setting** panel, navigate to
+**Build, Execution, Deployment->ToolChains**, and set the toolchain of CLion to **Visual Studio**
+with **amd64 (Recommended)** or **x86** architecture. Afterward, you can build and run the `Hello2D`
+target.
+
+If you prefer to use the VS Studio IDE, you can open the `x64 Native Tools Command Prompt for VS 2019` 
+and execute the following command in the `win/` directory:
+
+```
+cmake -G "Visual Studio 16 2019" -A x64 -B ./build-x64
+```
+
+This will generate a project for the `x64` architecture. If you want to generate a project for the
+`x86` architecture, open the `x86 Native Tools Command Prompt for VS 2019` and run the following 
+command instead:
+
+```
+cmake -G "Visual Studio 16 2019" -A Win32 -B ./build-x86
+```
+
+At last, go to the `build-x64/` or `build-x86/` directory and open the `Hello2D.sln` file. You'll be
+ready to go!
+
 ### QT Demo
 
 For **macOS** users, to begin, please open the `qt/` folder in CLion. Then, navigate to the 
