@@ -268,6 +268,27 @@ pack the generated `.wasm` file into the final web program. This is because comm
 usually ignore the `.wasm` file. Moreover, remember to upload the `.wasm` file to a server, enabling 
 users to access it from the network.
 
+### Linux
+
+When running Linux, the system usually lacks GPU hardware support. Therefore, we utilize the
+[**SwiftShader**](https://github.com/google/swiftshader) library to emulate the GPU rendering 
+environment. Since SwiftShader relies on certain X11 header files, it is necessary to install the 
+following packages before building the demo project:
+
+```
+yum install libX11-devel --nogpg
+```
+
+Next, execute the following commands in the linux/ directory:
+
+```
+cmake -B ./build -DCMAKE_BUILD_TYPE=Release
+cmake --build ./build -- -j 12
+```
+
+You will get the demo executable file in the build directory. You also have the option of opening
+the `linux/` directory in CLion and building the demo project directly in the IDE.
+
 ### Windows
 
 To start, open the `win/` directory in CLion.  Next, open the `File->Setting` panel and navigate to 
