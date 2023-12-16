@@ -15,7 +15,6 @@
       <file path="$PROJECT_DIR$/third_party" />
       <file path="$PROJECT_DIR$/vendor" />
       <file path="$PROJECT_DIR$/vendor_tools" />
-      <file path="$PROJECT_DIR$/win" />
     </excludeRoots>
   </component>
 </project>
