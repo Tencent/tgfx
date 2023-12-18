@@ -32,11 +32,13 @@ void DrawingManager::closeActiveOpsTask() {
 }
 
 void DrawingManager::newTextureResolveRenderTask(Surface* surface) {
-  if (surface->renderTarget->sampleCount() <= 1) {
+  auto texture = surface->texture;
+  if (surface->renderTarget->sampleCount() <= 1 &&
+      (!texture || !texture->getSampler()->hasMipmaps())) {
     return;
   }
   closeActiveOpsTask();
-  auto task = std::make_shared<TextureResolveRenderTask>(surface->renderTarget);
+  auto task = std::make_shared<TextureResolveRenderTask>(surface->renderTarget, surface->texture);
   task->makeClosed();
   tasks.push_back(std::move(task));
 }

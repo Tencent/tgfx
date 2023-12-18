@@ -18,10 +18,21 @@
 
 #include "TextureResolveRenderTask.h"
 #include "Gpu.h"
+#include "RenderTarget.h"
 
 namespace tgfx {
+TextureResolveRenderTask::TextureResolveRenderTask(std::shared_ptr<RenderTarget> renderTarget,
+                                                   std::shared_ptr<Texture> texture)
+    : RenderTask(std::move(renderTarget)), texture(std::move(texture)) {
+}
+
 bool TextureResolveRenderTask::execute(Gpu* gpu) {
-  gpu->resolveRenderTarget(renderTarget.get());
+  if (renderTarget->sampleCount() > 1) {
+    gpu->resolveRenderTarget(renderTarget.get());
+  }
+  if (texture != nullptr && texture->getSampler()->hasMipmaps()) {
+    gpu->regenerateMipMapLevels(texture->getSampler());
+  }
   return true;
 }
 }  // namespace tgfx

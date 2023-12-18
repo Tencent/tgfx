@@ -3,18 +3,21 @@
   <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
   <component name="CidrRootsConfiguration">
     <excludeRoots>
-      <file path="$PROJECT_DIR$/assets" />
       <file path="$PROJECT_DIR$/build" />
-      <file path="$PROJECT_DIR$/cmake-build-debug" />
-      <file path="$PROJECT_DIR$/cmake-build-webdebug" />
       <file path="$PROJECT_DIR$/out" />
       <file path="$PROJECT_DIR$/resources" />
       <file path="$PROJECT_DIR$/result" />
-      <file path="$PROJECT_DIR$/tgfx/.idea" />
-      <file path="$PROJECT_DIR$/tgfx/cmake-build-debug" />
       <file path="$PROJECT_DIR$/third_party" />
       <file path="$PROJECT_DIR$/vendor" />
-      <file path="$PROJECT_DIR$/vendor_tools" />
+      <file path="$PROJECT_DIR$/cmake-build-debug" />
+      <file path="$PROJECT_DIR$/cmake-build-webdebug" />
+      <file path="$PROJECT_DIR$/ios/TGFX" />
+      <file path="$PROJECT_DIR$/mac/TGFX" />
+      <file path="$PROJECT_DIR$/android/app/.cxx" />
+      <file path="$PROJECT_DIR$/android/app/build" />
+      <file path="$PROJECT_DIR$/linux/cmake-build-debug" />
+      <file path="$PROJECT_DIR$/qt/cmake-build-debug" />
+      <file path="$PROJECT_DIR$/win/cmake-build-debug" />
     </excludeRoots>
   </component>
 </project>

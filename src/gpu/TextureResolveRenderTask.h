@@ -23,10 +23,12 @@
 namespace tgfx {
 class TextureResolveRenderTask : public RenderTask {
  public:
-  explicit TextureResolveRenderTask(std::shared_ptr<RenderTarget> renderTarget)
-      : RenderTask(std::move(renderTarget)) {
-  }
+  explicit TextureResolveRenderTask(std::shared_ptr<RenderTarget> renderTarget,
+                                    std::shared_ptr<Texture> texture);
 
   bool execute(Gpu* gpu) override;
+
+ private:
+  std::shared_ptr<Texture> texture = nullptr;
 };
 }  // namespace tgfx
