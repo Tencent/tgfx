@@ -29,8 +29,8 @@
 
 namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
-  auto device = EGLDevice::Current();
-  if (device == nullptr) {
+  auto device = std::static_pointer_cast<EGLDevice>(GLDevice::Current());
+  if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
   return std::shared_ptr<EGLWindow>(new EGLWindow(device));
@@ -88,6 +88,18 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
 }
 
 void EGLWindow::onPresent(Context*, int64_t presentationTime) {
-  std::static_pointer_cast<EGLDevice>(device)->swapBuffers(presentationTime);
+  auto device = std::static_pointer_cast<EGLDevice>(this->device);
+  auto eglDisplay = device->eglDisplay;
+  // eglSurface cannot be nullptr in EGLWindow.
+  auto eglSurface = device->eglSurface;
+  if (presentationTime != INT64_MIN) {
+    static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
+        eglGetProcAddress("eglPresentationTimeANDROID"));
+    if (eglPresentationTimeANDROID) {
+      // egl uses nano seconds
+      eglPresentationTimeANDROID(eglDisplay, eglSurface, presentationTime * 1000);
+    }
+  }
+  eglSwapBuffers(eglDisplay, eglSurface);
 }
 }  // namespace tgfx

@@ -108,7 +108,8 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
   if (glContext) {
     return std::static_pointer_cast<EGLDevice>(glContext);
   }
-  if (eglDisplay == nullptr || eglContext == nullptr || eglSurface == nullptr) {
+  if (eglDisplay == nullptr || eglContext == nullptr) {
+    // eglSurface could be nullptr when there is 'EGL_KHR_surfaceless_context' support.
     return nullptr;
   }
   EGLContext oldEglContext = eglGetCurrentContext();
@@ -150,7 +151,9 @@ EGLDevice::~EGLDevice() {
     return;
   }
   eglDestroyContext(eglDisplay, eglContext);
-  eglDestroySurface(eglDisplay, eglSurface);
+  if (eglSurface != nullptr) {
+    eglDestroySurface(eglDisplay, eglSurface);
+  }
 }
 
 bool EGLDevice::sharableWith(void* nativeContext) const {
@@ -163,8 +166,8 @@ bool EGLDevice::onMakeCurrent() {
   oldEglReadSurface = eglGetCurrentSurface(EGL_READ);
   oldEglDrawSurface = eglGetCurrentSurface(EGL_DRAW);
   if (oldEglContext == eglContext) {
-    // 如果外部已经设定好了当前的 Context，以外部设定的为准，不再切换。外部用于 read/draw 的 Surface
-    // 有可能不一样。
+    // If the current context is already set by external, we don't need to switch it again.
+    // The read/draw surface may be different.
     return true;
   }
   auto result = eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
@@ -184,17 +187,5 @@ void EGLDevice::onClearCurrent() {
     // 可能失败。
     eglMakeCurrent(oldEglDisplay, oldEglDrawSurface, oldEglReadSurface, oldEglContext);
   }
-}
-
-void EGLDevice::swapBuffers(int64_t timestamp) {
-  if (timestamp != INT64_MIN) {
-    static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
-        eglGetProcAddress("eglPresentationTimeANDROID"));
-    if (eglPresentationTimeANDROID) {
-      // egl uses nano seconds
-      eglPresentationTimeANDROID(eglDisplay, eglSurface, timestamp * 1000);
-    }
-  }
-  eglSwapBuffers(eglDisplay, eglSurface);
 }
 }  // namespace tgfx

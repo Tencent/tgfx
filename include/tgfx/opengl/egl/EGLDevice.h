@@ -69,7 +69,6 @@ class EGLDevice : public GLDevice {
                                          bool externallyOwned);
 
   explicit EGLDevice(void* nativeHandle);
-  void swapBuffers(int64_t timestamp = INT64_MIN);
 
   friend class GLDevice;
 
