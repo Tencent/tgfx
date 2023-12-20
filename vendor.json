@@ -9,7 +9,8 @@
           "skcms"
         ],
         "arguments": [
-          "-DCMAKE_CXX_FLAGS=\"-w\""
+          "-DCMAKE_CXX_FLAGS=\"-w\"",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ]
       }
     },
@@ -20,7 +21,8 @@
           "pathkit"
         ],
         "arguments": [
-          "-DCMAKE_CXX_FLAGS=\"-w\""
+          "-DCMAKE_CXX_FLAGS=\"-w\"",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ]
       }
     },
@@ -31,7 +33,8 @@
           "zlibstatic"
         ],
         "arguments": [
-          "-DCMAKE_C_FLAGS=\"-w\""
+          "-DCMAKE_C_FLAGS=\"-w\"",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ],
         "includes": [
           "${SOURCE_DIR}/zlib.h",
@@ -46,6 +49,9 @@
           "webp",
           "webpdemux",
           "sharpyuv"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ]
       }
     },
@@ -57,7 +63,8 @@
           "webpdemux"
         ],
         "arguments": [
-          "-DWEBP_BUILD_WEBP_JS=ON"
+          "-DWEBP_BUILD_WEBP_JS=ON",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ],
         "platforms": [
           "web"
@@ -69,6 +76,9 @@
       "cmake": {
         "targets": [
           "turbojpeg-static"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ],
         "includes": [
           "${SOURCE_DIR}/jmorecfg.h",
@@ -88,7 +98,8 @@
           "png_static"
         ],
         "arguments": [
-          "-DPNG_BUILD_ZLIB=ON"
+          "-DPNG_BUILD_ZLIB=ON",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ],
         "includes": [
           "${SOURCE_DIR}/png.h",
@@ -113,7 +124,8 @@
         ],
         "arguments": [
           "-DPNG_BUILD_ZLIB=ON",
-          "-DPNG_ARM_NEON=on"
+          "-DPNG_ARM_NEON=on",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ],
         "includes": [
           "${SOURCE_DIR}/png.h",
@@ -139,7 +151,8 @@
         "arguments": [
           "-DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE",
           "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE",
-          "-DCMAKE_C_FLAGS=\"-w\""
+          "-DCMAKE_C_FLAGS=\"-w\"",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden"
         ]
       }
     },
@@ -153,6 +166,7 @@
           "-DHB_HAVE_FREETYPE=OFF",
           "-DHB_HAVE_CORETEXT=OFF",
           "-Wno-dev",
+          "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
           "-DCMAKE_CXX_FLAGS=\"-w -DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\""
         ]
       }
