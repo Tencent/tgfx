@@ -111,7 +111,7 @@ std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
     return nullptr;
   }
   auto provider = context->proxyProvider();
-  auto proxy = provider->findProxyByUniqueKey(uniqueKey);
+  auto proxy = provider->findTextureProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }

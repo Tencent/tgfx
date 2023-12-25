@@ -21,12 +21,13 @@
 #include "gpu/proxies/DeferredTextureProxy.h"
 #include "gpu/proxies/ImageBufferTextureProxy.h"
 #include "gpu/proxies/ImageGeneratorTextureProxy.h"
+#include "gpu/proxies/TextureRenderTargetProxy.h"
 
 namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context) : context(context) {
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::findProxyByUniqueKey(const UniqueKey& uniqueKey) {
+std::shared_ptr<TextureProxy> ProxyProvider::findTextureProxy(const UniqueKey& uniqueKey) {
   if (uniqueKey.empty()) {
     return nullptr;
   }
@@ -80,14 +81,13 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(int width, int height,
-                                                                PixelFormat format,
-                                                                ImageOrigin origin,
-                                                                bool mipMapped) {
+                                                                PixelFormat format, bool mipMapped,
+                                                                ImageOrigin origin) {
   if (!PlainTexture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
   auto proxy = std::shared_ptr<DeferredTextureProxy>(
-      new DeferredTextureProxy(this, width, height, format, origin, mipMapped));
+      new DeferredTextureProxy(this, width, height, format, mipMapped, origin));
   proxy->weakThis = proxy;
   return proxy;
 }

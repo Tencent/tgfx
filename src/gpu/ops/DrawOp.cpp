@@ -54,9 +54,9 @@ static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect)
   }
   dstRect.roundOut();
   dstTextureInfo.offset = {dstRect.x(), dstRect.y()};
-  auto dstTexture =
-      Texture::MakeRGBA(renderPass->context(), static_cast<int>(dstRect.width()),
-                        static_cast<int>(dstRect.height()), renderPass->renderTarget()->origin());
+  auto dstTexture = Texture::MakeRGBA(renderPass->context(), static_cast<int>(dstRect.width()),
+                                      static_cast<int>(dstRect.height()), false,
+                                      renderPass->renderTarget()->origin());
   if (dstTexture == nullptr) {
     LOGE("Failed to create dst texture(%f*%f).", dstRect.width(), dstRect.height());
     return {};

@@ -39,8 +39,7 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   if (!caps->isFormatRenderable(pixelFormat)) {
     return nullptr;
   }
-  auto texture =
-      Texture::MakeFormat(context, width, height, pixelFormat, ImageOrigin::TopLeft, mipMapped);
+  auto texture = Texture::MakeFormat(context, width, height, pixelFormat, mipMapped);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -85,9 +84,6 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderT
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount,
                                            const SurfaceOptions* options) {
-  if (texture == nullptr || texture->isYUV()) {
-    return nullptr;
-  }
   auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount);
   if (renderTarget == nullptr) {
     return nullptr;
@@ -182,16 +178,17 @@ void Surface::flushAndSubmit(bool syncCpu) {
 }
 
 static std::shared_ptr<Texture> MakeTextureFromRenderTarget(const RenderTarget* renderTarget,
+                                                            bool mipMapped,
                                                             bool discardContent = false) {
   auto context = renderTarget->getContext();
   auto width = renderTarget->width();
   auto height = renderTarget->height();
   if (discardContent) {
-    return Texture::MakeFormat(context, width, height, renderTarget->format(),
+    return Texture::MakeFormat(context, width, height, renderTarget->format(), mipMapped,
                                renderTarget->origin());
   }
-  auto texture =
-      Texture::MakeFormat(context, width, height, renderTarget->format(), renderTarget->origin());
+  auto texture = Texture::MakeFormat(context, width, height, renderTarget->format(), mipMapped,
+                                     renderTarget->origin());
   if (texture == nullptr) {
     return nullptr;
   }
@@ -208,7 +205,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (texture != nullptr && !externalTexture) {
     cachedImage = Image::MakeFrom(texture);
   } else {
-    auto textureCopy = MakeTextureFromRenderTarget(renderTarget.get());
+    auto textureCopy = MakeTextureFromRenderTarget(renderTarget.get(), false);
     cachedImage = Image::MakeFrom(textureCopy);
   }
   return cachedImage;
@@ -226,7 +223,8 @@ void Surface::aboutToDraw(bool discardContent) {
   if (texture == nullptr || externalTexture) {
     return;
   }
-  auto newTexture = MakeTextureFromRenderTarget(renderTarget.get(), discardContent);
+  auto mipMapped = texture->getSampler()->hasMipmaps();
+  auto newTexture = MakeTextureFromRenderTarget(renderTarget.get(), mipMapped, discardContent);
   auto success = renderTarget->replaceTexture(newTexture.get());
   if (!success) {
     LOGE("Surface::aboutToDraw(): Failed to replace the backing texture of the renderTarget!");

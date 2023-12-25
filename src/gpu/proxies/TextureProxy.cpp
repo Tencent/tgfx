@@ -38,8 +38,16 @@ int TextureProxy::height() const {
   return texture->height();
 }
 
+ImageOrigin TextureProxy::origin() const {
+  return texture->origin();
+}
+
 bool TextureProxy::hasMipmaps() const {
   return texture->getSampler()->hasMipmaps();
+}
+
+Context* TextureProxy::getContext() const {
+  return provider->context;
 }
 
 std::shared_ptr<Texture> TextureProxy::getTexture() const {

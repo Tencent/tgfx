@@ -27,6 +27,8 @@ class DeferredTextureProxy : public TextureProxy {
 
   int height() const override;
 
+  ImageOrigin origin() const override;
+
   bool hasMipmaps() const override;
 
  protected:
@@ -36,11 +38,11 @@ class DeferredTextureProxy : public TextureProxy {
   int _width = 0;
   int _height = 0;
   PixelFormat format = PixelFormat::RGBA_8888;
-  ImageOrigin origin = ImageOrigin::TopLeft;
   bool mipMapped = false;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
 
   DeferredTextureProxy(ProxyProvider* provider, int width, int height, PixelFormat format,
-                       ImageOrigin origin, bool mipMapped);
+                       bool mipMapped = false, ImageOrigin origin = ImageOrigin::TopLeft);
 
   friend class ProxyProvider;
 };

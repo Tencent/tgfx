@@ -27,6 +27,8 @@ class ImageBufferTextureProxy : public TextureProxy {
 
   int height() const override;
 
+  ImageOrigin origin() const override;
+
   bool hasMipmaps() const override;
 
  protected:

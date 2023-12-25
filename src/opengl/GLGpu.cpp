@@ -203,6 +203,9 @@ void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
                         static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
                         static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
                         static_cast<int>(srcRect.height()));
+  if (texture->getSampler()->hasMipmaps()) {
+    onRegenerateMipMapLevels(texture->getSampler());
+  }
 }
 
 void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {

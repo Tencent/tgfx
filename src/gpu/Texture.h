@@ -42,20 +42,20 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
                                            const void* pixels, size_t rowBytes,
-                                           ImageOrigin origin = ImageOrigin::TopLeft,
-                                           bool mipMapped = false) {
-    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, origin,
-                      mipMapped);
+                                           bool mipMapped = false,
+                                           ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, mipMapped,
+                      origin);
   }
   /**
    * Creates an empty texture with each pixel stored as 32-bit RGBA data. Returns nullptr if any of
    * the parameters is invalid.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
-                                           ImageOrigin origin = ImageOrigin::TopLeft,
-                                           bool mipMapped = false) {
-    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, origin,
-                      mipMapped);
+                                           bool mipMapped = false,
+                                           ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, mipMapped,
+                      origin);
   }
 
   /**
@@ -65,10 +65,10 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
                                             const void* pixels, size_t rowBytes,
-                                            ImageOrigin origin = ImageOrigin::TopLeft,
-                                            bool mipMapped = false) {
-    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, origin,
-                      mipMapped);
+                                            bool mipMapped = false,
+                                            ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, mipMapped,
+                      origin);
   }
   /**
    * Creates an empty texture with each pixel stored as a single translucency (alpha) channel.
@@ -76,9 +76,9 @@ class Texture : public Resource {
    * alpha only textures.
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
-                                            ImageOrigin origin = ImageOrigin::TopLeft,
-                                            bool mipMapped = false) {
-    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, origin, mipMapped);
+                                            bool mipMapped = false,
+                                            ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, mipMapped, origin);
   }
 
   /**
@@ -87,9 +87,9 @@ class Texture : public Resource {
    * specified pixelFormat.
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
-                                             PixelFormat pixelFormat, ImageOrigin origin,
-                                             bool mipMapped = false) {
-    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, origin, mipMapped);
+                                             PixelFormat pixelFormat, bool mipMapped = false,
+                                             ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, mipMapped, origin);
   }
 
   /**
@@ -99,8 +99,8 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
                                              const void* pixels, size_t rowBytes,
-                                             PixelFormat pixelFormat, ImageOrigin origin,
-                                             bool mipMapped = false);
+                                             PixelFormat pixelFormat, bool mipMapped = false,
+                                             ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates a new Texture which wraps the specified backend texture. The caller must ensure the

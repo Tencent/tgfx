@@ -35,8 +35,8 @@ static void ComputeScratchKey(BytesKey* scratchKey, int width, int height, Pixel
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
                                              const void* pixels, size_t rowBytes,
-                                             PixelFormat pixelFormat, ImageOrigin origin,
-                                             bool mipMapped) {
+                                             PixelFormat pixelFormat, bool mipMapped,
+                                             ImageOrigin origin) {
   if (!PlainTexture::CheckSizeAndFormat(context, width, height, pixelFormat)) {
     return nullptr;
   }

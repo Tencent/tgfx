@@ -32,20 +32,31 @@ class TextureProxy {
   virtual ~TextureProxy();
 
   /**
-   * Returns the width of the texture proxy.
+   * Returns the width of the texture.
    */
   virtual int width() const;
 
   /**
-   * Returns the height of the texture proxy.
+   * Returns the height of the texture.
    */
   virtual int height() const;
+
+  /**
+   * Returns the origin of the texture, either ImageOrigin::TopLeft or
+   * ImageOrigin::BottomLeft.
+   */
+  virtual ImageOrigin origin() const;
 
   /**
    * If we are instantiated and have a texture, return the mipmap state of that texture. Otherwise,
    * returns the proxy's mipmap state from creation time.
    */
   virtual bool hasMipmaps() const;
+
+  /**
+   * Returns the associated Context instance.
+   */
+  Context* getContext() const;
 
   /**
    * Returns the Texture of the proxy. Returns nullptr if the proxy is not instantiated yet.
@@ -65,7 +76,7 @@ class TextureProxy {
 
   /**
    * Assigns a UniqueKey to the proxy. The proxy will be findable via this UniqueKey using
-   * ProxyProvider.findProxyByUniqueKey(). If the updateTextureKey is true, it will also assign the
+   * ProxyProvider.findTextureProxy(). If the updateTextureKey is true, it will also assign the
    * UniqueKey to the target texture.
    */
   void assignUniqueKey(const UniqueKey& uniqueKey, bool updateTextureKey = true);

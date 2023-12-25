@@ -134,7 +134,7 @@ static bool CreateRenderBuffer(const Texture* texture, GLFrameBuffer* renderTarg
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int sampleCount) {
-  if (texture == nullptr) {
+  if (texture == nullptr || texture->isYUV()) {
     return nullptr;
   }
   auto context = texture->getContext();
