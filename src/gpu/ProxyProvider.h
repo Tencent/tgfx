@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "images/ImageGeneratorTask.h"
 #include "tgfx/core/ImageBuffer.h"
@@ -31,9 +32,9 @@ class ProxyProvider {
   explicit ProxyProvider(Context* context);
 
   /*
-   * Finds a proxy by the specified UniqueKey.
+   * Finds a texture proxy by the specified UniqueKey.
    */
-  std::shared_ptr<TextureProxy> findProxyByUniqueKey(const UniqueKey& uniqueKey);
+  std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
 
   /*
    * Create a texture proxy for the image buffer. The image buffer will be released after being
@@ -44,7 +45,7 @@ class ProxyProvider {
 
   /*
    * Create a texture proxy for the ImageGeneratorTask. The task will be released after the
-   * associated texture being instantiated.
+   * associated texture is instantiated.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGenerator> generator,
                                                    bool mipMapped = false,
@@ -52,17 +53,17 @@ class ProxyProvider {
 
   /*
    * Create a texture proxy for the ImageGeneratorTask. The task will be released after the
-   * associated texture being instantiated.
+   * associated texture is instantiated.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGeneratorTask> task,
                                                    bool mipMapped = false);
 
   /**
-   * Create a TextureProxy without any data.
+   * Create a TextureProxy without any pixel data.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(int width, int height, PixelFormat format,
-                                                   ImageOrigin origin = ImageOrigin::TopLeft,
-                                                   bool mipMapped = false);
+                                                   bool mipMapped = false,
+                                                   ImageOrigin origin = ImageOrigin::TopLeft);
 
   /*
    * Create a texture proxy that wraps an existing texture.
@@ -78,5 +79,6 @@ class ProxyProvider {
   void removeUniqueKey(TextureProxy* proxy);
 
   friend class TextureProxy;
+  friend class RenderTargetProxy;
 };
 }  // namespace tgfx

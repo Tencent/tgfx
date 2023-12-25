@@ -33,6 +33,10 @@ int ImageGeneratorTextureProxy::height() const {
   return texture ? texture->height() : task->imageHeight();
 }
 
+ImageOrigin ImageGeneratorTextureProxy::origin() const {
+  return texture ? texture->origin() : ImageOrigin::TopLeft;
+}
+
 bool ImageGeneratorTextureProxy::hasMipmaps() const {
   return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
 }

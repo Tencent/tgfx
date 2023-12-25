@@ -16,35 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DeferredTextureProxy.h"
+#pragma once
+
+#include "RenderTargetProxy.h"
 
 namespace tgfx {
-DeferredTextureProxy::DeferredTextureProxy(ProxyProvider* provider, int width, int height,
-                                           PixelFormat format, bool mipMapped, ImageOrigin origin)
-    : TextureProxy(provider), _width(width), _height(height), format(format), mipMapped(mipMapped),
-      _origin(origin) {
-}
-
-int DeferredTextureProxy::width() const {
-  return _width;
-}
-
-int DeferredTextureProxy::height() const {
-  return _height;
-}
-
-ImageOrigin DeferredTextureProxy::origin() const {
-  return _origin;
-}
-
-bool DeferredTextureProxy::hasMipmaps() const {
-  return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
-}
-
-std::shared_ptr<Texture> DeferredTextureProxy::onMakeTexture(Context* context) {
-  if (context == nullptr) {
-    return nullptr;
+class RenderTargetWrapper : public RenderTargetProxy {
+ public:
+  int width() const override {
+    return renderTarget->width();
   }
-  return Texture::MakeFormat(context, width(), height(), format, mipMapped);
-}
+
+  int height() const override {
+    return renderTarget->height();
+  }
+
+  ImageOrigin origin() const override {
+    return renderTarget->origin();
+  }
+
+  int sampleCount() const override {
+    return renderTarget->sampleCount();
+  }
+
+  Context* getContext() const override {
+    return renderTarget->getContext();
+  }
+
+  std::shared_ptr<TextureProxy> getTextureProxy() const override;
+
+ protected:
+  std::shared_ptr<RenderTarget> onMakeRenderTarget() override;
+
+ private:
+  explicit RenderTargetWrapper(std::shared_ptr<RenderTarget> renderTarget);
+
+  friend class RenderTargetProxy;
+};
 }  // namespace tgfx

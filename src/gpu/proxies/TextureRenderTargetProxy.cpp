@@ -16,35 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DeferredTextureProxy.h"
+#include "TextureRenderTargetProxy.h"
 
 namespace tgfx {
-DeferredTextureProxy::DeferredTextureProxy(ProxyProvider* provider, int width, int height,
-                                           PixelFormat format, bool mipMapped, ImageOrigin origin)
-    : TextureProxy(provider), _width(width), _height(height), format(format), mipMapped(mipMapped),
-      _origin(origin) {
+
+TextureRenderTargetProxy::TextureRenderTargetProxy(std::shared_ptr<TextureProxy> textureProxy,
+                                                   int sampleCount)
+    : textureProxy(std::move(textureProxy)), _sampleCount(sampleCount) {
 }
 
-int DeferredTextureProxy::width() const {
-  return _width;
-}
-
-int DeferredTextureProxy::height() const {
-  return _height;
-}
-
-ImageOrigin DeferredTextureProxy::origin() const {
-  return _origin;
-}
-
-bool DeferredTextureProxy::hasMipmaps() const {
-  return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
-}
-
-std::shared_ptr<Texture> DeferredTextureProxy::onMakeTexture(Context* context) {
-  if (context == nullptr) {
-    return nullptr;
+std::shared_ptr<RenderTarget> TextureRenderTargetProxy::onMakeRenderTarget() {
+  if (!textureProxy->isInstantiated()) {
+    textureProxy->instantiate();
   }
-  return Texture::MakeFormat(context, width(), height(), format, mipMapped);
+  auto texture = textureProxy->getTexture();
+  return RenderTarget::MakeFrom(texture.get(), _sampleCount);
 }
 }  // namespace tgfx

@@ -39,9 +39,9 @@ WebImageStream::WebImageStream(emscripten::val source, int width, int height, bo
 std::shared_ptr<Texture> WebImageStream::onMakeTexture(Context* context, bool mipMapped) {
   std::shared_ptr<Texture> texture = nullptr;
   if (alphaOnly) {
-    texture = Texture::MakeAlpha(context, width(), height(), ImageOrigin::TopLeft, mipMapped);
+    texture = Texture::MakeAlpha(context, width(), height(), mipMapped);
   } else {
-    texture = Texture::MakeRGBA(context, width(), height(), ImageOrigin::TopLeft, mipMapped);
+    texture = Texture::MakeRGBA(context, width(), height(), mipMapped);
   }
   if (texture != nullptr) {
     onUpdateTexture(texture, Rect::MakeWH(_width, _height));

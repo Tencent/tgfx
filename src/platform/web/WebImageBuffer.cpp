@@ -56,7 +56,7 @@ WebImageBuffer::~WebImageBuffer() {
 }
 
 std::shared_ptr<Texture> WebImageBuffer::onMakeTexture(Context* context, bool) const {
-  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft);
+  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0);
   if (texture == nullptr) {
     return nullptr;
   }

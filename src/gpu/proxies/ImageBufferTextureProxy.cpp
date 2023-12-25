@@ -33,6 +33,10 @@ int ImageBufferTextureProxy::height() const {
   return texture ? texture->height() : imageBuffer->height();
 }
 
+ImageOrigin ImageBufferTextureProxy::origin() const {
+  return texture ? texture->origin() : ImageOrigin::TopLeft;
+}
+
 bool ImageBufferTextureProxy::hasMipmaps() const {
   return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
 }

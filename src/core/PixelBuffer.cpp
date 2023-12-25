@@ -146,8 +146,8 @@ std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipMa
     return nullptr;
   }
   auto format = ColorTypeToPixelFormat(_info.colorType());
-  auto texture = Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format,
-                                     ImageOrigin::TopLeft, mipMapped);
+  auto texture =
+      Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipMapped);
   onUnlockPixels();
   return texture;
 }

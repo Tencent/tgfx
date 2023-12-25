@@ -49,10 +49,10 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
   std::shared_ptr<Texture> texture = nullptr;
   if (isAlphaOnly()) {
     texture = Texture::MakeAlpha(context, info.width(), info.height(), pixels, info.rowBytes(),
-                                 ImageOrigin::TopLeft, mipMapped);
+                                 mipMapped);
   } else {
-    texture = Texture::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(),
-                                ImageOrigin::TopLeft, mipMapped);
+    texture =
+        Texture::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(), mipMapped);
   }
   AndroidBitmap_unlockPixels(env, bitmap.get());
   return texture;
