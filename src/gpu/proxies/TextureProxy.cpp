@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureProxy.h"
-#include "ProxyProvider.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
 TextureProxy::TextureProxy(ProxyProvider* provider, std::shared_ptr<Texture> texture)

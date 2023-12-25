@@ -19,22 +19,26 @@
 #pragma once
 
 #include "gpu/proxies/TextureProxy.h"
-#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-struct CoordTransform {
-  CoordTransform() = default;
+class ImageBufferTextureProxy : public TextureProxy {
+ public:
+  int width() const override;
 
-  explicit CoordTransform(Matrix matrix, const TextureProxy* proxy = nullptr,
-                          const Point& alphaStart = Point::Zero())
-      : matrix(matrix), textureProxy(proxy), alphaStart(alphaStart) {
-  }
+  int height() const override;
 
-  Matrix getTotalMatrix() const;
+  bool hasMipmaps() const override;
 
-  Matrix matrix = Matrix::I();
-  const TextureProxy* textureProxy = nullptr;
-  // The alpha start point of the RGBAAA layout.
-  Point alphaStart = Point::Zero();
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) override;
+
+ private:
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  bool mipMapped = false;
+
+  ImageBufferTextureProxy(ProxyProvider* provider, std::shared_ptr<ImageBuffer> imageBuffer,
+                          bool mipMapped);
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

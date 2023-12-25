@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "TextureProxy.h"
 #include "TextureResolveRenderTask.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderTarget.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "utils/Log.h"
 
 namespace tgfx {

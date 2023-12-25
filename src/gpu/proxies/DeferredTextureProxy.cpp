@@ -16,25 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/proxies/TextureProxy.h"
-#include "tgfx/core/Matrix.h"
+#include "DeferredTextureProxy.h"
 
 namespace tgfx {
-struct CoordTransform {
-  CoordTransform() = default;
+DeferredTextureProxy::DeferredTextureProxy(ProxyProvider* provider, int width, int height,
+                                           PixelFormat format, ImageOrigin origin, bool mipMapped)
+    : TextureProxy(provider), _width(width), _height(height), format(format), origin(origin),
+      mipMapped(mipMapped) {
+}
 
-  explicit CoordTransform(Matrix matrix, const TextureProxy* proxy = nullptr,
-                          const Point& alphaStart = Point::Zero())
-      : matrix(matrix), textureProxy(proxy), alphaStart(alphaStart) {
+int DeferredTextureProxy::width() const {
+  return _width;
+}
+
+int DeferredTextureProxy::height() const {
+  return _height;
+}
+
+bool DeferredTextureProxy::hasMipmaps() const {
+  return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
+}
+
+std::shared_ptr<Texture> DeferredTextureProxy::onMakeTexture(Context* context) {
+  if (context == nullptr) {
+    return nullptr;
   }
-
-  Matrix getTotalMatrix() const;
-
-  Matrix matrix = Matrix::I();
-  const TextureProxy* textureProxy = nullptr;
-  // The alpha start point of the RGBAAA layout.
-  Point alphaStart = Point::Zero();
-};
+  return Texture::MakeFormat(context, width(), height(), format, origin, mipMapped);
+}
 }  // namespace tgfx
