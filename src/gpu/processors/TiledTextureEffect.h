@@ -19,8 +19,8 @@
 #pragma once
 
 #include "gpu/SamplerState.h"
-#include "gpu/TextureProxy.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {

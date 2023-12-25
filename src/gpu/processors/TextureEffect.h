@@ -19,9 +19,9 @@
 #pragma once
 
 #include "gpu/SamplerState.h"
-#include "gpu/TextureProxy.h"
 #include "gpu/YUVTexture.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {

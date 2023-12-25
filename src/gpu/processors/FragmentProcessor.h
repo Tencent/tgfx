@@ -23,10 +23,10 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
 #include "gpu/Texture.h"
-#include "gpu/TextureProxy.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 struct FPArgs {

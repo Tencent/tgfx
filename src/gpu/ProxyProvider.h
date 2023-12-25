@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "TextureProxy.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "images/ImageGeneratorTask.h"
 #include "tgfx/core/ImageBuffer.h"
 
