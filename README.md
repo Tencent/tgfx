@@ -349,8 +349,7 @@ node build_tgfx -p ios
 ```
 
 When developing for apple platforms, you have the convenient `-x [--xcframework]` option available. 
-This option enables you to effortlessly create xcframeworks while also generating the corresponding 
-`dSYM` symbol files.
+This option enables you to effortlessly create xcframeworks:
 
 ```
 node build_tgfx -p mac -x
