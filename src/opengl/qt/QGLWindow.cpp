@@ -180,12 +180,12 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   if (!singleBufferMode) {
-    fontSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
+    fontSurface = Surface::Make(context, width, height, ColorType::RGBA_8888);
     if (fontSurface == nullptr) {
       return nullptr;
     }
   }
-  auto backSurface = Surface::MakeFrom(Texture::MakeRGBA(context, width, height));
+  auto backSurface = Surface::Make(context, width, height, ColorType::RGBA_8888);
   if (backSurface == nullptr) {
     fontSurface = nullptr;
     return nullptr;

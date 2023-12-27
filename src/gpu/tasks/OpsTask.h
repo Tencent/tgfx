@@ -16,23 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureResolveRenderTask.h"
-#include "Gpu.h"
-#include "RenderTarget.h"
+#pragma once
+
+#include "gpu/ops/Op.h"
+#include "gpu/tasks/RenderTask.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
-TextureResolveRenderTask::TextureResolveRenderTask(std::shared_ptr<RenderTarget> renderTarget,
-                                                   std::shared_ptr<Texture> texture)
-    : RenderTask(std::move(renderTarget)), texture(std::move(texture)) {
-}
+class OpsTask : public RenderTask {
+ public:
+  OpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+      : RenderTask(std::move(renderTargetProxy)) {
+  }
 
-bool TextureResolveRenderTask::execute(Gpu* gpu) {
-  if (renderTarget->sampleCount() > 1) {
-    gpu->resolveRenderTarget(renderTarget.get());
-  }
-  if (texture != nullptr && texture->getSampler()->hasMipmaps()) {
-    gpu->regenerateMipMapLevels(texture->getSampler());
-  }
-  return true;
-}
+  void addOp(std::unique_ptr<Op> op);
+
+  bool execute(Gpu* gpu) override;
+
+ protected:
+  void onGatherProxies(std::vector<ProxyBase*>* proxies) const override;
+
+ private:
+  std::vector<std::unique_ptr<Op>> ops;
+};
 }  // namespace tgfx

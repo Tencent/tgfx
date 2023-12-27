@@ -36,9 +36,13 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
     return nullptr;
   }
+  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  if (!context->caps()->isFormatRenderable(format)) {
+    return nullptr;
+  }
   GLFrameBuffer frameBuffer = {};
   frameBuffer.id = frameBufferInfo.id;
-  frameBuffer.format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  frameBuffer.format = format;
   auto target =
       new GLRenderTarget(renderTarget.width(), renderTarget.height(), origin, 1, frameBuffer);
   target->frameBufferForDraw = frameBuffer;
@@ -327,9 +331,5 @@ void GLRenderTarget::onReleaseGPU() {
     gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   }
   ReleaseResource(context, &frameBufferForRead, &frameBufferForDraw, &msRenderBufferID);
-}
-
-const Swizzle& GLRenderTarget::writeSwizzle() const {
-  return context->caps()->getWriteSwizzle(frameBufferForDraw.format);
 }
 }  // namespace tgfx

@@ -32,7 +32,9 @@ bool OpsTask::execute(Gpu* gpu) {
   if (ops.empty()) {
     return false;
   }
-  auto renderPass = gpu->getRenderPass(renderTarget, renderTargetTexture);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  auto texture = renderTargetProxy->getTexture();
+  auto renderPass = gpu->getRenderPass(renderTarget, texture);
   if (renderPass == nullptr) {
     return false;
   }
@@ -47,11 +49,11 @@ bool OpsTask::execute(Gpu* gpu) {
   return true;
 }
 
-void OpsTask::gatherProxies(std::vector<TextureProxy*>* proxies) const {
+void OpsTask::onGatherProxies(std::vector<ProxyBase*>* proxies) const {
   if (ops.empty()) {
     return;
   }
-  auto func = [proxies](TextureProxy* proxy) { proxies->emplace_back(proxy); };
+  auto func = [proxies](ProxyBase* proxy) { proxies->emplace_back(proxy); };
   std::for_each(ops.begin(), ops.end(), [&func](auto& op) { op->visitProxies(func); });
 }
 }  // namespace tgfx

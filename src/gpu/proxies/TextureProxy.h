@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "ProxyBase.h"
 #include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
 
@@ -27,9 +28,9 @@ class ProxyProvider;
 /**
  * This class delays the acquisition of textures until they are actually required.
  */
-class TextureProxy {
+class TextureProxy : public ProxyBase {
  public:
-  virtual ~TextureProxy();
+  virtual ~TextureProxy() override;
 
   /**
    * Returns the width of the texture.
@@ -66,13 +67,13 @@ class TextureProxy {
   /**
    * Returns true if the backing texture is instantiated.
    */
-  bool isInstantiated() const;
+  bool isInstantiated() const override;
 
   /**
    * Instantiates the backing texture, if necessary. Returns true if the backing texture is
    * instantiated.
    */
-  bool instantiate();
+  bool instantiate() override;
 
   /**
    * Assigns a UniqueKey to the proxy. The proxy will be findable via this UniqueKey using

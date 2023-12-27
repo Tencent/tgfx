@@ -59,8 +59,6 @@ class GLRenderTarget : public RenderTarget {
 
   void onReleaseGPU() override;
 
-  const Swizzle& writeSwizzle() const override;
-
   friend class RenderTarget;
 };
 }  // namespace tgfx

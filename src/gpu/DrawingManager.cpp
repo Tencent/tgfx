@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "TextureResolveRenderTask.h"
 #include "gpu/Gpu.h"
-#include "gpu/RenderTarget.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/tasks/TextureResolveRenderTask.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -31,21 +31,22 @@ void DrawingManager::closeActiveOpsTask() {
   }
 }
 
-void DrawingManager::newTextureResolveRenderTask(Surface* surface) {
-  auto texture = surface->texture;
-  if (surface->renderTarget->sampleCount() <= 1 &&
-      (!texture || !texture->getSampler()->hasMipmaps())) {
+void DrawingManager::newTextureResolveRenderTask(
+    std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (renderTargetProxy->sampleCount() <= 1 && (!textureProxy || !textureProxy->hasMipmaps())) {
     return;
   }
   closeActiveOpsTask();
-  auto task = std::make_shared<TextureResolveRenderTask>(surface->renderTarget, surface->texture);
+  auto task = std::make_shared<TextureResolveRenderTask>(renderTargetProxy);
   task->makeClosed();
   tasks.push_back(std::move(task));
 }
 
-std::shared_ptr<OpsTask> DrawingManager::newOpsTask(Surface* surface) {
+std::shared_ptr<OpsTask> DrawingManager::newOpsTask(
+    std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   closeActiveOpsTask();
-  auto opsTask = std::make_shared<OpsTask>(surface->renderTarget, surface->texture);
+  auto opsTask = std::make_shared<OpsTask>(renderTargetProxy);
   tasks.push_back(opsTask);
   activeOpsTask = opsTask.get();
   return opsTask;
@@ -55,12 +56,12 @@ bool DrawingManager::flush(Semaphore* signalSemaphore) {
   auto* gpu = context->gpu();
   closeAllTasks();
   activeOpsTask = nullptr;
-  std::vector<TextureProxy*> proxies;
+  std::vector<ProxyBase*> proxies = {};
   std::for_each(tasks.begin(), tasks.end(),
                 [&proxies](std::shared_ptr<RenderTask>& task) { task->gatherProxies(&proxies); });
-  std::for_each(proxies.begin(), proxies.end(), [](TextureProxy* proxy) {
+  std::for_each(proxies.begin(), proxies.end(), [](ProxyBase* proxy) {
     if (!(proxy->isInstantiated() || proxy->instantiate())) {
-      LOGE("Failed to instantiate texture from proxy.");
+      LOGE("DrawingManager::flush() Failed to instantiate proxy!");
     }
   });
   std::for_each(tasks.begin(), tasks.end(),

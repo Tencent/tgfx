@@ -240,6 +240,9 @@ bool GLGpu::waitSemaphore(const Semaphore* semaphore) {
 
 RenderPass* GLGpu::getRenderPass(std::shared_ptr<RenderTarget> renderTarget,
                                  std::shared_ptr<Texture> renderTargetTexture) {
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
   if (glRenderPass == nullptr) {
     glRenderPass = GLRenderPass::Make(_context);
   }

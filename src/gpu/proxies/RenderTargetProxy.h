@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "ProxyBase.h"
 #include "TextureProxy.h"
 #include "gpu/RenderTarget.h"
 
@@ -25,7 +26,7 @@ namespace tgfx {
 /**
  * This class delays the acquisition of render targets until they are actually required.
  */
-class RenderTargetProxy {
+class RenderTargetProxy : public ProxyBase {
  public:
   /**
    * Creates a new RenderTargetProxy with an existing RenderTarget
@@ -46,8 +47,6 @@ class RenderTargetProxy {
                                                  PixelFormat format, int sampleCount = 1,
                                                  bool mipMapped = false);
 
-  virtual ~RenderTargetProxy() = default;
-
   /**
    * Returns the width of the render target.
    */
@@ -63,6 +62,11 @@ class RenderTargetProxy {
    * ImageOrigin::BottomLeft.
    */
   virtual ImageOrigin origin() const = 0;
+
+  /**
+   * Returns the pixel format of the render target.
+   */
+  virtual PixelFormat format() const = 0;
 
   /**
    * If we are instantiated and have a render target, return the sampleCount value of that render
@@ -82,6 +86,16 @@ class RenderTargetProxy {
   virtual std::shared_ptr<TextureProxy> getTextureProxy() const = 0;
 
   /**
+   * Returns true if the proxy is externally owned.
+   */
+  virtual bool externallyOwned() const = 0;
+
+  /**
+   * Returns true if the proxy was backed by a texture.
+   */
+  bool isTextureBacked() const;
+
+  /**
    * Returns the backing Texture of the proxy. Returns nullptr if the proxy is not instantiated yet,
    * or it is not backed by a texture.
    */
@@ -95,13 +109,27 @@ class RenderTargetProxy {
   /**
    * Returns true if the backing texture is instantiated.
    */
-  bool isInstantiated() const;
+  bool isInstantiated() const override;
 
   /**
    * Instantiates the backing texture, if necessary. Returns true if the backing texture is
    * instantiated.
    */
-  bool instantiate();
+  bool instantiate() override;
+
+  /**
+   * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy. If
+   * the copyContent is true, the content of the RenderTargetProxy will be copied to the new
+   * texture.
+   */
+  std::shared_ptr<TextureProxy> makeTextureProxy(bool copyContent = false) const;
+
+  /**
+   * Creates a compatible RenderTargetProxy instance matches the properties of this one. If
+   * copyContent is true, the content of this RenderTargetProxy will be copied to the new
+   * RenderTargetProxy.
+   */
+  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(bool copyContent = false) const;
 
  protected:
   std::shared_ptr<RenderTarget> renderTarget = nullptr;

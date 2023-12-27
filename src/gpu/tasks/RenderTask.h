@@ -18,17 +18,35 @@
 
 #pragma once
 
-#include "RenderTask.h"
+#include "gpu/Gpu.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
-class TextureResolveRenderTask : public RenderTask {
+class RenderTask {
  public:
-  explicit TextureResolveRenderTask(std::shared_ptr<RenderTarget> renderTarget,
-                                    std::shared_ptr<Texture> texture);
+  virtual ~RenderTask() = default;
 
-  bool execute(Gpu* gpu) override;
+  virtual bool execute(Gpu* gpu) = 0;
+
+  void gatherProxies(std::vector<ProxyBase*>* proxies) const;
+
+  void makeClosed() {
+    closed = true;
+  }
+
+  bool isClosed() const {
+    return closed;
+  }
+
+ protected:
+  explicit RenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+
+  virtual void onGatherProxies(std::vector<ProxyBase*>* proxies) const;
+
+  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
 
  private:
-  std::shared_ptr<Texture> texture = nullptr;
+  bool closed = false;
 };
 }  // namespace tgfx

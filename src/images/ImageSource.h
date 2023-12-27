@@ -48,7 +48,7 @@ class ImageSource {
 
   /**
    * Creates ImageSource from Texture, ImageSource is returned if texture is not nullptr. Note that
-   * this method is not thread safe, must be called while the asscociated context is locked.
+   * this method is not thread safe, must be called while the associated context is locked.
    */
   static std::shared_ptr<ImageSource> MakeFrom(UniqueKey uniqueKey,
                                                std::shared_ptr<Texture> texture);

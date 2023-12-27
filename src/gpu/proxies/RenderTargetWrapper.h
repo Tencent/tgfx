@@ -35,12 +35,20 @@ class RenderTargetWrapper : public RenderTargetProxy {
     return renderTarget->origin();
   }
 
+  PixelFormat format() const override {
+    return renderTarget->format();
+  }
+
   int sampleCount() const override {
     return renderTarget->sampleCount();
   }
 
   Context* getContext() const override {
     return renderTarget->getContext();
+  }
+
+  bool externallyOwned() const override {
+    return true;
   }
 
   std::shared_ptr<TextureProxy> getTextureProxy() const override;

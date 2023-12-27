@@ -21,7 +21,7 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-void DrawOp::visitProxies(const std::function<void(TextureProxy*)>& func) const {
+void DrawOp::visitProxies(const std::function<void(ProxyBase*)>& func) const {
   auto f = [&](const std::unique_ptr<FragmentProcessor>& fp) { fp->visitProxies(func); };
   std::for_each(_colors.begin(), _colors.end(), f);
   std::for_each(_masks.begin(), _masks.end(), f);
@@ -80,7 +80,8 @@ std::unique_ptr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
   if (!BlendModeAsCoeff(blendMode) && !caps->frameBufferFetchSupport) {
     dstTextureInfo = CreateDstTextureInfo(renderPass, bounds());
   }
-  const auto& swizzle = renderPass->renderTarget()->writeSwizzle();
+  auto format = renderPass->renderTarget()->format();
+  const auto& swizzle = caps->getWriteSwizzle(format);
   return std::make_unique<Pipeline>(std::move(gp), std::move(fragmentProcessors),
                                     numColorProcessors, blendMode, dstTextureInfo, &swizzle);
 }

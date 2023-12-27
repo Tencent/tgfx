@@ -23,11 +23,17 @@
 namespace tgfx {
 class DeferredTextureProxy : public TextureProxy {
  public:
-  int width() const override;
+  int width() const override {
+    return _width;
+  }
 
-  int height() const override;
+  int height() const override {
+    return _height;
+  }
 
-  ImageOrigin origin() const override;
+  ImageOrigin origin() const override {
+    return _origin;
+  }
 
   bool hasMipmaps() const override;
 
@@ -37,7 +43,7 @@ class DeferredTextureProxy : public TextureProxy {
  private:
   int _width = 0;
   int _height = 0;
-  PixelFormat format = PixelFormat::RGBA_8888;
+  PixelFormat _format = PixelFormat::RGBA_8888;
   bool mipMapped = false;
   ImageOrigin _origin = ImageOrigin::TopLeft;
 
