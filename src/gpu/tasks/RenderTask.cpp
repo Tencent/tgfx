@@ -16,27 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/RenderTask.h"
-#include "gpu/ops/Op.h"
-#include "tgfx/gpu/Surface.h"
+#include "RenderTask.h"
+#include "utils/Log.h"
 
 namespace tgfx {
-class OpsTask : public RenderTask {
- public:
-  OpsTask(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture)
-      : RenderTask(std::move(renderTarget)), renderTargetTexture(std::move(texture)) {
-  }
+RenderTask::RenderTask(std::shared_ptr<RenderTargetProxy> proxy)
+    : renderTargetProxy(std::move(proxy)) {
+  DEBUG_ASSERT(renderTargetProxy != nullptr);
+}
 
-  void addOp(std::unique_ptr<Op> op);
+void RenderTask::gatherProxies(std::vector<ProxyBase*>* proxies) const {
+  proxies->push_back(renderTargetProxy.get());
+  onGatherProxies(proxies);
+}
 
-  bool execute(Gpu* gpu) override;
-
-  void gatherProxies(std::vector<TextureProxy*>* proxies) const override;
-
- private:
-  std::shared_ptr<Texture> renderTargetTexture = nullptr;
-  std::vector<std::unique_ptr<Op>> ops;
-};
+void RenderTask::onGatherProxies(std::vector<ProxyBase*>*) const {
+}
 }  // namespace tgfx

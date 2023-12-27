@@ -16,23 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DeferredTextureProxy.h"
+#pragma once
 
 namespace tgfx {
-DeferredTextureProxy::DeferredTextureProxy(ProxyProvider* provider, int width, int height,
-                                           PixelFormat format, bool mipMapped, ImageOrigin origin)
-    : TextureProxy(provider), _width(width), _height(height), _format(format), mipMapped(mipMapped),
-      _origin(origin) {
-}
+/**
+ * This class delays the acquisition of instances until they are actually required.
+ */
+class ProxyBase {
+ public:
+  virtual ~ProxyBase() = default;
 
-bool DeferredTextureProxy::hasMipmaps() const {
-  return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
-}
+  /**
+   * Returns true if the proxy is instantiated.
+   */
+  virtual bool isInstantiated() const = 0;
 
-std::shared_ptr<Texture> DeferredTextureProxy::onMakeTexture(Context* context) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  return Texture::MakeFormat(context, width(), height(), _format, mipMapped, _origin);
-}
+  /**
+   * Instantiates the proxy if necessary. Returns true if the proxy is instantiated successfully.
+   */
+  virtual bool instantiate() = 0;
+};
 }  // namespace tgfx

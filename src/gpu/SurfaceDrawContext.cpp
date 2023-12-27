@@ -45,6 +45,6 @@ OpsTask* SurfaceDrawContext::getOpsTask() {
 }
 
 void SurfaceDrawContext::replaceOpsTask() {
-  opsTask = surface->getContext()->drawingManager()->newOpsTask(surface);
+  opsTask = surface->getContext()->drawingManager()->newOpsTask(surface->renderTargetProxy);
 }
 }  // namespace tgfx

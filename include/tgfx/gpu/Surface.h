@@ -28,6 +28,7 @@ namespace tgfx {
 class Canvas;
 class Context;
 class RenderTarget;
+class RenderTargetProxy;
 
 /**
  * The Surface class is responsible for managing the pixels that a Canvas draws into. The Surface
@@ -200,10 +201,8 @@ class Surface {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
  private:
-  std::shared_ptr<RenderTarget> renderTarget = nullptr;
-  std::shared_ptr<Texture> texture = nullptr;
+  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   SurfaceOptions surfaceOptions = {};
-  bool externalTexture = false;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
 
@@ -213,15 +212,14 @@ class Surface {
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1,
                                            const SurfaceOptions* options = nullptr);
 
-  Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
-          const SurfaceOptions* options, bool externalTexture = true);
+  Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options);
 
   std::shared_ptr<Texture> getTexture();
 
   void aboutToDraw(bool discardContent = false);
 
   friend class DrawingManager;
+  friend class SurfaceDrawContext;
   friend class Canvas;
-  friend class QGLWindow;
 };
 }  // namespace tgfx

@@ -104,14 +104,9 @@ class RenderTarget : public Resource {
   }
 
  private:
-  virtual const Swizzle& writeSwizzle() const = 0;
-
   int _width = 0;
   int _height = 0;
   ImageOrigin _origin = ImageOrigin::TopLeft;
   int _sampleCount = 1;
-
-  friend class DrawOp;
-  friend class Canvas;
 };
 }  // namespace tgfx

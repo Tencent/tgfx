@@ -29,6 +29,7 @@
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
@@ -709,7 +710,9 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
     return false;
   }
   surface->aboutToDraw(true);
-  color = surface->renderTarget->writeSwizzle().applyTo(color);
+  auto format = surface->renderTargetProxy->format();
+  const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
+  color = writeSwizzle.applyTo(color);
   auto [rect, useScissor] = getClipRect();
   if (rect.has_value()) {
     if (useScissor) {
@@ -731,7 +734,7 @@ void Canvas::draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa) {
     return;
   }
   auto aaType = AAType::None;
-  if (surface->renderTarget->sampleCount() > 1) {
+  if (surface->renderTargetProxy->sampleCount() > 1) {
     aaType = AAType::MSAA;
   } else if (aa && !IsPixelAligned(op->bounds())) {
     aaType = AAType::Coverage;

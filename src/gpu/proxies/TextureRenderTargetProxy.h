@@ -35,12 +35,20 @@ class TextureRenderTargetProxy : public RenderTargetProxy {
     return textureProxy->origin();
   }
 
+  PixelFormat format() const override {
+    return _format;
+  }
+
   int sampleCount() const override {
     return renderTarget ? renderTarget->sampleCount() : _sampleCount;
   }
 
   Context* getContext() const override {
     return textureProxy->getContext();
+  }
+
+  bool externallyOwned() const override {
+    return _externallyOwned;
   }
 
   std::shared_ptr<TextureProxy> getTextureProxy() const override {
@@ -52,9 +60,12 @@ class TextureRenderTargetProxy : public RenderTargetProxy {
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  PixelFormat _format = PixelFormat::RGBA_8888;
   int _sampleCount = 0;
+  bool _externallyOwned = false;
 
-  TextureRenderTargetProxy(std::shared_ptr<TextureProxy> textureProxy, int sampleCount);
+  TextureRenderTargetProxy(std::shared_ptr<TextureProxy> textureProxy, PixelFormat format,
+                           int sampleCount, bool externallyOwned);
 
   friend class RenderTargetProxy;
 };

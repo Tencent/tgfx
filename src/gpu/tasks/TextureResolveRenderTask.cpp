@@ -16,23 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DeferredTextureProxy.h"
+#include "TextureResolveRenderTask.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
-DeferredTextureProxy::DeferredTextureProxy(ProxyProvider* provider, int width, int height,
-                                           PixelFormat format, bool mipMapped, ImageOrigin origin)
-    : TextureProxy(provider), _width(width), _height(height), _format(format), mipMapped(mipMapped),
-      _origin(origin) {
+TextureResolveRenderTask::TextureResolveRenderTask(
+    std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+    : RenderTask(std::move(renderTargetProxy)) {
 }
 
-bool DeferredTextureProxy::hasMipmaps() const {
-  return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
-}
-
-std::shared_ptr<Texture> DeferredTextureProxy::onMakeTexture(Context* context) {
-  if (context == nullptr) {
-    return nullptr;
+bool TextureResolveRenderTask::execute(Gpu* gpu) {
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  if (renderTarget == nullptr) {
+    return false;
   }
-  return Texture::MakeFormat(context, width(), height(), _format, mipMapped, _origin);
+  if (renderTarget->sampleCount() > 1) {
+    gpu->resolveRenderTarget(renderTarget.get());
+  }
+  auto texture = renderTargetProxy->getTexture();
+  if (texture != nullptr && texture->getSampler()->hasMipmaps()) {
+    gpu->regenerateMipMapLevels(texture->getSampler());
+  }
+  return true;
 }
 }  // namespace tgfx

@@ -21,8 +21,10 @@
 namespace tgfx {
 
 TextureRenderTargetProxy::TextureRenderTargetProxy(std::shared_ptr<TextureProxy> textureProxy,
-                                                   int sampleCount)
-    : textureProxy(std::move(textureProxy)), _sampleCount(sampleCount) {
+                                                   PixelFormat format, int sampleCount,
+                                                   bool externallyOwned)
+    : textureProxy(std::move(textureProxy)), _format(format), _sampleCount(sampleCount),
+      _externallyOwned(externallyOwned) {
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTargetProxy::onMakeRenderTarget() {

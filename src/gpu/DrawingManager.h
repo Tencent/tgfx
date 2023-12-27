@@ -19,8 +19,8 @@
 #pragma once
 
 #include <vector>
-#include "RenderTask.h"
-#include "gpu/ops/OpsTask.h"
+#include "gpu/tasks/OpsTask.h"
+#include "gpu/tasks/RenderTask.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
@@ -29,11 +29,11 @@ class DrawingManager {
   explicit DrawingManager(Context* context) : context(context) {
   }
 
-  std::shared_ptr<OpsTask> newOpsTask(Surface* surface);
+  std::shared_ptr<OpsTask> newOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
   bool flush(Semaphore* signalSemaphore);
 
-  void newTextureResolveRenderTask(Surface* surface);
+  void newTextureResolveRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
  private:
   void closeAllTasks();
@@ -45,5 +45,7 @@ class DrawingManager {
   Context* context = nullptr;
   std::vector<std::shared_ptr<RenderTask>> tasks;
   OpsTask* activeOpsTask = nullptr;
+
+  friend class Surface;
 };
 }  // namespace tgfx

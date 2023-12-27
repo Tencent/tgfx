@@ -20,7 +20,7 @@
 
 #include <functional>
 #include "gpu/RenderTarget.h"
-#include "gpu/proxies/TextureProxy.h"
+#include "gpu/proxies/ProxyBase.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Context.h"
 
@@ -40,7 +40,7 @@ class Op {
 
   virtual ~Op() = default;
 
-  virtual void visitProxies(const std::function<void(TextureProxy*)>&) const {
+  virtual void visitProxies(const std::function<void(ProxyBase*)>&) const {
   }
 
   virtual void prepare(Gpu*) {
