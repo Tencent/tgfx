@@ -80,7 +80,7 @@ endif ()
 # collects tgfx common files.
 file(GLOB_RECURSE SRC_FILES
         src/core/*.*
-        src/effects/*.*
+        src/filters/*.*
         src/images/*.*
         src/shaders/*.*
         src/shapes/*.*
