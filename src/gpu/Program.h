@@ -23,8 +23,8 @@
 
 namespace tgfx {
 /**
- * The base class for GPU program. Overrides the onReleaseGPU() method to to free all GPU resources.
- * No backend API calls should be made during destructuring since there may be no GPU context which
+ * The base class for GPU program. Overrides the onReleaseGPU() method to free all GPU resources.
+ * No backend API calls should be made during destructuring since there may be no GPU context that
  * is current on the calling thread.
  */
 class Program {

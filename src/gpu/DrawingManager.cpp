@@ -20,7 +20,7 @@
 #include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "gpu/tasks/TextureResolveRenderTask.h"
+#include "gpu/tasks/TextureResolveTask.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -38,7 +38,7 @@ void DrawingManager::newTextureResolveRenderTask(
     return;
   }
   closeActiveOpsTask();
-  auto task = std::make_shared<TextureResolveRenderTask>(renderTargetProxy);
+  auto task = std::make_shared<TextureResolveTask>(renderTargetProxy);
   task->makeClosed();
   tasks.push_back(std::move(task));
 }
