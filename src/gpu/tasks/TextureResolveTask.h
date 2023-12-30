@@ -21,9 +21,9 @@
 #include "RenderTask.h"
 
 namespace tgfx {
-class TextureResolveRenderTask : public RenderTask {
+class TextureResolveTask : public RenderTask {
  public:
-  explicit TextureResolveRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  explicit TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
   bool execute(Gpu* gpu) override;
 };

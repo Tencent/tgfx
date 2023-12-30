@@ -16,16 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureResolveRenderTask.h"
+#include "TextureResolveTask.h"
 #include "gpu/Gpu.h"
 
 namespace tgfx {
-TextureResolveRenderTask::TextureResolveRenderTask(
-    std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
     : RenderTask(std::move(renderTargetProxy)) {
 }
 
-bool TextureResolveRenderTask::execute(Gpu* gpu) {
+bool TextureResolveTask::execute(Gpu* gpu) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     return false;
