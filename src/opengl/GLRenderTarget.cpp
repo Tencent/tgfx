@@ -304,22 +304,6 @@ void GLRenderTarget::resolve() const {
   }
 }
 
-bool GLRenderTarget::replaceTexture(const Texture* texture) {
-  if (textureTarget == 0 || texture == nullptr || texture->width() != width() ||
-      texture->height() != height() || texture->origin() != origin() ||
-      texture->getSampler()->format != format()) {
-    return false;
-  }
-  auto sampler = static_cast<const GLSampler*>(texture->getSampler());
-  auto gl = GLFunctions::Get(context);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferForRead.id);
-  FrameBufferTexture2D(context, textureTarget, 0, sampleCount());
-  textureTarget = sampler->target;
-  FrameBufferTexture2D(context, textureTarget, sampler->id, sampleCount());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
-  return true;
-}
-
 void GLRenderTarget::onReleaseGPU() {
   if (externalResource) {
     return;

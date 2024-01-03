@@ -93,11 +93,6 @@ class RenderTarget : public Resource {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                           int srcY = 0) const = 0;
 
-  /**
-   * Replaces the backing texture of the render target with the specified Texture.
-   */
-  virtual bool replaceTexture(const Texture* texture) = 0;
-
  protected:
   RenderTarget(int width, int height, ImageOrigin origin, int sampleCount = 1)
       : _width(width), _height(height), _origin(origin), _sampleCount(sampleCount) {
