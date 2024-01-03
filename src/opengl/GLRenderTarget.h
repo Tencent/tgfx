@@ -45,8 +45,6 @@ class GLRenderTarget : public RenderTarget {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                   int srcY = 0) const override;
 
-  bool replaceTexture(const Texture* texture) override;
-
  private:
   GLFrameBuffer frameBufferForRead = {};
   GLFrameBuffer frameBufferForDraw = {};
