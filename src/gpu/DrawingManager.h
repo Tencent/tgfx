@@ -31,7 +31,10 @@ class DrawingManager {
 
   std::shared_ptr<OpsTask> newOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
-  bool flush(Semaphore* signalSemaphore);
+  /**
+   * Returns true if any render tasks were executed.
+   */
+  bool flush();
 
   void newTextureResolveRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 

@@ -164,19 +164,14 @@ Canvas* Surface::getCanvas() {
 }
 
 bool Surface::flush(BackendSemaphore* signalSemaphore) {
-  auto semaphore = Semaphore::Wrap(signalSemaphore);
   auto drawingManager = renderTargetProxy->getContext()->drawingManager();
   drawingManager->newTextureResolveRenderTask(renderTargetProxy);
-  auto result = drawingManager->flush(semaphore.get());
-  if (signalSemaphore != nullptr) {
-    *signalSemaphore = semaphore->getBackendSemaphore();
-  }
-  return result;
+  return getContext()->flush(signalSemaphore);
 }
 
 void Surface::flushAndSubmit(bool syncCpu) {
   flush();
-  renderTargetProxy->getContext()->submit(syncCpu);
+  getContext()->submit(syncCpu);
 }
 
 std::shared_ptr<Image> Surface::makeImageSnapshot() {

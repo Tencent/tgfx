@@ -89,7 +89,7 @@ class ResourceCache {
   void purgeNotUsedSince(int64_t purgeTime, bool scratchResourcesOnly = false);
 
   /**
-   * Purge unreferenced resources from the cache until the the provided bytesLimit has been reached
+   * Purge unreferenced resources from the cache until the provided bytesLimit has been reached,
    * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
    * over the specified bytesLimit after purging.
    * @param bytesLimit The desired number of bytes after puring.
@@ -103,24 +103,18 @@ class ResourceCache {
   size_t maxBytes = 0;
   size_t totalBytes = 0;
   size_t purgeableBytes = 0;
-  bool purgingResource = false;
-  std::vector<std::shared_ptr<Resource>> strongReferences = {};
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   ScratchKeyMap<std::vector<Resource*>> scratchKeyMap = {};
   std::unordered_map<uint32_t, Resource*> uniqueKeyMap = {};
-  std::mutex removeLocker = {};
-  std::vector<Resource*> pendingPurgeableResources = {};
 
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);
-  static void NotifyReferenceReachedZero(Resource* resource);
+  static bool InList(const std::list<Resource*>& list, Resource* resource);
 
-  void attachToCurrentThread();
-  void detachFromCurrentThread();
   void releaseAll(bool releaseGPU);
-  void processUnreferencedResource(Resource* resource);
-  std::shared_ptr<Resource> wrapResource(Resource* resource);
+  void processUnreferencedResources();
+  std::shared_ptr<Resource> refResource(Resource* resource);
   std::shared_ptr<Resource> addResource(Resource* resource);
   void removeResource(Resource* resource);
   void purgeResourcesByLRU(bool scratchResourcesOnly,
@@ -132,6 +126,5 @@ class ResourceCache {
 
   friend class Resource;
   friend class Context;
-  friend class PurgeGuard;
 };
 }  // namespace tgfx

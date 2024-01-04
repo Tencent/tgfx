@@ -52,8 +52,10 @@ std::shared_ptr<OpsTask> DrawingManager::newOpsTask(
   return opsTask;
 }
 
-bool DrawingManager::flush(Semaphore* signalSemaphore) {
-  auto* gpu = context->gpu();
+bool DrawingManager::flush() {
+  if (tasks.empty()) {
+    return false;
+  }
   closeAllTasks();
   activeOpsTask = nullptr;
   std::vector<ProxyBase*> proxies = {};
@@ -64,10 +66,11 @@ bool DrawingManager::flush(Semaphore* signalSemaphore) {
       LOGE("DrawingManager::flush() Failed to instantiate proxy!");
     }
   });
+  auto gpu = context->gpu();
   std::for_each(tasks.begin(), tasks.end(),
                 [gpu](std::shared_ptr<RenderTask>& task) { task->execute(gpu); });
   removeAllTasks();
-  return context->caps()->semaphoreSupport && gpu->insertSemaphore(signalSemaphore);
+  return true;
 }
 
 void DrawingManager::closeAllTasks() {

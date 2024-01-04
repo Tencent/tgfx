@@ -184,8 +184,6 @@ class Context {
   ProxyProvider* _proxyProvider = nullptr;
 
   void releaseAll(bool releaseGPU);
-  void onLocked();
-  void onUnlocked();
 
   friend class Device;
 
