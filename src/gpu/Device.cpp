@@ -38,13 +38,11 @@ Context* Device::lockContext() {
     locker.unlock();
     return nullptr;
   }
-  context->onLocked();
   return context;
 }
 
 void Device::unlock() {
   if (contextLocked) {
-    context->onUnlocked();
     contextLocked = false;
     onUnlockContext();
   }

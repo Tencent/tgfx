@@ -48,12 +48,24 @@ Context::~Context() {
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
+  // Clean up all unreferenced resources before flushing, allowing them to be reused. This is
+  // particularly crucial for texture resources that are bound to render targets. Only after the
+  // cleanup can they be unbound and reused.
+  _resourceCache->processUnreferencedResources();
+  auto flushed = _drawingManager->flush();
+  if (signalSemaphore == nullptr) {
+    return false;
+  }
   auto semaphore = Semaphore::Wrap(signalSemaphore);
-  auto success = _drawingManager->flush(semaphore.get());
-  if (signalSemaphore != nullptr) {
+  auto semaphoreInserted = caps()->semaphoreSupport && _gpu->insertSemaphore(semaphore.get());
+  if (semaphoreInserted) {
     *signalSemaphore = semaphore->getBackendSemaphore();
   }
-  return success;
+  if (flushed) {
+    // Clean up all unreferenced resources after flushing to reduce memory usage.
+    _resourceCache->processUnreferencedResources();
+  }
+  return semaphoreInserted;
 }
 
 bool Context::submit(bool syncCpu) {
@@ -71,14 +83,6 @@ bool Context::wait(const BackendSemaphore& waitSemaphore) {
     return false;
   }
   return caps()->semaphoreSupport && _gpu->waitSemaphore(semaphore.get());
-}
-
-void Context::onLocked() {
-  _resourceCache->attachToCurrentThread();
-}
-
-void Context::onUnlocked() {
-  _resourceCache->detachFromCurrentThread();
 }
 
 size_t Context::memoryUsage() const {

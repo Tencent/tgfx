@@ -86,20 +86,23 @@ class Resource {
   }
 
  private:
-  std::weak_ptr<Resource> weakThis;
+  std::shared_ptr<Resource> reference;
   ScratchKey scratchKey = {};
   UniqueKey uniqueKey = {};
   std::atomic_uint32_t uniqueKeyGeneration = 0;
+  std::list<Resource*>* cachedList = nullptr;
   std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
 
   bool isPurgeable() const {
-    return weakThis.expired();
+    return reference.use_count() <= 1;
   }
 
   bool hasValidUniqueKey() const {
     return !uniqueKey.empty() && !uniqueKey.unique() && uniqueKey.uniqueID() == uniqueKeyGeneration;
   }
+
+  void release(bool releaseGPU);
 
   /**
    * Overridden to free GPU resources in the backend API.
