@@ -76,3 +76,4 @@ test/baseline/.cache
 .vscode
 ios/TGFX
 mac/TGFX
+/TGFX
