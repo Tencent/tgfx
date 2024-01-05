@@ -51,7 +51,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // Clean up all unreferenced resources before flushing, allowing them to be reused. This is
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
-  _resourceCache->processUnreferencedResources();
+  _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
   auto flushed = _drawingManager->flush();
   if (signalSemaphore == nullptr) {
     return false;
@@ -63,7 +63,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   }
   if (flushed) {
     // Clean up all unreferenced resources after flushing to reduce memory usage.
-    _resourceCache->processUnreferencedResources();
+    _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
   }
   return semaphoreInserted;
 }
@@ -93,8 +93,8 @@ size_t Context::purgeableBytes() const {
   return _resourceCache->getPurgeableBytes();
 }
 
-size_t Context::getCacheLimit() const {
-  return _resourceCache->getCacheLimit();
+size_t Context::cacheLimit() const {
+  return _resourceCache->cacheLimit();
 }
 
 void Context::setCacheLimit(size_t bytesLimit) {
