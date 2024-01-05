@@ -82,7 +82,7 @@ class Context {
   /**
    * Returns current cache limits of max gpu memory byte size.
    */
-  size_t getCacheLimit() const;
+  size_t cacheLimit() const;
 
   /**
    * Sets the cache limit of max gpu memory byte size.

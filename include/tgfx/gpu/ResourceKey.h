@@ -38,8 +38,6 @@ using ScratchKey = BytesKey;
 template <typename T>
 using ScratchKeyMap = BytesKeyMap<T>;
 
-class UniqueData;
-
 /**
  * A key that allows for exclusive use of a resource for a use case (AKA "domain"). There are three
  * rules governing the use of unique keys:

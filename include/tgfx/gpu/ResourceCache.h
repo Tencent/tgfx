@@ -56,7 +56,7 @@ class ResourceCache {
   /**
    * Returns current cache limits of max gpu memory byte size.
    */
-  size_t getCacheLimit() const {
+  size_t cacheLimit() const {
     return maxBytes;
   }
 

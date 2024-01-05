@@ -125,29 +125,6 @@ bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* res
   return resource->cachedList == &list;
 }
 
-void ResourceCache::processUnreferencedResources() {
-  std::vector<Resource*> needToPurge = {};
-  for (auto& resource : nonpurgeableResources) {
-    if (resource->isPurgeable()) {
-      needToPurge.push_back(resource);
-    }
-  }
-  if (needToPurge.empty()) {
-    return;
-  }
-  for (auto& resource : needToPurge) {
-    RemoveFromList(nonpurgeableResources, resource);
-    if (resource->scratchKey.isValid()) {
-      AddToList(purgeableResources, resource);
-      purgeableBytes += resource->memoryUsage();
-      resource->lastUsedTime = Clock::Now();
-    } else {
-      removeResource(resource);
-    }
-  }
-  purgeUntilMemoryTo(maxBytes);
-}
-
 void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
   auto result = uniqueKeyMap.find(uniqueKey.uniqueID());
   if (result != uniqueKeyMap.end()) {
@@ -219,6 +196,7 @@ bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool scratchResourcesO
 
 void ResourceCache::purgeResourcesByLRU(bool scratchResourcesOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
+  processUnreferencedResources();
   std::vector<Resource*> needToPurge = {};
   for (auto item = purgeableResources.rbegin(); item != purgeableResources.rend(); item++) {
     auto* resource = *item;
@@ -233,6 +211,28 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourcesOnly,
     RemoveFromList(purgeableResources, resource);
     purgeableBytes -= resource->memoryUsage();
     removeResource(resource);
+  }
+}
+
+void ResourceCache::processUnreferencedResources() {
+  std::vector<Resource*> needToPurge = {};
+  for (auto& resource : nonpurgeableResources) {
+    if (resource->isPurgeable()) {
+      needToPurge.push_back(resource);
+    }
+  }
+  if (needToPurge.empty()) {
+    return;
+  }
+  for (auto& resource : needToPurge) {
+    RemoveFromList(nonpurgeableResources, resource);
+    if (resource->scratchKey.isValid()) {
+      AddToList(purgeableResources, resource);
+      purgeableBytes += resource->memoryUsage();
+      resource->lastUsedTime = Clock::Now();
+    } else {
+      removeResource(resource);
+    }
   }
 }
 }  // namespace tgfx
