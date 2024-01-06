@@ -38,6 +38,8 @@ using ScratchKey = BytesKey;
 template <typename T>
 using ScratchKeyMap = BytesKeyMap<T>;
 
+class UniqueDomain;
+
 /**
  * A key that allows for exclusive use of a resource for a use case (AKA "domain"). There are three
  * rules governing the use of unique keys:
@@ -49,57 +51,85 @@ using ScratchKeyMap = BytesKeyMap<T>;
  *
  * This key type allows a code path to create cached resources for which it is the exclusive user.
  * The code path creates a domain which it sets on its keys. This guarantees that there are no
- * cross-domain collisions. Unique keys preempt scratch keys. While a resource has a unique key, it
- * is inaccessible via its scratch key. It can become scratch again if the unique key is removed.
+ * cross-domain collisions. Unique keys preempt scratch keys. While a resource has a valid unique
+ * key, it is inaccessible via its scratch key. It can become scratch again if the unique key is
+ * removed or no longer has any external references.
  */
 class UniqueKey {
  public:
   /**
-   * Creates a new valid UniqueKey.
+   * Creates a weak UniqueKey that contains a valid domain and holds a weak reference to the
+   * corresponding resource. When a resource is solely referenced by weak unique keys, it falls
+   * under the management of the Context and can be destroyed at any time.
    */
-  static UniqueKey Next();
+  static UniqueKey MakeWeak();
+
+  /**
+   * Creates a strong UniqueKey that contains a valid domain and holds a strong reference to the
+   * corresponding resource. When a resource is referenced by strong unique keys, the Context
+   * ensures that the resource is not destroyed until all strong unique keys are released or the
+   * Context itself is destroyed.
+   */
+  static UniqueKey MakeStrong();
 
   /**
    * Creates an empty UniqueKey.
    */
   UniqueKey() = default;
 
-  /**
-   * Returns a global unique ID for the UniqueKey.
-   */
-  uint32_t uniqueID() const {
-    return id == nullptr ? 0 : *id;
-  }
+  UniqueKey(const UniqueKey& key);
+
+  UniqueKey(UniqueKey&& key) noexcept;
+
+  virtual ~UniqueKey();
 
   /**
-   * Returns true if the UniqueKey is empty.
+   * Returns a global unique ID of the domain. Returns 0 if the UniqueKey is empty.
+   */
+  uint32_t domainID() const;
+
+  /**
+   * Returns true if the UniqueKey has no valid domain.
    */
   bool empty() const {
-    return id == nullptr;
+    return uniqueDomain == nullptr;
   }
 
   /**
-   * Returns true if the UniqueKey has only one valid reference.
+   * Returns true if the UniqueKey holds a strong reference to the corresponding resource.
    */
-  bool unique() const {
-    return id.use_count() == 1;
+  bool isStrong() const {
+    return strong;
   }
 
   /**
-   * Returns true if a is equivalent to b.
+   * Returns a strong UniqueKey that contains the same domain as the original key.
    */
-  friend bool operator==(const UniqueKey& a, const UniqueKey& b) {
-    return a.id == b.id;
-  }
+  UniqueKey makeStrong() const;
 
   /**
-   * Returns true if a is not equivalent to b.
+   * Returns a weak UniqueKey that contains the same domain as the original key.
    */
-  friend bool operator!=(const UniqueKey& a, const UniqueKey& b) {
-    return a.id != b.id;
-  }
+  UniqueKey makeWeak() const;
+
+  /**
+   * Returns the total number of times the domain has been referenced.
+   */
+  long useCount() const;
+
+  /**
+   * Returns the number of times the domain has been referenced strongly.
+   */
+  long strongCount() const;
+
+  UniqueKey& operator=(const UniqueKey& key);
+
+  UniqueKey& operator=(UniqueKey&& key) noexcept;
 
  private:
-  std::shared_ptr<uint32_t> id = nullptr;
+  UniqueDomain* uniqueDomain = nullptr;
+  bool strong = false;
+
+  UniqueKey(UniqueDomain* block, bool strong);
 };
 }  // namespace tgfx

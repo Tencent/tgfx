@@ -65,7 +65,7 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) co
   auto resourceCache = context->resourceCache();
   auto texture = std::static_pointer_cast<Texture>(resourceCache->findUniqueResource(uniqueKey));
   if (texture != nullptr) {
-    return MakeFrom(uniqueKey, texture);
+    return MakeFrom(uniqueKey.makeStrong(), texture);
   }
   auto proxy = lockTextureProxy(context, SurfaceOptions::DisableAsyncTaskFlag);
   if (proxy == nullptr) {
@@ -74,7 +74,7 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) co
   if (!proxy->isInstantiated()) {
     proxy->instantiate();
   }
-  return MakeFrom(uniqueKey, proxy->getTexture());
+  return MakeFrom(uniqueKey.makeStrong(), proxy->getTexture());
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {

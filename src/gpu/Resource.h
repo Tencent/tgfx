@@ -19,13 +19,13 @@
 #pragma once
 
 #include <atomic>
-#include "tgfx/gpu/ResourceCache.h"
+#include "gpu/ResourceCache.h"
 #include "tgfx/gpu/ResourceKey.h"
 
 namespace tgfx {
 /**
  * The base class for GPU resource. Overrides the onReleaseGPU() method to free all GPU resources.
- * No backend API calls should be made during destructuring since there may be no GPU context which
+ * No backend API calls should be made during destructuring since there may be no GPU context that
  * is current on the calling thread. Note: Resource is not thread safe, do not access any properties
  * of a Resource unless its associated device is locked.
  */
@@ -94,12 +94,12 @@ class Resource {
   std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
 
-  bool isPurgeable() const {
-    return reference.use_count() <= 1;
+  virtual bool isPurgeable() const {
+    return reference.use_count() <= 1 && uniqueKey.strongCount() == 0;
   }
 
   bool hasValidUniqueKey() const {
-    return !uniqueKey.empty() && !uniqueKey.unique() && uniqueKey.uniqueID() == uniqueKeyGeneration;
+    return uniqueKey.useCount() > 1 && uniqueKey.domainID() == uniqueKeyGeneration;
   }
 
   void release(bool releaseGPU);

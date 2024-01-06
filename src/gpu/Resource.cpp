@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/Resource.h"
+#include "gpu/Resource.h"
 
 namespace tgfx {
 void Resource::assignUniqueKey(const UniqueKey& newKey) {
@@ -24,7 +24,7 @@ void Resource::assignUniqueKey(const UniqueKey& newKey) {
     removeUniqueKey();
     return;
   }
-  if (newKey != uniqueKey) {
+  if (newKey.domainID() != uniqueKey.domainID()) {
     context->resourceCache()->changeUniqueKey(this, newKey);
   }
 }
@@ -40,7 +40,7 @@ void Resource::markUniqueKeyExpired() {
 }
 
 bool Resource::hasUniqueKey(const UniqueKey& newKey) const {
-  return !newKey.empty() && newKey.uniqueID() == uniqueKeyGeneration;
+  return !newKey.empty() && newKey.domainID() == uniqueKeyGeneration;
 }
 
 void Resource::release(bool releaseGPU) {

@@ -34,7 +34,7 @@ std::shared_ptr<ImageSource> EncodedSource::onMakeDecoded(Context* context) cons
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
-  return std::shared_ptr<EncodedSource>(new EncodedSource(UniqueKey::Next(), generator, true));
+  return std::shared_ptr<EncodedSource>(new EncodedSource(UniqueKey::MakeWeak(), generator, true));
 }
 
 std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context,

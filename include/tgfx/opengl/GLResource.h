@@ -18,35 +18,40 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
-};
-
-class GpuBuffer : public Resource {
+/**
+ * The base class for custom OpenGL resources. Overrides the onReleaseGPU() method to free all GPU
+ * resources. No backend API calls should be made during destructuring since there may be no OpenGL
+ * context that is current on the calling thread.
+ */
+class GLResource {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
-                                         const void* buffer, size_t size);
+  /**
+   * Attaches a GLResource to the associated Context. The onReleaseGPU() method will be called when
+   * all external references to the GLResource are released or when the associated Context is
+   * destroyed.
+   */
+  static void AttachToContext(Context* context, std::shared_ptr<GLResource> resource);
 
-  size_t size() const {
-    return _sizeInBytes;
-  }
+  virtual ~GLResource() = default;
 
-  size_t memoryUsage() const override {
-    return _sizeInBytes;
+  /**
+   * Retrieves the context associated with the resource. Returns nullptr if the resource has been
+   * released.
+   */
+  Context* getContext() const {
+    return context;
   }
 
  protected:
-  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _sizeInBytes(sizeInBytes) {
-  }
-
-  BufferType _bufferType;
+  virtual void onReleaseGPU() = 0;
 
  private:
-  size_t _sizeInBytes;
+  Context* context = nullptr;
+
+  friend class GLExternalResource;
 };
 }  // namespace tgfx

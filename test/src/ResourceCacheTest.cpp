@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
-#include "tgfx/gpu/Resource.h"
+#include "gpu/Resource.h"
 #include "tgfx/utils/Task.h"
 #include "utils/TestUtils.h"
 

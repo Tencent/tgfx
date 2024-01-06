@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/Resource.h"
 #include "gpu/TextureSampler.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
@@ -25,7 +26,6 @@
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/ImageOrigin.h"
-#include "tgfx/gpu/Resource.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {

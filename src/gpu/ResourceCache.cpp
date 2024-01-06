@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/ResourceCache.h"
+#include "gpu/ResourceCache.h"
 #include <unordered_map>
 #include <unordered_set>
-#include "tgfx/gpu/Resource.h"
+#include "gpu/Resource.h"
 #include "tgfx/utils/BytesKey.h"
 #include "tgfx/utils/Clock.h"
 #include "utils/Log.h"
@@ -96,7 +96,7 @@ Resource* ResourceCache::getUniqueResource(const UniqueKey& uniqueKey) {
   if (uniqueKey.empty()) {
     return nullptr;
   }
-  auto result = uniqueKeyMap.find(uniqueKey.uniqueID());
+  auto result = uniqueKeyMap.find(uniqueKey.domainID());
   if (result == uniqueKeyMap.end()) {
     return nullptr;
   }
@@ -126,20 +126,20 @@ bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* res
 }
 
 void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
-  auto result = uniqueKeyMap.find(uniqueKey.uniqueID());
+  auto result = uniqueKeyMap.find(uniqueKey.domainID());
   if (result != uniqueKeyMap.end()) {
     result->second->removeUniqueKey();
   }
   if (!resource->uniqueKey.empty()) {
-    uniqueKeyMap.erase(resource->uniqueKey.uniqueID());
+    uniqueKeyMap.erase(resource->uniqueKey.domainID());
   }
-  resource->uniqueKey = uniqueKey;
-  resource->uniqueKeyGeneration = uniqueKey.uniqueID();
-  uniqueKeyMap[uniqueKey.uniqueID()] = resource;
+  resource->uniqueKey = uniqueKey.makeWeak();
+  resource->uniqueKeyGeneration = uniqueKey.domainID();
+  uniqueKeyMap[uniqueKey.domainID()] = resource;
 }
 
 void ResourceCache::removeUniqueKey(Resource* resource) {
-  uniqueKeyMap.erase(resource->uniqueKey.uniqueID());
+  uniqueKeyMap.erase(resource->uniqueKey.domainID());
   resource->uniqueKey = {};
   resource->uniqueKeyGeneration = 0;
 }

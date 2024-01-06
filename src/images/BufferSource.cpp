@@ -24,7 +24,7 @@ BufferSource::BufferSource(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buf
 }
 
 std::shared_ptr<ImageSource> BufferSource::onMakeMipMapped() const {
-  return std::shared_ptr<BufferSource>(new BufferSource(UniqueKey::Next(), imageBuffer, true));
+  return std::shared_ptr<BufferSource>(new BufferSource(UniqueKey::MakeWeak(), imageBuffer, true));
 }
 
 std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context, uint32_t) const {

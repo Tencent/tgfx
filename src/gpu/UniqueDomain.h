@@ -18,35 +18,48 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include <atomic>
+#include "utils/UniqueID.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
-};
-
-class GpuBuffer : public Resource {
+class UniqueDomain {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
-                                         const void* buffer, size_t size);
+  UniqueDomain();
 
-  size_t size() const {
-    return _sizeInBytes;
+  /**
+   * Returns a global unique ID for the UniqueBlock.
+   */
+  uint32_t uniqueID() const {
+    return _uniqueID;
   }
 
-  size_t memoryUsage() const override {
-    return _sizeInBytes;
+  /**
+   * Returns the total number of times the UniqueBlock has been referenced.
+   */
+  long useCount() const {
+    return _useCount;
   }
 
- protected:
-  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _sizeInBytes(sizeInBytes) {
+  /**
+   * Returns the number of times the UniqueBlock has been referenced strongly.
+   */
+  long strongCount() const {
+    return _strongCount;
   }
 
-  BufferType _bufferType;
+  /**
+   * Increments the number of times the UniqueBlock has been referenced.
+   */
+  void addReference(bool strong);
+
+  /**
+   * Decrements the number of times the UniqueBlock has been referenced.
+   */
+  void releaseReference(bool strong);
 
  private:
-  size_t _sizeInBytes;
+  uint32_t _uniqueID = 0;
+  std::atomic_long _useCount = {0};
+  std::atomic_long _strongCount = {0};
 };
 }  // namespace tgfx
