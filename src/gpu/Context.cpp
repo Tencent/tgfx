@@ -20,8 +20,8 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ResourceCache.h"
 #include "gpu/ResourceProvider.h"
-#include "tgfx/gpu/ResourceCache.h"
 #include "tgfx/utils/Clock.h"
 #include "utils/Log.h"
 

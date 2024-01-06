@@ -16,14 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <memory>
-#include "tgfx/gpu/ResourceKey.h"
-#include "utils/UniqueID.h"
+#include "UniqueDomain.h"
 
 namespace tgfx {
-UniqueKey UniqueKey::Next() {
-  UniqueKey uniqueKey = {};
-  uniqueKey.id = std::make_shared<uint32_t>(UniqueID::Next());
-  return uniqueKey;
+UniqueDomain::UniqueDomain() : _uniqueID(UniqueID::Next()) {
+}
+
+void UniqueDomain::addReference(bool strong) {
+  _useCount++;
+  if (strong) {
+    _strongCount++;
+  }
+}
+
+void UniqueDomain::releaseReference(bool strong) {
+  if (strong) {
+    _strongCount--;
+  }
+  if (--_useCount <= 0) {
+    delete this;
+  }
 }
 }  // namespace tgfx

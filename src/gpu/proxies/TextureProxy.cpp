@@ -26,7 +26,7 @@ TextureProxy::TextureProxy(ProxyProvider* provider, std::shared_ptr<Texture> tex
 
 TextureProxy::~TextureProxy() {
   if (!uniqueKey.empty()) {
-    provider->proxyOwnerMap.erase(uniqueKey.uniqueID());
+    provider->proxyOwnerMap.erase(uniqueKey.domainID());
   }
 }
 
@@ -74,7 +74,7 @@ void TextureProxy::assignUniqueKey(const UniqueKey& newKey, bool updateTextureKe
     removeUniqueKey(updateTextureKey);
     return;
   }
-  if (newKey != uniqueKey) {
+  if (newKey.domainID() != uniqueKey.domainID()) {
     provider->changeUniqueKey(this, newKey);
   }
   setTextureUniqueKey = updateTextureKey;

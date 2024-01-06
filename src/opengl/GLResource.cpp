@@ -16,37 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
+#include "tgfx/opengl/GLResource.h"
 #include "gpu/Resource.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
-};
-
-class GpuBuffer : public Resource {
+class GLExternalResource : public Resource {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
-                                         const void* buffer, size_t size);
-
-  size_t size() const {
-    return _sizeInBytes;
+  explicit GLExternalResource(std::shared_ptr<GLResource> glResource)
+      : glResource(std::move(glResource)) {
   }
 
   size_t memoryUsage() const override {
-    return _sizeInBytes;
+    return 0;
   }
-
- protected:
-  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _sizeInBytes(sizeInBytes) {
-  }
-
-  BufferType _bufferType;
 
  private:
-  size_t _sizeInBytes;
+  std::shared_ptr<GLResource> glResource = nullptr;
+
+  bool isPurgeable() const override {
+    return glResource.use_count() <= 1;
+  }
+
+  void onReleaseGPU() override {
+    glResource->onReleaseGPU();
+    glResource->context = nullptr;
+  }
 };
+
+void GLResource::AttachToContext(Context* context, std::shared_ptr<GLResource> glResource) {
+  if (context == nullptr || glResource == nullptr) {
+    return;
+  }
+  glResource->context = context;
+  Resource::Wrap(context, new GLExternalResource(std::move(glResource)));
+}
 }  // namespace tgfx

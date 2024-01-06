@@ -31,7 +31,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::findTextureProxy(const UniqueKey& u
   if (uniqueKey.empty()) {
     return nullptr;
   }
-  auto result = proxyOwnerMap.find(uniqueKey.uniqueID());
+  auto result = proxyOwnerMap.find(uniqueKey.domainID());
   if (result != proxyOwnerMap.end()) {
     return result->second->weakThis.lock();
   }
@@ -102,19 +102,19 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapTexture(std::shared_ptr<Texture
 }
 
 void ProxyProvider::changeUniqueKey(TextureProxy* proxy, const UniqueKey& uniqueKey) {
-  auto result = proxyOwnerMap.find(uniqueKey.uniqueID());
+  auto result = proxyOwnerMap.find(uniqueKey.domainID());
   if (result != proxyOwnerMap.end()) {
     result->second->removeUniqueKey();
   }
   if (!proxy->uniqueKey.empty()) {
-    proxyOwnerMap.erase(proxy->uniqueKey.uniqueID());
+    proxyOwnerMap.erase(proxy->uniqueKey.domainID());
   }
   proxy->uniqueKey = uniqueKey;
-  proxyOwnerMap[uniqueKey.uniqueID()] = proxy;
+  proxyOwnerMap[uniqueKey.domainID()] = proxy;
 }
 
 void ProxyProvider::removeUniqueKey(TextureProxy* proxy) {
-  proxyOwnerMap.erase(proxy->uniqueKey.uniqueID());
+  proxyOwnerMap.erase(proxy->uniqueKey.domainID());
   proxy->uniqueKey = {};
 }
 
