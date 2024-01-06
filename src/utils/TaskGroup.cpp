@@ -118,7 +118,7 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 std::shared_ptr<Task> TaskGroup::popTask() {
   std::unique_lock<std::mutex> autoLock(locker);
   activeThreads--;
-  while (true) {
+  while (!exited) {
     if (tasks.empty()) {
       auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
       if (exited || status == std::cv_status::timeout) {
@@ -137,6 +137,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
       return task;
     }
   }
+  return nullptr;
 }
 
 bool TaskGroup::removeTask(Task* target) {
