@@ -21,6 +21,9 @@
 #include <cinttypes>
 
 namespace tgfx {
+/**
+ * Defines flags that can be passed to the rendering process.
+ */
 class RenderFlags {
  public:
   /**
