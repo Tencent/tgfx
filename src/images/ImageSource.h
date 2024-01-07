@@ -21,8 +21,8 @@
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
 class UniqueKey;

@@ -20,10 +20,10 @@
 
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/RenderFlags.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/ResourceKey.h"
-#include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
 class DrawOp;

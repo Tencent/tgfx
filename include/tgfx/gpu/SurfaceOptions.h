@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/gpu/RenderFlags.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 /**
