@@ -38,8 +38,8 @@ std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
 }
 
 std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context,
-                                                                uint32_t surfaceFlags) const {
-  bool disableAsyncTask = surfaceFlags & SurfaceOptions::DisableAsyncTaskFlag;
+                                                                uint32_t renderFlags) const {
+  bool disableAsyncTask = renderFlags & RenderFlags::DisableAsyncTask;
   return context->proxyProvider()->createTextureProxy(generator, mipMapped, disableAsyncTask);
 }
 }  // namespace tgfx

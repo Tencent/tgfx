@@ -25,11 +25,11 @@ RenderTask::RenderTask(std::shared_ptr<RenderTargetProxy> proxy)
   DEBUG_ASSERT(renderTargetProxy != nullptr);
 }
 
-void RenderTask::gatherProxies(std::vector<ProxyBase*>* proxies) const {
+void RenderTask::gatherProxies(std::vector<ResourceProxy*>* proxies) const {
   proxies->push_back(renderTargetProxy.get());
   onGatherProxies(proxies);
 }
 
-void RenderTask::onGatherProxies(std::vector<ProxyBase*>*) const {
+void RenderTask::onGatherProxies(std::vector<ResourceProxy*>*) const {
 }
 }  // namespace tgfx

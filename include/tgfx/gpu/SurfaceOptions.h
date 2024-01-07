@@ -18,48 +18,38 @@
 
 #pragma once
 
+#include "tgfx/core/RenderFlags.h"
+
 namespace tgfx {
 /**
  * Describes properties and constraints of a given Surface. The rendering engine can parse these
- * during drawing, and can sometimes optimize its performance (e.g. disabling an expensive feature).
+ * during drawing, and can sometimes optimize its performance (e.g., disabling an expensive feature).
  */
 class SurfaceOptions {
  public:
-  /**
-   * If this flag is set, the Surface will skip generating new caches to the associated Context
-   * during drawing.
-   */
-  static constexpr uint32_t DisableCacheFlag = 1 << 0;
-
-  /**
-   * If this flag is set, the Surface will perform all CPU-side tasks in the current thread rather
-   * than run them in parallel asynchronously.
-   */
-  static constexpr uint32_t DisableAsyncTaskFlag = 1 << 1;
-
   SurfaceOptions() = default;
 
-  SurfaceOptions(uint32_t flags) : _flags(flags) {
+  SurfaceOptions(uint32_t renderFlags) : _renderFlags(renderFlags) {
   }
 
-  uint32_t flags() const {
-    return _flags;
+  uint32_t renderFlags() const {
+    return _renderFlags;
   }
 
   bool cacheDisabled() const {
-    return _flags & DisableCacheFlag;
+    return _renderFlags & RenderFlags::DisableCache;
   }
 
   bool asyncTaskDisabled() const {
-    return _flags & DisableAsyncTaskFlag;
+    return _renderFlags & RenderFlags::DisableAsyncTask;
   }
 
   bool operator==(const SurfaceOptions& that) const {
-    return _flags == that._flags;
+    return _renderFlags == that._renderFlags;
   }
 
  private:
-  uint32_t _flags = 0;
+  uint32_t _renderFlags = 0;
 };
 
 }  // namespace tgfx

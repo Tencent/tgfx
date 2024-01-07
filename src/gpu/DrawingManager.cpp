@@ -58,10 +58,10 @@ bool DrawingManager::flush() {
   }
   closeAllTasks();
   activeOpsTask = nullptr;
-  std::vector<ProxyBase*> proxies = {};
+  std::vector<ResourceProxy*> proxies = {};
   std::for_each(tasks.begin(), tasks.end(),
                 [&proxies](std::shared_ptr<RenderTask>& task) { task->gatherProxies(&proxies); });
-  std::for_each(proxies.begin(), proxies.end(), [](ProxyBase* proxy) {
+  std::for_each(proxies.begin(), proxies.end(), [](ResourceProxy* proxy) {
     if (!(proxy->isInstantiated() || proxy->instantiate())) {
       LOGE("DrawingManager::flush() Failed to instantiate proxy!");
     }

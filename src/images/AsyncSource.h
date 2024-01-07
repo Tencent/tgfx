@@ -34,7 +34,7 @@ class AsyncSource : public EncodedSource {
   std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const override;
 
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
-                                                   uint32_t surfaceFlags) const override;
+                                                   uint32_t renderFlags) const override;
 
  private:
   std::shared_ptr<ImageGeneratorTask> imageTask = nullptr;

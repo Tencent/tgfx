@@ -18,22 +18,23 @@
 
 #pragma once
 
+#include <cinttypes>
+
 namespace tgfx {
 /**
- * This class delays the acquisition of instances until they are actually required.
+ * Defines flags that can be passed to the rendering process.
  */
-class ProxyBase {
+class RenderFlags {
  public:
-  virtual ~ProxyBase() = default;
+  /**
+   * Skips generating any new caches to the associated Context during the rendering process.
+   */
+  static constexpr uint32_t DisableCache = 1 << 0;
 
   /**
-   * Returns true if the proxy is instantiated.
+   * Performs all CPU-side tasks in the current thread rather than run them in parallel
+   * asynchronously.
    */
-  virtual bool isInstantiated() const = 0;
-
-  /**
-   * Instantiates the proxy if necessary. Returns true if the proxy is instantiated successfully.
-   */
-  virtual bool instantiate() = 0;
+  static constexpr uint32_t DisableAsyncTask = 1 << 1;
 };
 }  // namespace tgfx

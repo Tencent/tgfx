@@ -21,8 +21,8 @@
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
 class UniqueKey;
@@ -125,7 +125,7 @@ class ImageSource {
    * Returns a TextureProxy if there is a corresponding cache in the context. Otherwise, immediately
    * creates one.
    */
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t surfaceFlags = 0) const;
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t renderFlags = 0) const;
 
  protected:
   UniqueKey uniqueKey = {};
@@ -138,6 +138,6 @@ class ImageSource {
   virtual std::shared_ptr<ImageSource> onMakeMipMapped() const = 0;
 
   virtual std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
-                                                           uint32_t surfaceFlags) const = 0;
+                                                           uint32_t renderFlags) const = 0;
 };
 }  // namespace tgfx

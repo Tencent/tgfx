@@ -34,7 +34,7 @@ class OpsTask : public RenderTask {
   bool execute(Gpu* gpu) override;
 
  protected:
-  void onGatherProxies(std::vector<ProxyBase*>* proxies) const override;
+  void onGatherProxies(std::vector<ResourceProxy*>* proxies) const override;
 
  private:
   std::vector<std::unique_ptr<Op>> ops;
