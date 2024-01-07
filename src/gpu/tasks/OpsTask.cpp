@@ -49,11 +49,11 @@ bool OpsTask::execute(Gpu* gpu) {
   return true;
 }
 
-void OpsTask::onGatherProxies(std::vector<ProxyBase*>* proxies) const {
+void OpsTask::onGatherProxies(std::vector<ResourceProxy*>* proxies) const {
   if (ops.empty()) {
     return;
   }
-  auto func = [proxies](ProxyBase* proxy) { proxies->emplace_back(proxy); };
+  auto func = [proxies](ResourceProxy* proxy) { proxies->emplace_back(proxy); };
   std::for_each(ops.begin(), ops.end(), [&func](auto& op) { op->visitProxies(func); });
 }
 }  // namespace tgfx

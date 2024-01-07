@@ -134,9 +134,9 @@ Matrix SubsetImage::getTotalMatrix(const Matrix* localMatrix) const {
 }
 
 std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(
-    Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+    Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
     const SamplingOptions& sampling, const Matrix* localMatrix) {
   auto matrix = getTotalMatrix(localMatrix);
-  return Image::asFragmentProcessor(context, surfaceFlags, tileModeX, tileModeY, sampling, &matrix);
+  return Image::asFragmentProcessor(context, renderFlags, tileModeX, tileModeY, sampling, &matrix);
 }
 }  // namespace tgfx

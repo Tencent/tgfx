@@ -67,7 +67,7 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) co
   if (texture != nullptr) {
     return MakeFrom(uniqueKey.makeStrong(), texture);
   }
-  auto proxy = lockTextureProxy(context, SurfaceOptions::DisableAsyncTaskFlag);
+  auto proxy = lockTextureProxy(context, RenderFlags::DisableAsyncTask);
   if (proxy == nullptr) {
     return nullptr;
   }
@@ -106,7 +106,7 @@ std::shared_ptr<ImageSource> ImageSource::makeMipMapped() const {
 }
 
 std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
-                                                            uint32_t surfaceFlags) const {
+                                                            uint32_t renderFlags) const {
   if (context == nullptr) {
     return nullptr;
   }
@@ -115,10 +115,9 @@ std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
   if (proxy != nullptr) {
     return proxy;
   }
-  proxy = onMakeTextureProxy(context, surfaceFlags);
+  proxy = onMakeTextureProxy(context, renderFlags);
   if (proxy != nullptr) {
-    auto updateTextureKey =
-        !(surfaceFlags & SurfaceOptions::DisableCacheFlag) && !isTextureBacked();
+    auto updateTextureKey = !(renderFlags & RenderFlags::DisableCache) && !isTextureBacked();
     proxy->assignUniqueKey(uniqueKey, updateTextureKey);
   }
   return proxy;

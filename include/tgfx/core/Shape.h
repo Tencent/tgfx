@@ -90,7 +90,7 @@ class Shape {
   float _resolutionScale = 1.0f;
 
   virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                         uint32_t surfaceFlags) const = 0;
+                                         uint32_t renderFlags) const = 0;
 
   friend class Canvas;
 };

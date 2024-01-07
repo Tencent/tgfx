@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "ProxyBase.h"
+#include "ResourceProxy.h"
 #include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
 
@@ -28,7 +28,7 @@ class ProxyProvider;
 /**
  * This class delays the acquisition of textures until they are actually required.
  */
-class TextureProxy : public ProxyBase {
+class TextureProxy : public ResourceProxy {
  public:
   virtual ~TextureProxy() override;
 

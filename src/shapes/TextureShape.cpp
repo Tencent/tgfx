@@ -27,7 +27,7 @@ TextureShape::TextureShape(std::unique_ptr<PathProxy> pathProxy, float resolutio
 }
 
 std::unique_ptr<DrawOp> TextureShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                             uint32_t surfaceFlags) const {
+                                             uint32_t renderFlags) const {
   auto resourceCache = paint->context->resourceCache();
   auto texture = std::static_pointer_cast<Texture>(resourceCache->findUniqueResource(uniqueKey));
   if (texture != nullptr) {
@@ -49,7 +49,7 @@ std::unique_ptr<DrawOp> TextureShape::makeOp(GpuPaint* paint, const Matrix& view
   if (texture == nullptr) {
     return nullptr;
   }
-  if (!(surfaceFlags & SurfaceOptions::DisableCacheFlag)) {
+  if (!(renderFlags & RenderFlags::DisableCache)) {
     texture->assignUniqueKey(uniqueKey);
   }
   return makeTextureOp(texture, paint, viewMatrix);

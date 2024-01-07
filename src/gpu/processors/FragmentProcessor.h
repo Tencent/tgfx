@@ -30,11 +30,11 @@
 
 namespace tgfx {
 struct FPArgs {
-  FPArgs(Context* context, uint32_t surfaceFlags) : context(context), surfaceFlags(surfaceFlags) {
+  FPArgs(Context* context, uint32_t renderFlags) : context(context), renderFlags(renderFlags) {
   }
 
   Context* context = nullptr;
-  uint32_t surfaceFlags = 0;
+  uint32_t renderFlags = 0;
   Matrix preLocalMatrix = Matrix::I();
   Matrix postLocalMatrix = Matrix::I();
 };

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "ProxyBase.h"
+#include "ResourceProxy.h"
 #include "TextureProxy.h"
 #include "gpu/RenderTarget.h"
 
@@ -26,7 +26,7 @@ namespace tgfx {
 /**
  * This class delays the acquisition of render targets until they are actually required.
  */
-class RenderTargetProxy : public ProxyBase {
+class RenderTargetProxy : public ResourceProxy {
  public:
   /**
    * Creates a new RenderTargetProxy with an existing RenderTarget

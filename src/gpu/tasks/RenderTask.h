@@ -29,7 +29,7 @@ class RenderTask {
 
   virtual bool execute(Gpu* gpu) = 0;
 
-  void gatherProxies(std::vector<ProxyBase*>* proxies) const;
+  void gatherProxies(std::vector<ResourceProxy*>* proxies) const;
 
   void makeClosed() {
     closed = true;
@@ -42,7 +42,7 @@ class RenderTask {
  protected:
   explicit RenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
-  virtual void onGatherProxies(std::vector<ProxyBase*>* proxies) const;
+  virtual void onGatherProxies(std::vector<ResourceProxy*>* proxies) const;
 
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
 

@@ -27,7 +27,7 @@ TriangulatingShape::TriangulatingShape(std::unique_ptr<PathProxy> pathProxy, flo
 }
 
 std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                                   uint32_t surfaceFlags) const {
+                                                   uint32_t renderFlags) const {
   auto resourceCache = paint->context->resourceCache();
   auto buffer = std::static_pointer_cast<GpuBuffer>(resourceCache->findUniqueResource(uniqueKey));
   if (buffer != nullptr) {
@@ -46,7 +46,7 @@ std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix
   if (buffer == nullptr) {
     return nullptr;
   }
-  if (!(surfaceFlags & SurfaceOptions::DisableCacheFlag)) {
+  if (!(renderFlags & RenderFlags::DisableCache)) {
     buffer->assignUniqueKey(uniqueKey);
   }
   return std::make_unique<TriangulatingPathOp>(paint->color, buffer, count, bounds, viewMatrix);

@@ -27,7 +27,7 @@ class TextureShape : public PathShape {
 
  private:
   std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                 uint32_t surfaceFlags) const override;
+                                 uint32_t renderFlags) const override;
 
   std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
                                         const Matrix& viewMatrix) const;

@@ -253,11 +253,11 @@ class Image {
   virtual std::shared_ptr<Image> onApplyOrigin(EncodedOrigin encodedOrigin) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+      Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
       const SamplingOptions& sampling, const Matrix* localMatrix = nullptr);
 
  private:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, uint32_t surfaceFlags,
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, uint32_t renderFlags,
                                                          const SamplingOptions& sampling);
 
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Texture> texture);

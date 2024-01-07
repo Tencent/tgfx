@@ -84,8 +84,8 @@ void BlurImageFilter::draw(std::shared_ptr<Image> image, Surface* toSurface, boo
   auto texelSize = Point::Make(0.5f / static_cast<float>(image->width()),
                                0.5f / static_cast<float>(image->height()));
   auto processor =
-      image->asFragmentProcessor(toSurface->getContext(), toSurface->options()->flags(), tileMode,
-                                 tileMode, SamplingOptions());
+      image->asFragmentProcessor(toSurface->getContext(), toSurface->options()->renderFlags(),
+                                 tileMode, tileMode, SamplingOptions());
   drawContext->fillRectWithFP(
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,

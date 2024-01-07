@@ -56,7 +56,7 @@ class SubsetImage : public Image {
   std::shared_ptr<Image> onApplyOrigin(EncodedOrigin encodedOrigin) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+      Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
       const SamplingOptions& sampling, const Matrix* localMatrix = nullptr) override;
 
   Matrix getTotalMatrix(const Matrix* localMatrix) const;

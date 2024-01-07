@@ -186,9 +186,9 @@ const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
 }
 
-static bool PaintToGLPaint(Context* context, uint32_t surfaceFlags, const Paint& paint, float alpha,
+static bool PaintToGLPaint(Context* context, uint32_t renderFlags, const Paint& paint, float alpha,
                            std::unique_ptr<FragmentProcessor> shaderProcessor, GpuPaint* glPaint) {
-  FPArgs args(context, surfaceFlags);
+  FPArgs args(context, renderFlags);
   glPaint->context = context;
   glPaint->color = paint.getColor().makeOpaque();
   std::unique_ptr<FragmentProcessor> shaderFP;
@@ -226,13 +226,13 @@ static bool PaintToGLPaint(Context* context, uint32_t surfaceFlags, const Paint&
   return true;
 }
 
-static bool PaintToGLPaintWithImage(Context* context, uint32_t surfaceFlags, const Paint& paint,
+static bool PaintToGLPaintWithImage(Context* context, uint32_t renderFlags, const Paint& paint,
                                     float alpha, std::unique_ptr<FragmentProcessor> fp,
                                     bool imageIsAlphaOnly, GpuPaint* glPaint) {
   std::unique_ptr<FragmentProcessor> shaderFP;
   if (imageIsAlphaOnly) {
     if (auto shader = paint.getShader()) {
-      shaderFP = shader->asFragmentProcessor(FPArgs(context, surfaceFlags));
+      shaderFP = shader->asFragmentProcessor(FPArgs(context, renderFlags));
       if (!shaderFP) {
         return false;
       }
@@ -244,7 +244,7 @@ static bool PaintToGLPaintWithImage(Context* context, uint32_t surfaceFlags, con
   } else {
     shaderFP = FragmentProcessor::MulChildByInputAlpha(std::move(fp));
   }
-  return PaintToGLPaint(context, surfaceFlags, paint, alpha, std::move(shaderFP), glPaint);
+  return PaintToGLPaint(context, renderFlags, paint, alpha, std::move(shaderFP), glPaint);
 }
 
 std::shared_ptr<Texture> Canvas::getClipTexture() {
@@ -369,7 +369,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     return;
   }
   GpuPaint glPaint;
-  if (!PaintToGLPaint(getContext(), surface->options()->flags(), paint, state->alpha, nullptr,
+  if (!PaintToGLPaint(getContext(), surface->options()->renderFlags(), paint, state->alpha, nullptr,
                       &glPaint)) {
     return;
   }
@@ -382,7 +382,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (!clipBounds.intersect(bounds)) {
     return;
   }
-  auto op = shape->makeOp(&glPaint, state->matrix, surface->options()->flags());
+  auto op = shape->makeOp(&glPaint, state->matrix, surface->options()->renderFlags());
   if (op == nullptr) {
     return;
   }
@@ -444,12 +444,13 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor = image->asFragmentProcessor(getContext(), surface->options()->flags(), sampling);
+  auto processor =
+      image->asFragmentProcessor(getContext(), surface->options()->renderFlags(), sampling);
   if (processor == nullptr) {
     return;
   }
   GpuPaint glPaint;
-  if (!PaintToGLPaintWithImage(getContext(), surface->options()->flags(), paint, state->alpha,
+  if (!PaintToGLPaintWithImage(getContext(), surface->options()->renderFlags(), paint, state->alpha,
                                std::move(processor), image->isAlphaOnly(), &glPaint)) {
     return;
   }
@@ -475,7 +476,7 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
     return;
   }
   GpuPaint glPaint;
-  if (!PaintToGLPaint(getContext(), surface->options()->flags(), paint, state->alpha, nullptr,
+  if (!PaintToGLPaint(getContext(), surface->options()->renderFlags(), paint, state->alpha, nullptr,
                       &glPaint)) {
     return;
   }
@@ -613,7 +614,7 @@ void Canvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
     return;
   }
   GpuPaint glPaint;
-  if (!PaintToGLPaint(getContext(), surface->options()->flags(), paint, state->alpha, nullptr,
+  if (!PaintToGLPaint(getContext(), surface->options()->renderFlags(), paint, state->alpha, nullptr,
                       &glPaint)) {
     return;
   }
@@ -675,7 +676,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   }
   for (auto& rectOp : ops) {
     auto processor =
-        atlas->asFragmentProcessor(getContext(), surface->options()->flags(), sampling);
+        atlas->asFragmentProcessor(getContext(), surface->options()->renderFlags(), sampling);
     if (colors) {
       processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
     }

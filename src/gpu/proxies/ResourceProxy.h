@@ -18,16 +18,23 @@
 
 #pragma once
 
-#include "PathProxy.h"
-#include "PathShape.h"
-
 namespace tgfx {
-class TriangulatingShape : public PathShape {
+/**
+ * The base class for all proxy-derived objects. It delays the acquisition of resources until they
+ * are actually required.
+ */
+class ResourceProxy {
  public:
-  explicit TriangulatingShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
+  virtual ~ResourceProxy() = default;
 
- private:
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                 uint32_t renderFlags) const override;
+  /**
+   * Returns true if the proxy is instantiated.
+   */
+  virtual bool isInstantiated() const = 0;
+
+  /**
+   * Instantiates the proxy if necessary. Returns true if the proxy is instantiated successfully.
+   */
+  virtual bool instantiate() = 0;
 };
 }  // namespace tgfx

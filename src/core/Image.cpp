@@ -244,16 +244,16 @@ std::shared_ptr<Image> Image::onApplyOrigin(EncodedOrigin encodedOrigin) const {
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(
-    Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+    Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
     const SamplingOptions& sampling, const Matrix* localMatrix) {
-  return TiledTextureEffect::Make(source->lockTextureProxy(context, surfaceFlags), tileModeX,
+  return TiledTextureEffect::Make(source->lockTextureProxy(context, renderFlags), tileModeX,
                                   tileModeY, sampling, localMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
-                                                              uint32_t surfaceFlags,
+                                                              uint32_t renderFlags,
                                                               const SamplingOptions& sampling) {
-  return asFragmentProcessor(context, surfaceFlags, TileMode::Clamp, TileMode::Clamp, sampling);
+  return asFragmentProcessor(context, renderFlags, TileMode::Clamp, TileMode::Clamp, sampling);
 }
 
 std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {
