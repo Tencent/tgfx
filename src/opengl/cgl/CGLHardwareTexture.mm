@@ -46,7 +46,7 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
       CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
           ? PixelFormat::ALPHA_8
           : PixelFormat::RGBA_8888;
-  glTexture = Resource::Wrap(context, new CGLHardwareTexture(pixelBuffer));
+  glTexture = Resource::AddToContext(context, new CGLHardwareTexture(pixelBuffer), scratchKey);
   glTexture->sampler = std::move(glSampler);
   glTexture->texture = texture;
   glTexture->textureCache = textureCache;
@@ -81,10 +81,6 @@ CGLHardwareTexture::~CGLHardwareTexture() {
 
 size_t CGLHardwareTexture::memoryUsage() const {
   return CVPixelBufferGetDataSize(pixelBuffer);
-}
-
-void CGLHardwareTexture::computeScratchKey(BytesKey* scratchKey) const {
-  ComputeScratchKey(scratchKey, pixelBuffer);
 }
 
 void CGLHardwareTexture::onReleaseGPU() {

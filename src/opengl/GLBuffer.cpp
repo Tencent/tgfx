@@ -48,7 +48,8 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
     if (bufferID == 0) {
       return nullptr;
     }
-    glBuffer = Resource::Wrap(context, new GLBuffer(bufferType, size, bufferID));
+    glBuffer =
+        Resource::AddToContext(context, new GLBuffer(bufferType, size, bufferID), scratchKey);
   } else {
     glBuffer->_sizeInBytes = size;
   }
@@ -60,10 +61,6 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
   }
   gl->bindBuffer(target, 0);
   return glBuffer;
-}
-
-void GLBuffer::computeScratchKey(BytesKey* bytesKey) const {
-  ComputeScratchKey(bytesKey, _bufferType);
 }
 
 void GLBuffer::onReleaseGPU() {

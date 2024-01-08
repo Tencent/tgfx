@@ -88,8 +88,6 @@ class YUVTexture : public Texture {
 
   YUVTexture(int width, int height, YUVPixelFormat pixelFormat, YUVColorSpace colorSpace);
 
-  void computeScratchKey(BytesKey* scratchKey) const override;
-
  private:
   YUVPixelFormat _pixelFormat = YUVPixelFormat::I420;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;

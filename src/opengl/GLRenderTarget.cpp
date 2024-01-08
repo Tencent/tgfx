@@ -47,7 +47,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
       new GLRenderTarget(renderTarget.width(), renderTarget.height(), origin, 1, frameBuffer);
   target->frameBufferForDraw = frameBuffer;
   target->externalResource = true;
-  return Resource::Wrap(context, target);
+  return Resource::AddToContext(context, target);
 }
 
 static bool RenderbufferStorageMSAA(Context* context, int sampleCount, PixelFormat pixelFormat,
@@ -177,7 +177,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
                                textureFBInfo, glSampler->target);
   rt->frameBufferForDraw = renderTargetFBInfo;
   rt->msRenderBufferID = msRenderBufferID;
-  return Resource::Wrap(context, rt);
+  return Resource::AddToContext(context, rt);
 }
 
 GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,

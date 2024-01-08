@@ -43,9 +43,6 @@ class CGLHardwareTexture : public Texture {
     return pixelBuffer;
   }
 
- protected:
-  void computeScratchKey(BytesKey* scratchKey) const override;
-
  private:
   std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;

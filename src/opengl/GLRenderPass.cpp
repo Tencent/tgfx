@@ -53,7 +53,7 @@ class VertexArrayObject : public Resource {
     if (id == 0) {
       return nullptr;
     }
-    return Resource::Wrap(context, new VertexArrayObject(id));
+    return Resource::AddToContext(context, new VertexArrayObject(id));
   }
 
   explicit VertexArrayObject(unsigned id) : id(id) {

@@ -144,16 +144,10 @@ void ResourceCache::removeUniqueKey(Resource* resource) {
   resource->uniqueKeyGeneration = 0;
 }
 
-std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
-  if (InList(purgeableResources, resource)) {
-    RemoveFromList(purgeableResources, resource);
-    purgeableBytes -= resource->memoryUsage();
-    AddToList(nonpurgeableResources, resource);
-  }
-  return resource->reference;
-}
-
-std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource) {
+std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
+                                                     const ScratchKey& scratchKey) {
+  resource->context = context;
+  resource->scratchKey = scratchKey;
   if (resource->scratchKey.isValid()) {
     scratchKeyMap[resource->scratchKey].push_back(resource);
   }
@@ -164,6 +158,15 @@ std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource) {
   result->reference = result;
   AddToList(nonpurgeableResources, resource);
   return result;
+}
+
+std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
+  if (InList(purgeableResources, resource)) {
+    RemoveFromList(purgeableResources, resource);
+    purgeableBytes -= resource->memoryUsage();
+    AddToList(nonpurgeableResources, resource);
+  }
+  return resource->reference;
 }
 
 void ResourceCache::removeResource(Resource* resource) {

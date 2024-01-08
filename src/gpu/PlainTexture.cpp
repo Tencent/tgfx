@@ -53,7 +53,8 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
     if (sampler == nullptr) {
       return nullptr;
     }
-    texture = Resource::Wrap(context, new PlainTexture(std::move(sampler), width, height, origin));
+    auto plainTexture = new PlainTexture(std::move(sampler), width, height, origin);
+    texture = Resource::AddToContext(context, plainTexture, scratchKey);
   }
   if (pixels != nullptr) {
     context->gpu()->writePixels(texture->getSampler(), Rect::MakeWH(width, height), pixels,
@@ -83,10 +84,6 @@ PlainTexture::PlainTexture(std::unique_ptr<TextureSampler> sampler, int width, i
 size_t PlainTexture::memoryUsage() const {
   auto colorSize = width() * height() * PixelFormatBytesPerPixel(sampler->format);
   return sampler->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
-}
-
-void PlainTexture::computeScratchKey(BytesKey* scratchKey) const {
-  ComputeScratchKey(scratchKey, width(), height(), sampler->format, sampler->hasMipmaps());
 }
 
 void PlainTexture::onReleaseGPU() {

@@ -81,10 +81,11 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
     if (texturePlanes.empty()) {
       return nullptr;
     }
-    texture = std::static_pointer_cast<YUVTexture>(Resource::Wrap(
-        context,
-        new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::I420, colorSpace)));
-    texture->samplers = std::move(texturePlanes);
+    auto yuvTexture =
+        new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::I420, colorSpace);
+    yuvTexture->samplers = std::move(texturePlanes);
+    texture = std::static_pointer_cast<YUVTexture>(
+        Resource::AddToContext(context, yuvTexture, scratchKey));
   }
   SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;
@@ -106,10 +107,11 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
     if (texturePlanes.empty()) {
       return nullptr;
     }
-    texture = std::static_pointer_cast<YUVTexture>(Resource::Wrap(
-        context,
-        new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::NV12, colorSpace)));
-    texture->samplers = std::move(texturePlanes);
+    auto yuvTexture =
+        new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::NV12, colorSpace);
+    yuvTexture->samplers = std::move(texturePlanes);
+    texture = std::static_pointer_cast<YUVTexture>(
+        Resource::AddToContext(context, yuvTexture, scratchKey));
   }
   SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;
@@ -137,10 +139,6 @@ const TextureSampler* YUVTexture::getSamplerAt(size_t index) const {
 
 size_t YUVTexture::memoryUsage() const {
   return width() * height() * 3 / 2;
-}
-
-void YUVTexture::computeScratchKey(BytesKey* scratchKey) const {
-  ComputeScratchKey(scratchKey, width(), height(), _pixelFormat);
 }
 
 void YUVTexture::onReleaseGPU() {

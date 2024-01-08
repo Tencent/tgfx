@@ -63,7 +63,7 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
   if (outputTextureLuma == nil || outputTextureChroma == nil) {
     return nullptr;
   }
-  auto texture = Resource::Wrap(context, new EAGLNV12Texture(pixelBuffer, colorSpace));
+  auto texture = Resource::AddToContext(context, new EAGLNV12Texture(pixelBuffer, colorSpace));
   texture->lumaTexture = outputTextureLuma;
   texture->samplers.push_back(ToGLSampler(outputTextureLuma, lumaComponentFormat));
   texture->chromaTexture = outputTextureChroma;

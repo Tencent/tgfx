@@ -73,7 +73,7 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   sampler->format = format;
   sampler->target = CVOpenGLESTextureGetTarget(texture);
   sampler->id = CVOpenGLESTextureGetName(texture);
-  glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer));
+  glTexture = Resource::AddToContext(context, new EAGLHardwareTexture(pixelBuffer), scratchKey);
   glTexture->sampler = std::move(sampler);
   glTexture->texture = texture;
   return glTexture;
@@ -100,10 +100,6 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   if (texture) {
     CFRelease(texture);
   }
-}
-
-void EAGLHardwareTexture::computeScratchKey(BytesKey* scratchKey) const {
-  ComputeScratchKey(scratchKey, pixelBuffer);
 }
 
 size_t EAGLHardwareTexture::memoryUsage() const {
