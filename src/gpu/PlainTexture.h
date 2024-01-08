@@ -39,9 +39,6 @@ class PlainTexture : public Texture {
     return sampler.get();
   }
 
- protected:
-  void computeScratchKey(BytesKey* scratchKey) const override;
-
  private:
   std::unique_ptr<TextureSampler> sampler = {};
 

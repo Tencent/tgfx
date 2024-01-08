@@ -35,7 +35,8 @@ std::shared_ptr<GLVideoTexture> GLVideoTexture::Make(Context* context, int width
   if (sampler == nullptr) {
     return nullptr;
   }
-  auto texture = Resource::Wrap(context, new GLVideoTexture(std::move(sampler), width, height));
+  auto texture =
+      Resource::AddToContext(context, new GLVideoTexture(std::move(sampler), width, height));
   if (isAndroidMiniprogram) {
     // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
     // Video decoder will align to multiples of 16 on the Android WeChat mini-program.

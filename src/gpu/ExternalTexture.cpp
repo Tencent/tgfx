@@ -44,7 +44,7 @@ std::shared_ptr<Texture> ExternalTexture::MakeFrom(Context* context,
   }
   auto texture = new ExternalTexture(std::move(sampler), backendTexture.width(),
                                      backendTexture.height(), origin, adopted);
-  return Resource::Wrap(context, texture);
+  return Resource::AddToContext(context, texture);
 }
 
 ExternalTexture::ExternalTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,

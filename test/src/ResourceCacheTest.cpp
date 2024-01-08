@@ -20,31 +20,26 @@
 #include "gpu/Resource.h"
 #include "tgfx/utils/Task.h"
 #include "utils/TestUtils.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 class TestResource : public Resource {
  public:
   static std::shared_ptr<const TestResource> Make(tgfx::Context* context, uint32_t id) {
-    return Resource::Wrap(context, new TestResource(id));
+    static const uint32_t TestResourceType = UniqueID::Next();
+    ScratchKey scratchKey = {};
+    scratchKey.write(TestResourceType);
+    scratchKey.write(id);
+    return Resource::AddToContext(context, new TestResource(), scratchKey);
   }
 
   size_t memoryUsage() const override {
     return 1;
   }
 
- protected:
-  void computeScratchKey(BytesKey* key) const override {
-    key->write(id);
-  }
-
  private:
-  TestResource(uint32_t id) : Resource(), id(id) {
-  }
-
   void onReleaseGPU() override {
   }
-
-  uint32_t id = 0;
 };
 
 TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {

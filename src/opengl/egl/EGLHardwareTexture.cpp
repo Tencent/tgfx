@@ -91,8 +91,9 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   glTexParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   eglext::glEGLImageTargetTexture2DOES(sampler->target, (GLeglImageOES)eglImage);
-  glTexture = Resource::Wrap(
-      context, new EGLHardwareTexture(hardwareBuffer, eglImage, info.width(), info.height()));
+  auto eglHardwareTexture =
+      new EGLHardwareTexture(hardwareBuffer, eglImage, info.width(), info.height());
+  glTexture = Resource::AddToContext(context, eglHardwareTexture, scratchKey);
   glTexture->sampler = std::move(sampler);
   return glTexture;
 }

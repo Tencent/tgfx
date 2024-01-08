@@ -32,10 +32,9 @@ namespace tgfx {
 class Resource {
  public:
   template <class T>
-  static std::shared_ptr<T> Wrap(Context* context, T* resource) {
-    resource->context = context;
-    static_cast<Resource*>(resource)->computeScratchKey(&resource->scratchKey);
-    return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource));
+  static std::shared_ptr<T> AddToContext(Context* context, T* resource,
+                                         const ScratchKey& scratchKey = {}) {
+    return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource, scratchKey));
   }
 
   virtual ~Resource() = default;
@@ -78,12 +77,6 @@ class Resource {
 
  protected:
   Context* context = nullptr;
-
-  /**
-   * Overridden to compute a scratchKey to make this Resource reusable.
-   */
-  virtual void computeScratchKey(BytesKey*) const {
-  }
 
  private:
   std::shared_ptr<Resource> reference;

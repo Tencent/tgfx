@@ -27,9 +27,6 @@ class GLBuffer : public GpuBuffer {
     return _bufferID;
   }
 
- protected:
-  void computeScratchKey(BytesKey*) const override;
-
  private:
   GLBuffer(BufferType bufferType, size_t size, unsigned bufferID)
       : GpuBuffer(bufferType, size), _bufferID(bufferID) {

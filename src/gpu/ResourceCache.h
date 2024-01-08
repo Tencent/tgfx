@@ -114,8 +114,8 @@ class ResourceCache {
 
   void releaseAll(bool releaseGPU);
   void processUnreferencedResources();
+  std::shared_ptr<Resource> addResource(Resource* resource, const ScratchKey& scratchKey);
   std::shared_ptr<Resource> refResource(Resource* resource);
-  std::shared_ptr<Resource> addResource(Resource* resource);
   void removeResource(Resource* resource);
   void purgeResourcesByLRU(bool scratchResourcesOnly,
                            const std::function<bool(Resource*)>& satisfied);
