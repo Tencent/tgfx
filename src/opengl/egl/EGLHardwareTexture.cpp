@@ -93,7 +93,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   eglext::glEGLImageTargetTexture2DOES(sampler->target, (GLeglImageOES)eglImage);
   auto eglHardwareTexture =
       new EGLHardwareTexture(hardwareBuffer, eglImage, info.width(), info.height());
-  glTexture = Resource::AddToConetxt(context, eglHardwareTexture, scratchKey);
+  glTexture = Resource::AddToContext(context, eglHardwareTexture, scratchKey);
   glTexture->sampler = std::move(sampler);
   return glTexture;
 }
