@@ -92,18 +92,24 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer)
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                        ImageOrigin origin) {
-  auto texture = Texture::MakeFrom(context, backendTexture, origin);
-  return MakeFrom(std::move(texture));
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, false);
+  return MakeFrom(std::move(textureProxy));
 }
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
                                           ImageOrigin origin) {
-  auto texture = Texture::MakeAdopted(context, backendTexture, origin);
-  return MakeFrom(std::move(texture));
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, true);
+  return MakeFrom(std::move(textureProxy));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Texture> texture) {
-  auto source = ImageSource::MakeFrom(UniqueKey::MakeWeak(), std::move(texture));
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<TextureProxy> textureProxy) {
+  auto source = ImageSource::MakeFrom(std::move(textureProxy));
   return MakeFrom(std::move(source));
 }
 
@@ -113,7 +119,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageSource> source, Enco
   }
   std::shared_ptr<Image> image = nullptr;
   if (origin != EncodedOrigin::TopLeft) {
-    image = std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), origin));
+    image = std::make_shared<SubsetImage>(std::move(source), origin);
   } else {
     image = std::shared_ptr<Image>(new Image(std::move(source)));
   }
@@ -152,8 +158,8 @@ bool Image::isTextureBacked() const {
   return source->isTextureBacked();
 }
 
-BackendTexture Image::getBackendTexture() const {
-  return source->getBackendTexture();
+BackendTexture Image::getBackendTexture(Context* context) const {
+  return source->getBackendTexture(context);
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
@@ -187,7 +193,7 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  return std::shared_ptr<SubsetImage>(new SubsetImage(source, subset));
+  return std::make_shared<SubsetImage>(source, subset);
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
@@ -240,7 +246,7 @@ std::shared_ptr<Image> Image::applyOrigin(EncodedOrigin origin) const {
 }
 
 std::shared_ptr<Image> Image::onApplyOrigin(EncodedOrigin encodedOrigin) const {
-  return std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), encodedOrigin));
+  return std::make_shared<SubsetImage>(std::move(source), encodedOrigin);
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(

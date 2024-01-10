@@ -19,6 +19,7 @@
 #include "AHardwareBufferFunctions.h"
 #include "core/PixelBuffer.h"
 #include "tgfx/platform/android/HardwareBufferJNI.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
@@ -111,6 +112,14 @@ ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   auto bytesPerPixel = ImageInfo::GetBytesPerPixel(colorType);
   return ImageInfo::Make(static_cast<int>(desc.width), static_cast<int>(desc.height), colorType,
                          alphaType, desc.stride * bytesPerPixel);
+}
+
+PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
+  auto info = HardwareBufferGetInfo(buffer);
+  if (info.isEmpty()) {
+    return PixelFormat::Unknown;
+  }
+  return ColorTypeToPixelFormat(info.colorType());
 }
 
 HardwareBufferRef HardwareBufferFromJavaObject(JNIEnv* env, jobject hardwareBufferObject) {

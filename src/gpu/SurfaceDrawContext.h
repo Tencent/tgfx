@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/tasks/OpsTask.h"
+#include "gpu/tasks/OpsRenderTask.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Surface.h"
@@ -36,11 +36,11 @@ class SurfaceDrawContext {
   void addOp(std::unique_ptr<Op> op);
 
  protected:
-  OpsTask* getOpsTask();
+  OpsRenderTask* getOpsTask();
 
   void replaceOpsTask();
 
   Surface* surface = nullptr;
-  std::shared_ptr<OpsTask> opsTask;
+  std::shared_ptr<OpsRenderTask> opsTask;
 };
 }  // namespace tgfx

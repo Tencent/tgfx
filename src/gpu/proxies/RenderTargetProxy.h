@@ -29,66 +29,82 @@ namespace tgfx {
 class RenderTargetProxy : public ResourceProxy {
  public:
   /**
-   * Creates a new RenderTargetProxy with an existing RenderTarget
+   * Creates a new RenderTargetProxy with an existing backend render target.
    */
-  static std::shared_ptr<RenderTargetProxy> MakeFrom(std::shared_ptr<RenderTarget> renderTarget);
+  static std::shared_ptr<RenderTargetProxy> MakeFrom(Context* context,
+                                                     const BackendRenderTarget& backendRenderTarget,
+                                                     ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
-   * Creates a new RenderTargetProxy with an existing Texture
+   * Creates a new RenderTargetProxy with an existing backend texture. If adopted is true, the
+   * backend texture will be destroyed at a later point after the proxy is released.
    */
-  static std::shared_ptr<RenderTargetProxy> MakeFrom(std::shared_ptr<Texture> texture,
+  static std::shared_ptr<RenderTargetProxy> MakeFrom(Context* context,
+                                                     const BackendTexture& backendTexture,
+                                                     int sampleCount = 1,
+                                                     ImageOrigin origin = ImageOrigin::TopLeft,
+                                                     bool adopted = false);
+
+  /**
+   * Creates a new RenderTargetProxy with an existing HardwareBuffer.
+   */
+  static std::shared_ptr<RenderTargetProxy> MakeFrom(Context* context,
+                                                     HardwareBufferRef hardwareBuffer,
                                                      int sampleCount = 1);
 
   /**
    * Creates a new RenderTargetProxy instance with specified context, with, height, format, sample
-   * count and mipmap state.
+   * count, mipmap state and origin.
    */
   static std::shared_ptr<RenderTargetProxy> Make(Context* context, int width, int height,
                                                  PixelFormat format, int sampleCount = 1,
-                                                 bool mipMapped = false);
+                                                 bool mipMapped = false,
+                                                 ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Returns the width of the render target.
    */
-  virtual int width() const = 0;
+  int width() const {
+    return _width;
+  }
 
   /**
    * Returns the height of the render target.
    */
-  virtual int height() const = 0;
-
-  /**
-   * Returns the origin of the render target, either ImageOrigin::TopLeft or
-   * ImageOrigin::BottomLeft.
-   */
-  virtual ImageOrigin origin() const = 0;
+  int height() const {
+    return _height;
+  }
 
   /**
    * Returns the pixel format of the render target.
    */
-  virtual PixelFormat format() const = 0;
+  PixelFormat format() const {
+    return _format;
+  }
 
   /**
    * If we are instantiated and have a render target, return the sampleCount value of that render
    * target. Otherwise, returns the proxy's sampleCount value from creation time.
    */
-  virtual int sampleCount() const = 0;
+  int sampleCount() const {
+    return _sampleCount;
+  }
 
   /**
-   * Returns the associated Context instance.
+   * Returns the origin of the render target, either ImageOrigin::TopLeft or
+   * ImageOrigin::BottomLeft.
    */
-  virtual Context* getContext() const = 0;
+  ImageOrigin origin() const {
+    return _origin;
+  }
 
   /**
    * Returns the associated TextureProxy instance. Returns nullptr if the RenderTargetProxy is not
    * backed by a texture.
    */
-  virtual std::shared_ptr<TextureProxy> getTextureProxy() const = 0;
-
-  /**
-   * Returns true if the proxy is externally owned.
-   */
-  virtual bool externallyOwned() const = 0;
+  virtual std::shared_ptr<TextureProxy> getTextureProxy() const {
+    return nullptr;
+  }
 
   /**
    * Returns true if the proxy was backed by a texture.
@@ -107,38 +123,25 @@ class RenderTargetProxy : public ResourceProxy {
   std::shared_ptr<RenderTarget> getRenderTarget() const;
 
   /**
-   * Returns true if the backing texture is instantiated.
+   * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.
    */
-  bool isInstantiated() const override;
+  std::shared_ptr<TextureProxy> makeTextureProxy() const;
 
   /**
-   * Instantiates the backing texture, if necessary. Returns true if the backing texture is
-   * instantiated.
+   * Creates a compatible RenderTargetProxy instance matches the properties of this one.
    */
-  bool instantiate() override;
-
-  /**
-   * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy. If
-   * the copyContent is true, the content of the RenderTargetProxy will be copied to the new
-   * texture.
-   */
-  std::shared_ptr<TextureProxy> makeTextureProxy(bool copyContent = false) const;
-
-  /**
-   * Creates a compatible RenderTargetProxy instance matches the properties of this one. If
-   * copyContent is true, the content of this RenderTargetProxy will be copied to the new
-   * RenderTargetProxy.
-   */
-  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(bool copyContent = false) const;
+  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy() const;
 
  protected:
-  std::shared_ptr<RenderTarget> renderTarget = nullptr;
+  RenderTargetProxy(int width, int height, PixelFormat format, int sampleCount, ImageOrigin origin);
 
-  explicit RenderTargetProxy(std::shared_ptr<RenderTarget> renderTarget = nullptr);
+ private:
+  int _width = 0;
+  int _height = 0;
+  PixelFormat _format = PixelFormat::RGBA_8888;
+  int _sampleCount = 1;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
 
-  /**
-   * Overrides to create a new RenderTarget associated with specified context.
-   */
-  virtual std::shared_ptr<RenderTarget> onMakeRenderTarget() = 0;
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

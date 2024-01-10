@@ -21,12 +21,6 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-void DrawOp::visitProxies(const std::function<void(ResourceProxy*)>& func) const {
-  auto f = [&](const std::unique_ptr<FragmentProcessor>& fp) { fp->visitProxies(func); };
-  std::for_each(_colors.begin(), _colors.end(), f);
-  std::for_each(_masks.begin(), _masks.end(), f);
-}
-
 void DrawOp::prepare(Gpu* gpu) {
   onPrepare(gpu);
 }

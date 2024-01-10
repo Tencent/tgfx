@@ -22,24 +22,17 @@
 namespace tgfx {
 AsyncSource::AsyncSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> imageGenerator,
                          bool mipMapped)
-    : EncodedSource(std::move(uniqueKey), std::move(imageGenerator), mipMapped) {
-  auto tryHardware = !mipMapped;
-  if (generator->asyncSupport()) {
-    imageBuffer = generator->makeBuffer(tryHardware);
-  } else {
-    imageTask = ImageGeneratorTask::MakeFrom(generator, tryHardware);
-  }
+    : EncodedSource(std::move(uniqueKey), imageGenerator, mipMapped) {
+  imageDecoder = ImageDecoder::MakeFrom(std::move(imageGenerator), !mipMapped);
 }
 
 std::shared_ptr<ImageSource> AsyncSource::onMakeDecoded(Context*) const {
   return nullptr;
 }
 
-std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context, uint32_t) const {
-  auto provider = context->proxyProvider();
-  if (imageBuffer) {
-    return provider->createTextureProxy(imageBuffer, mipMapped);
-  }
-  return provider->createTextureProxy(imageTask, mipMapped);
+std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context,
+                                                              uint32_t renderFlags) const {
+  return context->proxyProvider()->createTextureProxy(uniqueKey, imageDecoder, mipMapped,
+                                                      renderFlags);
 }
 }  // namespace tgfx

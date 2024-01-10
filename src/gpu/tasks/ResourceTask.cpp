@@ -16,23 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DeferredTextureProxy.h"
+#include "ResourceTask.h"
+#include "utils/Log.h"
 
 namespace tgfx {
-DeferredTextureProxy::DeferredTextureProxy(ProxyProvider* provider, int width, int height,
-                                           PixelFormat format, bool mipMapped, ImageOrigin origin)
-    : TextureProxy(provider), _width(width), _height(height), _format(format), mipMapped(mipMapped),
-      _origin(origin) {
+ResourceTask::ResourceTask(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
-bool DeferredTextureProxy::hasMipmaps() const {
-  return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
-}
-
-std::shared_ptr<Texture> DeferredTextureProxy::onMakeTexture(Context* context) {
-  if (context == nullptr) {
-    return nullptr;
+bool ResourceTask::execute(Context* context) {
+  if (uniqueKey.strongCount() <= 1) {
+    // Skip the resource creation if there is no proxy is referencing it.
+    return false;
   }
-  return Texture::MakeFormat(context, width(), height(), _format, mipMapped, _origin);
+  auto resource = onMakeResource(context);
+  if (resource == nullptr) {
+    LOGE("ResourceTask::execute() Failed to create resource!");
+    return false;
+  }
+  resource->assignUniqueKey(uniqueKey);
+  return true;
 }
 }  // namespace tgfx

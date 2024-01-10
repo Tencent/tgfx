@@ -46,14 +46,11 @@ std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
-                                                   std::shared_ptr<Texture> texture) {
-  if (texture == nullptr) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<TextureProxy> textureProxy) {
+  if (textureProxy == nullptr) {
     return nullptr;
   }
-  texture->assignUniqueKey(uniqueKey);
-  auto source =
-      std::shared_ptr<TextureSource>(new TextureSource(std::move(uniqueKey), std::move(texture)));
+  auto source = std::shared_ptr<TextureSource>(new TextureSource(std::move(textureProxy)));
   source->weakThis = source;
   return source;
 }
@@ -62,19 +59,11 @@ ImageSource::ImageSource(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) 
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {
-  auto resourceCache = context->resourceCache();
-  auto texture = std::static_pointer_cast<Texture>(resourceCache->findUniqueResource(uniqueKey));
-  if (texture != nullptr) {
-    return MakeFrom(uniqueKey.makeStrong(), texture);
-  }
-  auto proxy = lockTextureProxy(context, RenderFlags::DisableAsyncTask);
+  auto proxy = lockTextureProxy(context);
   if (proxy == nullptr) {
     return nullptr;
   }
-  if (!proxy->isInstantiated()) {
-    proxy->instantiate();
-  }
-  return MakeFrom(uniqueKey.makeStrong(), proxy->getTexture());
+  return MakeFrom(std::move(proxy));
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {
@@ -110,16 +99,6 @@ std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto provider = context->proxyProvider();
-  auto proxy = provider->findTextureProxy(uniqueKey);
-  if (proxy != nullptr) {
-    return proxy;
-  }
-  proxy = onMakeTextureProxy(context, renderFlags);
-  if (proxy != nullptr) {
-    auto updateTextureKey = !(renderFlags & RenderFlags::DisableCache) && !isTextureBacked();
-    proxy->assignUniqueKey(uniqueKey, updateTextureKey);
-  }
-  return proxy;
+  return onMakeTextureProxy(context, renderFlags);
 }
 }  // namespace tgfx

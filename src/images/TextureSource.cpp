@@ -19,24 +19,34 @@
 #include "TextureSource.h"
 
 namespace tgfx {
-BackendTexture TextureSource::getBackendTexture() const {
-  if (!texture->hasUniqueKey(uniqueKey)) {
+
+TextureSource::TextureSource(std::shared_ptr<TextureProxy> textureProxy)
+    : ImageSource(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)) {
+}
+
+BackendTexture TextureSource::getBackendTexture(Context* context) const {
+  if (context == nullptr) {
+    return {};
+  }
+  context->flush();
+  auto texture = textureProxy->getTexture();
+  if (texture == nullptr) {
     return {};
   }
   return texture->getBackendTexture();
 }
 
 std::shared_ptr<ImageSource> TextureSource::makeTextureSource(Context* context) const {
-  if (texture->getContext() == context && texture->hasUniqueKey(uniqueKey)) {
+  if (textureProxy->getContext() == context) {
     return std::static_pointer_cast<ImageSource>(weakThis.lock());
   }
   return nullptr;
 }
 
 std::shared_ptr<TextureProxy> TextureSource::onMakeTextureProxy(Context* context, uint32_t) const {
-  if (!texture->hasUniqueKey(uniqueKey)) {
-    return {};
+  if (textureProxy->getContext() != context) {
+    return nullptr;
   }
-  return context->proxyProvider()->wrapTexture(texture);
+  return textureProxy;
 }
 }  // namespace tgfx

@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "gpu/Resource.h"
+
 namespace tgfx {
 /**
  * The base class for all proxy-derived objects. It delays the acquisition of resources until they
@@ -28,13 +30,25 @@ class ResourceProxy {
   virtual ~ResourceProxy() = default;
 
   /**
-   * Returns true if the proxy is instantiated.
+   * Retrieves the context associated with this ResourceProxy.
    */
-  virtual bool isInstantiated() const = 0;
+  Context* getContext() const {
+    return context;
+  }
 
   /**
-   * Instantiates the proxy if necessary. Returns true if the proxy is instantiated successfully.
+   * Retrieves the unique key associated with this ResourceProxy.
    */
-  virtual bool instantiate() = 0;
+  const UniqueKey& getUniqueKey() const {
+    return uniqueKey;
+  }
+
+ protected:
+  Context* context = nullptr;
+  UniqueKey uniqueKey = {};
+
+  ResourceProxy() = default;
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

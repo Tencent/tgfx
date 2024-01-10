@@ -28,26 +28,26 @@ namespace tgfx {
 class TextureSource : public ImageSource {
  public:
   int width() const override {
-    return texture->width();
+    return textureProxy->width();
   }
 
   int height() const override {
-    return texture->height();
+    return textureProxy->height();
   }
 
   bool hasMipmaps() const override {
-    return texture->getSampler()->hasMipmaps();
+    return textureProxy->hasMipmaps();
   }
 
   bool isAlphaOnly() const override {
-    return texture->getSampler()->format == PixelFormat::ALPHA_8;
+    return textureProxy->isAlphaOnly();
   }
 
   bool isTextureBacked() const override {
     return true;
   }
 
-  BackendTexture getBackendTexture() const override;
+  BackendTexture getBackendTexture(Context* context) const override;
 
   std::shared_ptr<ImageSource> makeTextureSource(Context* context) const override;
 
@@ -60,11 +60,9 @@ class TextureSource : public ImageSource {
                                                    uint32_t renderFlags) const override;
 
  private:
-  std::shared_ptr<Texture> texture = nullptr;
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
 
-  explicit TextureSource(UniqueKey uniqueKey, std::shared_ptr<Texture> texture)
-      : ImageSource(std::move(uniqueKey)), texture(std::move(texture)) {
-  }
+  explicit TextureSource(std::shared_ptr<TextureProxy> textureProxy);
 
   friend class ImageSource;
 };

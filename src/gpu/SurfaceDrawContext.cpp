@@ -37,7 +37,7 @@ void SurfaceDrawContext::fillRectWithFP(const Rect& dstRect, const Matrix& local
   addOp(std::move(op));
 }
 
-OpsTask* SurfaceDrawContext::getOpsTask() {
+OpsRenderTask* SurfaceDrawContext::getOpsTask() {
   if (opsTask == nullptr || opsTask->isClosed()) {
     replaceOpsTask();
   }
@@ -45,6 +45,6 @@ OpsTask* SurfaceDrawContext::getOpsTask() {
 }
 
 void SurfaceDrawContext::replaceOpsTask() {
-  opsTask = surface->getContext()->drawingManager()->newOpsTask(surface->renderTargetProxy);
+  opsTask = surface->getContext()->drawingManager()->addOpsTask(surface->renderTargetProxy);
 }
 }  // namespace tgfx

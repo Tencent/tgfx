@@ -96,7 +96,7 @@ class ImageBuffer {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the ImageBuffer is expired, which means it cannot create any new textures.
+   * Returns true if the ImageBuffer is expired, indicating that it cannot create any new textures.
    * However, you can still safely access all of its properties across threads.
    */
   virtual bool expired() const {

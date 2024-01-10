@@ -18,38 +18,29 @@
 
 #pragma once
 
-#include "gpu/proxies/TextureProxy.h"
+#include "ResourceTask.h"
+#include "images/ImageDecoder.h"
+#include "tgfx/gpu/ImageOrigin.h"
 
 namespace tgfx {
-class DeferredTextureProxy : public TextureProxy {
+class TextureCreateTask : public ResourceTask {
  public:
-  int width() const override {
-    return _width;
-  }
+  /**
+   * Creates a TextureCreateTask to generate a texture using the specified size and format.
+   */
+  static std::shared_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey, int width, int height,
+                                                     PixelFormat format, bool mipMapped = false,
+                                                     ImageOrigin origin = ImageOrigin::TopLeft);
 
-  int height() const override {
-    return _height;
-  }
-
-  ImageOrigin origin() const override {
-    return _origin;
-  }
-
-  bool hasMipmaps() const override;
+  /*
+   * Creates a TextureCreateTask to generate a texture using the given ImageBuffer.
+   */
+  static std::shared_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey,
+                                                     std::shared_ptr<ImageDecoder> imageDecoder,
+                                                     bool mipMapped = false);
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context) override;
-
- private:
-  int _width = 0;
-  int _height = 0;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-  bool mipMapped = false;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-
-  DeferredTextureProxy(ProxyProvider* provider, int width, int height, PixelFormat format,
-                       bool mipMapped = false, ImageOrigin origin = ImageOrigin::TopLeft);
-
-  friend class ProxyProvider;
+  explicit TextureCreateTask(UniqueKey uniqueKey) : ResourceTask(std::move(uniqueKey)) {
+  }
 };
 }  // namespace tgfx

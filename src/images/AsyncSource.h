@@ -19,6 +19,7 @@
 #pragma once
 
 #include "EncodedSource.h"
+#include "ImageDecoder.h"
 
 namespace tgfx {
 /**
@@ -37,8 +38,7 @@ class AsyncSource : public EncodedSource {
                                                    uint32_t renderFlags) const override;
 
  private:
-  std::shared_ptr<ImageGeneratorTask> imageTask = nullptr;
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<ImageDecoder> imageDecoder = nullptr;
 
   explicit AsyncSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator,
                        bool mipMapped = false);

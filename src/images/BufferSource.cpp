@@ -27,7 +27,9 @@ std::shared_ptr<ImageSource> BufferSource::onMakeMipMapped() const {
   return std::shared_ptr<BufferSource>(new BufferSource(UniqueKey::MakeWeak(), imageBuffer, true));
 }
 
-std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context, uint32_t) const {
-  return context->proxyProvider()->createTextureProxy(imageBuffer, mipMapped);
+std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context,
+                                                               uint32_t renderFlags) const {
+  return context->proxyProvider()->createTextureProxy(uniqueKey, imageBuffer, mipMapped,
+                                                      renderFlags);
 }
 }  // namespace tgfx

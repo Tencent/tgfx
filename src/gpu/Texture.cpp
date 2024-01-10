@@ -33,6 +33,14 @@ Texture::Texture(int width, int height, ImageOrigin origin)
     : _width(width), _height(height), _origin(origin) {
 }
 
+bool Texture::isAlphaOnly() const {
+  return !isYUV() && getSampler()->format == PixelFormat::ALPHA_8;
+}
+
+bool Texture::hasMipmaps() const {
+  return getSampler()->hasMipmaps();
+}
+
 Point Texture::getTextureCoord(float x, float y) const {
   if (getSampler()->type() == TextureType::Rectangle) {
     return {x, y};

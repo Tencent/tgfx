@@ -23,50 +23,20 @@
 namespace tgfx {
 class TextureRenderTargetProxy : public RenderTargetProxy {
  public:
-  int width() const override {
-    return textureProxy->width();
-  }
-
-  int height() const override {
-    return textureProxy->height();
-  }
-
-  ImageOrigin origin() const override {
-    return textureProxy->origin();
-  }
-
-  PixelFormat format() const override {
-    return _format;
-  }
-
-  int sampleCount() const override {
-    return renderTarget ? renderTarget->sampleCount() : _sampleCount;
-  }
-
-  Context* getContext() const override {
-    return textureProxy->getContext();
-  }
-
-  bool externallyOwned() const override {
-    return _externallyOwned;
-  }
-
   std::shared_ptr<TextureProxy> getTextureProxy() const override {
     return textureProxy;
   }
 
- protected:
-  std::shared_ptr<RenderTarget> onMakeRenderTarget() override;
-
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-  int _sampleCount = 0;
-  bool _externallyOwned = false;
 
   TextureRenderTargetProxy(std::shared_ptr<TextureProxy> textureProxy, PixelFormat format,
-                           int sampleCount, bool externallyOwned);
+                           int sampleCount)
+      : RenderTargetProxy(textureProxy->width(), textureProxy->height(), format, sampleCount,
+                          textureProxy->origin()),
+        textureProxy(std::move(textureProxy)) {
+  }
 
-  friend class RenderTargetProxy;
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

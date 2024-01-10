@@ -104,7 +104,6 @@ Resource* ResourceCache::getUniqueResource(const UniqueKey& uniqueKey) {
   if (!resource->hasValidUniqueKey()) {
     uniqueKeyMap.erase(result);
     resource->uniqueKey = {};
-    resource->uniqueKeyGeneration = 0;
     return nullptr;
   }
   return resource;
@@ -134,14 +133,12 @@ void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueK
     uniqueKeyMap.erase(resource->uniqueKey.domainID());
   }
   resource->uniqueKey = uniqueKey.makeWeak();
-  resource->uniqueKeyGeneration = uniqueKey.domainID();
   uniqueKeyMap[uniqueKey.domainID()] = resource;
 }
 
 void ResourceCache::removeUniqueKey(Resource* resource) {
   uniqueKeyMap.erase(resource->uniqueKey.domainID());
   resource->uniqueKey = {};
-  resource->uniqueKeyGeneration = 0;
 }
 
 std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,

@@ -185,15 +185,15 @@ class Image {
    * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
    * not backed by a Texture.
    */
-  BackendTexture getBackendTexture() const;
+  BackendTexture getBackendTexture(Context* context) const;
 
   /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a
    * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
-   * creates one immediately, which may block the calling thread. Returns the original Image if the
-   * Image is texture backed and the context is compatible with the backing GPU texture. Otherwise,
-   * returns nullptr. The associated CPU memory can be freed entirely by setting the original Image
-   * to nullptr, since the returned Image contains only a GPU texture.
+   * creates one immediately. Returns the original Image if the Image is texture backed and the
+   * context is compatible with the backing GPU texture. Otherwise, returns nullptr. It's safe to
+   * release the original Image to reduce CPU memory usage afterward, as the returned Image only
+   * contains a GPU texture.
    */
   std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
@@ -260,7 +260,7 @@ class Image {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, uint32_t renderFlags,
                                                          const SamplingOptions& sampling);
 
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Texture> texture);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<TextureProxy> textureProxy);
 
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageSource> source,
                                          EncodedOrigin origin = EncodedOrigin::TopLeft);

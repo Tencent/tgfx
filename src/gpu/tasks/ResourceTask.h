@@ -18,47 +18,29 @@
 
 #pragma once
 
-#include "RenderTargetProxy.h"
+#include "gpu/Resource.h"
 
 namespace tgfx {
-class RenderTargetWrapper : public RenderTargetProxy {
+/**
+ * The base class for all resource creation tasks.
+ */
+class ResourceTask {
  public:
-  int width() const override {
-    return renderTarget->width();
-  }
+  explicit ResourceTask(UniqueKey uniqueKey);
 
-  int height() const override {
-    return renderTarget->height();
-  }
+  virtual ~ResourceTask() = default;
 
-  ImageOrigin origin() const override {
-    return renderTarget->origin();
-  }
-
-  PixelFormat format() const override {
-    return renderTarget->format();
-  }
-
-  int sampleCount() const override {
-    return renderTarget->sampleCount();
-  }
-
-  Context* getContext() const override {
-    return renderTarget->getContext();
-  }
-
-  bool externallyOwned() const override {
-    return true;
-  }
-
-  std::shared_ptr<TextureProxy> getTextureProxy() const override;
+  /**
+   * Returns false if the resource creation is failed.
+   */
+  bool execute(Context* context);
 
  protected:
-  std::shared_ptr<RenderTarget> onMakeRenderTarget() override;
+  virtual std::shared_ptr<Resource> onMakeResource(Context* context) = 0;
 
  private:
-  explicit RenderTargetWrapper(std::shared_ptr<RenderTarget> renderTarget);
+  UniqueKey uniqueKey = {};
 
-  friend class RenderTargetProxy;
+  friend class DrawingManager;
 };
 }  // namespace tgfx

@@ -49,4 +49,8 @@ void HardwareBufferUnlock(HardwareBufferRef) {
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
   return {};
 }
+
+PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef) {
+  return PixelFormat::Unknown;
+}
 }  // namespace tgfx

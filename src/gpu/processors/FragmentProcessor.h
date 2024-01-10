@@ -102,8 +102,6 @@ class FragmentProcessor : public Processor {
     return coordTransforms.size();
   }
 
-  void visitProxies(const std::function<void(TextureProxy*)>& func) const;
-
   /**
    * Returns the coordinate transformation at index. index must be valid according to
    * numCoordTransforms().
@@ -298,9 +296,6 @@ class FragmentProcessor : public Processor {
 
   virtual bool onIsEqual(const FragmentProcessor&) const {
     return true;
-  }
-
-  virtual void onVisitProxies(const std::function<void(TextureProxy*)>&) const {
   }
 
   void internalEmitChild(size_t, const std::string&, const std::string&, EmitArgs&,

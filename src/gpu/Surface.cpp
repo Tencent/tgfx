@@ -19,7 +19,7 @@
 #include "tgfx/gpu/Surface.h"
 #include "DrawingManager.h"
 #include "core/PixelBuffer.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/ProxyProvider.h"
 #include "utils/Log.h"
 #include "utils/PixelFormatUtil.h"
 
@@ -36,51 +36,40 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
                                        const SurfaceOptions* options) {
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
   auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipMapped);
-  if (proxy == nullptr) {
-    return nullptr;
+  auto surface = MakeFrom(std::move(proxy), options);
+  if (surface != nullptr) {
+    // Clear the surface by default for internally created RenderTarget.
+    surface->getCanvas()->clear();
   }
-  auto surface = new Surface(std::move(proxy), options);
-  // Clear the surface by default for internally created RenderTarget.
-  surface->getCanvas()->clear();
-  return std::shared_ptr<Surface>(surface);
+  return surface;
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
                                            ImageOrigin origin, const SurfaceOptions* options) {
-  auto rt = RenderTarget::MakeFrom(context, renderTarget, origin);
-  return MakeFrom(std::move(rt), options);
+  auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, origin);
+  return MakeFrom(std::move(proxy), options);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount,
                                            const SurfaceOptions* options) {
-  auto texture = Texture::MakeFrom(context, backendTexture, origin);
-  return MakeFrom(std::move(texture), sampleCount, options);
+  auto proxy = RenderTargetProxy::MakeFrom(context, backendTexture, sampleCount, origin);
+  return MakeFrom(std::move(proxy), options);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            int sampleCount, const SurfaceOptions* options) {
-  auto texture = Texture::MakeFrom(context, hardwareBuffer);
-  return MakeFrom(std::move(texture), sampleCount, options);
+  auto proxy = RenderTargetProxy::MakeFrom(context, hardwareBuffer, sampleCount);
+  return MakeFrom(std::move(proxy), options);
 }
 
-std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            const SurfaceOptions* options) {
-  auto proxy = RenderTargetProxy::MakeFrom(std::move(renderTarget));
-  if (proxy == nullptr) {
+  if (renderTargetProxy == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Surface>(new Surface(std::move(proxy), options));
-}
-
-std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount,
-                                           const SurfaceOptions* options) {
-  auto proxy = RenderTargetProxy::MakeFrom(std::move(texture), sampleCount);
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<Surface>(new Surface(std::move(proxy), options));
+  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), options));
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options)
@@ -164,9 +153,9 @@ Canvas* Surface::getCanvas() {
 }
 
 bool Surface::flush(BackendSemaphore* signalSemaphore) {
-  auto drawingManager = renderTargetProxy->getContext()->drawingManager();
-  drawingManager->newTextureResolveRenderTask(renderTargetProxy);
-  return getContext()->flush(signalSemaphore);
+  auto context = getContext();
+  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
+  return context->flush(signalSemaphore);
 }
 
 void Surface::flushAndSubmit(bool syncCpu) {
@@ -179,12 +168,14 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (cachedImage != nullptr) {
     return cachedImage;
   }
-  if (renderTargetProxy->externallyOwned()) {
-    auto textureCopy = renderTargetProxy->makeTextureProxy(true);
-    cachedImage = Image::MakeFrom(textureCopy->getTexture());
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (textureProxy != nullptr && !textureProxy->externallyOwned()) {
+    cachedImage = Image::MakeFrom(std::move(textureProxy));
   } else {
-    auto texture = renderTargetProxy->getTexture();
-    cachedImage = Image::MakeFrom(texture);
+    auto textureCopy = renderTargetProxy->makeTextureProxy();
+    getContext()->drawingManager()->addRenderTargetCopyTask(
+        renderTargetProxy, textureCopy, Rect::MakeWH(width(), height()), Point::Zero());
+    cachedImage = Image::MakeFrom(std::move(textureCopy));
   }
   return cachedImage;
 }
@@ -198,16 +189,23 @@ void Surface::aboutToDraw(bool discardContent) {
   if (isUnique) {
     return;
   }
-  if (renderTargetProxy->externallyOwned()) {
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
     return;
   }
-  getContext()->drawingManager()->closeActiveOpsTask();
-  auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy(!discardContent);
+  auto drawingManager = getContext()->drawingManager();
+  drawingManager->closeActiveOpsTask();
+  auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy();
   if (newRenderTargetProxy == nullptr) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
     return;
   }
-  renderTargetProxy = newRenderTargetProxy;
+  if (!discardContent) {
+    auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
+    drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy,
+                                            Rect::MakeWH(width(), height()), Point::Zero());
+  }
+  std::swap(renderTargetProxy, newRenderTargetProxy);
 }
 
 Color Surface::getColor(int x, int y) {

@@ -16,20 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RenderTask.h"
-#include "utils/Log.h"
+#pragma once
+
+#include "ResourceTask.h"
 
 namespace tgfx {
-RenderTask::RenderTask(std::shared_ptr<RenderTargetProxy> proxy)
-    : renderTargetProxy(std::move(proxy)) {
-  DEBUG_ASSERT(renderTargetProxy != nullptr);
-}
+class RenderTargetCreateTask : public ResourceTask {
+ public:
+  /**
+   * Create a new RenderTargetCreateTask to generate a RenderTarget with the given properties.
+   */
+  static std::shared_ptr<RenderTargetCreateTask> MakeFrom(UniqueKey uniqueKey, UniqueKey textureKey,
+                                                          PixelFormat pixelFormat,
+                                                          int sampleCount = 1);
 
-void RenderTask::gatherProxies(std::vector<ResourceProxy*>* proxies) const {
-  proxies->push_back(renderTargetProxy.get());
-  onGatherProxies(proxies);
-}
+ protected:
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
-void RenderTask::onGatherProxies(std::vector<ResourceProxy*>*) const {
-}
+ private:
+  UniqueKey textureKey = {};
+  PixelFormat pixelFormat = PixelFormat::RGBA_8888;
+  int sampleCount = 1;
+
+  RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey textureKey, PixelFormat pixelFormat,
+                         int sampleCount);
+};
 }  // namespace tgfx

@@ -20,8 +20,8 @@
 
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "images/ImageGeneratorTask.h"
-#include "tgfx/core/ImageBuffer.h"
+#include "images/ImageDecoder.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
 /**
@@ -31,54 +31,82 @@ class ProxyProvider {
  public:
   explicit ProxyProvider(Context* context);
 
-  /*
-   * Finds a texture proxy by the specified UniqueKey.
+  /**
+   * Returns true if the proxy provider has a proxy for the given unique key.
    */
-  std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
+  bool hasResourceProxy(const UniqueKey& uniqueKey);
 
   /*
-   * Create a texture proxy for the image buffer. The image buffer will be released after being
+   * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being
    * uploaded to the GPU.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageBuffer> imageBuffer,
-                                                   bool mipMapped = false);
-
-  /*
-   * Create a texture proxy for the ImageGeneratorTask. The task will be released after the
-   * associated texture is instantiated.
-   */
-  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGenerator> generator,
+  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
+                                                   std::shared_ptr<ImageBuffer> imageBuffer,
                                                    bool mipMapped = false,
-                                                   bool disableAsyncTask = false);
+                                                   uint32_t renderFlags = 0);
 
   /*
-   * Create a texture proxy for the ImageGeneratorTask. The task will be released after the
-   * associated texture is instantiated.
+   * Creates a TextureProxy for the given ImageGenerator.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGeneratorTask> task,
-                                                   bool mipMapped = false);
+  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
+                                                   std::shared_ptr<ImageGenerator> generator,
+                                                   bool mipMapped = false,
+                                                   uint32_t renderFlags = 0);
 
   /**
-   * Create a TextureProxy without any pixel data.
+   * Creates a TextureProxy for the given ImageDecoder.
+   */
+  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
+                                                   std::shared_ptr<ImageDecoder> decoder,
+                                                   bool mipMapped = false,
+                                                   uint32_t renderFlags = 0);
+
+  /**
+   * Creates an empty TextureProxy with specified width, height, format, mipmap state and origin.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(int width, int height, PixelFormat format,
                                                    bool mipMapped = false,
                                                    ImageOrigin origin = ImageOrigin::TopLeft);
 
+  /**
+   * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend
+   * texture will be destroyed at a later point after the proxy is released.
+   */
+  std::shared_ptr<TextureProxy> wrapBackendTexture(const BackendTexture& backendTexture,
+                                                   ImageOrigin origin = ImageOrigin::TopLeft,
+                                                   bool adopted = false);
   /*
-   * Create a texture proxy that wraps an existing texture.
+   * Creates a texture proxy that wraps an existing texture.
    */
   std::shared_ptr<TextureProxy> wrapTexture(std::shared_ptr<Texture> texture);
 
+  /**
+   * Creates an empty RenderTargetProxy with specified width, height, format, sample count,
+   * mipmap state and origin.
+   */
+  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
+      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1);
+
+  /**
+   * Creates a render target proxy for the given BackendRenderTarget.
+   */
+  std::shared_ptr<RenderTargetProxy> wrapBackendRenderTarget(
+      const BackendRenderTarget& backendRenderTarget, ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /*
+   * Purges all unreferenced proxies.
+   */
+  void purgeExpiredProxies();
+
  private:
   Context* context = nullptr;
-  std::unordered_map<uint32_t, TextureProxy*> proxyOwnerMap = {};
+  std::unordered_map<uint32_t, std::weak_ptr<ResourceProxy>> proxyMap = {};
 
-  void changeUniqueKey(TextureProxy* proxy, const UniqueKey& uniqueKey);
+  static UniqueKey GetStrongKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
-  void removeUniqueKey(TextureProxy* proxy);
+  std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
 
-  friend class TextureProxy;
-  friend class RenderTargetProxy;
+  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, UniqueKey strongKey,
+                        uint32_t domainID = 0);
 };
 }  // namespace tgfx
