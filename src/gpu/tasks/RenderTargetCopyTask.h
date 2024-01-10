@@ -16,18 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RenderTargetWrapper.h"
+#pragma once
+
+#include "RenderTask.h"
 
 namespace tgfx {
-RenderTargetWrapper::RenderTargetWrapper(std::shared_ptr<RenderTarget> renderTarget)
-    : RenderTargetProxy(std::move(renderTarget)) {
-}
+class RenderTargetCopyTask : public RenderTask {
+ public:
+  RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                       std::shared_ptr<TextureProxy> dest, Rect srcRect, Point dstPoint);
 
-std::shared_ptr<TextureProxy> RenderTargetWrapper::getTextureProxy() const {
-  return nullptr;
-}
+  bool execute(Gpu* gpu) override;
 
-std::shared_ptr<RenderTarget> RenderTargetWrapper::onMakeRenderTarget() {
-  return renderTarget;
-}
+ private:
+  std::shared_ptr<TextureProxy> dest = nullptr;
+  Rect srcRect = {};
+  Point dstPoint = {};
+};
 }  // namespace tgfx

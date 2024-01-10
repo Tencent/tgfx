@@ -53,17 +53,18 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // cleanup can they be unbound and reused.
   _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
   auto flushed = _drawingManager->flush();
-  if (signalSemaphore == nullptr) {
-    return false;
-  }
-  auto semaphore = Semaphore::Wrap(signalSemaphore);
-  auto semaphoreInserted = caps()->semaphoreSupport && _gpu->insertSemaphore(semaphore.get());
-  if (semaphoreInserted) {
-    *signalSemaphore = semaphore->getBackendSemaphore();
+  bool semaphoreInserted = false;
+  if (signalSemaphore != nullptr) {
+    auto semaphore = Semaphore::Wrap(signalSemaphore);
+    semaphoreInserted = caps()->semaphoreSupport && _gpu->insertSemaphore(semaphore.get());
+    if (semaphoreInserted) {
+      *signalSemaphore = semaphore->getBackendSemaphore();
+    }
   }
   if (flushed) {
     // Clean up all unreferenced resources after flushing to reduce memory usage.
     _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
+    _proxyProvider->purgeExpiredProxies();
   }
   return semaphoreInserted;
 }

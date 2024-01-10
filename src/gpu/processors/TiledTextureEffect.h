@@ -81,10 +81,6 @@ class TiledTextureEffect : public FragmentProcessor {
 
   static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipMapMode mm);
 
-  void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {
-    func(textureProxy.get());
-  }
-
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
   CoordTransform coordTransform;

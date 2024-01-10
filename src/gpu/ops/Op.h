@@ -40,9 +40,6 @@ class Op {
 
   virtual ~Op() = default;
 
-  virtual void visitProxies(const std::function<void(ResourceProxy*)>&) const {
-  }
-
   virtual void prepare(Gpu*) {
   }
 

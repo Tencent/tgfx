@@ -229,9 +229,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   GLTextureInfo textureInfo = {};
   result = CreateGLTexture(context, width, height, &textureInfo);
   ASSERT_TRUE(result);
-  auto glTexture =
-      Texture::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
-  surface = Surface::MakeFrom(glTexture);
+  surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();

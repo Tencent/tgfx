@@ -20,7 +20,7 @@
 
 #include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/gpu/Surface.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 class RenderTask {
@@ -28,8 +28,6 @@ class RenderTask {
   virtual ~RenderTask() = default;
 
   virtual bool execute(Gpu* gpu) = 0;
-
-  void gatherProxies(std::vector<ResourceProxy*>* proxies) const;
 
   void makeClosed() {
     closed = true;
@@ -40,9 +38,9 @@ class RenderTask {
   }
 
  protected:
-  explicit RenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
-
-  virtual void onGatherProxies(std::vector<ResourceProxy*>* proxies) const;
+  explicit RenderTask(std::shared_ptr<RenderTargetProxy> proxy)
+      : renderTargetProxy(std::move(proxy)) {
+  }
 
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
 

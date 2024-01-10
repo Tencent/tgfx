@@ -129,7 +129,7 @@ class Texture : public Resource {
    * Creates a Texture from the platform-specific hardware buffer. For example, the hardware
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the
    * apple platform. The returned Image takes a reference to the hardwareBuffer. The colorSpace
-   * is ignored if the hardwareBuffer contains only one plane, which means it is not in the YUV
+   * is ignored if the hardwareBuffer contains only one plane, indicating that it is not in the YUV
    * format. Returns nullptr if the context is nullptr or the hardwareBuffer is nullptr.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
@@ -169,6 +169,16 @@ class Texture : public Resource {
   ImageOrigin origin() const {
     return _origin;
   }
+
+  /**
+   * Returns true if pixels represent transparency only.
+   */
+  bool isAlphaOnly() const;
+
+  /**
+   * Returns true if the texture has mipmap levels.
+   */
+  bool hasMipmaps() const;
 
   /**
    * Returns true if this is a YUVTexture.

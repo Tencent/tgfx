@@ -16,44 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpsTask.h"
-#include "gpu/Gpu.h"
-#include "gpu/RenderPass.h"
+#include "RenderTargetCopyTask.h"
 
 namespace tgfx {
-void OpsTask::addOp(std::unique_ptr<Op> op) {
-  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
-    return;
-  }
-  ops.emplace_back(std::move(op));
+RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                                           std::shared_ptr<TextureProxy> dest, Rect srcRect,
+                                           Point dstPoint)
+    : RenderTask(std::move(source)), dest(std::move(dest)), srcRect(std::move(srcRect)),
+      dstPoint(std::move(dstPoint)) {
 }
 
-bool OpsTask::execute(Gpu* gpu) {
-  if (ops.empty()) {
-    return false;
-  }
+bool RenderTargetCopyTask::execute(Gpu* gpu) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
-  auto texture = renderTargetProxy->getTexture();
-  auto renderPass = gpu->getRenderPass(renderTarget, texture);
-  if (renderPass == nullptr) {
+  if (renderTarget == nullptr) {
+    LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
     return false;
   }
-  std::for_each(ops.begin(), ops.end(), [gpu](auto& op) { op->prepare(gpu); });
-  renderPass->begin();
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass);
+  auto texture = dest->getTexture();
+  if (texture == nullptr) {
+    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
+    return false;
   }
-  renderPass->end();
-  gpu->submit(renderPass);
+  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), srcRect, dstPoint);
   return true;
-}
-
-void OpsTask::onGatherProxies(std::vector<ResourceProxy*>* proxies) const {
-  if (ops.empty()) {
-    return;
-  }
-  auto func = [proxies](ResourceProxy* proxy) { proxies->emplace_back(proxy); };
-  std::for_each(ops.begin(), ops.end(), [&func](auto& op) { op->visitProxies(func); });
 }
 }  // namespace tgfx

@@ -181,9 +181,7 @@ TGFX_TEST(CanvasTest, clip) {
   auto height = 1776;
   GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
-  auto glTexture =
-      Texture::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
-  auto surface = Surface::MakeFrom(glTexture);
+  auto surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->setMatrix(Matrix::MakeScale(3));
@@ -254,8 +252,8 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
     }
   }
   auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->tasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rects.size(), drawCallCount);
   canvas->flush();
@@ -301,8 +299,8 @@ TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
     }
   }
   auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->tasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->vertexCount, drawCallCount * 30);
   canvas->flush();
@@ -342,8 +340,8 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
     }
   }
   auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->tasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRects.size(), drawCallCount);
   canvas->flush();
@@ -385,8 +383,8 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   }
 
   auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->tasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
   canvas->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_clear_op"));
@@ -616,18 +614,37 @@ TGFX_TEST(CanvasTest, image) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 500);
+  SurfaceOptions options(RenderFlags::DisableCache);
+  auto surface = Surface::Make(context, 400, 500, false, 1, false, &options);
   auto canvas = surface->getCanvas();
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
   EXPECT_FALSE(image->hasMipmaps());
+  canvas->drawImage(image);
+  auto decodedImage = image->makeDecoded(context);
+  EXPECT_FALSE(decodedImage == image);
+  canvas->flush();
+  decodedImage = image->makeDecoded(context);
+  EXPECT_FALSE(decodedImage == image);
   auto textureImage = image->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   EXPECT_TRUE(textureImage->isTextureBacked());
   EXPECT_FALSE(textureImage->isLazyGenerated());
+  decodedImage = image->makeDecoded(context);
+  EXPECT_TRUE(decodedImage == image);
+  textureImage = nullptr;
+  decodedImage = image->makeDecoded(context);
+  EXPECT_FALSE(decodedImage == image);
+  context->flush();
+  decodedImage = image->makeDecoded(context);
+  EXPECT_FALSE(decodedImage == image);
+
+  surface = Surface::Make(context, 400, 500);
+  canvas = surface->getCanvas();
   canvas->drawImage(image);
+  textureImage = image->makeTextureImage(context);
   canvas->drawImage(textureImage, 200, 0);
   auto subset = image->makeSubset(Rect::MakeWH(120, 120));
   EXPECT_TRUE(subset == nullptr);
@@ -638,9 +655,10 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_EQ(subset->width(), 80);
   EXPECT_EQ(subset->height(), 90);
   canvas->drawImage(subset, 115, 15);
-  auto decodedImage = image->makeDecoded(context);
+  decodedImage = image->makeDecoded(context);
   EXPECT_TRUE(decodedImage == image);
   decodedImage = image->makeDecoded();
+  EXPECT_FALSE(decodedImage == image);
   ASSERT_TRUE(decodedImage != nullptr);
   EXPECT_FALSE(decodedImage->isLazyGenerated());
   EXPECT_FALSE(decodedImage->isTextureBacked());

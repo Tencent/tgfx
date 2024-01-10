@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <unordered_map>
 #include <vector>
-#include "gpu/tasks/OpsTask.h"
+#include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
+#include "gpu/tasks/ResourceTask.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
@@ -29,25 +31,28 @@ class DrawingManager {
   explicit DrawingManager(Context* context) : context(context) {
   }
 
-  std::shared_ptr<OpsTask> newOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  std::shared_ptr<OpsRenderTask> addOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+
+  void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+
+  void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                               std::shared_ptr<TextureProxy> dest, Rect srcRect, Point dstPoint);
+
+  void addResourceTask(std::shared_ptr<ResourceTask> resourceTask);
 
   /**
    * Returns true if any render tasks were executed.
    */
   bool flush();
 
-  void newTextureResolveRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
-
  private:
-  void closeAllTasks();
-
-  void removeAllTasks();
-
   void closeActiveOpsTask();
 
   Context* context = nullptr;
-  std::vector<std::shared_ptr<RenderTask>> tasks;
-  OpsTask* activeOpsTask = nullptr;
+  std::unordered_map<uint32_t, ResourceTask*> resourceTaskMap = {};
+  std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
+  std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
+  OpsRenderTask* activeOpsTask = nullptr;
 
   friend class Surface;
 };

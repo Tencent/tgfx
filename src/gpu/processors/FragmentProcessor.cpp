@@ -147,13 +147,6 @@ bool FragmentProcessor::isEqual(const FragmentProcessor& that) const {
   return true;
 }
 
-void FragmentProcessor::visitProxies(const std::function<void(TextureProxy*)>& func) const {
-  onVisitProxies(func);
-  for (const auto& fp : childProcessors) {
-    fp->visitProxies(func);
-  }
-}
-
 void FragmentProcessor::setData(UniformBuffer* uniformBuffer) const {
   onSetData(uniformBuffer);
 }

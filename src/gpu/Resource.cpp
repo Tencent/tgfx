@@ -35,14 +35,6 @@ void Resource::removeUniqueKey() {
   }
 }
 
-void Resource::markUniqueKeyExpired() {
-  uniqueKeyGeneration = 0;
-}
-
-bool Resource::hasUniqueKey(const UniqueKey& newKey) const {
-  return !newKey.empty() && newKey.domainID() == uniqueKeyGeneration;
-}
-
 void Resource::release(bool releaseGPU) {
   if (releaseGPU) {
     onReleaseGPU();

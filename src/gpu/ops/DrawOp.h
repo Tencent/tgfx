@@ -30,8 +30,6 @@ class DrawOp : public Op {
   explicit DrawOp(uint8_t classID) : Op(classID) {
   }
 
-  void visitProxies(const std::function<void(ResourceProxy*)>& func) const override;
-
   void prepare(Gpu* gpu) final;
 
   void execute(RenderPass* renderPass) final;

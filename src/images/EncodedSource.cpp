@@ -26,10 +26,12 @@ EncodedSource::EncodedSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeDecoded(Context* context) const {
-  if (context != nullptr && context->resourceCache()->hasUniqueResource(uniqueKey)) {
-    return nullptr;
+  if (context != nullptr) {
+    if (context->proxyProvider()->hasResourceProxy(uniqueKey) ||
+        context->resourceCache()->hasUniqueResource(uniqueKey)) {
+      return nullptr;
+    }
   }
-  auto encodedSource = std::static_pointer_cast<EncodedSource>(weakThis.lock());
   return std::shared_ptr<AsyncSource>(new AsyncSource(uniqueKey, generator, mipMapped));
 }
 
@@ -39,7 +41,6 @@ std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
 
 std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context,
                                                                 uint32_t renderFlags) const {
-  bool disableAsyncTask = renderFlags & RenderFlags::DisableAsyncTask;
-  return context->proxyProvider()->createTextureProxy(generator, mipMapped, disableAsyncTask);
+  return context->proxyProvider()->createTextureProxy(uniqueKey, generator, mipMapped, renderFlags);
 }
 }  // namespace tgfx

@@ -206,10 +206,7 @@ class Surface {
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
 
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
-                                           const SurfaceOptions* options = nullptr);
-
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1,
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            const SurfaceOptions* options = nullptr);
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options);

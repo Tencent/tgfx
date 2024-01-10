@@ -37,6 +37,11 @@ class Resource {
     return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource, scratchKey));
   }
 
+  template <class T>
+  static std::shared_ptr<T> Get(Context* context, const UniqueKey& uniqueKey) {
+    return std::static_pointer_cast<T>(context->resourceCache()->findUniqueResource(uniqueKey));
+  }
+
   virtual ~Resource() = default;
 
   /**
@@ -52,6 +57,13 @@ class Resource {
   virtual size_t memoryUsage() const = 0;
 
   /**
+   * Returns the associated UniqueKey.
+   */
+  const UniqueKey& getUniqueKey() const {
+    return uniqueKey;
+  }
+
+  /**
    * Assigns a UniqueKey to the resource. The resource will be findable via this UniqueKey using
    * ResourceCache.findUniqueResource(). This method is not thread safe, call it only when the
    * associated context is locked.
@@ -64,17 +76,6 @@ class Resource {
    */
   void removeUniqueKey();
 
-  /**
-   * Marks the associated UniqueKey as expired. This method is thread safe.
-   */
-  void markUniqueKeyExpired();
-
-  /**
-   * Returns true if the Resource has the same UniqueKey to the newKey and not expired. This method
-   * is thread safe.
-   */
-  bool hasUniqueKey(const UniqueKey& newKey) const;
-
  protected:
   Context* context = nullptr;
 
@@ -82,7 +83,6 @@ class Resource {
   std::shared_ptr<Resource> reference;
   ScratchKey scratchKey = {};
   UniqueKey uniqueKey = {};
-  std::atomic_uint32_t uniqueKeyGeneration = 0;
   std::list<Resource*>* cachedList = nullptr;
   std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
@@ -92,7 +92,7 @@ class Resource {
   }
 
   bool hasValidUniqueKey() const {
-    return uniqueKey.useCount() > 1 && uniqueKey.domainID() == uniqueKeyGeneration;
+    return uniqueKey.useCount() > 1;
   }
 
   void release(bool releaseGPU);

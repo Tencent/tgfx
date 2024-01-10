@@ -23,86 +23,68 @@
 #include "gpu/TextureSampler.h"
 
 namespace tgfx {
-class ProxyProvider;
-
 /**
  * This class delays the acquisition of textures until they are actually required.
  */
 class TextureProxy : public ResourceProxy {
  public:
-  virtual ~TextureProxy() override;
-
   /**
    * Returns the width of the texture.
    */
-  virtual int width() const;
+  int width() const {
+    return _width;
+  }
 
   /**
    * Returns the height of the texture.
    */
-  virtual int height() const;
+  int height() const {
+    return _height;
+  }
 
   /**
-   * Returns the origin of the texture, either ImageOrigin::TopLeft or
-   * ImageOrigin::BottomLeft.
+   * Return the mipmap state of the texture.
    */
-  virtual ImageOrigin origin() const;
+  bool hasMipmaps() const {
+    return mipMapped;
+  }
 
   /**
-   * If we are instantiated and have a texture, return the mipmap state of that texture. Otherwise,
-   * returns the proxy's mipmap state from creation time.
+   * Returns the origin of the texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
-  virtual bool hasMipmaps() const;
+  ImageOrigin origin() const {
+    return _origin;
+  }
 
   /**
-   * Returns the associated Context instance.
+   * Returns true if the texture represents transparency only.
    */
-  Context* getContext() const;
+  bool isAlphaOnly() const {
+    return _isAlphaOnly;
+  }
 
   /**
-   * Returns the Texture of the proxy. Returns nullptr if the proxy is not instantiated yet.
+   * Returns true if the backend texture is externally owned.
+   */
+  bool externallyOwned() const {
+    return _externallyOwned;
+  }
+
+  /**
+   * Returns the associated Texture instance.
    */
   std::shared_ptr<Texture> getTexture() const;
 
-  /**
-   * Returns true if the backing texture is instantiated.
-   */
-  bool isInstantiated() const override;
-
-  /**
-   * Instantiates the backing texture, if necessary. Returns true if the backing texture is
-   * instantiated.
-   */
-  bool instantiate() override;
-
-  /**
-   * Assigns a UniqueKey to the proxy. The proxy will be findable via this UniqueKey using
-   * ProxyProvider.findTextureProxy(). If the updateTextureKey is true, it will also assign the
-   * UniqueKey to the target texture.
-   */
-  void assignUniqueKey(const UniqueKey& uniqueKey, bool updateTextureKey = true);
-
-  /*
-   * Removes the UniqueKey from the proxy. If the updateTextureKey is true, it will also remove
-   * the UniqueKey from the target texture.
-   */
-  void removeUniqueKey(bool updateTextureKey = true);
-
- protected:
-  ProxyProvider* provider = nullptr;
-  bool setTextureUniqueKey = true;
-  std::shared_ptr<Texture> texture = nullptr;
-
-  explicit TextureProxy(ProxyProvider* provider, std::shared_ptr<Texture> texture = nullptr);
-
-  /**
-   * Overrides to create a new Texture associated with specified context.
-   */
-  virtual std::shared_ptr<Texture> onMakeTexture(Context* context);
-
  private:
-  UniqueKey uniqueKey = {};
-  std::weak_ptr<TextureProxy> weakThis;
+  int _width = 0;
+  int _height = 0;
+  bool mipMapped = false;
+  bool _isAlphaOnly = false;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
+  bool _externallyOwned = false;
+
+  TextureProxy(int width, int height, bool mipMapped, bool isAlphaOnly,
+               ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
 
   friend class ProxyProvider;
 };

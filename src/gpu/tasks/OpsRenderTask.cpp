@@ -16,32 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/proxies/TextureProxy.h"
-#include "images/ImageGeneratorTask.h"
+#include "OpsRenderTask.h"
+#include "gpu/Gpu.h"
+#include "gpu/RenderPass.h"
 
 namespace tgfx {
-class ImageGeneratorTextureProxy : public TextureProxy {
- public:
-  int width() const override;
+void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
+  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
+    return;
+  }
+  ops.emplace_back(std::move(op));
+}
 
-  int height() const override;
-
-  ImageOrigin origin() const override;
-
-  bool hasMipmaps() const override;
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context) override;
-
- private:
-  std::shared_ptr<ImageGeneratorTask> task = nullptr;
-  bool mipMapped = false;
-
-  ImageGeneratorTextureProxy(ProxyProvider* provider, std::shared_ptr<ImageGeneratorTask> task,
-                             bool mipMapped);
-
-  friend class ProxyProvider;
-};
+bool OpsRenderTask::execute(Gpu* gpu) {
+  if (ops.empty()) {
+    return false;
+  }
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  auto texture = renderTargetProxy->getTexture();
+  auto renderPass = gpu->getRenderPass(renderTarget, texture);
+  if (renderPass == nullptr) {
+    LOGE("OpsTask::execute() Failed to create render pass!");
+    return false;
+  }
+  std::for_each(ops.begin(), ops.end(), [gpu](auto& op) { op->prepare(gpu); });
+  renderPass->begin();
+  auto tempOps = std::move(ops);
+  for (auto& op : tempOps) {
+    op->execute(renderPass);
+  }
+  renderPass->end();
+  gpu->submit(renderPass);
+  return true;
+}
 }  // namespace tgfx

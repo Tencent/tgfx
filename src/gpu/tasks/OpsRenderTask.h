@@ -16,22 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureRenderTargetProxy.h"
+#pragma once
+
+#include "gpu/ops/Op.h"
+#include "gpu/tasks/RenderTask.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
-
-TextureRenderTargetProxy::TextureRenderTargetProxy(std::shared_ptr<TextureProxy> textureProxy,
-                                                   PixelFormat format, int sampleCount,
-                                                   bool externallyOwned)
-    : textureProxy(std::move(textureProxy)), _format(format), _sampleCount(sampleCount),
-      _externallyOwned(externallyOwned) {
-}
-
-std::shared_ptr<RenderTarget> TextureRenderTargetProxy::onMakeRenderTarget() {
-  if (!textureProxy->isInstantiated()) {
-    textureProxy->instantiate();
+class OpsRenderTask : public RenderTask {
+ public:
+  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+      : RenderTask(std::move(renderTargetProxy)) {
   }
-  auto texture = textureProxy->getTexture();
-  return RenderTarget::MakeFrom(texture.get(), _sampleCount);
-}
+
+  void addOp(std::unique_ptr<Op> op);
+
+  bool execute(Gpu* gpu) override;
+
+ private:
+  std::vector<std::unique_ptr<Op>> ops;
+};
 }  // namespace tgfx

@@ -39,11 +39,6 @@ class TextureEffect : public FragmentProcessor {
                                                  const SamplingOptions& sampling,
                                                  const Matrix* localMatrix = nullptr);
 
-  static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<Texture> texture,
-                                                       const SamplingOptions& sampling,
-                                                       const Point& alphaStart,
-                                                       const Matrix* localMatrix = nullptr);
-
   std::string name() const override {
     return "TextureEffect";
   }
@@ -69,10 +64,6 @@ class TextureEffect : public FragmentProcessor {
   Texture* getTexture() const;
 
   YUVTexture* getYUVTexture() const;
-
-  void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {
-    func(textureProxy.get());
-  }
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;

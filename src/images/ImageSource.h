@@ -47,11 +47,9 @@ class ImageSource {
                                                std::shared_ptr<ImageBuffer> buffer);
 
   /**
-   * Creates ImageSource from Texture, ImageSource is returned if texture is not nullptr. Note that
-   * this method is not thread safe, must be called while the associated context is locked.
+   * Creates ImageSource from TextureProxy, ImageSource is returned if textureProxy is not nullptr.
    */
-  static std::shared_ptr<ImageSource> MakeFrom(UniqueKey uniqueKey,
-                                               std::shared_ptr<Texture> texture);
+  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<TextureProxy> textureProxy);
 
   virtual ~ImageSource() = default;
 
@@ -96,7 +94,7 @@ class ImageSource {
    * Retrieves the backend texture. Returns an invalid BackendTexture if the ImageSource is not
    * backed by a Texture.
    */
-  virtual BackendTexture getBackendTexture() const {
+  virtual BackendTexture getBackendTexture(Context*) const {
     return {};
   }
 

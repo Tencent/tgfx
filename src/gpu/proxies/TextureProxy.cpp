@@ -17,82 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureProxy.h"
-#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-TextureProxy::TextureProxy(ProxyProvider* provider, std::shared_ptr<Texture> texture)
-    : provider(provider), texture(std::move(texture)) {
-}
-
-TextureProxy::~TextureProxy() {
-  if (!uniqueKey.empty()) {
-    provider->proxyOwnerMap.erase(uniqueKey.domainID());
-  }
-}
-
-int TextureProxy::width() const {
-  return texture->width();
-}
-
-int TextureProxy::height() const {
-  return texture->height();
-}
-
-ImageOrigin TextureProxy::origin() const {
-  return texture->origin();
-}
-
-bool TextureProxy::hasMipmaps() const {
-  return texture->getSampler()->hasMipmaps();
-}
-
-Context* TextureProxy::getContext() const {
-  return provider->context;
+TextureProxy::TextureProxy(int width, int height, bool mipMapped, bool isAlphaOnly,
+                           ImageOrigin origin, bool externallyOwned)
+    : _width(width), _height(height), mipMapped(mipMapped), _isAlphaOnly(isAlphaOnly),
+      _origin(origin), _externallyOwned(externallyOwned) {
 }
 
 std::shared_ptr<Texture> TextureProxy::getTexture() const {
-  return texture;
+  return Resource::Get<Texture>(context, uniqueKey);
 }
 
-bool TextureProxy::isInstantiated() const {
-  return texture != nullptr;
-}
-
-bool TextureProxy::instantiate() {
-  if (texture != nullptr) {
-    return true;
-  }
-  texture = onMakeTexture(provider->context);
-  if (texture != nullptr && setTextureUniqueKey) {
-    texture->assignUniqueKey(uniqueKey);
-  }
-  return texture != nullptr;
-}
-
-void TextureProxy::assignUniqueKey(const UniqueKey& newKey, bool updateTextureKey) {
-  if (newKey.empty()) {
-    removeUniqueKey(updateTextureKey);
-    return;
-  }
-  if (newKey.domainID() != uniqueKey.domainID()) {
-    provider->changeUniqueKey(this, newKey);
-  }
-  setTextureUniqueKey = updateTextureKey;
-  if (setTextureUniqueKey && texture != nullptr) {
-    texture->assignUniqueKey(newKey);
-  }
-}
-
-void TextureProxy::removeUniqueKey(bool updateTextureKey) {
-  if (!uniqueKey.empty()) {
-    provider->removeUniqueKey(this);
-  }
-  if (updateTextureKey && texture != nullptr) {
-    texture->removeUniqueKey();
-  }
-}
-
-std::shared_ptr<Texture> TextureProxy::onMakeTexture(Context*) {
-  return nullptr;
-}
 }  // namespace tgfx
