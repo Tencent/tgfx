@@ -20,8 +20,7 @@
 #include "gpu/Gpu.h"
 
 namespace tgfx {
-TextureResolveTask::TextureResolveTask(
-    std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
     : RenderTask(std::move(renderTargetProxy)) {
 }
 
