@@ -35,10 +35,6 @@ class TextureEffect : public FragmentProcessor {
                                                        const Point& alphaStart,
                                                        const Matrix* localMatrix = nullptr);
 
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Texture> texture,
-                                                 const SamplingOptions& sampling,
-                                                 const Matrix* localMatrix = nullptr);
-
   std::string name() const override {
     return "TextureEffect";
   }

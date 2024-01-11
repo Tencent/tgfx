@@ -39,6 +39,10 @@ struct ISize {
     return {w, h};
   }
 
+  static ISize Make(float w, float h) {
+    return {static_cast<int>(w), static_cast<int>(h)};
+  }
+
   static ISize MakeEmpty() {
     return {0, 0};
   }

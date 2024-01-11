@@ -75,11 +75,6 @@ class ProxyProvider {
   std::shared_ptr<TextureProxy> wrapBackendTexture(const BackendTexture& backendTexture,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
                                                    bool adopted = false);
-  /*
-   * Creates a texture proxy that wraps an existing texture.
-   */
-  std::shared_ptr<TextureProxy> wrapTexture(std::shared_ptr<Texture> texture);
-
   /**
    * Creates an empty RenderTargetProxy with specified width, height, format, sample count,
    * mipmap state and origin.

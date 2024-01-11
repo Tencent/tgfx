@@ -221,12 +221,12 @@ class Canvas {
 
   void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint& paint);
 
-  void drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPaint paint);
+  void drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, GpuPaint paint);
 
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);
 
-  void drawMaskGlyphs(TextBlob* textBlob, const Paint& paint);
+  void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
 
   void fillPath(const Path& path, const Paint& paint);
 

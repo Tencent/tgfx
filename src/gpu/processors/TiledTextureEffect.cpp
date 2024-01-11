@@ -60,21 +60,6 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, Filt
   }
 }
 
-std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture> texture,
-                                                            TileMode tileModeX, TileMode tileModeY,
-                                                            const SamplingOptions& sampling,
-                                                            const Matrix* localMatrix) {
-  if (texture == nullptr) {
-    return nullptr;
-  }
-  auto context = texture->getContext();
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto proxy = context->proxyProvider()->wrapTexture(std::move(texture));
-  return Make(std::move(proxy), tileModeX, tileModeY, sampling, localMatrix);
-}
-
 TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler,
                                        const Rect& subset) {
   struct Span {

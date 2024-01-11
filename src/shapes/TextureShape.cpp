@@ -17,53 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureShape.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/Mask.h"
 
 namespace tgfx {
-TextureShape::TextureShape(std::unique_ptr<PathProxy> pathProxy, float resolutionScale)
+TextureShape::TextureShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
+  auto path = getFillPath();
+  auto width = ceilf(bounds.width());
+  auto height = ceilf(bounds.height());
+  auto size = ISize::Make(width, height);
+  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  matrix.postScale(width / bounds.width(), height / bounds.height());
+  rasterizer = Rasterizer::MakeFrom(path, size, matrix);
 }
 
 std::unique_ptr<DrawOp> TextureShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,
                                              uint32_t renderFlags) const {
-  auto resourceCache = paint->context->resourceCache();
-  auto texture = std::static_pointer_cast<Texture>(resourceCache->findUniqueResource(uniqueKey));
-  if (texture != nullptr) {
-    return makeTextureOp(texture, paint, viewMatrix);
-  }
-  auto path = getFillPath();
-  auto width = ceilf(bounds.width());
-  auto height = ceilf(bounds.height());
-  auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
-  if (!mask) {
+  auto proxyProvider = paint->context->proxyProvider();
+  auto textureProxy = proxyProvider->createTextureProxy(uniqueKey, rasterizer, false, renderFlags);
+  if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  matrix.postScale(width / bounds.width(), height / bounds.height());
-  mask->setMatrix(matrix);
-  mask->fillPath(path);
-  // TODO(pengweilv): mip map
-  texture = Texture::MakeFrom(paint->context, mask->makeBuffer());
-  if (texture == nullptr) {
-    return nullptr;
-  }
-  if (!(renderFlags & RenderFlags::DisableCache)) {
-    texture->assignUniqueKey(uniqueKey);
-  }
-  return makeTextureOp(texture, paint, viewMatrix);
-}
-
-std::unique_ptr<DrawOp> TextureShape::makeTextureOp(std::shared_ptr<Texture> texture,
-                                                    GpuPaint* paint,
-                                                    const Matrix& viewMatrix) const {
   auto maskLocalMatrix = Matrix::I();
   maskLocalMatrix.postTranslate(-bounds.x(), -bounds.y());
-  maskLocalMatrix.postScale(static_cast<float>(texture->width()) / bounds.width(),
-                            static_cast<float>(texture->height()) / bounds.height());
+  maskLocalMatrix.postScale(static_cast<float>(textureProxy->width()) / bounds.width(),
+                            static_cast<float>(textureProxy->height()) / bounds.height());
   paint->coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
-      TextureEffect::Make(std::move(texture), SamplingOptions(), &maskLocalMatrix)));
+      TextureEffect::Make(std::move(textureProxy), SamplingOptions(), &maskLocalMatrix)));
   return FillRectOp::Make(paint->color, bounds, viewMatrix);
 }
 }  // namespace tgfx

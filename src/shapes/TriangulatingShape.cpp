@@ -22,7 +22,7 @@
 #include "gpu/ops/TriangulatingPathOp.h"
 
 namespace tgfx {
-TriangulatingShape::TriangulatingShape(std::unique_ptr<PathProxy> pathProxy, float resolutionScale)
+TriangulatingShape::TriangulatingShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
 }
 

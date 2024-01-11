@@ -24,7 +24,7 @@
 namespace tgfx {
 class PathShape : public Shape {
  public:
-  explicit PathShape(std::unique_ptr<PathProxy> proxy, float resolutionScale);
+  explicit PathShape(std::shared_ptr<PathProxy> proxy, float resolutionScale);
 
   Rect getBounds() const override {
     return bounds;
@@ -36,6 +36,6 @@ class PathShape : public Shape {
   Path getFillPath() const;
 
  private:
-  std::unique_ptr<PathProxy> proxy = nullptr;
+  std::shared_ptr<PathProxy> proxy = nullptr;
 };
 }  // namespace tgfx
