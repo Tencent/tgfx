@@ -88,23 +88,23 @@ class StrokeTextProxy : public PathProxy {
   Stroke stroke = {};
 };
 
-std::unique_ptr<PathProxy> PathProxy::MakeFromFill(const Path& path) {
-  return std::make_unique<FillPathProxy>(path);
+std::shared_ptr<PathProxy> PathProxy::MakeFromFill(const Path& path) {
+  return std::make_shared<FillPathProxy>(path);
 }
 
-std::unique_ptr<PathProxy> PathProxy::MakeFromFill(std::shared_ptr<TextBlob> textBlob) {
+std::shared_ptr<PathProxy> PathProxy::MakeFromFill(std::shared_ptr<TextBlob> textBlob) {
   if (textBlob->hasColor()) {
     return nullptr;
   }
-  return std::make_unique<FillTextProxy>(std::move(textBlob));
+  return std::make_shared<FillTextProxy>(std::move(textBlob));
 }
 
-std::unique_ptr<PathProxy> PathProxy::MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
+std::shared_ptr<PathProxy> PathProxy::MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
                                                      const Stroke& stroke) {
   if (textBlob->hasColor() || stroke.width <= 0) {
     return nullptr;
   }
-  return std::make_unique<StrokeTextProxy>(std::move(textBlob), stroke);
+  return std::make_shared<StrokeTextProxy>(std::move(textBlob), stroke);
 }
 
 }  // namespace tgfx

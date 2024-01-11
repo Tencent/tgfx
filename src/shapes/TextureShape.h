@@ -19,17 +19,17 @@
 #pragma once
 
 #include "PathShape.h"
+#include "core/Rasterizer.h"
 
 namespace tgfx {
 class TextureShape : public PathShape {
  public:
-  explicit TextureShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
+  explicit TextureShape(std::shared_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
  private:
+  std::shared_ptr<Rasterizer> rasterizer = nullptr;
+
   std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
                                  uint32_t renderFlags) const override;
-
-  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
-                                        const Matrix& viewMatrix) const;
 };
 }  // namespace tgfx

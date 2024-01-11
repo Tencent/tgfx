@@ -26,11 +26,11 @@
 namespace tgfx {
 class PathProxy {
  public:
-  static std::unique_ptr<PathProxy> MakeFromFill(const Path& path);
+  static std::shared_ptr<PathProxy> MakeFromFill(const Path& path);
 
-  static std::unique_ptr<PathProxy> MakeFromFill(std::shared_ptr<TextBlob> textBlob);
+  static std::shared_ptr<PathProxy> MakeFromFill(std::shared_ptr<TextBlob> textBlob);
 
-  static std::unique_ptr<PathProxy> MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
+  static std::shared_ptr<PathProxy> MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
                                                    const Stroke& stroke);
 
   virtual ~PathProxy() = default;

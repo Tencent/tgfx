@@ -19,7 +19,7 @@
 #include "PathShape.h"
 
 namespace tgfx {
-PathShape::PathShape(std::unique_ptr<PathProxy> pathProxy, float resolutionScale)
+PathShape::PathShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : Shape(resolutionScale), proxy(std::move(pathProxy)) {
   bounds = proxy->getBounds(resolutionScale);
 }

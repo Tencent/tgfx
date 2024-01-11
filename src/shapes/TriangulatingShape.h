@@ -24,7 +24,7 @@
 namespace tgfx {
 class TriangulatingShape : public PathShape {
  public:
-  explicit TriangulatingShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
+  explicit TriangulatingShape(std::shared_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
  private:
   std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,

@@ -116,18 +116,6 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
   return proxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::wrapTexture(std::shared_ptr<Texture> texture) {
-  if (texture == nullptr || texture->getContext() != context) {
-    return nullptr;
-  }
-  auto uniqueKey = texture->getUniqueKey();
-  if (uniqueKey.empty()) {
-    uniqueKey = UniqueKey::MakeWeak();
-    texture->assignUniqueKey(uniqueKey);
-  }
-  return findTextureProxy(uniqueKey);
-}
-
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount) {
   if (textureProxy == nullptr) {

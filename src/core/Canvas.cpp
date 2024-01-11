@@ -19,7 +19,9 @@
 #include "tgfx/core/Canvas.h"
 #include <atomic>
 #include "CanvasState.h"
+#include "core/Rasterizer.h"
 #include "gpu/GpuPaint.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/SurfaceDrawContext.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
@@ -510,21 +512,17 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
   auto deviceBounds = state->matrix.mapRect(localBounds);
   auto width = ceilf(deviceBounds.width());
   auto height = ceilf(deviceBounds.height());
-  auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
-  if (!mask) {
-    return;
-  }
   auto totalMatrix = state->matrix;
   auto matrix = Matrix::MakeTrans(-deviceBounds.x(), -deviceBounds.y());
   matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
   totalMatrix.postConcat(matrix);
-  mask->setMatrix(totalMatrix);
-  mask->fillPath(path);
-  auto texture = Texture::MakeFrom(getContext(), mask->makeBuffer());
-  drawMask(deviceBounds, std::move(texture), std::move(glPaint));
+  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), totalMatrix);
+  auto textureProxy = getContext()->proxyProvider()->createTextureProxy(
+      {}, std::move(rasterizer), false, surface->options()->renderFlags());
+  drawMask(deviceBounds, std::move(textureProxy), std::move(glPaint));
 }
 
-void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPaint glPaint) {
+void Canvas::drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, GpuPaint glPaint) {
   if (mask == nullptr) {
     return;
   }
@@ -584,7 +582,7 @@ void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_
   }
   auto textBlob = TextBlob::MakeFrom(glyphIDs, scaledPositions.data(), glyphCount, scaledFont);
   if (textBlob) {
-    drawMaskGlyphs(textBlob.get(), scaledPaint);
+    drawMaskGlyphs(textBlob, scaledPaint);
   }
   restore();
 }
@@ -609,7 +607,7 @@ void Canvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], 
   }
 }
 
-void Canvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
+void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint) {
   if (textBlob == nullptr) {
     return;
   }
@@ -626,19 +624,15 @@ void Canvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
   auto deviceBounds = state->matrix.mapRect(localBounds);
   auto width = ceilf(deviceBounds.width());
   auto height = ceilf(deviceBounds.height());
-  auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
-  if (mask == nullptr) {
-    return;
-  }
   auto totalMatrix = state->matrix;
   auto matrix = Matrix::I();
   matrix.postTranslate(-deviceBounds.x(), -deviceBounds.y());
   matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
   totalMatrix.postConcat(matrix);
-  mask->setMatrix(totalMatrix);
-  mask->fillText(textBlob, stroke);
-  auto texture = Texture::MakeFrom(getContext(), mask->makeBuffer());
-  drawMask(deviceBounds, std::move(texture), std::move(glPaint));
+  auto rasterizer = Rasterizer::MakeFrom(textBlob, ISize::Make(width, height), totalMatrix, stroke);
+  auto textureProxy = getContext()->proxyProvider()->createTextureProxy(
+      {}, std::move(rasterizer), false, surface->options()->renderFlags());
+  drawMask(deviceBounds, std::move(textureProxy), std::move(glPaint));
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
