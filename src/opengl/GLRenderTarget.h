@@ -38,8 +38,6 @@ class GLRenderTarget : public RenderTarget {
    */
   unsigned getFrameBufferID(bool forDraw = true) const;
 
-  void resolve() const;
-
   BackendRenderTarget getBackendRenderTarget() const override;
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,

@@ -100,12 +100,13 @@ ImageOrigin Surface::origin() const {
   return renderTargetProxy->origin();
 }
 
-std::shared_ptr<Texture> Surface::getTexture() {
+std::shared_ptr<TextureProxy> Surface::getTextureProxy() {
   if (!renderTargetProxy->isTextureBacked()) {
     return nullptr;
   }
-  flush();
-  return renderTargetProxy->getTexture();
+  auto drawingManager = getContext()->drawingManager();
+  drawingManager->addTextureResolveTask(renderTargetProxy);
+  return renderTargetProxy->getTextureProxy();
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
@@ -164,17 +165,18 @@ void Surface::flushAndSubmit(bool syncCpu) {
 }
 
 std::shared_ptr<Image> Surface::makeImageSnapshot() {
-  flush();
   if (cachedImage != nullptr) {
     return cachedImage;
   }
+  auto drawingManager = getContext()->drawingManager();
+  drawingManager->addTextureResolveTask(renderTargetProxy);
   auto textureProxy = renderTargetProxy->getTextureProxy();
   if (textureProxy != nullptr && !textureProxy->externallyOwned()) {
     cachedImage = Image::MakeFrom(std::move(textureProxy));
   } else {
     auto textureCopy = renderTargetProxy->makeTextureProxy();
-    getContext()->drawingManager()->addRenderTargetCopyTask(
-        renderTargetProxy, textureCopy, Rect::MakeWH(width(), height()), Point::Zero());
+    drawingManager->addRenderTargetCopyTask(renderTargetProxy, textureCopy,
+                                            Rect::MakeWH(width(), height()), Point::Zero());
     cachedImage = Image::MakeFrom(std::move(textureCopy));
   }
   return cachedImage;
@@ -193,8 +195,6 @@ void Surface::aboutToDraw(bool discardContent) {
   if (textureProxy == nullptr || textureProxy->externallyOwned()) {
     return;
   }
-  auto drawingManager = getContext()->drawingManager();
-  drawingManager->closeActiveOpsTask();
   auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy();
   if (newRenderTargetProxy == nullptr) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
@@ -202,6 +202,7 @@ void Surface::aboutToDraw(bool discardContent) {
   }
   if (!discardContent) {
     auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
+    auto drawingManager = getContext()->drawingManager();
     drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy,
                                             Rect::MakeWH(width(), height()), Point::Zero());
   }

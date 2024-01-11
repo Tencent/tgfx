@@ -247,7 +247,7 @@ static bool PaintToGLPaintWithImage(Context* context, uint32_t renderFlags, cons
   return PaintToGLPaint(context, renderFlags, paint, alpha, std::move(shaderFP), glPaint);
 }
 
-std::shared_ptr<Texture> Canvas::getClipTexture() {
+std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
   if (clipID != state->clipID) {
     _clipSurface = nullptr;
   }
@@ -268,7 +268,7 @@ std::shared_ptr<Texture> Canvas::getClipTexture() {
     clipCanvas->drawPath(state->clip, paint);
     clipID = state->clipID;
   }
-  return _clipSurface->getTexture();
+  return _clipSurface->getTextureProxy();
 }
 
 static constexpr float BOUNDS_TO_LERANCE = 1e-3f;

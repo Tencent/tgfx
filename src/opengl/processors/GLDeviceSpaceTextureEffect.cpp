@@ -20,17 +20,17 @@
 
 namespace tgfx {
 std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
-    std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin) {
-  if (texture == nullptr) {
+    std::shared_ptr<TextureProxy> textureProxy, ImageOrigin deviceOrigin) {
+  if (textureProxy == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<DeviceSpaceTextureEffect>(
-      new GLDeviceSpaceTextureEffect(std::move(texture), deviceOrigin));
+      new GLDeviceSpaceTextureEffect(std::move(textureProxy), deviceOrigin));
 }
 
-GLDeviceSpaceTextureEffect::GLDeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
+GLDeviceSpaceTextureEffect::GLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,
                                                        ImageOrigin deviceOrigin)
-    : DeviceSpaceTextureEffect(std::move(texture), deviceOrigin) {
+    : DeviceSpaceTextureEffect(std::move(textureProxy), deviceOrigin) {
 }
 
 void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
@@ -48,9 +48,21 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+  auto texture = textureProxy->getTexture();
+  if (texture == nullptr) {
+    return;
+  }
   float scales[] = {1.f / static_cast<float>(texture->width()),
                     1.f / static_cast<float>(texture->height())};
   uniformBuffer->setData("CoordScale", scales);
+  Matrix deviceCoordMatrix = Matrix::I();
+  if (deviceOrigin == ImageOrigin::BottomLeft) {
+    deviceCoordMatrix.postScale(1, -1);
+    deviceCoordMatrix.postTranslate(0, 1);
+  }
+  auto scale = texture->getTextureCoord(static_cast<float>(texture->width()),
+                                        static_cast<float>(texture->height()));
+  deviceCoordMatrix.postScale(scale.x, scale.y);
   uniformBuffer->setData("DeviceCoordMatrix", deviceCoordMatrix);
 }
 }  // namespace tgfx

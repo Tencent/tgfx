@@ -43,7 +43,8 @@ std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
 
 void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   auto textureProxy = renderTargetProxy->getTextureProxy();
-  if (renderTargetProxy->sampleCount() <= 1 && (!textureProxy || !textureProxy->hasMipmaps())) {
+  if (textureProxy == nullptr ||
+      (renderTargetProxy->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
   closeActiveOpsTask();

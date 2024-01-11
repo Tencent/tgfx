@@ -19,20 +19,19 @@
 #include "DeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
+DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,
                                                    ImageOrigin deviceOrigin)
-    : FragmentProcessor(ClassID()), texture(std::move(texture)) {
-  if (deviceOrigin == ImageOrigin::BottomLeft) {
-    deviceCoordMatrix.postScale(1, -1);
-    deviceCoordMatrix.postTranslate(0, 1);
-  }
-  auto scale = this->texture->getTextureCoord(static_cast<float>(this->texture->width()),
-                                              static_cast<float>(this->texture->height()));
-  deviceCoordMatrix.postScale(scale.x, scale.y);
+    : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)),
+      deviceOrigin(deviceOrigin) {
+}
+
+const TextureSampler* DeviceSpaceTextureEffect::onTextureSampler(size_t) const {
+  auto texture = textureProxy->getTexture();
+  return texture == nullptr ? nullptr : texture->getSampler();
 }
 
 bool DeviceSpaceTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const DeviceSpaceTextureEffect&>(processor);
-  return texture == that.texture && deviceCoordMatrix == that.deviceCoordMatrix;
+  return textureProxy == that.textureProxy && deviceOrigin == that.deviceOrigin;
 }
 }  // namespace tgfx

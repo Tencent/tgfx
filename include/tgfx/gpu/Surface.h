@@ -140,8 +140,8 @@ class Surface {
   HardwareBufferRef getHardwareBuffer();
 
   /**
-   * Returns Canvas that draws into Surface. Subsequent calls return the same Canvas. Canvas
-   * returned is managed and owned by Surface, and is deleted when Surface is deleted.
+   * Returns Canvas that draws into the Surface. Subsequent calls return the same Canvas. Canvas
+   * returned is managed and owned by Surface, and is deleted when the Surface is deleted.
    */
   Canvas* getCanvas();
 
@@ -211,7 +211,7 @@ class Surface {
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options);
 
-  std::shared_ptr<Texture> getTexture();
+  std::shared_ptr<TextureProxy> getTextureProxy();
 
   void aboutToDraw(bool discardContent = false);
 
