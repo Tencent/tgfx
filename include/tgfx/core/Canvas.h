@@ -211,7 +211,7 @@ class Canvas {
   void flush();
 
  private:
-  std::shared_ptr<Texture> getClipTexture();
+  std::shared_ptr<TextureProxy> getClipTexture();
 
   std::pair<std::optional<Rect>, bool> getClipRect();
 

@@ -24,7 +24,7 @@
 namespace tgfx {
 class GLDeviceSpaceTextureEffect : public DeviceSpaceTextureEffect {
  public:
-  GLDeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin);
+  GLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, ImageOrigin deviceOrigin);
 
   void emitCode(EmitArgs& args) const override;
 

@@ -279,31 +279,6 @@ unsigned GLRenderTarget::getFrameBufferID(bool forDraw) const {
   return forDraw ? frameBufferForDraw.id : frameBufferForRead.id;
 }
 
-void GLRenderTarget::resolve() const {
-  if (sampleCount() <= 1) {
-    return;
-  }
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
-  if (!caps->usesMSAARenderBuffers()) {
-    return;
-  }
-  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, frameBufferForDraw.id);
-  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBufferForRead.id);
-  if (caps->msFBOType == MSFBOType::ES_Apple) {
-    // Apple's extension uses the scissor as the blit bounds.
-    gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(0, 0, width(), height());
-    gl->resolveMultisampleFramebuffer();
-    gl->disable(GL_SCISSOR_TEST);
-  } else {
-    // BlitFrameBuffer respects the scissor, so disable it.
-    gl->disable(GL_SCISSOR_TEST);
-    gl->blitFramebuffer(0, 0, width(), height(), 0, 0, width(), height(), GL_COLOR_BUFFER_BIT,
-                        GL_NEAREST);
-  }
-}
-
 void GLRenderTarget::onReleaseGPU() {
   if (externalResource) {
     return;

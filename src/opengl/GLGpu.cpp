@@ -209,7 +209,30 @@ void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
 }
 
 void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {
-  static_cast<GLRenderTarget*>(renderTarget)->resolve();
+  if (renderTarget->sampleCount() <= 1) {
+    return;
+  }
+  auto gl = GLFunctions::Get(_context);
+  auto caps = GLCaps::Get(_context);
+  if (!caps->usesMSAARenderBuffers()) {
+    return;
+  }
+  auto glRT = static_cast<GLRenderTarget*>(renderTarget);
+  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->getFrameBufferID(true));
+  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->getFrameBufferID(false));
+  auto width = renderTarget->width();
+  auto height = renderTarget->height();
+  if (caps->msFBOType == MSFBOType::ES_Apple) {
+    // Apple's extension uses the scissor as the blit bounds.
+    gl->enable(GL_SCISSOR_TEST);
+    gl->scissor(0, 0, width, height);
+    gl->resolveMultisampleFramebuffer();
+    gl->disable(GL_SCISSOR_TEST);
+  } else {
+    // BlitFrameBuffer respects the scissor, so disable it.
+    gl->disable(GL_SCISSOR_TEST);
+    gl->blitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  }
 }
 
 bool GLGpu::insertSemaphore(Semaphore* semaphore) {
