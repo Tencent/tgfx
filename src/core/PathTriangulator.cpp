@@ -21,28 +21,33 @@
 #include "pathkit.h"
 
 namespace tgfx {
+/**
+ * When tessellating curved paths into linear segments, this defines the maximum distance in
+ * screen space which a segment may deviate from the mathematically correct value. Above this
+ * value, the segment will be subdivided. This value was chosen to approximate the super sampling
+ * accuracy of the raster path (16 samples, or one quarter pixel).
+ */
+static constexpr float DefaultTolerance = 0.25f;
+
+int PathTriangulator::GetTriangleCount(size_t bufferSize) {
+  return static_cast<int>(bufferSize / (sizeof(float) * 2));
+}
+
+int PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
+                                  std::vector<float>* vertices, bool* isLinear) {
+  const auto& skPath = PathRef::ReadAccess(path);
+  return skPath.toTriangles(DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds),
+                            vertices, isLinear);
+}
+
 int PathTriangulator::GetAATriangleCount(size_t bufferSize) {
   return static_cast<int>(bufferSize / (sizeof(float) * 3));
 }
 
-PathTriangulator::PathTriangulator(Path path, const Rect& clipBounds, float tolerance)
-    : path(std::move(path)), clipBounds(clipBounds), tolerance(tolerance) {
-}
-
-int PathTriangulator::toTriangles(std::vector<float>* vertices) const {
+int PathTriangulator::ToAATriangles(const Path& path, const Rect& clipBounds,
+                                    std::vector<float>* vertices) {
   const auto& skPath = PathRef::ReadAccess(path);
-  return skPath.toAATriangles(tolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds),
+  return skPath.toAATriangles(DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds),
                               vertices);
 }
-
-std::shared_ptr<Data> PathTriangulator::getData() const {
-  std::vector<float> vertices = {};
-  int count = toTriangles(&vertices);
-  if (count == 0) {
-    // The path is not a filled path, or it is invisible.
-    return nullptr;
-  }
-  return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
-}
-
 }  // namespace tgfx

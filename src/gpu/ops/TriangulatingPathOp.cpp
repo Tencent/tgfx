@@ -40,9 +40,9 @@ class TriangulatingPathVertices : public DataProvider {
   std::shared_ptr<Data> getData() const override {
     std::vector<float> mergedVertices = {};
     for (auto& pathPaint : pathPaints) {
-      PathTriangulator triangulator(pathPaint->path, pathPaint->clipBounds);
       std::vector<float> vertices = {};
-      auto count = triangulator.toTriangles(&vertices);
+      auto count =
+          PathTriangulator::ToAATriangles(pathPaint->path, pathPaint->clipBounds, &vertices);
       if (count > 0) {
         mergedVertices.insert(mergedVertices.end(), std::make_move_iterator(vertices.begin()),
                               std::make_move_iterator(vertices.end()));
