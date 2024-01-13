@@ -17,38 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TriangulatingShape.h"
-#include "core/PathRef.h"
 #include "gpu/GpuBuffer.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/ops/TriangulatingPathOp.h"
 
 namespace tgfx {
 TriangulatingShape::TriangulatingShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
+  auto path = getFillPath();
+  triangulator = std::make_shared<PathTriangulator>(path, bounds);
 }
 
 std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,
                                                    uint32_t renderFlags) const {
-  auto resourceCache = paint->context->resourceCache();
-  auto buffer = std::static_pointer_cast<GpuBuffer>(resourceCache->findUniqueResource(uniqueKey));
-  if (buffer != nullptr) {
-    auto vertexCount = buffer->size() / (sizeof(float) * 3);
-    return std::make_unique<TriangulatingPathOp>(paint->color, buffer, vertexCount, bounds,
-                                                 viewMatrix);
-  }
-  auto path = getFillPath();
-  std::vector<float> vertices = {};
-  int count = PathRef::ToAATriangles(path, bounds, &vertices);
-  if (count == 0) {
+  auto proxyProvider = paint->context->proxyProvider();
+  auto bufferProxy =
+      proxyProvider->createGpuBufferProxy(uniqueKey, triangulator, BufferType::Vertex, renderFlags);
+  if (bufferProxy == nullptr) {
     return nullptr;
   }
-  buffer = GpuBuffer::Make(paint->context, BufferType::Vertex, vertices.data(),
-                           vertices.size() * sizeof(float));
-  if (buffer == nullptr) {
-    return nullptr;
-  }
-  if (!(renderFlags & RenderFlags::DisableCache)) {
-    buffer->assignUniqueKey(uniqueKey);
-  }
-  return std::make_unique<TriangulatingPathOp>(paint->color, buffer, count, bounds, viewMatrix);
+  return std::make_unique<TriangulatingPathOp>(paint->color, bufferProxy, bounds, viewMatrix);
 }
 }  // namespace tgfx

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "GpuBuffer.h"
 #include "gpu/Texture.h"
+#include "gpu/proxies/GpuBufferProxy.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -34,13 +34,13 @@ class ResourceProvider {
 
   std::shared_ptr<Texture> getGradient(const Color* colors, const float* positions, int count);
 
-  std::shared_ptr<GpuBuffer> nonAAQuadIndexBuffer();
+  std::shared_ptr<GpuBufferProxy> nonAAQuadIndexBuffer();
 
   static uint16_t MaxNumNonAAQuads();
 
   static uint16_t NumIndicesPerNonAAQuad();
 
-  std::shared_ptr<GpuBuffer> aaQuadIndexBuffer();
+  std::shared_ptr<GpuBufferProxy> aaQuadIndexBuffer();
 
   static uint16_t MaxNumAAQuads();
 
@@ -49,13 +49,13 @@ class ResourceProvider {
   void releaseAll();
 
  private:
-  std::shared_ptr<GpuBuffer> createNonAAQuadIndexBuffer();
+  std::shared_ptr<GpuBufferProxy> createNonAAQuadIndexBuffer();
 
-  std::shared_ptr<GpuBuffer> createAAQuadIndexBuffer();
+  std::shared_ptr<GpuBufferProxy> createAAQuadIndexBuffer();
 
   Context* context = nullptr;
   GradientCache* _gradientCache = nullptr;
-  std::shared_ptr<GpuBuffer> _aaQuadIndexBuffer;
-  std::shared_ptr<GpuBuffer> _nonAAQuadIndexBuffer;
+  std::shared_ptr<GpuBufferProxy> _aaQuadIndexBuffer;
+  std::shared_ptr<GpuBufferProxy> _nonAAQuadIndexBuffer;
 };
 }  // namespace tgfx

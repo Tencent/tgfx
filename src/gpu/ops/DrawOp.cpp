@@ -21,14 +21,6 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-void DrawOp::prepare(Gpu* gpu) {
-  onPrepare(gpu);
-}
-
-void DrawOp::execute(RenderPass* renderPass) {
-  onExecute(renderPass);
-}
-
 static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect) {
   DstTextureInfo dstTextureInfo = {};
   if (renderPass->context()->caps()->textureBarrierSupport && renderPass->renderTargetTexture()) {

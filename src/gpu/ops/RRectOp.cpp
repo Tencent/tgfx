@@ -240,16 +240,15 @@ void RRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool useS
   }
 }
 
-void RRectOp::onPrepare(Gpu* gpu) {
-  auto* context = gpu->context();
+void RRectOp::prepare(Context* context) {
   auto useScale = UseScale(context);
   std::vector<float> vertices;
   for (const auto& rRectWrap : rRects) {
     rRectWrap.writeToVertices(vertices, useScale, aa);
   }
-  vertexBuffer = GpuBuffer::Make(context, BufferType::Vertex, vertices.data(),
-                                 vertices.size() * sizeof(float));
-  if (vertexBuffer == nullptr) {
+  auto vertexData = Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
+  vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexData), BufferType::Vertex);
+  if (vertexBufferProxy == nullptr) {
     return;
   }
 
@@ -260,12 +259,17 @@ void RRectOp::onPrepare(Gpu* gpu) {
       indices.emplace_back(gStandardRRectIndices[j] + offset);
     }
   }
-  indexBuffer = GpuBuffer::Make(context, BufferType::Index, indices.data(),
-                                indices.size() * sizeof(uint16_t));
+  auto indexData = Data::MakeWithCopy(indices.data(), indices.size() * sizeof(uint16_t));
+  indexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(indexData), BufferType::Index);
 }
 
-void RRectOp::onExecute(RenderPass* renderPass) {
-  if (indexBuffer == nullptr || vertexBuffer == nullptr) {
+void RRectOp::execute(RenderPass* renderPass) {
+  if (indexBufferProxy == nullptr || vertexBufferProxy == nullptr) {
+    return;
+  }
+  auto vertexBuffer = vertexBufferProxy->getBuffer();
+  auto indexBuffer = indexBufferProxy->getBuffer();
+  if (vertexBuffer == nullptr || indexBuffer == nullptr) {
     return;
   }
   auto pipeline = createPipeline(

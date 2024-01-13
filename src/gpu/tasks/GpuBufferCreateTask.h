@@ -18,39 +18,29 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "ResourceTask.h"
+#include "core/DataProvider.h"
+#include "gpu/GpuBuffer.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
-};
-
-class GpuBuffer : public Resource {
+class GpuBufferCreateTask : public ResourceTask {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, const void* buffer, size_t size,
-                                         BufferType bufferType);
-
-  BufferType bufferType() const {
-    return _bufferType;
-  }
-
-  size_t size() const {
-    return _sizeInBytes;
-  }
-
-  size_t memoryUsage() const override {
-    return _sizeInBytes;
-  }
+  /**
+   * Create a new GpuBufferCreateTask to generate a GpuBuffer with the given data provider. If async
+   * is true, the data provider will be read from an asynchronous thread immediately. Otherwise, the
+   * data provider will be read from the current thread when the GpuBufferCreateTask is executed.
+   */
+  static std::shared_ptr<GpuBufferCreateTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
+                                                       std::shared_ptr<DataProvider> provider,
+                                                       bool async);
 
  protected:
-  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _sizeInBytes(sizeInBytes) {
-  }
+  BufferType bufferType = BufferType::Vertex;
 
-  BufferType _bufferType;
+  GpuBufferCreateTask(UniqueKey uniqueKey, BufferType bufferType);
 
- private:
-  size_t _sizeInBytes;
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
+
+  virtual std::shared_ptr<Data> getData() = 0;
 };
 }  // namespace tgfx

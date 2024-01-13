@@ -28,8 +28,8 @@ static void ComputeScratchKey(BytesKey* scratchKey, BufferType bufferType) {
   scratchKey->write(static_cast<uint32_t>(bufferType));
 }
 
-std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferType,
-                                           const void* buffer, size_t size) {
+std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, const void* buffer, size_t size,
+                                           BufferType bufferType) {
   if (buffer == nullptr || size == 0) {
     return nullptr;
   }

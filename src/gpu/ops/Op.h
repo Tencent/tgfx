@@ -40,7 +40,7 @@ class Op {
 
   virtual ~Op() = default;
 
-  virtual void prepare(Gpu*) {
+  virtual void prepare(Context*) {
   }
 
   virtual void execute(RenderPass* renderPass) = 0;

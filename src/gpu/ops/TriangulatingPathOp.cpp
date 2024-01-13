@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TriangulatingPathOp.h"
-#include "core/PathRef.h"
+#include "core/PathTriangulator.h"
 #include "gpu/Gpu.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 
@@ -29,27 +29,28 @@ std::unique_ptr<TriangulatingPathOp> TriangulatingPathOp::Make(Color color, cons
     return nullptr;
   }
   std::vector<float> vertices = {};
-  int count = PathRef::ToAATriangles(path, clipBounds, &vertices);
+  PathTriangulator triangulator(path, clipBounds);
+  int count = triangulator.toTriangles(&vertices);
   if (count == 0) {
     return nullptr;
   }
-  return std::make_unique<TriangulatingPathOp>(color, vertices, count, path.getBounds(),
-                                               Matrix::I(), localMatrix);
+  return std::make_unique<TriangulatingPathOp>(color, vertices, path.getBounds(), Matrix::I(),
+                                               localMatrix);
 }
 
-TriangulatingPathOp::TriangulatingPathOp(Color color, std::shared_ptr<GpuBuffer> buffer,
-                                         int vertexCount, const Rect& bounds,
-                                         const Matrix& viewMatrix, const Matrix& localMatrix)
-    : DrawOp(ClassID()), color(color), buffer(std::move(buffer)), vertexCount(vertexCount),
-      viewMatrix(viewMatrix), localMatrix(localMatrix) {
+TriangulatingPathOp::TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> bufferProxy,
+                                         const Rect& bounds, const Matrix& viewMatrix,
+                                         const Matrix& localMatrix)
+    : DrawOp(ClassID()), color(color), bufferProxy(std::move(bufferProxy)), viewMatrix(viewMatrix),
+      localMatrix(localMatrix) {
   setBounds(bounds);
 }
 
-TriangulatingPathOp::TriangulatingPathOp(Color color, std::vector<float> vertices, int vertexCount,
+TriangulatingPathOp::TriangulatingPathOp(Color color, std::vector<float> vertices,
                                          const Rect& bounds, const Matrix& viewMatrix,
                                          const Matrix& localMatrix)
-    : DrawOp(ClassID()), color(color), vertices(std::move(vertices)), vertexCount(vertexCount),
-      viewMatrix(viewMatrix), localMatrix(localMatrix) {
+    : DrawOp(ClassID()), color(color), vertices(std::move(vertices)), viewMatrix(viewMatrix),
+      localMatrix(localMatrix) {
   setBounds(bounds);
 }
 
@@ -59,23 +60,26 @@ bool TriangulatingPathOp::onCombineIfPossible(Op* op) {
   }
   auto* that = static_cast<TriangulatingPathOp*>(op);
   if (viewMatrix != that->viewMatrix || localMatrix != that->localMatrix || color != that->color ||
-      buffer != nullptr || that->buffer != nullptr) {
+      bufferProxy != nullptr || that->bufferProxy != nullptr) {
     return false;
   }
   vertices.insert(vertices.end(), that->vertices.begin(), that->vertices.end());
-  vertexCount += that->vertexCount;
   return true;
 }
 
-void TriangulatingPathOp::onPrepare(Gpu* gpu) {
-  if (buffer == nullptr) {
-    buffer = GpuBuffer::Make(gpu->context(), BufferType::Vertex, vertices.data(),
-                             vertices.size() * sizeof(float));
+void TriangulatingPathOp::prepare(Context* context) {
+  if (bufferProxy == nullptr) {
+    auto data = Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
+    bufferProxy = GpuBufferProxy::MakeFrom(context, std::move(data), BufferType::Vertex);
     vertices = {};
   }
 }
 
-void TriangulatingPathOp::onExecute(RenderPass* renderPass) {
+void TriangulatingPathOp::execute(RenderPass* renderPass) {
+  if (bufferProxy == nullptr) {
+    return;
+  }
+  auto buffer = bufferProxy->getBuffer();
   if (buffer == nullptr) {
     return;
   }
@@ -85,6 +89,7 @@ void TriangulatingPathOp::onExecute(RenderPass* renderPass) {
                                                  localMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(nullptr, buffer);
+  auto vertexCount = PathTriangulator::GetAATriangleCount(buffer->size());
   renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
 }  // namespace tgfx

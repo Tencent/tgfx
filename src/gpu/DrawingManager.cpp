@@ -82,6 +82,9 @@ bool DrawingManager::flush() {
   if (resourceTasks.empty() && renderTasks.empty()) {
     return false;
   }
+  for (auto& task : renderTasks) {
+    task->prepare(context);
+  }
   for (auto& task : resourceTasks) {
     task->execute(context);
   }

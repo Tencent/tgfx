@@ -16,17 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PathRef.h"
-#include "tgfx/core/Path.h"
+#pragma once
+
+#include "ResourceProxy.h"
+#include "core/DataProvider.h"
+#include "gpu/GpuBuffer.h"
 
 namespace tgfx {
-using namespace pk;
+class GpuBufferProxy : public ResourceProxy {
+ public:
+  /**
+   * Creates a GpuBufferProxy from the given data.
+   */
+  static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context, std::shared_ptr<Data> data,
+                                                  BufferType bufferType);
 
-const SkPath& PathRef::ReadAccess(const Path& path) {
-  return path.pathRef->path;
-}
+  /**
+   * Returns the type of the buffer.
+   */
+  BufferType bufferType() const {
+    return _bufferType;
+  }
 
-SkPath& PathRef::WriteAccess(Path& path) {
-  return path.writableRef()->path;
-}
+  /**
+   * Returns the associated GpuBuffer instance.
+   */
+  std::shared_ptr<GpuBuffer> getBuffer() const;
+
+ private:
+  BufferType _bufferType = BufferType::Vertex;
+  size_t _size = 0;
+
+  explicit GpuBufferProxy(BufferType bufferType) : _bufferType(bufferType) {
+  }
+
+  friend class ProxyProvider;
+};
 }  // namespace tgfx

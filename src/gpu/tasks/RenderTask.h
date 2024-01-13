@@ -27,6 +27,9 @@ class RenderTask {
  public:
   virtual ~RenderTask() = default;
 
+  virtual void prepare(Context*) {
+  }
+
   virtual bool execute(Gpu* gpu) = 0;
 
   void makeClosed() {

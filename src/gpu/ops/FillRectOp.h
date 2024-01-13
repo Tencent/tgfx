@@ -31,6 +31,10 @@ class FillRectOp : public DrawOp {
   bool add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
            const Matrix& localMatrix);
 
+  void prepare(Context* context) override;
+
+  void execute(RenderPass* renderPass) override;
+
  private:
   DEFINE_OP_CLASS_ID
 
@@ -39,13 +43,9 @@ class FillRectOp : public DrawOp {
 
   bool onCombineIfPossible(Op* op) override;
 
-  void onPrepare(Gpu* gpu) override;
-
-  void onExecute(RenderPass* renderPass) override;
-
   bool canAdd(size_t count) const;
 
-  std::vector<float> vertices();
+  std::shared_ptr<Data> getVertexData();
 
   std::vector<float> coverageVertices() const;
 
@@ -57,7 +57,7 @@ class FillRectOp : public DrawOp {
   std::vector<Rect> rects;
   std::vector<Matrix> viewMatrices;
   std::vector<Matrix> localMatrices;
-  std::shared_ptr<GpuBuffer> vertexBuffer;
-  std::shared_ptr<GpuBuffer> indexBuffer;
+  std::shared_ptr<GpuBufferProxy> vertexBufferProxy;
+  std::shared_ptr<GpuBufferProxy> indexBufferProxy;
 };
 }  // namespace tgfx

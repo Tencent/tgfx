@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "core/DataProvider.h"
+#include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "images/ImageDecoder.h"
@@ -35,6 +37,16 @@ class ProxyProvider {
    * Returns true if the proxy provider has a proxy for the given unique key.
    */
   bool hasResourceProxy(const UniqueKey& uniqueKey);
+
+  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
+                                                       std::shared_ptr<Data> data,
+                                                       BufferType bufferType,
+                                                       uint32_t renderFlags = 0);
+
+  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
+                                                       std::shared_ptr<DataProvider> provider,
+                                                       BufferType bufferType,
+                                                       uint32_t renderFlags = 0);
 
   /*
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being
@@ -99,9 +111,13 @@ class ProxyProvider {
 
   static UniqueKey GetStrongKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
+  std::shared_ptr<GpuBufferProxy> findGpuBufferProxy(const UniqueKey& uniqueKey);
+
   std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
 
+  std::shared_ptr<ResourceProxy> findResourceProxy(const UniqueKey& uniqueKey);
+
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, UniqueKey strongKey,
-                        uint32_t domainID = 0);
+                        uint32_t domainID);
 };
 }  // namespace tgfx
