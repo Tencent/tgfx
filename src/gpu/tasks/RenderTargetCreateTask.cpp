@@ -39,12 +39,17 @@ RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey te
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* context) {
   auto texture = Resource::Get<Texture>(context, textureKey);
   if (texture == nullptr) {
+    LOGE("RenderTargetCreateTask::onMakeResource() Failed to get texture!");
     return nullptr;
   }
   if (texture->getSampler()->format != pixelFormat) {
     LOGE("RenderTargetCreateTask::onMakeResource() texture format mismatch!");
     return nullptr;
   }
-  return RenderTarget::MakeFrom(texture.get(), sampleCount);
+  auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount);
+  if (renderTarget == nullptr) {
+    LOGE("RenderTargetCreateTask::onMakeResource() Failed to create render target!");
+  }
+  return renderTarget;
 }
 }  // namespace tgfx

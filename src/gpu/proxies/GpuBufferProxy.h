@@ -30,6 +30,12 @@ class GpuBufferProxy : public ResourceProxy {
    */
   static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context, std::shared_ptr<Data> data,
                                                   BufferType bufferType);
+  /**
+   * Creates a GpuBufferProxy from the given data provider.
+   */
+  static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context,
+                                                  std::shared_ptr<DataProvider> dataProvider,
+                                                  BufferType bufferType);
 
   /**
    * Returns the type of the buffer.

@@ -255,7 +255,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rects.size(), drawCallCount);
+  EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rectPaints.size(), drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
   device->unlock();
@@ -302,8 +302,8 @@ TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->vertices.size(),
-            static_cast<size_t>(drawCallCount * 90));
+  EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->pathPaints.size(),
+            static_cast<size_t>(drawCallCount));
   canvas->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_triangle"));
   device->unlock();
@@ -344,7 +344,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRects.size(), drawCallCount);
+  EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRectPaints.size(), drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
   device->unlock();

@@ -30,7 +30,7 @@ void SurfaceDrawContext::fillRectWithFP(const Rect& dstRect, const Matrix& local
   if (fp == nullptr) {
     return;
   }
-  auto op = FillRectOp::Make({}, dstRect, Matrix::I(), localMatrix);
+  auto op = FillRectOp::Make(std::nullopt, dstRect, Matrix::I(), localMatrix);
   std::vector<std::unique_ptr<FragmentProcessor>> colors;
   colors.emplace_back(std::move(fp));
   op->setColors(std::move(colors));

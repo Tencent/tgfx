@@ -97,6 +97,14 @@ GpuBufferCreateTask::GpuBufferCreateTask(UniqueKey uniqueKey, BufferType bufferT
 
 std::shared_ptr<Resource> GpuBufferCreateTask::onMakeResource(Context* context) {
   auto data = getData();
-  return GpuBuffer::Make(context, data->data(), data->size(), bufferType);
+  if (data == nullptr || data->empty()) {
+    // We don't need to log an error here because the getData() should have already logged an error.
+    return nullptr;
+  }
+  auto gpuBuffer = GpuBuffer::Make(context, data->data(), data->size(), bufferType);
+  if (gpuBuffer == nullptr) {
+    LOGE("GpuBufferCreateTask::onMakeResource failed to create GpuBuffer");
+  }
+  return gpuBuffer;
 }
 }  // namespace tgfx

@@ -36,14 +36,27 @@ bool ProxyProvider::hasResourceProxy(const UniqueKey& uniqueKey) {
   return proxy->uniqueKey.domainID() == uniqueKey.domainID();
 }
 
+class DataWrapper : public DataProvider {
+ public:
+  DataWrapper(std::shared_ptr<Data> data) : data(std::move(data)) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    return data;
+  }
+
+ private:
+  std::shared_ptr<Data> data = nullptr;
+};
+
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const UniqueKey& uniqueKey,
                                                                     std::shared_ptr<Data> data,
                                                                     BufferType bufferType,
                                                                     uint32_t renderFlags) {
-  auto provider = DataProvider::Wrap(std::move(data));
-  if (provider == nullptr) {
+  if (data == nullptr || data->empty()) {
     return nullptr;
   }
+  auto provider = std::make_shared<DataWrapper>(std::move(data));
   renderFlags |= RenderFlags::DisableAsyncTask;
   return createGpuBufferProxy(uniqueKey, std::move(provider), bufferType, renderFlags);
 }

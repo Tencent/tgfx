@@ -26,8 +26,6 @@ namespace tgfx {
  */
 class DataProvider {
  public:
-  static std::shared_ptr<DataProvider> Wrap(std::shared_ptr<Data> data);
-
   virtual ~DataProvider() = default;
 
   /**

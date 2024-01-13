@@ -21,71 +21,117 @@
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "tgfx/utils/Buffer.h"
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-std::vector<float> FillRectOp::coverageVertices() const {
-  std::vector<float> vertices;
-  for (size_t i = 0; i < rects.size(); ++i) {
-    auto scale = sqrtf(viewMatrices[i].getScaleX() * viewMatrices[i].getScaleX() +
-                       viewMatrices[i].getSkewY() * viewMatrices[i].getSkewY());
-    // we want the new edge to be .5px away from the old line.
-    auto padding = 0.5f / scale;
-    auto insetBounds = rects[i].makeInset(padding, padding);
-    auto insetQuad = Quad::MakeFromRect(insetBounds, viewMatrices[i]);
-    auto outsetBounds = rects[i].makeOutset(padding, padding);
-    auto outsetQuad = Quad::MakeFromRect(outsetBounds, viewMatrices[i]);
+class RectPaint {
+ public:
+  RectPaint(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+            const Matrix& localMatrix)
+      : color(color.value_or(Color::White())), rect(rect), viewMatrix(viewMatrix),
+        localMatrix(localMatrix) {
+  }
 
-    auto normalInsetQuad = Quad::MakeFromRect(insetBounds, localMatrices[i]);
-    auto normalOutsetQuad = Quad::MakeFromRect(outsetBounds, localMatrices[i]);
+  Color color;
+  Rect rect;
+  Matrix viewMatrix;
+  Matrix localMatrix;
+};
 
-    for (int j = 0; j < 2; ++j) {
-      const auto& quad = j == 0 ? insetQuad : outsetQuad;
-      const auto& normalQuad = j == 0 ? normalInsetQuad : normalOutsetQuad;
-      auto coverage = j == 0 ? 1.0f : 0.0f;
-      for (int k = 0; k < 4; ++k) {
-        vertices.push_back(quad.point(k).x);
-        vertices.push_back(quad.point(k).y);
-        vertices.push_back(coverage);
-        vertices.push_back(normalQuad.point(k).x);
-        vertices.push_back(normalQuad.point(k).y);
-        if (!colors.empty()) {
-          vertices.push_back(colors[i].red);
-          vertices.push_back(colors[i].green);
-          vertices.push_back(colors[i].blue);
-          vertices.push_back(colors[i].alpha);
+class RectCoverageVerticesProvider : public DataProvider {
+ public:
+  RectCoverageVerticesProvider(std::vector<std::shared_ptr<RectPaint>> rectPaints, bool hasColor)
+      : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 9 : 5);
+    Buffer buffer(floatCount * sizeof(float));
+    auto vertices = reinterpret_cast<float*>(buffer.data());
+    auto index = 0;
+    for (auto& rectPaint : rectPaints) {
+      auto& viewMatrix = rectPaint->viewMatrix;
+      auto& rect = rectPaint->rect;
+      auto& localMatrix = rectPaint->localMatrix;
+      auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
+                         viewMatrix.getSkewY() * viewMatrix.getSkewY());
+      // we want the new edge to be .5px away from the old line.
+      auto padding = 0.5f / scale;
+      auto insetBounds = rect.makeInset(padding, padding);
+      auto insetQuad = Quad::MakeFromRect(insetBounds, viewMatrix);
+      auto outsetBounds = rect.makeOutset(padding, padding);
+      auto outsetQuad = Quad::MakeFromRect(outsetBounds, viewMatrix);
+
+      auto normalInsetQuad = Quad::MakeFromRect(insetBounds, localMatrix);
+      auto normalOutsetQuad = Quad::MakeFromRect(outsetBounds, localMatrix);
+
+      for (int j = 0; j < 2; ++j) {
+        const auto& quad = j == 0 ? insetQuad : outsetQuad;
+        const auto& normalQuad = j == 0 ? normalInsetQuad : normalOutsetQuad;
+        auto coverage = j == 0 ? 1.0f : 0.0f;
+        for (int k = 0; k < 4; ++k) {
+          vertices[index++] = quad.point(k).x;
+          vertices[index++] = quad.point(k).y;
+          vertices[index++] = coverage;
+          vertices[index++] = normalQuad.point(k).x;
+          vertices[index++] = normalQuad.point(k).y;
+          if (hasColor) {
+            auto& color = rectPaint->color;
+            vertices[index++] = color.red;
+            vertices[index++] = color.green;
+            vertices[index++] = color.blue;
+            vertices[index++] = color.alpha;
+          }
         }
       }
     }
+    return buffer.release();
   }
-  return vertices;
-}
 
-std::vector<float> FillRectOp::noCoverageVertices() const {
-  std::vector<float> vertices;
-  for (size_t i = 0; i < rects.size(); ++i) {
-    auto quad = Quad::MakeFromRect(rects[i], viewMatrices[i]);
-    auto localQuad = Quad::MakeFromRect(rects[i], localMatrices[i]);
-    for (int j = 3; j >= 0; --j) {
-      vertices.push_back(quad.point(j).x);
-      vertices.push_back(quad.point(j).y);
-      vertices.push_back(localQuad.point(j).x);
-      vertices.push_back(localQuad.point(j).y);
-      if (!colors.empty()) {
-        vertices.push_back(colors[i].red);
-        vertices.push_back(colors[i].green);
-        vertices.push_back(colors[i].blue);
-        vertices.push_back(colors[i].alpha);
+ private:
+  std::vector<std::shared_ptr<RectPaint>> rectPaints;
+  bool hasColor;
+};
+
+class RectNoCoverageVerticesProvider : public DataProvider {
+ public:
+  RectNoCoverageVerticesProvider(std::vector<std::shared_ptr<RectPaint>> rectPaints, bool hasColor)
+      : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    auto floatCount = rectPaints.size() * 4 * (hasColor ? 9 : 5);
+    Buffer buffer(floatCount * sizeof(float));
+    auto vertices = reinterpret_cast<float*>(buffer.data());
+    auto index = 0;
+    for (auto& rectPaint : rectPaints) {
+      auto& viewMatrix = rectPaint->viewMatrix;
+      auto& rect = rectPaint->rect;
+      auto& localMatrix = rectPaint->localMatrix;
+      auto quad = Quad::MakeFromRect(rect, viewMatrix);
+      auto localQuad = Quad::MakeFromRect(rect, localMatrix);
+      for (int j = 3; j >= 0; --j) {
+        vertices[index++] = quad.point(j).x;
+        vertices[index++] = quad.point(j).y;
+        vertices[index++] = localQuad.point(j).x;
+        vertices[index++] = localQuad.point(j).y;
+        if (hasColor) {
+          auto& color = rectPaint->color;
+          vertices[index++] = color.red;
+          vertices[index++] = color.green;
+          vertices[index++] = color.blue;
+          vertices[index++] = color.alpha;
+        }
       }
     }
+    return buffer.release();
   }
-  return vertices;
-}
 
-std::shared_ptr<Data> FillRectOp::getVertexData() {
-  auto vertices = aa == AAType::Coverage ? coverageVertices() : noCoverageVertices();
-  return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
-}
+ private:
+  std::vector<std::shared_ptr<RectPaint>> rectPaints;
+  bool hasColor;
+};
 
 std::unique_ptr<FillRectOp> FillRectOp::Make(std::optional<Color> color, const Rect& rect,
                                              const Matrix& viewMatrix, const Matrix& localMatrix) {
@@ -94,8 +140,9 @@ std::unique_ptr<FillRectOp> FillRectOp::Make(std::optional<Color> color, const R
 
 FillRectOp::FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
                        const Matrix& localMatrix)
-    : DrawOp(ClassID()), colors(color ? std::vector<Color>{*color} : std::vector<Color>()),
-      rects({rect}), viewMatrices({viewMatrix}), localMatrices({localMatrix}) {
+    : DrawOp(ClassID()), hasColor(color) {
+  auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix, localMatrix);
+  rectPaints.push_back(std::move(rectPaint));
   auto bounds = Rect::MakeEmpty();
   bounds.join(viewMatrix.mapRect(rect));
   setBounds(bounds);
@@ -103,46 +150,45 @@ FillRectOp::FillRectOp(std::optional<Color> color, const Rect& rect, const Matri
 
 bool FillRectOp::add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
                      const Matrix& localMatrix) {
-  if ((!color && !colors.empty()) || (color && colors.empty()) || !canAdd(1)) {
+  if (!color == hasColor || !canAdd(1)) {
     return false;
   }
   auto b = bounds();
   b.join(viewMatrix.mapRect(rect));
   setBounds(b);
-  rects.emplace_back(rect);
-  viewMatrices.emplace_back(viewMatrix);
-  localMatrices.emplace_back(localMatrix);
-  if (color) {
-    colors.push_back(*color);
-  }
+  auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix, localMatrix);
+  rectPaints.push_back(std::move(rectPaint));
   return true;
 }
 
 bool FillRectOp::canAdd(size_t count) const {
-  return rects.size() + count <= static_cast<size_t>(aa == AAType::Coverage
-                                                         ? ResourceProvider::MaxNumAAQuads()
-                                                         : ResourceProvider::MaxNumNonAAQuads());
+  return rectPaints.size() + count <=
+         static_cast<size_t>(aa == AAType::Coverage ? ResourceProvider::MaxNumAAQuads()
+                                                    : ResourceProvider::MaxNumNonAAQuads());
 }
 
 bool FillRectOp::onCombineIfPossible(Op* op) {
   auto* that = static_cast<FillRectOp*>(op);
-  if (colors.empty() != that->colors.empty() || !canAdd(that->rects.size()) ||
+  if (hasColor != that->hasColor || !canAdd(that->rectPaints.size()) ||
       !DrawOp::onCombineIfPossible(op)) {
     return false;
   }
-  rects.insert(rects.end(), that->rects.begin(), that->rects.end());
-  viewMatrices.insert(viewMatrices.end(), that->viewMatrices.begin(), that->viewMatrices.end());
-  localMatrices.insert(localMatrices.end(), that->localMatrices.begin(), that->localMatrices.end());
-  colors.insert(colors.end(), that->colors.begin(), that->colors.end());
+  rectPaints.insert(rectPaints.end(), that->rectPaints.begin(), that->rectPaints.end());
   return true;
 }
 
 bool FillRectOp::needsIndexBuffer() const {
-  return rects.size() > 1 || aa == AAType::Coverage;
+  return rectPaints.size() > 1 || aa == AAType::Coverage;
 }
 
 void FillRectOp::prepare(Context* context) {
-  vertexBufferProxy = GpuBufferProxy::MakeFrom(context, getVertexData(), BufferType::Vertex);
+  std::shared_ptr<DataProvider> vertexData = nullptr;
+  if (aa == AAType::Coverage) {
+    vertexData = std::make_shared<RectCoverageVerticesProvider>(rectPaints, hasColor);
+  } else {
+    vertexData = std::make_shared<RectNoCoverageVerticesProvider>(rectPaints, hasColor);
+  }
+  vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexData), BufferType::Vertex);
   if (aa == AAType::Coverage) {
     indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else {
@@ -168,10 +214,10 @@ void FillRectOp::execute(RenderPass* renderPass) {
       return;
     }
   }
-  auto pipeline =
-      createPipeline(renderPass, QuadPerEdgeAAGeometryProcessor::Make(
-                                     renderPass->renderTarget()->width(),
-                                     renderPass->renderTarget()->height(), aa, !colors.empty()));
+  auto pipeline = createPipeline(
+      renderPass,
+      QuadPerEdgeAAGeometryProcessor::Make(renderPass->renderTarget()->width(),
+                                           renderPass->renderTarget()->height(), aa, hasColor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer);
   if (needsIndexBuffer()) {
@@ -182,7 +228,7 @@ void FillRectOp::execute(RenderPass* renderPass) {
       numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
     }
     renderPass->drawIndexed(PrimitiveType::Triangles, 0,
-                            static_cast<int>(rects.size()) * numIndicesPerQuad);
+                            static_cast<int>(rectPaints.size()) * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }

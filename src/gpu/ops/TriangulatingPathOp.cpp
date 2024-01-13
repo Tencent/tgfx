@@ -22,20 +22,46 @@
 #include "gpu/processors/DefaultGeometryProcessor.h"
 
 namespace tgfx {
+class PathPaint {
+ public:
+  PathPaint(Path path, const Rect& clipBounds) : path(std::move(path)), clipBounds(clipBounds) {
+  }
+
+  Path path;
+  Rect clipBounds;
+};
+
+class TriangulatingPathVertices : public DataProvider {
+ public:
+  explicit TriangulatingPathVertices(std::vector<std::shared_ptr<PathPaint>> pathPaints)
+      : pathPaints(std::move(pathPaints)) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    std::vector<float> mergedVertices = {};
+    for (auto& pathPaint : pathPaints) {
+      PathTriangulator triangulator(pathPaint->path, pathPaint->clipBounds);
+      std::vector<float> vertices = {};
+      auto count = triangulator.toTriangles(&vertices);
+      if (count > 0) {
+        mergedVertices.insert(mergedVertices.end(), std::make_move_iterator(vertices.begin()),
+                              std::make_move_iterator(vertices.end()));
+      }
+    }
+    return Data::MakeWithCopy(mergedVertices.data(), mergedVertices.size() * sizeof(float));
+  }
+
+ private:
+  std::vector<std::shared_ptr<PathPaint>> pathPaints = {};
+};
+
 std::unique_ptr<TriangulatingPathOp> TriangulatingPathOp::Make(Color color, const Path& path,
                                                                const Rect& clipBounds,
                                                                const Matrix& localMatrix) {
-  if (path.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
+  if (path.isEmpty() || path.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
     return nullptr;
   }
-  std::vector<float> vertices = {};
-  PathTriangulator triangulator(path, clipBounds);
-  int count = triangulator.toTriangles(&vertices);
-  if (count == 0) {
-    return nullptr;
-  }
-  return std::make_unique<TriangulatingPathOp>(color, vertices, path.getBounds(), Matrix::I(),
-                                               localMatrix);
+  return std::make_unique<TriangulatingPathOp>(color, path, clipBounds, Matrix::I(), localMatrix);
 }
 
 TriangulatingPathOp::TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> bufferProxy,
@@ -46,11 +72,11 @@ TriangulatingPathOp::TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferP
   setBounds(bounds);
 }
 
-TriangulatingPathOp::TriangulatingPathOp(Color color, std::vector<float> vertices,
-                                         const Rect& bounds, const Matrix& viewMatrix,
-                                         const Matrix& localMatrix)
-    : DrawOp(ClassID()), color(color), vertices(std::move(vertices)), viewMatrix(viewMatrix),
-      localMatrix(localMatrix) {
+TriangulatingPathOp::TriangulatingPathOp(Color color, Path path, const Rect& bounds,
+                                         const Matrix& viewMatrix, const Matrix& localMatrix)
+    : DrawOp(ClassID()), color(color), viewMatrix(viewMatrix), localMatrix(localMatrix) {
+  auto pathPaint = std::make_shared<PathPaint>(std::move(path), bounds);
+  pathPaints.push_back(std::move(pathPaint));
   setBounds(bounds);
 }
 
@@ -63,15 +89,14 @@ bool TriangulatingPathOp::onCombineIfPossible(Op* op) {
       bufferProxy != nullptr || that->bufferProxy != nullptr) {
     return false;
   }
-  vertices.insert(vertices.end(), that->vertices.begin(), that->vertices.end());
+  pathPaints.insert(pathPaints.end(), that->pathPaints.begin(), that->pathPaints.end());
   return true;
 }
 
 void TriangulatingPathOp::prepare(Context* context) {
   if (bufferProxy == nullptr) {
-    auto data = Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
-    bufferProxy = GpuBufferProxy::MakeFrom(context, std::move(data), BufferType::Vertex);
-    vertices = {};
+    auto dataProvider = std::make_shared<TriangulatingPathVertices>(pathPaints);
+    bufferProxy = GpuBufferProxy::MakeFrom(context, std::move(dataProvider), BufferType::Vertex);
   }
 }
 

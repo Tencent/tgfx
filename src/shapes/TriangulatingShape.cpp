@@ -36,6 +36,7 @@ std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix
   if (bufferProxy == nullptr) {
     return nullptr;
   }
-  return std::make_unique<TriangulatingPathOp>(paint->color, bufferProxy, bounds, viewMatrix);
+  return std::make_unique<TriangulatingPathOp>(paint->color, std::move(bufferProxy), bounds,
+                                               viewMatrix);
 }
 }  // namespace tgfx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ResourceTask.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 ResourceTask::ResourceTask(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
@@ -30,7 +29,6 @@ bool ResourceTask::execute(Context* context) {
   }
   auto resource = onMakeResource(context);
   if (resource == nullptr) {
-    LOGE("ResourceTask::execute() Failed to create resource!");
     return false;
   }
   resource->assignUniqueKey(uniqueKey);
