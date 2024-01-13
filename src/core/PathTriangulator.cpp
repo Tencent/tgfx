@@ -39,6 +39,7 @@ std::shared_ptr<Data> PathTriangulator::getData() const {
   std::vector<float> vertices = {};
   int count = toTriangles(&vertices);
   if (count == 0) {
+    // The path is not a filled path, or it is invisible.
     return nullptr;
   }
   return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));

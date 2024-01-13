@@ -20,6 +20,7 @@
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
+#include "tgfx/utils/Buffer.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -98,6 +99,182 @@ static constexpr size_t kIndicesPerFillRRect =
 // stroke count is fill count minus center indices
 // static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
+class RRectPaint {
+ public:
+  RRectPaint(Color color, float innerXRadius, float innerYRadius, const RRect& rRect,
+             const Matrix& viewMatrix)
+      : color(color), innerXRadius(innerXRadius), innerYRadius(innerYRadius), rRect(rRect),
+        viewMatrix(viewMatrix) {
+  }
+
+  Color color;
+  float innerXRadius;
+  float innerYRadius;
+  RRect rRect;
+  Matrix viewMatrix;
+
+  void writeToVertices(std::vector<float>& vertices, bool useScale, AAType aa) const;
+};
+
+void WriteColor(float* vertices, int& index, const Color& color) {
+  vertices[index++] = color.red;
+  vertices[index++] = color.green;
+  vertices[index++] = color.blue;
+  vertices[index++] = color.alpha;
+}
+
+class RRectVerticesProvider : public DataProvider {
+ public:
+  RRectVerticesProvider(std::vector<std::shared_ptr<RRectPaint>> rRectPaints, AAType aaType,
+                        bool useScale)
+      : rRectPaints(std::move(rRectPaints)), aaType(aaType), useScale(useScale) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    auto floatCount = rRectPaints.size() * 4 * 48;
+    if (useScale) {
+      floatCount += rRectPaints.size() * 4 * 4;
+    }
+    Buffer buffer(floatCount * sizeof(float));
+    auto vertices = reinterpret_cast<float*>(buffer.data());
+    auto index = 0;
+    for (auto& rRectPaint : rRectPaints) {
+      auto& viewMatrix = rRectPaint->viewMatrix;
+      auto& rRect = rRectPaint->rRect;
+      auto& color = rRectPaint->color;
+      auto& innerXRadius = rRectPaint->innerXRadius;
+      auto& innerYRadius = rRectPaint->innerYRadius;
+      float reciprocalRadii[4] = {1e6f, 1e6f, 1e6f, 1e6f};
+      if (rRect.radii.x > 0) {
+        reciprocalRadii[0] = 1.f / rRect.radii.x;
+      }
+      if (rRect.radii.y > 0) {
+        reciprocalRadii[1] = 1.f / rRect.radii.y;
+      }
+      if (innerXRadius > 0) {
+        reciprocalRadii[2] = 1.f / innerXRadius;
+      }
+      if (innerYRadius > 0) {
+        reciprocalRadii[3] = 1.f / innerYRadius;
+      }
+      // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
+      // full sample coverage.
+      float aaBloat = aaType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
+      // Extend out the radii to antialias.
+      float xOuterRadius = rRect.radii.x + aaBloat;
+      float yOuterRadius = rRect.radii.y + aaBloat;
+
+      float xMaxOffset = xOuterRadius;
+      float yMaxOffset = yOuterRadius;
+      //  if (!stroked) {
+      // For filled rRectPaints we map a unit circle in the vertex attributes rather than
+      // computing an ellipse and modifying that distance, so we normalize to 1.
+      xMaxOffset /= rRect.radii.x;
+      yMaxOffset /= rRect.radii.y;
+      //  }
+      auto bounds = rRect.rect.makeOutset(aaBloat, aaBloat);
+      float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
+                          bounds.bottom};
+      float yOuterOffsets[4] = {
+          yMaxOffset,
+          FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
+          FLOAT_NEARLY_ZERO, yMaxOffset};
+      auto maxRadius = std::max(rRect.radii.x, rRect.radii.y);
+      for (int i = 0; i < 4; ++i) {
+        auto point = Point::Make(bounds.left, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        WriteColor(vertices, index, color);
+        vertices[index++] = xMaxOffset;
+        vertices[index++] = yOuterOffsets[i];
+        if (useScale) {
+          vertices[index++] = maxRadius;
+        }
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+
+        point = Point::Make(bounds.left + xOuterRadius, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        WriteColor(vertices, index, color);
+        vertices[index++] = FLOAT_NEARLY_ZERO;
+        vertices[index++] = yOuterOffsets[i];
+        if (useScale) {
+          vertices[index++] = maxRadius;
+        }
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+
+        point = Point::Make(bounds.right - xOuterRadius, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        WriteColor(vertices, index, color);
+        vertices[index++] = FLOAT_NEARLY_ZERO;
+        vertices[index++] = yOuterOffsets[i];
+        if (useScale) {
+          vertices[index++] = maxRadius;
+        }
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+
+        point = Point::Make(bounds.right, yCoords[i]);
+        viewMatrix.mapPoints(&point, 1);
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        WriteColor(vertices, index, color);
+        vertices[index++] = xMaxOffset;
+        vertices[index++] = yOuterOffsets[i];
+        if (useScale) {
+          vertices[index++] = maxRadius;
+        }
+        vertices[index++] = reciprocalRadii[0];
+        vertices[index++] = reciprocalRadii[1];
+        vertices[index++] = reciprocalRadii[2];
+        vertices[index++] = reciprocalRadii[3];
+      }
+    }
+    return buffer.release();
+  }
+
+ private:
+  std::vector<std::shared_ptr<RRectPaint>> rRectPaints;
+  AAType aaType = AAType::None;
+  bool useScale = false;
+};
+
+class RRectIndicesProvider : public DataProvider {
+ public:
+  explicit RRectIndicesProvider(std::vector<std::shared_ptr<RRectPaint>> rRectPaints)
+      : rRectPaints(std::move(rRectPaints)) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    auto bufferSize = rRectPaints.size() * kIndicesPerFillRRect * sizeof(uint16_t);
+    Buffer buffer(bufferSize);
+    auto indices = reinterpret_cast<uint16_t*>(buffer.data());
+    int index = 0;
+    for (size_t i = 0; i < rRectPaints.size(); ++i) {
+      auto offset = i * 16;
+      for (size_t j = 0; j < kIndicesPerFillRRect; ++j) {
+        indices[index++] = gStandardRRectIndices[j] + offset;
+      }
+    }
+    return buffer.release();
+  }
+
+ private:
+  std::vector<std::shared_ptr<RRectPaint>> rRectPaints = {};
+};
+
 std::unique_ptr<RRectOp> RRectOp::Make(Color color, const RRect& rRect, const Matrix& viewMatrix) {
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
@@ -113,7 +290,8 @@ RRectOp::RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
                  const Matrix& localMatrix)
     : DrawOp(ClassID()), localMatrix(localMatrix) {
   setTransformedBounds(rRect.rect, viewMatrix);
-  rRects.emplace_back(RRectWrap{color, 0.f, 0.f, rRect, viewMatrix});
+  auto rRectPaint = std::make_shared<RRectPaint>(color, 0.f, 0.f, rRect, viewMatrix);
+  rRectPaints.push_back(std::move(rRectPaint));
 }
 
 bool RRectOp::onCombineIfPossible(Op* op) {
@@ -124,7 +302,7 @@ bool RRectOp::onCombineIfPossible(Op* op) {
   if (localMatrix != that->localMatrix) {
     return false;
   }
-  rRects.insert(rRects.end(), that->rRects.begin(), that->rRects.end());
+  rRectPaints.insert(rRectPaints.end(), that->rRectPaints.begin(), that->rRectPaints.end());
   return true;
 }
 
@@ -132,134 +310,11 @@ static bool UseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
 
-void WriteColor(std::vector<float>& vertices, const Color& color) {
-  vertices.push_back(color.red);
-  vertices.push_back(color.green);
-  vertices.push_back(color.blue);
-  vertices.push_back(color.alpha);
-}
-
-void RRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool useScale,
-                                         AAType aa) const {
-  float reciprocalRadii[4] = {1e6f, 1e6f, 1e6f, 1e6f};
-  if (rRect.radii.x > 0) {
-    reciprocalRadii[0] = 1.f / rRect.radii.x;
-  }
-  if (rRect.radii.y > 0) {
-    reciprocalRadii[1] = 1.f / rRect.radii.y;
-  }
-  if (innerXRadius > 0) {
-    reciprocalRadii[2] = 1.f / innerXRadius;
-  }
-  if (innerYRadius > 0) {
-    reciprocalRadii[3] = 1.f / innerYRadius;
-  }
-  // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
-  // full sample coverage.
-  float aaBloat = aa == AAType::MSAA ? FLOAT_SQRT2 : .5f;
-  // Extend out the radii to antialias.
-  float xOuterRadius = rRect.radii.x + aaBloat;
-  float yOuterRadius = rRect.radii.y + aaBloat;
-
-  float xMaxOffset = xOuterRadius;
-  float yMaxOffset = yOuterRadius;
-  //  if (!stroked) {
-  // For filled rRects we map a unit circle in the vertex attributes rather than
-  // computing an ellipse and modifying that distance, so we normalize to 1.
-  xMaxOffset /= rRect.radii.x;
-  yMaxOffset /= rRect.radii.y;
-  //  }
-  auto bounds = rRect.rect.makeOutset(aaBloat, aaBloat);
-  float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
-                      bounds.bottom};
-  float yOuterOffsets[4] = {
-      yMaxOffset,
-      FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
-      FLOAT_NEARLY_ZERO, yMaxOffset};
-  auto maxRadius = std::max(rRect.radii.x, rRect.radii.y);
-  for (int i = 0; i < 4; ++i) {
-    auto point = Point::Make(bounds.left, yCoords[i]);
-    viewMatrix.mapPoints(&point, 1);
-    vertices.push_back(point.x);
-    vertices.push_back(point.y);
-    WriteColor(vertices, color);
-    vertices.push_back(xMaxOffset);
-    vertices.push_back(yOuterOffsets[i]);
-    if (useScale) {
-      vertices.push_back(maxRadius);
-    }
-    vertices.push_back(reciprocalRadii[0]);
-    vertices.push_back(reciprocalRadii[1]);
-    vertices.push_back(reciprocalRadii[2]);
-    vertices.push_back(reciprocalRadii[3]);
-
-    point = Point::Make(bounds.left + xOuterRadius, yCoords[i]);
-    viewMatrix.mapPoints(&point, 1);
-    vertices.push_back(point.x);
-    vertices.push_back(point.y);
-    WriteColor(vertices, color);
-    vertices.push_back(FLOAT_NEARLY_ZERO);
-    vertices.push_back(yOuterOffsets[i]);
-    if (useScale) {
-      vertices.push_back(maxRadius);
-    }
-    vertices.push_back(reciprocalRadii[0]);
-    vertices.push_back(reciprocalRadii[1]);
-    vertices.push_back(reciprocalRadii[2]);
-    vertices.push_back(reciprocalRadii[3]);
-
-    point = Point::Make(bounds.right - xOuterRadius, yCoords[i]);
-    viewMatrix.mapPoints(&point, 1);
-    vertices.push_back(point.x);
-    vertices.push_back(point.y);
-    WriteColor(vertices, color);
-    vertices.push_back(FLOAT_NEARLY_ZERO);
-    vertices.push_back(yOuterOffsets[i]);
-    if (useScale) {
-      vertices.push_back(maxRadius);
-    }
-    vertices.push_back(reciprocalRadii[0]);
-    vertices.push_back(reciprocalRadii[1]);
-    vertices.push_back(reciprocalRadii[2]);
-    vertices.push_back(reciprocalRadii[3]);
-
-    point = Point::Make(bounds.right, yCoords[i]);
-    viewMatrix.mapPoints(&point, 1);
-    vertices.push_back(point.x);
-    vertices.push_back(point.y);
-    WriteColor(vertices, color);
-    vertices.push_back(xMaxOffset);
-    vertices.push_back(yOuterOffsets[i]);
-    if (useScale) {
-      vertices.push_back(maxRadius);
-    }
-    vertices.push_back(reciprocalRadii[0]);
-    vertices.push_back(reciprocalRadii[1]);
-    vertices.push_back(reciprocalRadii[2]);
-    vertices.push_back(reciprocalRadii[3]);
-  }
-}
-
 void RRectOp::prepare(Context* context) {
   auto useScale = UseScale(context);
-  std::vector<float> vertices;
-  for (const auto& rRectWrap : rRects) {
-    rRectWrap.writeToVertices(vertices, useScale, aa);
-  }
-  auto vertexData = Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
+  auto vertexData = std::make_shared<RRectVerticesProvider>(rRectPaints, aa, useScale);
   vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexData), BufferType::Vertex);
-  if (vertexBufferProxy == nullptr) {
-    return;
-  }
-
-  std::vector<uint16_t> indices;
-  for (size_t i = 0; i < rRects.size(); ++i) {
-    auto offset = i * 16;
-    for (size_t j = 0; j < kIndicesPerFillRRect; ++j) {
-      indices.emplace_back(gStandardRRectIndices[j] + offset);
-    }
-  }
-  auto indexData = Data::MakeWithCopy(indices.data(), indices.size() * sizeof(uint16_t));
+  auto indexData = std::make_shared<RRectIndicesProvider>(rRectPaints);
   indexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(indexData), BufferType::Index);
 }
 
@@ -279,6 +334,6 @@ void RRectOp::execute(RenderPass* renderPass) {
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer);
   renderPass->drawIndexed(PrimitiveType::Triangles, 0,
-                          static_cast<int>(rRects.size() * kIndicesPerFillRRect));
+                          static_cast<int>(rRectPaints.size() * kIndicesPerFillRRect));
 }
 }  // namespace tgfx

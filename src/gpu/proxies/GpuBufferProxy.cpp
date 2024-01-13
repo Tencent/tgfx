@@ -28,6 +28,16 @@ std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
   }
   return context->proxyProvider()->createGpuBufferProxy({}, std::move(data), bufferType);
 }
+
+std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
+                                                         std::shared_ptr<DataProvider> dataProvider,
+                                                         BufferType bufferType) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  return context->proxyProvider()->createGpuBufferProxy({}, std::move(dataProvider), bufferType);
+}
+
 std::shared_ptr<GpuBuffer> GpuBufferProxy::getBuffer() const {
   return Resource::Get<GpuBuffer>(context, uniqueKey);
 }

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/Resource.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 /**

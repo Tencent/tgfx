@@ -22,6 +22,8 @@
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
+class RectPaint;
+
 class FillRectOp : public DrawOp {
  public:
   static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
@@ -45,18 +47,10 @@ class FillRectOp : public DrawOp {
 
   bool canAdd(size_t count) const;
 
-  std::shared_ptr<Data> getVertexData();
-
-  std::vector<float> coverageVertices() const;
-
-  std::vector<float> noCoverageVertices() const;
-
   bool needsIndexBuffer() const;
 
-  std::vector<Color> colors;
-  std::vector<Rect> rects;
-  std::vector<Matrix> viewMatrices;
-  std::vector<Matrix> localMatrices;
+  bool hasColor = true;
+  std::vector<std::shared_ptr<RectPaint>> rectPaints = {};
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy;
 };

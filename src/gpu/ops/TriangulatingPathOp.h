@@ -23,6 +23,8 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
+class PathPaint;
+
 class TriangulatingPathOp : public DrawOp {
  public:
   static std::unique_ptr<TriangulatingPathOp> Make(Color color, const Path& path,
@@ -33,7 +35,7 @@ class TriangulatingPathOp : public DrawOp {
                       const Matrix& viewMatrix = Matrix::I(),
                       const Matrix& localMatrix = Matrix::I());
 
-  TriangulatingPathOp(Color color, std::vector<float> vertices, const Rect& bounds,
+  TriangulatingPathOp(Color color, Path path, const Rect& bounds,
                       const Matrix& viewMatrix = Matrix::I(),
                       const Matrix& localMatrix = Matrix::I());
 
@@ -48,7 +50,7 @@ class TriangulatingPathOp : public DrawOp {
 
   Color color = Color::Transparent();
   std::shared_ptr<GpuBufferProxy> bufferProxy = nullptr;
-  std::vector<float> vertices = {};
+  std::vector<std::shared_ptr<PathPaint>> pathPaints = {};
   Matrix viewMatrix = Matrix::I();
   Matrix localMatrix = Matrix::I();
 };

@@ -22,6 +22,8 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
+class RRectPaint;
+
 class RRectOp : public DrawOp {
  public:
   static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix);
@@ -37,17 +39,7 @@ class RRectOp : public DrawOp {
 
   bool onCombineIfPossible(Op* op) override;
 
-  struct RRectWrap {
-    Color color = Color::Transparent();
-    float innerXRadius = 0;
-    float innerYRadius = 0;
-    RRect rRect;
-    Matrix viewMatrix = Matrix::I();
-
-    void writeToVertices(std::vector<float>& vertices, bool useScale, AAType aa) const;
-  };
-
-  std::vector<RRectWrap> rRects;
+  std::vector<std::shared_ptr<RRectPaint>> rRectPaints;
   Matrix localMatrix = Matrix::I();
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy;
