@@ -16,17 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "PathTriangulator.h"
 #include "PathRef.h"
-#include "tgfx/core/Path.h"
+#include "pathkit.h"
 
 namespace tgfx {
-using namespace pk;
-
-const SkPath& PathRef::ReadAccess(const Path& path) {
-  return path.pathRef->path;
+int PathTriangulator::GetAATriangleCount(size_t bufferSize) {
+  return static_cast<int>(bufferSize / (sizeof(float) * 3));
 }
 
-SkPath& PathRef::WriteAccess(Path& path) {
-  return path.writableRef()->path;
+PathTriangulator::PathTriangulator(Path path, const Rect& clipBounds, float tolerance)
+    : path(std::move(path)), clipBounds(clipBounds), tolerance(tolerance) {
 }
+
+int PathTriangulator::toTriangles(std::vector<float>* vertices) const {
+  const auto& skPath = PathRef::ReadAccess(path);
+  return skPath.toAATriangles(tolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds),
+                              vertices);
+}
+
+std::shared_ptr<Data> PathTriangulator::getData() const {
+  std::vector<float> vertices = {};
+  int count = toTriangles(&vertices);
+  if (count == 0) {
+    return nullptr;
+  }
+  return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
+}
+
 }  // namespace tgfx

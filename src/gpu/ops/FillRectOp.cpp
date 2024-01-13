@@ -82,12 +82,9 @@ std::vector<float> FillRectOp::noCoverageVertices() const {
   return vertices;
 }
 
-std::vector<float> FillRectOp::vertices() {
-  if (aa != AAType::Coverage) {
-    return noCoverageVertices();
-  } else {
-    return coverageVertices();
-  }
+std::shared_ptr<Data> FillRectOp::getVertexData() {
+  auto vertices = aa == AAType::Coverage ? coverageVertices() : noCoverageVertices();
+  return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
 }
 
 std::unique_ptr<FillRectOp> FillRectOp::Make(std::optional<Color> color, const Rect& rect,
@@ -144,23 +141,32 @@ bool FillRectOp::needsIndexBuffer() const {
   return rects.size() > 1 || aa == AAType::Coverage;
 }
 
-void FillRectOp::onPrepare(Gpu* gpu) {
-  auto data = vertices();
-  vertexBuffer =
-      GpuBuffer::Make(gpu->context(), BufferType::Vertex, data.data(), data.size() * sizeof(float));
-  if (vertexBuffer == nullptr) {
-    return;
-  }
+void FillRectOp::prepare(Context* context) {
+  vertexBufferProxy = GpuBufferProxy::MakeFrom(context, getVertexData(), BufferType::Vertex);
   if (aa == AAType::Coverage) {
-    indexBuffer = gpu->context()->resourceProvider()->aaQuadIndexBuffer();
+    indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else {
-    indexBuffer = gpu->context()->resourceProvider()->nonAAQuadIndexBuffer();
+    indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
   }
 }
 
-void FillRectOp::onExecute(RenderPass* renderPass) {
-  if (vertexBuffer == nullptr || (needsIndexBuffer() && indexBuffer == nullptr)) {
+void FillRectOp::execute(RenderPass* renderPass) {
+  if (vertexBufferProxy == nullptr) {
     return;
+  }
+  auto vertexBuffer = vertexBufferProxy->getBuffer();
+  if (vertexBuffer == nullptr) {
+    return;
+  }
+  std::shared_ptr<GpuBuffer> indexBuffer;
+  if (needsIndexBuffer()) {
+    if (indexBufferProxy == nullptr) {
+      return;
+    }
+    indexBuffer = indexBufferProxy->getBuffer();
+    if (indexBuffer == nullptr) {
+      return;
+    }
   }
   auto pipeline =
       createPipeline(renderPass, QuadPerEdgeAAGeometryProcessor::Make(

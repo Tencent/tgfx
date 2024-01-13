@@ -29,27 +29,26 @@ class TriangulatingPathOp : public DrawOp {
                                                    const Rect& clipBounds,
                                                    const Matrix& localMatrix);
 
-  TriangulatingPathOp(Color color, std::shared_ptr<GpuBuffer> buffer, int vertexCount,
-                      const Rect& bounds, const Matrix& viewMatrix = Matrix::I(),
-                      const Matrix& localMatrix = Matrix::I());
-
-  TriangulatingPathOp(Color color, std::vector<float> vertices, int vertexCount, const Rect& bounds,
+  TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> buffer, const Rect& bounds,
                       const Matrix& viewMatrix = Matrix::I(),
                       const Matrix& localMatrix = Matrix::I());
+
+  TriangulatingPathOp(Color color, std::vector<float> vertices, const Rect& bounds,
+                      const Matrix& viewMatrix = Matrix::I(),
+                      const Matrix& localMatrix = Matrix::I());
+
+  void prepare(Context* context) override;
+
+  void execute(RenderPass* renderPass) override;
 
  private:
   DEFINE_OP_CLASS_ID
 
   bool onCombineIfPossible(Op* op) override;
 
-  void onPrepare(Gpu* gpu) override;
-
-  void onExecute(RenderPass* renderPass) override;
-
   Color color = Color::Transparent();
-  std::shared_ptr<GpuBuffer> buffer = nullptr;
+  std::shared_ptr<GpuBufferProxy> bufferProxy = nullptr;
   std::vector<float> vertices = {};
-  int vertexCount = 0;
   Matrix viewMatrix = Matrix::I();
   Matrix localMatrix = Matrix::I();
 };

@@ -16,17 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PathRef.h"
-#include "tgfx/core/Path.h"
+#pragma once
+
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
-using namespace pk;
+/**
+ * DataProvider delays the data generation until it is needed.
+ */
+class DataProvider {
+ public:
+  static std::shared_ptr<DataProvider> Wrap(std::shared_ptr<Data> data);
 
-const SkPath& PathRef::ReadAccess(const Path& path) {
-  return path.pathRef->path;
-}
+  virtual ~DataProvider() = default;
 
-SkPath& PathRef::WriteAccess(Path& path) {
-  return path.writableRef()->path;
-}
+  /**
+   * Generates the data. DataProvider does not cache the data, each call to getData() will
+   * generate a new data.
+   */
+  virtual std::shared_ptr<Data> getData() const = 0;
+};
 }  // namespace tgfx

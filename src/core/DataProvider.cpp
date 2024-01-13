@@ -16,17 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PathRef.h"
-#include "tgfx/core/Path.h"
+#include "DataProvider.h"
 
 namespace tgfx {
-using namespace pk;
+class DataWrapper : public DataProvider {
+ public:
+  DataWrapper(std::shared_ptr<Data> data) : data(std::move(data)) {
+  }
 
-const SkPath& PathRef::ReadAccess(const Path& path) {
-  return path.pathRef->path;
-}
+  std::shared_ptr<Data> getData() const override {
+    return data;
+  }
 
-SkPath& PathRef::WriteAccess(Path& path) {
-  return path.writableRef()->path;
+ private:
+  std::shared_ptr<Data> data = nullptr;
+};
+
+std::shared_ptr<DataProvider> DataProvider::Wrap(std::shared_ptr<Data> data) {
+  if (data == nullptr || data->empty()) {
+    return nullptr;
+  }
+  return std::make_shared<DataWrapper>(std::move(data));
 }
 }  // namespace tgfx

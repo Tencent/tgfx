@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Shape.h"
-#include "core/PathRef.h"
+#include "core/PathTriangulator.h"
 #include "shapes/PathProxy.h"
 #include "shapes/RRectShape.h"
 #include "shapes/RectShape.h"
@@ -26,6 +26,10 @@
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
+// A factor used to estimate the memory size of a tessellated path, based on the average value of
+// Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
+static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
+
 std::shared_ptr<Shape> Shape::MakeFromFill(const Path& path, float resolutionScale) {
   if (path.isEmpty() || resolutionScale <= 0) {
     return nullptr;

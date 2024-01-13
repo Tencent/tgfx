@@ -18,6 +18,7 @@
 
 #include "ResourceProvider.h"
 #include "GradientCache.h"
+#include "tgfx/utils/Buffer.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -38,28 +39,30 @@ std::shared_ptr<Texture> ResourceProvider::getGradient(const Color* colors, cons
   return _gradientCache->getGradient(context, colors, positions, count);
 }
 
-std::shared_ptr<GpuBuffer> ResourceProvider::nonAAQuadIndexBuffer() {
+std::shared_ptr<GpuBufferProxy> ResourceProvider::nonAAQuadIndexBuffer() {
   if (_nonAAQuadIndexBuffer == nullptr) {
     _nonAAQuadIndexBuffer = createNonAAQuadIndexBuffer();
   }
   return _nonAAQuadIndexBuffer;
 }
 
-std::shared_ptr<GpuBuffer> ResourceProvider::aaQuadIndexBuffer() {
+std::shared_ptr<GpuBufferProxy> ResourceProvider::aaQuadIndexBuffer() {
   if (_aaQuadIndexBuffer == nullptr) {
     _aaQuadIndexBuffer = createAAQuadIndexBuffer();
   }
   return _aaQuadIndexBuffer;
 }
 
-std::shared_ptr<GpuBuffer> CreatePatternedIndexBuffer(Context* context, const uint16_t* pattern,
-                                                      uint16_t patternSize, uint16_t reps,
-                                                      uint16_t vertCount) {
-  auto size = static_cast<size_t>(reps * patternSize);
-  auto* data = new (std::nothrow) uint16_t[size];
-  if (data == nullptr) {
+std::shared_ptr<GpuBufferProxy> CreatePatternedIndexBuffer(Context* context,
+                                                           const uint16_t* pattern,
+                                                           uint16_t patternSize, uint16_t reps,
+                                                           uint16_t vertCount) {
+  auto size = static_cast<size_t>(reps * patternSize * sizeof(uint16_t));
+  Buffer buffer(size);
+  if (buffer.isEmpty()) {
     return nullptr;
   }
+  auto* data = reinterpret_cast<uint16_t*>(buffer.data());
   for (uint16_t i = 0; i < reps; ++i) {
     uint16_t baseIdx = i * patternSize;
     auto baseVert = static_cast<uint16_t>(i * vertCount);
@@ -67,16 +70,14 @@ std::shared_ptr<GpuBuffer> CreatePatternedIndexBuffer(Context* context, const ui
       data[baseIdx + j] = baseVert + pattern[j];
     }
   }
-  auto buffer = GpuBuffer::Make(context, BufferType::Index, data, size * sizeof(uint16_t));
-  delete[] data;
-  return buffer;
+  return GpuBufferProxy::MakeFrom(context, buffer.release(), BufferType::Index);
 }
 
 static constexpr uint16_t kMaxNumNonAAQuads = 1 << 8;  // max possible: (1 << 14) - 1;
 static constexpr uint16_t kVerticesPerNonAAQuad = 4;
 static constexpr uint16_t kIndicesPerNonAAQuad = 6;
 
-std::shared_ptr<GpuBuffer> ResourceProvider::createNonAAQuadIndexBuffer() {
+std::shared_ptr<GpuBufferProxy> ResourceProvider::createNonAAQuadIndexBuffer() {
   // clang-format off
   static constexpr uint16_t kNonAAQuadIndexPattern[] = {
     0, 1, 2, 2, 1, 3
@@ -98,7 +99,7 @@ static constexpr uint16_t kMaxNumAAQuads = 1 << 6;  // max possible: (1 << 13) -
 static constexpr uint16_t kVerticesPerAAQuad = 8;
 static constexpr uint16_t kIndicesPerAAQuad = 30;
 
-std::shared_ptr<GpuBuffer> ResourceProvider::createAAQuadIndexBuffer() {
+std::shared_ptr<GpuBufferProxy> ResourceProvider::createAAQuadIndexBuffer() {
   // clang-format off
   static constexpr uint16_t kAAQuadIndexPattern[] = {
     0, 1, 2, 1, 3, 2,

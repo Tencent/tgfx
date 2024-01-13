@@ -16,17 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PathRef.h"
-#include "tgfx/core/Path.h"
+#include "GpuBufferProxy.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-using namespace pk;
-
-const SkPath& PathRef::ReadAccess(const Path& path) {
-  return path.pathRef->path;
+std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
+                                                         std::shared_ptr<Data> data,
+                                                         BufferType bufferType) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  return context->proxyProvider()->createGpuBufferProxy({}, std::move(data), bufferType);
 }
-
-SkPath& PathRef::WriteAccess(Path& path) {
-  return path.writableRef()->path;
+std::shared_ptr<GpuBuffer> GpuBufferProxy::getBuffer() const {
+  return Resource::Get<GpuBuffer>(context, uniqueKey);
 }
 }  // namespace tgfx

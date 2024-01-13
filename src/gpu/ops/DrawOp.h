@@ -30,10 +30,6 @@ class DrawOp : public Op {
   explicit DrawOp(uint8_t classID) : Op(classID) {
   }
 
-  void prepare(Gpu* gpu) final;
-
-  void execute(RenderPass* renderPass) final;
-
   std::unique_ptr<Pipeline> createPipeline(RenderPass* renderPass,
                                            std::unique_ptr<GeometryProcessor> gp);
 
@@ -63,10 +59,6 @@ class DrawOp : public Op {
 
  protected:
   bool onCombineIfPossible(Op* op) override;
-
-  virtual void onPrepare(Gpu* gpu) = 0;
-
-  virtual void onExecute(RenderPass* renderPass) = 0;
 
   AAType aa = AAType::None;
 

@@ -28,6 +28,12 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
   ops.emplace_back(std::move(op));
 }
 
+void OpsRenderTask::prepare(Context* context) {
+  for (auto& op : ops) {
+    op->prepare(context);
+  }
+}
+
 bool OpsRenderTask::execute(Gpu* gpu) {
   if (ops.empty()) {
     return false;
@@ -39,7 +45,6 @@ bool OpsRenderTask::execute(Gpu* gpu) {
     LOGE("OpsTask::execute() Failed to create render pass!");
     return false;
   }
-  std::for_each(ops.begin(), ops.end(), [gpu](auto& op) { op->prepare(gpu); });
   renderPass->begin();
   auto tempOps = std::move(ops);
   for (auto& op : tempOps) {

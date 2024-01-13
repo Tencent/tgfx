@@ -31,6 +31,8 @@ class OpsRenderTask : public RenderTask {
 
   void addOp(std::unique_ptr<Op> op);
 
+  void prepare(Context* context) override;
+
   bool execute(Gpu* gpu) override;
 
  private:

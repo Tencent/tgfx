@@ -26,16 +26,16 @@ class RRectOp : public DrawOp {
  public:
   static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix);
 
+  void prepare(Context* context) override;
+
+  void execute(RenderPass* renderPass) override;
+
  private:
   DEFINE_OP_CLASS_ID
 
   RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
 
   bool onCombineIfPossible(Op* op) override;
-
-  void onPrepare(Gpu* gpu) override;
-
-  void onExecute(RenderPass* renderPass) override;
 
   struct RRectWrap {
     Color color = Color::Transparent();
@@ -49,8 +49,8 @@ class RRectOp : public DrawOp {
 
   std::vector<RRectWrap> rRects;
   Matrix localMatrix = Matrix::I();
-  std::shared_ptr<GpuBuffer> vertexBuffer;
-  std::shared_ptr<GpuBuffer> indexBuffer;
+  std::shared_ptr<GpuBufferProxy> vertexBufferProxy;
+  std::shared_ptr<GpuBufferProxy> indexBufferProxy;
 
   //  bool stroked = false;
   //  Point strokeWidths = Point::Zero();
