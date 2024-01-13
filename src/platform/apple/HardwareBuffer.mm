@@ -51,7 +51,7 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
 }
 
 HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
-  if (width <= 0 || height <= 0) {
+  if (!HardwareBufferAvailable() || width <= 0 || height <= 0) {
     return nil;
   }
 #if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1 && defined(__aarch64__)
