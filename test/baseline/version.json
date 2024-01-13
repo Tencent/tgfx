@@ -35,7 +35,7 @@
         "update_mask": "d010fb8"
     },
     "MaskTest": {
-        "rasterize_emoji": "d010fb8",
+        "rasterize_emoji": "c0f39f8",
         "rasterize_path": "d010fb8",
         "rasterize_path_texture": "d010fb8"
     },
