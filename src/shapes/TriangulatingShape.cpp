@@ -22,10 +22,30 @@
 #include "gpu/ops/TriangulatingPathOp.h"
 
 namespace tgfx {
+class TrianglesProvider : public DataProvider {
+ public:
+  TrianglesProvider(Path path, const Rect& clipBounds)
+      : path(std::move(path)), clipBounds(clipBounds) {
+  }
+
+  std::shared_ptr<Data> getData() const override {
+    std::vector<float> vertices = {};
+    int count = PathTriangulator::ToAATriangles(path, clipBounds, &vertices);
+    if (count == 0) {
+      // The path is not a filled path, or it is invisible.
+      return nullptr;
+    }
+    return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
+  }
+
+ private:
+  Path path = {};
+  Rect clipBounds = Rect::MakeEmpty();
+};
 TriangulatingShape::TriangulatingShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
   auto path = getFillPath();
-  triangulator = std::make_shared<PathTriangulator>(path, bounds);
+  triangulator = std::make_shared<TrianglesProvider>(path, bounds);
 }
 
 std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,

@@ -26,36 +26,31 @@ namespace tgfx {
 static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 
 /**
- * A DataProvider which tessellates a Path in device space with a mesh of alpha ramps for
- * antialiasing.
+ * Provides utility functions for converting paths to a collection of triangles.
  */
-class PathTriangulator : public DataProvider {
+class PathTriangulator {
  public:
   /**
-   * When tessellating curved paths into linear segments, this defines the maximum distance in
-   * screen space which a segment may deviate from the mathematically correct value. Above this
-   * value, the segment will be subdivided. This value was chosen to approximate the super sampling
-   * accuracy of the raster path (16 samples, or one quarter pixel).
+   * Returns the number of triangles based on the buffer size of the vertices.
    */
-  static constexpr float DefaultTolerance = 0.25f;
+  static int GetTriangleCount(size_t bufferSize);
+
+  /**
+   * Tessellates the path into a collection of triangles. Returns the number of triangles written
+   * to the vertices.
+   */
+  static int ToTriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices,
+                         bool* isLinear = nullptr);
 
   /**
    * Returns the number of antialiasing triangles based on the buffer size of the vertices.
    */
   static int GetAATriangleCount(size_t bufferSize);
 
-  PathTriangulator(Path path, const Rect& clipBounds, float tolerance = DefaultTolerance);
-
   /**
-   * Tessellates the path into triangles. Returns the number of triangles written to the vertices.
+   * Triangulates the given path in device space with a mesh of alpha ramps for antialiasing.
+   * Returns the number of triangles written to the vertices.
    */
-  int toTriangles(std::vector<float>* vertices) const;
-
-  std::shared_ptr<Data> getData() const override;
-
- private:
-  Path path = {};
-  Rect clipBounds = Rect::MakeEmpty();
-  float tolerance = DefaultTolerance;
+  static int ToAATriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices);
 };
 }  // namespace tgfx

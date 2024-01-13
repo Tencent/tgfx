@@ -28,7 +28,7 @@ class TriangulatingShape : public PathShape {
   explicit TriangulatingShape(std::shared_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
  private:
-  std::shared_ptr<PathTriangulator> triangulator = nullptr;
+  std::shared_ptr<DataProvider> triangulator = nullptr;
 
   std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
                                  uint32_t renderFlags) const override;

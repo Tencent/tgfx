@@ -213,6 +213,7 @@ jobs:
           name: web_build
           path: |
             web
+            !web/emsdk
             !web/node_modules
 
   win:
