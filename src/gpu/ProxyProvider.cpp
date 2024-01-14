@@ -192,7 +192,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::wrapBackendRenderTarget(
 }
 
 void ProxyProvider::purgeExpiredProxies() {
-  std::vector<uint32_t> keys;
+  std::vector<uint64_t> keys;
   for (auto& pair : proxyMap) {
     if (pair.second.expired()) {
       keys.push_back(pair.first);
