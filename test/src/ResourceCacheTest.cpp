@@ -25,12 +25,12 @@
 namespace tgfx {
 class TestResource : public Resource {
  public:
-  static std::shared_ptr<const TestResource> Make(tgfx::Context* context, uint32_t id) {
+  static std::shared_ptr<const TestResource> Make(Context* context, uint32_t id) {
     static const uint32_t TestResourceType = UniqueID::Next();
-    ScratchKey scratchKey = {};
-    scratchKey.write(TestResourceType);
-    scratchKey.write(id);
-    return Resource::AddToContext(context, new TestResource(), scratchKey);
+    BytesKey recycleKey = {};
+    recycleKey.write(TestResourceType);
+    recycleKey.write(id);
+    return Resource::AddToContext(context, new TestResource(), recycleKey);
   }
 
   size_t memoryUsage() const override {

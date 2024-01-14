@@ -26,7 +26,7 @@ TextureProxy::TextureProxy(int width, int height, bool mipMapped, bool isAlphaOn
 }
 
 std::shared_ptr<Texture> TextureProxy::getTexture() const {
-  return Resource::Get<Texture>(context, uniqueKey);
+  return Resource::Get<Texture>(context, resourceKey);
 }
 
 }  // namespace tgfx

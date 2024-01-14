@@ -127,7 +127,7 @@ std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Conte
   }
   if (success) {
     dirtyBounds.setEmpty();
-    texture->removeUniqueKey();
+    texture->removeResourceKey();
     textureVersion = contentVersion;
   }
   return texture;
@@ -138,7 +138,7 @@ void ImageReader::onContentDirty(const Rect& bounds) {
   hasPendingChanges = true;
   dirtyBounds.join(bounds);
   if (stream->isHardwareBacked() && texture != nullptr) {
-    texture->removeUniqueKey();
+    texture->removeResourceKey();
     textureVersion = 0;
     bufferVersion++;
   }

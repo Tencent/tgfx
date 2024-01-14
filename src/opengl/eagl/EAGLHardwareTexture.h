@@ -47,7 +47,7 @@ class EAGLHardwareTexture : public Texture {
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef texture = nil;
 
-  static void ComputeScratchKey(BytesKey* scratchKey, CVPixelBufferRef pixelBuffer);
+  static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
   void onReleaseGPU() override;
 };
 }  // namespace tgfx

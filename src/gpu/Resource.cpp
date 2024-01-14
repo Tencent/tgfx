@@ -19,19 +19,19 @@
 #include "gpu/Resource.h"
 
 namespace tgfx {
-void Resource::assignUniqueKey(const UniqueKey& newKey) {
+void Resource::assignResourceKey(const ResourceKey& newKey) {
   if (newKey.empty()) {
-    removeUniqueKey();
+    removeResourceKey();
     return;
   }
-  if (newKey.domainID() != uniqueKey.domainID()) {
-    context->resourceCache()->changeUniqueKey(this, newKey);
+  if (newKey.domain() != resourceKey.domain()) {
+    context->resourceCache()->changeResourceKey(this, newKey);
   }
 }
 
-void Resource::removeUniqueKey() {
-  if (!uniqueKey.empty()) {
-    context->resourceCache()->removeUniqueKey(this);
+void Resource::removeResourceKey() {
+  if (!resourceKey.empty()) {
+    context->resourceCache()->removeResourceKey(this);
   }
 }
 

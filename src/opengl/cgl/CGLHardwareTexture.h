@@ -49,7 +49,7 @@ class CGLHardwareTexture : public Texture {
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  static void ComputeScratchKey(BytesKey* scratchKey, CVPixelBufferRef pixelBuffer);
+  static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
 
   void onReleaseGPU() override;
 };

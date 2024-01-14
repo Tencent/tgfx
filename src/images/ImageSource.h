@@ -25,7 +25,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class UniqueKey;
+class ResourceKey;
 
 /**
  * ImageSource generates texture proxies for images.
@@ -36,15 +36,13 @@ class ImageSource {
    * Creates ImageSource from an image generator. ImageSource is returned if the generator is not
    * nullptr. The image generator may wrap codec data or custom data.
    */
-  static std::shared_ptr<ImageSource> MakeFrom(UniqueKey uniqueKey,
-                                               std::shared_ptr<ImageGenerator> generator);
+  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   /**
    * Creates ImageSource from ImageBuffer, ImageSource is returned if the imageBuffer is not nullptr
    * and its dimensions are greater than zero.
    */
-  static std::shared_ptr<ImageSource> MakeFrom(UniqueKey uniqueKey,
-                                               std::shared_ptr<ImageBuffer> buffer);
+  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<ImageBuffer> buffer);
 
   /**
    * Creates ImageSource from TextureProxy, ImageSource is returned if textureProxy is not nullptr.
@@ -126,10 +124,10 @@ class ImageSource {
   std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t renderFlags = 0) const;
 
  protected:
-  UniqueKey uniqueKey = {};
+  ResourceKey resourceKey = {};
   std::weak_ptr<ImageSource> weakThis;
 
-  explicit ImageSource(UniqueKey uniqueKey);
+  explicit ImageSource(ResourceKey resourceKey);
 
   virtual std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const;
 

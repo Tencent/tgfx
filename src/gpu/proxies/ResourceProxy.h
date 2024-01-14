@@ -37,15 +37,15 @@ class ResourceProxy {
   }
 
   /**
-   * Retrieves the unique key associated with this ResourceProxy.
+   * Returns the ResourceKey associated with this ResourceProxy.
    */
-  const UniqueKey& getUniqueKey() const {
-    return uniqueKey;
+  const ResourceKey& getResourceKey() const {
+    return resourceKey;
   }
 
  protected:
   Context* context = nullptr;
-  UniqueKey uniqueKey = {};
+  ResourceKey resourceKey = {};
 
   ResourceProxy() = default;
 

@@ -27,38 +27,38 @@ class UniqueDomain {
   UniqueDomain();
 
   /**
-   * Returns a global unique ID for the UniqueBlock.
+   * Returns a global unique ID for the UniqueDomain.
    */
-  uint32_t uniqueID() const {
+  uint64_t uniqueID() const {
     return _uniqueID;
   }
 
   /**
-   * Returns the total number of times the UniqueBlock has been referenced.
+   * Returns the total number of times the UniqueDomain has been referenced.
    */
   long useCount() const {
     return _useCount;
   }
 
   /**
-   * Returns the number of times the UniqueBlock has been referenced strongly.
+   * Returns the number of times the UniqueDomain has been referenced strongly.
    */
   long strongCount() const {
     return _strongCount;
   }
 
   /**
-   * Increments the number of times the UniqueBlock has been referenced.
+   * Increments the number of times the UniqueDomain has been referenced.
    */
   void addReference(bool strong);
 
   /**
-   * Decrements the number of times the UniqueBlock has been referenced.
+   * Decrements the number of times the UniqueDomain has been referenced.
    */
   void releaseReference(bool strong);
 
  private:
-  uint32_t _uniqueID = 0;
+  uint64_t _uniqueID = 0;
   std::atomic_long _useCount = {0};
   std::atomic_long _strongCount = {0};
 };

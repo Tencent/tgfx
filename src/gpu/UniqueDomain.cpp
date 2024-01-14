@@ -19,7 +19,9 @@
 #include "UniqueDomain.h"
 
 namespace tgfx {
-UniqueDomain::UniqueDomain() : _uniqueID(UniqueID::Next()) {
+static std::atomic_uint64_t DomainIDCount = {1};
+
+UniqueDomain::UniqueDomain() : _uniqueID(DomainIDCount++) {
 }
 
 void UniqueDomain::addReference(bool strong) {

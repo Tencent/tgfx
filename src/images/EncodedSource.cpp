@@ -20,27 +20,28 @@
 #include "AsyncSource.h"
 
 namespace tgfx {
-EncodedSource::EncodedSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator,
+EncodedSource::EncodedSource(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
                              bool mipMapped)
-    : ImageSource(std::move(uniqueKey)), generator(std::move(generator)), mipMapped(mipMapped) {
+    : ImageSource(std::move(resourceKey)), generator(std::move(generator)), mipMapped(mipMapped) {
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeDecoded(Context* context) const {
   if (context != nullptr) {
-    if (context->proxyProvider()->hasResourceProxy(uniqueKey) ||
-        context->resourceCache()->hasUniqueResource(uniqueKey)) {
+    if (context->proxyProvider()->hasResourceProxy(resourceKey) ||
+        context->resourceCache()->hasResource(resourceKey)) {
       return nullptr;
     }
   }
-  return std::shared_ptr<AsyncSource>(new AsyncSource(uniqueKey, generator, mipMapped));
+  return std::shared_ptr<AsyncSource>(new AsyncSource(resourceKey, generator, mipMapped));
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
-  return std::shared_ptr<EncodedSource>(new EncodedSource(UniqueKey::MakeWeak(), generator, true));
+  return std::shared_ptr<EncodedSource>(new EncodedSource(ResourceKey::NewWeak(), generator, true));
 }
 
 std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context,
                                                                 uint32_t renderFlags) const {
-  return context->proxyProvider()->createTextureProxy(uniqueKey, generator, mipMapped, renderFlags);
+  return context->proxyProvider()->createTextureProxy(resourceKey, generator, mipMapped,
+                                                      renderFlags);
 }
 }  // namespace tgfx

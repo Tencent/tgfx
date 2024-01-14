@@ -18,7 +18,6 @@
 
 #include "tgfx/core/Image.h"
 #include "gpu/Texture.h"
-#include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "images/ImageSource.h"
 #include "images/RGBAAAImage.h"
@@ -34,7 +33,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   if (codec == nullptr) {
     return nullptr;
   }
-  auto source = ImageSource::MakeFrom(UniqueKey::MakeWeak(), codec);
+  auto source = ImageSource::MakeFrom(codec);
   return MakeFrom(source, codec->origin());
 }
 
@@ -43,7 +42,7 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
   if (codec == nullptr) {
     return nullptr;
   }
-  auto source = ImageSource::MakeFrom(UniqueKey::MakeWeak(), codec);
+  auto source = ImageSource::MakeFrom(codec);
   return MakeFrom(source, codec->origin());
 }
 
@@ -53,7 +52,7 @@ std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
-  auto source = ImageSource::MakeFrom(UniqueKey::MakeWeak(), std::move(generator));
+  auto source = ImageSource::MakeFrom(std::move(generator));
   return MakeFrom(std::move(source));
 }
 
@@ -86,7 +85,7 @@ std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColo
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
-  auto source = ImageSource::MakeFrom(UniqueKey::MakeWeak(), std::move(imageBuffer));
+  auto source = ImageSource::MakeFrom(std::move(imageBuffer));
   return MakeFrom(std::move(source));
 }
 

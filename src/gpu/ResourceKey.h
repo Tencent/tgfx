@@ -22,95 +22,70 @@
 #include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
-/**
- * A key used for scratch resources. There are three important rules about scratch keys:
- *
- *    1) Multiple resources can share the same scratch key. Therefore, resources assigned the same
- *       scratch key should be interchangeable with respect to the code that uses them.
- *    2) A resource can have at most one scratch key, and it is set at resource creation by the
- *       resource itself.
- *    3) When a scratch resource is referenced, it will not be returned from the cache for a
- *       subsequent cache request until all refs are released. This facilitates using a scratch key
- *       for multiple render-to-texture scenarios.
- */
-using ScratchKey = BytesKey;
-
-template <typename T>
-using ScratchKeyMap = BytesKeyMap<T>;
-
 class UniqueDomain;
 
 /**
- * A key that allows for exclusive use of a resource for a use case (AKA "domain"). There are three
- * rules governing the use of unique keys:
- *
- *    1) Only one resource can have a given unique key at a time. Hence, "unique".
- *    2) A resource can have at most one unique key at a time.
- *    3) Unlike scratch keys, multiple requests for a unique key will return the same resource even
- *       if the resource already has refs.
- *
- * This key type allows a code path to create cached resources for which it is the exclusive user.
- * The code path creates a domain which it sets on its keys. This guarantees that there are no
- * cross-domain collisions. Unique keys preempt scratch keys. While a resource has a valid unique
- * key, it is inaccessible via its scratch key. It can become scratch again if the unique key is
- * removed or no longer has any external references.
+ * ResourceKey allows a code path to create cached resources for which it is the exclusive user.
+ * The code path generates a unique domain which it sets on its keys. This guarantees that there are
+ * no cross-domain collisions. Please refer to the comments in Resource::getResourceKey() for more
+ * details.
  */
-class UniqueKey {
+class ResourceKey {
  public:
   /**
-   * Creates a weak UniqueKey that contains a valid domain and holds a weak reference to the
-   * corresponding resource. When a resource is solely referenced by weak unique keys, it falls
+   * Creates a weak ResourceKey that contains a valid domain and holds a weak reference to the
+   * corresponding resource. When a resource is solely referenced by weak ResourceKeys, it falls
    * under the management of the Context and can be destroyed at any time.
    */
-  static UniqueKey MakeWeak();
+  static ResourceKey NewWeak();
 
   /**
-   * Creates a strong UniqueKey that contains a valid domain and holds a strong reference to the
-   * corresponding resource. When a resource is referenced by strong unique keys, the Context
-   * ensures that the resource is not destroyed until all strong unique keys are released or the
+   * Creates a strong ResourceKey that contains a valid domain and holds a strong reference to the
+   * corresponding resource. When a resource is referenced by strong ResourceKeys, the Context
+   * ensures that the resource is not destroyed until all strong ResourceKeys are released or the
    * Context itself is destroyed.
    */
-  static UniqueKey MakeStrong();
+  static ResourceKey NewStrong();
 
   /**
-   * Creates an empty UniqueKey.
+   * Creates an empty ResourceKey.
    */
-  UniqueKey() = default;
+  ResourceKey() = default;
 
-  UniqueKey(const UniqueKey& key);
+  ResourceKey(const ResourceKey& key);
 
-  UniqueKey(UniqueKey&& key) noexcept;
+  ResourceKey(ResourceKey&& key) noexcept;
 
-  virtual ~UniqueKey();
+  virtual ~ResourceKey();
 
   /**
-   * Returns a global unique ID of the domain. Returns 0 if the UniqueKey is empty.
+   * Returns a global unique ID of the domain. Returns 0 if the ResourceKey is empty.
    */
-  uint32_t domainID() const;
+  uint64_t domain() const;
 
   /**
-   * Returns true if the UniqueKey has no valid domain.
+   * Returns true if the ResourceKey has no valid domain.
    */
   bool empty() const {
     return uniqueDomain == nullptr;
   }
 
   /**
-   * Returns true if the UniqueKey holds a strong reference to the corresponding resource.
+   * Returns true if the ResourceKey holds a strong reference to the corresponding resource.
    */
   bool isStrong() const {
     return strong;
   }
 
   /**
-   * Returns a strong UniqueKey that contains the same domain as the original key.
+   * Returns a strong ResourceKey that contains the same domain as the original key.
    */
-  UniqueKey makeStrong() const;
+  ResourceKey makeStrong() const;
 
   /**
-   * Returns a weak UniqueKey that contains the same domain as the original key.
+   * Returns a weak ResourceKey that contains the same domain as the original key.
    */
-  UniqueKey makeWeak() const;
+  ResourceKey makeWeak() const;
 
   /**
    * Returns the total number of times the domain has been referenced.
@@ -122,14 +97,14 @@ class UniqueKey {
    */
   long strongCount() const;
 
-  UniqueKey& operator=(const UniqueKey& key);
+  ResourceKey& operator=(const ResourceKey& key);
 
-  UniqueKey& operator=(UniqueKey&& key) noexcept;
+  ResourceKey& operator=(ResourceKey&& key) noexcept;
 
  private:
   UniqueDomain* uniqueDomain = nullptr;
   bool strong = false;
 
-  UniqueKey(UniqueDomain* block, bool strong);
+  ResourceKey(UniqueDomain* block, bool strong);
 };
 }  // namespace tgfx

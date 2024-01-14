@@ -102,7 +102,7 @@ std::shared_ptr<Texture> RenderTargetProxy::getTexture() const {
 }
 
 std::shared_ptr<RenderTarget> RenderTargetProxy::getRenderTarget() const {
-  return Resource::Get<RenderTarget>(context, uniqueKey);
+  return Resource::Get<RenderTarget>(context, resourceKey);
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy() const {
