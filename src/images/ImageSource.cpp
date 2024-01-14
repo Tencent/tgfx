@@ -24,24 +24,23 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
-                                                   std::shared_ptr<ImageGenerator> generator) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
   if (generator == nullptr) {
     return nullptr;
   }
-  auto source =
-      std::shared_ptr<EncodedSource>(new EncodedSource(std::move(uniqueKey), std::move(generator)));
+  auto source = std::shared_ptr<EncodedSource>(
+      new EncodedSource(ResourceKey::NewWeak(), std::move(generator)));
   source->weakThis = source;
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
-                                                   std::shared_ptr<ImageBuffer> buffer) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
+  auto resourceKey = ResourceKey::NewWeak();
   auto source =
-      std::shared_ptr<BufferSource>(new BufferSource(std::move(uniqueKey), std::move(buffer)));
+      std::shared_ptr<BufferSource>(new BufferSource(std::move(resourceKey), std::move(buffer)));
   source->weakThis = source;
   return source;
 }
@@ -55,7 +54,7 @@ std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<TextureProxy>
   return source;
 }
 
-ImageSource::ImageSource(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
+ImageSource::ImageSource(ResourceKey resourceKey) : resourceKey(std::move(resourceKey)) {
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {

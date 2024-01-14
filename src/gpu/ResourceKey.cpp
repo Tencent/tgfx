@@ -21,57 +21,58 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-UniqueKey UniqueKey::MakeWeak() {
+ResourceKey ResourceKey::NewWeak() {
   return {new UniqueDomain(), false};
 }
 
-UniqueKey UniqueKey::MakeStrong() {
+ResourceKey ResourceKey::NewStrong() {
   return {new UniqueDomain(), true};
 }
 
-UniqueKey::UniqueKey(UniqueDomain* block, bool strong) : uniqueDomain(block), strong(strong) {
+ResourceKey::ResourceKey(UniqueDomain* block, bool strong) : uniqueDomain(block), strong(strong) {
   DEBUG_ASSERT(uniqueDomain != nullptr);
   uniqueDomain->addReference(strong);
 }
 
-UniqueKey::UniqueKey(const UniqueKey& key) : uniqueDomain(key.uniqueDomain), strong(key.strong) {
+ResourceKey::ResourceKey(const ResourceKey& key)
+    : uniqueDomain(key.uniqueDomain), strong(key.strong) {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addReference(strong);
   }
 }
 
-UniqueKey::UniqueKey(UniqueKey&& key) noexcept
+ResourceKey::ResourceKey(ResourceKey&& key) noexcept
     : uniqueDomain(key.uniqueDomain), strong(key.strong) {
   key.uniqueDomain = nullptr;
 }
 
-UniqueKey::~UniqueKey() {
+ResourceKey::~ResourceKey() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->releaseReference(strong);
   }
 }
 
-uint32_t UniqueKey::domainID() const {
+uint64_t ResourceKey::domain() const {
   return uniqueDomain != nullptr ? uniqueDomain->uniqueID() : 0;
 }
 
-UniqueKey UniqueKey::makeStrong() const {
+ResourceKey ResourceKey::makeStrong() const {
   return {uniqueDomain, true};
 }
 
-UniqueKey UniqueKey::makeWeak() const {
+ResourceKey ResourceKey::makeWeak() const {
   return {uniqueDomain, false};
 }
 
-long UniqueKey::useCount() const {
+long ResourceKey::useCount() const {
   return uniqueDomain != nullptr ? uniqueDomain->useCount() : 0;
 }
 
-long UniqueKey::strongCount() const {
+long ResourceKey::strongCount() const {
   return uniqueDomain != nullptr ? uniqueDomain->strongCount() : 0;
 }
 
-UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
+ResourceKey& ResourceKey::operator=(const ResourceKey& key) {
   if (this == &key) {
     return *this;
   }
@@ -86,7 +87,7 @@ UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
   return *this;
 }
 
-UniqueKey& UniqueKey::operator=(UniqueKey&& key) noexcept {
+ResourceKey& ResourceKey::operator=(ResourceKey&& key) noexcept {
   if (this == &key) {
     return *this;
   }

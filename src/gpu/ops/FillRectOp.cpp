@@ -94,9 +94,9 @@ class RectCoverageVerticesProvider : public DataProvider {
   bool hasColor;
 };
 
-class RectNoCoverageVerticesProvider : public DataProvider {
+class RectNonCoverageVerticesProvider : public DataProvider {
  public:
-  RectNoCoverageVerticesProvider(std::vector<std::shared_ptr<RectPaint>> rectPaints, bool hasColor)
+  RectNonCoverageVerticesProvider(std::vector<std::shared_ptr<RectPaint>> rectPaints, bool hasColor)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
   }
 
@@ -186,7 +186,7 @@ void FillRectOp::prepare(Context* context) {
   if (aa == AAType::Coverage) {
     vertexData = std::make_shared<RectCoverageVerticesProvider>(rectPaints, hasColor);
   } else {
-    vertexData = std::make_shared<RectNoCoverageVerticesProvider>(rectPaints, hasColor);
+    vertexData = std::make_shared<RectNonCoverageVerticesProvider>(rectPaints, hasColor);
   }
   vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexData), BufferType::Vertex);
   if (aa == AAType::Coverage) {

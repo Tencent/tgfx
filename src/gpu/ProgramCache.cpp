@@ -37,7 +37,6 @@ Program* ProgramCache::getProgram(const ProgramInfo* programInfo) {
     programLRU.push_front(result->second);
     return result->second;
   }
-  // TODO(domrjchen): createProgram() 应该统计到 programCompilingTime 里。
   auto program = programInfo->createProgram(context).release();
   if (program == nullptr) {
     return nullptr;

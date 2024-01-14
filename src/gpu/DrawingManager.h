@@ -49,7 +49,7 @@ class DrawingManager {
   void closeActiveOpsTask();
 
   Context* context = nullptr;
-  std::unordered_map<uint32_t, ResourceTask*> resourceTaskMap = {};
+  std::unordered_map<uint64_t, ResourceTask*> resourceTaskMap = {};
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
   OpsRenderTask* activeOpsTask = nullptr;

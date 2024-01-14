@@ -21,7 +21,7 @@
 namespace tgfx {
 
 TextureSource::TextureSource(std::shared_ptr<TextureProxy> textureProxy)
-    : ImageSource(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)) {
+    : ImageSource(textureProxy->getResourceKey()), textureProxy(std::move(textureProxy)) {
 }
 
 BackendTexture TextureSource::getBackendTexture(Context* context) const {

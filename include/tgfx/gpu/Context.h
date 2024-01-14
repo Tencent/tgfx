@@ -92,20 +92,20 @@ class Context {
   /**
    * Purges GPU resources that haven't been used the passed in time.
    * @param purgeTime A timestamp previously returned by Clock::Now().
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
+   * @param recyclableResourcesOnly If true, purgeable resources with external weak references are
+   * spared. If false, all purgeable resources will be deleted.
    */
-  void purgeResourcesNotUsedSince(int64_t purgeTime, bool scratchResourcesOnly = false);
+  void purgeResourcesNotUsedSince(int64_t purgeTime, bool recyclableResourcesOnly = false);
 
   /**
    * Purge unreferenced resources from the cache until the provided bytesLimit has been reached, or
    * we have purged all unreferenced resources. Returns true if the total resource bytes is not over
    * the specified bytesLimit after purging.
    * @param bytesLimit The desired number of bytes after puring.
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
+   * @param recyclableResourcesOnly If true, purgeable resources with external weak references are
+   * spared. If false, all purgeable resources will be deleted.
    */
-  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly = false);
+  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool recyclableResourcesOnly = false);
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more

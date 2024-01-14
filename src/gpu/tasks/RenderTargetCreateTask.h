@@ -26,7 +26,8 @@ class RenderTargetCreateTask : public ResourceTask {
   /**
    * Create a new RenderTargetCreateTask to generate a RenderTarget with the given properties.
    */
-  static std::shared_ptr<RenderTargetCreateTask> MakeFrom(UniqueKey uniqueKey, UniqueKey textureKey,
+  static std::shared_ptr<RenderTargetCreateTask> MakeFrom(ResourceKey strongKey,
+                                                          ResourceKey textureKey,
                                                           PixelFormat pixelFormat,
                                                           int sampleCount = 1);
 
@@ -34,11 +35,11 @@ class RenderTargetCreateTask : public ResourceTask {
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  UniqueKey textureKey = {};
+  ResourceKey textureKey = {};
   PixelFormat pixelFormat = PixelFormat::RGBA_8888;
   int sampleCount = 1;
 
-  RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey textureKey, PixelFormat pixelFormat,
+  RenderTargetCreateTask(ResourceKey strongKey, ResourceKey textureKey, PixelFormat pixelFormat,
                          int sampleCount);
 };
 }  // namespace tgfx

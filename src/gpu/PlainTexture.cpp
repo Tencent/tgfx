@@ -22,15 +22,15 @@
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-static void ComputeScratchKey(BytesKey* scratchKey, int width, int height, PixelFormat format,
+static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, PixelFormat format,
                               bool mipMapped) {
   static const uint32_t PlainTextureType = UniqueID::Next();
-  scratchKey->write(PlainTextureType);
-  scratchKey->write(static_cast<uint32_t>(width));
-  scratchKey->write(static_cast<uint32_t>(height));
+  recycleKey->write(PlainTextureType);
+  recycleKey->write(static_cast<uint32_t>(width));
+  recycleKey->write(static_cast<uint32_t>(height));
   auto formatValue = static_cast<uint32_t>(format);
   auto mipMapValue = static_cast<uint32_t>(mipMapped ? 1 : 0);
-  scratchKey->write(formatValue | (mipMapValue << 30));
+  recycleKey->write(formatValue | (mipMapValue << 30));
 }
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
@@ -42,10 +42,10 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   }
   auto caps = context->caps();
   int maxMipmapLevel = mipMapped ? caps->getMaxMipmapLevel(width, height) : 0;
-  ScratchKey scratchKey = {};
-  ComputeScratchKey(&scratchKey, width, height, pixelFormat, maxMipmapLevel > 0);
-  auto texture =
-      std::static_pointer_cast<Texture>(context->resourceCache()->findScratchResource(scratchKey));
+  BytesKey recycleKey = {};
+  ComputeRecycleKey(&recycleKey, width, height, pixelFormat, maxMipmapLevel > 0);
+  auto texture = std::static_pointer_cast<Texture>(
+      context->resourceCache()->findRecyclableResource(recycleKey));
   if (texture) {
     texture->_origin = origin;
   } else {
@@ -54,7 +54,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
       return nullptr;
     }
     auto plainTexture = new PlainTexture(std::move(sampler), width, height, origin);
-    texture = Resource::AddToContext(context, plainTexture, scratchKey);
+    texture = Resource::AddToContext(context, plainTexture, recycleKey);
   }
   if (pixels != nullptr) {
     context->gpu()->writePixels(texture->getSampler(), Rect::MakeWH(width, height), pixels,

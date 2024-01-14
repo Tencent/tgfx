@@ -20,9 +20,9 @@
 #include "BufferSource.h"
 
 namespace tgfx {
-AsyncSource::AsyncSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> imageGenerator,
+AsyncSource::AsyncSource(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> imageGenerator,
                          bool mipMapped)
-    : EncodedSource(std::move(uniqueKey), imageGenerator, mipMapped) {
+    : EncodedSource(std::move(resourceKey), imageGenerator, mipMapped) {
   imageDecoder = ImageDecoder::MakeFrom(std::move(imageGenerator), !mipMapped);
 }
 
@@ -32,7 +32,7 @@ std::shared_ptr<ImageSource> AsyncSource::onMakeDecoded(Context*) const {
 
 std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context,
                                                               uint32_t renderFlags) const {
-  return context->proxyProvider()->createTextureProxy(uniqueKey, imageDecoder, mipMapped,
+  return context->proxyProvider()->createTextureProxy(resourceKey, imageDecoder, mipMapped,
                                                       renderFlags);
 }
 }  // namespace tgfx

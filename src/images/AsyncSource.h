@@ -40,7 +40,7 @@ class AsyncSource : public EncodedSource {
  private:
   std::shared_ptr<ImageDecoder> imageDecoder = nullptr;
 
-  explicit AsyncSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator,
+  explicit AsyncSource(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
                        bool mipMapped = false);
 
   friend class EncodedSource;

@@ -34,16 +34,16 @@ class ProxyProvider {
   explicit ProxyProvider(Context* context);
 
   /**
-   * Returns true if the proxy provider has a proxy for the given unique key.
+   * Returns true if the proxy provider has a proxy for the given ResourceKey.
    */
-  bool hasResourceProxy(const UniqueKey& uniqueKey);
+  bool hasResourceProxy(const ResourceKey& resourceKey);
 
-  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
+  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const ResourceKey& resourceKey,
                                                        std::shared_ptr<Data> data,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
 
-  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
+  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const ResourceKey& resourceKey,
                                                        std::shared_ptr<DataProvider> provider,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
@@ -52,7 +52,7 @@ class ProxyProvider {
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being
    * uploaded to the GPU.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
+  std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey,
                                                    std::shared_ptr<ImageBuffer> imageBuffer,
                                                    bool mipMapped = false,
                                                    uint32_t renderFlags = 0);
@@ -60,7 +60,7 @@ class ProxyProvider {
   /*
    * Creates a TextureProxy for the given ImageGenerator.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
+  std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey,
                                                    std::shared_ptr<ImageGenerator> generator,
                                                    bool mipMapped = false,
                                                    uint32_t renderFlags = 0);
@@ -68,7 +68,7 @@ class ProxyProvider {
   /**
    * Creates a TextureProxy for the given ImageDecoder.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
+  std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey,
                                                    std::shared_ptr<ImageDecoder> decoder,
                                                    bool mipMapped = false,
                                                    uint32_t renderFlags = 0);
@@ -107,17 +107,17 @@ class ProxyProvider {
 
  private:
   Context* context = nullptr;
-  std::unordered_map<uint32_t, std::weak_ptr<ResourceProxy>> proxyMap = {};
+  std::unordered_map<uint64_t, std::weak_ptr<ResourceProxy>> proxyMap = {};
 
-  static UniqueKey GetStrongKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
+  static ResourceKey GetStrongKey(const ResourceKey& resourceKey, uint32_t renderFlags);
 
-  std::shared_ptr<GpuBufferProxy> findGpuBufferProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<GpuBufferProxy> findGpuBufferProxy(const ResourceKey& resourceKey);
 
-  std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<TextureProxy> findTextureProxy(const ResourceKey& resourceKey);
 
-  std::shared_ptr<ResourceProxy> findResourceProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<ResourceProxy> findResourceProxy(const ResourceKey& resourceKey);
 
-  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, UniqueKey strongKey,
-                        uint32_t domainID);
+  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, ResourceKey strongKey,
+                        uint64_t domainID);
 };
 }  // namespace tgfx

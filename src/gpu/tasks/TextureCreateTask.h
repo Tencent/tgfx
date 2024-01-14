@@ -28,19 +28,19 @@ class TextureCreateTask : public ResourceTask {
   /**
    * Creates a TextureCreateTask to generate a texture using the specified size and format.
    */
-  static std::shared_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey, int width, int height,
+  static std::shared_ptr<TextureCreateTask> MakeFrom(ResourceKey strongKey, int width, int height,
                                                      PixelFormat format, bool mipMapped = false,
                                                      ImageOrigin origin = ImageOrigin::TopLeft);
 
   /*
    * Creates a TextureCreateTask to generate a texture using the given ImageBuffer.
    */
-  static std::shared_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey,
+  static std::shared_ptr<TextureCreateTask> MakeFrom(ResourceKey strongKey,
                                                      std::shared_ptr<ImageDecoder> imageDecoder,
                                                      bool mipMapped = false);
 
  protected:
-  explicit TextureCreateTask(UniqueKey uniqueKey) : ResourceTask(std::move(uniqueKey)) {
+  explicit TextureCreateTask(ResourceKey strongKey) : ResourceTask(std::move(strongKey)) {
   }
 };
 }  // namespace tgfx
