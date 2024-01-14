@@ -257,13 +257,13 @@ std::shared_ptr<ResourceProxy> ProxyProvider::findResourceProxy(const ResourceKe
 }
 
 void ProxyProvider::addResourceProxy(std::shared_ptr<ResourceProxy> proxy, ResourceKey strongKey,
-                                     uint32_t domainID) {
+                                     uint64_t domainID) {
   if (domainID == 0) {
     domainID = strongKey.domain();
   }
   proxy->context = context;
   proxy->resourceKey = std::move(strongKey);
-  proxyMap[domainID] = proxy;
+  proxyMap[domainID] = std::move(proxy);
 }
 
 }  // namespace tgfx
