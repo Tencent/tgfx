@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/ResourceKey.h"
+#include "gpu/ResourceKey.h"
 #include "gpu/UniqueDomain.h"
 #include "utils/Log.h"
 

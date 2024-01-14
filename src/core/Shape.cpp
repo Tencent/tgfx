@@ -100,6 +100,5 @@ std::shared_ptr<Shape> Shape::MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
 }
 
 Shape::Shape(float resolutionScale) : _resolutionScale(resolutionScale) {
-  uniqueKey = UniqueKey::MakeWeak();
 }
 }  // namespace tgfx

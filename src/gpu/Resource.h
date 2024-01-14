@@ -20,7 +20,7 @@
 
 #include <atomic>
 #include "gpu/ResourceCache.h"
-#include "tgfx/gpu/ResourceKey.h"
+#include "gpu/ResourceKey.h"
 
 namespace tgfx {
 /**

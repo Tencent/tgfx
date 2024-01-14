@@ -21,8 +21,8 @@
 #include <functional>
 #include <list>
 #include <unordered_map>
+#include "gpu/ResourceKey.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/ResourceKey.h"
 
 namespace tgfx {
 class Resource;
