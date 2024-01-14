@@ -26,6 +26,8 @@ class GLGpu : public Gpu {
  public:
   static std::unique_ptr<Gpu> Make(Context* context);
 
+  std::shared_ptr<RenderPass> getRenderPass() override;
+
   std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                 int mipLevelCount) override;
 
@@ -45,19 +47,16 @@ class GLGpu : public Gpu {
 
   bool waitSemaphore(const Semaphore* semaphore) override;
 
-  RenderPass* getRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                            std::shared_ptr<Texture> renderTargetTexture) override;
-
   bool submitToGpu(bool syncCpu) override;
 
   void submit(RenderPass* renderPass) override;
 
  private:
+  std::shared_ptr<RenderPass> renderPass = nullptr;
+
   explicit GLGpu(Context* context) : Gpu(context) {
   }
 
   void onRegenerateMipMapLevels(const TextureSampler* sampler) override;
-
-  std::unique_ptr<GLRenderPass> glRenderPass;
 };
 }  // namespace tgfx

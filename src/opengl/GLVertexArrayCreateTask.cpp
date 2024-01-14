@@ -16,39 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpsRenderTask.h"
-#include "gpu/Gpu.h"
-#include "gpu/RenderPass.h"
+#include "GLVertexArrayCreateTask.h"
+#include "GLVertexArray.h"
 
 namespace tgfx {
-void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
-  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
-    return;
-  }
-  ops.emplace_back(std::move(op));
+GLVertexArrayCreateTask::GLVertexArrayCreateTask(ResourceKey strongKey)
+    : ResourceTask(std::move(strongKey)) {
 }
 
-void OpsRenderTask::prepare(Context* context) {
-  renderPass = context->gpu()->getRenderPass();
-  for (auto& op : ops) {
-    op->prepare(context);
+std::shared_ptr<Resource> GLVertexArrayCreateTask::onMakeResource(Context* context) {
+  auto vertexArray = GLVertexArray::Make(context);
+  if (vertexArray == nullptr) {
+    LOGE("GLVertexArrayCreateTask::onMakeResource() Failed to create the vertex array!");
   }
-}
-
-bool OpsRenderTask::execute(Gpu* gpu) {
-  if (ops.empty()) {
-    return false;
-  }
-  if (!renderPass->begin(renderTargetProxy)) {
-    LOGE("OpsTask::execute() Failed to initialize the render pass!");
-    return false;
-  }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass.get());
-  }
-  gpu->submit(renderPass.get());
-  renderPass->end();
-  return true;
+  return vertexArray;
 }
 }  // namespace tgfx

@@ -34,9 +34,11 @@ class Gpu {
  public:
   virtual ~Gpu() = default;
 
-  Context* context() {
-    return _context;
+  Context* getContext() {
+    return context;
   }
+
+  virtual std::shared_ptr<RenderPass> getRenderPass() = 0;
 
   virtual std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                         int mipLevelCount) = 0;
@@ -55,9 +57,6 @@ class Gpu {
 
   virtual bool waitSemaphore(const Semaphore* semaphore) = 0;
 
-  virtual RenderPass* getRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                    std::shared_ptr<Texture> renderTargetTexture) = 0;
-
   virtual bool submitToGpu(bool syncCpu) = 0;
 
   virtual void submit(RenderPass* renderPass) = 0;
@@ -65,11 +64,11 @@ class Gpu {
   void regenerateMipMapLevels(const TextureSampler* sampler);
 
  protected:
-  explicit Gpu(Context* context) : _context(context) {
+  Context* context;
+
+  explicit Gpu(Context* context) : context(context) {
   }
 
   virtual void onRegenerateMipMapLevels(const TextureSampler* sampler) = 0;
-
-  Context* _context;
 };
 }  // namespace tgfx

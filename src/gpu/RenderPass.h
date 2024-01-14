@@ -25,6 +25,7 @@
 #include "gpu/RenderTarget.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
@@ -40,11 +41,10 @@ enum class PrimitiveType {
 
 class RenderPass {
  public:
-  explicit RenderPass(Context* context) : _context(context) {
-  }
+  virtual ~RenderPass() = default;
 
-  Context* context() {
-    return _context;
+  Context* getContext() {
+    return context;
   }
 
   std::shared_ptr<RenderTarget> renderTarget() {
@@ -55,9 +55,7 @@ class RenderPass {
     return _renderTargetTexture;
   }
 
-  virtual ~RenderPass() = default;
-
-  void begin();
+  bool begin(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
   void end();
   void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer);
@@ -66,6 +64,9 @@ class RenderPass {
   void clear(const Rect& scissor, Color color);
 
  protected:
+  explicit RenderPass(Context* context) : context(context) {
+  }
+
   virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                            const Rect& drawBounds) = 0;
   virtual void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
@@ -74,7 +75,7 @@ class RenderPass {
   virtual void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;
 
-  Context* _context = nullptr;
+  Context* context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;
   std::shared_ptr<Texture> _renderTargetTexture = nullptr;
   Program* _program = nullptr;

@@ -19,11 +19,22 @@
 #include "RenderPass.h"
 
 namespace tgfx {
-void RenderPass::begin() {
+bool RenderPass::begin(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
+  if (renderTargetProxy == nullptr) {
+    return false;
+  }
+  _renderTarget = renderTargetProxy->getRenderTarget();
+  if (_renderTarget == nullptr) {
+    return false;
+  }
+  _renderTargetTexture = renderTargetProxy->getTexture();
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
+  return true;
 }
 
 void RenderPass::end() {
+  _renderTarget = nullptr;
+  _renderTargetTexture = nullptr;
   resetActiveBuffers();
 }
 

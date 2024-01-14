@@ -36,6 +36,7 @@ class OpsRenderTask : public RenderTask {
   bool execute(Gpu* gpu) override;
 
  private:
-  std::vector<std::unique_ptr<Op>> ops;
+  std::shared_ptr<RenderPass> renderPass = nullptr;
+  std::vector<std::unique_ptr<Op>> ops = {};
 };
 }  // namespace tgfx

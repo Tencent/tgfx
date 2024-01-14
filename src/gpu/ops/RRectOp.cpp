@@ -330,7 +330,7 @@ void RRectOp::execute(RenderPass* renderPass) {
   auto pipeline = createPipeline(
       renderPass, EllipseGeometryProcessor::Make(renderPass->renderTarget()->width(),
                                                  renderPass->renderTarget()->height(), false,
-                                                 UseScale(renderPass->context()), localMatrix));
+                                                 UseScale(renderPass->getContext()), localMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer);
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rRectPaints.size() * kIndicesPerFillRRect);

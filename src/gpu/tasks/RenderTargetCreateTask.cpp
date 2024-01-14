@@ -39,16 +39,16 @@ RenderTargetCreateTask::RenderTargetCreateTask(ResourceKey strongKey, ResourceKe
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* context) {
   auto texture = Resource::Get<Texture>(context, textureKey);
   if (texture == nullptr) {
-    LOGE("RenderTargetCreateTask::onMakeResource() Failed to get texture!");
+    LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");
     return nullptr;
   }
   if (texture->getSampler()->format != pixelFormat) {
-    LOGE("RenderTargetCreateTask::onMakeResource() texture format mismatch!");
+    LOGE("RenderTargetCreateTask::onMakeResource() the texture format mismatch!");
     return nullptr;
   }
   auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount);
   if (renderTarget == nullptr) {
-    LOGE("RenderTargetCreateTask::onMakeResource() Failed to create render target!");
+    LOGE("RenderTargetCreateTask::onMakeResource() Failed to create the render target!");
   }
   return renderTarget;
 }
