@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPass.h"
-#include "GLGpu.h"
 #include "GLUtil.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
+#include "opengl/GLVertexArray.h"
+#include "opengl/GLVertexArrayCreateTask.h"
 
 namespace tgfx {
 struct AttribLayout {
@@ -43,47 +45,13 @@ static AttribLayout GetAttribLayout(SLType type) {
   return {false, 0, 0};
 }
 
-class VertexArrayObject : public Resource {
- public:
-  static std::shared_ptr<VertexArrayObject> Make(Context* context) {
-    auto gl = GLFunctions::Get(context);
-    unsigned id = 0;
-    // Using VAO is required in the core profile.
-    gl->genVertexArrays(1, &id);
-    if (id == 0) {
-      return nullptr;
-    }
-    return Resource::AddToContext(context, new VertexArrayObject(id));
-  }
-
-  explicit VertexArrayObject(unsigned id) : id(id) {
-  }
-
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
-  unsigned id = 0;
-
- private:
-  void onReleaseGPU() override {
-    auto gl = GLFunctions::Get(context);
-    if (id > 0) {
-      gl->deleteVertexArrays(1, &id);
-      id = 0;
-    }
-  }
-};
-
-std::unique_ptr<GLRenderPass> GLRenderPass::Make(Context* context) {
-  std::shared_ptr<VertexArrayObject> vertexArrayObject;
+GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
   if (GLCaps::Get(context)->vertexArrayObjectSupport) {
-    vertexArrayObject = VertexArrayObject::Make(context);
-    if (vertexArrayObject == nullptr) {
-      return nullptr;
-    }
+    vertexArrayKey = ResourceKey::NewStrong();
+    // Using VAO is required in the core profile.
+    auto task = std::make_shared<GLVertexArrayCreateTask>(vertexArrayKey);
+    context->drawingManager()->addResourceTask(std::move(task));
   }
-  return std::unique_ptr<GLRenderPass>(new GLRenderPass(context, vertexArrayObject));
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -121,32 +89,21 @@ static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
   }
 }
 
-void GLRenderPass::set(std::shared_ptr<RenderTarget> renderTarget,
-                       std::shared_ptr<Texture> renderTargetTexture) {
-  _renderTarget = std::move(renderTarget);
-  _renderTargetTexture = std::move(renderTargetTexture);
-}
-
-void GLRenderPass::reset() {
-  _renderTarget = nullptr;
-  _renderTargetTexture = nullptr;
-}
-
 bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                                const Rect& drawBounds) {
-  _program = static_cast<GLProgram*>(_context->programCache()->getProgram(programInfo));
+  _program = static_cast<GLProgram*>(context->programCache()->getProgram(programInfo));
   if (_program == nullptr) {
     return false;
   }
-  auto gl = GLFunctions::Get(_context);
-  CheckGLError(_context);
+  auto gl = GLFunctions::Get(context);
+  CheckGLError(context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
-  UpdateScissor(_context, drawBounds);
-  UpdateBlend(_context, programInfo->blendInfo());
+  UpdateScissor(context, drawBounds);
+  UpdateBlend(context, programInfo->blendInfo());
   if (programInfo->requiresBarrier()) {
     gl->textureBarrier();
   }
@@ -164,7 +121,7 @@ static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
   auto func = [&]() {
-    auto gl = GLFunctions::Get(_context);
+    auto gl = GLFunctions::Get(context);
     gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(baseVertex),
                    static_cast<int>(vertexCount));
   };
@@ -173,7 +130,7 @@ void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t
 
 void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
   auto func = [&]() {
-    auto gl = GLFunctions::Get(_context);
+    auto gl = GLFunctions::Get(context);
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                    std::static_pointer_cast<GLBuffer>(_indexBuffer)->bufferID());
     gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
@@ -184,9 +141,10 @@ void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, 
 }
 
 void GLRenderPass::draw(const std::function<void()>& func) {
-  auto gl = GLFunctions::Get(_context);
-  if (vertexArrayObject) {
-    gl->bindVertexArray(vertexArrayObject->id);
+  auto gl = GLFunctions::Get(context);
+  auto vertexArray = Resource::Get<GLVertexArray>(context, vertexArrayKey);
+  if (vertexArray) {
+    gl->bindVertexArray(vertexArray->id());
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(_vertexBuffer)->bufferID());
   auto* program = static_cast<GLProgram*>(_program);
@@ -198,19 +156,19 @@ void GLRenderPass::draw(const std::function<void()>& func) {
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   func();
-  if (vertexArrayObject) {
+  if (vertexArray) {
     gl->bindVertexArray(0);
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-  CheckGLError(_context);
+  CheckGLError(context);
 }
 
 void GLRenderPass::onClear(const Rect& scissor, Color color) {
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
-  UpdateScissor(_context, scissor);
+  UpdateScissor(context, scissor);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
 }

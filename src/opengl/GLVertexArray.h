@@ -16,39 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpsRenderTask.h"
-#include "gpu/Gpu.h"
-#include "gpu/RenderPass.h"
+#pragma once
+
+#include "gpu/Resource.h"
 
 namespace tgfx {
-void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
-  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
-    return;
-  }
-  ops.emplace_back(std::move(op));
-}
+class GLVertexArray : public Resource {
+ public:
+  static std::shared_ptr<GLVertexArray> Make(Context* context);
 
-void OpsRenderTask::prepare(Context* context) {
-  renderPass = context->gpu()->getRenderPass();
-  for (auto& op : ops) {
-    op->prepare(context);
-  }
-}
+  explicit GLVertexArray(unsigned id);
 
-bool OpsRenderTask::execute(Gpu* gpu) {
-  if (ops.empty()) {
-    return false;
+  size_t memoryUsage() const override {
+    return 0;
   }
-  if (!renderPass->begin(renderTargetProxy)) {
-    LOGE("OpsTask::execute() Failed to initialize the render pass!");
-    return false;
+
+  unsigned id() const {
+    return _id;
   }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass.get());
-  }
-  gpu->submit(renderPass.get());
-  renderPass->end();
-  return true;
-}
+
+ private:
+  unsigned _id = 0;
+
+  void onReleaseGPU() override;
+};
 }  // namespace tgfx

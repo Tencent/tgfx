@@ -31,7 +31,7 @@ class EmptyTextureTask : public TextureCreateTask {
   std::shared_ptr<Resource> onMakeResource(Context* context) override {
     auto texture = Texture::MakeFormat(context, width, height, format, mipMapped, origin);
     if (texture == nullptr) {
-      LOGE("EmptyTextureTask::onMakeResource() Failed to create texture!");
+      LOGE("EmptyTextureTask::onMakeResource() Failed to create the texture!");
     }
     return texture;
   }
@@ -66,12 +66,12 @@ class ImageDecoderTask : public TextureCreateTask {
     }
     auto imageBuffer = decoder->decode();
     if (imageBuffer == nullptr) {
-      LOGE("ImageDecoderTask::onMakeResource() Failed to decode image!");
+      LOGE("ImageDecoderTask::onMakeResource() Failed to decode the image!");
       return nullptr;
     }
     auto texture = Texture::MakeFrom(context, imageBuffer, mipMapped);
     if (texture == nullptr) {
-      LOGE("ImageDecoderTask::onMakeResource() Failed to create texture!");
+      LOGE("ImageDecoderTask::onMakeResource() Failed to create the texture!");
     } else {
       // Free the decoded image buffer immediately to reduce memory pressure.
       decoder = nullptr;

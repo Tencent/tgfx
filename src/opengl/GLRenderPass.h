@@ -30,16 +30,10 @@
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
-class VertexArrayObject;
 
 class GLRenderPass : public RenderPass {
  public:
-  static std::unique_ptr<GLRenderPass> Make(Context* context);
-
-  void set(std::shared_ptr<RenderTarget> renderTarget,
-           std::shared_ptr<Texture> renderTargetTexture);
-
-  void reset();
+  explicit GLRenderPass(Context* context);
 
  protected:
   bool onBindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds) override;
@@ -50,12 +44,8 @@ class GLRenderPass : public RenderPass {
   void onClear(const Rect& scissor, Color color) override;
 
  private:
-  GLRenderPass(Context* context, std::shared_ptr<VertexArrayObject> vertexArrayObject)
-      : RenderPass(context), vertexArrayObject(std::move(vertexArrayObject)) {
-  }
+  ResourceKey vertexArrayKey = {};
 
   void draw(const std::function<void()>& func);
-
-  std::shared_ptr<VertexArrayObject> vertexArrayObject;
 };
 }  // namespace tgfx

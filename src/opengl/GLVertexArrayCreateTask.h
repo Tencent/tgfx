@@ -16,39 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpsRenderTask.h"
-#include "gpu/Gpu.h"
-#include "gpu/RenderPass.h"
+#pragma once
+
+#include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
-void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
-  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
-    return;
-  }
-  ops.emplace_back(std::move(op));
-}
+class GLVertexArrayCreateTask : public ResourceTask {
+ public:
+  explicit GLVertexArrayCreateTask(ResourceKey strongKey);
 
-void OpsRenderTask::prepare(Context* context) {
-  renderPass = context->gpu()->getRenderPass();
-  for (auto& op : ops) {
-    op->prepare(context);
-  }
-}
-
-bool OpsRenderTask::execute(Gpu* gpu) {
-  if (ops.empty()) {
-    return false;
-  }
-  if (!renderPass->begin(renderTargetProxy)) {
-    LOGE("OpsTask::execute() Failed to initialize the render pass!");
-    return false;
-  }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass.get());
-  }
-  gpu->submit(renderPass.get());
-  renderPass->end();
-  return true;
-}
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
+};
 }  // namespace tgfx

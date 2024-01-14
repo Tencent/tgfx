@@ -23,7 +23,8 @@
 namespace tgfx {
 static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect) {
   DstTextureInfo dstTextureInfo = {};
-  if (renderPass->context()->caps()->textureBarrierSupport && renderPass->renderTargetTexture()) {
+  auto context = renderPass->getContext();
+  if (context->caps()->textureBarrierSupport && renderPass->renderTargetTexture()) {
     dstTextureInfo.texture = renderPass->renderTargetTexture();
     dstTextureInfo.requiresBarrier = true;
     return dstTextureInfo;
@@ -40,7 +41,7 @@ static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect)
   }
   dstRect.roundOut();
   dstTextureInfo.offset = {dstRect.x(), dstRect.y()};
-  auto dstTexture = Texture::MakeRGBA(renderPass->context(), static_cast<int>(dstRect.width()),
+  auto dstTexture = Texture::MakeRGBA(context, static_cast<int>(dstRect.width()),
                                       static_cast<int>(dstRect.height()), false,
                                       renderPass->renderTarget()->origin());
   if (dstTexture == nullptr) {
@@ -48,8 +49,8 @@ static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect)
     return {};
   }
   dstTextureInfo.texture = dstTexture;
-  renderPass->context()->gpu()->copyRenderTargetToTexture(renderPass->renderTarget().get(),
-                                                          dstTexture.get(), dstRect, Point::Zero());
+  context->gpu()->copyRenderTargetToTexture(renderPass->renderTarget().get(), dstTexture.get(),
+                                            dstRect, Point::Zero());
   return dstTextureInfo;
 }
 
@@ -62,7 +63,7 @@ std::unique_ptr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
   std::move(_masks.begin(), _masks.end(),
             fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
   DstTextureInfo dstTextureInfo = {};
-  auto caps = renderPass->context()->caps();
+  auto caps = renderPass->getContext()->caps();
   if (!BlendModeAsCoeff(blendMode) && !caps->frameBufferFetchSupport) {
     dstTextureInfo = CreateDstTextureInfo(renderPass, bounds());
   }

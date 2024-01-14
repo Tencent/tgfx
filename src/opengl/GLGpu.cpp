@@ -27,14 +27,21 @@ std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
   return std::unique_ptr<GLGpu>(new GLGpu(context));
 }
 
+std::shared_ptr<RenderPass> GLGpu::getRenderPass() {
+  if (renderPass == nullptr) {
+    renderPass = std::make_shared<GLRenderPass>(context);
+  }
+  return renderPass;
+}
+
 std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, PixelFormat format,
                                                      int mipLevelCount) {
   // Texture memory must be allocated first on the web platform then can write pixels.
   DEBUG_ASSERT(mipLevelCount > 0);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
-  CheckGLError(_context);
-  auto gl = GLFunctions::Get(_context);
+  CheckGLError(context);
+  auto gl = GLFunctions::Get(context);
   auto sampler = std::make_unique<GLSampler>();
   gl->genTextures(1, &(sampler->id));
   if (sampler->id == 0) {
@@ -48,7 +55,7 @@ std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, Pixe
   gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   gl->texParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   gl->texParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  const auto& textureFormat = GLCaps::Get(_context)->getTextureFormat(format);
+  const auto& textureFormat = GLCaps::Get(context)->getTextureFormat(format);
   bool success = true;
   for (int level = 0; level < mipLevelCount && success; level++) {
     const int twoToTheMipLevel = 1 << level;
@@ -57,7 +64,7 @@ std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, Pixe
     gl->texImage2D(sampler->target, level, static_cast<int>(textureFormat.internalFormatTexImage),
                    currentWidth, currentHeight, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE,
                    nullptr);
-    success = CheckGLError(_context);
+    success = CheckGLError(context);
   }
   if (!success) {
     gl->deleteTextures(1, &(sampler->id));
@@ -71,7 +78,7 @@ void GLGpu::deleteSampler(TextureSampler* sampler) {
   if (glSampler == nullptr || glSampler->id == 0) {
     return;
   }
-  GLFunctions::Get(_context)->deleteTextures(1, &glSampler->id);
+  GLFunctions::Get(context)->deleteTextures(1, &glSampler->id);
   glSampler->id = 0;
 }
 
@@ -80,12 +87,12 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
   if (sampler == nullptr) {
     return;
   }
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   // https://skia-review.googlesource.com/c/skia/+/571418
   // HUAWEI nova9 pro(Adreno 642L), iqoo neo5(Adreno 650), Redmi K30pro(Adreno 650),
   // Xiaomi 8(Adreno 630), glaxy s9(Adreno 630)
   gl->flush();
-  auto caps = GLCaps::Get(_context);
+  auto caps = GLCaps::Get(context);
   auto glSampler = static_cast<const GLSampler*>(sampler);
   gl->bindTexture(glSampler->target, glSampler->id);
   const auto& format = caps->getTextureFormat(sampler->format);
@@ -173,14 +180,14 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
     return;
   }
   auto glSampler = static_cast<const GLSampler*>(sampler);
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0 + unitIndex));
   gl->bindTexture(glSampler->target, glSampler->id);
   gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S,
                     GetGLWrap(glSampler->target, samplerState.wrapModeX));
   gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T,
                     GetGLWrap(glSampler->target, samplerState.wrapModeY));
-  if (samplerState.mipMapped() && (!_context->caps()->mipMapSupport || !glSampler->hasMipmaps())) {
+  if (samplerState.mipMapped() && (!context->caps()->mipMapSupport || !glSampler->hasMipmaps())) {
     samplerState.mipMapMode = MipMapMode::None;
   }
   gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER,
@@ -191,7 +198,7 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
 
 void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
                                       const Rect& srcRect, const Point& dstPoint) {
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->getFrameBufferID(false));
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
@@ -212,8 +219,8 @@ void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {
   if (renderTarget->sampleCount() <= 1) {
     return;
   }
-  auto gl = GLFunctions::Get(_context);
-  auto caps = GLCaps::Get(_context);
+  auto gl = GLFunctions::Get(context);
+  auto caps = GLCaps::Get(context);
   if (!caps->usesMSAARenderBuffers()) {
     return;
   }
@@ -239,7 +246,7 @@ bool GLGpu::insertSemaphore(Semaphore* semaphore) {
   if (semaphore == nullptr) {
     return false;
   }
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   auto* sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (sync) {
     static_cast<GLSemaphore*>(semaphore)->glSync = sync;
@@ -255,28 +262,14 @@ bool GLGpu::waitSemaphore(const Semaphore* semaphore) {
   if (glSync == nullptr) {
     return false;
   }
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
   gl->deleteSync(glSync);
   return true;
 }
 
-RenderPass* GLGpu::getRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                 std::shared_ptr<Texture> renderTargetTexture) {
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  if (glRenderPass == nullptr) {
-    glRenderPass = GLRenderPass::Make(_context);
-  }
-  if (glRenderPass) {
-    glRenderPass->set(renderTarget, renderTargetTexture);
-  }
-  return glRenderPass.get();
-}
-
 bool GLGpu::submitToGpu(bool syncCpu) {
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   if (syncCpu) {
     gl->finish();
   } else {
@@ -286,11 +279,11 @@ bool GLGpu::submitToGpu(bool syncCpu) {
 }
 
 void GLGpu::submit(RenderPass*) {
-  glRenderPass->reset();
+  // does nothing for opengl.
 }
 
 void GLGpu::onRegenerateMipMapLevels(const TextureSampler* sampler) {
-  auto gl = GLFunctions::Get(_context);
+  auto gl = GLFunctions::Get(context);
   auto glSampler = static_cast<const GLSampler*>(sampler);
   if (glSampler->target != GL_TEXTURE_2D) {
     return;
