@@ -22,9 +22,9 @@
 #include "gpu/ops/TriangulatingPathOp.h"
 
 namespace tgfx {
-class TrianglesProvider : public DataProvider {
+class TriangleVerticesProvider : public DataProvider {
  public:
-  TrianglesProvider(Path path, const Rect& clipBounds)
+  TriangleVerticesProvider(Path path, const Rect& clipBounds)
       : path(std::move(path)), clipBounds(clipBounds) {
   }
 
@@ -42,10 +42,12 @@ class TrianglesProvider : public DataProvider {
   Path path = {};
   Rect clipBounds = Rect::MakeEmpty();
 };
+
 TriangulatingShape::TriangulatingShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
   auto path = getFillPath();
-  triangulator = std::make_shared<TrianglesProvider>(path, bounds);
+  uniqueKey = UniqueKey::MakeWeak();
+  triangulator = std::make_shared<TriangleVerticesProvider>(path, bounds);
 }
 
 std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,

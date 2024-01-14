@@ -23,7 +23,6 @@
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/gpu/ResourceKey.h"
 
 namespace tgfx {
 class DrawOp;
@@ -81,8 +80,6 @@ class Shape {
   virtual Rect getBounds() const = 0;
 
  protected:
-  UniqueKey uniqueKey = {};
-
   explicit Shape(float resolutionScale);
 
  private:
