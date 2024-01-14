@@ -88,13 +88,13 @@ GlyphID WebTypeface::getGlyphID(Unichar unichar) const {
   auto& glyphs = GlyphsMap()[webFontFamily];
   auto iter = std::find(glyphs.begin(), glyphs.end(), unichar);
   if (iter != glyphs.end()) {
-    return iter - glyphs.begin() + 1;
+    return static_cast<GlyphID>(iter - glyphs.begin() + 1);
   }
   if (glyphs.size() >= UINT16_MAX) {
     return 0;
   }
   glyphs.push_back(unichar);
-  return glyphs.size();
+  return static_cast<GlyphID>(glyphs.size());
 }
 
 std::shared_ptr<Data> WebTypeface::getBytes() const {

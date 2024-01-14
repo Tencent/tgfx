@@ -182,7 +182,7 @@ static size_t ToUTF16(int32_t uni, uint16_t utf16[2]) {
       utf16[0] = (uint16_t)uni;
     }
   }
-  return 1 + extra;
+  return static_cast<size_t>(1 + extra);
 }
 
 GlyphID CGTypeface::getGlyphID(Unichar unichar) const {
@@ -209,7 +209,7 @@ std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {
     return nullptr;
   }
   const auto* bytePtr = CFDataGetBytePtr(cfData);
-  auto length = CFDataGetLength(cfData);
+  auto length = static_cast<size_t>(CFDataGetLength(cfData));
   return Data::MakeAdopted(
       bytePtr, length, [](const void*, void* context) { CFRelease((CFDataRef)context); },
       (void*)cfData);

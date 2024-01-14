@@ -52,7 +52,7 @@ GLVideoTexture::GLVideoTexture(std::unique_ptr<TextureSampler> sampler, int widt
 }
 
 size_t GLVideoTexture::memoryUsage() const {
-  return width() * height() * 4;
+  return static_cast<size_t>(width()) * static_cast<size_t>(height()) * 4;
 }
 
 Point GLVideoTexture::getTextureCoord(float x, float y) const {

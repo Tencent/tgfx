@@ -36,7 +36,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
       return nullptr;
     }
     auto byteOffset = reinterpret_cast<void*>(data["byteOffset"].as<int>());
-    auto length = data["length"].as<int>();
+    auto length = data["length"].as<size_t>();
     Buffer imageBuffer(length);
     memcpy(imageBuffer.data(), byteOffset, length);
     data.call<void>("free");

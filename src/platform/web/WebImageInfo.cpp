@@ -47,13 +47,13 @@ static bool IsPng(std::shared_ptr<Data> imageBytes, int& width, int& height) {
   }
   std::string firstChunkType = ReadString(dataView, 12, 4);
   if (firstChunkType == "IHDR" && dataView.size() >= 24) {
-    width = dataView.getUint32(16);
-    height = dataView.getUint32(20);
+    width = static_cast<int>(dataView.getUint32(16));
+    height = static_cast<int>(dataView.getUint32(20));
     return true;
   } else if (firstChunkType == "CgBI") {
     if (Compare(dataView, 28, 4, "IHDR") && dataView.size() >= 40) {
-      width = dataView.getUint32(32);
-      height = dataView.getUint32(36);
+      width = static_cast<int>(dataView.getUint32(32));
+      height = static_cast<int>(dataView.getUint32(36));
       return true;
     }
   }
@@ -68,8 +68,8 @@ static bool IsJpeg(std::shared_ptr<Data> imageBytes, int& width, int& height) {
   if (!Compare(dataView, 0, 2, "\xFF\xD8")) {
     return false;
   }
-  off_t offset = 2;
-  while (offset + 9 <= static_cast<long>(dataView.size())) {
+  size_t offset = 2;
+  while (offset + 9 <= dataView.size()) {
     uint16_t sectionSize = dataView.getUint16(offset + 2);
     if (CompareAnyOf(dataView, offset, 2, {"\xFF\xC0", "\xFF\xC1", "\xFF\xC2"})) {
       height = dataView.getUint16(offset + 5);

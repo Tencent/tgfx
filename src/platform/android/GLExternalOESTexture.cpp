@@ -59,7 +59,7 @@ BackendTexture GLExternalOESTexture::getBackendTexture() const {
 }
 
 size_t GLExternalOESTexture::memoryUsage() const {
-  return textureWidth * textureHeight * 3 / 2;
+  return static_cast<size_t>(textureWidth) * static_cast<size_t>(textureHeight) * 3 / 2;
 }
 
 void GLExternalOESTexture::onReleaseGPU() {

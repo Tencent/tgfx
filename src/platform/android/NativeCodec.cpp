@@ -191,11 +191,12 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
     return nullptr;
   }
   env->SetBooleanField(options, BitmapFactoryOptions_inJustDecodeBounds, true);
-  auto byteArray = env->NewByteArray(imageBytes->size());
-  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
+  auto byteSize = static_cast<jsize>(imageBytes->size());
+  auto byteArray = env->NewByteArray(byteSize);
+  env->SetByteArrayRegion(byteArray, 0, byteSize,
                           reinterpret_cast<const jbyte*>(imageBytes->data()));
   env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray, byteArray, 0,
-                              imageBytes->size(), options);
+                              byteSize, options);
   if (env->ExceptionCheck()) {
     return nullptr;
   }
@@ -362,11 +363,12 @@ jobject NativeCodec::decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType al
     }
     return bitmap;
   }
-  auto byteArray = env->NewByteArray(imageBytes->size());
-  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
+  auto byteSize = static_cast<jsize>(imageBytes->size());
+  auto byteArray = env->NewByteArray(byteSize);
+  env->SetByteArrayRegion(byteArray, 0, byteSize,
                           reinterpret_cast<const jbyte*>(imageBytes->data()));
   auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
-                                            byteArray, 0, imageBytes->size(), options);
+                                            byteArray, 0, byteSize, options);
   if (env->ExceptionCheck()) {
     LOGE("NativeCodec::decodeBitmap() Failed to decode a Bitmap from the image bytes!");
     return nullptr;

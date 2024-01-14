@@ -26,8 +26,9 @@ jstring SafeToJString(JNIEnv* env, const std::string& text) {
   static Global<jclass> StringClass = env->FindClass("java/lang/String");
   static jmethodID StringConstructID =
       env->GetMethodID(StringClass.get(), "<init>", "([BLjava/lang/String;)V");
-  auto array = env->NewByteArray(text.size());
-  env->SetByteArrayRegion(array, 0, text.size(), reinterpret_cast<const jbyte*>(text.c_str()));
+  auto textSize = static_cast<jsize>(text.size());
+  auto array = env->NewByteArray(textSize);
+  env->SetByteArrayRegion(array, 0, textSize, reinterpret_cast<const jbyte*>(text.c_str()));
   auto stringUTF = env->NewStringUTF("UTF-8");
   auto result = (jstring)env->NewObject(StringClass.get(), StringConstructID, array, stringUTF);
   env->DeleteLocalRef(array);
