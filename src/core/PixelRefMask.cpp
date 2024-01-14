@@ -50,7 +50,7 @@ const std::array<uint8_t, 256>& PixelRefMask::GammaTable() {
     std::array<uint8_t, 256> table{};
     table[0] = 0;
     table[255] = 255;
-    for (int i = 1; i < 255; ++i) {
+    for (size_t i = 1; i < 255; ++i) {
       auto v = std::roundf(LinearToSRGB(static_cast<float>(i) / 255.f) * 255.f);
       table[i] = static_cast<uint8_t>(v);
     }

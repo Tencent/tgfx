@@ -162,21 +162,22 @@ void GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
 
 static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
-void GLRenderPass::onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
+void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
   auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
-    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], baseVertex, vertexCount);
+    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(baseVertex),
+                   static_cast<int>(vertexCount));
   };
   draw(func);
 }
 
-void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
+void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
   auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                    std::static_pointer_cast<GLBuffer>(_indexBuffer)->bufferID());
-    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], indexCount, GL_UNSIGNED_SHORT,
-                     reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
+    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
+                     GL_UNSIGNED_SHORT, reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   };
   draw(func);

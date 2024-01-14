@@ -46,7 +46,7 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   tgfx::Task::Run([device] {
-    for (int i = 0; i < 100; ++i) {
+    for (uint32_t i = 0; i < 100; ++i) {
       auto context = device->lockContext();
       ASSERT_TRUE(context != nullptr);
       auto resource = TestResource::Make(context, i);

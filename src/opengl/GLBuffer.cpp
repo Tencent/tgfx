@@ -36,7 +36,7 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, const void* buffer,
   // 防止前面产生的GLError，导致后面CheckGLError逻辑返回错误结果
   CheckGLError(context);
 
-  auto target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
+  unsigned target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, bufferType);
   auto glBuffer = std::static_pointer_cast<GLBuffer>(

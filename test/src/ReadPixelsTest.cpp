@@ -265,8 +265,8 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   ASSERT_EQ(rgbaCodec->width(), 1280);
   ASSERT_EQ(rgbaCodec->height(), 720);
   ASSERT_EQ(rgbaCodec->origin(), EncodedOrigin::TopLeft);
-  auto rowBytes = rgbaCodec->width() * 4;
-  Buffer buffer(rowBytes * rgbaCodec->height());
+  auto rowBytes = static_cast<size_t>(rgbaCodec->width()) * 4;
+  Buffer buffer(rowBytes * static_cast<size_t>(rgbaCodec->height()));
   auto pixels = buffer.data();
   ASSERT_TRUE(pixels);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,

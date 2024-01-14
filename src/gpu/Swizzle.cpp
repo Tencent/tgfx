@@ -16,27 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/StagedUniformBuffer.h"
-#include "tgfx/gpu/Context.h"
+#include "Swizzle.h"
 
 namespace tgfx {
-class GLUniformBuffer : public StagedUniformBuffer {
- public:
-  GLUniformBuffer(std::vector<Uniform> uniforms, std::vector<int> locations);
+// The normal component swizzles map to key values 0-3. We set the key for constant 1 to the
+// next int.
+static const int k1KeyValue = 4;
 
-  ~GLUniformBuffer() override;
+static float ComponentIdxToFloat(const Color& color, int idx) {
+  if (idx <= 3) {
+    return color[idx];
+  }
+  if (idx == k1KeyValue) {
+    return 1.0f;
+  }
+  return -1.0f;
+}
 
-  void uploadToGPU(Context* context);
-
- protected:
-  void onCopyData(size_t index, size_t offset, size_t size, const void* data) override;
-
- private:
-  uint8_t* buffer = nullptr;
-  bool bufferChanged = false;
-  std::vector<int> locations = {};
-  std::vector<bool> dirtyFlags = {};
-};
+Color Swizzle::applyTo(const Color& color) const {
+  int idx;
+  uint32_t k = key;
+  // Index of the input color that should be mapped to output r.
+  idx = static_cast<int>(k & 15);
+  float outR = ComponentIdxToFloat(color, idx);
+  k >>= 4;
+  idx = static_cast<int>(k & 15);
+  float outG = ComponentIdxToFloat(color, idx);
+  k >>= 4;
+  idx = static_cast<int>(k & 15);
+  float outB = ComponentIdxToFloat(color, idx);
+  k >>= 4;
+  idx = static_cast<int>(k & 15);
+  float outA = ComponentIdxToFloat(color, idx);
+  return {outR, outG, outB, outA};
+}
 }  // namespace tgfx

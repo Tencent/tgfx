@@ -109,7 +109,7 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
       auto data = reinterpret_cast<const uint8_t*>(pixels);
       for (int row = 0; row < height; ++row) {
         gl->texSubImage2D(glSampler->target, 0, x, y + row, width, 1, format.externalFormat,
-                          GL_UNSIGNED_BYTE, data + (row * rowBytes));
+                          GL_UNSIGNED_BYTE, data + (static_cast<size_t>(row) * rowBytes));
       }
     }
   }
@@ -174,7 +174,7 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
   }
   auto glSampler = static_cast<const GLSampler*>(sampler);
   auto gl = GLFunctions::Get(_context);
-  gl->activeTexture(GL_TEXTURE0 + unitIndex);
+  gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0 + unitIndex));
   gl->bindTexture(glSampler->target, glSampler->id);
   gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S,
                     GetGLWrap(glSampler->target, samplerState.wrapModeX));

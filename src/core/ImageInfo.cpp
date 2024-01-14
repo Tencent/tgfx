@@ -25,7 +25,7 @@ bool ImageInfo::IsValidSize(int width, int height) {
   return width > 0 && width <= MaxDimension && height > 0 && height <= MaxDimension;
 }
 
-int ImageInfo::GetBytesPerPixel(ColorType colorType) {
+size_t ImageInfo::GetBytesPerPixel(ColorType colorType) {
   switch (colorType) {
     case ColorType::ALPHA_8:
     case ColorType::Gray_8:
@@ -56,7 +56,7 @@ ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType 
       return emptyInfo;
     }
   } else {
-    rowBytes = width * bytesPerPixel;
+    rowBytes = static_cast<size_t>(width) * bytesPerPixel;
   }
   if (colorType == ColorType::ALPHA_8) {
     alphaType = AlphaType::Premultiplied;
@@ -66,7 +66,7 @@ ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType 
   return {width, height, colorType, alphaType, rowBytes};
 }
 
-int ImageInfo::bytesPerPixel() const {
+size_t ImageInfo::bytesPerPixel() const {
   return GetBytesPerPixel(_colorType);
 }
 
@@ -94,7 +94,7 @@ const void* ImageInfo::computeOffset(const void* pixels, int x, int y) const {
   }
   x = Clamp(x, _width - 1);
   y = Clamp(y, _height - 1);
-  auto offset = y * _rowBytes + x * bytesPerPixel();
+  auto offset = static_cast<size_t>(y) * _rowBytes + static_cast<size_t>(x) * bytesPerPixel();
   return reinterpret_cast<const uint8_t*>(pixels) + offset;
 }
 
@@ -104,7 +104,7 @@ void* ImageInfo::computeOffset(void* pixels, int x, int y) const {
   }
   x = Clamp(x, _width - 1);
   y = Clamp(y, _height - 1);
-  auto offset = y * _rowBytes + x * bytesPerPixel();
+  auto offset = static_cast<size_t>(y) * _rowBytes + static_cast<size_t>(x) * bytesPerPixel();
   return reinterpret_cast<uint8_t*>(pixels) + offset;
 }
 }  // namespace tgfx

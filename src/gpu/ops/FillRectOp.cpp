@@ -70,7 +70,7 @@ class RectCoverageVerticesProvider : public DataProvider {
         const auto& quad = j == 0 ? insetQuad : outsetQuad;
         const auto& normalQuad = j == 0 ? normalInsetQuad : normalOutsetQuad;
         auto coverage = j == 0 ? 1.0f : 0.0f;
-        for (int k = 0; k < 4; ++k) {
+        for (size_t k = 0; k < 4; ++k) {
           vertices[index++] = quad.point(k).x;
           vertices[index++] = quad.point(k).y;
           vertices[index++] = coverage;
@@ -111,11 +111,11 @@ class RectNonCoverageVerticesProvider : public DataProvider {
       auto& localMatrix = rectPaint->localMatrix;
       auto quad = Quad::MakeFromRect(rect, viewMatrix);
       auto localQuad = Quad::MakeFromRect(rect, localMatrix);
-      for (int j = 3; j >= 0; --j) {
-        vertices[index++] = quad.point(j).x;
-        vertices[index++] = quad.point(j).y;
-        vertices[index++] = localQuad.point(j).x;
-        vertices[index++] = localQuad.point(j).y;
+      for (size_t j = 4; j >= 1; --j) {
+        vertices[index++] = quad.point(j - 1).x;
+        vertices[index++] = quad.point(j - 1).y;
+        vertices[index++] = localQuad.point(j - 1).x;
+        vertices[index++] = localQuad.point(j - 1).y;
         if (hasColor) {
           auto& color = rectPaint->color;
           vertices[index++] = color.red;
@@ -227,8 +227,7 @@ void FillRectOp::execute(RenderPass* renderPass) {
     } else {
       numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
     }
-    renderPass->drawIndexed(PrimitiveType::Triangles, 0,
-                            static_cast<int>(rectPaints.size()) * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectPaints.size() * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }

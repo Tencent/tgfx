@@ -34,11 +34,11 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
   CVOpenGLESTextureRef texture = nil;
   auto caps = GLCaps::Get(context);
   const auto& format = caps->getTextureFormat(pixelFormat);
-  // 返回的 texture 对象是一个强引用计数为 1 的对象。
+  // The returned texture object has a strong reference count of 1.
   CVReturn result = CVOpenGLESTextureCacheCreateTextureFromImage(
-      kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
-      GL_TEXTURE_2D, format.internalFormatTexImage,         /* opengl format */
-      width, height, format.externalFormat,                 /* native iOS format */
+      kCFAllocatorDefault, textureCache, pixelBuffer, NULL,             /* texture attributes */
+      GL_TEXTURE_2D, static_cast<GLint>(format.internalFormatTexImage), /* opengl format */
+      width, height, format.externalFormat,                             /* native iOS format */
       GL_UNSIGNED_BYTE, 0, &texture);
   if (result != kCVReturnSuccess && texture != nil) {
     CFRelease(texture);

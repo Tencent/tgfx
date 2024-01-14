@@ -52,7 +52,7 @@ void ShaderBuilder::codeAppendf(const char* format, ...) {
   va_start(args, format);
   auto length = vsnprintf(buffer, kBufferSize, format, args);
   va_end(args);
-  codeAppend(std::string(buffer, length));
+  codeAppend(std::string(buffer, static_cast<size_t>(length)));
 }
 
 void ShaderBuilder::codeAppend(const std::string& str) {
@@ -95,7 +95,7 @@ void ShaderBuilder::addFeature(PrivateFeature featureBit, const std::string& ext
   }
   char buffer[kBufferSize];
   auto length = snprintf(buffer, kBufferSize, "#extension %s: require\n", extensionName.c_str());
-  shaderStrings[Type::Extensions].append(buffer, length);
+  shaderStrings[Type::Extensions].append(buffer, static_cast<size_t>(length));
   featuresAddedMask |= featureBit;
 }
 

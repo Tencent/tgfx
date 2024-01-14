@@ -50,14 +50,14 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer));
 }
 
-void RenderPass::draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
+void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
   onDraw(primitiveType, baseVertex, vertexCount);
 }
 
-void RenderPass::drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
+void RenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }

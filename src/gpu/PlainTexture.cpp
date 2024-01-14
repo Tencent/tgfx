@@ -82,7 +82,8 @@ PlainTexture::PlainTexture(std::unique_ptr<TextureSampler> sampler, int width, i
 }
 
 size_t PlainTexture::memoryUsage() const {
-  auto colorSize = width() * height() * PixelFormatBytesPerPixel(sampler->format);
+  auto colorSize = static_cast<size_t>(width()) * static_cast<size_t>(height()) *
+                   PixelFormatBytesPerPixel(sampler->format);
   return sampler->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
 }
 

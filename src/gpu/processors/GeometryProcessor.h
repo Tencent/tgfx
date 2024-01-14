@@ -62,7 +62,7 @@ class GeometryProcessor : public Processor {
     }
 
     void computeKey(BytesKey* bytesKey) const {
-      bytesKey->write(isInitialized() ? static_cast<uint32_t>(_gpuType) : ~0);
+      bytesKey->write(isInitialized() ? static_cast<uint32_t>(_gpuType) : ~0u);
     }
 
    private:

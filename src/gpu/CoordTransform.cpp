@@ -32,7 +32,8 @@ Matrix CoordTransform::getTotalMatrix() const {
   // If the texture has a crop rectangle, we need to shrink it to prevent bilinear sampling beyond
   // the edge of the crop rectangle.
   auto textureType = texture->getSampler()->type();
-  auto edgePoint = texture->getTextureCoord(texture->width(), texture->height());
+  auto edgePoint = texture->getTextureCoord(static_cast<float>(texture->width()),
+                                            static_cast<float>(texture->height()));
   static constexpr Point FullEdge = Point::Make(1.0f, 1.0f);
   if (textureType != TextureType::Rectangle && edgePoint != FullEdge && alphaStart.isZero()) {
     // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1

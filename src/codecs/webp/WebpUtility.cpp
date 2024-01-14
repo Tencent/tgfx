@@ -77,7 +77,7 @@ static inline int GetLE24(const uint8_t* const data) {
   return GetLE16(data) | (data[2] << 16);
 }
 static inline uint32_t GetLE32(const uint8_t* const data) {
-  return GetLE16(data) | ((uint32_t)GetLE16(data + 2) << 16);
+  return (uint32_t)GetLE16(data) | ((uint32_t)GetLE16(data + 2) << 16);
 }
 
 static inline void Skip(WebpFile* const ptr, size_t size) {
@@ -161,9 +161,9 @@ static uint32_t VP8LReadBits(VP8LBitReader* const br, int n_bits) {
 static int ReadImageInfo(VP8LBitReader* const br, int* const width, int* const height,
                          int* const has_alpha) {
   if (VP8LReadBits(br, 8) != VP8L_MAGIC_BYTE) return 0;
-  *width = VP8LReadBits(br, VP8L_IMAGE_SIZE_BITS) + 1;
-  *height = VP8LReadBits(br, VP8L_IMAGE_SIZE_BITS) + 1;
-  *has_alpha = VP8LReadBits(br, 1);
+  *width = static_cast<int>(VP8LReadBits(br, VP8L_IMAGE_SIZE_BITS)) + 1;
+  *height = static_cast<int>(VP8LReadBits(br, VP8L_IMAGE_SIZE_BITS)) + 1;
+  *has_alpha = static_cast<int>(VP8LReadBits(br, 1));
   if (VP8LReadBits(br, VP8L_VERSION_BITS) != 0) return 0;
   return !br->eos_;
 }
@@ -172,7 +172,7 @@ static bool ParseVP8L(WebpFile& webpFile, DecodeInfo& decodeInfo,
                       const uint32_t chunk_size_padded) {
   if (decodeInfo.width <= 0) {
     if (chunk_size_padded < VP8L_FRAME_HEADER_SIZE) return false;
-    fseek(webpFile.inFile, webpFile._start + CHUNK_HEADER_SIZE, SEEK_SET);
+    fseek(webpFile.inFile, static_cast<int>(webpFile._start) + CHUNK_HEADER_SIZE, SEEK_SET);
     auto vp8xHeader = static_cast<uint8_t*>(malloc(VP8L_FRAME_HEADER_SIZE));
     if (fread(vp8xHeader, 1, VP8L_FRAME_HEADER_SIZE, webpFile.inFile) != VP8L_FRAME_HEADER_SIZE)
       return false;
@@ -199,7 +199,7 @@ static bool ParseVP8L(WebpFile& webpFile, DecodeInfo& decodeInfo,
 static bool ParseVP8(WebpFile& webpFile, DecodeInfo& decodeInfo, const uint32_t chunk_size_padded) {
   if (decodeInfo.width <= 0) {
     if (chunk_size_padded < VP8_FRAME_HEADER_SIZE) return false;
-    fseek(webpFile.inFile, webpFile._start + CHUNK_HEADER_SIZE, SEEK_SET);
+    fseek(webpFile.inFile, static_cast<int>(webpFile._start) + CHUNK_HEADER_SIZE, SEEK_SET);
     auto vp8xHeader = static_cast<uint8_t*>(malloc(15));
     if (fread(vp8xHeader, 1, VP8_FRAME_HEADER_SIZE, webpFile.inFile) != VP8_FRAME_HEADER_SIZE)
       return false;
@@ -219,7 +219,7 @@ static bool ParseVP8(WebpFile& webpFile, DecodeInfo& decodeInfo, const uint32_t 
 static bool ParseVP8X(WebpFile& webpFile, DecodeInfo& decodeInfo,
                       const uint32_t chunk_size_padded) {
   if (decodeInfo.width <= 0) {
-    fseek(webpFile.inFile, webpFile._start + RIFF_HEADER_SIZE, SEEK_SET);
+    fseek(webpFile.inFile, static_cast<int>(webpFile._start) + RIFF_HEADER_SIZE, SEEK_SET);
     auto vp8xHeader = static_cast<uint8_t*>(malloc(6));
     if (fread(vp8xHeader, 1, 6, webpFile.inFile) != 6) return false;
     decodeInfo.width = 1 + GetLE24(vp8xHeader);
@@ -242,13 +242,13 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
     return {};
   }
   DecodeInfo decodeInfo;
-  size_t fileLength = ftell(infile);
+  size_t fileLength = static_cast<size_t>(ftell(infile));
   WebpFile webpFile = {infile, 0, fileLength, fileLength};
   webpFile._start = 12;
   auto chunkHeader = static_cast<uint8_t*>(malloc(RIFF_HEADER_SIZE));
   bool foundOrigin = false;
   do {
-    fseek(infile, webpFile._start, SEEK_SET);
+    fseek(infile, static_cast<int>(webpFile._start), SEEK_SET);
     if ((fileLength - webpFile._start) < RIFF_HEADER_SIZE) break;
     if (fread(chunkHeader, 1, RIFF_HEADER_SIZE, infile) != RIFF_HEADER_SIZE) break;
     const uint32_t fourcc = GetLE32(chunkHeader);
@@ -272,7 +272,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
       }
       case MKFOURCC('E', 'X', 'I', 'F'): {
         foundOrigin = true;
-        fseek(infile, webpFile._start + CHUNK_HEADER_SIZE, SEEK_SET);
+        fseek(infile, static_cast<int>(webpFile._start) + CHUNK_HEADER_SIZE, SEEK_SET);
         auto exifData = static_cast<uint8_t*>(malloc(chunk_size));
         if (fread(exifData, 1, chunk_size, infile) != chunk_size) {
           needBreak = true;
@@ -315,8 +315,8 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
     case WEBP_DEMUX_DONE:
       break;
   }
-  const int width = WebPDemuxGetI(demux, WEBP_FF_CANVAS_WIDTH);
-  const int height = WebPDemuxGetI(demux, WEBP_FF_CANVAS_HEIGHT);
+  const int width = static_cast<int>(WebPDemuxGetI(demux, WEBP_FF_CANVAS_WIDTH));
+  const int height = static_cast<int>(WebPDemuxGetI(demux, WEBP_FF_CANVAS_HEIGHT));
   // Sanity check for image size that's about to be decoded.
   {
     const int64_t size = (int64_t)width * (int64_t)height;

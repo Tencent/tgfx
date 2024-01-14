@@ -96,10 +96,10 @@ class UniformBuffer {
    * Copies data into the uniform buffer. The data must have the same size as the uniform specified
    * by name.
    */
-  virtual void onCopyData(int index, size_t offset, size_t size, const void* data) = 0;
+  virtual void onCopyData(size_t index, size_t offset, size_t size, const void* data) = 0;
 
  private:
-  std::unordered_map<std::string, int> uniformMap = {};
+  std::unordered_map<std::string, size_t> uniformMap = {};
 
   void onSetData(const std::string& name, const void* data, size_t size);
 };

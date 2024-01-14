@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-static int vendorIndex = 0;
+static size_t vendorIndex = 0;
 
 std::vector<std::pair<std::string, GLVendor>> vendors = {
     {"ATI Technologies Inc.", GLVendor::ATI},
@@ -111,8 +111,7 @@ TGFX_TEST(GLUtilTest, Caps) {
   }
   {
     vendorIndex++;
-    int size = static_cast<int>(vendors.size());
-    for (; vendorIndex < size; ++vendorIndex) {
+    for (; vendorIndex < vendors.size(); ++vendorIndex) {
       GLInfo info(glGetStringMock, nullptr, getIntegervMock, glGetInternalformativMock,
                   glGetShaderPrecisionFormatMock);
       GLCaps caps(info);

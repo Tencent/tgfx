@@ -69,7 +69,7 @@ TGFX_TEST(CanvasTest, Blur) {
   auto image = Image::MakeFrom(codec);
   ASSERT_TRUE(image != nullptr);
   auto imageMatrix = EncodedOriginToMatrix(codec->origin(), codec->width(), codec->height());
-  imageMatrix.postScale(0.2, 0.2);
+  imageMatrix.postScale(0.2f, 0.2f);
   auto bounds = Rect::MakeWH(codec->width(), codec->height());
   imageMatrix.mapRect(&bounds);
   auto imageWidth = static_cast<float>(bounds.width());
@@ -601,7 +601,7 @@ TGFX_TEST(CanvasTest, shape) {
   shape = Shape::MakeFromFill(path);
   canvas->drawShape(shape, paint);
   paint.setColor(Color::Black());
-  paint.setAlpha(0.3);
+  paint.setAlpha(0.3f);
   matrix.reset();
   matrix.postScale(0.5, 0.5, 60, 300);
   canvas->setMatrix(matrix);
@@ -671,7 +671,7 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_FALSE(rotationImage->hasMipmaps());
   rotationImage = rotationImage->makeMipMapped();
   EXPECT_TRUE(rotationImage->hasMipmaps());
-  auto matrix = Matrix::MakeScale(0.05);
+  auto matrix = Matrix::MakeScale(0.05f);
   matrix.postTranslate(0, 120);
   rotationImage = rotationImage->applyOrigin(EncodedOrigin::BottomRight);
   rotationImage = rotationImage->applyOrigin(EncodedOrigin::BottomRight);

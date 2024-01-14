@@ -34,7 +34,7 @@ static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef i
   return orientation;
 }
 
-static CGSize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientation* orientation) {
+static ISize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientation* orientation) {
   int width = 0;
   int height = 0;
   CFDictionaryRef imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, NULL);
@@ -52,7 +52,7 @@ static CGSize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientat
     *orientation = GetOrientationFromProperties(imageProperties);
     CFRelease(imageProperties);
   }
-  return CGSizeMake(width, height);
+  return {width, height};
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
@@ -79,9 +79,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   if (imageBytes == nullptr) {
     return nullptr;
   }
-  CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault,
-                                               reinterpret_cast<const UInt8*>(imageBytes->data()),
-                                               imageBytes->size(), kCFAllocatorNull);
+  CFDataRef data = CFDataCreateWithBytesNoCopy(
+      kCFAllocatorDefault, reinterpret_cast<const UInt8*>(imageBytes->data()),
+      static_cast<CFIndex>(imageBytes->size()), kCFAllocatorNull);
   if (data == nullptr) {
     return nullptr;
   }

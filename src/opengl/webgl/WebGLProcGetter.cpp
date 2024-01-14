@@ -23,7 +23,7 @@
 
 namespace tgfx {
 static void emscripten_glWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeout) {
-  uint32_t timeoutLo = timeout;
+  auto timeoutLo = static_cast<uint32_t>(timeout);
   uint32_t timeoutHi = timeout >> 32;
   emscripten_glWaitSync(sync, flags, timeoutLo, timeoutHi);
 }

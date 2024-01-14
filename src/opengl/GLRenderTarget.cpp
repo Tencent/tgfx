@@ -205,10 +205,10 @@ static void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const Im
   Buffer tempBuffer = {};
   if (flipY) {
     tempBuffer.alloc(srcInfo.byteSize());
-    auto rowCount = srcInfo.height();
+    auto rowCount = static_cast<size_t>(srcInfo.height());
     auto rowBytes = srcInfo.rowBytes();
     auto dst = tempBuffer.bytes();
-    for (int i = 0; i < rowCount; i++) {
+    for (size_t i = 0; i < rowCount; i++) {
       auto src = reinterpret_cast<const uint8_t*>(srcPixels) + (rowCount - i - 1) * rowBytes;
       memcpy(dst, src, rowBytes);
       dst += rowBytes;

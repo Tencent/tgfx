@@ -74,7 +74,7 @@ class GLProgramBuilder : public ProgramBuilder {
   GLVertexShaderBuilder _vertexBuilder;
   GLFragmentShaderBuilder _fragBuilder;
   std::vector<GLProgram::Attribute> attributes;
-  int vertexStride = 0;
+  size_t vertexStride = 0;
 
   friend class ProgramBuilder;
 };

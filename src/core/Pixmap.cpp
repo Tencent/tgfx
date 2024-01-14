@@ -32,12 +32,12 @@ static inline const void* AddOffset(const void* pixels, size_t offset) {
 }
 
 static void CopyRectMemory(const void* src, size_t srcRB, void* dst, size_t dstRB,
-                           size_t trimRowBytes, int rowCount) {
+                           size_t trimRowBytes, size_t rowCount) {
   if (trimRowBytes == dstRB && trimRowBytes == srcRB) {
     memcpy(dst, src, trimRowBytes * rowCount);
     return;
   }
-  for (int i = 0; i < rowCount; i++) {
+  for (size_t i = 0; i < rowCount; i++) {
     memcpy(dst, src, trimRowBytes);
     dst = AddOffset(dst, dstRB);
     src = AddOffset(src, srcRB);
@@ -64,7 +64,7 @@ static void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const
                           void* dstPixels) {
   if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
-                   dstInfo.minRowBytes(), dstInfo.height());
+                   dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
     return;
   }
   auto srcFormat = ColorMapper.at(srcInfo.colorType());
@@ -75,7 +75,7 @@ static void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const
   auto height = dstInfo.height();
   for (int i = 0; i < height; i++) {
     gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
-                         nullptr, width);
+                         nullptr, static_cast<size_t>(width));
     dstPixels = AddOffset(dstPixels, dstInfo.rowBytes());
     srcPixels = AddOffset(srcPixels, srcInfo.rowBytes());
   }
@@ -225,7 +225,7 @@ bool Pixmap::clear() {
     memset(_writablePixels, 0, byteSize());
   } else {
     auto rowCount = _info.height();
-    auto trimRowBytes = _info.width() * _info.bytesPerPixel();
+    auto trimRowBytes = static_cast<size_t>(_info.width()) * _info.bytesPerPixel();
     auto* pixels = static_cast<char*>(_writablePixels);
     for (int i = 0; i < rowCount; i++) {
       memset(pixels, 0, trimRowBytes);

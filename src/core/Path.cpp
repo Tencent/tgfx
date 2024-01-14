@@ -165,7 +165,7 @@ Rect Path::getBounds() const {
   // for thread safety.
   const auto& path = pathRef->path;
   auto count = path.countPoints();
-  auto points = new SkPoint[count];
+  auto points = new SkPoint[static_cast<size_t>(count)];
   path.getPoints(points, count);
   auto rect = SkRect::MakeEmpty();
   rect.setBounds(points, count);

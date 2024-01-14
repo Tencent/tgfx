@@ -35,7 +35,7 @@ GLUniformBuffer::~GLUniformBuffer() {
   delete[] buffer;
 }
 
-void GLUniformBuffer::onCopyData(int index, size_t offset, size_t size, const void* data) {
+void GLUniformBuffer::onCopyData(size_t index, size_t offset, size_t size, const void* data) {
   if (!dirtyFlags[index] && memcmp(buffer + offset, data, size) == 0) {
     return;
   }
@@ -50,7 +50,7 @@ void GLUniformBuffer::uploadToGPU(Context* context) {
   }
   bufferChanged = false;
   auto gl = GLFunctions::Get(context);
-  int index = 0;
+  size_t index = 0;
   for (auto& uniform : uniforms) {
     if (!dirtyFlags[index]) {
       index++;

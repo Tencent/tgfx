@@ -115,7 +115,7 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     return 0;
   }
   auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
-  auto size = env->GetArrayLength(imageBytes);
+  auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
   auto data = tgfx::Data::MakeWithCopy(bytes, size);
   auto image = tgfx::Image::MakeFromEncoded(data);
   env->ReleaseByteArrayElements(imageBytes, bytes, 0);

@@ -152,8 +152,8 @@ std::pair<std::shared_ptr<Image>, Point> BlurImageFilter::filterImage(
     th = std::max(static_cast<int>(static_cast<float>(th) * downScaling), 1);
   }
   for (int i = static_cast<int>(upSurfaces.size()) - 2; i >= 0; --i) {
-    auto width = upSurfaces[i].first;
-    auto height = upSurfaces[i].second;
+    auto width = upSurfaces[static_cast<size_t>(i)].first;
+    auto height = upSurfaces[static_cast<size_t>(i)].second;
     auto surface = Surface::Make(context.context, width, height);
     if (surface == nullptr) {
       return {};
