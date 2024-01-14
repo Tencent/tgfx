@@ -55,7 +55,7 @@ const Drawer* Drawer::GetByIndex(int index) {
   if (index < 0 || index >= Count()) {
     return nullptr;
   }
-  return drawers[index];
+  return drawers[static_cast<size_t>(index)];
 }
 
 const Drawer* Drawer::GetByName(const std::string& name) {
