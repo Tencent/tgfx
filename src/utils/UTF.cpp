@@ -84,7 +84,7 @@ int32_t UTF::NextUTF8(const char** ptr, const char* end) {
   int c = *p;
   int hic = c << 24;
 
-  if (!utf8_type_is_valid_leading_byte(utf8_byte_type(c))) {
+  if (!utf8_type_is_valid_leading_byte(utf8_byte_type((uint8_t)c))) {
     return next_fail(ptr, end);
   }
   if (hic < 0) {

@@ -113,7 +113,7 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   if (dstInfo.colorType() == ColorType::ALPHA_8) {
-    memset(dstPixels, 255, dstInfo.rowBytes() * height());
+    memset(dstPixels, 255, dstInfo.rowBytes() * static_cast<size_t>(height()));
     return true;
   }
   Bitmap bitmap = {};
@@ -171,9 +171,10 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     }
     JSAMPROW pRow[1];
     int line = 0;
-    JDIMENSION h = height();
+    JDIMENSION h = static_cast<JDIMENSION>(height());
     while (cinfo.output_scanline < h) {
-      pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) + outRowBytes * line);
+      pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
+                           outRowBytes * static_cast<size_t>(line));
       jpeg_read_scanlines(&cinfo, pRow, 1);
       line++;
     }
@@ -201,8 +202,8 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   uint8_t* dstBuffer = nullptr;
   unsigned long dstBufferSize = 0;  // NOLINT
   jpeg_mem_dest(&cinfo, &dstBuffer, &dstBufferSize);
-  cinfo.image_width = pixmap.width();
-  cinfo.image_height = pixmap.height();
+  cinfo.image_width = static_cast<JDIMENSION>(pixmap.width());
+  cinfo.image_height = static_cast<JDIMENSION>(pixmap.height());
   Buffer buffer = {};
   switch (pixmap.colorType()) {
     case ColorType::RGBA_8888:
@@ -235,7 +236,7 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   jpeg_set_quality(&cinfo, quality, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
   while (cinfo.next_scanline < cinfo.image_height) {
-    row_pointer[0] = &(srcPixels)[cinfo.next_scanline * srcRowBytes];
+    row_pointer[0] = &(srcPixels)[cinfo.next_scanline * static_cast<JDIMENSION>(srcRowBytes)];
     (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);
   }
 

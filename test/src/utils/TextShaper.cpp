@@ -81,7 +81,7 @@ std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<Typeface>& typefac
   if (hbFace == nullptr) {
     return nullptr;
   }
-  hb_face_set_upem(hbFace.get(), typeface->unitsPerEm());
+  hb_face_set_upem(hbFace.get(), static_cast<unsigned int>(typeface->unitsPerEm()));
   return hbFace;
 }
 
@@ -206,7 +206,7 @@ static bool ShapeText(std::list<HBGlyph>& glyphs, std::shared_ptr<Typeface> type
           glyph.text = string.substr(cluster, length);
           glyph.stringIndex = stringIndex + cluster;
           if (codepoint != 0) {
-            glyph.glyphID = codepoint;
+            glyph.glyphID = static_cast<GlyphID>(codepoint);
             glyph.typeface = typeface;
           } else {
             allShaped = false;

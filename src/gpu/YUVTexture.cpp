@@ -53,8 +53,8 @@ static std::vector<std::unique_ptr<TextureSampler>> MakeTexturePlanes(Context* c
 
 static void SubmitYUVTexture(Context* context, const YUVData* yuvData,
                              const std::vector<std::unique_ptr<TextureSampler>>* samplers) {
-  auto count = static_cast<int>(yuvData->planeCount());
-  for (int index = 0; index < count; index++) {
+  auto count = yuvData->planeCount();
+  for (size_t index = 0; index < count; index++) {
     auto sampler = (*samplers)[index].get();
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
@@ -138,7 +138,7 @@ const TextureSampler* YUVTexture::getSamplerAt(size_t index) const {
 }
 
 size_t YUVTexture::memoryUsage() const {
-  return width() * height() * 3 / 2;
+  return static_cast<size_t>(width()) * static_cast<size_t>(height()) * 3 / 2;
 }
 
 void YUVTexture::onReleaseGPU() {

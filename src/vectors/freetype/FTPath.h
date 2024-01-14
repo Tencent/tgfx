@@ -47,12 +47,12 @@ class FTPath {
   std::vector<std::shared_ptr<FreetypeOutline>> getOutlines() const;
 
  private:
-  bool finalizeOutline(FreetypeOutline* outline, int startPointIndex) const;
+  bool finalizeOutline(FreetypeOutline* outline, size_t startPointIndex) const;
 
   std::vector<FT_Vector> points = {};
   std::vector<PathVerb> verbs = {};
   std::vector<char> tags = {};
-  std::vector<int> contours = {};
+  std::vector<size_t> contours = {};
   PathFillType fillType = PathFillType::Winding;
 };
 }  // namespace tgfx

@@ -94,7 +94,7 @@ file(GLOB PLATFORM_COMMON_FILES
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -pedantic -Werror=return-type)
+    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type)
 endif ()
 
 if (MSVC)

@@ -175,13 +175,13 @@ bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   UpdateReadInfo(readInfo->p, readInfo->pi);
-  readInfo->rowPtrs = (unsigned char**)malloc(sizeof(unsigned char*) * h);
+  readInfo->rowPtrs = (unsigned char**)malloc(sizeof(unsigned char*) * (size_t)h);
   if (readInfo->rowPtrs == nullptr) {
     return false;
   }
   if (dstInfo.colorType() == ColorType::RGBA_8888 &&
       dstInfo.alphaType() == AlphaType::Unpremultiplied) {
-    for (int i = 0; i < h; i++) {
+    for (size_t i = 0; i < static_cast<size_t>(h); i++) {
       readInfo->rowPtrs[i] = static_cast<unsigned char*>(dstPixels) + (dstInfo.rowBytes() * i);
     }
     png_read_image(readInfo->p, readInfo->rowPtrs);
@@ -192,7 +192,7 @@ bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (readInfo->data == nullptr) {
     return false;
   }
-  for (int i = 0; i < h; i++) {
+  for (size_t i = 0; i < static_cast<size_t>(h); i++) {
     readInfo->rowPtrs[i] = readInfo->data + (info.rowBytes() * i);
   }
   png_read_image(readInfo->p, readInfo->rowPtrs);
@@ -228,7 +228,7 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
   uint8_t* alphaPixels = nullptr;
   Buffer tempBuffer;
   if (pixmap.colorType() == ColorType::ALPHA_8) {
-    tempBuffer.alloc(pixmap.width() * 2);
+    tempBuffer.alloc(static_cast<size_t>(pixmap.width()) * 2);
     alphaPixels = tempBuffer.bytes();
     srcRowBytes = static_cast<int>(tempBuffer.size());
   } else if (pixmap.colorType() != ColorType::RGBA_8888 ||
@@ -267,8 +267,9 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
       sigBit = {0, 0, 0, 1, 8};
       colorType = PNG_COLOR_TYPE_GRAY_ALPHA;
     }
-    png_set_IHDR(png_ptr, info_ptr, pixmap.width(), pixmap.height(), 8, colorType,
-                 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+    png_set_IHDR(png_ptr, info_ptr, static_cast<png_uint_32>(pixmap.width()),
+                 static_cast<png_uint_32>(pixmap.height()), 8, colorType, PNG_INTERLACE_NONE,
+                 PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
     png_set_sBIT(png_ptr, info_ptr, &sigBit);
     png_set_write_fn(png_ptr, &pngWriter, png_reader_write_data, nullptr);
     png_write_info(png_ptr, info_ptr);
@@ -280,7 +281,7 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
           *(alphaPixels++) = *(srcPixels++);
         }
         alphaPixels -= srcRowBytes;
-        srcPixels += (pixmap.rowBytes() - pixmap.width());
+        srcPixels += (pixmap.rowBytes() - static_cast<size_t>(pixmap.width()));
         png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(alphaPixels));
       } else {
         png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(srcPixels));

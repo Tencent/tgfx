@@ -127,7 +127,7 @@ void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
     GLProgram::Attribute attribute;
     attribute.gpuType = attr->gpuType();
     attribute.offset = vertexStride;
-    vertexStride += static_cast<int>(attr->sizeAlign4());
+    vertexStride += attr->sizeAlign4();
     attribute.location = gl->getAttribLocation(programID, attr->name().c_str());
     if (attribute.location >= 0) {
       attributes.push_back(attribute);
@@ -150,8 +150,8 @@ bool GLProgramBuilder::checkSamplerCounts() {
 
 std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
   auto uniformBuffer = _uniformHandler.makeUniformBuffer();
-  auto program =
-      new GLProgram(context, programID, std::move(uniformBuffer), attributes, vertexStride);
+  auto program = new GLProgram(context, programID, std::move(uniformBuffer), attributes,
+                               static_cast<int>(vertexStride));
   program->setupSamplerUniforms(_uniformHandler.samplers);
   return std::unique_ptr<GLProgram>(program);
 }

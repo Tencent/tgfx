@@ -64,7 +64,7 @@ std::shared_ptr<Resource> ResourceCache::findRecyclableResource(const BytesKey& 
     return nullptr;
   }
   auto& list = result->second;
-  int index = 0;
+  size_t index = 0;
   bool found = false;
   for (auto& resource : list) {
     if (resource->isPurgeable() && !resource->hasExternalReferences()) {

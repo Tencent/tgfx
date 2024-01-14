@@ -43,7 +43,7 @@ class ImageInfo {
   static ImageInfo Make(int width, int height, ColorType colorType,
                         AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0);
 
-  static int GetBytesPerPixel(ColorType colorType);
+  static size_t GetBytesPerPixel(ColorType colorType);
 
   /**
    * Creates an empty ImageInfo.
@@ -104,20 +104,20 @@ class ImageInfo {
    * Returns minimum bytes per row, computed from the width and colorType.
    */
   size_t minRowBytes() const {
-    return _width * bytesPerPixel();
+    return static_cast<size_t>(_width) * bytesPerPixel();
   }
 
   /**
    * Returns the byte size of the pixels, computed from the rowBytes and width.
    */
   size_t byteSize() const {
-    return _rowBytes * _height;
+    return _rowBytes * static_cast<size_t>(_height);
   }
 
   /**
    * Returns number of bytes per pixel required by the colorType.
    */
-  int bytesPerPixel() const;
+  size_t bytesPerPixel() const;
 
   /**
    * Creates a new ImageInfo with dimensions set to width and height, and keep other properties the

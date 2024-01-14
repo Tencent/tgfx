@@ -32,11 +32,10 @@ void GLProgram::setupSamplerUniforms(const std::vector<GLUniform>& textureSample
   auto gl = GLFunctions::Get(context);
   gl->useProgram(programId);
   // Assign texture units to sampler uniforms one time up front.
-  auto count = static_cast<int>(textureSamplers.size());
-  for (int i = 0; i < count; ++i) {
+  for (size_t i = 0; i < textureSamplers.size(); ++i) {
     const auto& sampler = textureSamplers[i];
     if (UNUSED_UNIFORM != sampler.location) {
-      gl->uniform1i(sampler.location, i);
+      gl->uniform1i(sampler.location, static_cast<int>(i));
     }
   }
 }

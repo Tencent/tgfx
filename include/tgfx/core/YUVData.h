@@ -82,11 +82,11 @@ class YUVData {
   /**
    * Returns the base address of the plane at the specified plane index.
    */
-  virtual const void* getBaseAddressAt(int planeIndex) const = 0;
+  virtual const void* getBaseAddressAt(size_t planeIndex) const = 0;
 
   /**
    * Returns the number of bytes per row for a plane at the specified plane index.
    */
-  virtual size_t getRowBytesAt(int planeIndex) const = 0;
+  virtual size_t getRowBytesAt(size_t planeIndex) const = 0;
 };
 }  // namespace tgfx

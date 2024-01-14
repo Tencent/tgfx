@@ -33,24 +33,25 @@ class PathTriangulator {
   /**
    * Returns the number of triangles based on the buffer size of the vertices.
    */
-  static int GetTriangleCount(size_t bufferSize);
+  static size_t GetTriangleCount(size_t bufferSize);
 
   /**
    * Tessellates the path into a collection of triangles. Returns the number of triangles written
    * to the vertices.
    */
-  static int ToTriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices,
-                         bool* isLinear = nullptr);
+  static size_t ToTriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices,
+                            bool* isLinear = nullptr);
 
   /**
    * Returns the number of antialiasing triangles based on the buffer size of the vertices.
    */
-  static int GetAATriangleCount(size_t bufferSize);
+  static size_t GetAATriangleCount(size_t bufferSize);
 
   /**
    * Triangulates the given path in device space with a mesh of alpha ramps for antialiasing.
    * Returns the number of triangles written to the vertices.
    */
-  static int ToAATriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices);
+  static size_t ToAATriangles(const Path& path, const Rect& clipBounds,
+                              std::vector<float>* vertices);
 };
 }  // namespace tgfx

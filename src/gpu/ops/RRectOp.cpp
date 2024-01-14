@@ -263,7 +263,7 @@ class RRectIndicesProvider : public DataProvider {
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
     int index = 0;
     for (size_t i = 0; i < rRectPaints.size(); ++i) {
-      auto offset = i * 16;
+      auto offset = static_cast<uint16_t>(i * 16);
       for (size_t j = 0; j < kIndicesPerFillRRect; ++j) {
         indices[index++] = gStandardRRectIndices[j] + offset;
       }
@@ -333,7 +333,6 @@ void RRectOp::execute(RenderPass* renderPass) {
                                                  UseScale(renderPass->context()), localMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer);
-  renderPass->drawIndexed(PrimitiveType::Triangles, 0,
-                          static_cast<int>(rRectPaints.size() * kIndicesPerFillRRect));
+  renderPass->drawIndexed(PrimitiveType::Triangles, 0, rRectPaints.size() * kIndicesPerFillRRect);
 }
 }  // namespace tgfx

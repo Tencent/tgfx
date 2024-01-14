@@ -51,7 +51,7 @@ bool SimpleTextBlob::hasColor() const {
 
 Rect SimpleTextBlob::getBounds(const Stroke* stroke) const {
   auto totalBounds = Rect::MakeEmpty();
-  int index = 0;
+  size_t index = 0;
   for (auto& glyphID : glyphIDs) {
     auto bounds = font.getBounds(glyphID);
     bounds.offset(positions[index]);

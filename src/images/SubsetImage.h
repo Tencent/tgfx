@@ -29,11 +29,11 @@ class SubsetImage : public Image {
   SubsetImage(std::shared_ptr<ImageSource> source, EncodedOrigin origin);
 
   int width() const override {
-    return bounds.width();
+    return static_cast<int>(bounds.width());
   }
 
   int height() const override {
-    return bounds.height();
+    return static_cast<int>(bounds.height());
   }
 
  protected:

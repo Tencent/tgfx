@@ -77,8 +77,8 @@ size_t FragmentProcessor::registerChildProcessor(std::unique_ptr<FragmentProcess
 }
 
 FragmentProcessor::Iter::Iter(const Pipeline* pipeline) {
-  for (int i = static_cast<int>(pipeline->numFragmentProcessors()) - 1; i >= 0; --i) {
-    fpStack.push_back(pipeline->getFragmentProcessor(i));
+  for (auto i = pipeline->numFragmentProcessors(); i >= 1; --i) {
+    fpStack.push_back(pipeline->getFragmentProcessor(i - 1));
   }
 }
 

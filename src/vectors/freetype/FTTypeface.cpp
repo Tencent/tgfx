@@ -162,7 +162,7 @@ bool FTTypeface::hasColor() const {
 }
 
 GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
-  return FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(unichar));
+  return static_cast<GlyphID>(FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(unichar)));
 }
 
 std::shared_ptr<Data> FTTypeface::getBytes() const {

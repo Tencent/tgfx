@@ -29,25 +29,27 @@ namespace tgfx {
  */
 static constexpr float DefaultTolerance = 0.25f;
 
-int PathTriangulator::GetTriangleCount(size_t bufferSize) {
-  return static_cast<int>(bufferSize / (sizeof(float) * 2));
+size_t PathTriangulator::GetTriangleCount(size_t bufferSize) {
+  return bufferSize / (sizeof(float) * 2);
 }
 
-int PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
-                                  std::vector<float>* vertices, bool* isLinear) {
+size_t PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
+                                     std::vector<float>* vertices, bool* isLinear) {
   const auto& skPath = PathRef::ReadAccess(path);
-  return skPath.toTriangles(DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds),
-                            vertices, isLinear);
+  auto count = skPath.toTriangles(
+      DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices, isLinear);
+  return static_cast<size_t>(count);
 }
 
-int PathTriangulator::GetAATriangleCount(size_t bufferSize) {
-  return static_cast<int>(bufferSize / (sizeof(float) * 3));
+size_t PathTriangulator::GetAATriangleCount(size_t bufferSize) {
+  return bufferSize / (sizeof(float) * 3);
 }
 
-int PathTriangulator::ToAATriangles(const Path& path, const Rect& clipBounds,
-                                    std::vector<float>* vertices) {
+size_t PathTriangulator::ToAATriangles(const Path& path, const Rect& clipBounds,
+                                       std::vector<float>* vertices) {
   const auto& skPath = PathRef::ReadAccess(path);
-  return skPath.toAATriangles(DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&clipBounds),
-                              vertices);
+  auto count = skPath.toAATriangles(DefaultTolerance,
+                                    *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices);
+  return static_cast<size_t>(count);
 }
 }  // namespace tgfx

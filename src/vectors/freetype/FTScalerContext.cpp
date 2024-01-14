@@ -392,14 +392,14 @@ FontMetrics FTScalerContext::generateFontMetrics() {
 
 bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) {
   auto face = _face->face;
-  const auto glyph_id = FT_Get_Char_Index(face, letter);
+  const auto glyph_id = FT_Get_Char_Index(face, static_cast<FT_ULong>(letter));
   if (glyph_id == 0) {
     return false;
   }
   if (FT_Load_Glyph(face, glyph_id, loadGlyphFlags) != FT_Err_Ok) {
     return false;
   }
-  emboldenIfNeeded(face, face->glyph, glyph_id);
+  emboldenIfNeeded(face, face->glyph, static_cast<GlyphID>(glyph_id));
   FT_Outline_Get_CBox(&face->glyph->outline, bbox);
   return true;
 }
@@ -627,8 +627,8 @@ std::shared_ptr<ImageBuffer> CopyFTBitmap(const FT_Bitmap& ftBitmap) {
   if (bitmap.isEmpty()) {
     return nullptr;
   }
-  auto width = static_cast<int>(ftBitmap.width);
-  auto height = static_cast<int>(ftBitmap.rows);
+  auto width = ftBitmap.width;
+  auto height = ftBitmap.rows;
   auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
   // FT_Bitmap::pitch is an int and allowed to be negative.
   auto srcRB = ftBitmap.pitch;
@@ -638,7 +638,7 @@ std::shared_ptr<ImageBuffer> CopyFTBitmap(const FT_Bitmap& ftBitmap) {
   auto dst = static_cast<uint8_t*>(bm.writablePixels());
   auto dstRB = bm.rowBytes();
   auto dstFormat = ToPixelFormat(bm.colorType());
-  for (int i = 0; i < height; i++) {
+  for (size_t i = 0; i < height; i++) {
     gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
                          dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
     src += srcRB;

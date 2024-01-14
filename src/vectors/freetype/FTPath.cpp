@@ -25,7 +25,7 @@ bool FTPath::isEmpty() const {
 
 void FTPath::moveTo(const Point& point) {
   if (!points.empty()) {
-    contours.push_back(static_cast<int>(points.size()) - 1);
+    contours.push_back(points.size() - 1);
   }
   verbs.push_back(PathVerb::Move);
   points.push_back({FloatToFDot6(point.x), FloatToFDot6(point.y)});
@@ -60,11 +60,11 @@ void FTPath::close() {
   if (!verbs.empty() && verbs[verbs.size() - 1] == PathVerb::Close) {
     return;
   }
-  auto lastContourPointIndex = contours.empty() ? -1 : contours[contours.size() - 1];
-  if (points.size() - lastContourPointIndex < 2) {
+  auto lastContourPointIndex = contours.empty() ? 0 : contours[contours.size() - 1] + 1;
+  if (points.size() - lastContourPointIndex < 1) {
     return;
   }
-  auto startPoint = points[lastContourPointIndex + 1];
+  auto startPoint = points[lastContourPointIndex];
   auto endPoint = points[points.size() - 1];
   if (startPoint.x != endPoint.x || startPoint.y != endPoint.y) {
     verbs.push_back(PathVerb::Line);
@@ -81,7 +81,7 @@ std::vector<std::shared_ptr<FreetypeOutline>> FTPath::getOutlines() const {
   std::vector<std::shared_ptr<FreetypeOutline>> outlines = {};
   auto outline = std::make_shared<FreetypeOutline>();
   auto contourCount = contours.size() + 1;
-  auto startPointIndex = 0;
+  size_t startPointIndex = 0;
   for (size_t i = 0; i < contourCount; i++) {
     auto contourPointIndex = contours.size() > i ? contours[i] : points.size() - 1;
     if (contourPointIndex - startPointIndex >= FT_OUTLINE_POINTS_MAX) {
@@ -100,7 +100,7 @@ std::vector<std::shared_ptr<FreetypeOutline>> FTPath::getOutlines() const {
   return outlines;
 }
 
-bool FTPath::finalizeOutline(FreetypeOutline* outline, int startPointIndex) const {
+bool FTPath::finalizeOutline(FreetypeOutline* outline, size_t startPointIndex) const {
   if (outline->contours.empty()) {
     return false;
   }

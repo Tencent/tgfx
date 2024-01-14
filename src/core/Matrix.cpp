@@ -255,8 +255,8 @@ void Matrix::setConcat(const Matrix& first, const Matrix& second) {
   auto& matA = first.values;
   auto& matB = second.values;
   auto a = matB[SCALE_X] * matA[SCALE_X];
-  auto b = 0.0;
-  auto c = 0.0;
+  auto b = 0.0f;
+  auto c = 0.0f;
   auto d = matB[SCALE_Y] * matA[SCALE_Y];
   auto tx = matB[TRANS_X] * matA[SCALE_X] + matA[TRANS_X];
   auto ty = matB[TRANS_Y] * matA[SCALE_Y] + matA[TRANS_Y];
@@ -356,7 +356,7 @@ bool Matrix::rectStaysRect() const {
   float m01 = values[SKEW_X];
   float m10 = values[SKEW_Y];
   float m11 = values[SCALE_Y];
-  if (m01 || m10) {
+  if (m01 != 0 || m10 != 0) {
     return m00 == 0 && m11 == 0 && m10 != 0 && m01 != 0;
   } else {
     return m00 != 0 && m11 != 0;

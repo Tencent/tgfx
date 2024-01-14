@@ -39,18 +39,18 @@ static inline bool is_valid_endian_marker(const uint8_t* data, bool* isLittleEnd
 
 static inline uint32_t get_endian_int(const uint8_t* data, bool littleEndian) {
   if (littleEndian) {
-    return (data[3] << 24) | (data[2] << 16) | (data[1] << 8) | (data[0]);
+    return static_cast<uint32_t>((data[3] << 24) | (data[2] << 16) | (data[1] << 8) | (data[0]));
   }
 
-  return (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | (data[3]);
+  return static_cast<uint32_t>((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | (data[3]));
 }
 
 inline uint16_t get_endian_short(const uint8_t* data, bool littleEndian) {
   if (littleEndian) {
-    return (data[1] << 8) | (data[0]);
+    return static_cast<uint16_t>((data[1] << 8) | (data[0]));
   }
 
-  return (data[0] << 8) | (data[1]);
+  return static_cast<uint16_t>((data[0] << 8) | (data[1]));
 }
 
 static bool is_orientation_marker(const uint8_t* data, size_t data_length, EncodedOrigin* origin) {

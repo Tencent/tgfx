@@ -51,7 +51,8 @@ CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels) {
   }
   CGColorSpaceRef colorspace =
       info.colorType() == ColorType::ALPHA_8 ? nullptr : CGColorSpaceCreateDeviceRGB();
-  auto cgContext = CGBitmapContextCreate(pixels, info.width(), info.height(), 8, info.rowBytes(),
+  auto cgContext = CGBitmapContextCreate(pixels, static_cast<size_t>(info.width()),
+                                         static_cast<size_t>(info.height()), 8, info.rowBytes(),
                                          colorspace, bitmapInfo);
   if (colorspace) {
     CFRelease(colorspace);

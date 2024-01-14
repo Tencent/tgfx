@@ -122,7 +122,8 @@ void GLInfo::fetchExtensions() {
       int extensionCount = 0;
       getIntegerv(GL_NUM_EXTENSIONS, &extensionCount);
       for (int i = 0; i < extensionCount; ++i) {
-        const char* ext = reinterpret_cast<const char*>(getStringi(GL_EXTENSIONS, i));
+        const char* ext =
+            reinterpret_cast<const char*>(getStringi(GL_EXTENSIONS, static_cast<unsigned>(i)));
         extensions.emplace_back(ext);
       }
     }
@@ -145,10 +146,10 @@ static bool IsMediumFloatFp32(const GLInfo& ctxInfo) {
   }
   // glGetShaderPrecisionFormat doesn't accept GL_GEOMETRY_SHADER as a shader type. Hopefully the
   // geometry shaders don't have lower precision than vertex and fragment.
-  for (unsigned shader : {GL_FRAGMENT_SHADER, GL_VERTEX_SHADER}) {
+  for (auto shader : {GL_FRAGMENT_SHADER, GL_VERTEX_SHADER}) {
     int range[2];
     int bits;
-    ctxInfo.getShaderPrecisionFormat(shader, GL_MEDIUM_FLOAT, range, &bits);
+    ctxInfo.getShaderPrecisionFormat(static_cast<unsigned>(shader), GL_MEDIUM_FLOAT, range, &bits);
     if (range[0] < 127 || range[1] < 127 || bits < 23) {
       return false;
     }
@@ -372,7 +373,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
       unsigned format = pixelFormatMap[pixelFormat].format.internalFormatRenderBuffer;
       info.getInternalformativ(GL_RENDERBUFFER, format, GL_NUM_SAMPLE_COUNTS, 1, &count);
       if (count) {
-        int* temp = new int[count];
+        int* temp = new int[static_cast<size_t>(count)];
         info.getInternalformativ(GL_RENDERBUFFER, format, GL_SAMPLES, count, temp);
         // GL has a concept of MSAA rasterization with a single sample but we do not.
         if (temp[count - 1] == 1) {

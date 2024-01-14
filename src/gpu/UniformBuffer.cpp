@@ -44,7 +44,7 @@ size_t Uniform::size() const {
 }
 
 UniformBuffer::UniformBuffer(std::vector<Uniform> uniformList) : uniforms(std::move(uniformList)) {
-  int index = 0;
+  size_t index = 0;
   size_t offset = 0;
   for (auto& uniform : uniforms) {
     uniformMap[uniform.name] = index++;

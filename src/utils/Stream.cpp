@@ -35,7 +35,7 @@ class FileStream : public Stream {
   }
 
   bool seek(size_t position) override {
-    return fseek(file, position, SEEK_SET) == 0;
+    return fseek(file, static_cast<long>(position), SEEK_SET) == 0;
   }
 
   bool move(int offset) override {

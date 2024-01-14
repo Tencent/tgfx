@@ -56,7 +56,8 @@ size_t ExternalTexture::memoryUsage() const {
   if (!adopted) {
     return 0;
   }
-  auto colorSize = width() * height() * PixelFormatBytesPerPixel(sampler->format);
+  auto colorSize = static_cast<size_t>(width()) * static_cast<size_t>(height()) *
+                   PixelFormatBytesPerPixel(sampler->format);
   return sampler->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
 }
 

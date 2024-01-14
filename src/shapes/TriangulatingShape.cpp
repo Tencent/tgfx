@@ -30,7 +30,7 @@ class TriangleVerticesProvider : public DataProvider {
 
   std::shared_ptr<Data> getData() const override {
     std::vector<float> vertices = {};
-    int count = PathTriangulator::ToAATriangles(path, clipBounds, &vertices);
+    auto count = PathTriangulator::ToAATriangles(path, clipBounds, &vertices);
     if (count == 0) {
       // The path is not a filled path, or it is invisible.
       return nullptr;
