@@ -30,15 +30,30 @@ namespace tgfx {
  */
 class Resource {
  public:
+  /**
+   * A convenient method to add a resource to the cache.
+   */
   template <class T>
-  static std::shared_ptr<T> AddToContext(Context* context, T* resource,
-                                         const BytesKey& recycleKey = {}) {
+  static std::shared_ptr<T> AddToCache(Context* context, T* resource,
+                                       const BytesKey& recycleKey = {}) {
     return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource, recycleKey));
   }
 
+  /**
+   * A convenient method to retrieve the corresponding resource in the cache by the specified
+   * ResourceKey.
+   */
   template <class T>
   static std::shared_ptr<T> Get(Context* context, const ResourceKey& resourceKey) {
     return std::static_pointer_cast<T>(context->resourceCache()->getResource(resourceKey));
+  }
+
+  /**
+   * A convenient method to retrieve a recycled resource in the cache by the specified recycle key.
+   */
+  template <class T>
+  static std::shared_ptr<T> FindRecycled(Context* context, const BytesKey& recycleKey) {
+    return std::static_pointer_cast<T>(context->resourceCache()->findRecycledResource(recycleKey));
   }
 
   virtual ~Resource() = default;
@@ -101,6 +116,11 @@ class Resource {
  protected:
   Context* context = nullptr;
 
+  /**
+   * Overridden to free GPU resources in the backend API.
+   */
+  virtual void onReleaseGPU() = 0;
+
  private:
   std::shared_ptr<Resource> reference;
   BytesKey recycleKey = {};
@@ -118,11 +138,6 @@ class Resource {
   }
 
   void release(bool releaseGPU);
-
-  /**
-   * Overridden to free GPU resources in the backend API.
-   */
-  virtual void onReleaseGPU() = 0;
 
   friend class ResourceCache;
 };

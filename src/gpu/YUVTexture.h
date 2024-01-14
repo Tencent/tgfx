@@ -88,11 +88,11 @@ class YUVTexture : public Texture {
 
   YUVTexture(int width, int height, YUVPixelFormat pixelFormat, YUVColorSpace colorSpace);
 
+  void onReleaseGPU() override;
+
  private:
   YUVPixelFormat _pixelFormat = YUVPixelFormat::I420;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
-
-  void onReleaseGPU() override;
 
   friend class Texture;
 };

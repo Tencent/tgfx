@@ -39,10 +39,11 @@ class PlainTexture : public Texture {
     return sampler.get();
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   std::unique_ptr<TextureSampler> sampler = {};
-
-  void onReleaseGPU() override;
 
   friend class Texture;
 };

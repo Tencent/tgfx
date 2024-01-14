@@ -66,9 +66,9 @@ class ResourceCache {
   void setCacheLimit(size_t bytesLimit);
 
   /**
-   * Returns a recyclable resource in the cache by the specified recycle key.
+   * Returns a recycled resource in the cache by the specified recycle key.
    */
-  std::shared_ptr<Resource> findRecyclableResource(const BytesKey& recycleKey);
+  std::shared_ptr<Resource> findRecycledResource(const BytesKey& recycleKey);
 
   /**
    * Retrieves the corresponding resource in the cache by the specified ResourceKey.
@@ -83,20 +83,20 @@ class ResourceCache {
   /**
    * Purges GPU resources that haven't been used the passed in time.
    * @param purgeTime A timestamp previously returned by Clock::Now().
-   * @param recyclableResourcesOnly If true, purgeable resources with external weak references are
+   * @param recycledResourceOnly If true, purgeable resources with external weak references are
    * spared. If false, all purgeable resources will be deleted.
    */
-  void purgeNotUsedSince(int64_t purgeTime, bool recyclableResourcesOnly = false);
+  void purgeNotUsedSince(int64_t purgeTime, bool recycledResourceOnly = false);
 
   /**
    * Purge unreferenced resources from the cache until the provided bytesLimit has been reached,
    * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
    * over the specified bytesLimit after purging.
    * @param bytesLimit The desired number of bytes after puring.
-   * @param recyclableResourcesOnly If true, purgeable resources with external weak references are
+   * @param recycledResourceOnly If true, purgeable resources with external weak references are
    * spared. If false, all purgeable resources will be deleted.
    */
-  bool purgeUntilMemoryTo(size_t bytesLimit, bool recyclableResourcesOnly = false);
+  bool purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourceOnly = false);
 
  private:
   Context* context = nullptr;
@@ -117,7 +117,7 @@ class ResourceCache {
   std::shared_ptr<Resource> addResource(Resource* resource, const BytesKey& recycleKey);
   std::shared_ptr<Resource> refResource(Resource* resource);
   void removeResource(Resource* resource);
-  void purgeResourcesByLRU(bool recyclableResourcesOnly,
+  void purgeResourcesByLRU(bool recycledResourceOnly,
                            const std::function<bool(Resource*)>& satisfied);
 
   void changeResourceKey(Resource* resource, const ResourceKey& resourceKey);

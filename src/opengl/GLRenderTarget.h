@@ -43,6 +43,9 @@ class GLRenderTarget : public RenderTarget {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                   int srcY = 0) const override;
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   GLFrameBuffer frameBufferForRead = {};
   GLFrameBuffer frameBufferForDraw = {};
@@ -52,8 +55,6 @@ class GLRenderTarget : public RenderTarget {
 
   GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
                  GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
-
-  void onReleaseGPU() override;
 
   friend class RenderTarget;
 };

@@ -48,6 +48,6 @@ void GLResource::AttachToContext(Context* context, std::shared_ptr<GLResource> g
     return;
   }
   glResource->context = context;
-  Resource::AddToContext(context, new GLExternalResource(std::move(glResource)));
+  Resource::AddToCache(context, new GLExternalResource(std::move(glResource)));
 }
 }  // namespace tgfx

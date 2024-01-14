@@ -30,14 +30,14 @@ class TestResource : public Resource {
     BytesKey recycleKey = {};
     recycleKey.write(TestResourceType);
     recycleKey.write(id);
-    return Resource::AddToContext(context, new TestResource(), recycleKey);
+    return Resource::AddToCache(context, new TestResource(), recycleKey);
   }
 
   size_t memoryUsage() const override {
     return 1;
   }
 
- private:
+ protected:
   void onReleaseGPU() override {
   }
 };

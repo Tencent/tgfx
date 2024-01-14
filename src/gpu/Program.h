@@ -44,13 +44,13 @@ class Program {
  protected:
   Context* context = nullptr;
 
- private:
-  BytesKey uniqueKey = {};
-
   /**
    * Overridden to free GPU resources in the backend API.
    */
   virtual void onReleaseGPU() = 0;
+
+ private:
+  BytesKey uniqueKey = {};
 
   friend class ProgramCache;
 };

@@ -52,8 +52,7 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   std::shared_ptr<EAGLHardwareTexture> glTexture = nullptr;
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, pixelBuffer);
-  glTexture = std::static_pointer_cast<EAGLHardwareTexture>(
-      context->resourceCache()->findRecyclableResource(recycleKey));
+  glTexture = Resource::FindRecycled<EAGLHardwareTexture>(context, recycleKey);
   if (glTexture) {
     return glTexture;
   }
@@ -73,7 +72,7 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   sampler->format = format;
   sampler->target = CVOpenGLESTextureGetTarget(texture);
   sampler->id = CVOpenGLESTextureGetName(texture);
-  glTexture = Resource::AddToContext(context, new EAGLHardwareTexture(pixelBuffer), recycleKey);
+  glTexture = Resource::AddToCache(context, new EAGLHardwareTexture(pixelBuffer), recycleKey);
   glTexture->sampler = std::move(sampler);
   glTexture->texture = texture;
   return glTexture;

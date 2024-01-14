@@ -102,12 +102,12 @@ void Context::setCacheLimit(size_t bytesLimit) {
   _resourceCache->setCacheLimit(bytesLimit);
 }
 
-void Context::purgeResourcesNotUsedSince(int64_t purgeTime, bool recyclableResourcesOnly) {
-  _resourceCache->purgeNotUsedSince(purgeTime, recyclableResourcesOnly);
+void Context::purgeResourcesNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly) {
+  _resourceCache->purgeNotUsedSince(purgeTime, recycledResourcesOnly);
 }
 
-bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool recyclableResourcesOnly) {
-  return _resourceCache->purgeUntilMemoryTo(bytesLimit, recyclableResourcesOnly);
+bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly) {
+  return _resourceCache->purgeUntilMemoryTo(bytesLimit, recycledResourcesOnly);
 }
 
 void Context::releaseAll(bool releaseGPU) {
