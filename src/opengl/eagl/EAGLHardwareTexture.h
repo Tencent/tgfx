@@ -42,12 +42,14 @@ class EAGLHardwareTexture : public Texture {
     return pixelBuffer;
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef texture = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
-  void onReleaseGPU() override;
 };
 }  // namespace tgfx

@@ -27,7 +27,7 @@ std::shared_ptr<GLVertexArray> GLVertexArray::Make(Context* context) {
   if (id == 0) {
     return nullptr;
   }
-  return Resource::AddToContext(context, new GLVertexArray(id));
+  return Resource::AddToCache(context, new GLVertexArray(id));
 }
 
 GLVertexArray::GLVertexArray(unsigned int id) : _id(id) {

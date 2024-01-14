@@ -41,6 +41,9 @@ class EGLHardwareTexture : public Texture {
     return hardwareBuffer;
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   std::unique_ptr<TextureSampler> sampler = {};
   AHardwareBuffer* hardwareBuffer = nullptr;
@@ -51,8 +54,6 @@ class EGLHardwareTexture : public Texture {
   EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage, int width, int height);
 
   ~EGLHardwareTexture() override;
-
-  void onReleaseGPU() override;
 };
 }  // namespace tgfx
 

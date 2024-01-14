@@ -64,6 +64,9 @@ class GLProgram : public Program {
     return attributes;
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   struct RenderTargetState {
     std::optional<int> width;
@@ -72,8 +75,6 @@ class GLProgram : public Program {
   };
 
   void setRenderTargetState(const GLRenderTarget* renderTarget);
-
-  void onReleaseGPU() override;
 
   RenderTargetState renderTargetState;
   unsigned programId = 0;

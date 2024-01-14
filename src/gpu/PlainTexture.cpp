@@ -44,8 +44,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   int maxMipmapLevel = mipMapped ? caps->getMaxMipmapLevel(width, height) : 0;
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, width, height, pixelFormat, maxMipmapLevel > 0);
-  auto texture = std::static_pointer_cast<Texture>(
-      context->resourceCache()->findRecyclableResource(recycleKey));
+  auto texture = Resource::FindRecycled<Texture>(context, recycleKey);
   if (texture) {
     texture->_origin = origin;
   } else {
@@ -54,7 +53,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
       return nullptr;
     }
     auto plainTexture = new PlainTexture(std::move(sampler), width, height, origin);
-    texture = Resource::AddToContext(context, plainTexture, recycleKey);
+    texture = Resource::AddToCache(context, plainTexture, recycleKey);
   }
   if (pixels != nullptr) {
     context->gpu()->writePixels(texture->getSampler(), Rect::MakeWH(width, height), pixels,

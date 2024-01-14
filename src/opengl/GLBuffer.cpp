@@ -39,8 +39,7 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, const void* buffer,
   unsigned target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, bufferType);
-  auto glBuffer = std::static_pointer_cast<GLBuffer>(
-      context->resourceCache()->findRecyclableResource(recycleKey));
+  auto glBuffer = Resource::FindRecycled<GLBuffer>(context, recycleKey);
   auto gl = GLFunctions::Get(context);
   if (glBuffer == nullptr) {
     unsigned bufferID = 0;
@@ -48,8 +47,7 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, const void* buffer,
     if (bufferID == 0) {
       return nullptr;
     }
-    glBuffer =
-        Resource::AddToContext(context, new GLBuffer(bufferType, size, bufferID), recycleKey);
+    glBuffer = Resource::AddToCache(context, new GLBuffer(bufferType, size, bufferID), recycleKey);
   } else {
     glBuffer->_sizeInBytes = size;
   }

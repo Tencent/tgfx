@@ -27,14 +27,15 @@ class GLBuffer : public GpuBuffer {
     return _bufferID;
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
+  unsigned _bufferID = 0;
+
   GLBuffer(BufferType bufferType, size_t size, unsigned bufferID)
       : GpuBuffer(bufferType, size), _bufferID(bufferID) {
   }
-
-  void onReleaseGPU() override;
-
-  unsigned _bufferID = 0;
 
   friend class GpuBuffer;
 };

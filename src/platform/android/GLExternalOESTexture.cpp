@@ -35,8 +35,7 @@ std::shared_ptr<GLExternalOESTexture> GLExternalOESTexture::Make(Context* contex
   if (sampler->id == 0) {
     return nullptr;
   }
-  return Resource::AddToContext(context,
-                                new GLExternalOESTexture(std::move(sampler), width, height));
+  return Resource::AddToCache(context, new GLExternalOESTexture(std::move(sampler), width, height));
 }
 
 GLExternalOESTexture::GLExternalOESTexture(std::unique_ptr<TextureSampler> sampler, int width,

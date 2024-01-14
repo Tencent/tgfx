@@ -43,6 +43,9 @@ class CGLHardwareTexture : public Texture {
     return pixelBuffer;
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;
@@ -50,7 +53,5 @@ class CGLHardwareTexture : public Texture {
   CVOpenGLTextureCacheRef textureCache = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
-
-  void onReleaseGPU() override;
 };
 }  // namespace tgfx

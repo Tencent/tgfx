@@ -35,9 +35,10 @@ class GLVertexArray : public Resource {
     return _id;
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   unsigned _id = 0;
-
-  void onReleaseGPU() override;
 };
 }  // namespace tgfx

@@ -38,13 +38,14 @@ class GLExternalOESTexture : public Texture {
 
   void updateTextureSize(int width, int height);
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   std::unique_ptr<TextureSampler> sampler = {};
   int textureWidth = 0;
   int textureHeight = 0;
 
   GLExternalOESTexture(std::unique_ptr<TextureSampler> sampler, int width, int height);
-
-  void onReleaseGPU() override;
 };
 }  // namespace tgfx

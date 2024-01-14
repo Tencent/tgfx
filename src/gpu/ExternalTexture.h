@@ -35,13 +35,14 @@ class ExternalTexture : public Texture {
     return sampler.get();
   }
 
+ protected:
+  void onReleaseGPU() override;
+
  private:
   std::unique_ptr<TextureSampler> sampler = {};
   bool adopted = false;
 
   ExternalTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
                   ImageOrigin origin, bool adopted);
-
-  void onReleaseGPU() override;
 };
 }  // namespace tgfx

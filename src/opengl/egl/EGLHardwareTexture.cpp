@@ -60,8 +60,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   }
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, hardwareBuffer);
-  auto glTexture = std::static_pointer_cast<EGLHardwareTexture>(
-      context->resourceCache()->findRecyclableResource(recycleKey));
+  auto glTexture = Resource::FindRecycled<EGLHardwareTexture>(context, recycleKey);
   if (glTexture != nullptr) {
     return glTexture;
   }
@@ -93,7 +92,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   eglext::glEGLImageTargetTexture2DOES(sampler->target, (GLeglImageOES)eglImage);
   auto eglHardwareTexture =
       new EGLHardwareTexture(hardwareBuffer, eglImage, info.width(), info.height());
-  glTexture = Resource::AddToContext(context, eglHardwareTexture, recycleKey);
+  glTexture = Resource::AddToCache(context, eglHardwareTexture, recycleKey);
   glTexture->sampler = std::move(sampler);
   return glTexture;
 }

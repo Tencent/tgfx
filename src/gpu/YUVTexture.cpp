@@ -74,8 +74,7 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
                                                        PixelFormat::GRAY_8};
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, yuvData->width(), yuvData->height(), YUVPixelFormat::I420);
-  auto texture = std::static_pointer_cast<YUVTexture>(
-      context->resourceCache()->findRecyclableResource(recycleKey));
+  auto texture = Resource::FindRecycled<YUVTexture>(context, recycleKey);
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(context, yuvData, yuvFormats);
     if (texturePlanes.empty()) {
@@ -84,8 +83,8 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
     auto yuvTexture =
         new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::I420, colorSpace);
     yuvTexture->samplers = std::move(texturePlanes);
-    texture = std::static_pointer_cast<YUVTexture>(
-        Resource::AddToContext(context, yuvTexture, recycleKey));
+    texture =
+        std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture, recycleKey));
   }
   SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;
@@ -100,8 +99,7 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
   PixelFormat yuvFormats[YUVData::NV12_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::RG_88};
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, yuvData->width(), yuvData->height(), YUVPixelFormat::NV12);
-  auto texture = std::static_pointer_cast<YUVTexture>(
-      context->resourceCache()->findRecyclableResource(recycleKey));
+  auto texture = Resource::FindRecycled<YUVTexture>(context, recycleKey);
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(context, yuvData, yuvFormats);
     if (texturePlanes.empty()) {
@@ -110,8 +108,8 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
     auto yuvTexture =
         new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::NV12, colorSpace);
     yuvTexture->samplers = std::move(texturePlanes);
-    texture = std::static_pointer_cast<YUVTexture>(
-        Resource::AddToContext(context, yuvTexture, recycleKey));
+    texture =
+        std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture, recycleKey));
   }
   SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;

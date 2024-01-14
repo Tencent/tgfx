@@ -25,8 +25,7 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
     Context* context, CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, pixelBuffer);
-  auto glTexture = std::static_pointer_cast<CGLHardwareTexture>(
-      context->resourceCache()->findRecyclableResource(recycleKey));
+  auto glTexture = Resource::FindRecycled<CGLHardwareTexture>(context, recycleKey);
   if (glTexture) {
     return glTexture;
   }
@@ -46,7 +45,7 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
       CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
           ? PixelFormat::ALPHA_8
           : PixelFormat::RGBA_8888;
-  glTexture = Resource::AddToContext(context, new CGLHardwareTexture(pixelBuffer), recycleKey);
+  glTexture = Resource::AddToCache(context, new CGLHardwareTexture(pixelBuffer), recycleKey);
   glTexture->sampler = std::move(glSampler);
   glTexture->texture = texture;
   glTexture->textureCache = textureCache;

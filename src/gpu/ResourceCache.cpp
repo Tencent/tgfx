@@ -58,7 +58,7 @@ void ResourceCache::setCacheLimit(size_t bytesLimit) {
   purgeUntilMemoryTo(maxBytes);
 }
 
-std::shared_ptr<Resource> ResourceCache::findRecyclableResource(const BytesKey& recycleKey) {
+std::shared_ptr<Resource> ResourceCache::findRecycledResource(const BytesKey& recycleKey) {
   auto result = recycleKeyMap.find(recycleKey);
   if (result == recycleKeyMap.end()) {
     return nullptr;
@@ -184,17 +184,17 @@ void ResourceCache::removeResource(Resource* resource) {
   resource->release(true);
 }
 
-void ResourceCache::purgeNotUsedSince(int64_t purgeTime, bool recyclableResourcesOnly) {
-  purgeResourcesByLRU(recyclableResourcesOnly,
+void ResourceCache::purgeNotUsedSince(int64_t purgeTime, bool recycledResourceOnly) {
+  purgeResourcesByLRU(recycledResourceOnly,
                       [&](Resource* resource) { return resource->lastUsedTime >= purgeTime; });
 }
 
-bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool recyclableResourcesOnly) {
-  purgeResourcesByLRU(recyclableResourcesOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
+bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourceOnly) {
+  purgeResourcesByLRU(recycledResourceOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
   return totalBytes <= bytesLimit;
 }
 
-void ResourceCache::purgeResourcesByLRU(bool recyclableResourcesOnly,
+void ResourceCache::purgeResourcesByLRU(bool recycledResourceOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
   processUnreferencedResources();
   std::vector<Resource*> needToPurge = {};
@@ -203,7 +203,7 @@ void ResourceCache::purgeResourcesByLRU(bool recyclableResourcesOnly,
     if (satisfied(resource)) {
       break;
     }
-    if (!recyclableResourcesOnly || !resource->hasExternalReferences()) {
+    if (!recycledResourceOnly || !resource->hasExternalReferences()) {
       needToPurge.push_back(resource);
     }
   }
