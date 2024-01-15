@@ -2,9 +2,9 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
-        "blur": "d010fb8",
+        "blur": "beebd55",
         "drawImage": "d010fb8",
-        "dropShadow": "d010fb8",
+        "dropShadow": "beebd55",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
         "greyColorMatrix": "d010fb8",
@@ -26,7 +26,7 @@
     "DrawersTest": {
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
-        "ImageWithShadow": "5a1fb11",
+        "ImageWithShadow": "beebd55",
         "SimpleText": "46b2963",
         "SweepGradient": "5a1fb11"
     },

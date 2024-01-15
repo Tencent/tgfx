@@ -64,13 +64,10 @@ TGFX_TEST(CanvasTest, Blur) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(codec != nullptr);
-  auto image = Image::MakeFrom(codec);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
-  auto imageMatrix = EncodedOriginToMatrix(codec->origin(), codec->width(), codec->height());
-  imageMatrix.postScale(0.2f, 0.2f);
-  auto bounds = Rect::MakeWH(codec->width(), codec->height());
+  auto imageMatrix = Matrix::MakeScale(0.2f, 0.2f);
+  auto bounds = Rect::MakeWH(image->width(), image->height());
   imageMatrix.mapRect(&bounds);
   auto imageWidth = static_cast<float>(bounds.width());
   auto imageHeight = static_cast<float>(bounds.height());
@@ -105,7 +102,7 @@ TGFX_TEST(CanvasTest, Blur) {
   canvas->save();
   canvas->concat(imageMatrix);
   paint.setImageFilter(
-      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeWH(codec->width(), codec->height())));
+      ImageFilter::Blur(130, 130, TileMode::Repeat, Rect::MakeWH(image->width(), image->height())));
   canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
@@ -115,13 +112,13 @@ TGFX_TEST(CanvasTest, Blur) {
   canvas->save();
   canvas->concat(imageMatrix);
   paint.setImageFilter(
-      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeLTRB(-100, -100, 2000, 1000)));
+      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeLTRB(2000, -100, 3124, 2000)));
   canvas->drawImage(image, &paint);
   paint.setImageFilter(
       ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeXYWH(1000, 1000, 1000, 1000)));
   canvas->drawImage(image, &paint);
   paint.setImageFilter(
-      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeXYWH(2000, 1000, 1000, 1000)));
+      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeXYWH(1000, 2000, 1000, 1000)));
   canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
