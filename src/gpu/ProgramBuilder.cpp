@@ -107,9 +107,8 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
   nameExpression(&output, "output");
 
   // Enclose custom code in a block to avoid namespace conflicts
-  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n",
-                                       pipeline->getProcessorIndex(processor),
-                                       processor->name().c_str());
+  fragmentShaderBuilder()->codeAppendf(
+      "{ // Processor%d : %s\n", pipeline->getProcessorIndex(processor), processor->name().c_str());
 
   std::vector<SamplerHandle> texSamplers;
   FragmentProcessor::Iter fpIter(processor);
