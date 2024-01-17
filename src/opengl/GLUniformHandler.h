@@ -36,8 +36,8 @@ class GLUniformHandler : public UniformHandler {
   explicit GLUniformHandler(ProgramBuilder* program) : UniformHandler(program) {
   }
 
-  std::string internalAddUniform(ShaderFlags visibility, SLType type, const std::string& name,
-                                 bool mangleName) override;
+  std::string internalAddUniform(ShaderFlags visibility, SLType type,
+                                 const std::string& name) override;
 
   SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name) override;
 
@@ -55,9 +55,9 @@ class GLUniformHandler : public UniformHandler {
 
   std::unique_ptr<GLUniformBuffer> makeUniformBuffer() const;
 
-  std::unordered_map<std::string, GLUniform> uniformMap;
-  std::vector<GLUniform> samplers;
-  std::vector<Swizzle> samplerSwizzles;
+  std::vector<GLUniform> uniforms = {};
+  std::vector<GLUniform> samplers = {};
+  std::vector<Swizzle> samplerSwizzles = {};
 
   friend class GLProgramBuilder;
 };

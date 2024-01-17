@@ -21,24 +21,18 @@
 
 namespace tgfx {
 std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType type,
-                                                 const std::string& name, bool mangleName) {
+                                                 const std::string& name) {
   GLUniform uniform;
   uniform.variable.setType(type);
   uniform.variable.setTypeModifier(ShaderVar::TypeModifier::Uniform);
-  char prefix = 'u';
-  if (prefix == name[0] || name.find(NO_MANGLE_PREFIX) == 0) {
-    prefix = '\0';
-  }
-  uniform.variable.setName(programBuilder->nameVariable(prefix, name, mangleName));
+  uniform.variable.setName(programBuilder->nameVariable(name));
   uniform.visibility = visibility;
-  auto uniformKey = StagedUniformBuffer::GetMangledName(name, programBuilder->stageIndex());
-  uniformMap[uniformKey] = uniform;
+  uniforms.push_back(uniform);
   return uniform.variable.name();
 }
 
 SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const std::string& name) {
-  auto mangleName = programBuilder->nameVariable('u', name);
-
+  auto mangledName = programBuilder->nameVariable(name);
   auto caps = GLCaps::Get(programBuilder->getContext());
   const auto& swizzle = caps->getReadSwizzle(sampler->format);
 
@@ -59,7 +53,7 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
   GLUniform samplerUniform;
   samplerUniform.variable.setType(type);
   samplerUniform.variable.setTypeModifier(ShaderVar::TypeModifier::Uniform);
-  samplerUniform.variable.setName(mangleName);
+  samplerUniform.variable.setName(mangledName);
   samplerUniform.visibility = ShaderFlags::Fragment;
   samplerSwizzles.push_back(swizzle);
   samplers.push_back(samplerUniform);
@@ -68,8 +62,7 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
 
 std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) const {
   std::string ret;
-  for (auto& item : uniformMap) {
-    auto& uniform = item.second;
+  for (auto& uniform : uniforms) {
     if ((uniform.visibility & visibility) == visibility) {
       ret += programBuilder->getShaderVarDeclarations(uniform.variable, visibility);
       ret += ";\n";
@@ -86,8 +79,7 @@ std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) con
 
 void GLUniformHandler::resolveUniformLocations(unsigned programID) {
   auto gl = GLFunctions::Get(programBuilder->getContext());
-  for (auto& item : uniformMap) {
-    auto& uniform = item.second;
+  for (auto& uniform : uniforms) {
     uniform.location = gl->getUniformLocation(programID, uniform.variable.name().c_str());
   }
   for (auto& sampler : samplers) {
@@ -96,11 +88,10 @@ void GLUniformHandler::resolveUniformLocations(unsigned programID) {
 }
 
 std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
-  std::vector<Uniform> uniforms = {};
+  std::vector<Uniform> uniformList = {};
   std::vector<int> locations = {};
-  for (auto& item : uniformMap) {
+  for (auto& uniform : uniforms) {
     std::optional<Uniform::Type> type;
-    auto& uniform = item.second;
     switch (uniform.variable.type()) {
       case SLType::Float:
         type = Uniform::Type::Float;
@@ -140,10 +131,10 @@ std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
         break;
     }
     if (type.has_value()) {
-      uniforms.push_back({item.first, *type});
+      uniformList.push_back({uniform.variable.name(), *type});
       locations.push_back(uniform.location);
     }
   }
-  return std::make_unique<GLUniformBuffer>(std::move(uniforms), std::move(locations));
+  return std::make_unique<GLUniformBuffer>(std::move(uniformList), std::move(locations));
 }
 }  // namespace tgfx

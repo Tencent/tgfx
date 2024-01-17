@@ -183,6 +183,7 @@ class FragmentProcessor : public Processor {
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
           coordFunc(std::move(coordFunc)) {
     }
+
     /**
      * Interface used to emit code in the shaders.
      */

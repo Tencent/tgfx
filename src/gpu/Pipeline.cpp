@@ -18,7 +18,6 @@
 
 #include "Pipeline.h"
 #include "gpu/ProgramBuilder.h"
-#include "gpu/StagedUniformBuffer.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
@@ -33,6 +32,21 @@ Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
   if (!BlendModeAsCoeff(blendMode, &_blendInfo)) {
     xferProcessor = PorterDuffXferProcessor::Make(blendMode);
   }
+  updateProcessorIndices();
+}
+
+void Pipeline::updateProcessorIndices() {
+  int index = 0;
+  processorIndices[geometryProcessor.get()] = index++;
+  for (auto& fragmentProcessor : fragmentProcessors) {
+    FragmentProcessor::Iter iter(fragmentProcessor.get());
+    const FragmentProcessor* fp = iter.next();
+    while (fp) {
+      processorIndices[fp] = index++;
+      fp = iter.next();
+    }
+  }
+  processorIndices[getXferProcessor()] = index++;
 }
 
 const XferProcessor* Pipeline::getXferProcessor() const {
@@ -43,24 +57,23 @@ const XferProcessor* Pipeline::getXferProcessor() const {
 }
 
 void Pipeline::getUniforms(UniformBuffer* uniformBuffer) const {
-  auto buffer = static_cast<StagedUniformBuffer*>(uniformBuffer);
-  buffer->advanceStage();
+  uniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor.get());
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
-  geometryProcessor->setData(buffer, &coordTransformIter);
+  geometryProcessor->setData(uniformBuffer, &coordTransformIter);
   for (auto& fragmentProcessor : fragmentProcessors) {
-    buffer->advanceStage();
     FragmentProcessor::Iter iter(fragmentProcessor.get());
     const FragmentProcessor* fp = iter.next();
     while (fp) {
-      fp->setData(buffer);
+      uniformBuffer->nameSuffix = getMangledSuffix(fp);
+      fp->setData(uniformBuffer);
       fp = iter.next();
     }
   }
-  if (dstTextureInfo.texture != nullptr) {
-    buffer->advanceStage();
-    xferProcessor->setData(buffer, dstTextureInfo.texture.get(), dstTextureInfo.offset);
-  }
-  buffer->resetStage();
+  auto processor = getXferProcessor();
+  uniformBuffer->nameSuffix = getMangledSuffix(processor);
+  auto texture = dstTextureInfo.texture ? dstTextureInfo.texture.get() : nullptr;
+  processor->setData(uniformBuffer, texture, dstTextureInfo.offset);
+  uniformBuffer->nameSuffix = "";
 }
 
 std::vector<SamplerInfo> Pipeline::getSamplers() const {
@@ -95,5 +108,21 @@ void Pipeline::computeUniqueKey(Context* context, BytesKey* uniqueKey) const {
 
 std::unique_ptr<Program> Pipeline::createProgram(Context* context) const {
   return ProgramBuilder::CreateProgram(context, this);
+}
+
+int Pipeline::getProcessorIndex(const Processor* processor) const {
+  auto result = processorIndices.find(processor);
+  if (result == processorIndices.end()) {
+    return -1;
+  }
+  return result->second;
+}
+
+std::string Pipeline::getMangledSuffix(const Processor* processor) const {
+  auto processorIndex = getProcessorIndex(processor);
+  if (processorIndex == -1) {
+    return "";
+  }
+  return "_P" + std::to_string(processorIndex);
 }
 }  // namespace tgfx

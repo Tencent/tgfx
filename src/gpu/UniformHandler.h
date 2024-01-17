@@ -24,8 +24,6 @@
 #include "gpu/TextureSampler.h"
 
 namespace tgfx {
-static constexpr char NO_MANGLE_PREFIX[] = "tgfx_";
-
 class ProgramBuilder;
 
 class UniformHandler {
@@ -39,8 +37,7 @@ class UniformHandler {
    * the final uniform name.
    */
   std::string addUniform(ShaderFlags visibility, SLType type, const std::string& name) {
-    bool mangle = name.find(NO_MANGLE_PREFIX) != 0;
-    return internalAddUniform(visibility, type, name, mangle);
+    return internalAddUniform(visibility, type, name);
   }
 
  protected:
@@ -58,7 +55,7 @@ class UniformHandler {
   virtual SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name) = 0;
 
   virtual std::string internalAddUniform(ShaderFlags visibility, SLType type,
-                                         const std::string& name, bool mangleName) = 0;
+                                         const std::string& name) = 0;
 
   virtual std::string getUniformDeclarations(ShaderFlags visibility) const = 0;
 

@@ -22,7 +22,7 @@
 
 namespace tgfx {
 GLUniformBuffer::GLUniformBuffer(std::vector<Uniform> uniformList, std::vector<int> locationList)
-    : StagedUniformBuffer(std::move(uniformList)), locations(std::move(locationList)) {
+    : UniformBuffer(std::move(uniformList)), locations(std::move(locationList)) {
   DEBUG_ASSERT(uniforms.size() == locations.size());
   if (!uniforms.empty()) {
     dirtyFlags.resize(uniforms.size(), true);

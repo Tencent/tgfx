@@ -155,7 +155,8 @@ void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputCol
                                   std::string* outputColor, EmitArgs& args,
                                   std::function<std::string(std::string_view)> coordFunc) const {
   auto* fragBuilder = args.fragBuilder;
-  outputColor->append(fragBuilder->mangleString());
+  auto pipeline = fragBuilder->getPipeline();
+  outputColor->append(pipeline->getMangledSuffix(this));
   fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
   internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc));
 }
@@ -169,7 +170,9 @@ void FragmentProcessor::internalEmitChild(
     size_t childIndex, const std::string& inputColor, const std::string& outputColor,
     EmitArgs& args, std::function<std::string(std::string_view)> coordFunc) const {
   auto* fragBuilder = args.fragBuilder;
-  fragBuilder->onBeforeChildProcEmitCode();  // call first so mangleString is updated
+  const auto* childProc = childProcessor(childIndex);
+  fragBuilder->onBeforeChildProcEmitCode(childProc);  // call first so mangleString is updated
+  auto pipeline = fragBuilder->getPipeline();
   // Prepare a mangled input color variable if the default is not used,
   // inputName remains the empty string if no variable is needed.
   std::string inputName;
@@ -178,16 +181,14 @@ void FragmentProcessor::internalEmitChild(
     // since this is called after onBeforeChildProcEmitCode(), it will be
     // unique to the child processor (exactly what we want for its input).
     inputName += "_childInput";
-    inputName += fragBuilder->mangleString();
+    inputName += pipeline->getMangledSuffix(childProc);
     fragBuilder->codeAppendf("vec4 %s = %s;", inputName.c_str(), inputColor.c_str());
   }
 
-  const auto* childProc = childProcessor(childIndex);
-
   // emit the code for the child in its own scope
   fragBuilder->codeAppend("{\n");
-  fragBuilder->codeAppendf("// Child Index %d (mangle: %s): %s\n", childIndex,
-                           fragBuilder->mangleString().c_str(), childProc->name().c_str());
+  fragBuilder->codeAppendf("// Processor%d : %s\n", pipeline->getProcessorIndex(childProc),
+                           childProc->name().c_str());
   TransformedCoordVars coordVars = args.transformedCoords->childInputs(childIndex);
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
 

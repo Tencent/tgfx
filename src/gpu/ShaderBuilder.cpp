@@ -33,13 +33,17 @@ static bool NeedsAppendEnter(const std::string& code) {
   return ch == ';' || ch == '{' || ch == '}';
 }
 
-ShaderBuilder::ShaderBuilder(ProgramBuilder* program) : programBuilder(program) {
+ShaderBuilder::ShaderBuilder(ProgramBuilder* builder) : programBuilder(builder) {
   for (int i = 0; i <= Type::Code; ++i) {
     shaderStrings.emplace_back("");
   }
   shaderStrings[Type::Main] = "void main() {";
   indentation = 1;
   atLineStart = true;
+}
+
+const Pipeline* ShaderBuilder::getPipeline() const {
+  return programBuilder->getPipeline();
 }
 
 void ShaderBuilder::setPrecisionQualifier(const std::string& precision) {

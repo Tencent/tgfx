@@ -23,6 +23,7 @@
 
 namespace tgfx {
 class ProgramBuilder;
+class Pipeline;
 
 /**
  * Features that should only be enabled internally by the builders.
@@ -36,7 +37,9 @@ enum class PrivateFeature : unsigned {
 
 class ShaderBuilder {
  public:
-  explicit ShaderBuilder(ProgramBuilder* program);
+  explicit ShaderBuilder(ProgramBuilder* builder);
+
+  const Pipeline* getPipeline() const;
 
   virtual ~ShaderBuilder() = default;
 
@@ -84,10 +87,6 @@ class ShaderBuilder {
    */
   void addFeature(PrivateFeature featureBit, const std::string& extensionName);
 
-  void nextStage() {
-    codeIndex++;
-  }
-
   virtual void onFinalize() = 0;
 
   void appendEnterIfNotEmpty(uint8_t type);
@@ -101,7 +100,6 @@ class ShaderBuilder {
   std::vector<ShaderVar> inputs;
   std::vector<ShaderVar> outputs;
   PrivateFeature featuresAddedMask = PrivateFeature::None;
-  int codeIndex = 0;
   bool finalized = false;
   int indentation = 0;
   bool atLineStart = false;

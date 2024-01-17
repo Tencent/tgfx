@@ -39,6 +39,10 @@ class ProgramBuilder {
     return context;
   }
 
+  const Pipeline* getPipeline() const {
+    return pipeline;
+  }
+
   virtual std::string versionDeclString() = 0;
 
   virtual std::string textureFuncName() const = 0;
@@ -56,15 +60,9 @@ class ProgramBuilder {
   }
 
   /**
-   * Generates a name for a variable. The generated string will be named prefixed by the prefix
-   * char (unless the prefix is '\0'). It also will mangle the name to be stage-specific unless
-   * explicitly asked not to.
+   * Generates a name for a variable. The generated string will be mangled to be processor-specific.
    */
-  std::string nameVariable(char prefix, const std::string& name, bool mangle = true) const;
-
-  int stageIndex() const {
-    return _stageIndex;
-  }
+  std::string nameVariable(const std::string& name) const;
 
   virtual UniformHandler* uniformHandler() = 0;
 
@@ -79,6 +77,7 @@ class ProgramBuilder {
  protected:
   Context* context = nullptr;
   const Pipeline* pipeline = nullptr;
+  int numFragmentSamplers = 0;
 
   ProgramBuilder(Context* context, const Pipeline* pipeline);
 
@@ -88,15 +87,9 @@ class ProgramBuilder {
 
   virtual bool checkSamplerCounts() = 0;
 
-  int numFragmentSamplers = 0;
-
  private:
-  /**
-   * advanceStage is called by program creator between each processor's emit code. It increments
-   * the stage offset for variable name mangling, and also ensures verification variables in the
-   * fragment shader are cleared.
-   */
-  void advanceStage();
+  std::vector<const Processor*> currentProcessors = {};
+  std::vector<ShaderVar> transformedCoordVars = {};
 
   /**
    * Generates a possibly mangled name for a stage variable and writes it to the fragment shader.
@@ -116,7 +109,7 @@ class ProgramBuilder {
 
   void emitFSOutputSwizzle();
 
-  int _stageIndex = -1;
-  std::vector<ShaderVar> transformedCoordVars = {};
+  friend class FragmentShaderBuilder;
+  friend class ProcessorGuard;
 };
 }  // namespace tgfx
