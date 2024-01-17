@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <unordered_map>
 #include "Swizzle.h"
 #include "gpu/Blend.h"
 #include "gpu/ProgramInfo.h"
@@ -89,14 +90,25 @@ class Pipeline : public ProgramInfo {
 
   std::unique_ptr<Program> createProgram(Context* context) const override;
 
+  /**
+   * Returns the index of the processor in the pipeline. Returns -1 if the processor is not in the
+   * pipeline.
+   */
+  int getProcessorIndex(const Processor* processor) const;
+
+  std::string getMangledSuffix(const Processor* processor) const;
+
  private:
-  std::unique_ptr<GeometryProcessor> geometryProcessor;
-  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors;
+  std::unique_ptr<GeometryProcessor> geometryProcessor = {};
+  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
+  std::unordered_map<const Processor*, int> processorIndices = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   std::unique_ptr<XferProcessor> xferProcessor;
   BlendInfo _blendInfo = {};
   DstTextureInfo dstTextureInfo = {};
   const Swizzle* _outputSwizzle = nullptr;
+
+  void updateProcessorIndices();
 };
 }  // namespace tgfx

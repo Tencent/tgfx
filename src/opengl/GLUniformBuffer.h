@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/StagedUniformBuffer.h"
+#include "gpu/UniformBuffer.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class GLUniformBuffer : public StagedUniformBuffer {
+class GLUniformBuffer : public UniformBuffer {
  public:
   GLUniformBuffer(std::vector<Uniform> uniforms, std::vector<int> locations);
 

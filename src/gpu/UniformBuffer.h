@@ -86,21 +86,17 @@ class UniformBuffer {
   std::vector<size_t> offsets = {};
 
   /**
-   * Generates a uniform key based on the specified name and the current stage index.
-   */
-  virtual std::string getUniformKey(const std::string& name) const {
-    return name;
-  }
-
-  /**
    * Copies data into the uniform buffer. The data must have the same size as the uniform specified
    * by name.
    */
   virtual void onCopyData(size_t index, size_t offset, size_t size, const void* data) = 0;
 
  private:
+  std::string nameSuffix = "";
   std::unordered_map<std::string, size_t> uniformMap = {};
 
   void onSetData(const std::string& name, const void* data, size_t size);
+
+  friend class Pipeline;
 };
 }  // namespace tgfx

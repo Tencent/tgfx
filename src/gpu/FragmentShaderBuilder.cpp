@@ -21,7 +21,6 @@
 
 namespace tgfx {
 FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
-  subStageIndices.push_back(0);
 }
 
 void FragmentShaderBuilder::onFinalize() {
@@ -32,18 +31,11 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
   outputs.emplace_back(CustomColorOutputName(), SLType::Float4, ShaderVar::TypeModifier::Out);
 }
 
-void FragmentShaderBuilder::onBeforeChildProcEmitCode() {
-  subStageIndices.push_back(0);
-  // second-to-last value in the subStageIndices stack is the index of the child proc
-  // at that level which is currently emitting code.
-  _mangleString.append("_c");
-  _mangleString += std::to_string(subStageIndices[subStageIndices.size() - 2]);
+void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) {
+  programBuilder->currentProcessors.push_back(child);
 }
 
 void FragmentShaderBuilder::onAfterChildProcEmitCode() {
-  subStageIndices.pop_back();
-  subStageIndices.back()++;
-  auto removeAt = _mangleString.rfind('_');
-  _mangleString.erase(removeAt, _mangleString.size() - removeAt);
+  programBuilder->currentProcessors.pop_back();
 }
 }  // namespace tgfx

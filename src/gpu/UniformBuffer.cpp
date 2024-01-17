@@ -61,7 +61,7 @@ void UniformBuffer::setData(const std::string& name, const Matrix& matrix) {
 }
 
 void UniformBuffer::onSetData(const std::string& name, const void* data, size_t size) {
-  auto key = getUniformKey(name);
+  auto key = name + nameSuffix;
   auto result = uniformMap.find(key);
   if (result == uniformMap.end()) {
     LOGE("UniformBuffer::onSetData() uniform '%s' not found!", name.c_str());

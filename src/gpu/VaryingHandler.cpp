@@ -23,7 +23,7 @@ namespace tgfx {
 Varying VaryingHandler::addVarying(const std::string& name, SLType type) {
   Varying varying;
   varying._type = type;
-  varying._name = programBuilder->nameVariable('v', name);
+  varying._name = programBuilder->nameVariable(name);
   varyings.push_back(std::move(varying));
   return varyings[varyings.size() - 1];
 }

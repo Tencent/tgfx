@@ -20,6 +20,20 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
+class ProcessorGuard {
+ public:
+  ProcessorGuard(ProgramBuilder* builder, const Processor* processor) : builder(builder) {
+    builder->currentProcessors.push_back(processor);
+  }
+
+  ~ProcessorGuard() {
+    builder->currentProcessors.pop_back();
+  }
+
+ private:
+  ProgramBuilder* builder = nullptr;
+};
+
 ProgramBuilder::ProgramBuilder(Context* context, const Pipeline* pipeline)
     : context(context), pipeline(pipeline) {
 }
@@ -35,22 +49,21 @@ bool ProgramBuilder::emitAndInstallProcessors() {
   return checkSamplerCounts();
 }
 
-void ProgramBuilder::advanceStage() {
-  _stageIndex++;
-  // Each output to the fragment processor gets its own code section
-  fragmentShaderBuilder()->nextStage();
-}
-
 void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) {
+  // We don't want the RTAdjustName to be mangled, so we add it to the uniform handler before the
+  // processor guard.
   uniformHandler()->addUniform(ShaderFlags::Vertex, SLType::Float4, RTAdjustName);
-  advanceStage();
+  auto geometryProcessor = pipeline->getGeometryProcessor();
+  // Set the current processor so that all variable names will be mangled correctly.
+  ProcessorGuard processorGuard(this, geometryProcessor);
   nameExpression(outputColor, "outputColor");
   nameExpression(outputCoverage, "outputCoverage");
-  auto geometryProcessor = pipeline->getGeometryProcessor();
+
+  auto processorIndex = pipeline->getProcessorIndex(geometryProcessor);
   // Enclose custom code in a block to avoid namespace conflicts
-  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex,
+  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n", processorIndex,
                                        geometryProcessor->name().c_str());
-  vertexShaderBuilder()->codeAppendf("// Geometry Processor %s\n",
+  vertexShaderBuilder()->codeAppendf("// Processor%d : %s\n", processorIndex,
                                      geometryProcessor->name().c_str());
 
   GeometryProcessor::FPCoordTransformHandler transformHandler(pipeline, &transformedCoordVars);
@@ -89,12 +102,13 @@ static const T* GetPointer(const std::vector<T>& vector, size_t atIndex) {
 std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* processor,
                                                    size_t transformedCoordVarsIdx,
                                                    const std::string& input) {
-  advanceStage();
+  ProcessorGuard processorGuard(this, processor);
   std::string output;
   nameExpression(&output, "output");
 
   // Enclose custom code in a block to avoid namespace conflicts
-  fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", _stageIndex,
+  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n",
+                                       pipeline->getProcessorIndex(processor),
                                        processor->name().c_str());
 
   std::vector<SamplerHandle> texSamplers;
@@ -115,17 +129,17 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
                                    &coords, &textureSamplers);
 
   processor->emitCode(args);
-
   fragmentShaderBuilder()->codeAppend("}");
   return output;
 }
 
 void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                             const std::string& coverageIn) {
-  advanceStage();
-
   auto xferProcessor = pipeline->getXferProcessor();
-  fragmentShaderBuilder()->codeAppendf("{ // Xfer Processor %s\n", xferProcessor->name().c_str());
+  ProcessorGuard processorGuard(this, xferProcessor);
+  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n",
+                                       pipeline->getProcessorIndex(xferProcessor),
+                                       xferProcessor->name().c_str());
 
   SamplerHandle dstTextureSamplerHandle;
   if (auto dstTexture = pipeline->dstTexture()) {
@@ -156,32 +170,23 @@ void ProgramBuilder::emitFSOutputSwizzle() {
   fragBuilder->codeAppendf("%s = %s.%s;", output.c_str(), output.c_str(), swizzle.c_str());
 }
 
-std::string ProgramBuilder::nameVariable(char prefix, const std::string& name, bool mangle) const {
-  std::string out;
-  if ('\0' != prefix) {
-    out += prefix;
+std::string ProgramBuilder::nameVariable(const std::string& name) const {
+  auto processor = currentProcessors.empty() ? nullptr : currentProcessors.back();
+  if (processor == nullptr) {
+    return name;
   }
-  out += name;
-  if (mangle && _stageIndex >= 0) {
-    if (out.rfind('_') == out.length() - 1) {
-      // Names containing "__" are reserved.
-      out += "x";
-    }
-    out += "_Stage";
-    out += std::to_string(_stageIndex);
-  }
-  return out;
+  return name + pipeline->getMangledSuffix(processor);
 }
 
 void ProgramBuilder::nameExpression(std::string* output, const std::string& baseName) {
-  // create var to hold stage result. If we already have a valid output name, just use that
+  // Create var to hold the stage result. If we already have a valid output name, just use that
   // otherwise create a new mangled one. This name is only valid if we are reordering stages
   // and have to tell stage exactly where to put its output.
   std::string outName;
   if (!output->empty()) {
     outName = *output;
   } else {
-    outName = nameVariable('\0', baseName);
+    outName = nameVariable(baseName);
   }
   fragmentShaderBuilder()->codeAppendf("vec4 %s;", outName.c_str());
   *output = outName;
