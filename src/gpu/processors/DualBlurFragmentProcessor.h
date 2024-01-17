@@ -27,7 +27,7 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
  public:
   static std::unique_ptr<DualBlurFragmentProcessor> Make(
       DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-      Point texelSize);
+      Size texelSize);
 
   std::string name() const override {
     return "DualBlurFragmentProcessor";
@@ -39,12 +39,12 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor,
-                            Point blurOffset, Point texelSize);
+                            Point blurOffset, Size texelSize);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
   DualBlurPassMode passMode;
   Point blurOffset;
-  Point texelSize;
+  Size texelSize;
 };
 }  // namespace tgfx
