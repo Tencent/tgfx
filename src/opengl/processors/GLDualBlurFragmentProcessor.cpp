@@ -21,7 +21,7 @@
 namespace tgfx {
 std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
     DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-    Point texelSize) {
+    Size texelSize) {
   if (processor == nullptr) {
     return nullptr;
   }
@@ -31,7 +31,7 @@ std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
 
 GLDualBlurFragmentProcessor::GLDualBlurFragmentProcessor(
     DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-    Point texelSize)
+    Size texelSize)
     : DualBlurFragmentProcessor(passMode, std::move(processor), blurOffset, texelSize) {
 }
 

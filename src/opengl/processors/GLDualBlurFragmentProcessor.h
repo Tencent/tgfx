@@ -26,7 +26,7 @@ class GLDualBlurFragmentProcessor : public DualBlurFragmentProcessor {
  public:
   GLDualBlurFragmentProcessor(DualBlurPassMode passMode,
                               std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-                              Point texelSize);
+                              Size texelSize);
 
   void emitCode(EmitArgs& args) const override;
 
