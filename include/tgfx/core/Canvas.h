@@ -127,6 +127,13 @@ class Canvas {
   Path getTotalClip() const;
 
   /**
+   * Replaces clip with the intersection of clip and rect. The resulting clip is aliased; pixels are
+   * fully contained by the clip. The rect is transformed by the current Matrix before it is
+   * combined with clip.
+   */
+  void clipRect(const Rect& rect);
+
+  /**
    * Replaces clip with the intersection of clip and path. The path is transformed by Matrix before
    * it is combined with clip.
    */
