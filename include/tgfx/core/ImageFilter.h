@@ -65,6 +65,6 @@ class ImageFilter {
 
   virtual Rect onFilterNodeBounds(const Rect& srcRect) const;
 
-  Rect cropRect;
+  Rect cropRect = Rect::MakeEmpty();
 };
 }  // namespace tgfx

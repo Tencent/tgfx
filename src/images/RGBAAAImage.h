@@ -26,15 +26,13 @@ class RGBAAAImage : public SubsetImage {
   RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
               int alphaStartX, int alphaStartY);
 
-  bool isRGBAAA() const override {
-    return true;
-  }
-
  protected:
   std::shared_ptr<SubsetImage> onCloneWith(const Rect& newBounds,
                                            EncodedOrigin newOrigin) const override;
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const override;
+
+  std::shared_ptr<ImageSource> onMakeTextureSource(Context* context) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,

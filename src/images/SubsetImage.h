@@ -47,6 +47,8 @@ class SubsetImage : public Image {
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const override;
 
+  std::shared_ptr<ImageSource> onMakeTextureSource(Context* context) const override;
+
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
   std::shared_ptr<Image> onMakeRGBAAA(int, int, int, int) const override {
@@ -60,5 +62,8 @@ class SubsetImage : public Image {
       const SamplingOptions& sampling, const Matrix* localMatrix = nullptr) override;
 
   Matrix getTotalMatrix(const Matrix* localMatrix) const;
+
+ private:
+  ISize getSourceSize() const;
 };
 }  // namespace tgfx

@@ -159,12 +159,6 @@ class Image {
   bool isAlphaOnly() const;
 
   /**
-   * Returns true if the Image is an RGBAAA image, which takes half of the original image as its RGB
-   * channels and the other half as its alpha channel.
-   */
-  virtual bool isRGBAAA() const;
-
-  /**
    * Returns true if Image is backed by an image generator or other services that create their
    * pixels on-demand.
    */
@@ -244,6 +238,8 @@ class Image {
   explicit Image(std::shared_ptr<ImageSource> source);
 
   virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const;
+
+  virtual std::shared_ptr<ImageSource> onMakeTextureSource(Context* context) const;
 
   virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
 

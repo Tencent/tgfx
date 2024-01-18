@@ -41,6 +41,10 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<ImageSource> new
   return std::shared_ptr<Image>(new RGBAAAImage(std::move(newSource), bounds, origin, alphaStart));
 }
 
+std::shared_ptr<ImageSource> RGBAAAImage::onMakeTextureSource(Context*) const {
+  return nullptr;
+}
+
 std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context,
                                                                     uint32_t renderFlags, TileMode,
                                                                     TileMode,

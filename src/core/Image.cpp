@@ -26,6 +26,7 @@
 #include "images/SubsetImage.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
@@ -145,10 +146,6 @@ bool Image::isAlphaOnly() const {
   return source->isAlphaOnly();
 }
 
-bool Image::isRGBAAA() const {
-  return false;
-}
-
 bool Image::isLazyGenerated() const {
   return source->isLazyGenerated();
 }
@@ -162,14 +159,24 @@ BackendTexture Image::getBackendTexture(Context* context) const {
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
-  auto textureSource = source->makeTextureSource(context);
+  auto textureSource = onMakeTextureSource(context);
   if (textureSource == source) {
     return weakThis.lock();
   }
-  if (textureSource == nullptr) {
+  if (textureSource != nullptr) {
+    return cloneWithSource(std::move(textureSource));
+  }
+  auto surface = Surface::Make(context, width(), height(), isAlphaOnly(), 1, hasMipmaps());
+  if (surface == nullptr) {
     return nullptr;
   }
-  return cloneWithSource(std::move(textureSource));
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(weakThis.lock(), 0, 0);
+  return surface->makeImageSnapshot();
+}
+
+std::shared_ptr<ImageSource> Image::onMakeTextureSource(Context* context) const {
+  return source->makeTextureSource(context);
 }
 
 std::shared_ptr<Image> Image::onCloneWith(std::shared_ptr<ImageSource> newSource) const {
@@ -262,8 +269,8 @@ std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
 }
 
 std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {
-  auto decodedImage = onCloneWith(std::move(newSource));
-  decodedImage->weakThis = decodedImage;
-  return decodedImage;
+  auto newImage = onCloneWith(std::move(newSource));
+  newImage->weakThis = newImage;
+  return newImage;
 }
 }  // namespace tgfx
