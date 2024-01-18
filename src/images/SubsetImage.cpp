@@ -85,9 +85,8 @@ SubsetImage::SubsetImage(std::shared_ptr<ImageSource> source, const Rect& bounds
 
 SubsetImage::SubsetImage(std::shared_ptr<ImageSource> imageSource, EncodedOrigin origin)
     : Image(std::move(imageSource)), origin(origin) {
-  bounds = Rect::MakeWH(source->width(), source->height());
-  auto matrix = EncodedOriginToMatrix(origin, source->width(), source->height());
-  matrix.mapRect(&bounds);
+  auto size = getSourceSize();
+  bounds = Rect::MakeWH(size.width, size.height);
 }
 
 SubsetImage::SubsetImage(std::shared_ptr<ImageSource> source, const Rect& bounds,
@@ -104,6 +103,15 @@ std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<ImageSource> new
   return std::shared_ptr<SubsetImage>(new SubsetImage(std::move(newSource), bounds, origin));
 }
 
+std::shared_ptr<ImageSource> SubsetImage::onMakeTextureSource(Context* context) const {
+  auto size = getSourceSize();
+  Rect sourceBounds = Rect::MakeWH(size.width, size.height);
+  if (bounds == sourceBounds) {
+    return source->makeTextureSource(context);
+  }
+  return nullptr;
+}
+
 std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset;
   newBounds.offset(bounds.x(), bounds.y());
@@ -111,13 +119,8 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> SubsetImage::onApplyOrigin(EncodedOrigin encodedOrigin) const {
-  auto width = source->width();
-  auto height = source->height();
-  if (origin == EncodedOrigin::LeftTop || origin == EncodedOrigin::RightTop ||
-      origin == EncodedOrigin::RightBottom || origin == EncodedOrigin::LeftBottom) {
-    std::swap(width, height);
-  }
-  auto matrix = EncodedOriginToMatrix(encodedOrigin, width, height);
+  auto size = getSourceSize();
+  auto matrix = EncodedOriginToMatrix(encodedOrigin, size.width, size.height);
   auto newBounds = matrix.mapRect(bounds);
   auto newOrigin = ConcatOrigin(origin, encodedOrigin);
   return onCloneWith(newBounds, newOrigin);
@@ -138,5 +141,15 @@ std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(
     const SamplingOptions& sampling, const Matrix* localMatrix) {
   auto matrix = getTotalMatrix(localMatrix);
   return Image::asFragmentProcessor(context, renderFlags, tileModeX, tileModeY, sampling, &matrix);
+}
+
+ISize SubsetImage::getSourceSize() const {
+  auto width = source->width();
+  auto height = source->height();
+  if (origin == EncodedOrigin::LeftTop || origin == EncodedOrigin::RightTop ||
+      origin == EncodedOrigin::RightBottom || origin == EncodedOrigin::LeftBottom) {
+    std::swap(width, height);
+  }
+  return ISize::Make(width, height);
 }
 }  // namespace tgfx

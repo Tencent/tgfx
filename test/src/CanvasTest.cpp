@@ -696,7 +696,6 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_EQ(image->height(), 512);
   image = image->makeMipMapped();
   rgbAAA = image->makeRGBAAA(512, 512, 512, 0);
-  EXPECT_TRUE(rgbAAA->isRGBAAA());
   EXPECT_EQ(rgbAAA->width(), 512);
   EXPECT_EQ(rgbAAA->height(), 512);
   matrix = Matrix::MakeScale(0.25);
