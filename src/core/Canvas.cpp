@@ -114,6 +114,12 @@ Path Canvas::getTotalClip() const {
   return state->clip;
 }
 
+void Canvas::clipRect(const tgfx::Rect& rect) {
+  Path path = {};
+  path.addRect(rect);
+  clipPath(path);
+}
+
 void Canvas::clipPath(const Path& path) {
   auto clipPath = path;
   clipPath.transform(state->matrix);
