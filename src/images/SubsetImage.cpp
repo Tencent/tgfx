@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
-#include "ImageSource.h"
+#include "images/sources/ImageSource.h"
 
 namespace tgfx {
 static const auto TopLeftMatrix = Matrix::I();

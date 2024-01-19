@@ -19,7 +19,7 @@
 #include "ImageShader.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "images/ImageSource.h"
+#include "images/sources/ImageSource.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, TileMode tileModeX,
