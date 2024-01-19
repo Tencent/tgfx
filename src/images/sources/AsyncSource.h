@@ -19,7 +19,7 @@
 #pragma once
 
 #include "EncodedSource.h"
-#include "ImageDecoder.h"
+#include "images/ImageDecoder.h"
 
 namespace tgfx {
 /**
