@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
+#include "core/RasterBuffer.h"
+#include "core/RasterGenerator.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Texture.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "images/BufferImage.h"
 #include "images/GeneratorImage.h"
-#include "images/RasterBuffer.h"
-#include "images/RasterGenerator.h"
 #include "images/SubsetImage.h"
 #include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"

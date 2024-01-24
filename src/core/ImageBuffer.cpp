@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageBuffer.h"
-#include "images/RasterBuffer.h"
-#include "images/RasterGenerator.h"
-#include "images/RasterYUVBuffer.h"
+#include "core/RasterBuffer.h"
+#include "core/RasterGenerator.h"
+#include "core/RasterYUVBuffer.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(const ImageInfo& info,
