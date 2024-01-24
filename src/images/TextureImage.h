@@ -52,7 +52,7 @@ class TextureImage : public ResourceImage {
     return true;
   }
 
-  BackendTexture getBackendTexture(Context* context) const override;
+  BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
