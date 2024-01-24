@@ -20,9 +20,9 @@
 
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
-#include "tgfx/core/EncodedOrigin.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Orientation.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/NativeImage.h"
 
@@ -50,7 +50,7 @@ class ImageCodec : public ImageGenerator {
   /**
    * Creates a new ImageCodec object from a platform-specific NativeImage. For example, the
    * NativeImage could be a jobject that represents a java Bitmap on the android platform or a
-   * CGImageRef on the apple platform.The returned ImageCodec object takes a reference on the
+   * CGImageRef on the apple platform. The returned ImageCodec object takes a reference to the
    * nativeImage. Returns nullptr if the nativeImage is nullptr or the current platform has no
    * NativeImage support.
    */
@@ -62,10 +62,10 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<Data> Encode(const Pixmap& pixmap, EncodedFormat format, int quality);
 
   /**
-   * Returns the encoded origin of the target image.
+   * Returns the orientation of the target image.
    */
-  EncodedOrigin origin() const {
-    return _origin;
+  Orientation orientation() const {
+    return _orientation;
   }
 
   bool isAlphaOnly() const override {
@@ -81,14 +81,14 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
-  ImageCodec(int width, int height, EncodedOrigin origin)
-      : ImageGenerator(width, height), _origin(origin) {
+  ImageCodec(int width, int height, Orientation orientation)
+      : ImageGenerator(width, height), _orientation(orientation) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  EncodedOrigin _origin = EncodedOrigin::TopLeft;
+  Orientation _orientation = Orientation::TopLeft;
 
   /**
    * If the file path represents an encoded image that the current platform knows how to decode,

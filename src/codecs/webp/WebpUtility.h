@@ -19,14 +19,14 @@
 #pragma once
 
 #include <string>
-#include "tgfx/core/EncodedOrigin.h"
+#include "tgfx/core/Orientation.h"
 
 namespace tgfx {
 
 struct DecodeInfo {
   int width = 0;
   int height = 0;
-  EncodedOrigin origin = EncodedOrigin::TopLeft;
+  Orientation orientation = Orientation::TopLeft;
 };
 
 class WebpUtility {

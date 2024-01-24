@@ -19,41 +19,42 @@
 #include "SubsetImage.h"
 
 namespace tgfx {
-std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, EncodedOrigin origin,
+std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
                                              const Rect& bounds) {
   if (source == nullptr || bounds.isEmpty()) {
     return nullptr;
   }
-  auto image = std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), origin, bounds));
+  auto image =
+      std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), orientation, bounds));
   image->weakThis = image;
   return image;
 }
 
-SubsetImage::SubsetImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds)
-    : OrientedImage(std::move(source), origin), bounds(bounds) {
+SubsetImage::SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds)
+    : OrientedImage(std::move(source), orientation), bounds(bounds) {
 }
 
 std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return SubsetImage::MakeFrom(std::move(newSource), origin, bounds);
+  return SubsetImage::MakeFrom(std::move(newSource), orientation, bounds);
 }
 
 std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset;
   newBounds.offset(bounds.x(), bounds.y());
-  return SubsetImage::MakeFrom(source, origin, newBounds);
+  return SubsetImage::MakeFrom(source, orientation, newBounds);
 }
 
-std::shared_ptr<Image> SubsetImage::onApplyOrigin(EncodedOrigin encodedOrigin) const {
-  auto newOrigin = concatOrigin(encodedOrigin);
+std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) const {
+  auto newOrientation = concatOrientation(orientation);
   auto orientedWidth = OrientedImage::width();
   auto orientedHeight = OrientedImage::height();
-  auto matrix = EncodedOriginToMatrix(encodedOrigin, orientedWidth, orientedHeight);
+  auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
   auto newBounds = matrix.mapRect(bounds);
-  return SubsetImage::MakeFrom(source, newOrigin, newBounds);
+  return SubsetImage::MakeFrom(source, newOrientation, newBounds);
 }
 
 Matrix SubsetImage::computeLocalMatrix() const {
-  auto matrix = EncodedOriginToMatrix(origin, source->width(), source->height());
+  auto matrix = OrientationToMatrix(orientation, source->width(), source->height());
   matrix.postTranslate(-bounds.x(), -bounds.y());
   matrix.invert(&matrix);
   return matrix;

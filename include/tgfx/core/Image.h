@@ -19,9 +19,9 @@
 #pragma once
 
 #include "tgfx/core/Data.h"
-#include "tgfx/core/EncodedOrigin.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Orientation.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
@@ -190,13 +190,6 @@ class Image {
   virtual std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
-   * Returns subset of Image. The subset must be fully contained by Image dimensions. The returned
-   * Image always shares pixels and caches with the original Image. Returns nullptr if the subset is
-   * empty, or the subset is not contained by bounds.
-   */
-  std::shared_ptr<Image> makeSubset(const Rect& subset) const;
-
-  /**
    * Returns a decoded Image from the lazy Image. The returned Image shares the same texture cache
    * with the original Image and immediately schedules an asynchronous decoding task, which will not
    * block the calling thread. Returns the original Image if the Image is not lazy or has a
@@ -211,6 +204,20 @@ class Image {
   std::shared_ptr<Image> makeMipMapped() const;
 
   /**
+   * Returns subset of Image. The subset must be fully contained by Image dimensions. The returned
+   * Image always shares pixels and caches with the original Image. Returns nullptr if the subset is
+   * empty, or the subset is not contained by bounds.
+   */
+  std::shared_ptr<Image> makeSubset(const Rect& subset) const;
+
+  /**
+   * Returns an Image with its origin transformed by the given Orientation. The returned Image
+   * always shares pixels and caches with the original Image. Returns the original Image if the
+   * orientation is Orientation::TopLeft.
+   */
+  std::shared_ptr<Image> makeOriented(Orientation orientation) const;
+
+  /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
    * channels and the other half as its alpha channel. Returns a subset Image if both alphaStartX
    * and alphaStartY are zero. Returns nullptr if the original Image has an encoded origin, subset
@@ -223,28 +230,22 @@ class Image {
   std::shared_ptr<Image> makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                     int alphaStartY);
 
-  /**
-   * Returns an Image with its origin transformed by the given EncodedOrigin. The returned Image
-   * always shares pixels and caches with the original Image.
-   */
-  std::shared_ptr<Image> applyOrigin(EncodedOrigin origin) const;
-
  protected:
   std::weak_ptr<Image> weakThis;
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
                                                            uint32_t renderFlags) const;
 
-  virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
-
   virtual std::shared_ptr<Image> onMakeDecoded(Context* context) const;
 
   virtual std::shared_ptr<Image> onMakeMipMapped() const = 0;
 
+  virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
+
+  virtual std::shared_ptr<Image> onMakeOriented(Orientation orientation) const;
+
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
-
-  virtual std::shared_ptr<Image> onApplyOrigin(EncodedOrigin origin) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,

@@ -37,7 +37,7 @@ bool JpegCodec::IsJpeg(const std::shared_ptr<Data>& data) {
 const uint32_t kExifHeaderSize = 14;
 const uint32_t kExifMarker = JPEG_APP0 + 1;
 
-static bool is_orientation_marker(jpeg_marker_struct* marker, EncodedOrigin* encodedOrigin) {
+static bool is_orientation_marker(jpeg_marker_struct* marker, Orientation* orientation) {
   if (kExifMarker != marker->marker || marker->data_length < kExifHeaderSize) {
     return false;
   }
@@ -49,18 +49,17 @@ static bool is_orientation_marker(jpeg_marker_struct* marker, EncodedOrigin* enc
 
   // Account for 'E', 'x', 'i', 'f', '\0', '<fill byte>'.
   constexpr size_t kOffset = 6;
-  return is_orientation_marker(marker->data + kOffset, marker->data_length - kOffset,
-                               encodedOrigin);
+  return is_orientation_marker(marker->data + kOffset, marker->data_length - kOffset, orientation);
 }
 
-static EncodedOrigin get_exif_orientation(jpeg_decompress_struct* dinfo) {
-  EncodedOrigin origin;
+static Orientation get_exif_orientation(jpeg_decompress_struct* dinfo) {
+  Orientation orientation;
   for (jpeg_marker_struct* marker = dinfo->marker_list; marker; marker = marker->next) {
-    if (is_orientation_marker(marker, &origin)) {
-      return origin;
+    if (is_orientation_marker(marker, &orientation)) {
+      return orientation;
     }
   }
-  return EncodedOrigin::TopLeft;
+  return Orientation::TopLeft;
 }
 
 struct my_error_mgr {
@@ -85,7 +84,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
   jpeg_decompress_struct cinfo = {};
   my_error_mgr jerr = {};
   cinfo.err = jpeg_std_error(&jerr.pub);
-  EncodedOrigin encodedOrigin = EncodedOrigin::TopLeft;
+  Orientation orientation = Orientation::TopLeft;
   do {
     if (setjmp(jerr.setjmp_buffer)) break;
     jpeg_create_decompress(&cinfo);
@@ -96,7 +95,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
     }
     jpeg_save_markers(&cinfo, kExifMarker, 0xFFFF);
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) break;
-    encodedOrigin = get_exif_orientation(&cinfo);
+    orientation = get_exif_orientation(&cinfo);
   } while (false);
   jpeg_destroy_decompress(&cinfo);
   if (infile) fclose(infile);
@@ -105,7 +104,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
   }
   return std::shared_ptr<ImageCodec>(new JpegCodec(static_cast<int>(cinfo.image_width),
                                                    static_cast<int>(cinfo.image_height),
-                                                   encodedOrigin, filePath, std::move(byteData)));
+                                                   orientation, filePath, std::move(byteData)));
 }
 
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {

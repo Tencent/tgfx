@@ -38,7 +38,7 @@ class RGBAAAImage : public SubsetImage {
  private:
   Point alphaStart = Point::Zero();
 
-  RGBAAAImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds,
+  RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds,
               const Point& alphaStart);
 };
 }  // namespace tgfx

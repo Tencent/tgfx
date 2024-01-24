@@ -38,7 +38,8 @@ class NativeCodec : public ImageCodec {
 
   static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);
 
-  NativeCodec(int width, int height, EncodedOrigin origin) : ImageCodec(width, height, origin) {
+  NativeCodec(int width, int height, Orientation orientation)
+      : ImageCodec(width, height, orientation) {
   }
 
   jobject decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType alphaType,

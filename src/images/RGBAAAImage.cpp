@@ -29,19 +29,19 @@ std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int 
   auto bounds = Rect::MakeWH(displayWidth, displayHeight);
   auto alphaStart = Point::Make(alphaStartX, alphaStartY);
   auto image = std::shared_ptr<RGBAAAImage>(
-      new RGBAAAImage(std::move(source), EncodedOrigin::TopLeft, bounds, alphaStart));
+      new RGBAAAImage(std::move(source), Orientation::TopLeft, bounds, alphaStart));
   image->weakThis = image;
   return image;
 }
 
-RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds,
+RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds,
                          const Point& alphaStart)
-    : SubsetImage(std::move(source), origin, bounds), alphaStart(alphaStart) {
+    : SubsetImage(std::move(source), orientation, bounds), alphaStart(alphaStart) {
 }
 
 std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource) const {
   auto image = std::shared_ptr<RGBAAAImage>(
-      new RGBAAAImage(std::move(newSource), origin, bounds, alphaStart));
+      new RGBAAAImage(std::move(newSource), orientation, bounds, alphaStart));
   image->weakThis = image;
   return image;
 }
