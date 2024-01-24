@@ -32,7 +32,7 @@ TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy)
     : ResourceImage(textureProxy->getResourceKey()), textureProxy(std::move(textureProxy)) {
 }
 
-BackendTexture TextureImage::getBackendTexture(Context* context) const {
+BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
   if (context == nullptr) {
     return {};
   }
@@ -40,6 +40,9 @@ BackendTexture TextureImage::getBackendTexture(Context* context) const {
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     return {};
+  }
+  if (origin != nullptr) {
+    *origin = textureProxy->origin();
   }
   return texture->getBackendTexture();
 }

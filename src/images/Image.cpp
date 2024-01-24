@@ -120,7 +120,7 @@ bool Image::isTextureBacked() const {
   return false;
 }
 
-BackendTexture Image::getBackendTexture(Context*) const {
+BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
 }
 
