@@ -29,21 +29,21 @@ static const auto RightTopMatrix = Matrix::MakeAll(0, -1, 1, 1, 0, 0);
 static const auto RightBottomMatrix = Matrix::MakeAll(0, -1, 1, -1, 0, 1);
 static const auto LeftBottomMatrix = Matrix::MakeAll(0, 1, 0, -1, 0, 1);
 
-static Matrix OriginToMatrix(EncodedOrigin origin) {
-  switch (origin) {
-    case EncodedOrigin::TopRight:
+static Matrix OrientationToMatrix(Orientation orientation) {
+  switch (orientation) {
+    case Orientation::TopRight:
       return TopRightMatrix;
-    case EncodedOrigin::BottomRight:
+    case Orientation::BottomRight:
       return BottomRightMatrix;
-    case EncodedOrigin::BottomLeft:
+    case Orientation::BottomLeft:
       return BottomLeftMatrix;
-    case EncodedOrigin::LeftTop:
+    case Orientation::LeftTop:
       return LeftTopMatrix;
-    case EncodedOrigin::RightTop:
+    case Orientation::RightTop:
       return RightTopMatrix;
-    case EncodedOrigin::RightBottom:
+    case Orientation::RightBottom:
       return RightBottomMatrix;
-    case EncodedOrigin::LeftBottom:
+    case Orientation::LeftBottom:
       return LeftBottomMatrix;
     default:
       break;
@@ -52,45 +52,32 @@ static Matrix OriginToMatrix(EncodedOrigin origin) {
 }
 
 std::shared_ptr<Image> OrientedImage::MakeFrom(std::shared_ptr<Image> source,
-                                               EncodedOrigin origin) {
+                                               Orientation orientation) {
   if (source == nullptr) {
     return nullptr;
   }
-  if (origin == EncodedOrigin::TopLeft) {
+  if (orientation == Orientation::TopLeft) {
     return source;
   }
-  auto image = std::shared_ptr<OrientedImage>(new OrientedImage(std::move(source), origin));
+  auto image = std::shared_ptr<OrientedImage>(new OrientedImage(std::move(source), orientation));
   image->weakThis = image;
   return image;
 }
 
-OrientedImage::OrientedImage(std::shared_ptr<Image> source, EncodedOrigin origin)
-    : NestedImage(std::move(source)), origin(origin) {
-}
-
-static bool NeedSwapWH(EncodedOrigin origin) {
-  switch (origin) {
-    case EncodedOrigin::LeftTop:
-    case EncodedOrigin::RightTop:
-    case EncodedOrigin::RightBottom:
-    case EncodedOrigin::LeftBottom:
-      return true;
-    default:
-      break;
-  }
-  return false;
+OrientedImage::OrientedImage(std::shared_ptr<Image> source, Orientation orientation)
+    : NestedImage(std::move(source)), orientation(orientation) {
 }
 
 int OrientedImage::width() const {
-  return NeedSwapWH(origin) ? source->height() : source->width();
+  return OrientationSwapsWidthHeight(orientation) ? source->height() : source->width();
 }
 
 int OrientedImage::height() const {
-  return NeedSwapWH(origin) ? source->width() : source->height();
+  return OrientationSwapsWidthHeight(orientation) ? source->width() : source->height();
 }
 
 std::shared_ptr<Image> OrientedImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return OrientedImage::MakeFrom(std::move(newSource), origin);
+  return OrientedImage::MakeFrom(std::move(newSource), orientation);
 }
 
 std::shared_ptr<Image> OrientedImage::onMakeMipMapped() const {
@@ -102,15 +89,15 @@ std::shared_ptr<Image> OrientedImage::onMakeMipMapped() const {
 }
 
 std::shared_ptr<Image> OrientedImage::onMakeSubset(const Rect& subset) const {
-  return SubsetImage::MakeFrom(source, origin, subset);
+  return SubsetImage::MakeFrom(source, orientation, subset);
 }
 
-std::shared_ptr<Image> OrientedImage::onApplyOrigin(EncodedOrigin newOrigin) const {
-  newOrigin = concatOrigin(newOrigin);
-  if (newOrigin == EncodedOrigin::TopLeft) {
+std::shared_ptr<Image> OrientedImage::onMakeOriented(Orientation newOrientation) const {
+  newOrientation = concatOrientation(newOrientation);
+  if (newOrientation == Orientation::TopLeft) {
     return source;
   }
-  return OrientedImage::MakeFrom(source, newOrigin);
+  return OrientedImage::MakeFrom(source, newOrientation);
 }
 
 std::unique_ptr<FragmentProcessor> OrientedImage::asFragmentProcessor(
@@ -125,36 +112,36 @@ std::unique_ptr<FragmentProcessor> OrientedImage::asFragmentProcessor(
 }
 
 Matrix OrientedImage::computeLocalMatrix() const {
-  auto matrix = EncodedOriginToMatrix(origin, source->width(), source->height());
+  auto matrix = OrientationToMatrix(orientation, source->width(), source->height());
   matrix.invert(&matrix);
   return matrix;
 }
 
-EncodedOrigin OrientedImage::concatOrigin(EncodedOrigin newOrigin) const {
-  auto oldMatrix = OriginToMatrix(origin);
-  auto newMatrix = OriginToMatrix(newOrigin);
+Orientation OrientedImage::concatOrientation(Orientation newOrientation) const {
+  auto oldMatrix = OrientationToMatrix(orientation);
+  auto newMatrix = OrientationToMatrix(newOrientation);
   oldMatrix.postConcat(newMatrix);
   if (oldMatrix == TopRightMatrix) {
-    return EncodedOrigin::TopRight;
+    return Orientation::TopRight;
   }
   if (oldMatrix == BottomRightMatrix) {
-    return EncodedOrigin::BottomRight;
+    return Orientation::BottomRight;
   }
   if (oldMatrix == BottomLeftMatrix) {
-    return EncodedOrigin::BottomLeft;
+    return Orientation::BottomLeft;
   }
   if (oldMatrix == LeftTopMatrix) {
-    return EncodedOrigin::LeftTop;
+    return Orientation::LeftTop;
   }
   if (oldMatrix == RightTopMatrix) {
-    return EncodedOrigin::RightTop;
+    return Orientation::RightTop;
   }
   if (oldMatrix == RightBottomMatrix) {
-    return EncodedOrigin::RightBottom;
+    return Orientation::RightBottom;
   }
   if (oldMatrix == LeftBottomMatrix) {
-    return EncodedOrigin::LeftBottom;
+    return Orientation::LeftBottom;
   }
-  return EncodedOrigin::TopLeft;
+  return Orientation::TopLeft;
 }
 }  // namespace tgfx

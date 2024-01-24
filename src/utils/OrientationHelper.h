@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/core/EncodedOrigin.h"
+#include "tgfx/core/Orientation.h"
 
 namespace tgfx {
 /*
@@ -53,7 +53,8 @@ inline uint16_t get_endian_short(const uint8_t* data, bool littleEndian) {
   return static_cast<uint16_t>((data[0] << 8) | (data[1]));
 }
 
-static bool is_orientation_marker(const uint8_t* data, size_t data_length, EncodedOrigin* origin) {
+static bool is_orientation_marker(const uint8_t* data, size_t data_length,
+                                  Orientation* orientation) {
   bool littleEndian;
   // We need eight bytes to read the endian marker and the offset, below.
   if (data_length < 8 || !is_valid_endian_marker(data, &littleEndian)) {
@@ -86,8 +87,8 @@ static bool is_orientation_marker(const uint8_t* data, size_t data_length, Encod
     uint32_t count = get_endian_int(data + 4, littleEndian);
     if (kOriginTag == tag && kOriginType == type && 1 == count) {
       uint16_t val = get_endian_short(data + 8, littleEndian);
-      if (0 < val && val <= static_cast<int>(EncodedOrigin::LeftBottom)) {
-        *origin = (EncodedOrigin)val;
+      if (0 < val && val <= static_cast<int>(Orientation::LeftBottom)) {
+        *orientation = (Orientation)val;
         return true;
       }
     }

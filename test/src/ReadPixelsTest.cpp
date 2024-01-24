@@ -264,7 +264,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 1280);
   ASSERT_EQ(rgbaCodec->height(), 720);
-  ASSERT_EQ(rgbaCodec->origin(), EncodedOrigin::TopLeft);
+  ASSERT_EQ(rgbaCodec->orientation(), Orientation::TopLeft);
   auto rowBytes = static_cast<size_t>(rgbaCodec->width()) * 4;
   Buffer buffer(rowBytes * static_cast<size_t>(rgbaCodec->height()));
   auto pixels = buffer.data();
@@ -278,7 +278,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 1280);
   ASSERT_EQ(codec->height(), 720);
-  ASSERT_EQ(codec->origin(), EncodedOrigin::TopLeft);
+  ASSERT_EQ(codec->orientation(), Orientation::TopLeft);
   buffer.clear();
   ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "PngCodec_Encode_RGBA");
@@ -325,7 +325,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 110);
   ASSERT_EQ(rgbaCodec->height(), 110);
-  ASSERT_EQ(rgbaCodec->origin(), EncodedOrigin::TopLeft);
+  ASSERT_EQ(rgbaCodec->orientation(), Orientation::TopLeft);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
                                   AlphaType::Premultiplied);
 
@@ -340,7 +340,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 110);
   ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->origin(), EncodedOrigin::TopLeft);
+  ASSERT_EQ(codec->orientation(), Orientation::TopLeft);
   buffer.clear();
   ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "WebpCodec_Encode_RGBA");
@@ -384,7 +384,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 4032);
   ASSERT_EQ(rgbaCodec->height(), 3024);
-  ASSERT_EQ(rgbaCodec->origin(), EncodedOrigin::RightTop);
+  ASSERT_EQ(rgbaCodec->orientation(), Orientation::RightTop);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), ColorType::RGBA_8888,
                                   AlphaType::Premultiplied);
   Buffer buffer(RGBAInfo.byteSize());
@@ -397,7 +397,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 4032);
   ASSERT_EQ(codec->height(), 3024);
-  ASSERT_EQ(codec->origin(), EncodedOrigin::TopLeft);
+  ASSERT_EQ(codec->orientation(), Orientation::TopLeft);
   buffer.clear();
   ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "JpegCodec_Encode_RGBA");

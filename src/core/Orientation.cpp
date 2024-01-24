@@ -16,30 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/EncodedOrigin.h"
+#include "tgfx/core/Orientation.h"
 
 namespace tgfx {
-Matrix EncodedOriginToMatrix(EncodedOrigin origin, int width, int height) {
+Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
   auto w = static_cast<float>(width);
   auto h = static_cast<float>(height);
-  switch (origin) {
-    case EncodedOrigin::TopLeft:
+  switch (orientation) {
+    case Orientation::TopLeft:
       return Matrix::I();
-    case EncodedOrigin::TopRight:
+    case Orientation::TopRight:
       return Matrix::MakeAll(-1, 0, w, 0, 1, 0);
-    case EncodedOrigin::BottomRight:
+    case Orientation::BottomRight:
       return Matrix::MakeAll(-1, 0, w, 0, -1, h);
-    case EncodedOrigin::BottomLeft:
+    case Orientation::BottomLeft:
       return Matrix::MakeAll(1, 0, 0, 0, -1, h);
-    case EncodedOrigin::LeftTop:
+    case Orientation::LeftTop:
       return Matrix::MakeAll(0, 1, 0, 1, 0, 0);
-    case EncodedOrigin::RightTop:
+    case Orientation::RightTop:
       return Matrix::MakeAll(0, -1, h, 1, 0, 0);
-    case EncodedOrigin::RightBottom:
+    case Orientation::RightBottom:
       return Matrix::MakeAll(0, -1, h, -1, 0, w);
-    case EncodedOrigin::LeftBottom:
+    case Orientation::LeftBottom:
       return Matrix::MakeAll(0, 1, 0, -1, 0, w);
   }
   return Matrix::I();
+}
+
+bool OrientationSwapsWidthHeight(Orientation origin) {
+  return origin >= Orientation::LeftTop;
 }
 }  // namespace tgfx

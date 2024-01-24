@@ -620,9 +620,9 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
   EXPECT_FALSE(image->hasMipmaps());
-  auto rotatedImage = image->applyOrigin(EncodedOrigin::RightTop);
+  auto rotatedImage = image->makeOriented(Orientation::RightTop);
   EXPECT_NE(rotatedImage, image);
-  rotatedImage = rotatedImage->applyOrigin(EncodedOrigin::LeftBottom);
+  rotatedImage = rotatedImage->makeOriented(Orientation::LeftBottom);
   EXPECT_EQ(rotatedImage, image);
   canvas->drawImage(image);
   auto decodedImage = image->makeDecoded(context);
@@ -674,8 +674,8 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(rotationImage->hasMipmaps());
   auto matrix = Matrix::MakeScale(0.05f);
   matrix.postTranslate(0, 120);
-  rotationImage = rotationImage->applyOrigin(EncodedOrigin::BottomRight);
-  rotationImage = rotationImage->applyOrigin(EncodedOrigin::BottomRight);
+  rotationImage = rotationImage->makeOriented(Orientation::BottomRight);
+  rotationImage = rotationImage->makeOriented(Orientation::BottomRight);
   canvas->drawImage(rotationImage, matrix);
   subset = rotationImage->makeSubset(Rect::MakeXYWH(500, 800, 2000, 2400));
   ASSERT_TRUE(subset != nullptr);
@@ -685,7 +685,7 @@ TGFX_TEST(CanvasTest, image) {
   ASSERT_TRUE(subset != nullptr);
   matrix.postTranslate(110, -30);
   canvas->drawImage(subset, matrix);
-  subset = subset->applyOrigin(EncodedOrigin::RightTop);
+  subset = subset->makeOriented(Orientation::RightTop);
   textureImage = subset->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   matrix.postTranslate(0, 110);
@@ -708,7 +708,7 @@ TGFX_TEST(CanvasTest, image) {
   subset = rgbAAA->makeSubset(Rect::MakeXYWH(100, 100, 300, 200));
   matrix.postTranslate(140, 5);
   canvas->drawImage(subset, matrix);
-  auto originImage = subset->applyOrigin(EncodedOrigin::BottomLeft);
+  auto originImage = subset->makeOriented(Orientation::BottomLeft);
   EXPECT_TRUE(originImage != nullptr);
   matrix.postTranslate(0, 70);
   canvas->drawImage(originImage, matrix);

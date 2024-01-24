@@ -246,7 +246,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
   WebpFile webpFile = {infile, 0, fileLength, fileLength};
   webpFile._start = 12;
   auto chunkHeader = static_cast<uint8_t*>(malloc(RIFF_HEADER_SIZE));
-  bool foundOrigin = false;
+  bool foundOrientation = false;
   do {
     fseek(infile, static_cast<int>(webpFile._start), SEEK_SET);
     if ((fileLength - webpFile._start) < RIFF_HEADER_SIZE) break;
@@ -271,14 +271,14 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
         break;
       }
       case MKFOURCC('E', 'X', 'I', 'F'): {
-        foundOrigin = true;
+        foundOrientation = true;
         fseek(infile, static_cast<int>(webpFile._start) + CHUNK_HEADER_SIZE, SEEK_SET);
         auto exifData = static_cast<uint8_t*>(malloc(chunk_size));
         if (fread(exifData, 1, chunk_size, infile) != chunk_size) {
           needBreak = true;
           break;
         }
-        is_orientation_marker(exifData, chunk_size, &decodeInfo.origin);
+        is_orientation_marker(exifData, chunk_size, &decodeInfo.orientation);
         if (chunk_size_padded <= webpFile._end - webpFile._start) {
           Skip(&webpFile, chunk_size_padded + CHUNK_HEADER_SIZE);
         } else {
@@ -296,7 +296,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
       }
     }
     if (needBreak) break;
-  } while (!foundOrigin && (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
+  } while (!foundOrientation && (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
   free(chunkHeader);
   fclose(infile);
   return decodeInfo;
@@ -327,16 +327,16 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
     }
   }
 
-  EncodedOrigin origin = EncodedOrigin::TopLeft;
+  Orientation orientation = Orientation::TopLeft;
   {
     WebPChunkIterator chunkIterator;
     if (WebPDemuxGetChunk(demux, "EXIF", 1, &chunkIterator)) {
-      is_orientation_marker(chunkIterator.chunk.bytes, chunkIterator.chunk.size, &origin);
+      is_orientation_marker(chunkIterator.chunk.bytes, chunkIterator.chunk.size, &orientation);
     }
     WebPDemuxReleaseChunkIterator(&chunkIterator);
   }
   WebPDemuxDelete(demux);
-  return {width, height, origin};
+  return {width, height, orientation};
 }
 
 }  // namespace tgfx

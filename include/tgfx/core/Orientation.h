@@ -24,7 +24,7 @@ namespace tgfx {
 /**
  * These values match the orientation www.exif.org/Exif2-2.PDF.
  */
-enum class EncodedOrigin {
+enum class Orientation {
   /**
    * Default
    */
@@ -60,9 +60,15 @@ enum class EncodedOrigin {
 };
 
 /**
- * Given an EncodedOrigin and the width and height of the source data, returns a matrix that
+ * Given an orientation and the width and height of the source data, returns a matrix that
  * transforms the source rectangle [0, 0, w, h] to a correctly oriented destination rectangle, with
  * the upper left corner still at [0, 0].
  */
-Matrix EncodedOriginToMatrix(EncodedOrigin origin, int width, int height);
+Matrix OrientationToMatrix(Orientation orientation, int width, int height);
+
+/**
+ * Return true if the orientation includes a 90-degree rotation, in which case, the width
+ * and height of the source data are swapped relative to a correctly oriented destination.
+ */
+bool OrientationSwapsWidthHeight(Orientation origin);
 }  // namespace tgfx

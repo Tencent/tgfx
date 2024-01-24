@@ -37,7 +37,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   if (image == nullptr) {
     return nullptr;
   }
-  return image->applyOrigin(codec->origin());
+  return image->makeOriented(codec->orientation());
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
@@ -46,7 +46,7 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
   if (image == nullptr) {
     return nullptr;
   }
-  return image->applyOrigin(codec->origin());
+  return image->makeOriented(codec->orientation());
 }
 
 std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
@@ -55,7 +55,7 @@ std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   if (image == nullptr) {
     return nullptr;
   }
-  return image->applyOrigin(codec->origin());
+  return image->makeOriented(codec->orientation());
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
@@ -142,23 +142,6 @@ std::shared_ptr<TextureProxy> Image::onLockTextureProxy(Context*, uint32_t) cons
   return nullptr;
 }
 
-std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
-  auto rect = subset;
-  rect.round();
-  auto bounds = Rect::MakeWH(width(), height());
-  if (bounds == rect) {
-    return weakThis.lock();
-  }
-  if (!bounds.contains(rect)) {
-    return nullptr;
-  }
-  return onMakeSubset(rect);
-}
-
-std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  return SubsetImage::MakeFrom(weakThis.lock(), EncodedOrigin::TopLeft, subset);
-}
-
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
   if (!isLazyGenerated()) {
     return weakThis.lock();
@@ -185,6 +168,34 @@ std::shared_ptr<Image> Image::makeMipMapped() const {
   return mipMapped;
 }
 
+std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
+  auto rect = subset;
+  rect.round();
+  auto bounds = Rect::MakeWH(width(), height());
+  if (bounds == rect) {
+    return weakThis.lock();
+  }
+  if (!bounds.contains(rect)) {
+    return nullptr;
+  }
+  return onMakeSubset(rect);
+}
+
+std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
+  return SubsetImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, subset);
+}
+
+std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
+  if (orientation == Orientation::TopLeft) {
+    return weakThis.lock();
+  }
+  return onMakeOriented(orientation);
+}
+
+std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
+  return OrientedImage::MakeFrom(weakThis.lock(), orientation);
+}
+
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                          int alphaStartY) {
   if (alphaStartX == 0 && alphaStartY == 0) {
@@ -195,17 +206,6 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 
 std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
   return nullptr;
-}
-
-std::shared_ptr<Image> Image::applyOrigin(EncodedOrigin origin) const {
-  if (origin == EncodedOrigin::TopLeft) {
-    return weakThis.lock();
-  }
-  return onApplyOrigin(origin);
-}
-
-std::shared_ptr<Image> Image::onApplyOrigin(EncodedOrigin origin) const {
-  return OrientedImage::MakeFrom(weakThis.lock(), origin);
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, TileMode tileModeX,

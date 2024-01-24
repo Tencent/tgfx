@@ -27,7 +27,7 @@ namespace tgfx {
  */
 class SubsetImage : public OrientedImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, EncodedOrigin origin,
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
                                          const Rect& bounds);
 
   int width() const override {
@@ -45,10 +45,10 @@ class SubsetImage : public OrientedImage {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  std::shared_ptr<Image> onApplyOrigin(EncodedOrigin newOrigin) const override;
+  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
 
   Matrix computeLocalMatrix() const override;
 
-  SubsetImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds);
+  SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds);
 };
 }  // namespace tgfx
