@@ -18,37 +18,43 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientedImage.h"
+#include "images/NestedImage.h"
 
 namespace tgfx {
 /**
- * An image that is a subset of another image.
+ * OrientImage wraps an existing image and applies an orientation transform.
  */
-class SubsetImage : public OrientedImage {
+class OrientedImage : public NestedImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, EncodedOrigin origin,
-                                         const Rect& bounds);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, EncodedOrigin origin);
 
-  int width() const override {
-    return static_cast<int>(bounds.width());
-  }
+  int width() const override;
 
-  int height() const override {
-    return static_cast<int>(bounds.height());
-  }
+  int height() const override;
 
  protected:
-  Rect bounds = Rect::MakeEmpty();
+  EncodedOrigin origin = EncodedOrigin::TopLeft;
+
+  OrientedImage(std::shared_ptr<Image> source, EncodedOrigin origin);
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
+
+  std::shared_ptr<Image> onMakeMipMapped() const override;
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
   std::shared_ptr<Image> onApplyOrigin(EncodedOrigin newOrigin) const override;
 
-  Matrix computeLocalMatrix() const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* localMatrix,
+                                                         uint32_t renderFlags) override;
 
-  SubsetImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds);
+  virtual Matrix computeLocalMatrix() const;
+
+  EncodedOrigin concatOrigin(EncodedOrigin newOrigin) const;
+
+  ISize getOrientedSize() const;
 };
 }  // namespace tgfx

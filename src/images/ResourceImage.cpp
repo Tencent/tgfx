@@ -16,39 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientedImage.h"
+#include "ResourceImage.h"
+#include "images/RGBAAAImage.h"
 
 namespace tgfx {
-/**
- * An image that is a subset of another image.
- */
-class SubsetImage : public OrientedImage {
- public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, EncodedOrigin origin,
-                                         const Rect& bounds);
 
-  int width() const override {
-    return static_cast<int>(bounds.width());
+ResourceImage::ResourceImage(ResourceKey resourceKey) : resourceKey(std::move(resourceKey)) {
+}
+
+std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int displayHeight,
+                                                   int alphaStartX, int alphaStartY) const {
+  if (isAlphaOnly()) {
+    return nullptr;
   }
-
-  int height() const override {
-    return static_cast<int>(bounds.height());
-  }
-
- protected:
-  Rect bounds = Rect::MakeEmpty();
-
-  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
-
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
-
-  std::shared_ptr<Image> onApplyOrigin(EncodedOrigin newOrigin) const override;
-
-  Matrix computeLocalMatrix() const override;
-
-  SubsetImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds);
-};
+  return RGBAAAImage::MakeFrom(weakThis.lock(), displayWidth, displayHeight, alphaStartX,
+                               alphaStartY);
+}
 }  // namespace tgfx

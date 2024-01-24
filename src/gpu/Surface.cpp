@@ -20,6 +20,7 @@
 #include "DrawingManager.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
+#include "images/TextureImage.h"
 #include "utils/Log.h"
 #include "utils/PixelFormatUtil.h"
 
@@ -172,12 +173,12 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   drawingManager->addTextureResolveTask(renderTargetProxy);
   auto textureProxy = renderTargetProxy->getTextureProxy();
   if (textureProxy != nullptr && !textureProxy->externallyOwned()) {
-    cachedImage = Image::MakeFrom(std::move(textureProxy));
+    cachedImage = TextureImage::MakeFrom(std::move(textureProxy));
   } else {
     auto textureCopy = renderTargetProxy->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTargetProxy, textureCopy,
                                             Rect::MakeWH(width(), height()), Point::Zero());
-    cachedImage = Image::MakeFrom(std::move(textureCopy));
+    cachedImage = TextureImage::MakeFrom(std::move(textureCopy));
   }
   return cachedImage;
 }

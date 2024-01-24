@@ -16,31 +16,44 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EncodedSource.h"
-#include "AsyncSource.h"
+#include "GeneratorImage.h"
+#include "DecoderImage.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-EncodedSource::EncodedSource(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
-                             bool mipMapped)
-    : ImageSource(std::move(resourceKey)), generator(std::move(generator)), mipMapped(mipMapped) {
+std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                                bool mipMapped) {
+  if (generator == nullptr) {
+    return nullptr;
+  }
+  auto image = std::shared_ptr<GeneratorImage>(
+      new GeneratorImage(ResourceKey::NewWeak(), std::move(generator), mipMapped));
+  image->weakThis = image;
+  return image;
 }
 
-std::shared_ptr<ImageSource> EncodedSource::onMakeDecoded(Context* context) const {
+GeneratorImage::GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
+                               bool mipMapped)
+    : ResourceImage(std::move(resourceKey)), generator(std::move(generator)), mipMapped(mipMapped) {
+}
+
+std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context) const {
   if (context != nullptr) {
     if (context->proxyProvider()->hasResourceProxy(resourceKey) ||
         context->resourceCache()->hasResource(resourceKey)) {
       return nullptr;
     }
   }
-  return std::shared_ptr<AsyncSource>(new AsyncSource(resourceKey, generator, mipMapped));
+  auto decoder = ImageDecoder::MakeFrom(generator, !mipMapped, true);
+  return DecoderImage::MakeFrom(resourceKey, std::move(decoder), mipMapped);
 }
 
-std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
-  return std::shared_ptr<EncodedSource>(new EncodedSource(ResourceKey::NewWeak(), generator, true));
+std::shared_ptr<Image> GeneratorImage::onMakeMipMapped() const {
+  return GeneratorImage::MakeFrom(generator, true);
 }
 
-std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context,
-                                                                uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(Context* context,
+                                                                 uint32_t renderFlags) const {
   return context->proxyProvider()->createTextureProxy(resourceKey, generator, mipMapped,
                                                       renderFlags);
 }

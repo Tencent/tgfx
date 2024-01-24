@@ -18,31 +18,23 @@
 
 #pragma once
 
-#include "EncodedSource.h"
-#include "ImageDecoder.h"
+#include "gpu/Resource.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
- * AsyncSource wraps an ImageGenerator and schedules an asynchronous decoding task immediately.
+ * The base class for all images that contains a resource key and can be cached as a GPU resource.
+ * The corresponding resource cache is immediately marked as expired if all associated images are
+ * released, which becomes recyclable and will be purged at some point in the future.
  */
-class AsyncSource : public EncodedSource {
+class ResourceImage : public Image {
  public:
-  bool isLazyGenerated() const override {
-    return false;
-  }
+  explicit ResourceImage(ResourceKey resourceKey);
 
  protected:
-  std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const override;
+  ResourceKey resourceKey = {};
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
-                                                   uint32_t renderFlags) const override;
-
- private:
-  std::shared_ptr<ImageDecoder> imageDecoder = nullptr;
-
-  explicit AsyncSource(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
-                       bool mipMapped = false);
-
-  friend class EncodedSource;
+  std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                      int alphaStartY) const override;
 };
 }  // namespace tgfx

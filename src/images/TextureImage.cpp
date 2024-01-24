@@ -16,15 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureSource.h"
+#include "TextureImage.h"
 
 namespace tgfx {
-
-TextureSource::TextureSource(std::shared_ptr<TextureProxy> textureProxy)
-    : ImageSource(textureProxy->getResourceKey()), textureProxy(std::move(textureProxy)) {
+std::shared_ptr<Image> TextureImage::MakeFrom(std::shared_ptr<TextureProxy> textureProxy) {
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  auto textureImage = std::shared_ptr<TextureImage>(new TextureImage(std::move(textureProxy)));
+  textureImage->weakThis = textureImage;
+  return textureImage;
 }
 
-BackendTexture TextureSource::getBackendTexture(Context* context) const {
+TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy)
+    : ResourceImage(textureProxy->getResourceKey()), textureProxy(std::move(textureProxy)) {
+}
+
+BackendTexture TextureImage::getBackendTexture(Context* context) const {
   if (context == nullptr) {
     return {};
   }
@@ -36,14 +44,14 @@ BackendTexture TextureSource::getBackendTexture(Context* context) const {
   return texture->getBackendTexture();
 }
 
-std::shared_ptr<ImageSource> TextureSource::makeTextureSource(Context* context) const {
+std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   if (textureProxy->getContext() == context) {
-    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+    return std::static_pointer_cast<Image>(weakThis.lock());
   }
   return nullptr;
 }
 
-std::shared_ptr<TextureProxy> TextureSource::onMakeTextureProxy(Context* context, uint32_t) const {
+std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(Context* context, uint32_t) const {
   if (textureProxy->getContext() != context) {
     return nullptr;
   }

@@ -17,13 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/Texture.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "images/ImageSource.h"
-#include "images/RGBAAAImage.h"
+#include "images/BufferImage.h"
+#include "images/GeneratorImage.h"
 #include "images/RasterBuffer.h"
 #include "images/RasterGenerator.h"
 #include "images/SubsetImage.h"
+#include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Surface.h"
@@ -31,30 +33,33 @@
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   auto codec = ImageCodec::MakeFrom(filePath);
-  if (codec == nullptr) {
+  auto image = MakeFrom(codec);
+  if (image == nullptr) {
     return nullptr;
   }
-  auto source = ImageSource::MakeFrom(codec);
-  return MakeFrom(source, codec->origin());
+  return image->applyOrigin(codec->origin());
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
   auto codec = ImageCodec::MakeFrom(std::move(encodedData));
-  if (codec == nullptr) {
+  auto image = MakeFrom(codec);
+  if (image == nullptr) {
     return nullptr;
   }
-  auto source = ImageSource::MakeFrom(codec);
-  return MakeFrom(source, codec->origin());
+  return image->applyOrigin(codec->origin());
 }
 
 std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   auto codec = ImageCodec::MakeFrom(nativeImage);
-  return MakeFrom(std::move(codec));
+  auto image = MakeFrom(codec);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return image->applyOrigin(codec->origin());
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
-  auto source = ImageSource::MakeFrom(std::move(generator));
-  return MakeFrom(std::move(source));
+  return GeneratorImage::MakeFrom(std::move(generator));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
@@ -86,8 +91,7 @@ std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColo
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
-  auto source = ImageSource::MakeFrom(std::move(imageBuffer));
-  return MakeFrom(std::move(source));
+  return BufferImage::MakeFrom(std::move(imageBuffer));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
@@ -96,7 +100,7 @@ std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& b
     return nullptr;
   }
   auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, false);
-  return MakeFrom(std::move(textureProxy));
+  return TextureImage::MakeFrom(std::move(textureProxy));
 }
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
@@ -105,66 +109,25 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
     return nullptr;
   }
   auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, true);
-  return MakeFrom(std::move(textureProxy));
-}
-
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<TextureProxy> textureProxy) {
-  auto source = ImageSource::MakeFrom(std::move(textureProxy));
-  return MakeFrom(std::move(source));
-}
-
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageSource> source, EncodedOrigin origin) {
-  if (source == nullptr) {
-    return nullptr;
-  }
-  std::shared_ptr<Image> image = nullptr;
-  if (origin != EncodedOrigin::TopLeft) {
-    image = std::make_shared<SubsetImage>(std::move(source), origin);
-  } else {
-    image = std::shared_ptr<Image>(new Image(std::move(source)));
-  }
-  image->weakThis = image;
-  return image;
-}
-
-Image::Image(std::shared_ptr<ImageSource> source) : source(std::move(source)) {
-}
-
-int Image::width() const {
-  return source->width();
-}
-
-int Image::height() const {
-  return source->height();
-}
-
-bool Image::hasMipmaps() const {
-  return source->hasMipmaps();
-}
-
-bool Image::isAlphaOnly() const {
-  return source->isAlphaOnly();
+  return TextureImage::MakeFrom(std::move(textureProxy));
 }
 
 bool Image::isLazyGenerated() const {
-  return source->isLazyGenerated();
+  return false;
 }
 
 bool Image::isTextureBacked() const {
-  return source->isTextureBacked();
+  return false;
 }
 
-BackendTexture Image::getBackendTexture(Context* context) const {
-  return source->getBackendTexture(context);
+BackendTexture Image::getBackendTexture(Context*) const {
+  return {};
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
-  auto textureSource = onMakeTextureSource(context);
-  if (textureSource == source) {
-    return weakThis.lock();
-  }
-  if (textureSource != nullptr) {
-    return cloneWithSource(std::move(textureSource));
+  auto proxy = onLockTextureProxy(context, 0);
+  if (proxy != nullptr) {
+    return TextureImage::MakeFrom(std::move(proxy));
   }
   auto surface = Surface::Make(context, width(), height(), isAlphaOnly(), 1, hasMipmaps());
   if (surface == nullptr) {
@@ -175,12 +138,8 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   return surface->makeImageSnapshot();
 }
 
-std::shared_ptr<ImageSource> Image::onMakeTextureSource(Context* context) const {
-  return source->makeTextureSource(context);
-}
-
-std::shared_ptr<Image> Image::onCloneWith(std::shared_ptr<ImageSource> newSource) const {
-  return std::shared_ptr<Image>(new Image(std::move(newSource)));
+std::shared_ptr<TextureProxy> Image::onLockTextureProxy(Context*, uint32_t) const {
+  return nullptr;
 }
 
 std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
@@ -193,29 +152,37 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   if (!bounds.contains(rect)) {
     return nullptr;
   }
-  auto subsetImage = onMakeSubset(rect);
-  subsetImage->weakThis = subsetImage;
-  return subsetImage;
+  return onMakeSubset(rect);
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  return std::make_shared<SubsetImage>(source, subset);
+  return SubsetImage::MakeFrom(weakThis.lock(), EncodedOrigin::TopLeft, subset);
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
-  auto decodedSource = source->makeDecoded(context);
-  if (decodedSource == source) {
+  if (!isLazyGenerated()) {
     return weakThis.lock();
   }
-  return cloneWithSource(std::move(decodedSource));
+  auto decoded = onMakeDecoded(context);
+  if (decoded == nullptr) {
+    return weakThis.lock();
+  }
+  return decoded;
+}
+
+std::shared_ptr<Image> Image::onMakeDecoded(Context*) const {
+  return nullptr;
 }
 
 std::shared_ptr<Image> Image::makeMipMapped() const {
-  auto mipMappedSource = source->makeMipMapped();
-  if (mipMappedSource == source) {
+  if (hasMipmaps()) {
     return weakThis.lock();
   }
-  return cloneWithSource(std::move(mipMappedSource));
+  auto mipMapped = onMakeMipMapped();
+  if (mipMapped == nullptr) {
+    return weakThis.lock();
+  }
+  return mipMapped;
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
@@ -223,54 +190,33 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
   if (alphaStartX == 0 && alphaStartY == 0) {
     return makeSubset(Rect::MakeWH(displayWidth, displayHeight));
   }
-  auto image = onMakeRGBAAA(displayWidth, displayHeight, alphaStartX, alphaStartY);
-  if (image != nullptr) {
-    image->weakThis = image;
-  }
-  return image;
+  return onMakeRGBAAA(displayWidth, displayHeight, alphaStartX, alphaStartY);
 }
 
-std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
-                                           int alphaStartY) const {
-  if (isAlphaOnly() || alphaStartX + displayWidth > source->width() ||
-      alphaStartY + displayHeight > source->height()) {
-    return nullptr;
-  }
-  return std::shared_ptr<Image>(
-      new RGBAAAImage(source, displayWidth, displayHeight, alphaStartX, alphaStartY));
+std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
+  return nullptr;
 }
 
 std::shared_ptr<Image> Image::applyOrigin(EncodedOrigin origin) const {
   if (origin == EncodedOrigin::TopLeft) {
     return weakThis.lock();
   }
-  auto image = onApplyOrigin(origin);
-  if (image != nullptr) {
-    image->weakThis = image;
+  return onApplyOrigin(origin);
+}
+
+std::shared_ptr<Image> Image::onApplyOrigin(EncodedOrigin origin) const {
+  return OrientedImage::MakeFrom(weakThis.lock(), origin);
+}
+
+std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, TileMode tileModeX,
+                                                              TileMode tileModeY,
+                                                              const SamplingOptions& sampling,
+                                                              const Matrix* localMatrix,
+                                                              uint32_t renderFlags) {
+  if (context == nullptr) {
+    return nullptr;
   }
-  return image;
-}
-
-std::shared_ptr<Image> Image::onApplyOrigin(EncodedOrigin encodedOrigin) const {
-  return std::make_shared<SubsetImage>(std::move(source), encodedOrigin);
-}
-
-std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(
-    Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
-    const SamplingOptions& sampling, const Matrix* localMatrix) {
-  return TiledTextureEffect::Make(source->lockTextureProxy(context, renderFlags), tileModeX,
-                                  tileModeY, sampling, localMatrix);
-}
-
-std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
-                                                              uint32_t renderFlags,
-                                                              const SamplingOptions& sampling) {
-  return asFragmentProcessor(context, renderFlags, TileMode::Clamp, TileMode::Clamp, sampling);
-}
-
-std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {
-  auto newImage = onCloneWith(std::move(newSource));
-  newImage->weakThis = newImage;
-  return newImage;
+  auto proxy = onLockTextureProxy(context, renderFlags);
+  return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, localMatrix);
 }
 }  // namespace tgfx

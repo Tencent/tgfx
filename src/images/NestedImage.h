@@ -18,50 +18,41 @@
 
 #pragma once
 
-#include "ImageSource.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
- * EncodedSource wraps an ImageGenerator that can generate ImageBuffers on demand.
+ * The base class for all images that have a source image and apply various transformations.
  */
-class EncodedSource : public ImageSource {
+class NestedImage : public Image {
  public:
+  explicit NestedImage(std::shared_ptr<Image> source);
+
   int width() const override {
-    return generator->width();
+    return source->width();
   }
 
   int height() const override {
-    return generator->height();
+    return source->height();
   }
 
   bool hasMipmaps() const override {
-    return mipMapped;
-  }
-
-  bool isAlphaOnly() const override {
-    return generator->isAlphaOnly();
+    return source->hasMipmaps();
   }
 
   bool isLazyGenerated() const override {
-    return true;
+    return source->isLazyGenerated();
+  }
+
+  bool isAlphaOnly() const override {
+    return source->isAlphaOnly();
   }
 
  protected:
-  std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const override;
+  std::shared_ptr<Image> source = nullptr;
 
-  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
+  std::shared_ptr<Image> onMakeDecoded(Context* context) const override;
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
-                                                   uint32_t renderFlags) const override;
-
- protected:
-  std::shared_ptr<ImageGenerator> generator = nullptr;
-  bool mipMapped = false;
-
-  EncodedSource(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
-                bool mipMapped = false);
-
-  friend class AsyncSource;
-  friend class ImageSource;
+  virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const = 0;
 };
 }  // namespace tgfx

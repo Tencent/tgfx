@@ -88,8 +88,9 @@ void BlurImageFilter::draw(Surface* toSurface, std::shared_ptr<Image> image, boo
   if (imageBounds) {
     localMatrix.postTranslate(imageBounds->x(), imageBounds->y());
   }
-  auto processor = image->asFragmentProcessor(
-      toSurface->getContext(), toSurface->options()->renderFlags(), mode, mode, SamplingOptions());
+  auto processor =
+      FragmentProcessor::MakeImage(toSurface->getContext(), image, mode, mode, SamplingOptions(),
+                                   nullptr, toSurface->options()->renderFlags());
   drawContext->fillRectWithFP(
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,

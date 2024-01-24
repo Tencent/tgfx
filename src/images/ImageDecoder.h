@@ -22,7 +22,7 @@
 
 namespace tgfx {
 /**
- * ImageDecoder is a task that decodes an image to ImageBuffer.
+ * ImageDecoder is a task that decodes an encoded image to an ImageBuffer.
  */
 class ImageDecoder {
  public:

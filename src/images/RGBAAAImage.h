@@ -23,25 +23,22 @@
 namespace tgfx {
 class RGBAAAImage : public SubsetImage {
  public:
-  RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
-              int alphaStartX, int alphaStartY);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, int displayWidth,
+                                         int displayHeight, int alphaStartX, int alphaStartY);
 
  protected:
-  std::shared_ptr<SubsetImage> onCloneWith(const Rect& newBounds,
-                                           EncodedOrigin newOrigin) const override;
+  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const override;
-
-  std::shared_ptr<ImageSource> onMakeTextureSource(Context* context) const override;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
-      const SamplingOptions& sampling, const Matrix* localMatrix = nullptr) override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* localMatrix,
+                                                         uint32_t renderFlags) override;
 
  private:
   Point alphaStart = Point::Zero();
 
-  RGBAAAImage(std::shared_ptr<ImageSource> source, const Rect& bounds, EncodedOrigin origin,
+  RGBAAAImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds,
               const Point& alphaStart);
 };
 }  // namespace tgfx

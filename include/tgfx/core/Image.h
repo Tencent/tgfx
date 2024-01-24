@@ -31,19 +31,17 @@
 #include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
-class ImageSource;
 class Context;
 class TextureProxy;
 class FragmentProcessor;
+class ImageCodec;
 
 /**
- * Image describes a two-dimensional array of pixels to draw. The pixels may be decoded in an
- * ImageBuffer, encoded in a Picture or compressed data stream, or located in GPU memory as a GPU
- * texture. The Image class is safe across threads and cannot be modified after it is created. The
- * width and height of an Image are always greater than zero. Creating an Image with zero width or
- * height returns nullptr. The corresponding GPU cache is immediately marked as expired if all
- * Images with the same ImageSource are released, which becomes recyclable and will be purged at
- * some point in the future.
+ * The Image class describes a two-dimensional array of pixels to draw. The pixels may be decoded in
+ * an ImageBuffer, encoded in an ImageGenerator, or located in GPU memory as a GPU texture. The
+ * Image class is safe across threads and cannot be modified after it is created. The width and
+ * height of an Image are always greater than zero. Creating an Image with zero width or height
+ * returns nullptr.
  */
 class Image {
  public:
@@ -145,51 +143,51 @@ class Image {
   /**
    * Returns the width of the Image.
    */
-  virtual int width() const;
+  virtual int width() const = 0;
 
   /**
    * Returns pixel row count.
    */
-  virtual int height() const;
+  virtual int height() const = 0;
 
   /**
    * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
    * defined by ColorType::ALPHA_8.
    */
-  bool isAlphaOnly() const;
-
-  /**
-   * Returns true if Image is backed by an image generator or other services that create their
-   * pixels on-demand.
-   */
-  bool isLazyGenerated() const;
-
-  /**
-   * Returns true if the Image was created from a GPU texture.
-   */
-  bool isTextureBacked() const;
+  virtual bool isAlphaOnly() const = 0;
 
   /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipMapped() method,
    * which may be ignored if the GPU or the associated image source does not support mipmaps.
    */
-  bool hasMipmaps() const;
+  virtual bool hasMipmaps() const = 0;
+
+  /**
+   * Returns true if Image is backed by an image generator or other services that create their
+   * pixels on-demand.
+   */
+  virtual bool isLazyGenerated() const;
+
+  /**
+   * Returns true if the Image was created from a GPU texture.
+   */
+  virtual bool isTextureBacked() const;
 
   /**
    * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
    * not backed by a Texture.
    */
-  BackendTexture getBackendTexture(Context* context) const;
+  virtual BackendTexture getBackendTexture(Context* context) const;
 
   /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a
    * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
    * creates one immediately. Returns the original Image if the Image is texture backed and the
    * context is compatible with the backing GPU texture. Otherwise, returns nullptr. It's safe to
-   * release the original Image to reduce CPU memory usage afterward, as the returned Image only
-   * contains a GPU texture.
+   * release the original Image to reduce CPU memory usage afterward, as the returned Image holds
+   * a strong reference to the texture cache.
    */
-  std::shared_ptr<Image> makeTextureImage(Context* context) const;
+  virtual std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
    * Returns subset of Image. The subset must be fully contained by Image dimensions. The returned
@@ -233,40 +231,26 @@ class Image {
 
  protected:
   std::weak_ptr<Image> weakThis;
-  std::shared_ptr<ImageSource> source = nullptr;
 
-  explicit Image(std::shared_ptr<ImageSource> source);
-
-  virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const;
-
-  virtual std::shared_ptr<ImageSource> onMakeTextureSource(Context* context) const;
+  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
+                                                           uint32_t renderFlags) const;
 
   virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
+
+  virtual std::shared_ptr<Image> onMakeDecoded(Context* context) const;
+
+  virtual std::shared_ptr<Image> onMakeMipMapped() const = 0;
 
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
 
-  virtual std::shared_ptr<Image> onApplyOrigin(EncodedOrigin encodedOrigin) const;
+  virtual std::shared_ptr<Image> onApplyOrigin(EncodedOrigin origin) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
-      const SamplingOptions& sampling, const Matrix* localMatrix = nullptr);
+      Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+      const Matrix* localMatrix, uint32_t renderFlags);
 
- private:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, uint32_t renderFlags,
-                                                         const SamplingOptions& sampling);
-
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<TextureProxy> textureProxy);
-
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageSource> source,
-                                         EncodedOrigin origin = EncodedOrigin::TopLeft);
-
-  std::shared_ptr<Image> cloneWithSource(std::shared_ptr<ImageSource> newSource) const;
-
-  friend class ImageShader;
-  friend class BlurImageFilter;
-  friend class Canvas;
-  friend class Surface;
-  friend class Mask;
+  friend class FragmentProcessor;
+  friend class RGBAAAImage;
 };
 }  // namespace tgfx
