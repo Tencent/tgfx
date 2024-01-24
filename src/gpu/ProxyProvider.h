@@ -19,10 +19,10 @@
 #pragma once
 
 #include "core/DataProvider.h"
+#include "core/ImageDecoder.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "images/ImageDecoder.h"
 #include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {

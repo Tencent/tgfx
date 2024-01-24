@@ -27,7 +27,7 @@ namespace tgfx {
 class ImageDecoder {
  public:
   /*
-   * Create an ImageDecoder wraps the existing ImageBuffer.
+   * Create an ImageDecoder wraps a decoded ImageBuffer.
    */
   static std::shared_ptr<ImageDecoder> Wrap(std::shared_ptr<ImageBuffer> imageBuffer);
 

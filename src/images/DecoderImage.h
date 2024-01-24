@@ -19,7 +19,7 @@
 #pragma once
 
 #include "GeneratorImage.h"
-#include "ImageDecoder.h"
+#include "core/ImageDecoder.h"
 
 namespace tgfx {
 /**

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "ResourceTask.h"
-#include "images/ImageDecoder.h"
+#include "core/ImageDecoder.h"
 #include "tgfx/gpu/ImageOrigin.h"
 
 namespace tgfx {
