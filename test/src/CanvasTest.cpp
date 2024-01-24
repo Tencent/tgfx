@@ -620,6 +620,10 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
   EXPECT_FALSE(image->hasMipmaps());
+  auto rotatedImage = image->applyOrigin(EncodedOrigin::RightTop);
+  EXPECT_NE(rotatedImage, image);
+  rotatedImage = rotatedImage->applyOrigin(EncodedOrigin::LeftBottom);
+  EXPECT_EQ(rotatedImage, image);
   canvas->drawImage(image);
   auto decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);

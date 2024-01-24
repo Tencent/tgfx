@@ -18,37 +18,43 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientedImage.h"
+#include "ResourceImage.h"
 
 namespace tgfx {
 /**
- * An image that is a subset of another image.
+ * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
  */
-class SubsetImage : public OrientedImage {
+class BufferImage : public ResourceImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, EncodedOrigin origin,
-                                         const Rect& bounds);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> buffer,
+                                         bool mipMapped = false);
 
   int width() const override {
-    return static_cast<int>(bounds.width());
+    return imageBuffer->width();
   }
 
   int height() const override {
-    return static_cast<int>(bounds.height());
+    return imageBuffer->height();
+  }
+
+  bool hasMipmaps() const override {
+    return mipMapped;
+  }
+
+  bool isAlphaOnly() const override {
+    return imageBuffer->isAlphaOnly();
   }
 
  protected:
-  Rect bounds = Rect::MakeEmpty();
+  std::shared_ptr<Image> onMakeMipMapped() const override;
 
-  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
+                                                   uint32_t renderFlags) const override;
 
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
+ private:
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  bool mipMapped = false;
 
-  std::shared_ptr<Image> onApplyOrigin(EncodedOrigin newOrigin) const override;
-
-  Matrix computeLocalMatrix() const override;
-
-  SubsetImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds);
+  BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer, bool mipMapped = false);
 };
 }  // namespace tgfx

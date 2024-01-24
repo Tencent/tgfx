@@ -17,139 +17,45 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
-#include "ImageSource.h"
 
 namespace tgfx {
-static const auto TopLeftMatrix = Matrix::I();
-static const auto TopRightMatrix = Matrix::MakeAll(-1, 0, 1, 0, 1, 0);
-static const auto BottomRightMatrix = Matrix::MakeAll(-1, 0, 1, 0, -1, 1);
-static const auto BottomLeftMatrix = Matrix::MakeAll(1, 0, 0, 0, -1, 1);
-static const auto LeftTopMatrix = Matrix::MakeAll(0, 1, 0, 1, 0, 0);
-static const auto RightTopMatrix = Matrix::MakeAll(0, -1, 1, 1, 0, 0);
-static const auto RightBottomMatrix = Matrix::MakeAll(0, -1, 1, -1, 0, 1);
-static const auto LeftBottomMatrix = Matrix::MakeAll(0, 1, 0, -1, 0, 1);
-
-static Matrix OriginToMatrix(EncodedOrigin origin) {
-  switch (origin) {
-    case EncodedOrigin::TopRight:
-      return TopRightMatrix;
-    case EncodedOrigin::BottomRight:
-      return BottomRightMatrix;
-    case EncodedOrigin::BottomLeft:
-      return BottomLeftMatrix;
-    case EncodedOrigin::LeftTop:
-      return LeftTopMatrix;
-    case EncodedOrigin::RightTop:
-      return RightTopMatrix;
-    case EncodedOrigin::RightBottom:
-      return RightBottomMatrix;
-    case EncodedOrigin::LeftBottom:
-      return LeftBottomMatrix;
-    default:
-      break;
+std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, EncodedOrigin origin,
+                                             const Rect& bounds) {
+  if (source == nullptr || bounds.isEmpty()) {
+    return nullptr;
   }
-  return TopLeftMatrix;
+  auto image = std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), origin, bounds));
+  image->weakThis = image;
+  return image;
 }
 
-static EncodedOrigin ConcatOrigin(EncodedOrigin oldOrigin, EncodedOrigin newOrigin) {
-  auto oldMatrix = OriginToMatrix(oldOrigin);
-  auto newMatrix = OriginToMatrix(newOrigin);
-  oldMatrix.postConcat(newMatrix);
-  if (oldMatrix == TopRightMatrix) {
-    return EncodedOrigin::TopRight;
-  }
-  if (oldMatrix == BottomRightMatrix) {
-    return EncodedOrigin::BottomRight;
-  }
-  if (oldMatrix == BottomLeftMatrix) {
-    return EncodedOrigin::BottomLeft;
-  }
-  if (oldMatrix == LeftTopMatrix) {
-    return EncodedOrigin::LeftTop;
-  }
-  if (oldMatrix == RightTopMatrix) {
-    return EncodedOrigin::RightTop;
-  }
-  if (oldMatrix == RightBottomMatrix) {
-    return EncodedOrigin::RightBottom;
-  }
-  if (oldMatrix == LeftBottomMatrix) {
-    return EncodedOrigin::LeftBottom;
-  }
-  return EncodedOrigin::TopLeft;
+SubsetImage::SubsetImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds)
+    : OrientedImage(std::move(source), origin), bounds(bounds) {
 }
 
-SubsetImage::SubsetImage(std::shared_ptr<ImageSource> source, const Rect& bounds)
-    : Image(std::move(source)), bounds(bounds) {
-}
-
-SubsetImage::SubsetImage(std::shared_ptr<ImageSource> imageSource, EncodedOrigin origin)
-    : Image(std::move(imageSource)), origin(origin) {
-  auto size = getSourceSize();
-  bounds = Rect::MakeWH(size.width, size.height);
-}
-
-SubsetImage::SubsetImage(std::shared_ptr<ImageSource> source, const Rect& bounds,
-                         EncodedOrigin origin)
-    : Image(std::move(source)), bounds(bounds), origin(origin) {
-}
-
-std::shared_ptr<SubsetImage> SubsetImage::onCloneWith(const Rect& newBounds,
-                                                      EncodedOrigin newOrigin) const {
-  return std::shared_ptr<SubsetImage>(new SubsetImage(source, newBounds, newOrigin));
-}
-
-std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<ImageSource> newSource) const {
-  return std::shared_ptr<SubsetImage>(new SubsetImage(std::move(newSource), bounds, origin));
-}
-
-std::shared_ptr<ImageSource> SubsetImage::onMakeTextureSource(Context* context) const {
-  auto size = getSourceSize();
-  Rect sourceBounds = Rect::MakeWH(size.width, size.height);
-  if (bounds == sourceBounds) {
-    return source->makeTextureSource(context);
-  }
-  return nullptr;
+std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<Image> newSource) const {
+  return SubsetImage::MakeFrom(std::move(newSource), origin, bounds);
 }
 
 std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset;
   newBounds.offset(bounds.x(), bounds.y());
-  return onCloneWith(newBounds, origin);
+  return SubsetImage::MakeFrom(source, origin, newBounds);
 }
 
 std::shared_ptr<Image> SubsetImage::onApplyOrigin(EncodedOrigin encodedOrigin) const {
-  auto size = getSourceSize();
-  auto matrix = EncodedOriginToMatrix(encodedOrigin, size.width, size.height);
+  auto newOrigin = concatOrigin(encodedOrigin);
+  auto orientedWidth = OrientedImage::width();
+  auto orientedHeight = OrientedImage::height();
+  auto matrix = EncodedOriginToMatrix(encodedOrigin, orientedWidth, orientedHeight);
   auto newBounds = matrix.mapRect(bounds);
-  auto newOrigin = ConcatOrigin(origin, encodedOrigin);
-  return onCloneWith(newBounds, newOrigin);
+  return SubsetImage::MakeFrom(source, newOrigin, newBounds);
 }
 
-Matrix SubsetImage::getTotalMatrix(const Matrix* localMatrix) const {
+Matrix SubsetImage::computeLocalMatrix() const {
   auto matrix = EncodedOriginToMatrix(origin, source->width(), source->height());
   matrix.postTranslate(-bounds.x(), -bounds.y());
   matrix.invert(&matrix);
-  if (localMatrix != nullptr) {
-    matrix.preConcat(*localMatrix);
-  }
   return matrix;
-}
-
-std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(
-    Context* context, uint32_t renderFlags, TileMode tileModeX, TileMode tileModeY,
-    const SamplingOptions& sampling, const Matrix* localMatrix) {
-  auto matrix = getTotalMatrix(localMatrix);
-  return Image::asFragmentProcessor(context, renderFlags, tileModeX, tileModeY, sampling, &matrix);
-}
-
-ISize SubsetImage::getSourceSize() const {
-  auto width = source->width();
-  auto height = source->height();
-  if (origin == EncodedOrigin::LeftTop || origin == EncodedOrigin::RightTop ||
-      origin == EncodedOrigin::RightBottom || origin == EncodedOrigin::LeftBottom) {
-    std::swap(width, height);
-  }
-  return ISize::Make(width, height);
 }
 }  // namespace tgfx

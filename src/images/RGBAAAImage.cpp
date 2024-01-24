@@ -17,41 +17,48 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAAImage.h"
-#include "ImageSource.h"
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-RGBAAAImage::RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
-                         int alphaStartX, int alphaStartY)
-    : SubsetImage(std::move(source), Rect::MakeWH(displayWidth, displayHeight)),
-      alphaStart(Point::Make(alphaStartX, alphaStartY)) {
+std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
+                                             int displayHeight, int alphaStartX, int alphaStartY) {
+  if (source == nullptr || alphaStartX + displayWidth > source->width() ||
+      alphaStartY + displayHeight > source->height()) {
+    return nullptr;
+  }
+  auto bounds = Rect::MakeWH(displayWidth, displayHeight);
+  auto alphaStart = Point::Make(alphaStartX, alphaStartY);
+  auto image = std::shared_ptr<RGBAAAImage>(
+      new RGBAAAImage(std::move(source), EncodedOrigin::TopLeft, bounds, alphaStart));
+  image->weakThis = image;
+  return image;
 }
 
-RGBAAAImage::RGBAAAImage(std::shared_ptr<ImageSource> source, const Rect& bounds,
-                         EncodedOrigin origin, const Point& alphaStart)
-    : SubsetImage(std::move(source), bounds, origin), alphaStart(alphaStart) {
+RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, EncodedOrigin origin, const Rect& bounds,
+                         const Point& alphaStart)
+    : SubsetImage(std::move(source), origin, bounds), alphaStart(alphaStart) {
 }
 
-std::shared_ptr<SubsetImage> RGBAAAImage::onCloneWith(const Rect& newBounds,
-                                                      EncodedOrigin newOrigin) const {
-  return std::shared_ptr<RGBAAAImage>(new RGBAAAImage(source, newBounds, newOrigin, alphaStart));
+std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource) const {
+  auto image = std::shared_ptr<RGBAAAImage>(
+      new RGBAAAImage(std::move(newSource), origin, bounds, alphaStart));
+  image->weakThis = image;
+  return image;
 }
 
-std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<ImageSource> newSource) const {
-  return std::shared_ptr<Image>(new RGBAAAImage(std::move(newSource), bounds, origin, alphaStart));
-}
-
-std::shared_ptr<ImageSource> RGBAAAImage::onMakeTextureSource(Context*) const {
-  return nullptr;
-}
-
-std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context,
-                                                                    uint32_t renderFlags, TileMode,
+std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context, TileMode,
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,
-                                                                    const Matrix* localMatrix) {
-  auto matrix = getTotalMatrix(localMatrix);
-  return TextureEffect::MakeRGBAAA(source->lockTextureProxy(context, renderFlags), sampling,
-                                   alphaStart, &matrix);
+                                                                    const Matrix* localMatrix,
+                                                                    uint32_t renderFlags) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto proxy = source->onLockTextureProxy(context, renderFlags);
+  auto totalMatrix = computeLocalMatrix();
+  if (localMatrix != nullptr) {
+    totalMatrix.preConcat(*localMatrix);
+  }
+  return TextureEffect::MakeRGBAAA(std::move(proxy), sampling, alphaStart, &totalMatrix);
 }
 }  // namespace tgfx

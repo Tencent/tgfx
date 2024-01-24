@@ -452,8 +452,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor =
-      image->asFragmentProcessor(getContext(), surface->options()->renderFlags(), sampling);
+  auto processor = FragmentProcessor::MakeImage(getContext(), image, sampling,
+                                                surface->options()->renderFlags());
   if (processor == nullptr) {
     return;
   }
@@ -675,8 +675,8 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     return;
   }
   for (auto& rectOp : ops) {
-    auto processor =
-        atlas->asFragmentProcessor(getContext(), surface->options()->renderFlags(), sampling);
+    auto processor = FragmentProcessor::MakeImage(getContext(), atlas, sampling,
+                                                  surface->options()->renderFlags());
     if (colors) {
       processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
     }

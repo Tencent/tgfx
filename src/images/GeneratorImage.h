@@ -18,52 +18,50 @@
 
 #pragma once
 
-#include "ImageSource.h"
-#include "gpu/TextureSampler.h"
+#include "ResourceImage.h"
 
 namespace tgfx {
 /**
- * TextureSource wraps an existing texture.
+ * GeneratorImage wraps an ImageGenerator that can generate ImageBuffers on demand.
  */
-class TextureSource : public ImageSource {
+class GeneratorImage : public ResourceImage {
  public:
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                         bool mipMapped = false);
+
   int width() const override {
-    return textureProxy->width();
+    return generator->width();
   }
 
   int height() const override {
-    return textureProxy->height();
+    return generator->height();
   }
 
   bool hasMipmaps() const override {
-    return textureProxy->hasMipmaps();
+    return mipMapped;
   }
 
   bool isAlphaOnly() const override {
-    return textureProxy->isAlphaOnly();
+    return generator->isAlphaOnly();
   }
 
-  bool isTextureBacked() const override {
+  bool isLazyGenerated() const override {
     return true;
   }
 
-  BackendTexture getBackendTexture(Context* context) const override;
-
-  std::shared_ptr<ImageSource> makeTextureSource(Context* context) const override;
-
  protected:
-  std::shared_ptr<ImageSource> onMakeMipMapped() const override {
-    return nullptr;
-  }
+  std::shared_ptr<Image> onMakeDecoded(Context* context) const override;
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
+  std::shared_ptr<Image> onMakeMipMapped() const override;
+
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
                                                    uint32_t renderFlags) const override;
 
- private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+ protected:
+  std::shared_ptr<ImageGenerator> generator = nullptr;
+  bool mipMapped = false;
 
-  explicit TextureSource(std::shared_ptr<TextureProxy> textureProxy);
-
-  friend class ImageSource;
+  GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
+                 bool mipMapped = false);
 };
 }  // namespace tgfx

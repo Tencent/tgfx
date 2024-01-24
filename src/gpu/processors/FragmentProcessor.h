@@ -42,11 +42,12 @@ struct FPArgs {
 bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse);
 
 class Pipeline;
+class Image;
 
 class FragmentProcessor : public Processor {
  public:
   /**
-   *  In many instances (e.g. Shader::asFragmentProcessor() implementations) it is desirable to
+   *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
    *  only consider the input color's alpha. However, there is a competing desire to have reusable
    *  FragmentProcessor subclasses that can be used in other scenarios where the entire input
    *  color is considered. This function exists to filter the input color and pass it to a FP. It
@@ -66,7 +67,7 @@ class FragmentProcessor : public Processor {
       std::unique_ptr<FragmentProcessor> child, bool inverted = false);
 
   /**
-   * Returns a fragment processor that runs the passed in array of fragment processors in a
+   * Returns a fragment processor that runs the passed in an array of fragment processors in a
    * series. The original input is passed to the first, the first's output is passed to the
    * second, etc. The output of the returned processor is the output of the last processor of the
    * series.
@@ -75,6 +76,31 @@ class FragmentProcessor : public Processor {
    */
   static std::unique_ptr<FragmentProcessor> RunInSeries(std::unique_ptr<FragmentProcessor>* series,
                                                         int count);
+
+  /**
+   * Creates a fragment processor that will draw the passed in image. The image will be sampled
+   * using the passed in sampling options and matrix. The passed in matrix will be applied to the
+   * local coordinates of the fragment. The passed in matrix is applied before the local matrix
+   * of the fragment processor.
+   */
+  static std::unique_ptr<FragmentProcessor> MakeImage(Context* context,
+                                                      std::shared_ptr<Image> image,
+                                                      TileMode tileModeX, TileMode tileModeY,
+                                                      const SamplingOptions& sampling,
+                                                      const Matrix* localMatrix = nullptr,
+                                                      uint32_t renderFlags = 0);
+
+  /**
+   * Creates a fragment processor that will draw the passed in image. The image will be sampled
+   * using the passed in sampling options.
+   */
+  static std::unique_ptr<FragmentProcessor> MakeImage(Context* context,
+                                                      std::shared_ptr<Image> image,
+                                                      const SamplingOptions& sampling,
+                                                      uint32_t renderFlags = 0) {
+    return MakeImage(context, std::move(image), TileMode::Clamp, TileMode::Clamp, sampling, nullptr,
+                     renderFlags);
+  }
 
   size_t numTextureSamplers() const {
     return onCountTextureSamplers();

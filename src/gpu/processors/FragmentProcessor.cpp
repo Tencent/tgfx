@@ -20,8 +20,19 @@
 #include "SeriesFragmentProcessor.h"
 #include "gpu/Pipeline.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
+std::unique_ptr<FragmentProcessor> FragmentProcessor::MakeImage(
+    Context* context, std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
+    const SamplingOptions& sampling, const Matrix* localMatrix, uint32_t renderFlags) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return image->asFragmentProcessor(context, tileModeX, tileModeY, sampling, localMatrix,
+                                    renderFlags);
+}
+
 bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse) {
   if (totalInverse == nullptr) {
     return false;

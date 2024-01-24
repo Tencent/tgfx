@@ -18,20 +18,25 @@
 
 #pragma once
 
-#include "ImageSource.h"
+#include "GeneratorImage.h"
+#include "ImageDecoder.h"
 
 namespace tgfx {
 /**
- * BufferSource wraps a decoded ImageBuffer that can generate textures on demand.
+ * DecoderImage wraps an ImageDecoder that can decode ImageBuffers asynchronously.
  */
-class BufferSource : public ImageSource {
+class DecoderImage : public ResourceImage {
  public:
+  static std::shared_ptr<Image> MakeFrom(ResourceKey resourceKey,
+                                         std::shared_ptr<ImageDecoder> decoder,
+                                         bool mipMapped = false);
+
   int width() const override {
-    return imageBuffer->width();
+    return decoder->width();
   }
 
   int height() const override {
-    return imageBuffer->height();
+    return decoder->height();
   }
 
   bool hasMipmaps() const override {
@@ -39,23 +44,20 @@ class BufferSource : public ImageSource {
   }
 
   bool isAlphaOnly() const override {
-    return imageBuffer->isAlphaOnly();
+    return decoder->isAlphaOnly();
   }
 
  protected:
-  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
+  std::shared_ptr<Image> onMakeMipMapped() const override;
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
                                                    uint32_t renderFlags) const override;
 
  private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<ImageDecoder> decoder = nullptr;
   bool mipMapped = false;
 
-  BufferSource(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer,
+  DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder,
                bool mipMapped = false);
-
-  friend class ImageSource;
-  friend class AsyncSource;
 };
 }  // namespace tgfx

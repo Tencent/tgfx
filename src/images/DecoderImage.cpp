@@ -16,21 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BufferSource.h"
+#include "DecoderImage.h"
+#include "BufferImage.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-BufferSource::BufferSource(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer,
+std::shared_ptr<Image> DecoderImage::MakeFrom(ResourceKey resourceKey,
+                                              std::shared_ptr<ImageDecoder> decoder,
+                                              bool mipMapped) {
+  if (decoder == nullptr) {
+    return nullptr;
+  }
+  auto image = std::shared_ptr<DecoderImage>(
+      new DecoderImage(std::move(resourceKey), std::move(decoder), mipMapped));
+  image->weakThis = image;
+  return image;
+}
+
+DecoderImage::DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder,
                            bool mipMapped)
-    : ImageSource(std::move(resourceKey)), imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
+    : ResourceImage(std::move(resourceKey)), decoder(std::move(decoder)), mipMapped(mipMapped) {
 }
 
-std::shared_ptr<ImageSource> BufferSource::onMakeMipMapped() const {
-  return std::shared_ptr<BufferSource>(new BufferSource(ResourceKey::NewWeak(), imageBuffer, true));
+std::shared_ptr<Image> DecoderImage::onMakeMipMapped() const {
+  return DecoderImage::MakeFrom(ResourceKey::NewWeak(), decoder, true);
 }
 
-std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context,
+std::shared_ptr<TextureProxy> DecoderImage::onLockTextureProxy(Context* context,
                                                                uint32_t renderFlags) const {
-  return context->proxyProvider()->createTextureProxy(resourceKey, imageBuffer, mipMapped,
-                                                      renderFlags);
+  return context->proxyProvider()->createTextureProxy(resourceKey, decoder, mipMapped, renderFlags);
 }
 }  // namespace tgfx
