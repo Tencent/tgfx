@@ -42,4 +42,8 @@ Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
   }
   return Matrix::I();
 }
+
+bool OrientationSwapsWidthHeight(Orientation origin) {
+  return origin >= Orientation::LeftTop
+}
 }  // namespace tgfx

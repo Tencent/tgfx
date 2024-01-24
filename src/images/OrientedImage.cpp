@@ -68,25 +68,12 @@ OrientedImage::OrientedImage(std::shared_ptr<Image> source, Orientation orientat
     : NestedImage(std::move(source)), orientation(orientation) {
 }
 
-static bool NeedSwapWH(Orientation orientation) {
-  switch (orientation) {
-    case Orientation::LeftTop:
-    case Orientation::RightTop:
-    case Orientation::RightBottom:
-    case Orientation::LeftBottom:
-      return true;
-    default:
-      break;
-  }
-  return false;
-}
-
 int OrientedImage::width() const {
-  return NeedSwapWH(orientation) ? source->height() : source->width();
+  return OrientationSwapsWidthHeight(orientation) ? source->height() : source->width();
 }
 
 int OrientedImage::height() const {
-  return NeedSwapWH(orientation) ? source->width() : source->height();
+  return OrientationSwapsWidthHeight(orientation) ? source->width() : source->height();
 }
 
 std::shared_ptr<Image> OrientedImage::onCloneWith(std::shared_ptr<Image> newSource) const {

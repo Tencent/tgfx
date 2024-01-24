@@ -60,9 +60,15 @@ enum class Orientation {
 };
 
 /**
- * Given an Orientation and the width and height of the source data, returns a matrix that
+ * Given an orientation and the width and height of the source data, returns a matrix that
  * transforms the source rectangle [0, 0, w, h] to a correctly oriented destination rectangle, with
  * the upper left corner still at [0, 0].
  */
 Matrix OrientationToMatrix(Orientation orientation, int width, int height);
+
+/**
+ * Return true if the orientation includes a 90-degree rotation, in which case, the width
+ * and height of the source data are swapped relative to a correctly oriented destination.
+ */
+bool OrientationSwapsWidthHeight(Orientation origin);
 }  // namespace tgfx
