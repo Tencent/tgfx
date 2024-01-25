@@ -41,6 +41,20 @@ struct FPArgs {
 
 bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse);
 
+struct ImageFPArgs {
+  ImageFPArgs(Context* context, const SamplingOptions& sampling, uint32_t renderFlags = 0,
+              TileMode tileModeX = TileMode::Clamp, TileMode tileModeY = TileMode::Clamp)
+      : context(context), sampling(sampling), renderFlags(renderFlags), tileModeX(tileModeX),
+        tileModeY(tileModeY) {
+  }
+
+  Context* context = nullptr;
+  SamplingOptions sampling = {};
+  uint32_t renderFlags = 0;
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
+};
+
 class Pipeline;
 class Image;
 
@@ -76,31 +90,13 @@ class FragmentProcessor : public Processor {
    */
   static std::unique_ptr<FragmentProcessor> RunInSeries(std::unique_ptr<FragmentProcessor>* series,
                                                         int count);
-
   /**
-   * Creates a fragment processor that will draw the passed in image. The image will be sampled
-   * using the passed in sampling options and matrix. The passed in matrix will be applied to the
-   * local coordinates of the fragment. The passed in matrix is applied before the local matrix
-   * of the fragment processor.
+   * Creates a fragment processor that will draw the given image with the ImageFPArgs options.
    */
-  static std::unique_ptr<FragmentProcessor> MakeImage(Context* context,
-                                                      std::shared_ptr<Image> image,
-                                                      TileMode tileModeX, TileMode tileModeY,
-                                                      const SamplingOptions& sampling,
-                                                      const Matrix* localMatrix = nullptr,
-                                                      uint32_t renderFlags = 0);
-
-  /**
-   * Creates a fragment processor that will draw the passed in image. The image will be sampled
-   * using the passed in sampling options.
-   */
-  static std::unique_ptr<FragmentProcessor> MakeImage(Context* context,
-                                                      std::shared_ptr<Image> image,
-                                                      const SamplingOptions& sampling,
-                                                      uint32_t renderFlags = 0) {
-    return MakeImage(context, std::move(image), TileMode::Clamp, TileMode::Clamp, sampling, nullptr,
-                     renderFlags);
-  }
+  static std::unique_ptr<FragmentProcessor> MakeFromImage(std::shared_ptr<Image> image,
+                                                          const ImageFPArgs& args,
+                                                          const Matrix* localMatrix = nullptr,
+                                                          const Rect* subset = nullptr);
 
   size_t numTextureSamplers() const {
     return onCountTextureSamplers();

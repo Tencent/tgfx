@@ -25,15 +25,15 @@ namespace tgfx {
 class BlurImageFilter : public ImageFilter {
  public:
   BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode,
-                  const Rect& cropRect)
-      : ImageFilter(cropRect), blurOffset(blurOffset), downScaling(downScaling),
-        iteration(iteration), tileMode(tileMode) {
-  }
-
-  std::pair<std::shared_ptr<Image>, Point> filterImage(const ImageFilterContext& context) override;
+                  const Rect* cropRect);
 
  private:
-  Rect onFilterNodeBounds(const Rect& srcRect) const override;
+  Rect onFilterBounds(const Rect& srcRect) const override;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                         const ImageFPArgs& args,
+                                                         const Matrix* localMatrix,
+                                                         const Rect* subset) const override;
 
   void draw(Surface* toSurface, std::shared_ptr<Image> image, bool isDown,
             const Rect* imageBounds = nullptr, TileMode mode = TileMode::Clamp) const;

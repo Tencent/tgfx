@@ -21,8 +21,8 @@
 #include "core/RasterGenerator.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Texture.h"
-#include "gpu/processors/TiledTextureEffect.h"
 #include "images/BufferImage.h"
+#include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
 #include "images/SubsetImage.h"
 #include "images/TextureImage.h"
@@ -125,10 +125,6 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
-  auto proxy = onLockTextureProxy(context, 0);
-  if (proxy != nullptr) {
-    return TextureImage::MakeFrom(std::move(proxy));
-  }
   auto surface = Surface::Make(context, width(), height(), isAlphaOnly(), 1, hasMipmaps());
   if (surface == nullptr) {
     return nullptr;
@@ -136,10 +132,6 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   auto canvas = surface->getCanvas();
   canvas->drawImage(weakThis.lock(), 0, 0);
   return surface->makeImageSnapshot();
-}
-
-std::shared_ptr<TextureProxy> Image::onLockTextureProxy(Context*, uint32_t) const {
-  return nullptr;
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
@@ -196,8 +188,12 @@ std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
   return OrientedImage::MakeFrom(weakThis.lock(), orientation);
 }
 
+std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset) {
+  return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset);
+}
+
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
-                                         int alphaStartY) {
+                                         int alphaStartY) const {
   if (alphaStartX == 0 && alphaStartY == 0) {
     return makeSubset(Rect::MakeWH(displayWidth, displayHeight));
   }
@@ -206,17 +202,5 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 
 std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
   return nullptr;
-}
-
-std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, TileMode tileModeX,
-                                                              TileMode tileModeY,
-                                                              const SamplingOptions& sampling,
-                                                              const Matrix* localMatrix,
-                                                              uint32_t renderFlags) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto proxy = onLockTextureProxy(context, renderFlags);
-  return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, localMatrix);
 }
 }  // namespace tgfx

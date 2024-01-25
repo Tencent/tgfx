@@ -23,14 +23,14 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> FragmentProcessor::MakeImage(
-    Context* context, std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
-    const SamplingOptions& sampling, const Matrix* localMatrix, uint32_t renderFlags) {
+std::unique_ptr<FragmentProcessor> FragmentProcessor::MakeFromImage(std::shared_ptr<Image> image,
+                                                                    const ImageFPArgs& args,
+                                                                    const Matrix* localMatrix,
+                                                                    const Rect* clipBounds) {
   if (image == nullptr) {
     return nullptr;
   }
-  return image->asFragmentProcessor(context, tileModeX, tileModeY, sampling, localMatrix,
-                                    renderFlags);
+  return image->asFragmentProcessor(args, localMatrix, clipBounds);
 }
 
 bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse) {

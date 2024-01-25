@@ -28,14 +28,6 @@ class NestedImage : public Image {
  public:
   explicit NestedImage(std::shared_ptr<Image> source);
 
-  int width() const override {
-    return source->width();
-  }
-
-  int height() const override {
-    return source->height();
-  }
-
   bool hasMipmaps() const override {
     return source->hasMipmaps();
   }
@@ -52,6 +44,8 @@ class NestedImage : public Image {
   std::shared_ptr<Image> source = nullptr;
 
   std::shared_ptr<Image> onMakeDecoded(Context* context) const override;
+
+  std::shared_ptr<Image> onMakeMipMapped() const override;
 
   virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const = 0;
 };

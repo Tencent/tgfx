@@ -29,4 +29,12 @@ std::shared_ptr<Image> NestedImage::onMakeDecoded(Context* context) const {
   }
   return onCloneWith(std::move(newSource));
 }
+
+std::shared_ptr<Image> NestedImage::onMakeMipMapped() const {
+  auto newSource = source->makeMipMapped();
+  if (newSource == source) {
+    return nullptr;
+  }
+  return onCloneWith(std::move(newSource));
+}
 }  // namespace tgfx

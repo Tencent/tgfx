@@ -39,22 +39,17 @@ class OrientedImage : public NestedImage {
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::shared_ptr<Image> onMakeMipMapped() const override;
-
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
   std::shared_ptr<Image> onMakeOriented(Orientation newOrientation) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, TileMode tileModeX,
-                                                         TileMode tileModeY,
-                                                         const SamplingOptions& sampling,
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
                                                          const Matrix* localMatrix,
-                                                         uint32_t renderFlags) override;
+                                                         const Rect* subset) const override;
 
-  virtual Matrix computeLocalMatrix() const;
+  virtual std::pair<Matrix, Rect> concatMatrixAndClip(const Matrix* localMatrix,
+                                                      const Rect* subset) const;
 
   Orientation concatOrientation(Orientation newOrientation) const;
-
-  ISize getOrientedSize() const;
 };
 }  // namespace tgfx

@@ -18,7 +18,6 @@
 
 #include "TestEnvironment.h"
 #include "utils/Baseline.h"
-#include "utils/DevicePool.h"
 
 namespace tgfx {
 void TestEnvironment::SetUp() {
@@ -27,7 +26,6 @@ void TestEnvironment::SetUp() {
 
 void TestEnvironment::TearDown() {
   Baseline::TearDown();
-  DevicePool::CleanAll();
 }
 
 }  // namespace tgfx
