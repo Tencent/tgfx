@@ -17,11 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ResourceImage.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "images/RGBAAAImage.h"
+#include "images/TextureImage.h"
 
 namespace tgfx {
 
 ResourceImage::ResourceImage(ResourceKey resourceKey) : resourceKey(std::move(resourceKey)) {
+}
+
+std::shared_ptr<Image> ResourceImage::makeTextureImage(Context* context) const {
+  auto proxy = onLockTextureProxy(context, 0);
+  return TextureImage::MakeFrom(std::move(proxy));
 }
 
 std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int displayHeight,
@@ -29,7 +36,16 @@ std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int display
   if (isAlphaOnly()) {
     return nullptr;
   }
-  return RGBAAAImage::MakeFrom(weakThis.lock(), displayWidth, displayHeight, alphaStartX,
+  auto resourceImage = std::static_pointer_cast<ResourceImage>(weakThis.lock());
+  return RGBAAAImage::MakeFrom(std::move(resourceImage), displayWidth, displayHeight, alphaStartX,
                                alphaStartY);
+}
+
+std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(const ImageFPArgs& args,
+                                                                      const Matrix* localMatrix,
+                                                                      const Rect*) const {
+  auto proxy = onLockTextureProxy(args.context, args.renderFlags);
+  return TiledTextureEffect::Make(std::move(proxy), args.tileModeX, args.tileModeY, args.sampling,
+                                  localMatrix);
 }
 }  // namespace tgfx

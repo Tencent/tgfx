@@ -80,14 +80,6 @@ std::shared_ptr<Image> OrientedImage::onCloneWith(std::shared_ptr<Image> newSour
   return OrientedImage::MakeFrom(std::move(newSource), orientation);
 }
 
-std::shared_ptr<Image> OrientedImage::onMakeMipMapped() const {
-  auto newSource = source->makeMipMapped();
-  if (newSource == source) {
-    return nullptr;
-  }
-  return onCloneWith(std::move(newSource));
-}
-
 std::shared_ptr<Image> OrientedImage::onMakeSubset(const Rect& subset) const {
   return SubsetImage::MakeFrom(source, orientation, subset);
 }
@@ -100,21 +92,22 @@ std::shared_ptr<Image> OrientedImage::onMakeOriented(Orientation newOrientation)
   return OrientedImage::MakeFrom(source, newOrientation);
 }
 
-std::unique_ptr<FragmentProcessor> OrientedImage::asFragmentProcessor(
-    Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-    const Matrix* localMatrix, uint32_t renderFlags) {
-  auto totalMatrix = computeLocalMatrix();
-  if (localMatrix != nullptr) {
-    totalMatrix.preConcat(*localMatrix);
-  }
-  return FragmentProcessor::MakeImage(context, source, tileModeX, tileModeY, sampling, &totalMatrix,
-                                      renderFlags);
+std::unique_ptr<FragmentProcessor> OrientedImage::asFragmentProcessor(const ImageFPArgs& args,
+                                                                      const Matrix* localMatrix,
+                                                                      const Rect* subset) const {
+  auto result = concatMatrixAndClip(localMatrix, subset);
+  return FragmentProcessor::MakeFromImage(source, args, &result.first, &result.second);
 }
 
-Matrix OrientedImage::computeLocalMatrix() const {
+std::pair<Matrix, Rect> OrientedImage::concatMatrixAndClip(const Matrix* localMatrix,
+                                                           const Rect* subset) const {
   auto matrix = OrientationToMatrix(orientation, source->width(), source->height());
   matrix.invert(&matrix);
-  return matrix;
+  auto clip = subset ? matrix.mapRect(*subset) : Rect::MakeWH(source->width(), source->height());
+  if (localMatrix != nullptr) {
+    matrix.preConcat(*localMatrix);
+  }
+  return {matrix, clip};
 }
 
 Orientation OrientedImage::concatOrientation(Orientation newOrientation) const {

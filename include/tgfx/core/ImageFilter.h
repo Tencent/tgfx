@@ -25,46 +25,42 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-struct ImageFilterContext {
-  ImageFilterContext(Context* context, Matrix matrix, Rect clipBounds, std::shared_ptr<Image> image)
-      : context(context), deviceMatrix(matrix), clipBounds(clipBounds), source(std::move(image)) {
-  }
-
-  Context* context = nullptr;
-  Matrix deviceMatrix = Matrix::I();
-  Rect clipBounds = Rect::MakeEmpty();
-  std::shared_ptr<Image> source;
-};
-
 class ImageFilter {
  public:
   static std::shared_ptr<ImageFilter> Blur(float blurrinessX, float blurrinessY,
                                            TileMode tileMode = TileMode::Decal,
-                                           const Rect& cropRect = Rect::MakeEmpty());
+                                           const Rect* cropRect = nullptr);
 
   static std::shared_ptr<ImageFilter> DropShadow(float dx, float dy, float blurrinessX,
                                                  float blurrinessY, const Color& color,
-                                                 const Rect& cropRect = Rect::MakeEmpty());
+                                                 const Rect* cropRect = nullptr);
 
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color,
-                                                     const Rect& cropRect = Rect::MakeEmpty());
+                                                     const Rect* cropRect = nullptr);
 
-  virtual ~ImageFilter() = default;
+  virtual ~ImageFilter();
 
-  virtual std::pair<std::shared_ptr<Image>, Point> filterImage(
-      const ImageFilterContext& context) = 0;
-
+  /**
+   * Returns the bounds of the filtered image by the given bounds of the source image.
+   */
   Rect filterBounds(const Rect& rect) const;
 
  protected:
-  explicit ImageFilter(const Rect cropRect) : cropRect(cropRect) {
-  }
+  explicit ImageFilter(const Rect* cropRect);
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipRect = nullptr) const;
 
-  virtual Rect onFilterNodeBounds(const Rect& srcRect) const;
+  virtual Rect onFilterBounds(const Rect& srcRect) const;
 
-  Rect cropRect = Rect::MakeEmpty();
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                                 const ImageFPArgs& args,
+                                                                 const Matrix* localMatrix,
+                                                                 const Rect* subset) const;
+
+ private:
+  Rect* cropRect = nullptr;
+
+  friend class FilterImage;
 };
 }  // namespace tgfx

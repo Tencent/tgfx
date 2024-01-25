@@ -18,61 +18,33 @@
 
 #include "DropShadowImageFilter.h"
 #include "gpu/Texture.h"
+#include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color,
-                                                     const Rect& cropRect) {
+                                                     const Rect* cropRect) {
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false,
                                                  cropRect);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
                                                          float blurrinessY, const Color& color,
-                                                         const Rect& cropRect) {
+                                                         const Rect* cropRect) {
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true,
                                                  cropRect);
 }
 
-std::pair<std::shared_ptr<Image>, Point> DropShadowImageFilter::filterImage(
-    const ImageFilterContext& context) {
-  auto image = context.source;
-  if (image == nullptr) {
-    return {};
-  }
-  auto inputBounds = Rect::MakeWH(image->width(), image->height());
-  Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, &context.clipBounds)) {
-    return {};
-  }
-  if (!inputBounds.intersect(dstBounds)) {
-    return {};
-  }
-  dstBounds.roundOut();
-  auto dstOffset = Point::Make(dstBounds.x(), dstBounds.y());
-  auto surface = Surface::Make(context.context, static_cast<int>(dstBounds.width()),
-                               static_cast<int>(dstBounds.height()));
-  if (surface == nullptr) {
-    return {};
-  }
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  paint.setImageFilter(ImageFilter::Blur(blurrinessX, blurrinessY));
-  paint.setColorFilter(ColorFilter::Blend(color, BlendMode::SrcIn));
-  canvas->concat(Matrix::MakeTrans(-dstOffset.x, -dstOffset.y));
-  canvas->save();
-  canvas->concat(Matrix::MakeTrans(dx, dy));
-  canvas->drawImage(image, &paint);
-  canvas->restore();
-  if (!shadowOnly) {
-    canvas->drawImage(image);
-  }
-  return {surface->makeImageSnapshot(), dstOffset};
+DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrinessX,
+                                             float blurrinessY, const Color& color, bool shadowOnly,
+                                             const Rect* cropRect)
+    : ImageFilter(cropRect), dx(dx), dy(dy), blurrinessX(blurrinessX), blurrinessY(blurrinessY),
+      color(color), shadowOnly(shadowOnly) {
 }
 
-Rect DropShadowImageFilter::onFilterNodeBounds(const Rect& srcRect) const {
+Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
   auto bounds = srcRect;
   auto shadowBounds = bounds;
   shadowBounds.offset(dx, dy);
@@ -86,4 +58,38 @@ Rect DropShadowImageFilter::onFilterNodeBounds(const Rect& srcRect) const {
   }
   return bounds;
 }
+
+std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
+    std::shared_ptr<Image> source, const ImageFPArgs& args, const Matrix* localMatrix,
+    const Rect* subset) const {
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  Rect dstBounds = Rect::MakeEmpty();
+  if (!applyCropRect(inputBounds, &dstBounds, subset)) {
+    return nullptr;
+  }
+  auto surface = Surface::Make(args.context, static_cast<int>(dstBounds.width()),
+                               static_cast<int>(dstBounds.height()));
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto offsetMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setImageFilter(ImageFilter::Blur(blurrinessX, blurrinessY));
+  paint.setColorFilter(ColorFilter::Blend(color, BlendMode::SrcIn));
+  canvas->concat(offsetMatrix);
+  canvas->save();
+  canvas->concat(Matrix::MakeTrans(dx, dy));
+  canvas->drawImage(source, &paint);
+  canvas->restore();
+  if (!shadowOnly) {
+    canvas->drawImage(source);
+  }
+  auto image = surface->makeImageSnapshot();
+  if (localMatrix != nullptr) {
+    offsetMatrix.preConcat(*localMatrix);
+  }
+  return FragmentProcessor::MakeFromImage(image, args, &offsetMatrix);
+}
+
 }  // namespace tgfx

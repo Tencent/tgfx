@@ -24,15 +24,15 @@ namespace tgfx {
 class DropShadowImageFilter : public ImageFilter {
  public:
   DropShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
-                        const Color& color, bool shadowOnly, const Rect& cropRect)
-      : ImageFilter(cropRect), dx(dx), dy(dy), blurrinessX(blurrinessX), blurrinessY(blurrinessY),
-        color(color), shadowOnly(shadowOnly) {
-  }
-
-  std::pair<std::shared_ptr<Image>, Point> filterImage(const ImageFilterContext& context) override;
+                        const Color& color, bool shadowOnly, const Rect* cropRect);
 
  private:
-  Rect onFilterNodeBounds(const Rect& srcRect) const override;
+  Rect onFilterBounds(const Rect& srcRect) const override;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                         const ImageFPArgs& args,
+                                                         const Matrix* localMatrix,
+                                                         const Rect* subset) const override;
 
   float dx;
   float dy;

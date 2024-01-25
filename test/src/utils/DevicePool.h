@@ -24,7 +24,5 @@ namespace tgfx {
 class DevicePool {
  public:
   static std::shared_ptr<tgfx::GLDevice> Make();
-
-  static void CleanAll();
 };
 }  // namespace tgfx

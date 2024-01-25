@@ -18,17 +18,18 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientedImage.h"
+#include "images/NestedImage.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 /**
- * An image that is a subset of another image.
+ * FilterImage wraps an existing image and applies an ImageFilter to it.
  */
-class SubsetImage : public OrientedImage {
+class FilterImage : public NestedImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                         const Rect& bounds);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
+                                         std::shared_ptr<ImageFilter> filter,
+                                         Point* offset = nullptr);
 
   int width() const override {
     return static_cast<int>(bounds.width());
@@ -39,17 +40,22 @@ class SubsetImage : public OrientedImage {
   }
 
  protected:
-  Rect bounds = Rect::MakeEmpty();
+  FilterImage(std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter,
+              const Rect& bounds);
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
+                                                         const Matrix* localMatrix,
+                                                         const Rect* subset) const override;
 
-  std::pair<Matrix, Rect> concatMatrixAndClip(const Matrix* localMatrix,
-                                              const Rect* subset) const override;
+ private:
+  std::shared_ptr<ImageFilter> filter = nullptr;
+  Rect bounds = Rect::MakeEmpty();
 
-  SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
+                                         std::shared_ptr<ImageFilter> filter, const Rect& bounds);
 };
 }  // namespace tgfx

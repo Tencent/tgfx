@@ -20,8 +20,9 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
-                                             int displayHeight, int alphaStartX, int alphaStartY) {
+std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<ResourceImage> source,
+                                             int displayWidth, int displayHeight, int alphaStartX,
+                                             int alphaStartY) {
   if (source == nullptr || alphaStartX + displayWidth > source->width() ||
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
@@ -46,19 +47,12 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
   return image;
 }
 
-std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context, TileMode,
-                                                                    TileMode,
-                                                                    const SamplingOptions& sampling,
+std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const ImageFPArgs& args,
                                                                     const Matrix* localMatrix,
-                                                                    uint32_t renderFlags) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto proxy = source->onLockTextureProxy(context, renderFlags);
-  auto totalMatrix = computeLocalMatrix();
-  if (localMatrix != nullptr) {
-    totalMatrix.preConcat(*localMatrix);
-  }
-  return TextureEffect::MakeRGBAAA(std::move(proxy), sampling, alphaStart, &totalMatrix);
+                                                                    const Rect*) const {
+  auto proxy = std::static_pointer_cast<ResourceImage>(source)->onLockTextureProxy(
+      args.context, args.renderFlags);
+  auto result = concatMatrixAndClip(localMatrix, nullptr);
+  return TextureEffect::MakeRGBAAA(std::move(proxy), args.sampling, alphaStart, &result.first);
 }
 }  // namespace tgfx

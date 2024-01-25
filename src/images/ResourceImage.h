@@ -31,10 +31,21 @@ class ResourceImage : public Image {
  public:
   explicit ResourceImage(ResourceKey resourceKey);
 
+  std::shared_ptr<Image> makeTextureImage(Context* context) const override;
+
  protected:
   ResourceKey resourceKey = {};
 
   std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                       int alphaStartY) const override;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
+                                                         const Matrix* localMatrix,
+                                                         const Rect* subset) const override;
+
+  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
+                                                           uint32_t renderFlags) const = 0;
+
+  friend class RGBAAAImage;
 };
 }  // namespace tgfx

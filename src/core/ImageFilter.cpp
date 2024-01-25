@@ -17,12 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageFilter.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
+ImageFilter::ImageFilter(const Rect* rect) {
+  if (rect != nullptr) {
+    cropRect = new Rect(*rect);
+    cropRect->roundOut();
+  }
+}
+
+ImageFilter::~ImageFilter() {
+  delete cropRect;
+}
+
 bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipRect) const {
-  *dstRect = onFilterNodeBounds(srcRect);
-  if (!cropRect.isEmpty()) {
-    dstRect->intersect(cropRect);
+  *dstRect = onFilterBounds(srcRect);
+  dstRect->roundOut();
+  if (cropRect) {
+    if (!dstRect->intersect(*cropRect)) {
+      return false;
+    }
   }
   if (clipRect) {
     return dstRect->intersect(*clipRect);
@@ -36,7 +51,14 @@ Rect ImageFilter::filterBounds(const Rect& rect) const {
   return dstBounds;
 }
 
-Rect ImageFilter::onFilterNodeBounds(const Rect& srcRect) const {
+Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
+}
+
+std::unique_ptr<FragmentProcessor> ImageFilter::asFragmentProcessor(std::shared_ptr<Image> source,
+                                                                    const ImageFPArgs& args,
+                                                                    const Matrix* localMatrix,
+                                                                    const Rect* subset) const {
+  return FragmentProcessor::MakeFromImage(std::move(source), args, localMatrix, subset);
 }
 }  // namespace tgfx

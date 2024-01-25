@@ -65,7 +65,7 @@ static std::tuple<int, float, float> Get(float blurriness) {
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
-                                               TileMode tileMode, const Rect& cropRect) {
+                                               TileMode tileMode, const Rect* cropRect) {
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
@@ -74,6 +74,12 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   return std::make_shared<BlurImageFilter>(
       Point::Make(std::get<2>(x), std::get<2>(y)), std::max(std::get<1>(x), std::get<1>(y)),
       std::max(std::get<0>(x), std::get<0>(y)), tileMode, cropRect);
+}
+
+BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iteration,
+                                 TileMode tileMode, const Rect* cropRect)
+    : ImageFilter(cropRect), blurOffset(blurOffset), downScaling(downScaling), iteration(iteration),
+      tileMode(tileMode) {
 }
 
 void BlurImageFilter::draw(Surface* toSurface, std::shared_ptr<Image> image, bool isDown,
@@ -88,66 +94,62 @@ void BlurImageFilter::draw(Surface* toSurface, std::shared_ptr<Image> image, boo
   if (imageBounds) {
     localMatrix.postTranslate(imageBounds->x(), imageBounds->y());
   }
-  auto processor =
-      FragmentProcessor::MakeImage(toSurface->getContext(), image, mode, mode, SamplingOptions(),
-                                   nullptr, toSurface->options()->renderFlags());
+  ImageFPArgs args(toSurface->getContext(), {}, toSurface->options()->renderFlags(), mode, mode);
+  auto processor = FragmentProcessor::MakeFromImage(image, args);
   drawContext->fillRectWithFP(
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(processor), blurOffset, texelSize));
 }
 
-std::pair<std::shared_ptr<Image>, Point> BlurImageFilter::filterImage(
-    const ImageFilterContext& context) {
-  auto image = context.source;
-  if (image == nullptr) {
-    return {};
-  }
-  auto inputBounds = Rect::MakeWH(image->width(), image->height());
+Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
+  auto mul = static_cast<float>(std::pow(2, iteration)) / downScaling;
+  return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
+}
+
+std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
+    std::shared_ptr<Image> source, const ImageFPArgs& args, const Matrix* localMatrix,
+    const Rect* subset) const {
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
   Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, &context.clipBounds)) {
-    return {};
+  if (!applyCropRect(inputBounds, &dstBounds, subset)) {
+    return nullptr;
   }
-  if (!inputBounds.intersect(dstBounds)) {
-    return {};
-  }
-  dstBounds.roundOut();
-  auto dstOffset = Point::Make(dstBounds.x(), dstBounds.y());
   int tw = static_cast<int>(dstBounds.width() * downScaling);
   int th = static_cast<int>(dstBounds.height() * downScaling);
   std::vector<std::pair<int, int>> upSurfaces;
   upSurfaces.emplace_back(static_cast<int>(dstBounds.width()),
                           static_cast<int>(dstBounds.height()));
+  std::shared_ptr<Image> lastImage = nullptr;
   for (int i = 0; i < iteration; ++i) {
-    auto surface = Surface::Make(context.context, tw, th);
+    auto surface = Surface::Make(args.context, tw, th);
     if (surface == nullptr) {
       return {};
     }
     upSurfaces.emplace_back(tw, th);
-    if (i == 0) {
-      draw(surface.get(), image, true, &dstBounds, tileMode);
+    if (lastImage == nullptr) {
+      draw(surface.get(), source, true, &dstBounds, tileMode);
     } else {
-      draw(surface.get(), image, true);
+      draw(surface.get(), lastImage, true);
     }
-    image = surface->makeImageSnapshot();
+    lastImage = surface->makeImageSnapshot();
     tw = std::max(static_cast<int>(static_cast<float>(tw) * downScaling), 1);
     th = std::max(static_cast<int>(static_cast<float>(th) * downScaling), 1);
   }
   for (size_t i = upSurfaces.size() - 1; i > 0; --i) {
     auto width = upSurfaces[i - 1].first;
     auto height = upSurfaces[i - 1].second;
-    auto surface = Surface::Make(context.context, width, height);
+    auto surface = Surface::Make(args.context, width, height);
     if (surface == nullptr) {
       return {};
     }
-    draw(surface.get(), image, false);
-    image = surface->makeImageSnapshot();
+    draw(surface.get(), lastImage, false);
+    lastImage = surface->makeImageSnapshot();
   }
-  return {image, dstOffset};
-}
-
-Rect BlurImageFilter::onFilterNodeBounds(const Rect& srcRect) const {
-  auto mul = static_cast<float>(std::pow(2, iteration)) / downScaling;
-  return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
+  auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  if (localMatrix != nullptr) {
+    matrix.preConcat(*localMatrix);
+  }
+  return FragmentProcessor::MakeFromImage(lastImage, args, &matrix);
 }
 }  // namespace tgfx

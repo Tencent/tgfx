@@ -101,8 +101,8 @@ TGFX_TEST(CanvasTest, Blur) {
   canvas->concat(Matrix::MakeTrans(-imageWidth - padding, imageHeight + padding));
   canvas->save();
   canvas->concat(imageMatrix);
-  paint.setImageFilter(
-      ImageFilter::Blur(130, 130, TileMode::Repeat, Rect::MakeWH(image->width(), image->height())));
+  auto cropRect = Rect::MakeWH(image->width(), image->height());
+  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Repeat, &cropRect));
   canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
@@ -111,14 +111,14 @@ TGFX_TEST(CanvasTest, Blur) {
   canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
   canvas->save();
   canvas->concat(imageMatrix);
-  paint.setImageFilter(
-      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeLTRB(2000, -100, 3124, 2000)));
+  cropRect = Rect::MakeLTRB(2000, -100, 3124, 2000);
+  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp, &cropRect));
   canvas->drawImage(image, &paint);
-  paint.setImageFilter(
-      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeXYWH(1000, 1000, 1000, 1000)));
+  cropRect = Rect::MakeXYWH(1000, 1000, 1000, 1000);
+  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp, &cropRect));
   canvas->drawImage(image, &paint);
-  paint.setImageFilter(
-      ImageFilter::Blur(130, 130, TileMode::Clamp, Rect::MakeXYWH(1000, 2000, 1000, 1000)));
+  cropRect = Rect::MakeXYWH(1000, 2000, 1000, 1000);
+  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp, &cropRect));
   canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);

@@ -351,6 +351,7 @@ Rect Canvas::clipLocalBounds(Rect localBounds) {
     Matrix inverse = Matrix::I();
     state->matrix.invert(&inverse);
     clippedLocalBounds = inverse.mapRect(clippedDeviceBounds);
+    clippedLocalBounds.intersect(localBounds);
   }
   return clippedLocalBounds;
 }
@@ -428,16 +429,12 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   auto oldMatrix = getMatrix();
   auto imageFilter = realPaint.getImageFilter();
   if (imageFilter != nullptr) {
-    realPaint.setImageFilter(nullptr);
-    auto clipBounds = state->clip.getBounds();
-    Matrix inverted = Matrix::I();
-    if (!oldMatrix.invert(&inverted)) {
+    auto offset = Point::Zero();
+    image = image->makeWithFilter(std::move(imageFilter), &offset);
+    if (image == nullptr) {
       return;
     }
-    inverted.mapRect(&clipBounds);
-    ImageFilterContext context(getContext(), oldMatrix, clipBounds, image);
-    auto [outImage, offset] = imageFilter->filterImage(context);
-    image = outImage;
+    realPaint.setImageFilter(nullptr);
     concat(Matrix::MakeTrans(offset.x, offset.y));
   }
   drawImage(std::move(image), sampling, realPaint);
@@ -452,8 +449,10 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor = FragmentProcessor::MakeImage(getContext(), image, sampling,
-                                                surface->options()->renderFlags());
+  auto subset = localBounds;
+  subset.roundOut();
+  ImageFPArgs args(getContext(), sampling, surface->options()->renderFlags());
+  auto processor = FragmentProcessor::MakeFromImage(image, args, nullptr, &subset);
   if (processor == nullptr) {
     return;
   }
@@ -674,9 +673,9 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   if (ops.empty()) {
     return;
   }
+  ImageFPArgs args(getContext(), sampling, surface->options()->renderFlags());
   for (auto& rectOp : ops) {
-    auto processor = FragmentProcessor::MakeImage(getContext(), atlas, sampling,
-                                                  surface->options()->renderFlags());
+    auto processor = FragmentProcessor::MakeFromImage(atlas, args);
     if (colors) {
       processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
     }

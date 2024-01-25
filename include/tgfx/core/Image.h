@@ -31,7 +31,9 @@
 #include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
+struct ImageFPArgs;
 class Context;
+class ImageFilter;
 class TextureProxy;
 class FragmentProcessor;
 class ImageCodec;
@@ -219,6 +221,13 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
+   * Returns a filtered Image with the specified filter. The filter has the potential to alter the
+   * bounds of the source Image. The offset stores the translation information for the filtered
+   * Image. If the filter is nullptr or fails to apply, nullptr is returned.
+   */
+  std::shared_ptr<Image> makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset);
+
+  /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
    * channels and the other half as its alpha channel. Returns a subset Image if both alphaStartX
    * and alphaStartY are zero. Returns nullptr if the original Image has an encoded origin, subset
@@ -229,13 +238,10 @@ class Image {
    * @param alphaStartY The y position of where alpha area begins in the original image.
    */
   std::shared_ptr<Image> makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
-                                    int alphaStartY);
+                                    int alphaStartY) const;
 
  protected:
   std::weak_ptr<Image> weakThis;
-
-  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
-                                                           uint32_t renderFlags) const;
 
   virtual std::shared_ptr<Image> onMakeDecoded(Context* context) const;
 
@@ -248,9 +254,9 @@ class Image {
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix, uint32_t renderFlags);
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
+                                                                 const Matrix* localMatrix,
+                                                                 const Rect* subset) const = 0;
 
   friend class FragmentProcessor;
   friend class RGBAAAImage;

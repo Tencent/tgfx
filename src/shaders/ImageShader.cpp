@@ -37,8 +37,8 @@ std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs
   if (!ComputeTotalInverse(args, &matrix)) {
     return nullptr;
   }
-  auto processor = FragmentProcessor::MakeImage(args.context, image, tileModeX, tileModeY, sampling,
-                                                &matrix, args.renderFlags);
+  ImageFPArgs imageFpArgs(args.context, sampling, args.renderFlags, tileModeX, tileModeY);
+  auto processor = FragmentProcessor::MakeFromImage(image, imageFpArgs, &matrix);
   if (processor == nullptr) {
     return nullptr;
   }
