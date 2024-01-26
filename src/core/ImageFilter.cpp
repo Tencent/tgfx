@@ -31,7 +31,13 @@ ImageFilter::~ImageFilter() {
   delete cropRect;
 }
 
-bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipRect) const {
+Rect ImageFilter::filterBounds(const Rect& rect) const {
+  auto dstBounds = Rect::MakeEmpty();
+  applyCropRect(rect, &dstBounds);
+  return dstBounds;
+}
+
+bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds) const {
   *dstRect = onFilterBounds(srcRect);
   dstRect->roundOut();
   if (cropRect) {
@@ -39,16 +45,10 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
       return false;
     }
   }
-  if (clipRect) {
-    return dstRect->intersect(*clipRect);
+  if (clipBounds) {
+    return dstRect->intersect(*clipBounds);
   }
   return true;
-}
-
-Rect ImageFilter::filterBounds(const Rect& rect) const {
-  auto dstBounds = Rect::MakeEmpty();
-  applyCropRect(rect, &dstBounds);
-  return dstBounds;
 }
 
 Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -58,7 +58,8 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
 std::unique_ptr<FragmentProcessor> ImageFilter::asFragmentProcessor(std::shared_ptr<Image> source,
                                                                     const ImageFPArgs& args,
                                                                     const Matrix* localMatrix,
-                                                                    const Rect* subset) const {
-  return FragmentProcessor::MakeFromImage(std::move(source), args, localMatrix, subset);
+                                                                    const Rect* clipBounds) const {
+
+  return FragmentProcessor::MakeFromImage(std::move(source), args, localMatrix, clipBounds);
 }
 }  // namespace tgfx

@@ -33,7 +33,7 @@ class BlurImageFilter : public ImageFilter {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const ImageFPArgs& args,
                                                          const Matrix* localMatrix,
-                                                         const Rect* subset) const override;
+                                                         const Rect* clipBounds) const override;
 
   void draw(Surface* toSurface, std::shared_ptr<Image> image, bool isDown,
             const Rect* imageBounds = nullptr, TileMode mode = TileMode::Clamp) const;

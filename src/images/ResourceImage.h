@@ -41,7 +41,7 @@ class ResourceImage : public Image {
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
                                                          const Matrix* localMatrix,
-                                                         const Rect* subset) const override;
+                                                         const Rect* clipBounds) const override;
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
                                                            uint32_t renderFlags) const = 0;

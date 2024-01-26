@@ -66,12 +66,12 @@ std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
 
 std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const ImageFPArgs& args,
                                                                     const Matrix* localMatrix,
-                                                                    const Rect* subset) const {
+                                                                    const Rect* clipBounds) const {
   auto matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   if (localMatrix != nullptr) {
     matrix.preConcat(*localMatrix);
   }
-  auto clipRect = subset ? subset->makeOffset(bounds.x(), bounds.y()) : bounds;
+  auto clipRect = clipBounds ? clipBounds->makeOffset(bounds.x(), bounds.y()) : bounds;
   return filter->asFragmentProcessor(source, args, &matrix, &clipRect);
 }
 }  // namespace tgfx

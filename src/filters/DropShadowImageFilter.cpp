@@ -61,10 +61,10 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const ImageFPArgs& args, const Matrix* localMatrix,
-    const Rect* subset) const {
+    const Rect* clipBounds) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, subset)) {
+  if (!applyCropRect(inputBounds, &dstBounds, clipBounds)) {
     return nullptr;
   }
   auto surface = Surface::Make(args.context, static_cast<int>(dstBounds.width()),

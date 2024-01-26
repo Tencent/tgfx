@@ -32,7 +32,7 @@ class DropShadowImageFilter : public ImageFilter {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const ImageFPArgs& args,
                                                          const Matrix* localMatrix,
-                                                         const Rect* subset) const override;
+                                                         const Rect* clipBounds) const override;
 
   float dx;
   float dy;

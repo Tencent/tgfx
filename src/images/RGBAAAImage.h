@@ -32,7 +32,7 @@ class RGBAAAImage : public SubsetImage {
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
                                                          const Matrix* localMatrix,
-                                                         const Rect* subset) const override;
+                                                         const Rect* clipBounds) const override;
 
  private:
   Point alphaStart = Point::Zero();

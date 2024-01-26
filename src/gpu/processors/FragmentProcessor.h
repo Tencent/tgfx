@@ -96,7 +96,7 @@ class FragmentProcessor : public Processor {
   static std::unique_ptr<FragmentProcessor> MakeFromImage(std::shared_ptr<Image> image,
                                                           const ImageFPArgs& args,
                                                           const Matrix* localMatrix = nullptr,
-                                                          const Rect* subset = nullptr);
+                                                          const Rect* clipRect = nullptr);
 
   size_t numTextureSamplers() const {
     return onCountTextureSamplers();

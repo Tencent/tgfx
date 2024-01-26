@@ -95,11 +95,11 @@ void BlurImageFilter::draw(Surface* toSurface, std::shared_ptr<Image> image, boo
     localMatrix.postTranslate(imageBounds->x(), imageBounds->y());
   }
   ImageFPArgs args(toSurface->getContext(), {}, toSurface->options()->renderFlags(), mode, mode);
-  auto processor = FragmentProcessor::MakeFromImage(image, args);
-  drawContext->fillRectWithFP(
-      dstRect, localMatrix,
+  auto imageProcessor = FragmentProcessor::MakeFromImage(image, args);
+  auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
-                                      std::move(processor), blurOffset, texelSize));
+                                      std::move(imageProcessor), blurOffset, texelSize);
+  drawContext->fillRectWithFP(dstRect, localMatrix, std::move(blurProcessor));
 }
 
 Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -109,10 +109,10 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const ImageFPArgs& args, const Matrix* localMatrix,
-    const Rect* subset) const {
+    const Rect* clipBounds) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, subset)) {
+  if (!applyCropRect(inputBounds, &dstBounds, clipBounds)) {
     return nullptr;
   }
   int tw = static_cast<int>(dstBounds.width() * downScaling);
