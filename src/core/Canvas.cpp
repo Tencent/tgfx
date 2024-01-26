@@ -449,10 +449,10 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (localBounds.isEmpty()) {
     return;
   }
-  auto subset = localBounds;
-  subset.roundOut();
+  auto clipBounds = localBounds;
+  clipBounds.roundOut();
   ImageFPArgs args(getContext(), sampling, surface->options()->renderFlags());
-  auto processor = FragmentProcessor::MakeFromImage(image, args, nullptr, &subset);
+  auto processor = FragmentProcessor::MakeFromImage(image, args, nullptr, &clipBounds);
   if (processor == nullptr) {
     return;
   }

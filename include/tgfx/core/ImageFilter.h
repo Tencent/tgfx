@@ -49,14 +49,17 @@ class ImageFilter {
  protected:
   explicit ImageFilter(const Rect* cropRect);
 
-  bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipRect = nullptr) const;
+  bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
+  /**
+   * The returned processor is in the coordinate space of the source image.
+   */
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                                  const ImageFPArgs& args,
                                                                  const Matrix* localMatrix,
-                                                                 const Rect* subset) const;
+                                                                 const Rect* clipBounds) const;
 
  private:
   Rect* cropRect = nullptr;

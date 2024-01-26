@@ -47,8 +47,8 @@ class SubsetImage : public OrientedImage {
 
   std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
 
-  std::pair<Matrix, Rect> concatMatrixAndClip(const Matrix* localMatrix,
-                                              const Rect* subset) const override;
+  MatrixAndClipResult concatMatrixAndClip(const Matrix* localMatrix,
+                                          const Rect* clipBounds) const override;
 
   SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds);
 };

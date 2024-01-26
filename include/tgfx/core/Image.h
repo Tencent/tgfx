@@ -256,7 +256,7 @@ class Image {
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
                                                                  const Matrix* localMatrix,
-                                                                 const Rect* subset) const = 0;
+                                                                 const Rect* clipBounds) const = 0;
 
   friend class FragmentProcessor;
   friend class RGBAAAImage;

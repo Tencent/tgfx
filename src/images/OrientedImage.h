@@ -18,9 +18,23 @@
 
 #pragma once
 
+#include <optional>
 #include "images/NestedImage.h"
 
 namespace tgfx {
+struct MatrixAndClipResult {
+  std::optional<Matrix> matrix = std::nullopt;
+  std::optional<Rect> clip = std::nullopt;
+
+  const Matrix* getMatrix() const {
+    return matrix ? std::addressof(*matrix) : nullptr;
+  }
+
+  const Rect* getClip() const {
+    return clip ? std::addressof(*clip) : nullptr;
+  }
+};
+
 /**
  * OrientImage wraps an existing image and applies an orientation transform.
  */
@@ -45,10 +59,10 @@ class OrientedImage : public NestedImage {
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
                                                          const Matrix* localMatrix,
-                                                         const Rect* subset) const override;
+                                                         const Rect* clipBounds) const override;
 
-  virtual std::pair<Matrix, Rect> concatMatrixAndClip(const Matrix* localMatrix,
-                                                      const Rect* subset) const;
+  virtual MatrixAndClipResult concatMatrixAndClip(const Matrix* localMatrix,
+                                                  const Rect* clipBounds) const;
 
   Orientation concatOrientation(Orientation newOrientation) const;
 };

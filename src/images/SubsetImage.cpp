@@ -52,13 +52,26 @@ std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) cons
   return SubsetImage::MakeFrom(source, newOrientation, newBounds);
 }
 
-std::pair<Matrix, Rect> SubsetImage::concatMatrixAndClip(const Matrix* localMatrix,
-                                                         const Rect* subset) const {
-  auto matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  if (localMatrix != nullptr) {
-    matrix.preConcat(*localMatrix);
+MatrixAndClipResult SubsetImage::concatMatrixAndClip(const Matrix* localMatrix,
+                                                     const Rect* clipBounds) const {
+  std::optional<Matrix> matrix = std::nullopt;
+  if (bounds.x() != 0 || bounds.y() != 0) {
+    matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   }
-  auto clip = subset ? subset->makeOffset(bounds.x(), bounds.y()) : bounds;
-  return OrientedImage::concatMatrixAndClip(&matrix, &clip);
+  if (localMatrix != nullptr) {
+    if (matrix) {
+      matrix->preConcat(*localMatrix);
+    } else {
+      matrix = *localMatrix;
+    }
+  }
+  auto clipRect = bounds;
+  if (clipBounds != nullptr) {
+    if (!clipRect.intersect(*clipBounds)) {
+      clipRect.setEmpty();
+    }
+  }
+  auto matrixResult = matrix ? std::addressof(*matrix) : nullptr;
+  return OrientedImage::concatMatrixAndClip(matrixResult, &clipRect);
 }
 }  // namespace tgfx
