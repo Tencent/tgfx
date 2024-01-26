@@ -71,7 +71,7 @@ MatrixAndClipResult SubsetImage::concatMatrixAndClip(const Matrix* localMatrix,
       clipRect.setEmpty();
     }
   }
-  auto matrixResult = matrix ? &matrix.value() : nullptr;
+  auto matrixResult = matrix ? std::addressof(*matrix) : nullptr;
   return OrientedImage::concatMatrixAndClip(matrixResult, &clipRect);
 }
 }  // namespace tgfx

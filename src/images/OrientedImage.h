@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "images/NestedImage.h"
 
 namespace tgfx {
@@ -26,11 +27,11 @@ struct MatrixAndClipResult {
   std::optional<Rect> clip = std::nullopt;
 
   const Matrix* getMatrix() const {
-    return matrix.has_value() ? &matrix.value() : nullptr;
+    return matrix ? std::addressof(*matrix) : nullptr;
   }
 
   const Rect* getClip() const {
-    return clip.has_value() ? &clip.value() : nullptr;
+    return clip ? std::addressof(*clip) : nullptr;
   }
 };
 
