@@ -31,7 +31,8 @@ std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType 
   return uniform.variable.name();
 }
 
-SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const std::string& name) {
+SamplerHandle GLUniformHandler::internalAddSampler(const TextureSampler* sampler,
+                                                   const std::string& name) {
   auto mangledName = programBuilder->nameVariable(name);
   auto caps = GLCaps::Get(programBuilder->getContext());
   const auto& swizzle = caps->getReadSwizzle(sampler->format);
