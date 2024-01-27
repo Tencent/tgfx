@@ -18,14 +18,20 @@
 
 #include "DropShadowImageFilter.h"
 #include "gpu/Texture.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/ColorFilter.h"
-#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color,
                                                      const Rect* cropRect) {
+  if (cropRect && cropRect->isEmpty()) {
+    return nullptr;
+  }
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false,
                                                  cropRect);
 }
@@ -33,6 +39,9 @@ std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float b
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
                                                          float blurrinessY, const Color& color,
                                                          const Rect* cropRect) {
+  if (cropRect && cropRect->isEmpty()) {
+    return nullptr;
+  }
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true,
                                                  cropRect);
 }
@@ -40,23 +49,25 @@ std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, flo
 DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrinessX,
                                              float blurrinessY, const Color& color, bool shadowOnly,
                                              const Rect* cropRect)
-    : ImageFilter(cropRect), dx(dx), dy(dy), blurrinessX(blurrinessX), blurrinessY(blurrinessY),
-      color(color), shadowOnly(shadowOnly) {
+    : ImageFilter(cropRect), dx(dx), dy(dy),
+      blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
+      shadowOnly(shadowOnly) {
 }
 
 Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
   auto bounds = srcRect;
-  auto shadowBounds = bounds;
-  shadowBounds.offset(dx, dy);
-  if (auto filter = ImageFilter::Blur(blurrinessX, blurrinessY)) {
-    shadowBounds = filter->filterBounds(shadowBounds);
+  bounds.offset(dx, dy);
+  if (blurFilter != nullptr) {
+    bounds = blurFilter->filterBounds(bounds);
   }
   if (!shadowOnly) {
-    bounds.join(shadowBounds);
-  } else {
-    bounds = shadowBounds;
+    bounds.join(srcRect);
   }
   return bounds;
+}
+
+static bool CanDirectlyDraw(TileMode tileMode) {
+  return tileMode == TileMode::Clamp || tileMode == TileMode::Decal;
 }
 
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
@@ -67,29 +78,59 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (!applyCropRect(inputBounds, &dstBounds, clipBounds)) {
     return nullptr;
   }
-  auto surface = Surface::Make(args.context, static_cast<int>(dstBounds.width()),
-                               static_cast<int>(dstBounds.height()));
-  if (surface == nullptr) {
+  if (CanDirectlyDraw(args.tileModeX) && CanDirectlyDraw(args.tileModeY)) {
+    ImageFPArgs shadowArgs(args.context, args.sampling, args.renderFlags, TileMode::Decal,
+                           TileMode::Decal);
+    return getFragmentProcessor(std::move(source), shadowArgs, dstBounds, localMatrix);
+  }
+  auto mipMapped = source->hasMipmaps() && args.sampling.mipMapMode != MipMapMode::None;
+  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstBounds.width()),
+                                              static_cast<int>(dstBounds.height()),
+                                              PixelFormat::RGBA_8888, 1, mipMapped);
+  if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto offsetMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
-  auto canvas = surface->getCanvas();
-  Paint paint;
-  paint.setImageFilter(ImageFilter::Blur(blurrinessX, blurrinessY));
-  paint.setColorFilter(ColorFilter::Blend(color, BlendMode::SrcIn));
-  canvas->concat(offsetMatrix);
-  canvas->save();
-  canvas->concat(Matrix::MakeTrans(dx, dy));
-  canvas->drawImage(source, &paint);
-  canvas->restore();
-  if (!shadowOnly) {
-    canvas->drawImage(source);
+  ImageFPArgs shadowArgs(args.context, {}, args.renderFlags, TileMode::Decal, TileMode::Decal);
+  auto processor = getFragmentProcessor(std::move(source), shadowArgs, dstBounds);
+  if (processor == nullptr) {
+    return nullptr;
   }
-  auto image = surface->makeImageSnapshot();
+  fillRenderTargetWithFP(renderTarget, std::move(processor),
+                         Matrix::MakeTrans(dstBounds.x(), dstBounds.y()));
+  auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
   if (localMatrix != nullptr) {
-    offsetMatrix.preConcat(*localMatrix);
+    matrix.preConcat(*localMatrix);
   }
-  return FragmentProcessor::MakeFromImage(image, args, &offsetMatrix);
+  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), args.tileModeX, args.tileModeY,
+                                  args.sampling, &matrix);
+}
+
+std::unique_ptr<FragmentProcessor> DropShadowImageFilter::getFragmentProcessor(
+    std::shared_ptr<Image> source, const ImageFPArgs& args, const Rect& dstBounds,
+    const Matrix* localMatrix) const {
+  std::unique_ptr<FragmentProcessor> shadowProcessor;
+  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+  if (localMatrix != nullptr) {
+    shadowMatrix.preConcat(*localMatrix);
+  }
+  auto shadowBounds = dstBounds.makeOffset(-dx, -dy);
+  if (blurFilter != nullptr) {
+    shadowProcessor = blurFilter->asFragmentProcessor(source, args, &shadowMatrix, &shadowBounds);
+  } else {
+    shadowProcessor = FragmentProcessor::MakeFromImage(source, args, &shadowMatrix, &shadowBounds);
+  }
+  if (shadowProcessor == nullptr) {
+    return nullptr;
+  }
+  auto colorProcessor = ConstColorProcessor::Make(color, InputMode::Ignore);
+  auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
+  if (shadowOnly) {
+    return colorShadowProcessor;
+  }
+  auto imageProcessor = FragmentProcessor::MakeFromImage(source, args, localMatrix, &dstBounds);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }
 
 }  // namespace tgfx

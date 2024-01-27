@@ -244,8 +244,7 @@ static bool PaintToGLPaintWithImage(Context* context, uint32_t renderFlags, cons
       if (!shaderFP) {
         return false;
       }
-      std::unique_ptr<FragmentProcessor> fpSeries[] = {std::move(shaderFP), std::move(fp)};
-      shaderFP = FragmentProcessor::RunInSeries(fpSeries, 2);
+      shaderFP = FragmentProcessor::Compose(std::move(shaderFP), std::move(fp));
     } else {
       shaderFP = std::move(fp);
     }

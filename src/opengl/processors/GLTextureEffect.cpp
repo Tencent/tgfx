@@ -49,18 +49,18 @@ static const float ColorConversionJPEGFullRange[] = {
 };
 
 std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
-                                                             const SamplingOptions& sampling,
                                                              const Point& alphaStart,
+                                                             const SamplingOptions& sampling,
                                                              const Matrix* localMatrix) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto matrix = localMatrix ? *localMatrix : Matrix::I();
-  return std::make_unique<GLTextureEffect>(std::move(proxy), sampling, alphaStart, matrix);
+  return std::make_unique<GLTextureEffect>(std::move(proxy), alphaStart, sampling, matrix);
 }
 
-GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, SamplingOptions sampling,
-                                 const Point& alphaStart, const Matrix& localMatrix)
+GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
+                                 SamplingOptions sampling, const Matrix& localMatrix)
     : TextureEffect(std::move(proxy), sampling, alphaStart, localMatrix) {
 }
 

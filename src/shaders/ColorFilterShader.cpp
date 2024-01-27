@@ -44,7 +44,6 @@ std::unique_ptr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
   if (fp2 == nullptr) {
     return fp1;
   }
-  std::unique_ptr<FragmentProcessor> fpSeries[] = {std::move(fp1), std::move(fp2)};
-  return FragmentProcessor::RunInSeries(fpSeries, 2);
+  return FragmentProcessor::Compose(std::move(fp1), std::move(fp2));
 }
 }  // namespace tgfx
