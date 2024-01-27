@@ -29,6 +29,8 @@ class Canvas;
 class Context;
 class RenderTarget;
 class RenderTargetProxy;
+class OpsRenderTask;
+class Op;
 
 /**
  * The Surface class is responsible for managing the pixels that a Canvas draws into. The Surface
@@ -202,6 +204,7 @@ class Surface {
 
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
+  std::shared_ptr<OpsRenderTask> opsTask = nullptr;
   SurfaceOptions surfaceOptions = {};
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
@@ -215,8 +218,9 @@ class Surface {
 
   void aboutToDraw(bool discardContent = false);
 
+  void addOp(std::unique_ptr<Op> op);
+
   friend class DrawingManager;
-  friend class SurfaceDrawContext;
   friend class Canvas;
 };
 }  // namespace tgfx
