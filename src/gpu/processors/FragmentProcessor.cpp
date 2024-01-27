@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "SeriesFragmentProcessor.h"
+#include "ComposeFragmentProcessor.h"
 #include "gpu/Pipeline.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"
@@ -64,9 +64,9 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
       std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
 }
 
-std::unique_ptr<FragmentProcessor> FragmentProcessor::RunInSeries(
-    std::unique_ptr<FragmentProcessor>* series, int count) {
-  return SeriesFragmentProcessor::Make(series, count);
+std::unique_ptr<FragmentProcessor> FragmentProcessor::Compose(
+    std::unique_ptr<FragmentProcessor> f, std::unique_ptr<FragmentProcessor> g) {
+  return ComposeFragmentProcessor::Make(std::move(f), std::move(g));
 }
 
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
@@ -187,7 +187,7 @@ void FragmentProcessor::internalEmitChild(
   // Prepare a mangled input color variable if the default is not used,
   // inputName remains the empty string if no variable is needed.
   std::string inputName;
-  if (!inputColor.empty() && inputColor != "vec4(1.0)" && inputColor != "vec4(1)") {
+  if (!inputColor.empty() && inputColor != "vec4(1.0)") {
     // The input name is based off of the current mangle string, and
     // since this is called after onBeforeChildProcEmitCode(), it will be
     // unique to the child processor (exactly what we want for its input).

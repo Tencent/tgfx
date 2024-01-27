@@ -57,8 +57,8 @@ class RenderTargetProxy : public ResourceProxy {
    * count, mipmap state and origin.
    */
   static std::shared_ptr<RenderTargetProxy> Make(Context* context, int width, int height,
-                                                 PixelFormat format, int sampleCount = 1,
-                                                 bool mipMapped = false,
+                                                 PixelFormat format = PixelFormat::RGBA_8888,
+                                                 int sampleCount = 1, bool mipMapped = false,
                                                  ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**

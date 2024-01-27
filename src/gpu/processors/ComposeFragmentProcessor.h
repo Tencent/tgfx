@@ -21,18 +21,19 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-class SeriesFragmentProcessor : public FragmentProcessor {
+class ComposeFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(std::unique_ptr<FragmentProcessor>* children,
-                                                 int count);
+  static std::unique_ptr<FragmentProcessor> Make(std::unique_ptr<FragmentProcessor> f,
+                                                 std::unique_ptr<FragmentProcessor> g);
 
   std::string name() const override {
-    return "SeriesFragmentProcessor";
+    return "ComposeFragmentProcessor";
   }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children, int count);
+  ComposeFragmentProcessor(std::unique_ptr<FragmentProcessor> f,
+                           std::unique_ptr<FragmentProcessor> g);
 };
 }  // namespace tgfx

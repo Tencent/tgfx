@@ -18,12 +18,13 @@
 
 #pragma once
 
-#include "gpu/processors/SeriesFragmentProcessor.h"
+#include "gpu/processors/ComposeFragmentProcessor.h"
 
 namespace tgfx {
-class GLSeriesFragmentProcessor : public SeriesFragmentProcessor {
+class GLComposeFragmentProcessor : public ComposeFragmentProcessor {
  public:
-  GLSeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children, int count);
+  GLComposeFragmentProcessor(std::unique_ptr<FragmentProcessor> f,
+                             std::unique_ptr<FragmentProcessor> g);
 
   void emitCode(EmitArgs& args) const override;
 };

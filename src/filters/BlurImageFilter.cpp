@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BlurImageFilter.h"
-#include "gpu/SurfaceDrawContext.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/DualBlurFragmentProcessor.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 static const float BLUR_LEVEL_1_LIMIT = 10.0f;
@@ -66,7 +68,8 @@ static std::tuple<int, float, float> Get(float blurriness) {
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode, const Rect* cropRect) {
-  if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
+  if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0) ||
+      (cropRect && cropRect->isEmpty())) {
     return nullptr;
   }
   auto x = Get(blurrinessX);
@@ -82,24 +85,19 @@ BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iterat
       tileMode(tileMode) {
 }
 
-void BlurImageFilter::draw(Surface* toSurface, std::shared_ptr<Image> image, bool isDown,
-                           const Rect* imageBounds, TileMode mode) const {
-  auto drawContext = std::make_unique<SurfaceDrawContext>(toSurface);
-  auto dstRect = Rect::MakeWH(toSurface->width(), toSurface->height());
-  auto textureWidth = imageBounds ? imageBounds->width() : static_cast<float>(image->width());
-  auto textureHeight = imageBounds ? imageBounds->height() : static_cast<float>(image->height());
-  auto texelSize = Size::Make(0.5f / textureWidth, 0.5f / textureHeight);
+void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
+                           std::unique_ptr<FragmentProcessor> imageProcessor,
+                           const Rect& imageBounds, bool isDown) const {
+  auto dstWidth = static_cast<float>(renderTarget->width());
+  auto dstHeight = static_cast<float>(renderTarget->height());
   auto localMatrix =
-      Matrix::MakeScale(textureWidth / dstRect.width(), textureHeight / dstRect.height());
-  if (imageBounds) {
-    localMatrix.postTranslate(imageBounds->x(), imageBounds->y());
-  }
-  ImageFPArgs args(toSurface->getContext(), {}, toSurface->options()->renderFlags(), mode, mode);
-  auto imageProcessor = FragmentProcessor::MakeFromImage(image, args);
+      Matrix::MakeScale(imageBounds.width() / dstWidth, imageBounds.height() / dstHeight);
+  localMatrix.postTranslate(imageBounds.x(), imageBounds.y());
+  auto texelSize = Size::Make(0.5f / imageBounds.width(), 0.5f / imageBounds.height());
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
-  drawContext->fillRectWithFP(dstRect, localMatrix, std::move(blurProcessor));
+  fillRenderTargetWithFP(std::move(renderTarget), std::move(blurProcessor), localMatrix);
 }
 
 Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -115,41 +113,44 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
   if (!applyCropRect(inputBounds, &dstBounds, clipBounds)) {
     return nullptr;
   }
-  int tw = static_cast<int>(dstBounds.width() * downScaling);
-  int th = static_cast<int>(dstBounds.height() * downScaling);
-  std::vector<std::pair<int, int>> upSurfaces;
-  upSurfaces.emplace_back(static_cast<int>(dstBounds.width()),
-                          static_cast<int>(dstBounds.height()));
-  std::shared_ptr<Image> lastImage = nullptr;
-  for (int i = 0; i < iteration; ++i) {
-    auto surface = Surface::Make(args.context, tw, th);
-    if (surface == nullptr) {
-      return {};
-    }
-    upSurfaces.emplace_back(tw, th);
-    if (lastImage == nullptr) {
-      draw(surface.get(), source, true, &dstBounds, tileMode);
-    } else {
-      draw(surface.get(), lastImage, true);
-    }
-    lastImage = surface->makeImageSnapshot();
-    tw = std::max(static_cast<int>(static_cast<float>(tw) * downScaling), 1);
-    th = std::max(static_cast<int>(static_cast<float>(th) * downScaling), 1);
+  ImageFPArgs imageArgs(args.context, {}, args.renderFlags, tileMode, tileMode);
+  auto processor = FragmentProcessor::MakeFromImage(source, imageArgs, nullptr, &dstBounds);
+  auto imageBounds = dstBounds;
+  std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
+  auto mipMapped = source->hasMipmaps() && args.sampling.mipMapMode != MipMapMode::None;
+  auto lastRenderTarget = RenderTargetProxy::Make(
+      args.context, static_cast<int>(imageBounds.width()), static_cast<int>(imageBounds.height()),
+      PixelFormat::RGBA_8888, 1, mipMapped);
+  if (lastRenderTarget == nullptr) {
+    return nullptr;
   }
-  for (size_t i = upSurfaces.size() - 1; i > 0; --i) {
-    auto width = upSurfaces[i - 1].first;
-    auto height = upSurfaces[i - 1].second;
-    auto surface = Surface::Make(args.context, width, height);
-    if (surface == nullptr) {
-      return {};
+  for (int i = 0; i < iteration; ++i) {
+    renderTargets.push_back(lastRenderTarget);
+    if (processor == nullptr) {
+      processor = TextureEffect::Make(lastRenderTarget->getTextureProxy());
     }
-    draw(surface.get(), lastImage, false);
-    lastImage = surface->makeImageSnapshot();
+    int downWidth = static_cast<int>(imageBounds.width() * downScaling);
+    int downHeight = static_cast<int>(imageBounds.height() * downScaling);
+    auto renderTarget = RenderTargetProxy::Make(args.context, downWidth, downHeight);
+    if (renderTarget == nullptr) {
+      return nullptr;
+    }
+    draw(renderTarget, std::move(processor), imageBounds, true);
+    lastRenderTarget = renderTarget;
+    imageBounds = Rect::MakeWH(downWidth, downHeight);
+  }
+  for (size_t i = renderTargets.size(); i > 0; --i) {
+    processor = TextureEffect::Make(lastRenderTarget->getTextureProxy());
+    auto renderTarget = renderTargets[i - 1];
+    draw(renderTarget, std::move(processor), imageBounds, false);
+    lastRenderTarget = renderTarget;
+    imageBounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   }
   auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
   if (localMatrix != nullptr) {
     matrix.preConcat(*localMatrix);
   }
-  return FragmentProcessor::MakeFromImage(lastImage, args, &matrix);
+  return TiledTextureEffect::Make(lastRenderTarget->getTextureProxy(), args.tileModeX,
+                                  args.tileModeY, args.sampling, &matrix);
 }
 }  // namespace tgfx

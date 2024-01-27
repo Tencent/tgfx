@@ -25,6 +25,8 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+class RenderTargetProxy;
+
 class ImageFilter {
  public:
   static std::shared_ptr<ImageFilter> Blur(float blurrinessX, float blurrinessY,
@@ -51,6 +53,10 @@ class ImageFilter {
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
+  void fillRenderTargetWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
+                              std::unique_ptr<FragmentProcessor> fp,
+                              const Matrix& localMatrix) const;
+
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
   /**
@@ -65,5 +71,6 @@ class ImageFilter {
   Rect* cropRect = nullptr;
 
   friend class FilterImage;
+  friend class DropShadowImageFilter;
 };
 }  // namespace tgfx

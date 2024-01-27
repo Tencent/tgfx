@@ -27,12 +27,12 @@ namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
-                                                 const SamplingOptions& sampling,
+                                                 const SamplingOptions& sampling = {},
                                                  const Matrix* localMatrix = nullptr);
 
   static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
-                                                       const SamplingOptions& sampling,
                                                        const Point& alphaStart,
+                                                       const SamplingOptions& sampling = {},
                                                        const Matrix* localMatrix = nullptr);
 
   std::string name() const override {

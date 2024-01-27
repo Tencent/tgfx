@@ -145,8 +145,8 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
     dstTextureSamplerHandle = emitSampler(dstTexture->getSampler(), "DstTextureSampler");
   }
 
-  std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1)";
-  std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1)";
+  std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
+  std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1.0)";
   XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
                                fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle);
   xferProcessor->emitCode(args);

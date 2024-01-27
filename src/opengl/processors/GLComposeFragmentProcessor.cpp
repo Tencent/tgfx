@@ -16,27 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSeriesFragmentProcessor.h"
+#include "GLComposeFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> SeriesFragmentProcessor::Make(
-    std::unique_ptr<FragmentProcessor>* children, int count) {
-  if (!count) {
+std::unique_ptr<FragmentProcessor> ComposeFragmentProcessor::Make(
+    std::unique_ptr<FragmentProcessor> f, std::unique_ptr<FragmentProcessor> g) {
+  if (f == nullptr && g == nullptr) {
     return nullptr;
   }
-  if (1 == count) {
-    return std::move(children[0]);
+  if (f == nullptr) {
+    return g;
   }
-  return std::unique_ptr<FragmentProcessor>(new GLSeriesFragmentProcessor(children, count));
+  if (g == nullptr) {
+    return f;
+  }
+  return std::unique_ptr<FragmentProcessor>(
+      new GLComposeFragmentProcessor(std::move(f), std::move(g)));
 }
 
-GLSeriesFragmentProcessor::GLSeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children,
-                                                     int count)
-    : SeriesFragmentProcessor(children, count) {
+GLComposeFragmentProcessor::GLComposeFragmentProcessor(std::unique_ptr<FragmentProcessor> f,
+                                                       std::unique_ptr<FragmentProcessor> g)
+    : ComposeFragmentProcessor(std::move(f), std::move(g)) {
 }
 
-void GLSeriesFragmentProcessor::emitCode(EmitArgs& args) const {
-  // First guy's input might be nil.
+void GLComposeFragmentProcessor::emitCode(EmitArgs& args) const {
+  // The first guy's input might be nil.
   std::string temp = "out0";
   emitChild(0, args.inputColor, &temp, args);
   std::string input = temp;
@@ -45,7 +49,7 @@ void GLSeriesFragmentProcessor::emitCode(EmitArgs& args) const {
     emitChild(i, input, &temp, args);
     input = temp;
   }
-  // Last guy writes to our output variable.
+  // The last guy writes to our output variable.
   emitChild(numChildProcessors() - 1, input, args);
 }
 }  // namespace tgfx

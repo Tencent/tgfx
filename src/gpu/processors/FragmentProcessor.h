@@ -81,15 +81,13 @@ class FragmentProcessor : public Processor {
       std::unique_ptr<FragmentProcessor> child, bool inverted = false);
 
   /**
-   * Returns a fragment processor that runs the passed in an array of fragment processors in a
-   * series. The original input is passed to the first, the first's output is passed to the
-   * second, etc. The output of the returned processor is the output of the last processor of the
-   * series.
-   *
-   * The array elements with be moved.
+   * Returns a fragment processor that composes two fragment processors `f` and `g` into f(g(x)).
+   * This is equivalent to running them in series (`g`, then `f`). This is not the same as
+   * transfer-mode composition; there is no blending step.
    */
-  static std::unique_ptr<FragmentProcessor> RunInSeries(std::unique_ptr<FragmentProcessor>* series,
-                                                        int count);
+  static std::unique_ptr<FragmentProcessor> Compose(std::unique_ptr<FragmentProcessor> f,
+                                                    std::unique_ptr<FragmentProcessor> g);
+
   /**
    * Creates a fragment processor that will draw the given image with the ImageFPArgs options.
    */

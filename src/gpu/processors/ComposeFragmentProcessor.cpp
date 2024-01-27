@@ -16,14 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SeriesFragmentProcessor.h"
+#include "ComposeFragmentProcessor.h"
 
 namespace tgfx {
-SeriesFragmentProcessor::SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children,
-                                                 int count)
+ComposeFragmentProcessor::ComposeFragmentProcessor(std::unique_ptr<FragmentProcessor> f,
+                                                   std::unique_ptr<FragmentProcessor> g)
     : FragmentProcessor(ClassID()) {
-  for (int i = 0; i < count; ++i) {
-    registerChildProcessor(std::move(children[i]));
-  }
+  registerChildProcessor(std::move(f));
+  registerChildProcessor(std::move(g));
 }
 }  // namespace tgfx

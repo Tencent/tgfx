@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageFilter.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/ops/ClearOp.h"
+#include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -49,6 +52,25 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
     return dstRect->intersect(*clipBounds);
   }
   return true;
+}
+
+void ImageFilter::fillRenderTargetWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                         std::unique_ptr<FragmentProcessor> fp,
+                                         const Matrix& localMatrix) const {
+  if (renderTarget == nullptr || fp == nullptr) {
+    return;
+  }
+  auto dstRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
+  auto op = FillRectOp::Make(std::nullopt, dstRect, Matrix::I(), localMatrix);
+  std::vector<std::unique_ptr<FragmentProcessor>> colors;
+  colors.emplace_back(std::move(fp));
+  op->setColors(std::move(colors));
+  op->setBlendMode(BlendMode::Src);
+  auto drawingManager = renderTarget->getContext()->drawingManager();
+  auto opsTask = drawingManager->addOpsTask(renderTarget);
+  auto clearOp = ClearOp::Make(Color::Transparent(), dstRect);
+  opsTask->addOp(std::move(op));
+  drawingManager->addTextureResolveTask(renderTarget);
 }
 
 Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
