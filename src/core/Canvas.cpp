@@ -192,7 +192,9 @@ static bool PaintToGLPaint(Context* context, uint32_t renderFlags, const Paint& 
                            std::unique_ptr<FragmentProcessor> shaderProcessor, GpuPaint* glPaint) {
   FPArgs args(context, renderFlags);
   glPaint->context = context;
-  glPaint->color = paint.getColor().makeOpaque();
+  auto color = paint.getColor();
+  color.alpha *= alpha;
+  glPaint->color = color.premultiply();
   std::unique_ptr<FragmentProcessor> shaderFP;
   if (shaderProcessor) {
     shaderFP = std::move(shaderProcessor);
@@ -202,16 +204,8 @@ static bool PaintToGLPaint(Context* context, uint32_t renderFlags, const Paint& 
       return false;
     }
   }
-  alpha *= paint.getAlpha();
   if (shaderFP) {
     glPaint->colorFragmentProcessors.emplace_back(std::move(shaderFP));
-    if (alpha != 1.f) {
-      glPaint->colorFragmentProcessors.emplace_back(
-          ConstColorProcessor::Make(Color{alpha, alpha, alpha, alpha}, InputMode::ModulateRGBA));
-    }
-  } else {
-    glPaint->color.alpha = alpha;
-    glPaint->color = glPaint->color.premultiply();
   }
   if (auto colorFilter = paint.getColorFilter()) {
     if (auto processor = colorFilter->asFragmentProcessor()) {
