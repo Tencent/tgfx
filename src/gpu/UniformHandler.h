@@ -31,7 +31,7 @@ class UniformHandler {
   virtual ~UniformHandler() = default;
 
   /**
-   * Add a uniform variable to the current program, that has visibility in one or more shaders.
+   * Adds a uniform variable to the current program, that has visibility in one or more shaders.
    * visibility is a bitfield of ShaderFlag values indicating from which shaders the uniform should
    * be accessible. At least one bit must be set. The actual uniform name will be mangled. Returns
    * the final uniform name.
@@ -39,6 +39,11 @@ class UniformHandler {
   std::string addUniform(ShaderFlags visibility, SLType type, const std::string& name) {
     return internalAddUniform(visibility, type, name);
   }
+
+  /**
+   * Adds a sampler to the current program.
+   */
+  SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name);
 
  protected:
   explicit UniformHandler(ProgramBuilder* program) : programBuilder(program) {
@@ -48,14 +53,17 @@ class UniformHandler {
   ProgramBuilder* programBuilder;
 
  private:
+  std::unordered_map<const TextureSampler*, SamplerHandle> samplerMap = {};
+
   virtual const ShaderVar& samplerVariable(SamplerHandle samplerHandle) const = 0;
 
   virtual const Swizzle& samplerSwizzle(SamplerHandle samplerHandle) const = 0;
 
-  virtual SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name) = 0;
-
   virtual std::string internalAddUniform(ShaderFlags visibility, SLType type,
                                          const std::string& name) = 0;
+
+  virtual SamplerHandle internalAddSampler(const TextureSampler* sampler,
+                                           const std::string& name) = 0;
 
   virtual std::string getUniformDeclarations(ShaderFlags visibility) const = 0;
 
