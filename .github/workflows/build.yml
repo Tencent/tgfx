@@ -11,13 +11,13 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             /usr/local/Cellar/ninja
@@ -30,7 +30,7 @@ jobs:
 
       - name: Get Third-Party Cache
         id: third-party-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             third_party
@@ -57,7 +57,7 @@ jobs:
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             /usr/local/Cellar/ninja
@@ -69,7 +69,7 @@ jobs:
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             third_party
@@ -86,13 +86,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             third_party
@@ -126,7 +126,7 @@ jobs:
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             third_party
@@ -143,13 +143,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             web/emsdk
@@ -159,7 +159,7 @@ jobs:
 
       - name: Get Third-Party Cache
         id: third-party-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             third_party
@@ -191,7 +191,7 @@ jobs:
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             web/emsdk
@@ -200,7 +200,7 @@ jobs:
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             third_party
@@ -220,13 +220,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             third_party
@@ -245,7 +245,7 @@ jobs:
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             third_party
@@ -262,13 +262,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             third_party
@@ -289,7 +289,7 @@ jobs:
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             third_party
@@ -306,13 +306,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             third_party
@@ -344,7 +344,7 @@ jobs:
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             third_party
