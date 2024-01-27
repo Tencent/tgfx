@@ -22,7 +22,6 @@
 #include "core/Rasterizer.h"
 #include "gpu/GpuPaint.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/SurfaceDrawContext.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
@@ -53,15 +52,10 @@ static uint32_t NextClipID() {
 }
 
 Canvas::Canvas(Surface* surface) : surface(surface), clipID(kDefaultClipID) {
-  drawContext = new SurfaceDrawContext(surface);
   state = std::make_shared<CanvasState>();
   state->clip.addRect(0, 0, static_cast<float>(surface->width()),
                       static_cast<float>(surface->height()));
   state->clipID = NextClipID();
-}
-
-Canvas::~Canvas() {
-  delete drawContext;
 }
 
 void Canvas::save() {
@@ -689,7 +683,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
 
 bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
   if (!paint.colorFragmentProcessors.empty() || !paint.coverageFragmentProcessors.empty() ||
-      !state->matrix.rectStaysRect() || drawContext == nullptr) {
+      !state->matrix.rectStaysRect()) {
     return false;
   }
   auto color = paint.color;
@@ -717,11 +711,11 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
     if (useScissor) {
       FlipYIfNeeded(&bounds, surface);
       rect->intersect(bounds);
-      drawContext->addOp(ClearOp::Make(color, *rect));
+      surface->addOp(ClearOp::Make(color, *rect));
       return true;
     } else if (rect->isEmpty()) {
       FlipYIfNeeded(&bounds, surface);
-      drawContext->addOp(ClearOp::Make(color, bounds));
+      surface->addOp(ClearOp::Make(color, bounds));
       return true;
     }
   }
@@ -729,9 +723,6 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
 }
 
 void Canvas::draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa) {
-  if (drawContext == nullptr) {
-    return;
-  }
   auto aaType = AAType::None;
   if (surface->renderTargetProxy->sampleCount() > 1) {
     aaType = AAType::MSAA;
@@ -756,6 +747,6 @@ void Canvas::draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa) {
   op->setColors(std::move(paint.colorFragmentProcessors));
   op->setMasks(std::move(masks));
   surface->aboutToDraw(false);
-  drawContext->addOp(std::move(op));
+  surface->addOp(std::move(op));
 }
 }  // namespace tgfx

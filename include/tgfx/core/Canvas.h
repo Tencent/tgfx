@@ -33,7 +33,6 @@ class Surface;
 class SurfaceOptions;
 class Texture;
 struct CanvasState;
-class SurfaceDrawContext;
 class GpuPaint;
 
 /**
@@ -45,8 +44,6 @@ class GpuPaint;
 class Canvas {
  public:
   explicit Canvas(Surface* surface);
-
-  ~Canvas();
 
   /**
    * Retrieves the context associated with this Surface.
@@ -247,7 +244,6 @@ class Canvas {
   std::shared_ptr<Surface> _clipSurface = nullptr;
   uint32_t clipID = 0;
   std::shared_ptr<CanvasState> state = nullptr;
-  SurfaceDrawContext* drawContext = nullptr;
   std::vector<std::shared_ptr<CanvasState>> savedStateList = {};
 };
 }  // namespace tgfx

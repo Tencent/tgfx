@@ -242,4 +242,11 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   }
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
+
+void Surface::addOp(std::unique_ptr<Op> op) {
+  if (opsTask == nullptr || opsTask->isClosed()) {
+    opsTask = getContext()->drawingManager()->addOpsTask(renderTargetProxy);
+  }
+  opsTask->addOp(std::move(op));
+}
 }  // namespace tgfx
