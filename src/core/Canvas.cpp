@@ -20,7 +20,6 @@
 #include <atomic>
 #include "CanvasState.h"
 #include "core/Rasterizer.h"
-#include "gpu/GpuPaint.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
@@ -155,9 +154,6 @@ bool Canvas::nothingToDraw(const Paint& paint) const {
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
-  if (nothingToDraw(paint)) {
-    return;
-  }
   Path path = {};
   path.addRect(rect);
   drawPath(path, paint);
@@ -186,60 +182,6 @@ Surface* Canvas::getSurface() const {
 
 const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
-}
-
-static bool PaintToGLPaint(Context* context, uint32_t renderFlags, const Paint& paint, float alpha,
-                           std::unique_ptr<FragmentProcessor> shaderProcessor, GpuPaint* glPaint) {
-  FPArgs args(context, renderFlags);
-  glPaint->context = context;
-  auto color = paint.getColor();
-  color.alpha *= alpha;
-  glPaint->color = color.premultiply();
-  std::unique_ptr<FragmentProcessor> shaderFP;
-  if (shaderProcessor) {
-    shaderFP = std::move(shaderProcessor);
-  } else if (auto shader = paint.getShader()) {
-    shaderFP = shader->asFragmentProcessor(args);
-    if (shaderFP == nullptr) {
-      return false;
-    }
-  }
-  if (shaderFP) {
-    glPaint->colorFragmentProcessors.emplace_back(std::move(shaderFP));
-  }
-  if (auto colorFilter = paint.getColorFilter()) {
-    if (auto processor = colorFilter->asFragmentProcessor()) {
-      glPaint->colorFragmentProcessors.emplace_back(std::move(processor));
-    } else {
-      return false;
-    }
-  }
-  if (auto maskFilter = paint.getMaskFilter()) {
-    if (auto processor = maskFilter->asFragmentProcessor(args)) {
-      glPaint->coverageFragmentProcessors.emplace_back(std::move(processor));
-    }
-  }
-  return true;
-}
-
-static bool PaintToGLPaintWithImage(Context* context, uint32_t renderFlags, const Paint& paint,
-                                    float alpha, std::unique_ptr<FragmentProcessor> fp,
-                                    bool imageIsAlphaOnly, GpuPaint* glPaint) {
-  std::unique_ptr<FragmentProcessor> shaderFP;
-  if (imageIsAlphaOnly) {
-    if (auto shader = paint.getShader()) {
-      shaderFP = shader->asFragmentProcessor(FPArgs(context, renderFlags));
-      if (!shaderFP) {
-        return false;
-      }
-      shaderFP = FragmentProcessor::Compose(std::move(shaderFP), std::move(fp));
-    } else {
-      shaderFP = std::move(fp);
-    }
-  } else {
-    shaderFP = FragmentProcessor::MulChildByInputAlpha(std::move(fp));
-  }
-  return PaintToGLPaint(context, renderFlags, paint, alpha, std::move(shaderFP), glPaint);
 }
 
 std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
@@ -364,11 +306,6 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (shape == nullptr || nothingToDraw(paint)) {
     return;
   }
-  GpuPaint glPaint;
-  if (!PaintToGLPaint(getContext(), surface->options()->renderFlags(), paint, state->alpha, nullptr,
-                      &glPaint)) {
-    return;
-  }
   auto bounds = shape->getBounds();
   if (!state->matrix.isIdentity()) {
     state->matrix.mapRect(&bounds);
@@ -378,11 +315,13 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (!clipBounds.intersect(bounds)) {
     return;
   }
-  auto op = shape->makeOp(&glPaint, state->matrix, surface->options()->renderFlags());
+  auto inputColor = getInputColor(paint);
+  auto op =
+      shape->makeOp(getContext(), inputColor, state->matrix, surface->options()->renderFlags());
   if (op == nullptr) {
     return;
   }
-  draw(std::move(op), std::move(glPaint));
+  drawOp(std::move(op), paint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
@@ -424,43 +363,58 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
     realPaint.setImageFilter(nullptr);
     concat(Matrix::MakeTrans(offset.x, offset.y));
   }
-  drawImage(std::move(image), sampling, realPaint);
-  setMatrix(oldMatrix);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint& paint) {
-  if (image == nullptr) {
-    return;
-  }
   auto localBounds = clipLocalBounds(Rect::MakeWH(image->width(), image->height()));
   if (localBounds.isEmpty()) {
     return;
   }
   auto clipBounds = localBounds;
   clipBounds.roundOut();
-  ImageFPArgs args(getContext(), sampling, surface->options()->renderFlags());
-  auto processor = FragmentProcessor::MakeFromImage(image, args, nullptr, &clipBounds);
-  if (processor == nullptr) {
+  auto shader = realPaint.getShader();
+  if (shader != nullptr) {
+    realPaint.setShader(nullptr);
+  }
+  auto imageProcessor = getImageProcessor(std::move(image), sampling, clipBounds, shader);
+  if (imageProcessor == nullptr) {
     return;
   }
-  GpuPaint glPaint;
-  if (!PaintToGLPaintWithImage(getContext(), surface->options()->renderFlags(), paint, state->alpha,
-                               std::move(processor), image->isAlphaOnly(), &glPaint)) {
-    return;
-  }
-  auto op = FillRectOp::Make(glPaint.color, localBounds, state->matrix);
-  draw(std::move(op), std::move(glPaint), true);
+  auto op = FillRectOp::Make(getInputColor(realPaint), localBounds, state->matrix);
+  op->addColorFP(std::move(imageProcessor));
+  drawOp(std::move(op), realPaint, true);
+  setMatrix(oldMatrix);
 }
 
-static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const GpuPaint& glPaint,
+std::unique_ptr<FragmentProcessor> Canvas::getImageProcessor(std::shared_ptr<Image> image,
+                                                             SamplingOptions sampling,
+                                                             const Rect& clipBounds,
+                                                             std::shared_ptr<Shader> shader) {
+  ImageFPArgs args(getContext(), sampling, surface->options()->renderFlags());
+  auto imageProcessor = FragmentProcessor::MakeFromImage(image, args, nullptr, &clipBounds);
+  if (imageProcessor == nullptr) {
+    return nullptr;
+  }
+  if (!image->isAlphaOnly()) {
+    return FragmentProcessor::MulChildByInputAlpha(std::move(imageProcessor));
+  }
+  if (shader == nullptr) {
+    return imageProcessor;
+  }
+  FPArgs fpArgs(getContext(), surface->options()->renderFlags());
+  auto processor = shader->asFragmentProcessor(fpArgs);
+  if (!processor) {
+    return nullptr;
+  }
+  return FragmentProcessor::Compose(std::move(processor), std::move(imageProcessor));
+}
+
+static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const Color& color,
                                                 const Matrix& viewMatrix) {
   auto rect = Rect::MakeEmpty();
   if (path.asRect(&rect)) {
-    return FillRectOp::Make(glPaint.color, rect, viewMatrix);
+    return FillRectOp::Make(color, rect, viewMatrix);
   }
   RRect rRect;
   if (path.asRRect(&rRect)) {
-    return RRectOp::Make(glPaint.color, rRect, viewMatrix);
+    return RRectOp::Make(color, rRect, viewMatrix);
   }
   return nullptr;
 }
@@ -469,22 +423,18 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
   if (path.isEmpty()) {
     return;
   }
-  GpuPaint glPaint;
-  if (!PaintToGLPaint(getContext(), surface->options()->renderFlags(), paint, state->alpha, nullptr,
-                      &glPaint)) {
-    return;
-  }
   auto bounds = path.getBounds();
   auto localBounds = clipLocalBounds(bounds);
   if (localBounds.isEmpty()) {
     return;
   }
-  if (drawAsClear(path, glPaint)) {
+  if (drawAsClear(path, paint)) {
     return;
   }
-  auto op = MakeSimplePathOp(path, glPaint, state->matrix);
+  auto inputColor = getInputColor(paint);
+  auto op = MakeSimplePathOp(path, inputColor, state->matrix);
   if (op) {
-    draw(std::move(op), std::move(glPaint));
+    drawOp(std::move(op), paint);
     return;
   }
   auto localMatrix = Matrix::I();
@@ -493,11 +443,11 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
   }
   auto tempPath = path;
   tempPath.transform(state->matrix);
-  op = TriangulatingPathOp::Make(glPaint.color, tempPath, state->clip.getBounds(), localMatrix);
+  op = TriangulatingPathOp::Make(inputColor, tempPath, state->clip.getBounds(), localMatrix);
   if (op) {
     save();
     resetMatrix();
-    draw(std::move(op), std::move(glPaint));
+    drawOp(std::move(op), paint);
     restore();
     return;
   }
@@ -511,10 +461,10 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
   auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), totalMatrix);
   auto textureProxy = getContext()->proxyProvider()->createTextureProxy(
       {}, std::move(rasterizer), false, surface->options()->renderFlags());
-  drawMask(deviceBounds, std::move(textureProxy), std::move(glPaint));
+  drawMask(deviceBounds, std::move(textureProxy), paint);
 }
 
-void Canvas::drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, GpuPaint glPaint) {
+void Canvas::drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, const Paint& paint) {
   if (mask == nullptr) {
     return;
   }
@@ -534,10 +484,14 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, Gp
                             static_cast<float>(mask->height()) / bounds.height());
   auto oldMatrix = state->matrix;
   resetMatrix();
-  glPaint.coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
-      TextureEffect::Make(std::move(mask), SamplingOptions(), &maskLocalMatrix)));
-  auto op = FillRectOp::Make(glPaint.color, bounds, state->matrix, localMatrix);
-  draw(std::move(op), std::move(glPaint));
+  auto op = FillRectOp::Make(getInputColor(paint), bounds, state->matrix, localMatrix);
+  auto maskProcessor = FragmentProcessor::MulInputByChildAlpha(
+      TextureEffect::Make(std::move(mask), SamplingOptions(), &maskLocalMatrix));
+  if (maskProcessor == nullptr) {
+    return;
+  }
+  op->addMaskFP(std::move(maskProcessor));
+  drawOp(std::move(op), paint);
   setMatrix(oldMatrix);
 }
 
@@ -603,11 +557,6 @@ void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& pai
   if (textBlob == nullptr) {
     return;
   }
-  GpuPaint glPaint;
-  if (!PaintToGLPaint(getContext(), surface->options()->renderFlags(), paint, state->alpha, nullptr,
-                      &glPaint)) {
-    return;
-  }
   auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
   auto localBounds = clipLocalBounds(textBlob->getBounds(stroke));
   if (localBounds.isEmpty()) {
@@ -624,7 +573,7 @@ void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& pai
   auto rasterizer = Rasterizer::MakeFrom(textBlob, ISize::Make(width, height), totalMatrix, stroke);
   auto textureProxy = getContext()->proxyProvider()->createTextureProxy(
       {}, std::move(rasterizer), false, surface->options()->renderFlags());
-  drawMask(deviceBounds, std::move(textureProxy), std::move(glPaint));
+  drawMask(deviceBounds, std::move(textureProxy), paint);
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
@@ -669,18 +618,21 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     if (processor == nullptr) {
       return;
     }
-    GpuPaint glPaint;
-    glPaint.colorFragmentProcessors.emplace_back(std::move(processor));
-    draw(std::move(rectOp), std::move(glPaint), false);
+    rectOp->addColorFP(std::move(processor));
+    drawOp(std::move(rectOp), {});
   }
 }
 
-bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
-  if (!paint.colorFragmentProcessors.empty() || !paint.coverageFragmentProcessors.empty() ||
-      !state->matrix.rectStaysRect()) {
+static bool HasColorOnly(const Paint& paint) {
+  return paint.getColorFilter() == nullptr && paint.getShader() == nullptr &&
+         paint.getImageFilter() == nullptr && paint.getMaskFilter() == nullptr;
+}
+
+bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
+  if (!HasColorOnly(paint) || !state->matrix.rectStaysRect()) {
     return false;
   }
-  auto color = paint.color;
+  auto color = getInputColor(paint);
   if (getBlendMode() == BlendMode::Clear) {
     color = Color::Transparent();
   } else if (getBlendMode() != BlendMode::Src) {
@@ -716,7 +668,10 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
   return false;
 }
 
-void Canvas::draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa) {
+void Canvas::drawOp(std::unique_ptr<DrawOp> op, const Paint& paint, bool aa) {
+  if (!getProcessors(paint, op.get())) {
+    return;
+  }
   auto aaType = AAType::None;
   if (surface->renderTargetProxy->sampleCount() > 1) {
     aaType = AAType::MSAA;
@@ -729,18 +684,50 @@ void Canvas::draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa) {
       aaType = AAType::Coverage;
     }
   }
-  auto masks = std::move(paint.coverageFragmentProcessors);
   Rect scissorRect = Rect::MakeEmpty();
   auto clipMask = getClipMask(op->bounds(), &scissorRect);
   if (clipMask) {
-    masks.push_back(std::move(clipMask));
+    op->addMaskFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
   op->setBlendMode(state->blendMode);
   op->setAA(aaType);
-  op->setColors(std::move(paint.colorFragmentProcessors));
-  op->setMasks(std::move(masks));
   surface->aboutToDraw(false);
   surface->addOp(std::move(op));
+}
+
+Color Canvas::getInputColor(const Paint& paint) {
+  auto color = paint.getColor();
+  color.alpha *= state->alpha;
+  return color.premultiply();
+}
+
+bool Canvas::getProcessors(const Paint& paint, DrawOp* drawOp) {
+  if (drawOp == nullptr) {
+    return false;
+  }
+  FPArgs args(getContext(), surface->options()->renderFlags());
+  if (auto shader = paint.getShader()) {
+    auto shaderFP = shader->asFragmentProcessor(args);
+    if (shaderFP == nullptr) {
+      return false;
+    }
+    drawOp->addColorFP(std::move(shaderFP));
+  }
+  if (auto colorFilter = paint.getColorFilter()) {
+    if (auto processor = colorFilter->asFragmentProcessor()) {
+      drawOp->addColorFP(std::move(processor));
+    } else {
+      return false;
+    }
+  }
+  if (auto maskFilter = paint.getMaskFilter()) {
+    if (auto processor = maskFilter->asFragmentProcessor(args)) {
+      drawOp->addMaskFP(std::move(processor));
+    } else {
+      return false;
+    }
+  }
+  return true;
 }
 }  // namespace tgfx

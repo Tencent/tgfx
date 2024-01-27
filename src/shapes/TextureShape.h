@@ -20,6 +20,7 @@
 
 #include "PathShape.h"
 #include "core/Rasterizer.h"
+#include "gpu/ResourceKey.h"
 
 namespace tgfx {
 class TextureShape : public PathShape {
@@ -30,7 +31,7 @@ class TextureShape : public PathShape {
   ResourceKey resourceKey = {};
   std::shared_ptr<Rasterizer> rasterizer = nullptr;
 
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
+  std::unique_ptr<DrawOp> makeOp(Context* context, const Color& color, const Matrix& viewMatrix,
                                  uint32_t renderFlags) const override;
 };
 }  // namespace tgfx

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "gpu/GpuPaint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TextBlob.h"

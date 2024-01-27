@@ -49,12 +49,12 @@ class DrawOp : public Op {
     aa = type;
   }
 
-  void setColors(std::vector<std::unique_ptr<FragmentProcessor>> colors) {
-    _colors = std::move(colors);
+  void addColorFP(std::unique_ptr<FragmentProcessor> colorProcessor) {
+    _colors.emplace_back(std::move(colorProcessor));
   }
 
-  void setMasks(std::vector<std::unique_ptr<FragmentProcessor>> masks) {
-    _masks = std::move(masks);
+  void addMaskFP(std::unique_ptr<FragmentProcessor> maskProcessor) {
+    _masks.emplace_back(std::move(maskProcessor));
   }
 
  protected:

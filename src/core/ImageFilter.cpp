@@ -62,9 +62,7 @@ void ImageFilter::fillRenderTargetWithFP(std::shared_ptr<RenderTargetProxy> rend
   }
   auto dstRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   auto op = FillRectOp::Make(std::nullopt, dstRect, Matrix::I(), localMatrix);
-  std::vector<std::unique_ptr<FragmentProcessor>> colors;
-  colors.emplace_back(std::move(fp));
-  op->setColors(std::move(colors));
+  op->addColorFP(std::move(fp));
   op->setBlendMode(BlendMode::Src);
   auto drawingManager = renderTarget->getContext()->drawingManager();
   auto opsTask = drawingManager->addOpsTask(renderTarget);

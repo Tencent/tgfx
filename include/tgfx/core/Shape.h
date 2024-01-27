@@ -27,8 +27,6 @@
 namespace tgfx {
 class DrawOp;
 
-class GpuPaint;
-
 /**
  * Represents a geometric shape that can be used as a drawing mask. Shape is usually used to cache a
  * complex Path or TextBlob for frequent drawing. Unlike Path or TextBlob, Shape's resolution is
@@ -86,8 +84,8 @@ class Shape {
   std::weak_ptr<Shape> weakThis;
   float _resolutionScale = 1.0f;
 
-  virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                         uint32_t renderFlags) const = 0;
+  virtual std::unique_ptr<DrawOp> makeOp(Context* context, const Color& color,
+                                         const Matrix& viewMatrix, uint32_t renderFlags) const = 0;
 
   friend class Canvas;
 };
