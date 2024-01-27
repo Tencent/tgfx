@@ -33,7 +33,6 @@ class Surface;
 class SurfaceOptions;
 class Texture;
 struct CanvasState;
-class GpuPaint;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
@@ -215,35 +214,29 @@ class Canvas {
   void flush();
 
  private:
-  std::shared_ptr<TextureProxy> getClipTexture();
-
-  std::pair<std::optional<Rect>, bool> getClipRect();
-
-  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
-
-  Rect clipLocalBounds(Rect localBounds);
-
-  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint& paint);
-
-  void drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, GpuPaint paint);
-
-  void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
-                       const Font& font, const Paint& paint);
-
-  void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
-
-  void fillPath(const Path& path, const Paint& paint);
-
-  bool drawAsClear(const Path& path, const GpuPaint& paint);
-
-  void draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa = false);
-
-  bool nothingToDraw(const Paint& paint) const;
-
   Surface* surface = nullptr;
   std::shared_ptr<Surface> _clipSurface = nullptr;
   uint32_t clipID = 0;
   std::shared_ptr<CanvasState> state = nullptr;
   std::vector<std::shared_ptr<CanvasState>> savedStateList = {};
+
+  bool nothingToDraw(const Paint& paint) const;
+  std::shared_ptr<TextureProxy> getClipTexture();
+  std::pair<std::optional<Rect>, bool> getClipRect();
+  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
+  Rect clipLocalBounds(Rect localBounds);
+  std::unique_ptr<FragmentProcessor> getImageProcessor(std::shared_ptr<Image> image,
+                                                       SamplingOptions sampling,
+                                                       const Rect& clipBounds,
+                                                       std::shared_ptr<Shader> shader);
+  void drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, const Paint& paint);
+  void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
+                       const Font& font, const Paint& paint);
+  void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
+  void fillPath(const Path& path, const Paint& paint);
+  bool drawAsClear(const Path& path, const Paint& paint);
+  void drawOp(std::unique_ptr<DrawOp> op, const Paint& paint, bool aa = false);
+  Color getInputColor(const Paint& paint);
+  bool getProcessors(const Paint& paint, DrawOp* drawOp);
 };
 }  // namespace tgfx

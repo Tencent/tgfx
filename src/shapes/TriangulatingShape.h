@@ -21,6 +21,7 @@
 #include "PathProxy.h"
 #include "PathShape.h"
 #include "core/PathTriangulator.h"
+#include "gpu/ResourceKey.h"
 
 namespace tgfx {
 class TriangulatingShape : public PathShape {
@@ -31,7 +32,7 @@ class TriangulatingShape : public PathShape {
   ResourceKey resourceKey = {};
   std::shared_ptr<DataProvider> triangulator = nullptr;
 
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
+  std::unique_ptr<DrawOp> makeOp(Context* context, const Color& color, const Matrix& viewMatrix,
                                  uint32_t renderFlags) const override;
 };
 }  // namespace tgfx

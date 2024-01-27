@@ -50,15 +50,15 @@ TriangulatingShape::TriangulatingShape(std::shared_ptr<PathProxy> pathProxy, flo
   triangulator = std::make_shared<TriangleVerticesProvider>(path, bounds);
 }
 
-std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,
+std::unique_ptr<DrawOp> TriangulatingShape::makeOp(Context* context, const Color& color,
+                                                   const Matrix& viewMatrix,
                                                    uint32_t renderFlags) const {
-  auto proxyProvider = paint->context->proxyProvider();
+  auto proxyProvider = context->proxyProvider();
   auto bufferProxy = proxyProvider->createGpuBufferProxy(resourceKey, triangulator,
                                                          BufferType::Vertex, renderFlags);
   if (bufferProxy == nullptr) {
     return nullptr;
   }
-  return std::make_unique<TriangulatingPathOp>(paint->color, std::move(bufferProxy), bounds,
-                                               viewMatrix);
+  return std::make_unique<TriangulatingPathOp>(color, std::move(bufferProxy), bounds, viewMatrix);
 }
 }  // namespace tgfx
