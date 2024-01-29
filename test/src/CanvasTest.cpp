@@ -493,6 +493,40 @@ TGFX_TEST(CanvasTest, filterMode) {
   device->unlock();
 }
 
+TGFX_TEST(CanvasTest, rasterized) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto rasterImage = image->makeRasterized();
+  EXPECT_TRUE(rasterImage == image);
+  image = MakeImage("resources/apitest/rotation.jpg");
+  rasterImage = image->makeRasterized();
+  EXPECT_FALSE(rasterImage->hasMipmaps());
+  EXPECT_FALSE(rasterImage == image);
+  rasterImage = image->makeRasterized(0.15f);
+  EXPECT_EQ(rasterImage->width(), 454);
+  EXPECT_EQ(rasterImage->height(), 605);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 1100, 1400);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
+  canvas->clear();
+  rasterImage = rasterImage->makeMipMapped();
+  EXPECT_FALSE(rasterImage->hasMipmaps());
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
+  canvas->clear();
+  rasterImage = rasterImage->makeRasterized(2.0f);
+  EXPECT_EQ(rasterImage->width(), 908);
+  EXPECT_EQ(rasterImage->height(), 1210);
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
+  device->unlock();
+}
+
 TGFX_TEST(CanvasTest, mipmap) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);

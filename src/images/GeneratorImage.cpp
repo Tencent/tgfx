@@ -34,7 +34,7 @@ std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> 
 
 GeneratorImage::GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
                                bool mipMapped)
-    : ResourceImage(std::move(resourceKey)), generator(std::move(generator)), mipMapped(mipMapped) {
+    : RasterImage(std::move(resourceKey)), generator(std::move(generator)), mipMapped(mipMapped) {
 }
 
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context) const {

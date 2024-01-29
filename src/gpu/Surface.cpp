@@ -20,6 +20,7 @@
 #include "DrawingManager.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/RenderContext.h"
 #include "images/TextureImage.h"
 #include "utils/Log.h"
 #include "utils/PixelFormatUtil.h"
@@ -79,10 +80,12 @@ Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions*
   if (options != nullptr) {
     surfaceOptions = *options;
   }
+  renderContext = new RenderContext(renderTargetProxy);
 }
 
 Surface::~Surface() {
   delete canvas;
+  delete renderContext;
 }
 
 Context* Surface::getContext() const {
@@ -183,33 +186,6 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   return cachedImage;
 }
 
-void Surface::aboutToDraw(bool discardContent) {
-  if (cachedImage == nullptr) {
-    return;
-  }
-  auto isUnique = cachedImage.use_count() == 1;
-  cachedImage = nullptr;
-  if (isUnique) {
-    return;
-  }
-  auto textureProxy = renderTargetProxy->getTextureProxy();
-  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
-    return;
-  }
-  auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy();
-  if (newRenderTargetProxy == nullptr) {
-    LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
-    return;
-  }
-  if (!discardContent) {
-    auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
-    auto drawingManager = getContext()->drawingManager();
-    drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy,
-                                            Rect::MakeWH(width(), height()), Point::Zero());
-  }
-  std::swap(renderTargetProxy, newRenderTargetProxy);
-}
-
 Color Surface::getColor(int x, int y) {
   uint8_t color[4];
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
@@ -243,10 +219,40 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
-void Surface::addOp(std::unique_ptr<Op> op) {
-  if (opsTask == nullptr || opsTask->isClosed()) {
-    opsTask = getContext()->drawingManager()->addOpsTask(renderTargetProxy);
+void Surface::aboutToDraw(bool discardContent) {
+  if (cachedImage == nullptr) {
+    return;
   }
-  opsTask->addOp(std::move(op));
+  auto isUnique = cachedImage.use_count() == 1;
+  cachedImage = nullptr;
+  if (isUnique) {
+    return;
+  }
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
+    return;
+  }
+  auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy();
+  if (newRenderTargetProxy == nullptr) {
+    LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
+    return;
+  }
+  if (!discardContent) {
+    auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
+    auto drawingManager = getContext()->drawingManager();
+    drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy,
+                                            Rect::MakeWH(width(), height()), Point::Zero());
+  }
+  replaceRenderTargetProxy(std::move(newRenderTargetProxy));
+}
+
+void Surface::replaceRenderTargetProxy(std::shared_ptr<RenderTargetProxy> proxy) {
+  renderTargetProxy = proxy;
+  delete renderContext;
+  renderContext = new RenderContext(renderTargetProxy);
+}
+
+void Surface::addOp(std::unique_ptr<Op> op) {
+  renderContext->addOp(std::move(op));
 }
 }  // namespace tgfx

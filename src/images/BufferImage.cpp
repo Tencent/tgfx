@@ -32,7 +32,7 @@ std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer
 
 BufferImage::BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer,
                          bool mipMapped)
-    : ResourceImage(std::move(resourceKey)), imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
+    : RasterImage(std::move(resourceKey)), imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
 }
 
 std::shared_ptr<Image> BufferImage::onMakeMipMapped() const {

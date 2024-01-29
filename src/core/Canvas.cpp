@@ -26,7 +26,6 @@
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
 #include "gpu/processors/AARectEffect.h"
-#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -648,18 +647,20 @@ bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
   if (!IsPixelAligned(bounds)) {
     return false;
   }
-  surface->aboutToDraw(true);
   auto format = surface->renderTargetProxy->format();
   const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
   color = writeSwizzle.applyTo(color);
-  auto [rect, useScissor] = getClipRect();
-  if (rect.has_value()) {
+  auto [clipRect, useScissor] = getClipRect();
+  if (clipRect.has_value()) {
     if (useScissor) {
       FlipYIfNeeded(&bounds, surface);
-      rect->intersect(bounds);
-      surface->addOp(ClearOp::Make(color, *rect));
+      clipRect->intersect(bounds);
+      surface->aboutToDraw();
+      surface->addOp(ClearOp::Make(color, *clipRect));
       return true;
-    } else if (rect->isEmpty()) {
+    } else if (clipRect->isEmpty()) {
+      auto discardContent = bounds == Rect::MakeWH(surface->width(), surface->height());
+      surface->aboutToDraw(discardContent);
       FlipYIfNeeded(&bounds, surface);
       surface->addOp(ClearOp::Make(color, bounds));
       return true;

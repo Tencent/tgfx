@@ -35,7 +35,7 @@ std::shared_ptr<Image> DecoderImage::MakeFrom(ResourceKey resourceKey,
 
 DecoderImage::DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder,
                            bool mipMapped)
-    : ResourceImage(std::move(resourceKey)), decoder(std::move(decoder)), mipMapped(mipMapped) {
+    : RasterImage(std::move(resourceKey)), decoder(std::move(decoder)), mipMapped(mipMapped) {
 }
 
 std::shared_ptr<Image> DecoderImage::onMakeMipMapped() const {

@@ -19,19 +19,22 @@
 #pragma once
 
 #include "gpu/Resource.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
- * The base class for all images that contains a resource key and can be cached as a GPU resource.
- * The corresponding resource cache is immediately marked as expired if all associated images are
- * released, which becomes recyclable and will be purged at some point in the future.
+ * The base class for all images that can directly generate a texture.
  */
-class ResourceImage : public Image {
+class RasterImage : public Image {
  public:
-  explicit ResourceImage(ResourceKey resourceKey);
+  explicit RasterImage(ResourceKey resourceKey);
+
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
+
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t renderFlags = 0) const;
 
  protected:
   ResourceKey resourceKey = {};
@@ -45,7 +48,5 @@ class ResourceImage : public Image {
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
                                                            uint32_t renderFlags) const = 0;
-
-  friend class RGBAAAImage;
 };
 }  // namespace tgfx

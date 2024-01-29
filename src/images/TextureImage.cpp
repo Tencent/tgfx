@@ -29,7 +29,7 @@ std::shared_ptr<Image> TextureImage::MakeFrom(std::shared_ptr<TextureProxy> text
 }
 
 TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy)
-    : ResourceImage(textureProxy->getResourceKey()), textureProxy(std::move(textureProxy)) {
+    : RasterImage(textureProxy->getResourceKey()), textureProxy(std::move(textureProxy)) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
