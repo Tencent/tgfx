@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "ResourceImage.h"
+#include "RasterImage.h"
 
 namespace tgfx {
 /**
  * GeneratorImage wraps an ImageGenerator that can generate ImageBuffers on demand.
  */
-class GeneratorImage : public ResourceImage {
+class GeneratorImage : public RasterImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
                                          bool mipMapped = false);

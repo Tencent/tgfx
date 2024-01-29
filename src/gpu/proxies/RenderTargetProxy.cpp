@@ -80,7 +80,8 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int
     return nullptr;
   }
   auto proxyProvider = context->proxyProvider();
-  auto textureProxy = proxyProvider->createTextureProxy(width, height, format, mipMapped, origin);
+  auto textureProxy =
+      proxyProvider->createTextureProxy({}, width, height, format, mipMapped, origin);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -109,7 +110,7 @@ std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy() const {
   auto context = getContext();
   auto textureProxy = getTextureProxy();
   auto hasMipmaps = textureProxy && textureProxy->hasMipmaps();
-  return context->proxyProvider()->createTextureProxy(width(), height(), format(), hasMipmaps,
+  return context->proxyProvider()->createTextureProxy({}, width(), height(), format(), hasMipmaps,
                                                       origin());
 }
 

@@ -31,7 +31,9 @@
 namespace tgfx {
 class Surface;
 class SurfaceOptions;
+class RenderContext;
 class Texture;
+class TextureProxy;
 struct CanvasState;
 
 /**
@@ -142,7 +144,7 @@ class Canvas {
   void clear(const Color& color = Color::Transparent());
 
   /**
-   * Draws a rectangle with specified paint, using current current alpha, blend mode, clip and
+   * Draws a rectangle with specified paint, using current alpha, blend mode, clip and
    * matrix.
    */
   void drawRect(const Rect& rect, const Paint& paint);

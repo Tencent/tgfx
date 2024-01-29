@@ -22,7 +22,7 @@
 
 namespace tgfx {
 /**
- * The base class for all images that have a source image and apply various transformations.
+ * The base class for all images that have a single source image and apply various transformations.
  */
 class NestedImage : public Image {
  public:

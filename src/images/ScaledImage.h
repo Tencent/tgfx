@@ -18,43 +18,44 @@
 
 #pragma once
 
-#include "RasterImage.h"
+#include "images/RasterImage.h"
 
 namespace tgfx {
-/**
- * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
- */
-class BufferImage : public RasterImage {
+class ScaledImage : public RasterImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> buffer,
-                                         bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
+                                         float rasterizationScale = 1.0f);
 
-  int width() const override {
-    return imageBuffer->width();
-  }
+  int width() const override;
 
-  int height() const override {
-    return imageBuffer->height();
-  }
+  int height() const override;
 
   bool hasMipmaps() const override {
-    return mipMapped;
+    return source->hasMipmaps();
   }
 
   bool isAlphaOnly() const override {
-    return imageBuffer->isAlphaOnly();
+    return source->isAlphaOnly();
   }
 
+  bool isLazyGenerated() const override {
+    return source->isLazyGenerated();
+  }
+
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f) const override;
+
  protected:
+  std::shared_ptr<Image> onMakeDecoded(Context* context) const override;
+
   std::shared_ptr<Image> onMakeMipMapped() const override;
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
                                                    uint32_t renderFlags) const override;
 
  private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  bool mipMapped = false;
+  std::shared_ptr<Image> source = nullptr;
+  float rasterizationScale = 1.0f;
 
-  BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer, bool mipMapped = false);
+  ScaledImage(ResourceKey resourceKey, std::shared_ptr<Image> source, float rasterizationScale);
 };
 }  // namespace tgfx

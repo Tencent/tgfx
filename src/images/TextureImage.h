@@ -19,13 +19,13 @@
 #pragma once
 
 #include "gpu/proxies/TextureProxy.h"
-#include "images/ResourceImage.h"
+#include "images/RasterImage.h"
 
 namespace tgfx {
 /**
- * TextureImage wraps an existing texture.
+ * TextureImage wraps an existing texture proxy.
  */
-class TextureImage : public ResourceImage {
+class TextureImage : public RasterImage {
  public:
   /**
    * Creates an Image wraps the existing TextureProxy, returns nullptr if textureProxy is nullptr.

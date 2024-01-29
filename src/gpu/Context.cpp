@@ -63,8 +63,8 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   }
   if (flushed) {
     // Clean up all unreferenced resources after flushing to reduce memory usage.
-    _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
     _proxyProvider->purgeExpiredProxies();
+    _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
   }
   return semaphoreInserted;
 }

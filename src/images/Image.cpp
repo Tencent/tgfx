@@ -24,6 +24,7 @@
 #include "images/BufferImage.h"
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
+#include "images/ScaledImage.h"
 #include "images/SubsetImage.h"
 #include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"
@@ -122,6 +123,13 @@ bool Image::isTextureBacked() const {
 
 BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
+}
+
+std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale) const {
+  if (rasterizationScale <= 0) {
+    return nullptr;
+  }
+  return ScaledImage::MakeFrom(weakThis.lock(), rasterizationScale);
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {

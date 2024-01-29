@@ -19,12 +19,12 @@
 #pragma once
 
 #include "SubsetImage.h"
-#include "images/ResourceImage.h"
+#include "images/RasterImage.h"
 
 namespace tgfx {
 class RGBAAAImage : public SubsetImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source, int displayWidth,
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<RasterImage> source, int displayWidth,
                                          int displayHeight, int alphaStartX, int alphaStartY);
 
  protected:

@@ -34,16 +34,15 @@ namespace tgfx {
 struct ImageFPArgs;
 class Context;
 class ImageFilter;
-class TextureProxy;
 class FragmentProcessor;
 class ImageCodec;
 
 /**
- * The Image class describes a two-dimensional array of pixels to draw. The pixels may be decoded in
- * an ImageBuffer, encoded in an ImageGenerator, or located in GPU memory as a GPU texture. The
- * Image class is safe across threads and cannot be modified after it is created. The width and
- * height of an Image are always greater than zero. Creating an Image with zero width or height
- * returns nullptr.
+ * The Image class represents a two-dimensional array of pixels for drawing. These pixels can be
+ * decoded in a raster ImageBuffer, encoded in compressed data streams or scalable drawing commands,
+ * or located in GPU memory as a GPU texture. The Image class is thread-safe and immutable once
+ * created. The width and height of an Image are always greater than zero. Attempting to create an
+ * Image with zero width or height will return nullptr.
  */
 class Image {
  public:
@@ -183,6 +182,21 @@ class Image {
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
 
   /**
+   * Returns a rasterized Image that is scaled by the specified rasterizationScale. A rasterized
+   * Image has a fixed resolution and can be cached as a GPU resource for repeated drawing. By
+   * default, an Image directly backed by an ImageBuffer, an ImageGenerator, or a GPU texture is
+   * rasterized. Other images are not rasterized unless they are implicitly created by this method.
+   * For instance, if you create a subset Image from a rasterized Image, the subset Image does not
+   * create its own GPU cache but uses the full resolution cache created by the original Image. If
+   * you want the subset Image to create its own GPU cache, you should call makeRasterized() on the
+   * subset Image. The default value of rasterizationScale is 1.0, indicating that the Image should
+   * be rasterized at its current size. Larger values magnify the image content, while smaller
+   * values shrink it. If the Image is already rasterized and the rasterizationScale is 1.0, the
+   * original Image is returned. If the rasterizationScale is less than zero, nullptr is returned.
+   */
+  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f) const;
+
+  /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a
    * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
    * creates one immediately. Returns the original Image if the Image is texture backed and the
@@ -215,8 +229,8 @@ class Image {
 
   /**
    * Returns an Image with its origin transformed by the given Orientation. The returned Image
-   * always shares pixels and caches with the original Image. Returns the original Image if the
-   * orientation is Orientation::TopLeft.
+   * always shares pixels and caches with the original Image. If the orientation is
+   * Orientation::TopLeft, the original Image is returned.
    */
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
@@ -229,9 +243,10 @@ class Image {
 
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
-   * channels and the other half as its alpha channel. Returns a subset Image if both alphaStartX
-   * and alphaStartY are zero. Returns nullptr if the original Image has an encoded origin, subset
-   * bounds, or an RGBAAA layout.
+   * channels and the other half as its alpha channel. If both alphaStartX and alphaStartY are zero,
+   * a subset Image is returned. If the original Image cannot directly generate a texture, nullptr
+   * is returned. For example, an Image with orientation or subset cannot generate a texture
+   * directly.
    * @param displayWidth The display width of the RGBAAA image.
    * @param displayHeight The display height of the RGBAAA image.
    * @param alphaStartX The x position of where alpha area begins in the original image.

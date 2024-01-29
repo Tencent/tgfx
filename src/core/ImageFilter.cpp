@@ -54,23 +54,6 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   return true;
 }
 
-void ImageFilter::fillRenderTargetWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                         std::unique_ptr<FragmentProcessor> fp,
-                                         const Matrix& localMatrix) const {
-  if (renderTarget == nullptr || fp == nullptr) {
-    return;
-  }
-  auto dstRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  auto op = FillRectOp::Make(std::nullopt, dstRect, Matrix::I(), localMatrix);
-  op->addColorFP(std::move(fp));
-  op->setBlendMode(BlendMode::Src);
-  auto drawingManager = renderTarget->getContext()->drawingManager();
-  auto opsTask = drawingManager->addOpsTask(renderTarget);
-  auto clearOp = ClearOp::Make(Color::Transparent(), dstRect);
-  opsTask->addOp(std::move(op));
-  drawingManager->addTextureResolveTask(renderTarget);
-}
-
 Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
 }

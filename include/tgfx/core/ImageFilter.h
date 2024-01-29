@@ -53,10 +53,6 @@ class ImageFilter {
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
-  void fillRenderTargetWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                              std::unique_ptr<FragmentProcessor> fp,
-                              const Matrix& localMatrix) const;
-
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
   /**

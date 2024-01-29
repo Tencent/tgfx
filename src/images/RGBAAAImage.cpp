@@ -20,9 +20,8 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<ResourceImage> source,
-                                             int displayWidth, int displayHeight, int alphaStartX,
-                                             int alphaStartY) {
+std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<RasterImage> source, int displayWidth,
+                                             int displayHeight, int alphaStartX, int alphaStartY) {
   if (source == nullptr || alphaStartX + displayWidth > source->width() ||
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
@@ -50,8 +49,8 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
 std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const ImageFPArgs& args,
                                                                     const Matrix* localMatrix,
                                                                     const Rect*) const {
-  auto proxy = std::static_pointer_cast<ResourceImage>(source)->onLockTextureProxy(
-      args.context, args.renderFlags);
+  auto proxy = std::static_pointer_cast<RasterImage>(source)->lockTextureProxy(args.context,
+                                                                               args.renderFlags);
   auto result = concatMatrixAndClip(localMatrix, nullptr);
   return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, args.sampling, result.getMatrix());
 }

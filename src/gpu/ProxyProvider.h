@@ -76,9 +76,11 @@ class ProxyProvider {
   /**
    * Creates an empty TextureProxy with specified width, height, format, mipmap state and origin.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(int width, int height, PixelFormat format,
+  std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey, int width,
+                                                   int height, PixelFormat format,
                                                    bool mipMapped = false,
-                                                   ImageOrigin origin = ImageOrigin::TopLeft);
+                                                   ImageOrigin origin = ImageOrigin::TopLeft,
+                                                   uint32_t renderFlags = 0);
 
   /**
    * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend

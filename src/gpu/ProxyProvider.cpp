@@ -114,22 +114,28 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   return proxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(int width, int height,
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const ResourceKey& resourceKey,
+                                                                int width, int height,
                                                                 PixelFormat format, bool mipMapped,
-                                                                ImageOrigin origin) {
+                                                                ImageOrigin origin,
+                                                                uint32_t renderFlags) {
+  auto proxy = findTextureProxy(resourceKey);
+  if (proxy != nullptr) {
+    return proxy;
+  }
   if (!PlainTexture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
-  auto strongKey = ResourceKey::NewStrong();
+  auto strongKey = GetStrongKey(resourceKey, renderFlags);
   auto task = TextureCreateTask::MakeFrom(strongKey, width, height, format, mipMapped, origin);
   if (task == nullptr) {
     return nullptr;
   }
   context->drawingManager()->addResourceTask(std::move(task));
   auto isAlphaOnly = format == PixelFormat::ALPHA_8;
-  auto proxy = std::shared_ptr<TextureProxy>(
+  proxy = std::shared_ptr<TextureProxy>(
       new TextureProxy(width, height, mipMapped, isAlphaOnly, origin));
-  addResourceProxy(proxy, strongKey, strongKey.domain());
+  addResourceProxy(proxy, strongKey, resourceKey.domain());
   return proxy;
 }
 

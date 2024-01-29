@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DropShadowImageFilter.h"
+#include "gpu/RenderContext.h"
 #include "gpu/Texture.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -95,8 +96,9 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (processor == nullptr) {
     return nullptr;
   }
-  fillRenderTargetWithFP(renderTarget, std::move(processor),
-                         Matrix::MakeTrans(dstBounds.x(), dstBounds.y()));
+  RenderContext renderContext(renderTarget);
+  renderContext.fillWithFP(std::move(processor), Matrix::MakeTrans(dstBounds.x(), dstBounds.y()),
+                           true);
   auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
   if (localMatrix != nullptr) {
     matrix.preConcat(*localMatrix);

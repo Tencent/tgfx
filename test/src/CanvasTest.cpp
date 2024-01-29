@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/DrawingManager.h"
+#include "gpu/Texture.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
+#include "images/RasterImage.h"
 #include "opengl/GLCaps.h"
 #include "opengl/GLSampler.h"
 #include "tgfx/core/Canvas.h"
@@ -490,6 +492,48 @@ TGFX_TEST(CanvasTest, filterMode) {
   canvas->clear();
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_linear"));
+  device->unlock();
+}
+
+TGFX_TEST(CanvasTest, rasterized) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto rasterImage = image->makeRasterized();
+  EXPECT_TRUE(rasterImage == image);
+  image = MakeImage("resources/apitest/rotation.jpg");
+  rasterImage = image->makeRasterized();
+  EXPECT_FALSE(rasterImage->hasMipmaps());
+  EXPECT_FALSE(rasterImage == image);
+  rasterImage = image->makeRasterized(0.15f);
+  EXPECT_EQ(rasterImage->width(), 454);
+  EXPECT_EQ(rasterImage->height(), 605);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 1100, 1400);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
+  auto texture = Resource::Get<Texture>(
+      context, std::static_pointer_cast<RasterImage>(rasterImage)->resourceKey);
+  EXPECT_TRUE(texture != nullptr);
+  EXPECT_EQ(texture->width(), 454);
+  EXPECT_EQ(texture->height(), 605);
+  texture =
+      Resource::Get<Texture>(context, std::static_pointer_cast<RasterImage>(image)->resourceKey);
+  EXPECT_TRUE(texture == nullptr);
+  canvas->clear();
+  rasterImage = rasterImage->makeMipMapped();
+  EXPECT_TRUE(rasterImage->hasMipmaps());
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
+  canvas->clear();
+  rasterImage = rasterImage->makeRasterized(2.0f);
+  EXPECT_EQ(rasterImage->width(), 908);
+  EXPECT_EQ(rasterImage->height(), 1210);
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
   device->unlock();
 }
 
