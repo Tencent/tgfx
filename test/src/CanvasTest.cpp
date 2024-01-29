@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/DrawingManager.h"
+#include "gpu/Texture.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
+#include "images/RasterImage.h"
 #include "opengl/GLCaps.h"
 #include "opengl/GLSampler.h"
 #include "tgfx/core/Canvas.h"
@@ -513,9 +515,17 @@ TGFX_TEST(CanvasTest, rasterized) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
+  auto texture = Resource::Get<Texture>(
+      context, std::static_pointer_cast<RasterImage>(rasterImage)->resourceKey);
+  EXPECT_TRUE(texture != nullptr);
+  EXPECT_EQ(texture->width(), 454);
+  EXPECT_EQ(texture->height(), 605);
+  texture =
+      Resource::Get<Texture>(context, std::static_pointer_cast<RasterImage>(image)->resourceKey);
+  EXPECT_TRUE(texture == nullptr);
   canvas->clear();
   rasterImage = rasterImage->makeMipMapped();
-  EXPECT_FALSE(rasterImage->hasMipmaps());
+  EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
   canvas->clear();
