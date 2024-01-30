@@ -110,9 +110,9 @@ Resource* ResourceCache::getUniqueResource(const ResourceKey& resourceKey) {
 }
 
 void ResourceCache::AddToList(std::list<Resource*>& list, Resource* resource) {
-  list.push_front(resource);
+  list.push_back(resource);
   resource->cachedList = &list;
-  resource->cachedPosition = list.begin();
+  resource->cachedPosition = --list.end();
 }
 
 void ResourceCache::RemoveFromList(std::list<Resource*>& list, Resource* resource) {
@@ -197,20 +197,19 @@ bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourceO
 void ResourceCache::purgeResourcesByLRU(bool recycledResourceOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
   processUnreferencedResources();
-  std::vector<Resource*> needToPurge = {};
-  for (auto item = purgeableResources.rbegin(); item != purgeableResources.rend(); item++) {
+  auto item = purgeableResources.begin();
+  while (item != purgeableResources.end()) {
     auto* resource = *item;
     if (satisfied(resource)) {
       break;
     }
     if (!recycledResourceOnly || !resource->hasExternalReferences()) {
-      needToPurge.push_back(resource);
+      item = purgeableResources.erase(item);
+      purgeableBytes -= resource->memoryUsage();
+      removeResource(resource);
+    } else {
+      item++;
     }
-  }
-  for (auto& resource : needToPurge) {
-    RemoveFromList(purgeableResources, resource);
-    purgeableBytes -= resource->memoryUsage();
-    removeResource(resource);
   }
 }
 
