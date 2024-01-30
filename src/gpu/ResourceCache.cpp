@@ -184,7 +184,8 @@ void ResourceCache::removeResource(Resource* resource) {
   resource->release(true);
 }
 
-void ResourceCache::purgeNotUsedSince(int64_t purgeTime, bool recycledResourceOnly) {
+void ResourceCache::purgeNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
+                                      bool recycledResourceOnly) {
   purgeResourcesByLRU(recycledResourceOnly,
                       [&](Resource* resource) { return resource->lastUsedTime >= purgeTime; });
 }
@@ -192,6 +193,13 @@ void ResourceCache::purgeNotUsedSince(int64_t purgeTime, bool recycledResourceOn
 bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourceOnly) {
   purgeResourcesByLRU(recycledResourceOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
   return totalBytes <= bytesLimit;
+}
+
+bool ResourceCache::purgeToCacheLimit(std::chrono::steady_clock::time_point notUsedSinceTime) {
+  purgeResourcesByLRU(false, [&](Resource* resource) {
+    return resource->lastUsedTime >= notUsedSinceTime || totalBytes <= maxBytes;
+  });
+  return totalBytes <= maxBytes;
 }
 
 void ResourceCache::purgeResourcesByLRU(bool recycledResourceOnly,
@@ -223,12 +231,13 @@ void ResourceCache::processUnreferencedResources() {
   if (needToPurge.empty()) {
     return;
   }
+  auto currentTime = std::chrono::steady_clock::now();
   for (auto& resource : needToPurge) {
     RemoveFromList(nonpurgeableResources, resource);
     if (resource->recycleKey.isValid()) {
       AddToList(purgeableResources, resource);
       purgeableBytes += resource->memoryUsage();
-      resource->lastUsedTime = Clock::Now();
+      resource->lastUsedTime = currentTime;
     } else {
       removeResource(resource);
     }

@@ -127,7 +127,7 @@ class Resource {
   ResourceKey resourceKey = {};
   std::list<Resource*>* cachedList = nullptr;
   std::list<Resource*>::iterator cachedPosition;
-  int64_t lastUsedTime = 0;
+  std::chrono::steady_clock::time_point lastUsedTime = {};
 
   virtual bool isPurgeable() const {
     return reference.use_count() <= 1 && resourceKey.strongCount() == 0;

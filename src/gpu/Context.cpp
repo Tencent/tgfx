@@ -48,10 +48,13 @@ Context::~Context() {
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
+  _proxyProvider->purgeExpiredProxies();
   // Clean up all unreferenced resources before flushing, allowing them to be reused. This is
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
-  _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
+  _resourceCache->processUnreferencedResources();
+  // Retain the resources created after this time point until the next flush() for reuse.
+  auto timePoint = std::chrono::steady_clock::now();
   auto flushed = _drawingManager->flush();
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
@@ -64,7 +67,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   if (flushed) {
     // Clean up all unreferenced resources after flushing to reduce memory usage.
     _proxyProvider->purgeExpiredProxies();
-    _resourceCache->purgeUntilMemoryTo(_resourceCache->cacheLimit());
+    _resourceCache->purgeToCacheLimit(timePoint);
   }
   return semaphoreInserted;
 }
@@ -102,7 +105,8 @@ void Context::setCacheLimit(size_t bytesLimit) {
   _resourceCache->setCacheLimit(bytesLimit);
 }
 
-void Context::purgeResourcesNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly) {
+void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
+                                         bool recycledResourcesOnly) {
   _resourceCache->purgeNotUsedSince(purgeTime, recycledResourcesOnly);
 }
 
