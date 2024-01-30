@@ -92,7 +92,7 @@ class Context {
 
   /**
    * Purges GPU resources that haven't been used since the passed point in time.
-   * @param purgeTimePoint A time point previously returned by std::chrono::steady_clock::now().
+   * @param purgeTime A time point previously returned by std::chrono::steady_clock::now().
    * @param recycledResourcesOnly If true, purgeable resources with external weak references are
    * spared. If false, all purgeable resources will be deleted.
    */
