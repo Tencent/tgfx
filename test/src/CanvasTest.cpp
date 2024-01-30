@@ -21,6 +21,7 @@
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
+#include "images/NestedImage.h"
 #include "images/RasterImage.h"
 #include "opengl/GLCaps.h"
 #include "opengl/GLSampler.h"
@@ -522,7 +523,8 @@ TGFX_TEST(CanvasTest, rasterized) {
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
-  auto imageResourceKey = std::static_pointer_cast<RasterImage>(image)->resourceKey;
+  auto source = std::static_pointer_cast<NestedImage>(image)->source;
+  auto imageResourceKey = std::static_pointer_cast<RasterImage>(source)->resourceKey;
   texture = Resource::Get<Texture>(context, imageResourceKey);
   EXPECT_TRUE(texture == nullptr);
   canvas->clear();
