@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <chrono>
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
@@ -90,12 +91,13 @@ class Context {
   void setCacheLimit(size_t bytesLimit);
 
   /**
-   * Purges GPU resources that haven't been used the passed in time.
-   * @param purgeTime A timestamp previously returned by Clock::Now().
+   * Purges GPU resources that haven't been used since the passed point in time.
+   * @param purgeTimePoint A time point previously returned by std::chrono::steady_clock::now().
    * @param recycledResourcesOnly If true, purgeable resources with external weak references are
    * spared. If false, all purgeable resources will be deleted.
    */
-  void purgeResourcesNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly = false);
+  void purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
+                                  bool recycledResourcesOnly = false);
 
   /**
    * Purge unreferenced resources from the cache until the provided bytesLimit has been reached, or

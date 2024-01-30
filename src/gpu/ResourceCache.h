@@ -81,12 +81,12 @@ class ResourceCache {
   bool hasResource(const ResourceKey& resourceKey);
 
   /**
-   * Purges GPU resources that haven't been used the passed in time.
-   * @param purgeTime A timestamp previously returned by Clock::Now().
+   * Purges GPU resources that haven't been used since the passed point in time.
+   * @param purgeTimePoint A time point previously returned by std::chrono::steady_clock::now().
    * @param recycledResourceOnly If true, purgeable resources with external weak references are
    * spared. If false, all purgeable resources will be deleted.
    */
-  void purgeNotUsedSince(int64_t purgeTime, bool recycledResourceOnly = false);
+  void purgeNotUsedSince(std::chrono::steady_clock::time_point purgeTimePoint, bool recycledResourceOnly = false);
 
   /**
    * Purge unreferenced resources from the cache until the provided bytesLimit has been reached,
@@ -97,6 +97,12 @@ class ResourceCache {
    * spared. If false, all purgeable resources will be deleted.
    */
   bool purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourceOnly = false);
+
+  /**
+   * Purge unreferenced resources not used since the specific time point until the default
+   * cacheLimit is reached.
+   */
+  bool purgeToCacheLimit(std::chrono::steady_clock::time_point notUsedSinceTime);
 
  private:
   Context* context = nullptr;

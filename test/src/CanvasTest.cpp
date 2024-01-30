@@ -500,6 +500,8 @@ TGFX_TEST(CanvasTest, rasterized) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
+  auto defaultCacheLimit = context->cacheLimit();
+  context->setCacheLimit(0);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   auto rasterImage = image->makeRasterized();
   EXPECT_TRUE(rasterImage == image);
@@ -515,25 +517,31 @@ TGFX_TEST(CanvasTest, rasterized) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto texture = Resource::Get<Texture>(
-      context, std::static_pointer_cast<RasterImage>(rasterImage)->resourceKey);
+  auto rasterImageResourceKey = std::static_pointer_cast<RasterImage>(rasterImage)->resourceKey;
+  auto texture = Resource::Get<Texture>(context, rasterImageResourceKey);
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
-  texture =
-      Resource::Get<Texture>(context, std::static_pointer_cast<RasterImage>(image)->resourceKey);
+  auto imageResourceKey = std::static_pointer_cast<RasterImage>(image)->resourceKey;
+  texture = Resource::Get<Texture>(context, imageResourceKey);
   EXPECT_TRUE(texture == nullptr);
   canvas->clear();
   rasterImage = rasterImage->makeMipMapped();
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
+  texture = Resource::Get<Texture>(context, rasterImageResourceKey);
+  EXPECT_TRUE(texture == nullptr);
+  rasterImageResourceKey = std::static_pointer_cast<RasterImage>(rasterImage)->resourceKey;
+  texture = Resource::Get<Texture>(context, rasterImageResourceKey);
+  EXPECT_TRUE(texture != nullptr);
   canvas->clear();
   rasterImage = rasterImage->makeRasterized(2.0f);
   EXPECT_EQ(rasterImage->width(), 908);
   EXPECT_EQ(rasterImage->height(), 1210);
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
+  context->setCacheLimit(defaultCacheLimit);
   device->unlock();
 }
 
