@@ -16,25 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
-#include <mutex>
-#include "FTFontData.h"
-#include "ft2build.h"
-#include FT_FREETYPE_H
+#include "FTLibrary.h"
+#include FT_MODULE_H
 
 namespace tgfx {
-std::mutex& FTMutex();
+FT_Library FTLibrary::Get() {
+  static FTLibrary& ftLibrary = *new FTLibrary();
+  return ftLibrary.library;
+}
+FTLibrary::FTLibrary() {
+  FT_Init_FreeType(&library);
+}
 
-class FTFace {
- public:
-  static std::unique_ptr<FTFace> Make(const FTFontData& data);
-
-  FTFace();
-
-  ~FTFace();
-
-  FT_Face face = nullptr;
-};
+FTLibrary::~FTLibrary() {
+  if (library) {
+    FT_Done_Library(library);
+  }
+}
 }  // namespace tgfx

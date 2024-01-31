@@ -42,23 +42,4 @@ inline FT_F26Dot6 FDot6Ceil(FT_F26Dot6 x) {
 inline FT_F26Dot6 FDot6Round(FT_F26Dot6 x) {
   return (((x) + 32) >> 6);
 }
-
-class FTLibrary {
- public:
-  FTLibrary();
-
-  FTLibrary(const FTLibrary&) = delete;
-
-  FTLibrary& operator=(const FTLibrary&) = delete;
-
-  ~FTLibrary();
-
-  FT_Library library() const {
-    return _library;
-  }
-
- private:
-  FT_Library _library = nullptr;
-};
-
 }  // namespace tgfx

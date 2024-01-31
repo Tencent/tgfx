@@ -18,10 +18,9 @@
 
 #pragma once
 
+#include <mutex>
 #include "ft2build.h"
 #include FT_FREETYPE_H
-
-#include "FTFace.h"
 #include "FTFontData.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
@@ -37,15 +36,9 @@ class FTTypeface : public Typeface {
     return _uniqueID;
   }
 
-  std::string fontFamily() const override {
-    return _face->face->family_name ? _face->face->family_name : "";
-  }
+  std::string fontFamily() const override;
 
-  std::string fontStyle() const override {
-    return _face->face->style_name ? _face->face->style_name : "";
-  }
-
-  static int GetUnitsPerEm(FT_Face face);
+  std::string fontStyle() const override;
 
   int glyphsCount() const override;
 
@@ -77,12 +70,15 @@ class FTTypeface : public Typeface {
                           bool fauxItalic) const override;
 
  private:
-  FTTypeface(FTFontData data, std::unique_ptr<FTFace> face);
-
   uint32_t _uniqueID = 0;
   FTFontData data;
-  std::unique_ptr<FTFace> _face;
+  mutable std::mutex locker = {};
+  FT_Face face = nullptr;
   std::weak_ptr<FTTypeface> weakThis;
+
+  static int GetUnitsPerEm(FT_Face face);
+
+  FTTypeface(FTFontData data, FT_Face face);
 
   friend class FTScalerContext;
 };

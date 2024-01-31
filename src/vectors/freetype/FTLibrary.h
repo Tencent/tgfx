@@ -16,18 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FTUtil.h"
+#pragma once
 
-#include FT_MODULE_H
+#include "ft2build.h"
+#include FT_FREETYPE_H
 
 namespace tgfx {
-FTLibrary::FTLibrary() {
-  FT_Init_FreeType(&_library);
-}
+// The thread safety model of FreeType https://github.com/behdad/ftthread:
+// 1. A FT_Face object can only be safely used from one thread at a time.
+// 2. A FT_Library object can be used without modification from multiple threads at the same time.
+// 3. FT_Face creation / destruction with the same FT_Library object can only be done from one
+//    thread at a time.
+class FTLibrary {
+ public:
+  static FT_Library Get();
 
-FTLibrary::~FTLibrary() {
-  if (_library) {
-    FT_Done_Library(_library);
-  }
-}
+  FTLibrary();
+
+  FTLibrary(const FTLibrary&) = delete;
+
+  FTLibrary& operator=(const FTLibrary&) = delete;
+
+  ~FTLibrary();
+
+ private:
+  FT_Library library = nullptr;
+};
 }  // namespace tgfx

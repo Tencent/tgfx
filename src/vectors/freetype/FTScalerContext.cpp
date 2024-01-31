@@ -123,10 +123,10 @@ bool FTScalerContextRec::computeMatrices(Point* s, Matrix* sA) const {
 
 static constexpr float ITALIC_SKEW = -0.20f;
 
-std::unique_ptr<FTScalerContext> FTScalerContext::Make(std::shared_ptr<Typeface> typeface,
+std::unique_ptr<FTScalerContext> FTScalerContext::Make(std::shared_ptr<FTTypeface> typeface,
                                                        float size, bool fauxBold, bool fauxItalic,
                                                        bool verticalText) {
-  if (typeface == nullptr) {
+  if (typeface == nullptr || typeface->face == nullptr) {
     return nullptr;
   }
   FTScalerContextRec rec;
@@ -175,76 +175,76 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
   return chosenStrikeIndex;
 }
 
-FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, FTScalerContextRec rec)
-    : typeface(std::move(typeFace)), rec(rec) {
-  std::lock_guard<std::mutex> lockGuard(FTMutex());
-  _face = static_cast<FTTypeface*>(typeface.get())->_face.get();
+FTScalerContext::FTScalerContext(std::shared_ptr<FTTypeface> ftTypeface, FTScalerContextRec rec)
+    : typeface(std::move(ftTypeface)), rec(rec) {
+  std::lock_guard<std::mutex> autoLock(typeface->locker);
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
   // Always using FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH to get correct
   // advances, as fontconfig and cairo do.
   loadGlyphFlags |= FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH;
   loadGlyphFlags |= FT_LOAD_TARGET_NORMAL;
-  if (FT_HAS_COLOR(_face->face)) {
+  auto face = typeface->face;
+  if (FT_HAS_COLOR(face)) {
     loadGlyphFlags |= FT_LOAD_COLOR;
   }
   if (rec.verticalText) {
     loadGlyphFlags |= FT_LOAD_VERTICAL_LAYOUT;
   }
 
-  auto err = FT_New_Size(_face->face, &ftSize);
+  auto err = FT_New_Size(face, &ftSize);
   if (err != FT_Err_Ok) {
-    LOGE("FT_New_Size(%s) failed.", _face->face->family_name);
+    LOGE("FT_New_Size(%s) failed.", face->family_name);
     return;
   }
   err = FT_Activate_Size(ftSize);
   if (err != FT_Err_Ok) {
-    LOGE("FT_Activate_Size(%s) failed.", _face->face->family_name);
+    LOGE("FT_Activate_Size(%s) failed.", face->family_name);
     return;
   }
   rec.computeMatrices(&scale, &matrix22Scalar);
   auto scaleX = FloatToFDot6(scale.x);
   auto scaleY = FloatToFDot6(scale.y);
-  if (FT_IS_SCALABLE(_face->face)) {
-    err = FT_Set_Char_Size(_face->face, scaleX, scaleY, 72, 72);
+  if (FT_IS_SCALABLE(face)) {
+    err = FT_Set_Char_Size(face, scaleX, scaleY, 72, 72);
     if (err != FT_Err_Ok) {
-      LOGE("FT_Set_CharSize(%s, %f, %f) failed.", _face->face->family_name, scaleX, scaleY);
+      LOGE("FT_Set_CharSize(%s, %f, %f) failed.", face->family_name, scaleX, scaleY);
       return;
     }
     // Adjust the matrix to reflect the actually chosen scale.
     // FreeType currently does not allow requesting sizes less than 1, this allows for scaling.
     // Don't do this at all sizes as that will interfere with hinting.
     if (scale.x < 1 || scale.y < 1) {
-      auto unitsPerEm = static_cast<float>(_face->face->units_per_EM);
-      const auto& metrics = _face->face->size->metrics;
+      auto unitsPerEm = static_cast<float>(face->units_per_EM);
+      const auto& metrics = face->size->metrics;
       auto xPpem = unitsPerEm * FTFixedToFloat(metrics.x_scale) / 64.0f;
       auto yPpem = unitsPerEm * FTFixedToFloat(metrics.y_scale) / 64.0f;
       matrix22Scalar.preScale(scale.x / xPpem, scale.y / yPpem);
     }
-  } else if (FT_HAS_FIXED_SIZES(_face->face)) {
-    strikeIndex = ChooseBitmapStrike(_face->face, scaleY);
+  } else if (FT_HAS_FIXED_SIZES(face)) {
+    strikeIndex = ChooseBitmapStrike(face, scaleY);
     if (strikeIndex == -1) {
-      LOGE("No glyphs for font \"%s\" size %f.\n", _face->face->family_name, rec.textSize);
+      LOGE("No glyphs for font \"%s\" size %f.\n", face->family_name, rec.textSize);
       return;
     }
 
-    err = FT_Select_Size(_face->face, strikeIndex);
+    err = FT_Select_Size(face, strikeIndex);
     if (err != 0) {
-      LOGE("FT_Select_Size(%s, %d) failed.", _face->face->family_name, strikeIndex);
+      LOGE("FT_Select_Size(%s, %d) failed.", face->family_name, strikeIndex);
       strikeIndex = -1;
       return;
     }
 
     // Adjust the matrix to reflect the actually chosen scale.
-    // It is likely that the ppem chosen was not the one requested, this allows for scaling.
-    matrix22Scalar.preScale(scale.x / static_cast<float>(_face->face->size->metrics.x_ppem),
-                            scale.y / static_cast<float>(_face->face->size->metrics.y_ppem));
+    // It is likely that the ppem chosen was not the one requested; this allows for scaling.
+    matrix22Scalar.preScale(scale.x / static_cast<float>(face->size->metrics.x_ppem),
+                            scale.y / static_cast<float>(face->size->metrics.y_ppem));
 
     // FreeType documentation says:
     // FT_LOAD_NO_BITMAP -- Ignore bitmap strikes when loading.
     // Bitmap-only fonts ignore this flag.
     //
-    // However, in FreeType 2.5.1 color bitmap only fonts do not ignore this flag.
-    // Force this flag off for bitmap only fonts.
+    // However, in FreeType 2.5.1 color bitmap-only fonts do not ignore this flag.
+    // Force this flag off for bitmap-only fonts.
     loadGlyphFlags &= ~FT_LOAD_NO_BITMAP;
   } else {
     return;
@@ -253,12 +253,12 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, FTScalerCon
   matrix22.xy = FloatToFTFixed(-matrix22Scalar.getSkewX());
   matrix22.yx = FloatToFTFixed(-matrix22Scalar.getSkewY());
   matrix22.yy = FloatToFTFixed(matrix22Scalar.getScaleY());
-  FT_Set_Transform(_face->face, &matrix22, nullptr);
+  FT_Set_Transform(face, &matrix22, nullptr);
 }
 
 FTScalerContext::~FTScalerContext() {
   if (ftSize) {
-    std::lock_guard<std::mutex> lockGuard(FTMutex());
+    std::lock_guard<std::mutex> autoLock(typeface->locker);
     FT_Done_Size(ftSize);
   }
 }
@@ -268,17 +268,17 @@ int FTScalerContext::setupSize() {
   if (err != 0) {
     return err;
   }
-  FT_Set_Transform(_face->face, &matrix22, nullptr);
+  FT_Set_Transform(typeface->face, &matrix22, nullptr);
   return 0;
 }
 
 FontMetrics FTScalerContext::generateFontMetrics() {
-  std::lock_guard<std::mutex> lockGuard(FTMutex());
+  std::lock_guard<std::mutex> autoLock(typeface->locker);
   FontMetrics metrics;
   if (setupSize()) {
     return metrics;
   }
-  auto face = _face->face;
+  auto face = typeface->face;
   auto upem = static_cast<float>(FTTypeface::GetUnitsPerEm(face));
 
   // use the os/2 table as a source of reasonable defaults.
@@ -391,7 +391,7 @@ FontMetrics FTScalerContext::generateFontMetrics() {
 }
 
 bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) {
-  auto face = _face->face;
+  auto face = typeface->face;
   const auto glyph_id = FT_Get_Char_Index(face, static_cast<FT_ULong>(letter));
   if (glyph_id == 0) {
     return false;
@@ -515,10 +515,10 @@ static bool GenerateGlyphPath(FT_Face face, Path* path) {
 }
 
 bool FTScalerContext::generatePath(GlyphID glyphID, Path* path) {
-  std::lock_guard<std::mutex> lockGuard(FTMutex());
-  auto face = _face->face;
+  std::lock_guard<std::mutex> autoLock(typeface->locker);
+  auto face = typeface->face;
   // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
-  if (!FT_IS_SCALABLE(face) || this->setupSize()) {
+  if (!FT_IS_SCALABLE(face) || setupSize()) {
     path->reset();
     return false;
   }
@@ -541,7 +541,7 @@ bool FTScalerContext::generatePath(GlyphID glyphID, Path* path) {
 }
 
 void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) {
-  auto face = _face->face;
+  auto face = typeface->face;
   FT_Outline_Get_CBox(&face->glyph->outline, bbox);
 
   // outset the box to integral boundaries
@@ -552,13 +552,13 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) {
 }
 
 GlyphMetrics FTScalerContext::generateGlyphMetrics(GlyphID glyphID) {
-  std::lock_guard<std::mutex> lockGuard(FTMutex());
+  std::lock_guard<std::mutex> autoLock(typeface->locker);
   GlyphMetrics glyph;
   if (setupSize()) {
     return glyph;
   }
 
-  auto face = _face->face;
+  auto face = typeface->face;
   auto err = FT_Load_Glyph(face, glyphID,
                            loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY));
   if (err != FT_Err_Ok) {
@@ -648,11 +648,11 @@ std::shared_ptr<ImageBuffer> CopyFTBitmap(const FT_Bitmap& ftBitmap) {
 }
 
 std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphId, Matrix* matrix) {
-  std::lock_guard<std::mutex> lockGuard(FTMutex());
+  std::lock_guard<std::mutex> autoLock(typeface->locker);
   if (setupSize()) {
     return nullptr;
   }
-  auto face = _face->face;
+  auto face = typeface->face;
   auto flags = loadGlyphFlags;
   flags |= FT_LOAD_RENDER;
   flags &= ~FT_LOAD_NO_BITMAP;

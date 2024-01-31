@@ -21,7 +21,6 @@
 #include <memory>
 #include "ft2build.h"
 #include FT_FREETYPE_H
-#include "FTFace.h"
 #include "FTTypeface.h"
 #include "core/PixelBuffer.h"
 
@@ -38,7 +37,7 @@ class FTScalerContextRec {
 
 class FTScalerContext {
  public:
-  static std::unique_ptr<FTScalerContext> Make(std::shared_ptr<Typeface> typeface, float size,
+  static std::unique_ptr<FTScalerContext> Make(std::shared_ptr<FTTypeface> typeface, float size,
                                                bool fauxBold = false, bool fauxItalic = false,
                                                bool verticalText = false);
 
@@ -53,10 +52,10 @@ class FTScalerContext {
   std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphId, Matrix* matrix);
 
  private:
-  FTScalerContext(std::shared_ptr<Typeface> typeFace, FTScalerContextRec rec);
+  FTScalerContext(std::shared_ptr<FTTypeface> typeFace, FTScalerContextRec rec);
 
   bool valid() const {
-    return _face != nullptr && ftSize != nullptr;
+    return typeface != nullptr && ftSize != nullptr;
   }
 
   int setupSize();
@@ -67,9 +66,8 @@ class FTScalerContext {
 
   void getBBoxForCurrentGlyph(FT_BBox* bbox);
 
-  std::shared_ptr<Typeface> typeface;
-  FTScalerContextRec rec;
-  FTFace* _face = nullptr;
+  std::shared_ptr<FTTypeface> typeface = nullptr;
+  FTScalerContextRec rec = {};
   FT_Size ftSize = nullptr;
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   Matrix matrix22Scalar = Matrix::I();

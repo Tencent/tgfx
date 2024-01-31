@@ -17,15 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTMask.h"
+#include "FTLibrary.h"
 #include "FTPath.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-static const FTLibrary& GetLibrary() {
-  static const auto& library = *new FTLibrary;
-  return library;
-}
-
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto path = reinterpret_cast<FTPath*>(info);
   switch (verb) {
@@ -117,7 +113,6 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   finalPath.decompose(Iterator, &ftPath);
   ftPath.setFillType(path.getFillType());
   auto outlines = ftPath.getOutlines();
-  auto ftLibrary = GetLibrary().library();
   auto buffer = static_cast<unsigned char*>(pixels);
   int rows = info.height();
   int pitch = static_cast<int>(info.rowBytes());
@@ -133,6 +128,7 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   params.flags = FT_RASTER_FLAG_AA | FT_RASTER_FLAG_DIRECT;
   params.gray_spans = SpanFunc;
   params.user = &target;
+  auto ftLibrary = FTLibrary::Get();
   for (auto& outline : outlines) {
     FT_Outline_Render(ftLibrary, &(outline->outline), &params);
   }
