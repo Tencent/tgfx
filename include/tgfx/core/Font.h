@@ -95,7 +95,8 @@ class Font {
   }
 
   /**
-   * Returns the FontMetrics associated with this font.
+   * Returns the FontMetrics associated with this font. Results are scaled by text size but do not
+   * take into account dimensions required by text skew, fake bold, and style stroke.
    */
   FontMetrics getMetrics() const {
     return typeface->getMetrics(size);
