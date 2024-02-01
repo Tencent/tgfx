@@ -25,54 +25,42 @@
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
-class FTScalerContextRec {
- public:
-  bool computeMatrices(Point* scale, Matrix* remaining) const;
-
-  float textSize = 12.f;
-  float skewX = 0.0f;
-  bool embolden = false;
-  bool verticalText = false;
-};
-
 class FTScalerContext {
  public:
-  static std::unique_ptr<FTScalerContext> Make(std::shared_ptr<FTTypeface> typeface, float size,
-                                               bool fauxBold = false, bool fauxItalic = false,
-                                               bool verticalText = false);
+  static std::unique_ptr<FTScalerContext> Make(std::shared_ptr<FTTypeface> typeface, float size);
 
   ~FTScalerContext();
 
-  FontMetrics generateFontMetrics();
+  FontMetrics generateFontMetrics(bool fauxBold, bool fauxItalic);
 
-  GlyphMetrics generateGlyphMetrics(GlyphID glyphID);
+  GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic,
+                                    bool verticalText = false);
 
-  bool generatePath(GlyphID glyphID, Path* path);
+  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path);
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphId, Matrix* matrix);
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxBold, bool fauxItalic,
+                                             Matrix* matrix);
 
  private:
-  FTScalerContext(std::shared_ptr<FTTypeface> typeFace, FTScalerContextRec rec);
+  FTScalerContext(std::shared_ptr<FTTypeface> typeFace, float textSize);
 
   bool valid() const {
     return typeface != nullptr && ftSize != nullptr;
   }
 
-  int setupSize();
+  int setupSize(bool fauxItalic);
 
-  bool getCBoxForLetter(char letter, FT_BBox* bbox);
-
-  void emboldenIfNeeded(FT_Face face, FT_GlyphSlot glyph, GlyphID gid) const;
+  bool getCBoxForLetter(char letter, bool fauxBold, FT_BBox* bbox);
 
   void getBBoxForCurrentGlyph(FT_BBox* bbox);
 
+  Matrix getExtraMatrix(bool fauxItalic);
+
   std::shared_ptr<FTTypeface> typeface = nullptr;
-  FTScalerContextRec rec = {};
+  float textSize = 1.0f;
+  Point extraScale = Point::Make(1.f, 1.f);
   FT_Size ftSize = nullptr;
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
-  Matrix matrix22Scalar = Matrix::I();
-  FT_Matrix matrix22 = {};
-  Point scale = Point::Make(1.f, 1.f);
   FT_Int32 loadGlyphFlags = 0;
 };
 }  // namespace tgfx

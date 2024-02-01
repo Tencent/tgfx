@@ -42,8 +42,8 @@ void Font::setTypeface(std::shared_ptr<Typeface> newTypeface) {
 }
 
 void Font::setSize(float newSize) {
-  if (newSize <= 0) {
-    size = 12.0f;
+  if (newSize < 0) {
+    size = 0.0f;
   } else {
     size = newSize;
   }
