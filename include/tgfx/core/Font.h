@@ -34,7 +34,7 @@ class Font {
   /**
    * Constructs Font with default values with Typeface and size in points.
    */
-  explicit Font(std::shared_ptr<Typeface> typeface, float size = 12.0f);
+  Font(std::shared_ptr<Typeface> typeface, float size);
 
   /**
    * Returns a new font with the same attributes of this font, but with the specified size.
@@ -42,11 +42,9 @@ class Font {
   Font makeWithSize(float size) const;
 
   /**
-   * Returns a typeface reference if set, or the default typeface reference, which is never nullptr.
+   * Returns a typeface reference if set, nullptr otherwise.
    */
-  std::shared_ptr<Typeface> getTypeface() const {
-    return typeface;
-  }
+  std::shared_ptr<Typeface> getTypeface() const;
 
   /**
    * Sets a new Typeface to this Font.
@@ -56,9 +54,7 @@ class Font {
   /**
    * Returns the point size of this font.
    */
-  float getSize() const {
-    return size;
-  }
+  float getSize() const;
 
   /**
    * Sets text size in points. Has no effect if textSize is not greater than or equal to zero.
@@ -95,73 +91,57 @@ class Font {
   }
 
   /**
-   * Returns the FontMetrics associated with this font. Results are scaled by text size but do not
-   * take into account dimensions required by fauxBold and fauxItalic.
-   */
-  FontMetrics getMetrics() const {
-    return typeface->getMetrics(size);
-  }
-
-  /**
    * Returns the glyph ID corresponds to the specified glyph name. The glyph name must be in utf-8
    * encoding. Returns 0 if the glyph name is not in this Font.
    */
-  GlyphID getGlyphID(const std::string& name) const {
-    return typeface->getGlyphID(name);
-  }
+  GlyphID getGlyphID(const std::string& name) const;
 
   /**
    * Returns the glyph ID corresponds to the specified unicode code point. Returns 0 if the code
    * point is not in this Font.
    */
-  GlyphID getGlyphID(Unichar unichar) const {
-    return typeface->getGlyphID(unichar);
-  }
+  GlyphID getGlyphID(Unichar unichar) const;
+
+  /**
+   * Returns the FontMetrics associated with this font. Results are scaled by text size but do not
+   * take into account dimensions required by fauxBold and fauxItalic.
+   */
+  FontMetrics getMetrics() const;
 
   /**
    * Returns the bounding box of the specified glyph.
    */
-  Rect getBounds(GlyphID glyphID) const {
-    return typeface->getBounds(glyphID, size, fauxBold, fauxItalic);
-  }
+  Rect getBounds(GlyphID glyphID) const;
 
   /**
    * Returns the advance for specified glyph.
    * @param glyphID The id of specified glyph.
-   * @param verticalText The intended drawing orientation of the glyph.
+   * @param verticalText The intended drawing orientation of the glyph. Please note that it is not
+   * supported on the web platform.
    */
-  float getAdvance(GlyphID glyphID, bool verticalText = false) const {
-    return typeface->getAdvance(glyphID, size, verticalText);
-  }
+  float getAdvance(GlyphID glyphID, bool verticalText = false) const;
+
+  /**
+   * Calculates the offset from the default (horizontal) origin to the vertical origin for specified
+   * glyph.
+   */
+  Point getVerticalOffset(GlyphID glyphID) const;
 
   /**
    * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path
    * and returns true. If glyph is described by a bitmap, returns false and ignores path parameter.
    */
-  bool getPath(GlyphID glyphID, Path* path) const {
-    return typeface->getPath(glyphID, size, fauxBold, fauxItalic, path);
-  }
+  bool getPath(GlyphID glyphID, Path* path) const;
 
   /**
    * Creates an image buffer capturing the content of the specified glyph. The returned matrix
    * should apply to the glyph image when drawing. Please note that the fauxBold is not supported
    * for this method.
    */
-  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, Matrix* matrix) const {
-    return typeface->getGlyphImage(glyphID, size, fauxItalic, matrix);
-  }
-
-  /**
-   * Calculates the offset from the default (horizontal) origin to the vertical origin for specified
-   * glyph.
-   */
-  Point getVerticalOffset(GlyphID glyphID) const {
-    return typeface->getVerticalOffset(glyphID, size);
-  }
+  std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, Matrix* matrix) const;
 
  private:
-  std::shared_ptr<Typeface> typeface = nullptr;
-  float size = 12.0f;
+  std::shared_ptr<ScalerContext> scalerContext = nullptr;
   bool fauxBold = false;
   bool fauxItalic = false;
 };

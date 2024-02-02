@@ -34,7 +34,6 @@ namespace tgfx {
 //  This value was chosen by eyeballing the result in Firefox and trying to match it.
 static constexpr FT_Pos BITMAP_EMBOLDEN_STRENGTH = 1 << 6;
 static constexpr int OUTLINE_EMBOLDEN_DIVISOR = 24;
-static constexpr float ITALIC_SKEW = -0.20f;
 
 static float FTFixedToFloat(FT_Fixed x) {
   return static_cast<float>(x) * 1.52587890625e-5f;
@@ -48,17 +47,9 @@ static FT_Fixed FloatToFTFixed(float x) {
   return static_cast<FT_Fixed>(x * (1 << 16));
 }
 
-std::unique_ptr<FTScalerContext> FTScalerContext::Make(std::shared_ptr<FTTypeface> typeface,
-                                                       float size) {
-  if (typeface == nullptr || typeface->face == nullptr) {
-    return nullptr;
-  }
-  auto scalerContext =
-      std::unique_ptr<FTScalerContext>(new FTScalerContext(std::move(typeface), size));
-  if (!scalerContext->valid()) {
-    return nullptr;
-  }
-  return scalerContext;
+std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
+                                                        float size) {
+  return std::make_shared<FTScalerContext>(std::move(typeface), size);
 }
 
 static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_Int32 glyphFlags) {
@@ -85,10 +76,6 @@ static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_
  * Returns the bitmap strike equal to or just larger than the requested size.
  */
 static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
-  if (face == nullptr) {
-    return -1;
-  }
-
   FT_Pos requestedPPEM = scaleY;  // FT_Bitmap_Size::y_ppem is in 26.6 format.
   FT_Int chosenStrikeIndex = -1;
   FT_Pos chosenPPEM = 0;
@@ -114,15 +101,14 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
   return chosenStrikeIndex;
 }
 
-FTScalerContext::FTScalerContext(std::shared_ptr<FTTypeface> ftTypeface, float size)
-    : typeface(std::move(ftTypeface)), textSize(size) {
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
+FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
+    : ScalerContext(std::move(tf), size), textScale(size) {
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
   // Always using FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH to get correct
   // advances, as fontconfig and cairo do.
   loadGlyphFlags |= FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH;
   loadGlyphFlags |= FT_LOAD_TARGET_NORMAL;
-  auto face = typeface->face;
+  auto face = ftTypeface()->face;
   if (FT_HAS_COLOR(face)) {
     loadGlyphFlags |= FT_LOAD_COLOR;
   }
@@ -137,35 +123,32 @@ FTScalerContext::FTScalerContext(std::shared_ptr<FTTypeface> ftTypeface, float s
     LOGE("FT_Activate_Size(%s) failed.", face->family_name);
     return;
   }
-  if (textSize < 0.0f) {
-    textSize = 0.0f;
-  }
-  if (FloatNearlyZero(textSize) || !FloatsAreFinite(&textSize, 1)) {
-    textSize = 1.0f;
+  if (FloatNearlyZero(textScale) || !FloatsAreFinite(&textScale, 1)) {
+    textScale = 1.0f;
     extraScale.set(0.0f, 0.0f);
   }
-  auto textScale = FloatToFDot6(textSize);
+  auto textScaleDot6 = FloatToFDot6(textScale);
   if (FT_IS_SCALABLE(face)) {
-    err = FT_Set_Char_Size(face, textScale, textScale, 72, 72);
+    err = FT_Set_Char_Size(face, textScaleDot6, textScaleDot6, 72, 72);
     if (err != FT_Err_Ok) {
-      LOGE("FT_Set_CharSize(%s, %f, %f) failed.", face->family_name, textScale, textScale);
+      LOGE("FT_Set_CharSize(%s, %f, %f) failed.", face->family_name, textScaleDot6, textScaleDot6);
       return;
     }
     // Adjust the matrix to reflect the actually chosen scale.
     // FreeType currently does not allow requesting sizes less than 1, this allows for scaling.
     // Don't do this at all sizes as that will interfere with hinting.
-    if (textSize < 1) {
+    if (textScale < 1) {
       auto unitsPerEm = static_cast<float>(face->units_per_EM);
       const auto& metrics = face->size->metrics;
       auto xPpem = unitsPerEm * FTFixedToFloat(metrics.x_scale) / 64.0f;
       auto yPpem = unitsPerEm * FTFixedToFloat(metrics.y_scale) / 64.0f;
-      extraScale.x *= textSize / xPpem;
-      extraScale.y *= textSize / yPpem;
+      extraScale.x *= textScale / xPpem;
+      extraScale.y *= textScale / yPpem;
     }
   } else if (FT_HAS_FIXED_SIZES(face)) {
-    strikeIndex = ChooseBitmapStrike(face, textScale);
+    strikeIndex = ChooseBitmapStrike(face, textScaleDot6);
     if (strikeIndex == -1) {
-      LOGE("No glyphs for font \"%s\" size %f.\n", face->family_name, textSize);
+      LOGE("No glyphs for font \"%s\" size %f.\n", face->family_name, textScaleDot6);
       return;
     }
 
@@ -178,8 +161,8 @@ FTScalerContext::FTScalerContext(std::shared_ptr<FTTypeface> ftTypeface, float s
 
     // Adjust the matrix to reflect the actually chosen scale.
     // It is likely that the ppem chosen was not the one requested; this allows for scaling.
-    extraScale.x *= textSize / static_cast<float>(face->size->metrics.x_ppem);
-    extraScale.y *= textSize / static_cast<float>(face->size->metrics.y_ppem);
+    extraScale.x *= textScale / static_cast<float>(face->size->metrics.x_ppem);
+    extraScale.y *= textScale / static_cast<float>(face->size->metrics.y_ppem);
 
     // FreeType documentation says:
     // FT_LOAD_NO_BITMAP -- Ignore bitmap strikes when loading.
@@ -193,12 +176,12 @@ FTScalerContext::FTScalerContext(std::shared_ptr<FTTypeface> ftTypeface, float s
 
 FTScalerContext::~FTScalerContext() {
   if (ftSize) {
-    std::lock_guard<std::mutex> autoLock(typeface->locker);
+    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
     FT_Done_Size(ftSize);
   }
 }
 
-int FTScalerContext::setupSize(bool fauxItalic) {
+int FTScalerContext::setupSize(bool fauxItalic) const {
   FT_Error err = FT_Activate_Size(ftSize);
   if (err != 0) {
     return err;
@@ -210,36 +193,32 @@ int FTScalerContext::setupSize(bool fauxItalic) {
       FloatToFTFixed(-matrix.getSkewY()),
       FloatToFTFixed(matrix.getScaleY()),
   };
-  FT_Set_Transform(typeface->face, &matrix22, nullptr);
+  FT_Set_Transform(ftTypeface()->face, &matrix22, nullptr);
   return 0;
 }
 
-FontMetrics FTScalerContext::generateFontMetrics() {
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
+FontMetrics FTScalerContext::getFontMetrics() const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   FontMetrics metrics = {};
+  if (setupSize(false)) {
+    return metrics;
+  }
   getFontMetricsInternal(&metrics);
   return metrics;
 }
 
-void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) {
-  if (fontMetrics != nullptr) {
-    *metrics = *fontMetrics;
-    return;
-  }
-  if (setupSize(false)) {
-    return;
-  }
-  auto face = typeface->face;
-  auto upem = static_cast<float>(FTTypeface::GetUnitsPerEm(face));
+void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
+  auto face = ftTypeface()->face;
+  auto upem = static_cast<float>(ftTypeface()->unitsPerEmInternal());
 
   // use the os/2 table as a source of reasonable defaults.
   auto xHeight = 0.0f;
   auto capHeight = 0.0f;
   auto* os2 = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
   if (os2) {
-    xHeight = static_cast<float>(os2->sxHeight) / upem * textSize;
+    xHeight = static_cast<float>(os2->sxHeight) / upem * textScale;
     if (os2->version != 0xFFFF && os2->version >= 2) {
-      capHeight = static_cast<float>(os2->sCapHeight) / upem * textSize;
+      capHeight = static_cast<float>(os2->sCapHeight) / upem * textScale;
     }
   }
 
@@ -258,8 +237,8 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) {
     // It completely ignores the OS/2 fsSelection::UseTypoMetrics bit.
     // It also ignores the VDMX tables, which are also of interest here
     // (and override everything else when they apply).
-    static const int kUseTypoMetricsMask = (1 << 7);
-    if (os2 && os2->version != 0xFFFF && (os2->fsSelection & kUseTypoMetricsMask)) {
+    static const int UseTypoMetricsMask = (1 << 7);
+    if (os2 && os2->version != 0xFFFF && (os2->fsSelection & UseTypoMetricsMask)) {
       ascent = -static_cast<float>(os2->sTypoAscender) / upem;
       descent = -static_cast<float>(os2->sTypoDescender) / upem;
       leading = static_cast<float>(os2->sTypoLineGap) / upem;
@@ -316,33 +295,31 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) {
 
   // synthesize elements that were not provided by the os/2 table or format-specific metrics
   if (xHeight == 0.f) {
-    xHeight = -ascent * textSize;
+    xHeight = -ascent * textScale;
   }
   if (capHeight == 0.f) {
-    capHeight = -ascent * textSize;
+    capHeight = -ascent * textScale;
   }
 
   // disallow negative line spacing
   if (leading < 0.0f) {
     leading = 0.0f;
   }
-  metrics->top = ymax * textSize;
-  metrics->ascent = ascent * textSize;
-  metrics->descent = descent * textSize;
-  metrics->bottom = ymin * textSize;
-  metrics->leading = leading * textSize;
-  metrics->xMin = xmin * textSize;
-  metrics->xMax = xmax * textSize;
+  metrics->top = ymax * textScale;
+  metrics->ascent = ascent * textScale;
+  metrics->descent = descent * textScale;
+  metrics->bottom = ymin * textScale;
+  metrics->leading = leading * textScale;
+  metrics->xMin = xmin * textScale;
+  metrics->xMax = xmax * textScale;
   metrics->xHeight = xHeight;
   metrics->capHeight = capHeight;
-  metrics->underlineThickness = underlineThickness * textSize;
-  metrics->underlinePosition = underlinePosition * textSize;
-  fontMetrics = std::make_unique<FontMetrics>();
-  *fontMetrics = *metrics;
+  metrics->underlineThickness = underlineThickness * textScale;
+  metrics->underlinePosition = underlinePosition * textScale;
 }
 
-bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) {
-  auto face = typeface->face;
+bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) const {
+  auto face = ftTypeface()->face;
   const auto glyph_id = FT_Get_Char_Index(face, static_cast<FT_ULong>(letter));
   if (glyph_id == 0) {
     return false;
@@ -435,9 +412,10 @@ static bool GenerateGlyphPath(FT_Face face, Path* path) {
   return true;
 }
 
-bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) {
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
-  auto face = typeface->face;
+bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,
+                                   Path* path) const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  auto face = ftTypeface()->face;
   // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
   if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
     path->reset();
@@ -462,8 +440,8 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) {
-  auto face = typeface->face;
+void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
+  auto face = ftTypeface()->face;
   FT_Outline_Get_CBox(&face->glyph->outline, bbox);
 
   // outset the box to integral boundaries
@@ -473,78 +451,67 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) {
   bbox->yMax = (bbox->yMax + 63) & ~63;
 }
 
-GlyphMetrics FTScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBold,
-                                                   bool fauxItalic) {
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
-  GlyphMetrics metrics;
+Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  auto bounds = Rect::MakeEmpty();
   if (setupSize(fauxItalic)) {
-    return metrics;
+    return bounds;
   }
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
-  auto face = typeface->face;
+  auto face = ftTypeface()->face;
   auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
   if (err != FT_Err_Ok) {
-    return metrics;
+    return bounds;
   }
   if (fauxBold) {
     ApplyEmbolden(face, face->glyph, glyphID, glyphFlags);
   }
   if (face->glyph->format == FT_GLYPH_FORMAT_OUTLINE) {
     using FT_PosLimits = std::numeric_limits<FT_Pos>;
-    FT_BBox bounds = {FT_PosLimits::max(), FT_PosLimits::max(), FT_PosLimits::min(),
-                      FT_PosLimits::min()};
+    FT_BBox rect = {FT_PosLimits::max(), FT_PosLimits::max(), FT_PosLimits::min(),
+                    FT_PosLimits::min()};
     if (0 < face->glyph->outline.n_contours) {
-      getBBoxForCurrentGlyph(&bounds);
+      getBBoxForCurrentGlyph(&rect);
     } else {
-      bounds = {0, 0, 0, 0};
+      rect = {0, 0, 0, 0};
     }
     // Round out, no longer dot6.
-    bounds.xMin = FDot6Floor(bounds.xMin);
-    bounds.yMin = FDot6Floor(bounds.yMin);
-    bounds.xMax = FDot6Ceil(bounds.xMax);
-    bounds.yMax = FDot6Ceil(bounds.yMax);
+    rect.xMin = FDot6Floor(rect.xMin);
+    rect.yMin = FDot6Floor(rect.yMin);
+    rect.xMax = FDot6Ceil(rect.xMax);
+    rect.yMax = FDot6Ceil(rect.yMax);
 
-    FT_Pos width = bounds.xMax - bounds.xMin;
-    FT_Pos height = bounds.yMax - bounds.yMin;
-    FT_Pos top = -bounds.yMax;  // Freetype y-up, We y-down.
-    FT_Pos left = bounds.xMin;
+    FT_Pos width = rect.xMax - rect.xMin;
+    FT_Pos height = rect.yMax - rect.yMin;
+    FT_Pos top = -rect.yMax;  // Freetype y-up, We y-down.
+    FT_Pos left = rect.xMin;
 
-    metrics.width = static_cast<float>(width);
-    metrics.height = static_cast<float>(height);
-    metrics.top = static_cast<float>(top);
-    metrics.left = static_cast<float>(left);
+    bounds.setXYWH(static_cast<float>(left), static_cast<float>(top), static_cast<float>(width),
+                   static_cast<float>(height));
   } else if (face->glyph->format == FT_GLYPH_FORMAT_BITMAP) {
-    auto rect = Rect::MakeXYWH(static_cast<float>(face->glyph->bitmap_left),
-                               -static_cast<float>(face->glyph->bitmap_top),
-                               static_cast<float>(face->glyph->bitmap.width),
-                               static_cast<float>(face->glyph->bitmap.rows));
+    bounds.setXYWH(static_cast<float>(face->glyph->bitmap_left),
+                   -static_cast<float>(face->glyph->bitmap_top),
+                   static_cast<float>(face->glyph->bitmap.width),
+                   static_cast<float>(face->glyph->bitmap.rows));
     auto matrix = getExtraMatrix(fauxItalic);
-    matrix.mapRect(&rect);
-    rect.roundOut();
-    metrics.width = static_cast<float>(rect.width());
-    metrics.height = static_cast<float>(rect.height());
-    metrics.top = static_cast<float>(rect.top);
-    metrics.left = static_cast<float>(rect.left);
+    matrix.mapRect(&bounds);
+    bounds.roundOut();
   } else {
-    LOGE("unknown glyph format");
-    return metrics;
+    LOGE("FTScalerContext::getBounds() unknown glyph format!");
   }
-
-  metrics.advanceX = FDot6ToFloat(face->glyph->advance.x);
-  metrics.advanceY = FDot6ToFloat(face->glyph->advance.y);
-  return metrics;
+  return bounds;
 }
 
-float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) {
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
-  return getAdvanceInternal(glyphID, verticalText);
-}
-
-float FTScalerContext::getAdvanceInternal(tgfx::GlyphID glyphID, bool verticalText) {
+float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (setupSize(false)) {
     return 0;
   }
-  auto face = typeface->face;
+  return getAdvanceInternal(glyphID, verticalText);
+}
+
+float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) const {
+  auto face = ftTypeface()->face;
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   if (verticalText) {
     glyphFlags |= FT_LOAD_VERTICAL_LAYOUT;
@@ -556,9 +523,9 @@ float FTScalerContext::getAdvanceInternal(tgfx::GlyphID glyphID, bool verticalTe
   return verticalText ? FDot6ToFloat(face->glyph->advance.y) : FDot6ToFloat(face->glyph->advance.x);
 }
 
-Point FTScalerContext::getVerticalOffset(tgfx::GlyphID glyphID) {
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
-  if (glyphID == 0) {
+Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  if (glyphID == 0 || setupSize(false)) {
     return Point::Zero();
   }
   FontMetrics metrics = {};
@@ -605,12 +572,12 @@ std::shared_ptr<ImageBuffer> CopyFTBitmap(const FT_Bitmap& ftBitmap) {
 }
 
 std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID, bool fauxItalic,
-                                                            Matrix* matrix) {
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
+                                                            Matrix* matrix) const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (setupSize(fauxItalic)) {
     return nullptr;
   }
-  auto face = typeface->face;
+  auto face = ftTypeface()->face;
   auto glyphFlags = loadGlyphFlags;
   glyphFlags |= FT_LOAD_RENDER;
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
@@ -631,11 +598,15 @@ std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID, boo
   return CopyFTBitmap(ftBitmap);
 }
 
-Matrix FTScalerContext::getExtraMatrix(bool fauxItalic) {
+Matrix FTScalerContext::getExtraMatrix(bool fauxItalic) const {
   auto matrix = Matrix::MakeScale(extraScale.x, extraScale.y);
   if (fauxItalic) {
     matrix.postSkew(ITALIC_SKEW, 0);
   }
   return matrix;
+}
+
+FTTypeface* FTScalerContext::ftTypeface() const {
+  return static_cast<FTTypeface*>(typeface.get());
 }
 }  // namespace tgfx

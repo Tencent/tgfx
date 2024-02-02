@@ -68,7 +68,7 @@ TGFX_TEST(MaskTest, Rasterize) {
   font.setTypeface(typeface);
   font.setFauxItalic(true);
   font.setFauxBold(true);
-  auto buffer = font.getGlyphImage(glyphID, &matrix);
+  auto buffer = font.getImage(glyphID, &matrix);
   ASSERT_TRUE(buffer != nullptr);
   EXPECT_TRUE(fabsf(matrix.getScaleX() - 2.75229359f) < FLT_EPSILON);
   EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.550458729f) < FLT_EPSILON);

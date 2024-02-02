@@ -29,8 +29,6 @@ class WebTypeface : public Typeface {
  public:
   static std::shared_ptr<WebTypeface> Make(const std::string& name, const std::string& style = "");
 
-  ~WebTypeface() override;
-
   uint32_t uniqueID() const override {
     return _uniqueID;
   }
@@ -43,8 +41,8 @@ class WebTypeface : public Typeface {
     return style;
   }
 
-  int glyphsCount() const override {
-    return 0;
+  size_t glyphsCount() const override {
+    return 1;  // Returns a non-zero value to indicate that we are not empty.
   }
 
   int unitsPerEm() const override {
@@ -63,26 +61,10 @@ class WebTypeface : public Typeface {
     return nullptr;
   }
 
- protected:
-  Point getVerticalOffset(GlyphID glyphID, float size) const override;
-
-  float getAdvance(GlyphID glyphID, float size, bool verticalText) const override;
-
-  FontMetrics getMetrics(float size) const override;
-
-  bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-               Path* path) const override;
-  Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
-
-  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
-                                             Matrix* matrix) const override;
-
  private:
   explicit WebTypeface(std::string name, std::string style);
 
   uint32_t _uniqueID;
-  std::unordered_map<float, FontMetrics>* fontMetricsMap =
-      new std::unordered_map<float, FontMetrics>;
   emscripten::val scalerContextClass = emscripten::val::null();
   std::string name;
   std::string style;

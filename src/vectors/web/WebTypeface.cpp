@@ -42,10 +42,6 @@ std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data>, int) {
   return nullptr;
 }
 
-std::shared_ptr<Typeface> Typeface::MakeDefault() {
-  return WebTypeface::Make("Arial");
-}
-
 std::shared_ptr<WebTypeface> WebTypeface::Make(const std::string& name, const std::string& style) {
   auto scalerContextClass = val::module_property("ScalerContext");
   if (!scalerContextClass.as<bool>()) {
@@ -62,10 +58,6 @@ WebTypeface::WebTypeface(std::string name, std::string style)
   if (!this->style.empty()) {
     webFontFamily += " " + this->style;
   }
-}
-
-WebTypeface::~WebTypeface() {
-  delete fontMetricsMap;
 }
 
 bool WebTypeface::hasColor() const {
@@ -111,63 +103,5 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   }
   auto unichar = glyphs.at(glyphID - 1);
   return UTF::ToUTF8(unichar);
-}
-
-Point WebTypeface::getVerticalOffset(GlyphID glyphID, float size) const {
-  if (glyphID == 0) {
-    return Point::Zero();
-  }
-  auto metrics = getMetrics(size);
-  auto advanceX = getAdvance(glyphID, size, false);
-  return {-advanceX * 0.5f, metrics.capHeight};
-}
-
-float WebTypeface::getAdvance(GlyphID glyphID, float size, bool) const {
-  if (glyphID == 0) {
-    return 0;
-  }
-  auto scalerContext = scalerContextClass.new_(name, style, size, false, false);
-  return scalerContext.call<float>("getTextAdvance", getText(glyphID));
-}
-
-FontMetrics WebTypeface::getMetrics(float size) const {
-  auto iter = fontMetricsMap->find(size);
-  if (iter != fontMetricsMap->end()) {
-    return iter->second;
-  }
-  auto scalerContext = scalerContextClass.new_(name, style, size);
-  auto metrics = scalerContext.call<FontMetrics>("generateFontMetrics");
-  fontMetricsMap->insert(std::make_pair(size, metrics));
-  return metrics;
-}
-
-bool WebTypeface::getPath(GlyphID, float, bool, bool, Path*) const {
-  return false;
-}
-
-Rect WebTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
-  if (glyphID == 0) {
-    return Rect::MakeEmpty();
-  }
-  auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
-  return scalerContext.call<Rect>("getTextBounds", getText(glyphID));
-}
-
-std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float size,
-                                                        bool fauxItalic, Matrix* matrix) const {
-  if (glyphID == 0) {
-    return nullptr;
-  }
-  // the fauxBold is not supported for this method on other platforms, so we set it to false.
-  auto scalerContext = scalerContextClass.new_(name, style, size, false, fauxItalic);
-  auto bounds = scalerContext.call<Rect>("getTextBounds", getText(glyphID));
-  if (bounds.isEmpty()) {
-    return nullptr;
-  }
-  auto buffer = scalerContext.call<val>("generateImage", getText(glyphID), bounds);
-  if (matrix) {
-    matrix->setTranslate(bounds.left, bounds.top);
-  }
-  return WebImageBuffer::MakeAdopted(std::move(buffer));
 }
 }  // namespace tgfx

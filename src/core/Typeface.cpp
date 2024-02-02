@@ -18,8 +18,56 @@
 
 #include "tgfx/core/Typeface.h"
 #include "tgfx/utils/UTF.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
+class EmptyTypeface : public Typeface {
+ public:
+  uint32_t uniqueID() const override {
+    return _uniqueID;
+  }
+
+  std::string fontFamily() const override {
+    return "";
+  }
+
+  std::string fontStyle() const override {
+    return "";
+  }
+
+  size_t glyphsCount() const override {
+    return 0;
+  }
+
+  int unitsPerEm() const override {
+    return 0;
+  }
+
+  bool hasColor() const override {
+    return false;
+  }
+
+  GlyphID getGlyphID(Unichar) const override {
+    return 0;
+  }
+
+  std::shared_ptr<Data> getBytes() const override {
+    return nullptr;
+  }
+
+  std::shared_ptr<Data> copyTableData(FontTableTag) const override {
+    return nullptr;
+  }
+
+ private:
+  uint32_t _uniqueID = UniqueID::Next();
+};
+
+std::shared_ptr<Typeface> Typeface::MakeEmpty() {
+  static auto emptyTypeface = std::make_shared<EmptyTypeface>();
+  return emptyTypeface;
+}
+
 GlyphID Typeface::getGlyphID(const std::string& name) const {
   if (name.empty()) {
     return 0;

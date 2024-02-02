@@ -112,11 +112,6 @@ std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int
   return typeface;
 }
 
-std::shared_ptr<Typeface> Typeface::MakeDefault() {
-  static auto typeface = Typeface::MakeFromName("Lucida Sans", "");
-  return typeface;
-}
-
 std::shared_ptr<CGTypeface> CGTypeface::Make(CTFontRef ctFont, std::shared_ptr<Data> data) {
   if (ctFont == nullptr) {
     return nullptr;
@@ -213,62 +208,5 @@ std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {
   return Data::MakeAdopted(
       bytePtr, length, [](const void*, void* context) { CFRelease((CFDataRef)context); },
       (void*)cfData);
-}
-
-FontMetrics CGTypeface::getMetrics(float size) const {
-  auto scalerContext = CGScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return {};
-  }
-  return scalerContext->generateFontMetrics();
-}
-
-Rect CGTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
-  auto scalerContext = CGScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return Rect::MakeEmpty();
-  }
-  auto metrics = scalerContext->generateGlyphMetrics(glyphID, fauxBold, fauxItalic);
-  auto bounds = Rect::MakeXYWH(metrics.left, metrics.top, metrics.width, metrics.height);
-  auto advance = metrics.advanceX;
-  if (bounds.isEmpty() && advance > 0) {
-    auto fontMetrics = scalerContext->generateFontMetrics();
-    bounds.setLTRB(0, fontMetrics.ascent, advance, fontMetrics.descent);
-  }
-  return bounds;
-}
-
-float CGTypeface::getAdvance(GlyphID glyphID, float size, bool verticalText) const {
-  auto scalerContext = CGScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return 0;
-  }
-  return scalerContext->getAdvance(glyphID, verticalText);
-}
-
-bool CGTypeface::getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                         Path* path) const {
-  auto scalerContext = CGScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return false;
-  }
-  return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
-}
-
-std::shared_ptr<ImageBuffer> CGTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
-                                                       Matrix* matrix) const {
-  auto scalerContext = CGScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return nullptr;
-  }
-  return scalerContext->generateImage(glyphID, fauxItalic, matrix);
-}
-
-Point CGTypeface::getVerticalOffset(GlyphID glyphID, float size) const {
-  auto scalerContext = CGScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return Point::Zero();
-  }
-  return scalerContext->getVerticalOffset(glyphID);
 }
 }  // namespace tgfx

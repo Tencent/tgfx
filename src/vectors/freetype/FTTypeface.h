@@ -40,7 +40,7 @@ class FTTypeface : public Typeface {
 
   std::string fontStyle() const override;
 
-  int glyphsCount() const override;
+  size_t glyphsCount() const override;
 
   int unitsPerEm() const override;
 
@@ -52,31 +52,15 @@ class FTTypeface : public Typeface {
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
- protected:
-  float getAdvance(GlyphID glyphID, float size, bool verticalText) const override;
-
-  FontMetrics getMetrics(float size) const override;
-
-  bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-               Path* path) const override;
-
-  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
-                                             Matrix* matrix) const override;
-
-  Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
-
-  Point getVerticalOffset(GlyphID glyphID, float size) const override;
-
  private:
   uint32_t _uniqueID = 0;
   FTFontData data;
-  mutable std::mutex locker = {};
   FT_Face face = nullptr;
   std::weak_ptr<FTTypeface> weakThis;
 
-  static int GetUnitsPerEm(FT_Face face);
-
   FTTypeface(FTFontData data, FT_Face face);
+
+  int unitsPerEmInternal() const;
 
   friend class FTScalerContext;
 };

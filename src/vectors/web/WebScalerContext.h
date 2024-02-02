@@ -18,19 +18,12 @@
 
 #pragma once
 
-#include <memory>
-#include "ft2build.h"
-#include FT_FREETYPE_H
-#include "FTTypeface.h"
-#include "core/PixelBuffer.h"
 #include "core/ScalerContext.h"
 
 namespace tgfx {
-class FTScalerContext : public ScalerContext {
+class WebScalerContext : public ScalerContext {
  public:
-  FTScalerContext(std::shared_ptr<Typeface> typeFace, float textSize);
-
-  ~FTScalerContext() override;
+  WebScalerContext(std::shared_ptr<Typeface> typeface, float size, emscripten::val scalerContext);
 
   FontMetrics getFontMetrics() const override;
 
@@ -46,24 +39,8 @@ class FTScalerContext : public ScalerContext {
                                              Matrix* matrix) const override;
 
  private:
-  int setupSize(bool fauxItalic) const;
+  emscripten::val scalerContext = emscripten::val::null();
 
-  void getFontMetricsInternal(FontMetrics* metrics) const;
-
-  float getAdvanceInternal(GlyphID glyphID, bool verticalText = false) const;
-
-  bool getCBoxForLetter(char letter, FT_BBox* bbox) const;
-
-  void getBBoxForCurrentGlyph(FT_BBox* bbox) const;
-
-  Matrix getExtraMatrix(bool fauxItalic) const;
-
-  FTTypeface* ftTypeface() const;
-
-  float textScale = 1.0f;
-  Point extraScale = Point::Make(1.f, 1.f);
-  FT_Size ftSize = nullptr;
-  FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
-  FT_Int32 loadGlyphFlags = 0;
+  std::string getText(GlyphID glyphID) const;
 };
 }  // namespace tgfx

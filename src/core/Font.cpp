@@ -17,14 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Font.h"
+#include "ScalerContext.h"
 
 namespace tgfx {
-Font::Font() : Font(Typeface::MakeDefault()) {
+static auto EmptyContext = ScalerContext::MakeEmpty(0);
+
+Font::Font() : scalerContext(EmptyContext) {
 }
 
-Font::Font(std::shared_ptr<Typeface> tf, float textSize) {
-  setTypeface(std::move(tf));
-  setSize(textSize);
+Font::Font(std::shared_ptr<Typeface> tf, float textSize)
+    : scalerContext(ScalerContext::Make(std::move(tf), textSize)) {
 }
 
 Font Font::makeWithSize(float newSize) const {
@@ -33,19 +35,77 @@ Font Font::makeWithSize(float newSize) const {
   return newFont;
 }
 
+std::shared_ptr<Typeface> Font::getTypeface() const {
+  return scalerContext->getTypeface();
+}
+
 void Font::setTypeface(std::shared_ptr<Typeface> newTypeface) {
-  if (newTypeface == nullptr) {
-    typeface = Typeface::MakeDefault();
-  } else {
-    typeface = std::move(newTypeface);
+  if (newTypeface == scalerContext->getTypeface()) {
+    return;
   }
+  scalerContext = ScalerContext::Make(std::move(newTypeface), scalerContext->getSize());
+}
+
+float Font::getSize() const {
+  return scalerContext->getSize();
 }
 
 void Font::setSize(float newSize) {
   if (newSize < 0) {
-    size = 0.0f;
-  } else {
-    size = newSize;
+    newSize = 0;
   }
+  if (newSize == scalerContext->getSize()) {
+    return;
+  }
+  scalerContext = ScalerContext::Make(scalerContext->getTypeface(), newSize);
+}
+
+GlyphID Font::getGlyphID(const std::string& name) const {
+  auto typeface = scalerContext->getTypeface();
+  return typeface ? typeface->getGlyphID(name) : 0;
+}
+
+GlyphID Font::getGlyphID(Unichar unichar) const {
+  auto typeface = scalerContext->getTypeface();
+  return typeface ? typeface->getGlyphID(unichar) : 0;
+}
+
+FontMetrics Font::getMetrics() const {
+  return scalerContext->getFontMetrics();
+}
+
+Rect Font::getBounds(GlyphID glyphID) const {
+  if (glyphID == 0) {
+    return Rect::MakeEmpty();
+  }
+  return scalerContext->getBounds(glyphID, fauxBold, fauxItalic);
+}
+
+float Font::getAdvance(GlyphID glyphID, bool verticalText) const {
+  if (glyphID == 0) {
+    return 0;
+  }
+  return scalerContext->getAdvance(glyphID, verticalText);
+}
+
+Point Font::getVerticalOffset(GlyphID glyphID) const {
+  if (glyphID == 0) {
+    return Point::Zero();
+  }
+  return scalerContext->getVerticalOffset(glyphID);
+}
+
+bool Font::getPath(GlyphID glyphID, Path* path) const {
+  if (glyphID == 0) {
+    return false;
+  }
+  return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
+}
+
+std::shared_ptr<ImageBuffer> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
+  if (glyphID == 0) {
+    return nullptr;
+  }
+  return scalerContext->generateImage(glyphID, fauxItalic, matrix);
 }
 }  // namespace tgfx

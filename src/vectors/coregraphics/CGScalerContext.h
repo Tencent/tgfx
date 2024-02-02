@@ -20,32 +20,30 @@
 
 #include "CGTypeface.h"
 #include "core/PixelBuffer.h"
+#include "core/ScalerContext.h"
 #include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-class CGScalerContext {
+class CGScalerContext : public ScalerContext {
  public:
-  static std::unique_ptr<CGScalerContext> Make(std::shared_ptr<Typeface> typeface, float size);
-
-  ~CGScalerContext();
-
-  FontMetrics generateFontMetrics();
-
-  GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic);
-
-  float getAdvance(GlyphID glyphID, bool verticalText);
-
-  Point getVerticalOffset(GlyphID glyphID);
-
-  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path);
-
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxItalic, Matrix* matrix);
-
- private:
   CGScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
-  std::shared_ptr<Typeface> typeface = nullptr;
-  float textSize = 1.0f;
+  ~CGScalerContext() override;
+
+  FontMetrics getFontMetrics() const override;
+
+  Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
+
+  float getAdvance(GlyphID glyphID, bool verticalText) const override;
+
+  Point getVerticalOffset(GlyphID glyphID) const override;
+
+  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
+
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxItalic,
+                                             Matrix* matrix) const override;
+
+ private:
   float fauxBoldScale = 1.0f;
   CTFontRef ctFont = nullptr;
 };

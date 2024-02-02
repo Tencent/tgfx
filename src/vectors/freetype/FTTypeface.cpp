@@ -25,73 +25,6 @@
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-class EmptyTypeface : public Typeface {
- public:
-  uint32_t uniqueID() const override {
-    return _uniqueID;
-  }
-
-  std::string fontFamily() const override {
-    return "";
-  }
-
-  std::string fontStyle() const override {
-    return "";
-  }
-
-  int glyphsCount() const override {
-    return 0;
-  }
-
-  int unitsPerEm() const override {
-    return 0;
-  }
-
-  bool hasColor() const override {
-    return false;
-  }
-
-  GlyphID getGlyphID(Unichar) const override {
-    return 0;
-  }
-
-  std::shared_ptr<Data> getBytes() const override {
-    return nullptr;
-  }
-
-  std::shared_ptr<Data> copyTableData(FontTableTag) const override {
-    return nullptr;
-  }
-
- protected:
-  FontMetrics getMetrics(float) const override {
-    return {};
-  }
-
-  Rect getBounds(GlyphID, float, bool, bool) const override {
-    return {};
-  }
-
-  float getAdvance(GlyphID, float, bool) const override {
-    return 0;
-  }
-
-  bool getPath(GlyphID, float, bool, bool, Path*) const override {
-    return false;
-  }
-
-  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID, float, bool, Matrix*) const override {
-    return nullptr;
-  }
-
-  Point getVerticalOffset(GlyphID, float) const override {
-    return Point::Zero();
-  }
-
- private:
-  uint32_t _uniqueID = UniqueID::Next();
-};
-
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
   return SystemFont::MakeFromName(fontFamily, fontStyle);
@@ -111,10 +44,6 @@ std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int
     return nullptr;
   }
   return FTTypeface::Make(FTFontData(std::move(data), ttcIndex));
-}
-
-std::shared_ptr<Typeface> Typeface::MakeDefault() {
-  return std::make_shared<EmptyTypeface>();
 }
 
 static std::mutex& FTMutex() {
@@ -167,18 +96,6 @@ FTTypeface::~FTTypeface() {
   FT_Done_Face(face);
 }
 
-int FTTypeface::GetUnitsPerEm(FT_Face face) {
-  auto unitsPerEm = face->units_per_EM;
-  // At least some versions of FreeType set face->units_per_EM to 0 for bitmap only fonts.
-  if (unitsPerEm == 0) {
-    auto* ttHeader = static_cast<TT_Header*>(FT_Get_Sfnt_Table(face, FT_SFNT_HEAD));
-    if (ttHeader) {
-      unitsPerEm = ttHeader->Units_Per_EM;
-    }
-  }
-  return unitsPerEm;
-}
-
 std::string FTTypeface::fontFamily() const {
   std::lock_guard<std::mutex> autoLock(locker);
   return face->family_name ? face->family_name : "";
@@ -189,14 +106,26 @@ std::string FTTypeface::fontStyle() const {
   return face->style_name ? face->style_name : "";
 }
 
-int FTTypeface::glyphsCount() const {
+size_t FTTypeface::glyphsCount() const {
   std::lock_guard<std::mutex> autoLock(locker);
-  return static_cast<int>(face->num_glyphs);
+  return static_cast<size_t>(face->num_glyphs);
 }
 
 int FTTypeface::unitsPerEm() const {
   std::lock_guard<std::mutex> autoLock(locker);
-  return GetUnitsPerEm(face);
+  return unitsPerEmInternal();
+}
+
+int FTTypeface::unitsPerEmInternal() const {
+  auto upem = face->units_per_EM;
+  // At least some versions of FreeType set face->units_per_EM to 0 for bitmap only fonts.
+  if (upem == 0) {
+    auto* ttHeader = static_cast<TT_Header*>(FT_Get_Sfnt_Table(face, FT_SFNT_HEAD));
+    if (ttHeader) {
+      upem = ttHeader->Units_Per_EM;
+    }
+  }
+  return upem;
 }
 
 bool FTTypeface::hasColor() const {
@@ -230,63 +159,5 @@ std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
     return nullptr;
   }
   return Data::MakeAdopted(tableData, tableLength);
-}
-
-FontMetrics FTTypeface::getMetrics(float size) const {
-  auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return {};
-  }
-  return scalerContext->generateFontMetrics();
-}
-
-Rect FTTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
-  auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return Rect::MakeEmpty();
-  }
-  auto glyphMetrics = scalerContext->generateGlyphMetrics(glyphID, fauxBold, fauxItalic);
-  auto bounds =
-      Rect::MakeXYWH(glyphMetrics.left, glyphMetrics.top, glyphMetrics.width, glyphMetrics.height);
-  auto advance = glyphMetrics.advanceX;
-  if (bounds.isEmpty() && advance > 0) {
-    auto fontMetrics = scalerContext->generateFontMetrics();
-    bounds.setLTRB(0, fontMetrics.ascent, advance, fontMetrics.descent);
-  }
-  return bounds;
-}
-
-float FTTypeface::getAdvance(GlyphID glyphID, float size, bool verticalText) const {
-  auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return 0;
-  }
-  return scalerContext->getAdvance(glyphID, verticalText);
-}
-
-bool FTTypeface::getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                         Path* path) const {
-  auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return false;
-  }
-  return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
-}
-
-std::shared_ptr<ImageBuffer> FTTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
-                                                       Matrix* matrix) const {
-  auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return nullptr;
-  }
-  return scalerContext->generateImage(glyphID, fauxItalic, matrix);
-}
-
-Point FTTypeface::getVerticalOffset(GlyphID glyphID, float size) const {
-  auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
-  if (scalerContext == nullptr) {
-    return Point::Zero();
-  }
-  return scalerContext->getVerticalOffset(glyphID);
 }
 }  // namespace tgfx

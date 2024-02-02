@@ -66,17 +66,4 @@ class FontMetrics {
    */
   float underlinePosition = 0;
 };
-
-struct GlyphMetrics {
-  float width = 0;
-  float height = 0;
-
-  // The offset from the glyphs' origin on the baseline to the top left of the glyph mask.
-  float top = 0;
-  float left = 0;
-
-  // The advance for this glyph.
-  float advanceX = 0;
-  float advanceY = 0;
-};
 }  // namespace tgfx

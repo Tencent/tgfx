@@ -539,7 +539,7 @@ void Canvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], 
     const auto& position = positions[i];
 
     auto glyphMatrix = Matrix::I();
-    auto glyphBuffer = font.getGlyphImage(glyphID, &glyphMatrix);
+    auto glyphBuffer = font.getImage(glyphID, &glyphMatrix);
     if (glyphBuffer == nullptr) {
       continue;
     }
