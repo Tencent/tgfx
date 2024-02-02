@@ -64,11 +64,9 @@ class WebTypeface : public Typeface {
   }
 
  protected:
-  Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                          bool fauxItalic) const override;
+  Point getVerticalOffset(GlyphID glyphID, float size) const override;
 
-  float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                   bool verticalText) const override;
+  float getAdvance(GlyphID glyphID, float size, bool verticalText) const override;
 
   FontMetrics getMetrics(float size) const override;
 

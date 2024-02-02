@@ -59,8 +59,7 @@ class CGTypeface : public Typeface {
 
   FontMetrics getMetrics(float size) const override;
 
-  Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                          bool fauxItalic) const override;
+  Point getVerticalOffset(GlyphID glyphID, float size) const override;
 
   bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                Path* path) const override;
@@ -68,8 +67,7 @@ class CGTypeface : public Typeface {
   std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
                                              Matrix* matrix) const override;
 
-  float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                   bool verticalText) const override;
+  float getAdvance(GlyphID glyphID, float size, bool verticalText) const override;
 
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
