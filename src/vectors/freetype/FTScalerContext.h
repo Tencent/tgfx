@@ -31,15 +31,14 @@ class FTScalerContext {
 
   ~FTScalerContext();
 
-  FontMetrics generateFontMetrics(bool fauxBold, bool fauxItalic);
+  FontMetrics generateFontMetrics(bool fauxBold = false, bool fauxItalic = false);
 
   GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic,
                                     bool verticalText = false);
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path);
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxBold, bool fauxItalic,
-                                             Matrix* matrix);
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxItalic, Matrix* matrix);
 
  private:
   FTScalerContext(std::shared_ptr<FTTypeface> typeFace, float textSize);

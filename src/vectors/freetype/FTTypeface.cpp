@@ -80,7 +80,7 @@ class EmptyTypeface : public Typeface {
     return false;
   }
 
-  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID, float, bool, bool, Matrix*) const override {
+  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID, float, bool, Matrix*) const override {
     return nullptr;
   }
 
@@ -237,7 +237,7 @@ FontMetrics FTTypeface::getMetrics(float size) const {
   if (scalerContext == nullptr) {
     return {};
   }
-  return scalerContext->generateFontMetrics(false, false);
+  return scalerContext->generateFontMetrics();
 }
 
 Rect FTTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
@@ -250,7 +250,7 @@ Rect FTTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool faux
       Rect::MakeXYWH(glyphMetrics.left, glyphMetrics.top, glyphMetrics.width, glyphMetrics.height);
   auto advance = glyphMetrics.advanceX;
   if (bounds.isEmpty() && advance > 0) {
-    auto fontMetrics = scalerContext->generateFontMetrics(fauxBold, fauxItalic);
+    auto fontMetrics = scalerContext->generateFontMetrics();
     bounds.setLTRB(0, fontMetrics.ascent, advance, fontMetrics.descent);
   }
   return bounds;
@@ -276,13 +276,13 @@ bool FTTypeface::getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxIt
   return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
 }
 
-std::shared_ptr<ImageBuffer> FTTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                                       bool fauxItalic, Matrix* matrix) const {
+std::shared_ptr<ImageBuffer> FTTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
+                                                       Matrix* matrix) const {
   auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
   if (scalerContext == nullptr) {
     return nullptr;
   }
-  return scalerContext->generateImage(glyphID, fauxBold, fauxItalic, matrix);
+  return scalerContext->generateImage(glyphID, fauxItalic, matrix);
 }
 
 Point FTTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,

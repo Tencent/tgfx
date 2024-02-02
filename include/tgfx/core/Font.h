@@ -96,7 +96,7 @@ class Font {
 
   /**
    * Returns the FontMetrics associated with this font. Results are scaled by text size but do not
-   * take into account dimensions required by text skew, fake bold, and style stroke.
+   * take into account dimensions required by fauxBold and fauxItalic.
    */
   FontMetrics getMetrics() const {
     return typeface->getMetrics(size);
@@ -144,10 +144,11 @@ class Font {
 
   /**
    * Creates an image buffer capturing the content of the specified glyph. The returned matrix
-   * should apply to the glyph image when drawing.
+   * should apply to the glyph image when drawing. Please note that the fauxBold is not supported
+   * for this method.
    */
   std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, Matrix* matrix) const {
-    return typeface->getGlyphImage(glyphID, size, fauxBold, fauxItalic, matrix);
+    return typeface->getGlyphImage(glyphID, size, fauxItalic, matrix);
   }
 
   /**

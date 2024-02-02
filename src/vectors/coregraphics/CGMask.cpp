@@ -18,13 +18,14 @@
 
 #include "CGMask.h"
 #include "CGTypeface.h"
-#include "CGUtil.h"
 #include "core/SimpleTextBlob.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
+static constexpr float ITALIC_SKEW = -0.20f;
+
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto cgPath = reinterpret_cast<CGMutablePathRef>(info);
   switch (verb) {
@@ -163,6 +164,13 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   auto rect = CGRectMake(bounds.left, bounds.top, bounds.width(), bounds.height());
   CGContextDrawImage(cgContext, rect, image);
   pixelRef->unlockPixels();
+}
+
+static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
+  return CGAffineTransformMake(
+      static_cast<CGFloat>(matrix.getScaleX()), -static_cast<CGFloat>(matrix.getSkewY()),
+      -static_cast<CGFloat>(matrix.getSkewX()), static_cast<CGFloat>(matrix.getScaleY()),
+      static_cast<CGFloat>(matrix.getTranslateX()), static_cast<CGFloat>(matrix.getTranslateY()));
 }
 
 bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {

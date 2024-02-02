@@ -569,8 +569,8 @@ std::shared_ptr<ImageBuffer> CopyFTBitmap(const FT_Bitmap& ftBitmap) {
   return bitmap.makeBuffer();
 }
 
-std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID, bool fauxBold,
-                                                            bool fauxItalic, Matrix* matrix) {
+std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID, bool fauxItalic,
+                                                            Matrix* matrix) {
   std::lock_guard<std::mutex> autoLock(typeface->locker);
   if (setupSize(fauxItalic)) {
     return nullptr;
@@ -582,9 +582,6 @@ std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID, boo
   auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
   if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_BITMAP) {
     return nullptr;
-  }
-  if (fauxBold) {
-    ApplyEmbolden(face, face->glyph, glyphID, glyphFlags);
   }
   auto ftBitmap = face->glyph->bitmap;
   if (ftBitmap.pixel_mode != FT_PIXEL_MODE_BGRA && ftBitmap.pixel_mode != FT_PIXEL_MODE_GRAY) {
