@@ -18,13 +18,13 @@
 
 #include "CGMask.h"
 #include "CGTypeface.h"
+#include "core/ScalerContext.h"
 #include "core/SimpleTextBlob.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-static constexpr float ITALIC_SKEW = -0.20f;
 
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto cgPath = reinterpret_cast<CGMutablePathRef>(info);

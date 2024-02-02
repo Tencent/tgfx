@@ -57,28 +57,30 @@ export class ScalerContext {
     private readonly fontName: string;
     private readonly fontStyle: string;
     private readonly size: number;
-    private readonly fauxBold: boolean;
-    private readonly fauxItalic: boolean;
+    private fontMetrics!: {
+        ascent: number;
+        descent: number;
+        xHeight: number;
+        capHeight: number;
+    };
 
     private fontBoundingBoxMap: { key: string; value: Rect }[] = [];
 
-    public constructor(fontName: string, fontStyle: string, size: number, fauxBold = false, fauxItalic = false) {
+    public constructor(fontName: string, fontStyle: string, size: number) {
         this.fontName = fontName;
         this.fontStyle = fontStyle;
         this.size = size;
-        this.fauxBold = fauxBold;
-        this.fauxItalic = fauxItalic;
         this.loadCanvas();
     }
 
-    public fontString() {
+    public fontString(fauxBold: boolean, fauxItalic: boolean) {
         const attributes = [];
         // css font-style
-        if (this.fauxItalic) {
+        if (fauxItalic) {
             attributes.push('italic');
         }
         // css font-weight
-        if (this.fauxBold) {
+        if (fauxBold) {
             attributes.push('bold');
         }
         // css font-size
@@ -90,15 +92,28 @@ export class ScalerContext {
         return attributes.join(' ');
     }
 
-    public getTextAdvance(text: string) {
+    public getFontMetrics() {
+        if (this.fontMetrics) {
+            return this.fontMetrics;
+        }
         const {context} = ScalerContext;
-        context.font = this.fontString();
-        return context.measureText(text).width;
+        context.font = this.fontString(false, false);
+        const metrics = this.measureText(context, 'H');
+        const capHeight = metrics.actualBoundingBoxAscent;
+        const xMetrics = this.measureText(context, 'x');
+        const xHeight = xMetrics.actualBoundingBoxAscent;
+        this.fontMetrics = {
+            ascent: -metrics.fontBoundingBoxAscent,
+            descent: metrics.fontBoundingBoxDescent,
+            xHeight,
+            capHeight,
+        };
+        return this.fontMetrics;
     }
 
-    public getTextBounds(text: string) {
+    public getBounds(text: string, fauxBold: boolean, fauxItalic: boolean) {
         const {context} = ScalerContext;
-        context.font = this.fontString();
+        context.font = this.fontString(fauxBold, fauxItalic);
         const metrics = this.measureText(context, text);
         const bounds: Rect = {
             left: Math.floor(-metrics.actualBoundingBoxLeft),
@@ -115,25 +130,16 @@ export class ScalerContext {
         return bounds;
     }
 
-    public generateFontMetrics() {
+    public getAdvance(text: string) {
         const {context} = ScalerContext;
-        context.font = this.fontString();
-        const metrics = this.measureText(context, '中');
-        const capHeight = metrics.actualBoundingBoxAscent;
-        const xMetrics = this.measureText(context, 'x');
-        const xHeight = xMetrics.actualBoundingBoxAscent;
-        return {
-            ascent: -metrics.fontBoundingBoxAscent,
-            descent: metrics.fontBoundingBoxDescent,
-            xHeight,
-            capHeight,
-        };
+        context.font = this.fontString(false, false);
+        return context.measureText(text).width;
     }
 
-    public generateImage(text: string, bounds: Rect) {
+    public generateImage(text: string, fauxItalic: boolean, bounds: Rect) {
         const canvas = getCanvas2D(bounds.right - bounds.left, bounds.bottom - bounds.top);
         const context = canvas.getContext('2d') as CanvasRenderingContext2D;
-        context.font = this.fontString();
+        context.font = this.fontString(false, fauxItalic);
         context.fillText(text, -bounds.left, -bounds.top);
         return canvas;
     }
@@ -159,7 +165,6 @@ export class ScalerContext {
         ctx.canvas.height = this.size * 1.5;
         const pos = [0, this.size];
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        ctx.font = this.fontString();
         ctx.fillText(text, pos[0], pos[1]);
         const imageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
         const {left, top, right, bottom} = measureText(imageData);
@@ -170,7 +175,6 @@ export class ScalerContext {
         if (fontBoundingBox) {
             fontMeasure = fontBoundingBox.value;
         } else {
-            ctx.font = this.fontString();
             ctx.fillText('测', pos[0], pos[1]);
             const fontImageData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
             fontMeasure = measureText(fontImageData);

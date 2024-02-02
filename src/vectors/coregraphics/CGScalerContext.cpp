@@ -17,13 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "vectors/coregraphics/CGScalerContext.h"
+#include "core/ScalerContext.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathEffect.h"
 #include "utils/Log.h"
 
 namespace tgfx {
-static constexpr float ITALIC_SKEW = -0.20f;
-
 static constexpr float StdFakeBoldInterpKeys[] = {
     9.f,
     36.f,
@@ -75,16 +74,13 @@ static CGAffineTransform GetTransform(bool fauxItalic) {
   return fauxItalic ? italicTransform : identityTransform;
 }
 
-std::unique_ptr<CGScalerContext> CGScalerContext::Make(std::shared_ptr<Typeface> typeface,
-                                                       float size) {
-  if (typeface == nullptr) {
-    return nullptr;
-  }
-  return std::unique_ptr<CGScalerContext>(new CGScalerContext(std::move(typeface), size));
+std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
+                                                        float size) {
+  return std::make_shared<CGScalerContext>(std::move(typeface), size);
 }
 
 CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
-    : typeface(std::move(tf)), textSize(size) {
+    : ScalerContext(std::move(tf), size) {
   CTFontRef font = std::static_pointer_cast<CGTypeface>(typeface)->ctFont;
   fauxBoldScale = FloatInterpFunc(textSize, StdFakeBoldInterpKeys, StdFakeBoldInterpValues, 2);
   ctFont = CTFontCreateCopyWithAttributes(font, static_cast<CGFloat>(textSize), nullptr, nullptr);
@@ -96,7 +92,7 @@ CGScalerContext::~CGScalerContext() {
   }
 }
 
-FontMetrics CGScalerContext::generateFontMetrics() {
+FontMetrics CGScalerContext::getFontMetrics() const {
   FontMetrics metrics;
   auto theBounds = CTFontGetBoundingBox(ctFont);
   metrics.top = static_cast<float>(-CGRectGetMaxY(theBounds));
@@ -113,15 +109,8 @@ FontMetrics CGScalerContext::generateFontMetrics() {
   return metrics;
 }
 
-GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBold,
-                                                   bool fauxItalic) {
-  GlyphMetrics glyph;
+Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
   const auto cgGlyph = static_cast<CGGlyph>(glyphID);
-  // The following block produces cgAdvance in CG units (pixels, y up).
-  CGSize cgAdvance;
-  CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationHorizontal, &cgGlyph, &cgAdvance, 1);
-  glyph.advanceX = static_cast<float>(cgAdvance.width);
-  glyph.advanceY = static_cast<float>(cgAdvance.height);
   // Glyphs are always drawn from the horizontal origin. The caller must manually use the result
   // of CTFontGetVerticalTranslationsForGlyphs to calculate where to draw the glyph for vertical
   // glyphs. As a result, always get the horizontal bounds of a glyph and translate it if the
@@ -133,33 +122,24 @@ GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBol
   auto transform = GetTransform(fauxItalic);
   cgBounds = CGRectApplyAffineTransform(cgBounds, transform);
   if (CGRectIsEmpty(cgBounds)) {
-    return glyph;
+    return Rect::MakeEmpty();
   }
   // Convert cgBounds to Glyph units (pixels, y down).
-  auto rect = Rect::MakeXYWH(static_cast<float>(cgBounds.origin.x),
-                             static_cast<float>(-cgBounds.origin.y - cgBounds.size.height),
-                             static_cast<float>(cgBounds.size.width),
-                             static_cast<float>(cgBounds.size.height));
+  auto bounds = Rect::MakeXYWH(static_cast<float>(cgBounds.origin.x),
+                               static_cast<float>(-cgBounds.origin.y - cgBounds.size.height),
+                               static_cast<float>(cgBounds.size.width),
+                               static_cast<float>(cgBounds.size.height));
 
-  // We're trying to pack left and top into int16_t,
-  // and width and height into uint16_t
-  if (!Rect::MakeXYWH(-32767, -32767, 65535, 65535).contains(rect)) {
-    return glyph;
-  }
   if (fauxBold) {
     auto fauxBoldSize = textSize * fauxBoldScale;
-    rect.outset(fauxBoldSize, fauxBoldSize);
+    bounds.outset(fauxBoldSize, fauxBoldSize);
   }
-  rect.roundOut();
-  rect.outset(1.f, 1.f);
-  glyph.left = rect.left;
-  glyph.top = rect.top;
-  glyph.width = rect.width();
-  glyph.height = rect.height();
-  return glyph;
+  bounds.roundOut();
+  bounds.outset(1.f, 1.f);
+  return bounds;
 }
 
-float CGScalerContext::getAdvance(GlyphID glyphID, bool verticalText) {
+float CGScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
   CGSize cgAdvance;
   if (verticalText) {
     CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationVertical, &glyphID, &cgAdvance, 1);
@@ -171,7 +151,7 @@ float CGScalerContext::getAdvance(GlyphID glyphID, bool verticalText) {
   return verticalText ? static_cast<float>(cgAdvance.height) : static_cast<float>(cgAdvance.width);
 }
 
-Point CGScalerContext::getVerticalOffset(GlyphID glyphID) {
+Point CGScalerContext::getVerticalOffset(GlyphID glyphID) const {
   // CTFontGetVerticalTranslationsForGlyphs produces cgVertOffset in CG units (pixels, y up).
   CGSize cgVertOffset;
   CTFontGetVerticalTranslationsForGlyphs(ctFont, &glyphID, &cgVertOffset, 1);
@@ -247,7 +227,8 @@ class CTPathGeometrySink {
   CGPoint current = {0, 0};
 };
 
-bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) {
+bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,
+                                   Path* path) const {
   auto fontFormat = CTFontCopyAttribute(ctFont, kCTFontFormatAttribute);
   if (!fontFormat) {
     return false;
@@ -280,7 +261,7 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
 }
 
 std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID, bool fauxItalic,
-                                                            Matrix* matrix) {
+                                                            Matrix* matrix) const {
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   auto transform = GetTransform(fauxItalic);

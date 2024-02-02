@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <mutex>
+#include <unordered_map>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/ImageBuffer.h"
@@ -36,19 +38,21 @@ typedef int32_t Unichar;
 
 typedef uint32_t FontTableTag;
 
+class ScalerContext;
+
 /**
  * A set of character glyphs and layout information for drawing text.
  */
 class Typeface {
  public:
   /**
-   * Returns the default typeface reference, which is never nullptr.
+   * Returns a non-null typeface which contains no glyphs.
    */
-  static std::shared_ptr<Typeface> MakeDefault();
+  static std::shared_ptr<Typeface> MakeEmpty();
 
   /**
    * Returns a typeface reference for the given font family and font style. If the family and
-   * style cannot be matched identically, a best match is found and returned, which is never
+   * style cannot be matched identically, the best match is found and returned, which is never
    * nullptr.
    */
   static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
@@ -93,7 +97,7 @@ class Typeface {
   /**
    *  Return the number of glyphs in this typeface.
    */
-  virtual int glyphsCount() const = 0;
+  virtual size_t glyphsCount() const = 0;
 
   /**
    * Returns the number of glyph space units per em for this typeface.
@@ -125,44 +129,11 @@ class Typeface {
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
  protected:
-  /**
-   * Returns the FontMetrics associated with this typeface.
-   */
-  virtual FontMetrics getMetrics(float size) const = 0;
+  mutable std::mutex locker = {};
 
-  /**
-   * Returns the bounding box of the specified glyph. The bounds is specified in glyph space
-   * units.
-   */
-  virtual Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const = 0;
+ private:
+  std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
-  /**
-   * Returns the advance for specified glyph. The value is specified in glyph space units.
-   */
-  virtual float getAdvance(GlyphID glyphID, float size, bool verticalText) const = 0;
-
-  /**
-   * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path
-   * and returns true. If glyph is described by a bitmap, returns false and ignores path parameter.
-   * The points in path are specified in glyph space units.
-   */
-  virtual bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                       Path* path) const = 0;
-
-  /**
-   * Creates an image buffer capturing the content of the specified glyph. The returned matrix
-   * should apply to the glyph image when drawing. Please note that the fauxBold is not supported
-   * for this method.
-   */
-  virtual std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
-                                                     Matrix* matrix) const = 0;
-
-  /**
-   * Calculates the offset from the default (horizontal) origin to the vertical origin for specified
-   * glyph. The offset is specified in glyph space units.
-   */
-  virtual Point getVerticalOffset(GlyphID glyphID, float size) const = 0;
-
-  friend class Font;
+  friend class ScalerContext;
 };
 }  // namespace tgfx
