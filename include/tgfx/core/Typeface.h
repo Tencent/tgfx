@@ -152,10 +152,11 @@ class Typeface {
 
   /**
    * Creates an image buffer capturing the content of the specified glyph. The returned matrix
-   * should apply to the glyph image when drawing.
+   * should apply to the glyph image when drawing. Please note that the fauxBold is not supported
+   * for this method.
    */
-  virtual std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                                     bool fauxItalic, Matrix* matrix) const = 0;
+  virtual std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxItalic,
+                                                     Matrix* matrix) const = 0;
 
   /**
    * Calculates the offset from the default (horizontal) origin to the vertical origin for specified

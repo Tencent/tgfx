@@ -23,37 +23,29 @@
 #include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-class CGScalerContextRec {
- public:
-  float textSize = 12.f;
-  float skewX = 0.f;
-  float fauxBoldSize = 0.f;
-  bool verticalText = false;
-};
-
 class CGScalerContext {
  public:
-  static std::unique_ptr<CGScalerContext> Make(std::shared_ptr<Typeface> typeface, float size,
-                                               bool fauxBold = false, bool fauxItalic = false,
-                                               bool verticalText = false);
+  static std::unique_ptr<CGScalerContext> Make(std::shared_ptr<Typeface> typeface, float size);
+
   ~CGScalerContext();
 
   FontMetrics generateFontMetrics();
 
-  GlyphMetrics generateGlyphMetrics(GlyphID glyphID);
+  GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic,
+                                    bool verticalText = false);
 
-  Point getVerticalOffset(GlyphID glyphID) const;
+  Point getVerticalOffset(GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
-  bool generatePath(GlyphID glyphID, Path* path);
+  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path);
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, Matrix* matrix);
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxItalic, Matrix* matrix);
 
  private:
-  CGScalerContext(std::shared_ptr<Typeface> typeface, CGScalerContextRec);
+  CGScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
-  std::shared_ptr<Typeface> _typeface;
-  CGScalerContextRec rec;
+  std::shared_ptr<Typeface> typeface = nullptr;
+  float textSize = 1.0f;
+  float fauxBoldScale = 1.0f;
   CTFontRef ctFont = nullptr;
-  CGAffineTransform transform = CGAffineTransformIdentity;
 };
 }  // namespace tgfx

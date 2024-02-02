@@ -119,7 +119,7 @@ Point WebTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
     return Point::Zero();
   }
   auto metrics = getMetrics(size);
-  auto advance = getAdvance(glyphID, size, fauxBold, fauxItalic, true);
+  auto advance = getAdvance(glyphID, size, fauxBold, fauxItalic, false);
   return {-advance * 0.5f, metrics.capHeight};
 }
 
@@ -155,12 +155,13 @@ Rect WebTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fau
   return scalerContext.call<Rect>("getTextBounds", getText(glyphID));
 }
 
-std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float size,
                                                         bool fauxItalic, Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
-  auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
+  // the fauxBold is not supported for this method on other platforms, so we set it to false.
+  auto scalerContext = scalerContextClass.new_(name, style, size, false, fauxItalic);
   auto bounds = scalerContext.call<Rect>("getTextBounds", getText(glyphID));
   if (bounds.isEmpty()) {
     return nullptr;
