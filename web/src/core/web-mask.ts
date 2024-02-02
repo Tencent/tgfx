@@ -82,10 +82,10 @@ export class WebMask {
     }
 
     public fillText(webFont: WebFont, texts: Vector<string>, positions: Vector<Point>, matrixWasmIns: any) {
-        const scalerContext = new ScalerContext(webFont.name, webFont.style, webFont.size, webFont.bold, webFont.italic);
+        const scalerContext = new ScalerContext(webFont.name, webFont.style, webFont.size);
         const matrix = new Matrix(matrixWasmIns);
         this.context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
-        this.context.font = scalerContext.fontString();
+        this.context.font = scalerContext.fontString(webFont.bold, webFont.italic);
         for (let i = 0; i < texts.size(); i++) {
             const position = positions.get(i);
             this.context.fillText(texts.get(i), position.x, position.y);
@@ -102,10 +102,10 @@ export class WebMask {
         if (stroke.width < 0.5) {
             return;
         }
-        const scalerContext = new ScalerContext(webFont.name, webFont.style, webFont.size, webFont.bold, webFont.italic);
+        const scalerContext = new ScalerContext(webFont.name, webFont.style, webFont.size);
         const matrix = new Matrix(matrixWasmIns);
         this.context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
-        this.context.font = scalerContext.fontString();
+        this.context.font = scalerContext.fontString(webFont.bold, webFont.italic);
         this.context.lineJoin = WebMask.getLineJoin(stroke.join);
         this.context.miterLimit = stroke.miterLimit;
         this.context.lineCap = WebMask.getLineCap(stroke.cap);
