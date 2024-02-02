@@ -53,8 +53,7 @@ class FTTypeface : public Typeface {
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
  protected:
-  float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                   bool verticalText) const override;
+  float getAdvance(GlyphID glyphID, float size, bool verticalText) const override;
 
   FontMetrics getMetrics(float size) const override;
 
@@ -66,8 +65,7 @@ class FTTypeface : public Typeface {
 
   Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
 
-  Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                          bool fauxItalic) const override;
+  Point getVerticalOffset(GlyphID glyphID, float size) const override;
 
  private:
   uint32_t _uniqueID = 0;

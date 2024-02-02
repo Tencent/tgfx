@@ -31,10 +31,11 @@ class CGScalerContext {
 
   FontMetrics generateFontMetrics();
 
-  GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic,
-                                    bool verticalText = false);
+  GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic);
 
-  Point getVerticalOffset(GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
+  float getAdvance(GlyphID glyphID, bool verticalText);
+
+  Point getVerticalOffset(GlyphID glyphID);
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path);
 

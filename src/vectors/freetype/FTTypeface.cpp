@@ -72,7 +72,7 @@ class EmptyTypeface : public Typeface {
     return {};
   }
 
-  float getAdvance(GlyphID, float, bool, bool, bool) const override {
+  float getAdvance(GlyphID, float, bool) const override {
     return 0;
   }
 
@@ -84,7 +84,7 @@ class EmptyTypeface : public Typeface {
     return nullptr;
   }
 
-  Point getVerticalOffset(GlyphID, float, bool, bool) const override {
+  Point getVerticalOffset(GlyphID, float) const override {
     return Point::Zero();
   }
 
@@ -256,15 +256,12 @@ Rect FTTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool faux
   return bounds;
 }
 
-float FTTypeface::getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                             bool verticalText) const {
+float FTTypeface::getAdvance(GlyphID glyphID, float size, bool verticalText) const {
   auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
   if (scalerContext == nullptr) {
     return 0;
   }
-  auto glyphMetrics =
-      scalerContext->generateGlyphMetrics(glyphID, fauxBold, fauxItalic, verticalText);
-  return verticalText ? glyphMetrics.advanceY : glyphMetrics.advanceX;
+  return scalerContext->getAdvance(glyphID, verticalText);
 }
 
 bool FTTypeface::getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
@@ -285,15 +282,11 @@ std::shared_ptr<ImageBuffer> FTTypeface::getGlyphImage(GlyphID glyphID, float si
   return scalerContext->generateImage(glyphID, fauxItalic, matrix);
 }
 
-Point FTTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                                    bool fauxItalic) const {
+Point FTTypeface::getVerticalOffset(GlyphID glyphID, float size) const {
   auto scalerContext = FTScalerContext::Make(weakThis.lock(), size);
   if (scalerContext == nullptr) {
     return Point::Zero();
   }
-  auto metrics = scalerContext->generateFontMetrics(fauxBold, fauxItalic);
-  auto offsetY = metrics.capHeight;
-  auto glyphMetrics = scalerContext->generateGlyphMetrics(glyphID, fauxBold, fauxItalic);
-  return {-glyphMetrics.advanceX * 0.5f, offsetY};
+  return scalerContext->getVerticalOffset(glyphID);
 }
 }  // namespace tgfx

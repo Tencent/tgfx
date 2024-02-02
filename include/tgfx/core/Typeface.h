@@ -139,8 +139,7 @@ class Typeface {
   /**
    * Returns the advance for specified glyph. The value is specified in glyph space units.
    */
-  virtual float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                           bool verticalText) const = 0;
+  virtual float getAdvance(GlyphID glyphID, float size, bool verticalText) const = 0;
 
   /**
    * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path
@@ -162,8 +161,7 @@ class Typeface {
    * Calculates the offset from the default (horizontal) origin to the vertical origin for specified
    * glyph. The offset is specified in glyph space units.
    */
-  virtual Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                                  bool fauxItalic) const = 0;
+  virtual Point getVerticalOffset(GlyphID glyphID, float size) const = 0;
 
   friend class Font;
 };

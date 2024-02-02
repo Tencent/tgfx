@@ -214,11 +214,20 @@ int FTScalerContext::setupSize(bool fauxItalic) {
   return 0;
 }
 
-FontMetrics FTScalerContext::generateFontMetrics(bool fauxBold, bool fauxItalic) {
+FontMetrics FTScalerContext::generateFontMetrics() {
   std::lock_guard<std::mutex> autoLock(typeface->locker);
-  FontMetrics metrics;
-  if (setupSize(fauxItalic)) {
-    return metrics;
+  FontMetrics metrics = {};
+  getFontMetricsInternal(&metrics);
+  return metrics;
+}
+
+void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) {
+  if (fontMetrics != nullptr) {
+    *metrics = *fontMetrics;
+    return;
+  }
+  if (setupSize(false)) {
+    return;
   }
   auto face = typeface->face;
   auto upem = static_cast<float>(FTTypeface::GetUnitsPerEm(face));
@@ -271,13 +280,13 @@ FontMetrics FTScalerContext::generateFontMetrics(bool fauxBold, bool fauxItalic)
     // we may be able to synthesize x_height and cap_height from outline
     if (xHeight == 0.f) {
       FT_BBox bbox;
-      if (getCBoxForLetter('x', fauxBold, &bbox)) {
+      if (getCBoxForLetter('x', &bbox)) {
         xHeight = static_cast<float>(bbox.yMax) / 64.0f;
       }
     }
     if (capHeight == 0.f) {
       FT_BBox bbox;
-      if (getCBoxForLetter('H', fauxBold, &bbox)) {
+      if (getCBoxForLetter('H', &bbox)) {
         capHeight = static_cast<float>(bbox.yMax) / 64.0f;
       }
     }
@@ -302,7 +311,7 @@ FontMetrics FTScalerContext::generateFontMetrics(bool fauxBold, bool fauxItalic)
       underlinePosition = -static_cast<float>(post->underlinePosition) / upem;
     }
   } else {
-    return metrics;
+    return;
   }
 
   // synthesize elements that were not provided by the os/2 table or format-specific metrics
@@ -317,22 +326,22 @@ FontMetrics FTScalerContext::generateFontMetrics(bool fauxBold, bool fauxItalic)
   if (leading < 0.0f) {
     leading = 0.0f;
   }
-
-  metrics.top = ymax * textSize;
-  metrics.ascent = ascent * textSize;
-  metrics.descent = descent * textSize;
-  metrics.bottom = ymin * textSize;
-  metrics.leading = leading * textSize;
-  metrics.xMin = xmin * textSize;
-  metrics.xMax = xmax * textSize;
-  metrics.xHeight = xHeight;
-  metrics.capHeight = capHeight;
-  metrics.underlineThickness = underlineThickness * textSize;
-  metrics.underlinePosition = underlinePosition * textSize;
-  return metrics;
+  metrics->top = ymax * textSize;
+  metrics->ascent = ascent * textSize;
+  metrics->descent = descent * textSize;
+  metrics->bottom = ymin * textSize;
+  metrics->leading = leading * textSize;
+  metrics->xMin = xmin * textSize;
+  metrics->xMax = xmax * textSize;
+  metrics->xHeight = xHeight;
+  metrics->capHeight = capHeight;
+  metrics->underlineThickness = underlineThickness * textSize;
+  metrics->underlinePosition = underlinePosition * textSize;
+  fontMetrics = std::make_unique<FontMetrics>();
+  *fontMetrics = *metrics;
 }
 
-bool FTScalerContext::getCBoxForLetter(char letter, bool fauxBold, FT_BBox* bbox) {
+bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) {
   auto face = typeface->face;
   const auto glyph_id = FT_Get_Char_Index(face, static_cast<FT_ULong>(letter));
   if (glyph_id == 0) {
@@ -340,9 +349,6 @@ bool FTScalerContext::getCBoxForLetter(char letter, bool fauxBold, FT_BBox* bbox
   }
   if (FT_Load_Glyph(face, glyph_id, loadGlyphFlags) != FT_Err_Ok) {
     return false;
-  }
-  if (fauxBold) {
-    ApplyEmbolden(face, face->glyph, static_cast<GlyphID>(glyph_id), loadGlyphFlags);
   }
   FT_Outline_Get_CBox(&face->glyph->outline, bbox);
   return true;
@@ -467,17 +473,14 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) {
   bbox->yMax = (bbox->yMax + 63) & ~63;
 }
 
-GlyphMetrics FTScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic,
-                                                   bool verticalText) {
+GlyphMetrics FTScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBold,
+                                                   bool fauxItalic) {
   std::lock_guard<std::mutex> autoLock(typeface->locker);
   GlyphMetrics metrics;
   if (setupSize(fauxItalic)) {
     return metrics;
   }
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
-  if (verticalText) {
-    glyphFlags |= FT_LOAD_VERTICAL_LAYOUT;
-  }
   auto face = typeface->face;
   auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
   if (err != FT_Err_Ok) {
@@ -530,6 +533,38 @@ GlyphMetrics FTScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBol
   metrics.advanceX = FDot6ToFloat(face->glyph->advance.x);
   metrics.advanceY = FDot6ToFloat(face->glyph->advance.y);
   return metrics;
+}
+
+float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) {
+  std::lock_guard<std::mutex> autoLock(typeface->locker);
+  return getAdvanceInternal(glyphID, verticalText);
+}
+
+float FTScalerContext::getAdvanceInternal(tgfx::GlyphID glyphID, bool verticalText) {
+  if (setupSize(false)) {
+    return 0;
+  }
+  auto face = typeface->face;
+  auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
+  if (verticalText) {
+    glyphFlags |= FT_LOAD_VERTICAL_LAYOUT;
+  }
+  auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
+  if (err != FT_Err_Ok) {
+    return 0;
+  }
+  return verticalText ? FDot6ToFloat(face->glyph->advance.y) : FDot6ToFloat(face->glyph->advance.x);
+}
+
+Point FTScalerContext::getVerticalOffset(tgfx::GlyphID glyphID) {
+  std::lock_guard<std::mutex> autoLock(typeface->locker);
+  if (glyphID == 0) {
+    return Point::Zero();
+  }
+  FontMetrics metrics = {};
+  getFontMetricsInternal(&metrics);
+  auto advanceX = getAdvanceInternal(glyphID);
+  return {-advanceX * 0.5f, metrics.capHeight};
 }
 
 static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {

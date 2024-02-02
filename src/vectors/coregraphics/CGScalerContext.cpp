@@ -113,21 +113,13 @@ FontMetrics CGScalerContext::generateFontMetrics() {
   return metrics;
 }
 
-GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic,
-                                                   bool verticalText) {
+GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBold,
+                                                   bool fauxItalic) {
   GlyphMetrics glyph;
   const auto cgGlyph = static_cast<CGGlyph>(glyphID);
   // The following block produces cgAdvance in CG units (pixels, y up).
   CGSize cgAdvance;
-  if (verticalText) {
-    CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationVertical, &cgGlyph, &cgAdvance, 1);
-    // Vertical advances are returned as widths instead of heights.
-    std::swap(cgAdvance.width, cgAdvance.height);
-  } else {
-    CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationHorizontal, &cgGlyph, &cgAdvance, 1);
-  }
-  auto transform = GetTransform(fauxItalic);
-  cgAdvance = CGSizeApplyAffineTransform(cgAdvance, transform);
+  CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationHorizontal, &cgGlyph, &cgAdvance, 1);
   glyph.advanceX = static_cast<float>(cgAdvance.width);
   glyph.advanceY = static_cast<float>(cgAdvance.height);
   // Glyphs are always drawn from the horizontal origin. The caller must manually use the result
@@ -138,6 +130,7 @@ GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBol
   // CTFontGetBoundingRectsForGlyphs produces cgBounds in CG units (pixels, y up).
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &cgGlyph, &cgBounds, 1);
+  auto transform = GetTransform(fauxItalic);
   cgBounds = CGRectApplyAffineTransform(cgBounds, transform);
   if (CGRectIsEmpty(cgBounds)) {
     return glyph;
@@ -166,12 +159,22 @@ GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID, bool fauxBol
   return glyph;
 }
 
-Point CGScalerContext::getVerticalOffset(GlyphID glyphID, bool, bool fauxItalic) const {
+float CGScalerContext::getAdvance(GlyphID glyphID, bool verticalText) {
+  CGSize cgAdvance;
+  if (verticalText) {
+    CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationVertical, &glyphID, &cgAdvance, 1);
+    // Vertical advances are returned as widths instead of heights.
+    std::swap(cgAdvance.width, cgAdvance.height);
+  } else {
+    CTFontGetAdvancesForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgAdvance, 1);
+  }
+  return verticalText ? static_cast<float>(cgAdvance.height) : static_cast<float>(cgAdvance.width);
+}
+
+Point CGScalerContext::getVerticalOffset(GlyphID glyphID) {
   // CTFontGetVerticalTranslationsForGlyphs produces cgVertOffset in CG units (pixels, y up).
   CGSize cgVertOffset;
   CTFontGetVerticalTranslationsForGlyphs(ctFont, &glyphID, &cgVertOffset, 1);
-  auto transform = GetTransform(fauxItalic);
-  cgVertOffset = CGSizeApplyAffineTransform(cgVertOffset, transform);
   Point vertOffset = {static_cast<float>(cgVertOffset.width),
                       static_cast<float>(cgVertOffset.height)};
   // From CG units (pixels, y up) to Glyph units (pixels, y down).

@@ -31,10 +31,13 @@ class FTScalerContext {
 
   ~FTScalerContext();
 
-  FontMetrics generateFontMetrics(bool fauxBold = false, bool fauxItalic = false);
+  FontMetrics generateFontMetrics();
 
-  GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic,
-                                    bool verticalText = false);
+  GlyphMetrics generateGlyphMetrics(GlyphID glyphID, bool fauxBold, bool fauxItalic);
+
+  float getAdvance(GlyphID glyphID, bool verticalText = false);
+
+  Point getVerticalOffset(GlyphID glyphID);
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path);
 
@@ -49,13 +52,18 @@ class FTScalerContext {
 
   int setupSize(bool fauxItalic);
 
-  bool getCBoxForLetter(char letter, bool fauxBold, FT_BBox* bbox);
+  void getFontMetricsInternal(FontMetrics* metrics);
+
+  float getAdvanceInternal(GlyphID glyphID, bool verticalText = false);
+
+  bool getCBoxForLetter(char letter, FT_BBox* bbox);
 
   void getBBoxForCurrentGlyph(FT_BBox* bbox);
 
   Matrix getExtraMatrix(bool fauxItalic);
 
   std::shared_ptr<FTTypeface> typeface = nullptr;
+  std::unique_ptr<FontMetrics> fontMetrics = nullptr;
   float textSize = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);
   FT_Size ftSize = nullptr;

@@ -113,22 +113,20 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   return UTF::ToUTF8(unichar);
 }
 
-Point WebTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                                     bool fauxItalic) const {
+Point WebTypeface::getVerticalOffset(GlyphID glyphID, float size) const {
   if (glyphID == 0) {
     return Point::Zero();
   }
   auto metrics = getMetrics(size);
-  auto advance = getAdvance(glyphID, size, fauxBold, fauxItalic, false);
-  return {-advance * 0.5f, metrics.capHeight};
+  auto advanceX = getAdvance(glyphID, size, false);
+  return {-advanceX * 0.5f, metrics.capHeight};
 }
 
-float WebTypeface::getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                              bool) const {
+float WebTypeface::getAdvance(GlyphID glyphID, float size, bool) const {
   if (glyphID == 0) {
     return 0;
   }
-  auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
+  auto scalerContext = scalerContextClass.new_(name, style, size, false, false);
   return scalerContext.call<float>("getTextAdvance", getText(glyphID));
 }
 

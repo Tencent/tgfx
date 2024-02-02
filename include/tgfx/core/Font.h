@@ -131,7 +131,7 @@ class Font {
    * @param verticalText The intended drawing orientation of the glyph.
    */
   float getAdvance(GlyphID glyphID, bool verticalText = false) const {
-    return typeface->getAdvance(glyphID, size, fauxBold, fauxItalic, verticalText);
+    return typeface->getAdvance(glyphID, size, verticalText);
   }
 
   /**
@@ -156,7 +156,7 @@ class Font {
    * glyph.
    */
   Point getVerticalOffset(GlyphID glyphID) const {
-    return typeface->getVerticalOffset(glyphID, size, fauxBold, fauxItalic);
+    return typeface->getVerticalOffset(glyphID, size);
   }
 
  private:
