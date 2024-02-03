@@ -45,8 +45,8 @@ class GeneratorImage : public RasterImage {
     return generator->isAlphaOnly();
   }
 
-  bool isLazyGenerated() const override {
-    return true;
+  bool isFullyDecoded() const override {
+    return false;
   }
 
  protected:

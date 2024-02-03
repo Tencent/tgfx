@@ -113,8 +113,8 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   return TextureImage::MakeFrom(std::move(textureProxy));
 }
 
-bool Image::isLazyGenerated() const {
-  return false;
+bool Image::isFullyDecoded() const {
+  return true;
 }
 
 bool Image::isTextureBacked() const {
@@ -143,7 +143,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
-  if (!isLazyGenerated()) {
+  if (isFullyDecoded()) {
     return weakThis.lock();
   }
   auto decoded = onMakeDecoded(context);

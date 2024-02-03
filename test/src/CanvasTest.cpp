@@ -671,7 +671,7 @@ TGFX_TEST(CanvasTest, image) {
   auto canvas = surface->getCanvas();
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
-  EXPECT_TRUE(image->isLazyGenerated());
+  EXPECT_FALSE(image->isFullyDecoded());
   EXPECT_FALSE(image->isTextureBacked());
   EXPECT_FALSE(image->hasMipmaps());
   auto rotatedImage = image->makeOriented(Orientation::RightTop);
@@ -687,7 +687,7 @@ TGFX_TEST(CanvasTest, image) {
   auto textureImage = image->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   EXPECT_TRUE(textureImage->isTextureBacked());
-  EXPECT_FALSE(textureImage->isLazyGenerated());
+  EXPECT_TRUE(textureImage->isFullyDecoded());
   decodedImage = image->makeDecoded(context);
   EXPECT_TRUE(decodedImage == image);
   textureImage = nullptr;
@@ -716,7 +716,7 @@ TGFX_TEST(CanvasTest, image) {
   decodedImage = image->makeDecoded();
   EXPECT_FALSE(decodedImage == image);
   ASSERT_TRUE(decodedImage != nullptr);
-  EXPECT_FALSE(decodedImage->isLazyGenerated());
+  EXPECT_TRUE(decodedImage->isFullyDecoded());
   EXPECT_FALSE(decodedImage->isTextureBacked());
   canvas->drawImage(decodedImage, 315, 0);
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/rotation.jpg"));
