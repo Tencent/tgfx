@@ -531,8 +531,6 @@ TGFX_TEST(CanvasTest, rasterized) {
   image = image->makeMipMapped();
   EXPECT_TRUE(image->hasMipmaps());
   rasterImage = image->makeRasterized(0.15f);
-  EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeMipMapped();
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));

@@ -56,7 +56,7 @@ std::shared_ptr<Image> ScaledImage::makeRasterized(float scaleFactor) const {
   if (scaleFactor == 1.0f) {
     return weakThis.lock();
   }
-  return MakeFrom(source, rasterizationScale * scaleFactor);
+  return MakeFrom(source, rasterizationScale * scaleFactor, mipMapped);
 }
 
 std::shared_ptr<Image> ScaledImage::onMakeDecoded(Context* context) const {
@@ -84,7 +84,8 @@ std::shared_ptr<TextureProxy> ScaledImage::onLockTextureProxy(Context* context,
   if (hasCache) {
     return textureProxy;
   }
-  auto mipMapMode = source->hasMipmaps() ? MipMapMode::Linear : MipMapMode::None;
+  auto drawWithMipMap = source->hasMipmaps() && rasterizationScale < 1.0f;
+  auto mipMapMode = drawWithMipMap ? MipMapMode::Linear : MipMapMode::None;
   SamplingOptions sampling(FilterMode::Linear, mipMapMode);
   auto sourceFlags = renderFlags | RenderFlags::DisableCache;
   ImageFPArgs imageArgs(context, sampling, sourceFlags);
