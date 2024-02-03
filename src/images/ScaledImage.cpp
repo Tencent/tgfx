@@ -24,20 +24,20 @@
 
 namespace tgfx {
 std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> source,
-                                             float rasterizationScale) {
+                                             float rasterizationScale, bool mipMapped) {
   if (source == nullptr || rasterizationScale <= 0) {
     return nullptr;
   }
   auto scaledImage = std::shared_ptr<ScaledImage>(
-      new ScaledImage(ResourceKey::NewWeak(), std::move(source), rasterizationScale));
+      new ScaledImage(ResourceKey::NewWeak(), std::move(source), rasterizationScale, mipMapped));
   scaledImage->weakThis = scaledImage;
   return scaledImage;
 }
 
 ScaledImage::ScaledImage(ResourceKey resourceKey, std::shared_ptr<Image> source,
-                         float rasterizationScale)
+                         float rasterizationScale, bool mipMapped)
     : RasterImage(std::move(resourceKey)), source(std::move(source)),
-      rasterizationScale(rasterizationScale) {
+      rasterizationScale(rasterizationScale), mipMapped(mipMapped) {
 }
 
 static int GetScaledSize(int size, float scale) {
@@ -65,17 +65,13 @@ std::shared_ptr<Image> ScaledImage::onMakeDecoded(Context* context) const {
     return nullptr;
   }
   auto newImage = std::shared_ptr<ScaledImage>(
-      new ScaledImage(resourceKey, std::move(newSource), rasterizationScale));
+      new ScaledImage(resourceKey, std::move(newSource), rasterizationScale, mipMapped));
   newImage->weakThis = newImage;
   return newImage;
 }
 
 std::shared_ptr<Image> ScaledImage::onMakeMipMapped() const {
-  auto newSource = source->makeMipMapped();
-  if (newSource == source) {
-    return nullptr;
-  }
-  return MakeFrom(std::move(newSource), rasterizationScale);
+  return ScaledImage::MakeFrom(source, rasterizationScale, true);
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::onLockTextureProxy(Context* context,
@@ -83,13 +79,12 @@ std::shared_ptr<TextureProxy> ScaledImage::onLockTextureProxy(Context* context,
   auto proxyProvider = context->proxyProvider();
   auto hasCache = proxyProvider->hasResourceProxy(resourceKey);
   auto format = isAlphaOnly() ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto mipMapped = hasMipmaps();
   auto textureProxy = proxyProvider->createTextureProxy(
       resourceKey, width(), height(), format, mipMapped, ImageOrigin::TopLeft, renderFlags);
   if (hasCache) {
     return textureProxy;
   }
-  auto mipMapMode = mipMapped ? MipMapMode::Linear : MipMapMode::None;
+  auto mipMapMode = source->hasMipmaps() ? MipMapMode::Linear : MipMapMode::None;
   SamplingOptions sampling(FilterMode::Linear, mipMapMode);
   auto sourceFlags = renderFlags | RenderFlags::DisableCache;
   ImageFPArgs imageArgs(context, sampling, sourceFlags);
