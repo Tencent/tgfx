@@ -66,8 +66,8 @@ void PixelRef::clear() {
   unlockPixels();
 }
 
-std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipMapped) {
-  return Texture::MakeFrom(context, pixelBuffer, mipMapped);
+std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipmapped) {
+  return Texture::MakeFrom(context, pixelBuffer, mipmapped);
 }
 
 bool PixelRef::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {

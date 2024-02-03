@@ -40,12 +40,12 @@ class TextureImage : public RasterImage {
     return textureProxy->height();
   }
 
-  bool hasMipmaps() const override {
-    return textureProxy->hasMipmaps();
-  }
-
   bool isAlphaOnly() const override {
     return textureProxy->isAlphaOnly();
+  }
+
+  bool hasMipmaps() const override {
+    return textureProxy->hasMipmaps();
   }
 
   bool isTextureBacked() const override {
@@ -57,12 +57,11 @@ class TextureImage : public RasterImage {
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
  protected:
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
-                                                   uint32_t renderFlags) const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<Image> onMakeMipMapped() const override {
-    return nullptr;
-  }
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+                                                   bool mipmapped,
+                                                   uint32_t renderFlags) const override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;

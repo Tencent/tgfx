@@ -24,20 +24,28 @@
 
 namespace tgfx {
 std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> source,
-                                             float rasterizationScale, bool mipMapped) {
+                                             float rasterizationScale, SamplingOptions sampling) {
   if (source == nullptr || rasterizationScale <= 0) {
     return nullptr;
   }
+  auto hasMipmap = source->hasMipmaps();
+  auto needMipmap = sampling.mipmapMode != MipmapMode::None;
+  if (hasMipmap != needMipmap) {
+    auto newSource = source->makeMipmapped(needMipmap);
+    if (newSource != nullptr) {
+      source = std::move(newSource);
+    }
+  }
   auto scaledImage = std::shared_ptr<ScaledImage>(
-      new ScaledImage(ResourceKey::NewWeak(), std::move(source), rasterizationScale, mipMapped));
+      new ScaledImage(ResourceKey::NewWeak(), std::move(source), rasterizationScale, sampling));
   scaledImage->weakThis = scaledImage;
-  return scaledImage;
+  return hasMipmap ? scaledImage->makeMipmapped(true) : scaledImage;
 }
 
 ScaledImage::ScaledImage(ResourceKey resourceKey, std::shared_ptr<Image> source,
-                         float rasterizationScale, bool mipMapped)
+                         float rasterizationScale, SamplingOptions sampling)
     : RasterImage(std::move(resourceKey)), source(std::move(source)),
-      rasterizationScale(rasterizationScale), mipMapped(mipMapped) {
+      rasterizationScale(rasterizationScale), sampling(sampling) {
 }
 
 static int GetScaledSize(int size, float scale) {
@@ -52,41 +60,39 @@ int ScaledImage::height() const {
   return GetScaledSize(source->height(), rasterizationScale);
 }
 
-std::shared_ptr<Image> ScaledImage::makeRasterized(float scaleFactor) const {
+std::shared_ptr<Image> ScaledImage::makeRasterized(float scaleFactor,
+                                                   SamplingOptions options) const {
   if (scaleFactor == 1.0f) {
     return weakThis.lock();
   }
-  return MakeFrom(source, rasterizationScale * scaleFactor, mipMapped);
+  return ScaledImage::MakeFrom(source, rasterizationScale * scaleFactor, options);
 }
 
-std::shared_ptr<Image> ScaledImage::onMakeDecoded(Context* context) const {
-  auto newSource = source->makeDecoded(context);
-  if (newSource == source) {
+std::shared_ptr<Image> ScaledImage::onMakeDecoded(Context* context, bool) const {
+  // There is no need to pass tryHardware to the source image, as our texture proxy is not locked
+  // from the source image.
+  auto newSource = source->onMakeDecoded(context);
+  if (newSource == nullptr) {
     return nullptr;
   }
   auto newImage = std::shared_ptr<ScaledImage>(
-      new ScaledImage(resourceKey, std::move(newSource), rasterizationScale, mipMapped));
+      new ScaledImage(resourceKey, std::move(newSource), rasterizationScale, sampling));
   newImage->weakThis = newImage;
   return newImage;
 }
 
-std::shared_ptr<Image> ScaledImage::onMakeMipMapped() const {
-  return ScaledImage::MakeFrom(source, rasterizationScale, true);
-}
-
 std::shared_ptr<TextureProxy> ScaledImage::onLockTextureProxy(Context* context,
+                                                              const ResourceKey& key,
+                                                              bool mipmapped,
                                                               uint32_t renderFlags) const {
   auto proxyProvider = context->proxyProvider();
-  auto hasCache = proxyProvider->hasResourceProxy(resourceKey);
+  auto hasCache = proxyProvider->hasResourceProxy(key);
   auto format = isAlphaOnly() ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto textureProxy = proxyProvider->createTextureProxy(
-      resourceKey, width(), height(), format, mipMapped, ImageOrigin::TopLeft, renderFlags);
+  auto textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, mipmapped,
+                                                        ImageOrigin::TopLeft, renderFlags);
   if (hasCache) {
     return textureProxy;
   }
-  auto drawWithMipMap = source->hasMipmaps() && rasterizationScale < 1.0f;
-  auto mipMapMode = drawWithMipMap ? MipMapMode::Linear : MipMapMode::None;
-  SamplingOptions sampling(FilterMode::Linear, mipMapMode);
   auto sourceFlags = renderFlags | RenderFlags::DisableCache;
   ImageFPArgs imageArgs(context, sampling, sourceFlags);
   auto processor = FragmentProcessor::MakeFromImage(source, imageArgs);

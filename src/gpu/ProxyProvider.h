@@ -54,7 +54,7 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey,
                                                    std::shared_ptr<ImageBuffer> imageBuffer,
-                                                   bool mipMapped = false,
+                                                   bool mipmapped = false,
                                                    uint32_t renderFlags = 0);
 
   /*
@@ -62,7 +62,7 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey,
                                                    std::shared_ptr<ImageGenerator> generator,
-                                                   bool mipMapped = false,
+                                                   bool mipmapped = false,
                                                    uint32_t renderFlags = 0);
 
   /**
@@ -70,7 +70,7 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey,
                                                    std::shared_ptr<ImageDecoder> decoder,
-                                                   bool mipMapped = false,
+                                                   bool mipmapped = false,
                                                    uint32_t renderFlags = 0);
 
   /**
@@ -78,7 +78,7 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(const ResourceKey& resourceKey, int width,
                                                    int height, PixelFormat format,
-                                                   bool mipMapped = false,
+                                                   bool mipmapped = false,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
                                                    uint32_t renderFlags = 0);
 

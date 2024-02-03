@@ -528,9 +528,10 @@ TGFX_TEST(CanvasTest, rasterized) {
   texture = Resource::Get<Texture>(context, imageResourceKey);
   EXPECT_TRUE(texture == nullptr);
   canvas->clear();
-  image = image->makeMipMapped();
+  image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
-  rasterImage = image->makeRasterized(0.15f);
+  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
+  rasterImage = image->makeRasterized(0.15f, sampling);
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
@@ -540,7 +541,7 @@ TGFX_TEST(CanvasTest, rasterized) {
   texture = Resource::Get<Texture>(context, rasterImageResourceKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();
-  rasterImage = rasterImage->makeRasterized(2.0f);
+  rasterImage = rasterImage->makeRasterized(2.0f, sampling);
   EXPECT_EQ(rasterImage->width(), 908);
   EXPECT_EQ(rasterImage->height(), 1210);
   canvas->drawImage(rasterImage, 100, 100);
@@ -565,8 +566,8 @@ TGFX_TEST(CanvasTest, mipmap) {
   auto imageBuffer = bitmap.makeBuffer();
   auto image = Image::MakeFrom(imageBuffer);
   ASSERT_TRUE(image != nullptr);
-  auto imageMipMapped = image->makeMipMapped();
-  ASSERT_TRUE(imageMipMapped != nullptr);
+  auto imageMipmapped = image->makeMipmapped(true);
+  ASSERT_TRUE(imageMipmapped != nullptr);
   float scale = 0.03f;
   auto width = codec->width();
   auto height = codec->height();
@@ -578,27 +579,27 @@ TGFX_TEST(CanvasTest, mipmap) {
   auto canvas = surface->getCanvas();
   canvas->setMatrix(imageMatrix);
   // 绘制没有 mipmap 的 texture 时，使用 MipmapMode::Linear 会回退到 MipmapMode::None。
-  canvas->drawImage(image, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  canvas->drawImage(image, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_none"));
   canvas->clear();
-  canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Nearest));
+  canvas->drawImage(imageMipmapped, SamplingOptions(FilterMode::Linear, MipmapMode::Nearest));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_nearest"));
   canvas->clear();
-  canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  canvas->drawImage(imageMipmapped, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear"));
   surface = Surface::Make(context, static_cast<int>(imageWidth * 4.f),
                           static_cast<int>(imageHeight * 4.f));
   canvas = surface->getCanvas();
   Paint paint;
-  paint.setShader(Shader::MakeImageShader(imageMipMapped, TileMode::Mirror, TileMode::Repeat,
-                                          SamplingOptions(FilterMode::Linear, MipMapMode::Linear))
+  paint.setShader(Shader::MakeImageShader(imageMipmapped, TileMode::Mirror, TileMode::Repeat,
+                                          SamplingOptions(FilterMode::Linear, MipmapMode::Linear))
                       ->makeWithPreLocalMatrix(imageMatrix));
   canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_texture_effect"));
   device->unlock();
 }
 
-TGFX_TEST(CanvasTest, hardwareMipMap) {
+TGFX_TEST(CanvasTest, hardwareMipmap) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
@@ -612,8 +613,8 @@ TGFX_TEST(CanvasTest, hardwareMipMap) {
   pixmap.reset();
   ASSERT_TRUE(result);
   auto image = Image::MakeFrom(bitmap);
-  auto imageMipMapped = image->makeMipMapped();
-  ASSERT_TRUE(imageMipMapped != nullptr);
+  auto imageMipmapped = image->makeMipmapped(true);
+  ASSERT_TRUE(imageMipmapped != nullptr);
   float scale = 0.03f;
   auto width = codec->width();
   auto height = codec->height();
@@ -624,7 +625,7 @@ TGFX_TEST(CanvasTest, hardwareMipMap) {
       Surface::Make(context, static_cast<int>(imageWidth), static_cast<int>(imageHeight));
   auto canvas = surface->getCanvas();
   canvas->setMatrix(imageMatrix);
-  canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  canvas->drawImage(imageMipmapped, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_hardware"));
   device->unlock();
 }
@@ -726,7 +727,7 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_EQ(rotationImage->width(), 3024);
   EXPECT_EQ(rotationImage->height(), 4032);
   EXPECT_FALSE(rotationImage->hasMipmaps());
-  rotationImage = rotationImage->makeMipMapped();
+  rotationImage = rotationImage->makeMipmapped(true);
   EXPECT_TRUE(rotationImage->hasMipmaps());
   auto matrix = Matrix::MakeScale(0.05f);
   matrix.postTranslate(0, 120);
@@ -745,7 +746,7 @@ TGFX_TEST(CanvasTest, image) {
   textureImage = subset->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   matrix.postTranslate(0, 110);
-  SamplingOptions sampling(FilterMode::Linear, MipMapMode::None);
+  SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   canvas->setMatrix(matrix);
   canvas->drawImage(textureImage, sampling);
   canvas->resetMatrix();
@@ -754,7 +755,7 @@ TGFX_TEST(CanvasTest, image) {
   image = MakeImage("resources/apitest/rgbaaa.png");
   EXPECT_EQ(image->width(), 1024);
   EXPECT_EQ(image->height(), 512);
-  image = image->makeMipMapped();
+  image = image->makeMipmapped(true);
   rgbAAA = image->makeRGBAAA(512, 512, 512, 0);
   EXPECT_EQ(rgbAAA->width(), 512);
   EXPECT_EQ(rgbAAA->height(), 512);

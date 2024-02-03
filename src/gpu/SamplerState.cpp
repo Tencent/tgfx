@@ -38,13 +38,13 @@ SamplerState::SamplerState(TileMode tileMode) {
 }
 
 SamplerState::SamplerState(TileMode tileModeX, TileMode tileModeY, SamplingOptions sampling)
-    : filterMode(sampling.filterMode), mipMapMode(sampling.mipMapMode) {
+    : filterMode(sampling.filterMode), mipmapMode(sampling.mipmapMode) {
   wrapModeX = TileModeToWrapMode(tileModeX);
   wrapModeY = TileModeToWrapMode(tileModeY);
 }
 
 bool operator==(const SamplerState& a, const SamplerState& b) {
   return a.wrapModeX == b.wrapModeX && a.wrapModeY == b.wrapModeY && a.filterMode == b.filterMode &&
-         a.mipMapMode == b.mipMapMode;
+         a.mipmapMode == b.mipmapMode;
 }
 }  // namespace tgfx

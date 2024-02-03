@@ -68,10 +68,10 @@ class ImageStream {
 
  protected:
   /**
-   * Creates a new Texture capturing the pixels in the TextureBuffer. The mipMapped parameter
+   * Creates a new Texture capturing the pixels in the TextureBuffer. The mipmapped parameter
    * specifies whether created texture must allocate mip map levels.
    */
-  virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) = 0;
+  virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) = 0;
 
   /**
    * Updates the specified bounds of the texture with the pixels in the TextureBuffer.

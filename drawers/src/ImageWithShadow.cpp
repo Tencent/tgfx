@@ -28,10 +28,10 @@ void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host)
   auto size = screenSize - static_cast<int>(150 * scale);
   size = std::max(size, 50);
   auto image = host->getImage("bridge");
-  image = image->makeMipMapped();
+  image = image->makeMipmapped(true);
   auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
   auto matrix = tgfx::Matrix::MakeScale(imageScale);
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipMapMode::Linear);
+  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
   auto surface = tgfx::Surface::Make(canvas->getContext(), size, size);
   auto scaledCanvas = surface->getCanvas();
   tgfx::Path path = {};

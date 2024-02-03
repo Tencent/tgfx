@@ -18,6 +18,7 @@
 
 #include "RasterImage.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "images/MipmapImage.h"
 #include "images/RGBAAAImage.h"
 #include "images/TextureImage.h"
 
@@ -25,11 +26,12 @@ namespace tgfx {
 RasterImage::RasterImage(ResourceKey resourceKey) : resourceKey(std::move(resourceKey)) {
 }
 
-std::shared_ptr<Image> RasterImage::makeRasterized(float rasterizationScale) const {
+std::shared_ptr<Image> RasterImage::makeRasterized(float rasterizationScale,
+                                                   SamplingOptions sampling) const {
   if (rasterizationScale == 1.0f) {
     return weakThis.lock();
   }
-  return Image::makeRasterized(rasterizationScale);
+  return Image::makeRasterized(rasterizationScale, sampling);
 }
 
 std::shared_ptr<Image> RasterImage::makeTextureImage(Context* context) const {
@@ -41,7 +43,12 @@ std::shared_ptr<TextureProxy> RasterImage::lockTextureProxy(tgfx::Context* conte
   if (context == nullptr) {
     return nullptr;
   }
-  return onLockTextureProxy(context, renderFlags);
+  return onLockTextureProxy(context, resourceKey, false, renderFlags);
+}
+
+std::shared_ptr<Image> RasterImage::onMakeMipmapped(bool enabled) const {
+  auto source = std::static_pointer_cast<RasterImage>(weakThis.lock());
+  return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
 }
 
 std::shared_ptr<Image> RasterImage::onMakeRGBAAA(int displayWidth, int displayHeight,

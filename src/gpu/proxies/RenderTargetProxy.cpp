@@ -72,7 +72,7 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int width, int height,
                                                            PixelFormat format, int sampleCount,
-                                                           bool mipMapped, ImageOrigin origin) {
+                                                           bool mipmapped, ImageOrigin origin) {
   if (context == nullptr) {
     return nullptr;
   }
@@ -81,7 +81,7 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int
   }
   auto proxyProvider = context->proxyProvider();
   auto textureProxy =
-      proxyProvider->createTextureProxy({}, width, height, format, mipMapped, origin);
+      proxyProvider->createTextureProxy({}, width, height, format, mipmapped, origin);
   if (textureProxy == nullptr) {
     return nullptr;
   }

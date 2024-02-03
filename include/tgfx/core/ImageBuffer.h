@@ -107,10 +107,10 @@ class ImageBuffer {
   ImageBuffer() = default;
 
   /**
-   * Creates a new Texture capturing the pixels of the ImageBuffer. The mipMapped parameter
+   * Creates a new Texture capturing the pixels of the ImageBuffer. The mipmapped parameter
    * specifies whether created texture must allocate mip map levels.
    */
-  virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const = 0;
+  virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const = 0;
 
   friend class Texture;
 };

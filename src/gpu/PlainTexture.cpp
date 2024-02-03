@@ -23,25 +23,25 @@
 
 namespace tgfx {
 static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, PixelFormat format,
-                              bool mipMapped) {
+                              bool mipmapped) {
   static const uint32_t PlainTextureType = UniqueID::Next();
   recycleKey->write(PlainTextureType);
   recycleKey->write(static_cast<uint32_t>(width));
   recycleKey->write(static_cast<uint32_t>(height));
   auto formatValue = static_cast<uint32_t>(format);
-  auto mipMapValue = static_cast<uint32_t>(mipMapped ? 1 : 0);
-  recycleKey->write(formatValue | (mipMapValue << 30));
+  auto mipmapValue = static_cast<uint32_t>(mipmapped ? 1 : 0);
+  recycleKey->write(formatValue | (mipmapValue << 30));
 }
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
                                              const void* pixels, size_t rowBytes,
-                                             PixelFormat pixelFormat, bool mipMapped,
+                                             PixelFormat pixelFormat, bool mipmapped,
                                              ImageOrigin origin) {
   if (!PlainTexture::CheckSizeAndFormat(context, width, height, pixelFormat)) {
     return nullptr;
   }
   auto caps = context->caps();
-  int maxMipmapLevel = mipMapped ? caps->getMaxMipmapLevel(width, height) : 0;
+  int maxMipmapLevel = mipmapped ? caps->getMaxMipmapLevel(width, height) : 0;
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, width, height, pixelFormat, maxMipmapLevel > 0);
   auto texture = Resource::FindRecycled<Texture>(context, recycleKey);

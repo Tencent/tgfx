@@ -54,7 +54,12 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   return nullptr;
 }
 
-std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(Context* context, uint32_t) const {
+std::shared_ptr<Image> TextureImage::onMakeMipmapped(bool) const {
+  return nullptr;
+}
+
+std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(Context* context, const ResourceKey&,
+                                                               bool, uint32_t) const {
   if (textureProxy->getContext() != context) {
     return nullptr;
   }

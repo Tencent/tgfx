@@ -136,9 +136,9 @@ void PixelBuffer::unlockPixels() {
   locker.unlock();
 }
 
-std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (!mipMapped && isHardwareBacked()) {
+  if (!mipmapped && isHardwareBacked()) {
     return onBindToHardwareTexture(context);
   }
   auto pixels = onLockPixels();
@@ -147,7 +147,7 @@ std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipMa
   }
   auto format = ColorTypeToPixelFormat(_info.colorType());
   auto texture =
-      Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipMapped);
+      Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
   onUnlockPixels();
   return texture;
 }

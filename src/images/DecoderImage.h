@@ -28,8 +28,7 @@ namespace tgfx {
 class DecoderImage : public RasterImage {
  public:
   static std::shared_ptr<Image> MakeFrom(ResourceKey resourceKey,
-                                         std::shared_ptr<ImageDecoder> decoder,
-                                         bool mipMapped = false);
+                                         std::shared_ptr<ImageDecoder> decoder);
 
   int width() const override {
     return decoder->width();
@@ -39,25 +38,18 @@ class DecoderImage : public RasterImage {
     return decoder->height();
   }
 
-  bool hasMipmaps() const override {
-    return mipMapped;
-  }
-
   bool isAlphaOnly() const override {
     return decoder->isAlphaOnly();
   }
 
  protected:
-  std::shared_ptr<Image> onMakeMipMapped() const override;
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+                                                   bool mipmapped,
                                                    uint32_t renderFlags) const override;
 
  private:
   std::shared_ptr<ImageDecoder> decoder = nullptr;
-  bool mipMapped = false;
 
-  DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder,
-               bool mipMapped = false);
+  DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder);
 };
 }  // namespace tgfx

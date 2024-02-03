@@ -99,7 +99,7 @@ class ImageReader {
 
   bool checkExpired(uint64_t contentVersion);
 
-  std::shared_ptr<Texture> readTexture(uint64_t contentVersion, Context* context, bool mipMapped);
+  std::shared_ptr<Texture> readTexture(uint64_t contentVersion, Context* context, bool mipmapped);
 
   void onContentDirty(const Rect& bounds);
 

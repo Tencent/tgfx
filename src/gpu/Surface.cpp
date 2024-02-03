@@ -27,17 +27,17 @@
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
-                                       int sampleCount, bool mipMapped,
+                                       int sampleCount, bool mipmapped,
                                        const SurfaceOptions* options) {
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
-              sampleCount, mipMapped, options);
+              sampleCount, mipmapped, options);
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, ColorType colorType,
-                                       int sampleCount, bool mipMapped,
+                                       int sampleCount, bool mipmapped,
                                        const SurfaceOptions* options) {
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
-  auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipMapped);
+  auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipmapped);
   auto surface = MakeFrom(std::move(proxy), options);
   if (surface != nullptr) {
     // Clear the surface by default for internally created RenderTarget.

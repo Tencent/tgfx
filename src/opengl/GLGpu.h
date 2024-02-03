@@ -57,6 +57,6 @@ class GLGpu : public Gpu {
   explicit GLGpu(Context* context) : Gpu(context) {
   }
 
-  void onRegenerateMipMapLevels(const TextureSampler* sampler) override;
+  void onRegenerateMipmapLevels(const TextureSampler* sampler) override;
 };
 }  // namespace tgfx

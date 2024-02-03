@@ -19,25 +19,26 @@
 #pragma once
 
 #include "images/RasterImage.h"
-#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
-class ScaledImage : public RasterImage {
+class MipmapImage : public RasterImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         float rasterizationScale = 1.0f,
-                                         SamplingOptions sampling = {});
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<RasterImage> source);
 
-  int width() const override;
+  int width() const override {
+    return source->width();
+  }
 
-  int height() const override;
+  int height() const override {
+    return source->height();
+  }
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
   }
 
-  bool isFullyDecoded() const override {
-    return source->isFullyDecoded();
+  bool hasMipmaps() const override {
+    return true;
   }
 
   std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
@@ -46,16 +47,15 @@ class ScaledImage : public RasterImage {
  protected:
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
   std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
                                                    bool mipmapped,
                                                    uint32_t renderFlags) const override;
 
  private:
-  std::shared_ptr<Image> source = nullptr;
-  float rasterizationScale = 1.0f;
-  SamplingOptions sampling = {};
+  std::shared_ptr<RasterImage> source = nullptr;
 
-  ScaledImage(ResourceKey resourceKey, std::shared_ptr<Image> source, float rasterizationScale,
-              SamplingOptions sampling);
+  MipmapImage(ResourceKey resourceKey, std::shared_ptr<RasterImage> source);
 };
 }  // namespace tgfx

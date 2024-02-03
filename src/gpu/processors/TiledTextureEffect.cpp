@@ -26,7 +26,7 @@ namespace tgfx {
 using Wrap = SamplerState::WrapMode;
 
 TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, FilterMode filter,
-                                                                 MipMapMode mm) {
+                                                                 MipmapMode mm) {
   switch (wrap) {
     case Wrap::MirrorRepeat:
       return ShaderMode::MirrorRepeat;
@@ -34,15 +34,15 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, Filt
       return ShaderMode::Clamp;
     case Wrap::Repeat:
       switch (mm) {
-        case MipMapMode::None:
+        case MipmapMode::None:
           switch (filter) {
             case FilterMode::Nearest:
               return ShaderMode::RepeatNearestNone;
             case FilterMode::Linear:
               return ShaderMode::RepeatLinearNone;
           }
-        case MipMapMode::Nearest:
-        case MipMapMode::Linear:
+        case MipmapMode::Nearest:
+        case MipmapMode::Linear:
           switch (filter) {
             case FilterMode::Nearest:
               return ShaderMode::RepeatNearestMipmap;
@@ -103,7 +103,7 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
     }
     r.shaderSubset = subset;
     r.shaderClamp = subset.makeInset(0.5f);
-    r.shaderMode = GetShaderMode(wrap, sampler.filterMode, sampler.mipMapMode);
+    r.shaderMode = GetShaderMode(wrap, sampler.filterMode, sampler.mipmapMode);
     return r;
   };
 
@@ -111,7 +111,7 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
   auto x = resolve(texture->width(), sampler.wrapModeX, subsetX);
   Span subsetY{subset.top, subset.bottom};
   auto y = resolve(texture->height(), sampler.wrapModeY, subsetY);
-  hwSampler = SamplerState(x.hwWrap, y.hwWrap, sampler.filterMode, sampler.mipMapMode);
+  hwSampler = SamplerState(x.hwWrap, y.hwWrap, sampler.filterMode, sampler.mipmapMode);
   shaderModeX = x.shaderMode;
   shaderModeY = y.shaderMode;
   shaderSubset = {x.shaderSubset.a, y.shaderSubset.a, x.shaderSubset.b, y.shaderSubset.b};

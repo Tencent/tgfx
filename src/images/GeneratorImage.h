@@ -26,8 +26,7 @@ namespace tgfx {
  */
 class GeneratorImage : public RasterImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                         bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   int width() const override {
     return generator->width();
@@ -35,10 +34,6 @@ class GeneratorImage : public RasterImage {
 
   int height() const override {
     return generator->height();
-  }
-
-  bool hasMipmaps() const override {
-    return mipMapped;
   }
 
   bool isAlphaOnly() const override {
@@ -50,18 +45,15 @@ class GeneratorImage : public RasterImage {
   }
 
  protected:
-  std::shared_ptr<Image> onMakeDecoded(Context* context) const override;
+  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<Image> onMakeMipMapped() const override;
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+                                                   bool mipmapped,
                                                    uint32_t renderFlags) const override;
 
  protected:
   std::shared_ptr<ImageGenerator> generator = nullptr;
-  bool mipMapped = false;
 
-  GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
-                 bool mipMapped = false);
+  GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator);
 };
 }  // namespace tgfx

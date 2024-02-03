@@ -84,10 +84,10 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
                            TileMode::Decal);
     return getFragmentProcessor(std::move(source), shadowArgs, dstBounds, localMatrix);
   }
-  auto mipMapped = source->hasMipmaps() && args.sampling.mipMapMode != MipMapMode::None;
+  auto mipmapped = source->hasMipmaps() && args.sampling.mipmapMode != MipmapMode::None;
   auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstBounds.width()),
                                               static_cast<int>(dstBounds.height()),
-                                              PixelFormat::RGBA_8888, 1, mipMapped);
+                                              PixelFormat::RGBA_8888, 1, mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }

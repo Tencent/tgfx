@@ -42,9 +42,9 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
                                            const void* pixels, size_t rowBytes,
-                                           bool mipMapped = false,
+                                           bool mipmapped = false,
                                            ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, mipMapped,
+    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, mipmapped,
                       origin);
   }
   /**
@@ -52,9 +52,9 @@ class Texture : public Resource {
    * the parameters is invalid.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
-                                           bool mipMapped = false,
+                                           bool mipmapped = false,
                                            ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, mipMapped,
+    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, mipmapped,
                       origin);
   }
 
@@ -65,9 +65,9 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
                                             const void* pixels, size_t rowBytes,
-                                            bool mipMapped = false,
+                                            bool mipmapped = false,
                                             ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, mipMapped,
+    return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, mipmapped,
                       origin);
   }
   /**
@@ -76,9 +76,9 @@ class Texture : public Resource {
    * alpha only textures.
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
-                                            bool mipMapped = false,
+                                            bool mipmapped = false,
                                             ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, mipMapped, origin);
+    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, mipmapped, origin);
   }
 
   /**
@@ -87,9 +87,9 @@ class Texture : public Resource {
    * specified pixelFormat.
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
-                                             PixelFormat pixelFormat, bool mipMapped = false,
+                                             PixelFormat pixelFormat, bool mipmapped = false,
                                              ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, mipMapped, origin);
+    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, mipmapped, origin);
   }
 
   /**
@@ -99,7 +99,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
                                              const void* pixels, size_t rowBytes,
-                                             PixelFormat pixelFormat, bool mipMapped = false,
+                                             PixelFormat pixelFormat, bool mipmapped = false,
                                              ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
@@ -123,7 +123,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context,
                                            std::shared_ptr<ImageBuffer> imageBuffer,
-                                           bool mipMapped = false);
+                                           bool mipmapped = false);
 
   /**
    * Creates a Texture from the platform-specific hardware buffer. For example, the hardware

@@ -113,20 +113,13 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   return TextureImage::MakeFrom(std::move(textureProxy));
 }
 
-bool Image::isFullyDecoded() const {
-  return true;
-}
-
-bool Image::isTextureBacked() const {
-  return false;
-}
-
 BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
 }
 
-std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale) const {
-  return ScaledImage::MakeFrom(weakThis.lock(), rasterizationScale, hasMipmaps());
+std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
+                                             SamplingOptions sampling) const {
+  return ScaledImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
@@ -150,19 +143,15 @@ std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
   return decoded;
 }
 
-std::shared_ptr<Image> Image::onMakeDecoded(Context*) const {
+std::shared_ptr<Image> Image::onMakeDecoded(Context*, bool) const {
   return nullptr;
 }
 
-std::shared_ptr<Image> Image::makeMipMapped() const {
-  if (hasMipmaps()) {
+std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
+  if (hasMipmaps() == enabled) {
     return weakThis.lock();
   }
-  auto mipMapped = onMakeMipMapped();
-  if (mipMapped == nullptr) {
-    return weakThis.lock();
-  }
-  return mipMapped;
+  return onMakeMipmapped(enabled);
 }
 
 std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {

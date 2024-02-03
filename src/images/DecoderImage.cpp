@@ -22,28 +22,24 @@
 
 namespace tgfx {
 std::shared_ptr<Image> DecoderImage::MakeFrom(ResourceKey resourceKey,
-                                              std::shared_ptr<ImageDecoder> decoder,
-                                              bool mipMapped) {
+                                              std::shared_ptr<ImageDecoder> decoder) {
   if (decoder == nullptr) {
     return nullptr;
   }
-  auto image = std::shared_ptr<DecoderImage>(
-      new DecoderImage(std::move(resourceKey), std::move(decoder), mipMapped));
+  auto image =
+      std::shared_ptr<DecoderImage>(new DecoderImage(std::move(resourceKey), std::move(decoder)));
   image->weakThis = image;
   return image;
 }
 
-DecoderImage::DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder,
-                           bool mipMapped)
-    : RasterImage(std::move(resourceKey)), decoder(std::move(decoder)), mipMapped(mipMapped) {
-}
-
-std::shared_ptr<Image> DecoderImage::onMakeMipMapped() const {
-  return DecoderImage::MakeFrom(ResourceKey::NewWeak(), decoder, true);
+DecoderImage::DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder)
+    : RasterImage(std::move(resourceKey)), decoder(std::move(decoder)) {
 }
 
 std::shared_ptr<TextureProxy> DecoderImage::onLockTextureProxy(Context* context,
+                                                               const ResourceKey& key,
+                                                               bool mipmapped,
                                                                uint32_t renderFlags) const {
-  return context->proxyProvider()->createTextureProxy(resourceKey, decoder, mipMapped, renderFlags);
+  return context->proxyProvider()->createTextureProxy(key, decoder, mipmapped, renderFlags);
 }
 }  // namespace tgfx

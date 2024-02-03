@@ -90,7 +90,7 @@ class PixelBuffer : public ImageBuffer {
  protected:
   explicit PixelBuffer(const ImageInfo& info);
 
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
   virtual void* onLockPixels() const = 0;
   virtual void onUnlockPixels() const = 0;

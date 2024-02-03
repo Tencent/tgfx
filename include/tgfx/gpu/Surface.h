@@ -50,7 +50,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
-                                       bool mipMapped = false,
+                                       bool mipmapped = false,
                                        const SurfaceOptions* options = nullptr);
 
   /**
@@ -60,7 +60,7 @@ class Surface {
    * the GPU backend.
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height, ColorType colorType,
-                                       int sampleCount = 1, bool mipMapped = false,
+                                       int sampleCount = 1, bool mipmapped = false,
                                        const SurfaceOptions* options = nullptr);
 
   /**

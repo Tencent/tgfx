@@ -46,7 +46,7 @@ class TextureProxy : public ResourceProxy {
    * Return the mipmap state of the texture.
    */
   bool hasMipmaps() const {
-    return mipMapped;
+    return mipmapped;
   }
 
   /**
@@ -78,12 +78,12 @@ class TextureProxy : public ResourceProxy {
  private:
   int _width = 0;
   int _height = 0;
-  bool mipMapped = false;
+  bool mipmapped = false;
   bool _isAlphaOnly = false;
   ImageOrigin _origin = ImageOrigin::TopLeft;
   bool _externallyOwned = false;
 
-  TextureProxy(int width, int height, bool mipMapped, bool isAlphaOnly,
+  TextureProxy(int width, int height, bool mipmapped, bool isAlphaOnly,
                ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
 
   friend class ProxyProvider;

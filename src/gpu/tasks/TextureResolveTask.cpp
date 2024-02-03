@@ -35,7 +35,7 @@ bool TextureResolveTask::execute(Gpu* gpu) {
   }
   auto texture = renderTargetProxy->getTexture();
   if (texture != nullptr && texture->hasMipmaps()) {
-    gpu->regenerateMipMapLevels(texture->getSampler());
+    gpu->regenerateMipmapLevels(texture->getSampler());
   }
   return true;
 }

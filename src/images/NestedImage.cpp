@@ -22,17 +22,17 @@ namespace tgfx {
 NestedImage::NestedImage(std::shared_ptr<Image> source) : source(std::move(source)) {
 }
 
-std::shared_ptr<Image> NestedImage::onMakeDecoded(Context* context) const {
-  auto newSource = source->makeDecoded(context);
-  if (newSource == source) {
+std::shared_ptr<Image> NestedImage::onMakeDecoded(Context* context, bool tryHardware) const {
+  auto newSource = source->onMakeDecoded(context, tryHardware);
+  if (newSource == nullptr) {
     return nullptr;
   }
   return onCloneWith(std::move(newSource));
 }
 
-std::shared_ptr<Image> NestedImage::onMakeMipMapped() const {
-  auto newSource = source->makeMipMapped();
-  if (newSource == source) {
+std::shared_ptr<Image> NestedImage::onMakeMipmapped(bool enabled) const {
+  auto newSource = source->makeMipmapped(enabled);
+  if (newSource == nullptr) {
     return nullptr;
   }
   return onCloneWith(std::move(newSource));

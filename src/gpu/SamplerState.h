@@ -41,16 +41,16 @@ class SamplerState {
   SamplerState(TileMode tileModeX, TileMode tileModeY, SamplingOptions sampling);
 
   SamplerState(WrapMode wrapModeX, WrapMode wrapModeY, FilterMode filterMode = FilterMode::Linear,
-               MipMapMode mipMapMode = MipMapMode::None)
-      : wrapModeX(wrapModeX), wrapModeY(wrapModeY), filterMode(filterMode), mipMapMode(mipMapMode) {
+               MipmapMode mipmapMode = MipmapMode::None)
+      : wrapModeX(wrapModeX), wrapModeY(wrapModeY), filterMode(filterMode), mipmapMode(mipmapMode) {
   }
 
   explicit SamplerState(SamplingOptions sampling)
-      : filterMode(sampling.filterMode), mipMapMode(sampling.mipMapMode) {
+      : filterMode(sampling.filterMode), mipmapMode(sampling.mipmapMode) {
   }
 
-  bool mipMapped() const {
-    return mipMapMode != MipMapMode::None;
+  bool mipmapped() const {
+    return mipmapMode != MipmapMode::None;
   }
 
   friend bool operator==(const SamplerState& a, const SamplerState& b);
@@ -58,6 +58,6 @@ class SamplerState {
   WrapMode wrapModeX = WrapMode::Clamp;
   WrapMode wrapModeY = WrapMode::Clamp;
   FilterMode filterMode = FilterMode::Linear;
-  MipMapMode mipMapMode = MipMapMode::None;
+  MipmapMode mipmapMode = MipmapMode::None;
 };
 }  // namespace tgfx

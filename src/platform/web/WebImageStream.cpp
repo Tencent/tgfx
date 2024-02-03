@@ -36,12 +36,12 @@ WebImageStream::WebImageStream(emscripten::val source, int width, int height, bo
     : source(source), _width(width), _height(height), alphaOnly(alphaOnly) {
 }
 
-std::shared_ptr<Texture> WebImageStream::onMakeTexture(Context* context, bool mipMapped) {
+std::shared_ptr<Texture> WebImageStream::onMakeTexture(Context* context, bool mipmapped) {
   std::shared_ptr<Texture> texture = nullptr;
   if (alphaOnly) {
-    texture = Texture::MakeAlpha(context, width(), height(), mipMapped);
+    texture = Texture::MakeAlpha(context, width(), height(), mipmapped);
   } else {
-    texture = Texture::MakeRGBA(context, width(), height(), mipMapped);
+    texture = Texture::MakeRGBA(context, width(), height(), mipmapped);
   }
   if (texture != nullptr) {
     onUpdateTexture(texture, Rect::MakeWH(_width, _height));
@@ -55,7 +55,7 @@ bool WebImageStream::onUpdateTexture(std::shared_ptr<Texture> texture, const Rec
                                           source, glSampler->id, alphaOnly);
   if (glSampler->hasMipmaps()) {
     auto gpu = texture->getContext()->gpu();
-    gpu->regenerateMipMapLevels(glSampler);
+    gpu->regenerateMipmapLevels(glSampler);
   }
   return true;
 }

@@ -158,22 +158,28 @@ class Image {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the Image has mipmap levels. The flag was set by the makeMipMapped() method,
+   * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,
    * which may be ignored if the GPU or the associated image source does not support mipmaps.
    */
-  virtual bool hasMipmaps() const = 0;
+  virtual bool hasMipmaps() const {
+    return false;
+  }
 
   /**
    * Returns true if the Image and all its children have been fully decoded. A fully decoded Image
    * means that its pixels are ready for drawing. On the other hand, if the Image requires decoding
    * or rasterization on the CPU side before drawing, it is not yet fully decoded.
    */
-  virtual bool isFullyDecoded() const;
+  virtual bool isFullyDecoded() const {
+    return true;
+  }
 
   /**
    * Returns true if the Image was created from a GPU texture.
    */
-  virtual bool isTextureBacked() const;
+  virtual bool isTextureBacked() const {
+    return false;
+  }
 
   /**
    * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
@@ -192,10 +198,12 @@ class Image {
    * you want the subset Image to create its own GPU cache, you should call makeRasterized() on the
    * subset Image. The default value of rasterizationScale is 1.0, indicating that the Image should
    * be rasterized at its current size. Larger values magnify the image content, while smaller
-   * values shrink it. If the Image is already rasterized and the rasterizationScale is 1.0, the
-   * original Image is returned. If the rasterizationScale is less than zero, nullptr is returned.
+   * values shrink it. The sampling options will be applied if the rasterizationScale is not 1.0.
+   * If the Image is already rasterized and the rasterizationScale is 1.0, the original Image is
+   * returned. If the rasterizationScale is less than zero, nullptr is returned.
    */
-  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f) const;
+  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
+                                                SamplingOptions sampling = {}) const;
 
   /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a
@@ -216,10 +224,10 @@ class Image {
   std::shared_ptr<Image> makeDecoded(Context* context = nullptr) const;
 
   /**
-   * Returns an Image with mipmaps enabled. Returns the original Image if the Image has mipmaps
-   * enabled already or fails to enable mipmaps.
+   * Returns an Image with mipmaps enabled or disabled. If mipmaps are already enabled or disabled,
+   * the original Image is returned. If enabling or disabling mipmaps fails, nullptr is returned.
    */
-  std::shared_ptr<Image> makeMipMapped() const;
+  std::shared_ptr<Image> makeMipmapped(bool enabled) const;
 
   /**
    * Returns subset of Image. The subset must be fully contained by Image dimensions. The returned
@@ -259,9 +267,9 @@ class Image {
  protected:
   std::weak_ptr<Image> weakThis;
 
-  virtual std::shared_ptr<Image> onMakeDecoded(Context* context) const;
+  virtual std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware = true) const;
 
-  virtual std::shared_ptr<Image> onMakeMipMapped() const = 0;
+  virtual std::shared_ptr<Image> onMakeMipmapped(bool enabled) const = 0;
 
   virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
 
@@ -275,6 +283,7 @@ class Image {
                                                                  const Rect* clipBounds) const = 0;
 
   friend class FragmentProcessor;
-  friend class RGBAAAImage;
+  friend class NestedImage;
+  friend class ScaledImage;
 };
 }  // namespace tgfx

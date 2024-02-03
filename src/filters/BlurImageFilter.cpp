@@ -119,10 +119,10 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
   auto processor = FragmentProcessor::MakeFromImage(source, imageArgs, nullptr, &dstBounds);
   auto imageBounds = dstBounds;
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
-  auto mipMapped = source->hasMipmaps() && args.sampling.mipMapMode != MipMapMode::None;
+  auto mipmapped = source->hasMipmaps() && args.sampling.mipmapMode != MipmapMode::None;
   auto lastRenderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(imageBounds.width()), static_cast<int>(imageBounds.height()),
-      PixelFormat::RGBA_8888, 1, mipMapped);
+      PixelFormat::RGBA_8888, 1, mipmapped);
   if (lastRenderTarget == nullptr) {
     return nullptr;
   }
