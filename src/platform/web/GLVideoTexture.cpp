@@ -26,10 +26,10 @@ using namespace emscripten;
 static constexpr int ANDROID_ALIGNMENT = 16;
 
 std::shared_ptr<GLVideoTexture> GLVideoTexture::Make(Context* context, int width, int height,
-                                                     bool mipMapped) {
+                                                     bool mipmapped) {
   static auto isAndroidMiniprogram =
       val::module_property("tgfx").call<bool>("isAndroidMiniprogram");
-  int maxMipmapLevel = mipMapped ? context->caps()->getMaxMipmapLevel(width, height) : 0;
+  int maxMipmapLevel = mipmapped ? context->caps()->getMaxMipmapLevel(width, height) : 0;
   auto sampler =
       context->gpu()->createSampler(width, height, PixelFormat::RGBA_8888, maxMipmapLevel + 1);
   if (sampler == nullptr) {

@@ -22,11 +22,11 @@
 namespace tgfx {
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context,
                                            std::shared_ptr<ImageBuffer> imageBuffer,
-                                           bool mipMapped) {
+                                           bool mipmapped) {
   if (context == nullptr || imageBuffer == nullptr) {
     return nullptr;
   }
-  return imageBuffer->onMakeTexture(context, mipMapped);
+  return imageBuffer->onMakeTexture(context, mipmapped);
 }
 
 Texture::Texture(int width, int height, ImageOrigin origin)

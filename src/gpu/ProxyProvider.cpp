@@ -81,42 +81,42 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const ResourceKey& resourceKey, std::shared_ptr<ImageBuffer> imageBuffer, bool mipMapped,
+    const ResourceKey& resourceKey, std::shared_ptr<ImageBuffer> imageBuffer, bool mipmapped,
     uint32_t renderFlags) {
   auto decoder = ImageDecoder::Wrap(std::move(imageBuffer));
-  return createTextureProxy(resourceKey, std::move(decoder), mipMapped, renderFlags);
+  return createTextureProxy(resourceKey, std::move(decoder), mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const ResourceKey& resourceKey, std::shared_ptr<ImageGenerator> generator, bool mipMapped,
+    const ResourceKey& resourceKey, std::shared_ptr<ImageGenerator> generator, bool mipmapped,
     uint32_t renderFlags) {
   auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
-  auto decoder = ImageDecoder::MakeFrom(std::move(generator), !mipMapped, asyncDecoding);
-  return createTextureProxy(resourceKey, std::move(decoder), mipMapped, renderFlags);
+  auto decoder = ImageDecoder::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
+  return createTextureProxy(resourceKey, std::move(decoder), mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const ResourceKey& resourceKey, std::shared_ptr<ImageDecoder> decoder, bool mipMapped,
+    const ResourceKey& resourceKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped,
     uint32_t renderFlags) {
   auto proxy = findTextureProxy(resourceKey);
   if (proxy != nullptr) {
     return proxy;
   }
   auto strongKey = GetStrongKey(resourceKey, renderFlags);
-  auto task = TextureCreateTask::MakeFrom(strongKey, decoder, mipMapped);
+  auto task = TextureCreateTask::MakeFrom(strongKey, decoder, mipmapped);
   if (task == nullptr) {
     return nullptr;
   }
   context->drawingManager()->addResourceTask(std::move(task));
   proxy = std::shared_ptr<TextureProxy>(
-      new TextureProxy(decoder->width(), decoder->height(), mipMapped, decoder->isAlphaOnly()));
+      new TextureProxy(decoder->width(), decoder->height(), mipmapped, decoder->isAlphaOnly()));
   addResourceProxy(proxy, strongKey, resourceKey.domain());
   return proxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const ResourceKey& resourceKey,
                                                                 int width, int height,
-                                                                PixelFormat format, bool mipMapped,
+                                                                PixelFormat format, bool mipmapped,
                                                                 ImageOrigin origin,
                                                                 uint32_t renderFlags) {
   auto proxy = findTextureProxy(resourceKey);
@@ -127,14 +127,14 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const ResourceKe
     return nullptr;
   }
   auto strongKey = GetStrongKey(resourceKey, renderFlags);
-  auto task = TextureCreateTask::MakeFrom(strongKey, width, height, format, mipMapped, origin);
+  auto task = TextureCreateTask::MakeFrom(strongKey, width, height, format, mipmapped, origin);
   if (task == nullptr) {
     return nullptr;
   }
   context->drawingManager()->addResourceTask(std::move(task));
   auto isAlphaOnly = format == PixelFormat::ALPHA_8;
   proxy = std::shared_ptr<TextureProxy>(
-      new TextureProxy(width, height, mipMapped, isAlphaOnly, origin));
+      new TextureProxy(width, height, mipmapped, isAlphaOnly, origin));
   addResourceProxy(proxy, strongKey, resourceKey.domain());
   return proxy;
 }

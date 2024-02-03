@@ -34,7 +34,7 @@ std::shared_ptr<ImageBuffer> NativeImageBuffer::MakeFrom(JNIEnv* env, jobject bi
   return pixelBuffer;
 }
 
-std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool mipmapped) const {
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -49,10 +49,10 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
   std::shared_ptr<Texture> texture = nullptr;
   if (isAlphaOnly()) {
     texture = Texture::MakeAlpha(context, info.width(), info.height(), pixels, info.rowBytes(),
-                                 mipMapped);
+                                 mipmapped);
   } else {
     texture =
-        Texture::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(), mipMapped);
+        Texture::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(), mipmapped);
   }
   AndroidBitmap_unlockPixels(env, bitmap.get());
   return texture;

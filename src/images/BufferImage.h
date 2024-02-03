@@ -26,8 +26,7 @@ namespace tgfx {
  */
 class BufferImage : public RasterImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> buffer,
-                                         bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> buffer);
 
   int width() const override {
     return imageBuffer->width();
@@ -37,24 +36,18 @@ class BufferImage : public RasterImage {
     return imageBuffer->height();
   }
 
-  bool hasMipmaps() const override {
-    return mipMapped;
-  }
-
   bool isAlphaOnly() const override {
     return imageBuffer->isAlphaOnly();
   }
 
  protected:
-  std::shared_ptr<Image> onMakeMipMapped() const override;
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+                                                   bool mipmapped,
                                                    uint32_t renderFlags) const override;
 
  private:
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  bool mipMapped = false;
 
-  BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer, bool mipMapped = false);
+  BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer);
 };
 }  // namespace tgfx

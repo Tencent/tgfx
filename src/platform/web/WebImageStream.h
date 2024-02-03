@@ -54,7 +54,7 @@ class WebImageStream : public ImageStream {
  protected:
   WebImageStream(emscripten::val source, int width, int height, bool alphaOnly);
 
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
 
   bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
 

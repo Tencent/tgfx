@@ -61,7 +61,7 @@ class Gpu {
 
   virtual void submit(RenderPass* renderPass) = 0;
 
-  void regenerateMipMapLevels(const TextureSampler* sampler);
+  void regenerateMipmapLevels(const TextureSampler* sampler);
 
  protected:
   Context* context;
@@ -69,6 +69,6 @@ class Gpu {
   explicit Gpu(Context* context) : context(context) {
   }
 
-  virtual void onRegenerateMipMapLevels(const TextureSampler* sampler) = 0;
+  virtual void onRegenerateMipmapLevels(const TextureSampler* sampler) = 0;
 };
 }  // namespace tgfx

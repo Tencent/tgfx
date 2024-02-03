@@ -161,8 +161,8 @@ class Canvas {
 
   /**
    * Draws an image, with its top-left corner at (left, top), using current clip, matrix and
-   * optional paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipMapMode::Linear
-   * as the sampling options. Otherwise, uses FilterMode::Linear and MipMapMode::None as the
+   * optional paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipmapMode::Linear
+   * as the sampling options. Otherwise, uses FilterMode::Linear and MipmapMode::None as the
    * sampling options.
    */
   void drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint = nullptr);
@@ -170,15 +170,15 @@ class Canvas {
   /**
    * Draws a Image, with its top-left corner at (0, 0), using current alpha, clip and matrix
    * premultiplied with existing Matrix. If image->hasMipmaps() is true, uses FilterMode::Linear
-   * and MipMapMode::Linear as the sampling options. Otherwise, uses FilterMode::Linear and
-   * MipMapMode::None as the sampling options.
+   * and MipmapMode::Linear as the sampling options. Otherwise, uses FilterMode::Linear and
+   * MipmapMode::None as the sampling options.
    */
   void drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint = nullptr);
 
   /**
    * Draws an image, with its top-left corner at (0, 0), using current clip, matrix and optional
-   * paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipMapMode::Linear as the
-   * sampling options. Otherwise, uses FilterMode::Linear and MipMapMode::None as the sampling
+   * paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipmapMode::Linear as the
+   * sampling options. Otherwise, uses FilterMode::Linear and MipmapMode::None as the sampling
    * options.
    */
   void drawImage(std::shared_ptr<Image> image, const Paint* paint = nullptr);

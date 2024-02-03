@@ -38,7 +38,7 @@ class NV12HardwareBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;

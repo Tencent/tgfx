@@ -46,8 +46,8 @@ class ImageReaderBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override {
-    return imageReader->readTexture(contentVersion, context, mipMapped);
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override {
+    return imageReader->readTexture(contentVersion, context, mipmapped);
   }
 
  private:
@@ -107,7 +107,7 @@ bool ImageReader::checkExpired(uint64_t contentVersion) {
 }
 
 std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Context* context,
-                                                  bool mipMapped) {
+                                                  bool mipmapped) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (contentVersion == textureVersion) {
     return texture;
@@ -120,7 +120,7 @@ std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Conte
   }
   bool success = true;
   if (texture == nullptr) {
-    texture = stream->onMakeTexture(context, mipMapped);
+    texture = stream->onMakeTexture(context, mipmapped);
     success = texture != nullptr;
   } else if (!stream->isHardwareBacked()) {
     success = stream->onUpdateTexture(texture, dirtyBounds);

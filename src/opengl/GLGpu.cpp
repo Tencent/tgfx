@@ -49,7 +49,7 @@ std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, Pixe
   }
   sampler->target = GL_TEXTURE_2D;
   sampler->format = format;
-  sampler->maxMipMapLevel = mipLevelCount - 1;
+  sampler->maxMipmapLevel = mipLevelCount - 1;
   gl->bindTexture(sampler->target, sampler->id);
   gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -121,7 +121,7 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
     }
   }
   if (sampler->hasMipmaps()) {
-    onRegenerateMipMapLevels(sampler);
+    onRegenerateMipmapLevels(sampler);
   }
 }
 
@@ -134,18 +134,18 @@ static int FilterToGLMagFilter(FilterMode filterMode) {
   }
 }
 
-static int FilterToGLMinFilter(FilterMode filterMode, MipMapMode mipMapMode) {
-  switch (mipMapMode) {
-    case MipMapMode::None:
+static int FilterToGLMinFilter(FilterMode filterMode, MipmapMode mipmapMode) {
+  switch (mipmapMode) {
+    case MipmapMode::None:
       return FilterToGLMagFilter(filterMode);
-    case MipMapMode::Nearest:
+    case MipmapMode::Nearest:
       switch (filterMode) {
         case FilterMode::Nearest:
           return GL_NEAREST_MIPMAP_NEAREST;
         case FilterMode::Linear:
           return GL_LINEAR_MIPMAP_NEAREST;
       }
-    case MipMapMode::Linear:
+    case MipmapMode::Linear:
       switch (filterMode) {
         case FilterMode::Nearest:
           return GL_NEAREST_MIPMAP_LINEAR;
@@ -187,11 +187,11 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
                     GetGLWrap(glSampler->target, samplerState.wrapModeX));
   gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T,
                     GetGLWrap(glSampler->target, samplerState.wrapModeY));
-  if (samplerState.mipMapped() && (!context->caps()->mipMapSupport || !glSampler->hasMipmaps())) {
-    samplerState.mipMapMode = MipMapMode::None;
+  if (samplerState.mipmapped() && (!context->caps()->mipmapSupport || !glSampler->hasMipmaps())) {
+    samplerState.mipmapMode = MipmapMode::None;
   }
   gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER,
-                    FilterToGLMinFilter(samplerState.filterMode, samplerState.mipMapMode));
+                    FilterToGLMinFilter(samplerState.filterMode, samplerState.mipmapMode));
   gl->texParameteri(glSampler->target, GL_TEXTURE_MAG_FILTER,
                     FilterToGLMagFilter(samplerState.filterMode));
 }
@@ -211,7 +211,7 @@ void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
                         static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
                         static_cast<int>(srcRect.height()));
   if (texture->hasMipmaps()) {
-    onRegenerateMipMapLevels(texture->getSampler());
+    onRegenerateMipmapLevels(texture->getSampler());
   }
 }
 
@@ -282,7 +282,7 @@ void GLGpu::submit(RenderPass*) {
   // does nothing for opengl.
 }
 
-void GLGpu::onRegenerateMipMapLevels(const TextureSampler* sampler) {
+void GLGpu::onRegenerateMipmapLevels(const TextureSampler* sampler) {
   auto gl = GLFunctions::Get(context);
   auto glSampler = static_cast<const GLSampler*>(sampler);
   if (glSampler->target != GL_TEXTURE_2D) {

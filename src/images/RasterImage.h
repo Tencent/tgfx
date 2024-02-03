@@ -30,7 +30,8 @@ class RasterImage : public Image {
  public:
   explicit RasterImage(ResourceKey resourceKey);
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f) const override;
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
+                                        SamplingOptions sampling = {}) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
@@ -39,6 +40,8 @@ class RasterImage : public Image {
  protected:
   ResourceKey resourceKey = {};
 
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
   std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                       int alphaStartY) const override;
 
@@ -46,7 +49,10 @@ class RasterImage : public Image {
                                                          const Matrix* localMatrix,
                                                          const Rect* clipBounds) const override;
 
-  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context,
+  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+                                                           bool mipmapped,
                                                            uint32_t renderFlags) const = 0;
+
+  friend class MipmapImage;
 };
 }  // namespace tgfx

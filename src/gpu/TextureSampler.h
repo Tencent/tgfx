@@ -43,7 +43,7 @@ class TextureSampler {
    * The pixel format of the sampler.
    */
   PixelFormat format = PixelFormat::RGBA_8888;
-  int maxMipMapLevel = 0;
+  int maxMipmapLevel = 0;
 
   /**
    * Returns the TextureType of TextureSampler.
@@ -56,7 +56,7 @@ class TextureSampler {
    * Returns true if the TextureSampler has mipmap levels.
    */
   bool hasMipmaps() const {
-    return maxMipMapLevel > 0;
+    return maxMipmapLevel > 0;
   }
 
   /**

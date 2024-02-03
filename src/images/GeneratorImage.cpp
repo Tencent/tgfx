@@ -21,40 +21,35 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                                bool mipMapped) {
+std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
   if (generator == nullptr) {
     return nullptr;
   }
   auto image = std::shared_ptr<GeneratorImage>(
-      new GeneratorImage(ResourceKey::NewWeak(), std::move(generator), mipMapped));
+      new GeneratorImage(ResourceKey::NewWeak(), std::move(generator)));
   image->weakThis = image;
   return image;
 }
 
-GeneratorImage::GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator,
-                               bool mipMapped)
-    : RasterImage(std::move(resourceKey)), generator(std::move(generator)), mipMapped(mipMapped) {
+GeneratorImage::GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator)
+    : RasterImage(std::move(resourceKey)), generator(std::move(generator)) {
 }
 
-std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context) const {
+std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryHardware) const {
   if (context != nullptr) {
     if (context->proxyProvider()->hasResourceProxy(resourceKey) ||
         context->resourceCache()->hasResource(resourceKey)) {
       return nullptr;
     }
   }
-  auto decoder = ImageDecoder::MakeFrom(generator, !mipMapped, true);
-  return DecoderImage::MakeFrom(resourceKey, std::move(decoder), mipMapped);
-}
-
-std::shared_ptr<Image> GeneratorImage::onMakeMipMapped() const {
-  return GeneratorImage::MakeFrom(generator, true);
+  auto decoder = ImageDecoder::MakeFrom(generator, tryHardware, true);
+  return DecoderImage::MakeFrom(resourceKey, std::move(decoder));
 }
 
 std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(Context* context,
+                                                                 const ResourceKey& key,
+                                                                 bool mipmapped,
                                                                  uint32_t renderFlags) const {
-  return context->proxyProvider()->createTextureProxy(resourceKey, generator, mipMapped,
-                                                      renderFlags);
+  return context->proxyProvider()->createTextureProxy(key, generator, mipmapped, renderFlags);
 }
 }  // namespace tgfx

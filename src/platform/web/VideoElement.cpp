@@ -42,8 +42,8 @@ void VideoElement::markFrameChanged(emscripten::val promise) {
   }
 }
 
-std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipMapped) {
-  auto texture = GLVideoTexture::Make(context, width(), height(), mipMapped);
+std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
+  auto texture = GLVideoTexture::Make(context, width(), height(), mipmapped);
   if (texture != nullptr) {
     onUpdateTexture(texture, Rect::MakeWH(width(), height()));
   }

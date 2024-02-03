@@ -54,7 +54,7 @@ class WebImageBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   int _width = 0;

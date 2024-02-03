@@ -230,7 +230,7 @@ int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
 }
 
 int GLCaps::getMaxMipmapLevel(int width, int height) const {
-  if (!mipMapSupport) {
+  if (!mipmapSupport) {
     return 0;
   }
   int maxDimension = std::max(width, height);
@@ -290,7 +290,7 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
     clampToBorderSupport = false;
   }
   npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
-  mipMapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
+  mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -305,7 +305,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   semaphoreSupport = version >= GL_VER(2, 0);
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
-  mipMapSupport = npotTextureTileSupport;
+  mipmapSupport = npotTextureTileSupport;
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

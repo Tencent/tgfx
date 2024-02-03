@@ -20,28 +20,24 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer, bool mipMapped) {
+std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto image = std::shared_ptr<BufferImage>(
-      new BufferImage(ResourceKey::NewWeak(), std::move(buffer), mipMapped));
+  auto image =
+      std::shared_ptr<BufferImage>(new BufferImage(ResourceKey::NewWeak(), std::move(buffer)));
   image->weakThis = image;
   return image;
 }
 
-BufferImage::BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer,
-                         bool mipMapped)
-    : RasterImage(std::move(resourceKey)), imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
-}
-
-std::shared_ptr<Image> BufferImage::onMakeMipMapped() const {
-  return BufferImage::MakeFrom(imageBuffer, true);
+BufferImage::BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer)
+    : RasterImage(std::move(resourceKey)), imageBuffer(std::move(buffer)) {
 }
 
 std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(Context* context,
+                                                              const ResourceKey& key,
+                                                              bool mipmapped,
                                                               uint32_t renderFlags) const {
-  return context->proxyProvider()->createTextureProxy(resourceKey, imageBuffer, mipMapped,
-                                                      renderFlags);
+  return context->proxyProvider()->createTextureProxy(key, imageBuffer, mipmapped, renderFlags);
 }
 }  // namespace tgfx

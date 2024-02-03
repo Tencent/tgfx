@@ -19,9 +19,9 @@
 #include "TextureProxy.h"
 
 namespace tgfx {
-TextureProxy::TextureProxy(int width, int height, bool mipMapped, bool isAlphaOnly,
+TextureProxy::TextureProxy(int width, int height, bool mipmapped, bool isAlphaOnly,
                            ImageOrigin origin, bool externallyOwned)
-    : _width(width), _height(height), mipMapped(mipMapped), _isAlphaOnly(isAlphaOnly),
+    : _width(width), _height(height), mipmapped(mipmapped), _isAlphaOnly(isAlphaOnly),
       _origin(origin), _externallyOwned(externallyOwned) {
 }
 

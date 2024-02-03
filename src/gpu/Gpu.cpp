@@ -20,10 +20,10 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-void Gpu::regenerateMipMapLevels(const TextureSampler* sampler) {
+void Gpu::regenerateMipmapLevels(const TextureSampler* sampler) {
   if (!sampler->hasMipmaps()) {
     return;
   }
-  onRegenerateMipMapLevels(sampler);
+  onRegenerateMipmapLevels(sampler);
 }
 }  // namespace tgfx

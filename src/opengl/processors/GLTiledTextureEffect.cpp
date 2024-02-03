@@ -238,22 +238,22 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     const char* extraRepeatCoordY = nullptr;
     const char* repeatCoordWeightY = nullptr;
 
-    bool mipMapRepeatX =
+    bool mipmapRepeatX =
         sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
         sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-    bool mipMapRepeatY =
+    bool mipmapRepeatY =
         sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
         sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
 
-    if (mipMapRepeatX || mipMapRepeatY) {
+    if (mipmapRepeatX || mipmapRepeatY) {
       fragBuilder->codeAppend("vec2 extraRepeatCoord;");
     }
-    if (mipMapRepeatX) {
+    if (mipmapRepeatX) {
       fragBuilder->codeAppend("float repeatCoordWeightX;");
       extraRepeatCoordX = "extraRepeatCoord.x";
       repeatCoordWeightX = "repeatCoordWeightX";
     }
-    if (mipMapRepeatY) {
+    if (mipmapRepeatY) {
       fragBuilder->codeAppend("float repeatCoordWeightY;");
       extraRepeatCoordY = "extraRepeatCoord.y";
       repeatCoordWeightY = "repeatCoordWeightY";
@@ -268,18 +268,18 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("vec2 clampedCoord;");
     clampCoord(args, useClamp, names.clampName);
 
-    if (mipMapRepeatX && mipMapRepeatY) {
+    if (mipmapRepeatX && mipmapRepeatY) {
       fragBuilder->codeAppendf("extraRepeatCoord = clamp(extraRepeatCoord, %s.xy, %s.zw);",
                                names.clampName.c_str(), names.clampName.c_str());
-    } else if (mipMapRepeatX) {
+    } else if (mipmapRepeatX) {
       fragBuilder->codeAppendf("extraRepeatCoord.x = clamp(extraRepeatCoord.x, %s.x, %s.z);",
                                names.clampName.c_str(), names.clampName.c_str());
-    } else if (mipMapRepeatY) {
+    } else if (mipmapRepeatY) {
       fragBuilder->codeAppendf("extraRepeatCoord.y = clamp(extraRepeatCoord.y, %s.y, %s.w);",
                                names.clampName.c_str(), names.clampName.c_str());
     }
 
-    if (mipMapRepeatX && mipMapRepeatY) {
+    if (mipmapRepeatX && mipmapRepeatY) {
       const char* textureColor1 = "textureColor1";
       readColor(args, names.dimensionsName, "clampedCoord", textureColor1);
       const char* textureColor2 = "textureColor2";
@@ -295,7 +295,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
           "vec4 textureColor = mix(mix(%s, %s, repeatCoordWeightX), mix(%s, %s, "
           "repeatCoordWeightX), repeatCoordWeightY);",
           textureColor1, textureColor2, textureColor3, textureColor4);
-    } else if (mipMapRepeatX) {
+    } else if (mipmapRepeatX) {
       const char* textureColor1 = "textureColor1";
       readColor(args, names.dimensionsName, "clampedCoord", textureColor1);
       const char* textureColor2 = "textureColor2";
@@ -303,7 +303,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
                 textureColor2);
       fragBuilder->codeAppendf("vec4 textureColor = mix(%s, %s, repeatCoordWeightX);",
                                textureColor1, textureColor2);
-    } else if (mipMapRepeatY) {
+    } else if (mipmapRepeatY) {
       const char* textureColor1 = "textureColor1";
       readColor(args, names.dimensionsName, "clampedCoord", textureColor1);
       const char* textureColor2 = "textureColor2";

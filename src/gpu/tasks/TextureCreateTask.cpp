@@ -22,14 +22,14 @@
 namespace tgfx {
 class EmptyTextureTask : public TextureCreateTask {
  public:
-  EmptyTextureTask(ResourceKey strongKey, int width, int height, PixelFormat format, bool mipMapped,
+  EmptyTextureTask(ResourceKey strongKey, int width, int height, PixelFormat format, bool mipmapped,
                    ImageOrigin origin)
       : TextureCreateTask(std::move(strongKey)), width(width), height(height), format(format),
-        mipMapped(mipMapped), origin(origin) {
+        mipmapped(mipmapped), origin(origin) {
   }
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override {
-    auto texture = Texture::MakeFormat(context, width, height, format, mipMapped, origin);
+    auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
     if (texture == nullptr) {
       LOGE("EmptyTextureTask::onMakeResource() Failed to create the texture!");
     }
@@ -40,24 +40,24 @@ class EmptyTextureTask : public TextureCreateTask {
   int width = 0;
   int height = 0;
   PixelFormat format = PixelFormat::RGBA_8888;
-  bool mipMapped = false;
+  bool mipmapped = false;
   ImageOrigin origin = ImageOrigin::TopLeft;
 };
 
 std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(ResourceKey strongKey, int width,
                                                                int height, PixelFormat format,
-                                                               bool mipMapped, ImageOrigin origin) {
+                                                               bool mipmapped, ImageOrigin origin) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
   return std::shared_ptr<TextureCreateTask>(
-      new EmptyTextureTask(std::move(strongKey), width, height, format, mipMapped, origin));
+      new EmptyTextureTask(std::move(strongKey), width, height, format, mipmapped, origin));
 }
 
 class ImageDecoderTask : public TextureCreateTask {
  public:
-  ImageDecoderTask(ResourceKey strongKey, std::shared_ptr<ImageDecoder> decoder, bool mipMapped)
-      : TextureCreateTask(std::move(strongKey)), decoder(std::move(decoder)), mipMapped(mipMapped) {
+  ImageDecoderTask(ResourceKey strongKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped)
+      : TextureCreateTask(std::move(strongKey)), decoder(std::move(decoder)), mipmapped(mipmapped) {
   }
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override {
@@ -69,7 +69,7 @@ class ImageDecoderTask : public TextureCreateTask {
       LOGE("ImageDecoderTask::onMakeResource() Failed to decode the image!");
       return nullptr;
     }
-    auto texture = Texture::MakeFrom(context, imageBuffer, mipMapped);
+    auto texture = Texture::MakeFrom(context, imageBuffer, mipmapped);
     if (texture == nullptr) {
       LOGE("ImageDecoderTask::onMakeResource() Failed to create the texture!");
     } else {
@@ -81,14 +81,14 @@ class ImageDecoderTask : public TextureCreateTask {
 
  private:
   std::shared_ptr<ImageDecoder> decoder = nullptr;
-  bool mipMapped = false;
+  bool mipmapped = false;
 };
 
 std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(
-    ResourceKey strongKey, std::shared_ptr<ImageDecoder> decoder, bool mipMapped) {
+    ResourceKey strongKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped) {
   if (decoder == nullptr) {
     return nullptr;
   }
-  return std::make_shared<ImageDecoderTask>(std::move(strongKey), std::move(decoder), mipMapped);
+  return std::make_shared<ImageDecoderTask>(std::move(strongKey), std::move(decoder), mipmapped);
 }
 }  // namespace tgfx

@@ -45,7 +45,7 @@ class Caps {
    */
   bool clampToBorderSupport = true;
   bool npotTextureTileSupport = true;  // Vulkan and Metal always have support.
-  bool mipMapSupport = true;
+  bool mipmapSupport = true;
   bool textureBarrierSupport = false;
   bool frameBufferFetchSupport = false;
 };

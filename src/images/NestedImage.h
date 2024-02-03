@@ -43,9 +43,9 @@ class NestedImage : public Image {
  protected:
   std::shared_ptr<Image> source = nullptr;
 
-  std::shared_ptr<Image> onMakeDecoded(Context* context) const override;
+  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<Image> onMakeMipMapped() const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
   virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const = 0;
 };

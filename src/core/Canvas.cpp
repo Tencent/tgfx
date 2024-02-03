@@ -338,8 +338,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
   if (image == nullptr) {
     return;
   }
-  auto mipMapMode = image->hasMipmaps() ? MipMapMode::Linear : MipMapMode::None;
-  SamplingOptions sampling(FilterMode::Linear, mipMapMode);
+  auto mipmapMode = image->hasMipmaps() ? MipmapMode::Linear : MipmapMode::None;
+  SamplingOptions sampling(FilterMode::Linear, mipmapMode);
   drawImage(std::move(image), sampling, paint);
 }
 

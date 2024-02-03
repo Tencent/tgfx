@@ -40,17 +40,17 @@ RasterBuffer::RasterBuffer(const ImageInfo& info, std::shared_ptr<Data> pixels)
     : info(info), pixels(std::move(pixels)) {
 }
 
-std::shared_ptr<Texture> RasterBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+std::shared_ptr<Texture> RasterBuffer::onMakeTexture(Context* context, bool mipmapped) const {
   switch (info.colorType()) {
     case ColorType::ALPHA_8:
       return Texture::MakeAlpha(context, info.width(), info.height(), pixels->data(),
-                                info.rowBytes(), mipMapped);
+                                info.rowBytes(), mipmapped);
     case ColorType::BGRA_8888:
       return Texture::MakeFormat(context, info.width(), info.height(), pixels->data(),
-                                 info.rowBytes(), PixelFormat::BGRA_8888, mipMapped);
+                                 info.rowBytes(), PixelFormat::BGRA_8888, mipmapped);
     case ColorType::RGBA_8888:
       return Texture::MakeRGBA(context, info.width(), info.height(), pixels->data(),
-                               info.rowBytes(), mipMapped);
+                               info.rowBytes(), mipmapped);
     default:
       return nullptr;
   }
