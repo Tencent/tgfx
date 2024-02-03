@@ -126,10 +126,7 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
 }
 
 std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale) const {
-  if (rasterizationScale <= 0) {
-    return nullptr;
-  }
-  return ScaledImage::MakeFrom(weakThis.lock(), rasterizationScale);
+  return ScaledImage::MakeFrom(weakThis.lock(), rasterizationScale, hasMipmaps());
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {

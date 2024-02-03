@@ -24,14 +24,14 @@ namespace tgfx {
 class ScaledImage : public RasterImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         float rasterizationScale = 1.0f);
+                                         float rasterizationScale = 1.0f, bool mipMapped = false);
 
   int width() const override;
 
   int height() const override;
 
   bool hasMipmaps() const override {
-    return source->hasMipmaps();
+    return mipMapped;
   }
 
   bool isAlphaOnly() const override {
@@ -55,7 +55,9 @@ class ScaledImage : public RasterImage {
  private:
   std::shared_ptr<Image> source = nullptr;
   float rasterizationScale = 1.0f;
+  bool mipMapped = false;
 
-  ScaledImage(ResourceKey resourceKey, std::shared_ptr<Image> source, float rasterizationScale);
+  ScaledImage(ResourceKey resourceKey, std::shared_ptr<Image> source, float rasterizationScale,
+              bool mipMapped);
 };
 }  // namespace tgfx
