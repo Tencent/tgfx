@@ -32,8 +32,8 @@ class NestedImage : public Image {
     return source->hasMipmaps();
   }
 
-  bool isLazyGenerated() const override {
-    return source->isLazyGenerated();
+  bool isFullyDecoded() const override {
+    return source->isFullyDecoded();
   }
 
   bool isAlphaOnly() const override {

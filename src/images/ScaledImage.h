@@ -38,8 +38,8 @@ class ScaledImage : public RasterImage {
     return source->isAlphaOnly();
   }
 
-  bool isLazyGenerated() const override {
-    return source->isLazyGenerated();
+  bool isFullyDecoded() const override {
+    return source->isFullyDecoded();
   }
 
   std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f) const override;

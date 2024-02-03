@@ -164,10 +164,11 @@ class Image {
   virtual bool hasMipmaps() const = 0;
 
   /**
-   * Returns true if Image is backed by an image generator or other services that create their
-   * pixels on-demand.
+   * Returns true if the Image and all its children have been fully decoded. A fully decoded Image
+   * means that its pixels are ready for drawing. On the other hand, if the Image requires decoding
+   * or rasterization on the CPU side before drawing, it is not yet fully decoded.
    */
-  virtual bool isLazyGenerated() const;
+  virtual bool isFullyDecoded() const;
 
   /**
    * Returns true if the Image was created from a GPU texture.
@@ -207,10 +208,10 @@ class Image {
   virtual std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
-   * Returns a decoded Image from the lazy Image. The returned Image shares the same texture cache
+   * Returns a fully decoded Image from this Image. The returned Image shares the same GPU cache
    * with the original Image and immediately schedules an asynchronous decoding task, which will not
-   * block the calling thread. Returns the original Image if the Image is not lazy or has a
-   * corresponding texture cache in the specified context.
+   * block the calling thread. If the Image is fully decoded or has a corresponding texture cache in
+   * the specified context, the original Image is returned.
    */
   std::shared_ptr<Image> makeDecoded(Context* context = nullptr) const;
 
