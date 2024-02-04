@@ -18,44 +18,35 @@
 
 #pragma once
 
-#include "images/RasterImage.h"
-#include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-class ScaledImage : public RasterImage {
+/**
+ * The base class for all images that have a single source image and apply various transformations.
+ */
+class TransformImage : public Image {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         float rasterizationScale = 1.0f,
-                                         SamplingOptions sampling = {});
+  explicit TransformImage(std::shared_ptr<Image> source);
 
-  int width() const override;
-
-  int height() const override;
-
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
+  bool hasMipmaps() const override {
+    return source->hasMipmaps();
   }
 
   bool isFullyDecoded() const override {
     return source->isFullyDecoded();
   }
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        SamplingOptions sampling = {}) const override;
+  bool isAlphaOnly() const override {
+    return source->isAlphaOnly();
+  }
 
  protected:
+  std::shared_ptr<Image> source = nullptr;
+
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
-                                                   bool mipmapped,
-                                                   uint32_t renderFlags) const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
- private:
-  std::shared_ptr<Image> source = nullptr;
-  float rasterizationScale = 1.0f;
-  SamplingOptions sampling = {};
-
-  ScaledImage(ResourceKey resourceKey, std::shared_ptr<Image> source, float rasterizationScale,
-              SamplingOptions sampling);
+  virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const = 0;
 };
 }  // namespace tgfx

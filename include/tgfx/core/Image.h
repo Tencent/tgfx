@@ -283,7 +283,7 @@ class Image {
                                                                  const Rect* clipBounds) const = 0;
 
   friend class FragmentProcessor;
-  friend class NestedImage;
-  friend class ScaledImage;
+  friend class TransformImage;
+  friend class RasterImage;
 };
 }  // namespace tgfx

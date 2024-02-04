@@ -33,7 +33,7 @@ std::shared_ptr<Image> DecoderImage::MakeFrom(ResourceKey resourceKey,
 }
 
 DecoderImage::DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder)
-    : RasterImage(std::move(resourceKey)), decoder(std::move(decoder)) {
+    : TextureImage(std::move(resourceKey)), decoder(std::move(decoder)) {
 }
 
 std::shared_ptr<TextureProxy> DecoderImage::onLockTextureProxy(Context* context,

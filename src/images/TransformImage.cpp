@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NestedImage.h"
+#include "TransformImage.h"
 
 namespace tgfx {
-NestedImage::NestedImage(std::shared_ptr<Image> source) : source(std::move(source)) {
+TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {
 }
 
-std::shared_ptr<Image> NestedImage::onMakeDecoded(Context* context, bool tryHardware) const {
+std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryHardware) const {
   auto newSource = source->onMakeDecoded(context, tryHardware);
   if (newSource == nullptr) {
     return nullptr;
@@ -30,7 +30,7 @@ std::shared_ptr<Image> NestedImage::onMakeDecoded(Context* context, bool tryHard
   return onCloneWith(std::move(newSource));
 }
 
-std::shared_ptr<Image> NestedImage::onMakeMipmapped(bool enabled) const {
+std::shared_ptr<Image> TransformImage::onMakeMipmapped(bool enabled) const {
   auto newSource = source->makeMipmapped(enabled);
   if (newSource == nullptr) {
     return nullptr;

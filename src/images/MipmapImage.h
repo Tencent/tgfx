@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "images/RasterImage.h"
+#include "images/TextureImage.h"
 
 namespace tgfx {
-class MipmapImage : public RasterImage {
+class MipmapImage : public TextureImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<RasterImage> source);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<TextureImage> source);
 
   int width() const override {
     return source->width();
@@ -54,8 +54,8 @@ class MipmapImage : public RasterImage {
                                                    uint32_t renderFlags) const override;
 
  private:
-  std::shared_ptr<RasterImage> source = nullptr;
+  std::shared_ptr<TextureImage> source = nullptr;
 
-  MipmapImage(ResourceKey resourceKey, std::shared_ptr<RasterImage> source);
+  MipmapImage(ResourceKey resourceKey, std::shared_ptr<TextureImage> source);
 };
 }  // namespace tgfx

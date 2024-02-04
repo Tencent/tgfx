@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "RasterImage.h"
+#include "TextureImage.h"
 
 namespace tgfx {
 /**
  * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
  */
-class BufferImage : public RasterImage {
+class BufferImage : public TextureImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> buffer);
 

@@ -31,7 +31,7 @@ std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer
 }
 
 BufferImage::BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer)
-    : RasterImage(std::move(resourceKey)), imageBuffer(std::move(buffer)) {
+    : TextureImage(std::move(resourceKey)), imageBuffer(std::move(buffer)) {
 }
 
 std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(Context* context,
