@@ -368,11 +368,10 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   }
   auto clipBounds = localBounds;
   clipBounds.roundOut();
-  auto shader = realPaint.getShader();
-  if (shader != nullptr) {
+  if (realPaint.getShader() != nullptr && !image->isAlphaOnly()) {
     realPaint.setShader(nullptr);
   }
-  auto imageProcessor = getImageProcessor(std::move(image), sampling, clipBounds, shader);
+  auto imageProcessor = getImageProcessor(std::move(image), sampling, clipBounds);
   if (imageProcessor == nullptr) {
     return;
   }
@@ -384,25 +383,13 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
 
 std::unique_ptr<FragmentProcessor> Canvas::getImageProcessor(std::shared_ptr<Image> image,
                                                              SamplingOptions sampling,
-                                                             const Rect& clipBounds,
-                                                             std::shared_ptr<Shader> shader) {
+                                                             const Rect& clipBounds) {
   ImageFPArgs args(getContext(), sampling, surface->options()->renderFlags());
   auto imageProcessor = FragmentProcessor::MakeFromImage(image, args, nullptr, &clipBounds);
-  if (imageProcessor == nullptr) {
-    return nullptr;
-  }
-  if (!image->isAlphaOnly()) {
-    return FragmentProcessor::MulChildByInputAlpha(std::move(imageProcessor));
-  }
-  if (shader == nullptr) {
+  if (image->isAlphaOnly()) {
     return imageProcessor;
   }
-  FPArgs fpArgs(getContext(), surface->options()->renderFlags());
-  auto processor = shader->asFragmentProcessor(fpArgs);
-  if (!processor) {
-    return nullptr;
-  }
-  return FragmentProcessor::Compose(std::move(processor), std::move(imageProcessor));
+  return FragmentProcessor::MulChildByInputAlpha(std::move(imageProcessor));
 }
 
 static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const Color& color,

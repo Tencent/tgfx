@@ -229,8 +229,7 @@ class Canvas {
   Rect clipLocalBounds(Rect localBounds);
   std::unique_ptr<FragmentProcessor> getImageProcessor(std::shared_ptr<Image> image,
                                                        SamplingOptions sampling,
-                                                       const Rect& clipBounds,
-                                                       std::shared_ptr<Shader> shader);
+                                                       const Rect& clipBounds);
   void drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, const Paint& paint);
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);
