@@ -27,21 +27,18 @@ class ClampedGradientEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<ClampedGradientEffect> Make(std::unique_ptr<FragmentProcessor> colorizer,
                                                      std::unique_ptr<FragmentProcessor> gradLayout,
-                                                     Color leftBorderColor, Color rightBorderColor,
-                                                     bool makePremultiply);
+                                                     Color leftBorderColor, Color rightBorderColor);
 
   std::string name() const override {
     return "ClampedGradientEffect";
   }
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
   ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                         std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
-                        Color rightBorderColor, bool makePremultiplied);
+                        Color rightBorderColor);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
@@ -49,6 +46,5 @@ class ClampedGradientEffect : public FragmentProcessor {
   size_t gradLayoutIndex = ULONG_MAX;
   Color leftBorderColor;
   Color rightBorderColor;
-  bool makePremultiply;
 };
 }  // namespace tgfx

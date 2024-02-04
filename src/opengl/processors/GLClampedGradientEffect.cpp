@@ -21,18 +21,16 @@
 namespace tgfx {
 std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(
     std::unique_ptr<FragmentProcessor> colorizer, std::unique_ptr<FragmentProcessor> gradLayout,
-    Color leftBorderColor, Color rightBorderColor, bool makePremultiply) {
-  return std::unique_ptr<ClampedGradientEffect>(
-      new GLClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
-                                  rightBorderColor, makePremultiply));
+    Color leftBorderColor, Color rightBorderColor) {
+  return std::unique_ptr<ClampedGradientEffect>(new GLClampedGradientEffect(
+      std::move(colorizer), std::move(gradLayout), leftBorderColor, rightBorderColor));
 }
 
 GLClampedGradientEffect::GLClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                                                  std::unique_ptr<FragmentProcessor> gradLayout,
-                                                 Color leftBorderColor, Color rightBorderColor,
-                                                 bool makePremultiply)
+                                                 Color leftBorderColor, Color rightBorderColor)
     : ClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
-                            rightBorderColor, makePremultiply) {
+                            rightBorderColor) {
 }
 
 void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
@@ -56,11 +54,9 @@ void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
   emitChild(colorizerIndex, _input0, &_child0, args);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), _child0.c_str());
   fragBuilder->codeAppend("}");
-  if (makePremultiply) {
-    fragBuilder->codeAppend("{");
-    fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
-    fragBuilder->codeAppend("}");
-  }
+  // make sure the output color is premultiplied
+  fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
 }
 
 void GLClampedGradientEffect::onSetData(UniformBuffer* uniformBuffer) const {

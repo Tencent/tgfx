@@ -19,23 +19,16 @@
 #include "ClampedGradientEffect.h"
 
 namespace tgfx {
-void ClampedGradientEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t flag = makePremultiply ? 1 : 0;
-  bytesKey->write(flag);
-}
-
 bool ClampedGradientEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const ClampedGradientEffect&>(processor);
-  return makePremultiply == that.makePremultiply && leftBorderColor == that.leftBorderColor &&
-         rightBorderColor == that.rightBorderColor;
+  return leftBorderColor == that.leftBorderColor && rightBorderColor == that.rightBorderColor;
 }
 
 ClampedGradientEffect::ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                                              std::unique_ptr<FragmentProcessor> gradLayout,
-                                             Color leftBorderColor, Color rightBorderColor,
-                                             bool makePremultiplied)
+                                             Color leftBorderColor, Color rightBorderColor)
     : FragmentProcessor(ClassID()), leftBorderColor(leftBorderColor),
-      rightBorderColor(rightBorderColor), makePremultiply(makePremultiplied) {
+      rightBorderColor(rightBorderColor) {
   colorizerIndex = registerChildProcessor(std::move(colorizer));
   gradLayoutIndex = registerChildProcessor(std::move(gradLayout));
 }
