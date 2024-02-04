@@ -176,12 +176,12 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   drawingManager->addTextureResolveTask(renderTargetProxy);
   auto textureProxy = renderTargetProxy->getTextureProxy();
   if (textureProxy != nullptr && !textureProxy->externallyOwned()) {
-    cachedImage = TextureImage::MakeFrom(std::move(textureProxy));
+    cachedImage = TextureImage::Wrap(std::move(textureProxy));
   } else {
     auto textureCopy = renderTargetProxy->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTargetProxy, textureCopy,
                                             Rect::MakeWH(width(), height()), Point::Zero());
-    cachedImage = TextureImage::MakeFrom(std::move(textureCopy));
+    cachedImage = TextureImage::Wrap(std::move(textureCopy));
   }
   return cachedImage;
 }

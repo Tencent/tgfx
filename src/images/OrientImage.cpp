@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OrientedImage.h"
+#include "OrientImage.h"
 #include "images/SubsetImage.h"
 
 namespace tgfx {
@@ -51,55 +51,56 @@ static Matrix OrientationToMatrix(Orientation orientation) {
   return TopLeftMatrix;
 }
 
-std::shared_ptr<Image> OrientedImage::MakeFrom(std::shared_ptr<Image> source,
-                                               Orientation orientation) {
+std::shared_ptr<Image> OrientImage::MakeFrom(std::shared_ptr<Image> source,
+                                             Orientation orientation) {
   if (source == nullptr) {
     return nullptr;
   }
   if (orientation == Orientation::TopLeft) {
     return source;
   }
-  auto image = std::shared_ptr<OrientedImage>(new OrientedImage(std::move(source), orientation));
+  auto image = std::shared_ptr<OrientImage>(new OrientImage(std::move(source), orientation));
   image->weakThis = image;
   return image;
 }
 
-OrientedImage::OrientedImage(std::shared_ptr<Image> source, Orientation orientation)
-    : NestedImage(std::move(source)), orientation(orientation) {
+OrientImage::OrientImage(std::shared_ptr<Image> source, Orientation orientation)
+    : TransformImage(std::move(source)), orientation(orientation) {
 }
 
-int OrientedImage::width() const {
+int OrientImage::width() const {
   return OrientationSwapsWidthHeight(orientation) ? source->height() : source->width();
 }
 
-int OrientedImage::height() const {
+int OrientImage::height() const {
   return OrientationSwapsWidthHeight(orientation) ? source->width() : source->height();
 }
 
-std::shared_ptr<Image> OrientedImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return OrientedImage::MakeFrom(std::move(newSource), orientation);
+std::shared_ptr<Image> OrientImage::onCloneWith(std::shared_ptr<Image> newSource) const {
+  return OrientImage::MakeFrom(std::move(newSource), orientation);
 }
 
-std::shared_ptr<Image> OrientedImage::onMakeSubset(const Rect& subset) const {
+std::shared_ptr<Image> OrientImage::onMakeSubset(const Rect& subset) const {
   return SubsetImage::MakeFrom(source, orientation, subset);
 }
 
-std::shared_ptr<Image> OrientedImage::onMakeOriented(Orientation newOrientation) const {
+std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) const {
   newOrientation = concatOrientation(newOrientation);
   if (newOrientation == Orientation::TopLeft) {
     return source;
   }
-  return OrientedImage::MakeFrom(source, newOrientation);
+  return OrientImage::MakeFrom(source, newOrientation);
 }
 
-std::unique_ptr<FragmentProcessor> OrientedImage::asFragmentProcessor(
-    const ImageFPArgs& args, const Matrix* localMatrix, const Rect* clipBounds) const {
+std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const ImageFPArgs& args,
+                                                                    const Matrix* localMatrix,
+                                                                    const Rect* clipBounds) const {
   auto result = concatMatrixAndClip(localMatrix, clipBounds);
   return FragmentProcessor::MakeFromImage(source, args, result.getMatrix(), result.getClip());
 }
 
-MatrixAndClipResult OrientedImage::concatMatrixAndClip(const Matrix* localMatrix,
-                                                       const Rect* clipBounds) const {
+MatrixAndClipResult OrientImage::concatMatrixAndClip(const Matrix* localMatrix,
+                                                     const Rect* clipBounds) const {
   auto matrix = OrientationToMatrix(orientation, source->width(), source->height());
   matrix.invert(&matrix);
   std::optional<Rect> clipRect = std::nullopt;
@@ -112,7 +113,7 @@ MatrixAndClipResult OrientedImage::concatMatrixAndClip(const Matrix* localMatrix
   return {matrix, clipRect};
 }
 
-Orientation OrientedImage::concatOrientation(Orientation newOrientation) const {
+Orientation OrientImage::concatOrientation(Orientation newOrientation) const {
   auto oldMatrix = OrientationToMatrix(orientation);
   auto newMatrix = OrientationToMatrix(newOrientation);
   oldMatrix.postConcat(newMatrix);

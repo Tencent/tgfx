@@ -18,54 +18,46 @@
 
 #pragma once
 
+#include "gpu/Resource.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "images/RasterImage.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
- * TextureImage wraps an existing texture proxy.
+ * The base class for all images that can directly generate a texture proxy.
  */
-class TextureImage : public RasterImage {
+class TextureImage : public Image {
  public:
   /**
    * Creates an Image wraps the existing TextureProxy, returns nullptr if textureProxy is nullptr.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<TextureProxy> textureProxy);
+  static std::shared_ptr<Image> Wrap(std::shared_ptr<TextureProxy> textureProxy);
 
-  int width() const override {
-    return textureProxy->width();
-  }
+  explicit TextureImage(ResourceKey resourceKey);
 
-  int height() const override {
-    return textureProxy->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return textureProxy->isAlphaOnly();
-  }
-
-  bool hasMipmaps() const override {
-    return textureProxy->hasMipmaps();
-  }
-
-  bool isTextureBacked() const override {
-    return true;
-  }
-
-  BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const override;
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
+                                        SamplingOptions sampling = {}) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t renderFlags = 0) const;
+
  protected:
+  ResourceKey resourceKey = {};
+
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
-                                                   bool mipmapped,
-                                                   uint32_t renderFlags) const override;
+  std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                      int alphaStartY) const override;
 
- private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
+                                                         const Matrix* localMatrix,
+                                                         const Rect* clipBounds) const override;
 
-  explicit TextureImage(std::shared_ptr<TextureProxy> textureProxy);
+  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+                                                           bool mipmapped,
+                                                           uint32_t renderFlags) const = 0;
+
+  friend class MipmapImage;
 };
 }  // namespace tgfx

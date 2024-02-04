@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "images/NestedImage.h"
+#include "images/TransformImage.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 /**
  * FilterImage wraps an existing image and applies an ImageFilter to it.
  */
-class FilterImage : public NestedImage {
+class FilterImage : public TransformImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
                                          std::shared_ptr<ImageFilter> filter,

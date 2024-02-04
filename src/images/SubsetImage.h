@@ -19,13 +19,13 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientedImage.h"
+#include "images/OrientImage.h"
 
 namespace tgfx {
 /**
  * An image that is a subset of another image.
  */
-class SubsetImage : public OrientedImage {
+class SubsetImage : public OrientImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
                                          const Rect& bounds);

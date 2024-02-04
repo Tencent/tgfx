@@ -19,7 +19,7 @@
 #include "MipmapImage.h"
 
 namespace tgfx {
-std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<RasterImage> source) {
+std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<TextureImage> source) {
   if (source == nullptr) {
     return nullptr;
   }
@@ -29,14 +29,14 @@ std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<RasterImage> source
   return image;
 }
 
-MipmapImage::MipmapImage(ResourceKey resourceKey, std::shared_ptr<RasterImage> source)
-    : RasterImage(std::move(resourceKey)), source(std::move(source)) {
+MipmapImage::MipmapImage(ResourceKey resourceKey, std::shared_ptr<TextureImage> source)
+    : TextureImage(std::move(resourceKey)), source(std::move(source)) {
 }
 
 std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
                                                    SamplingOptions sampling) const {
   auto newSource =
-      std::static_pointer_cast<RasterImage>(source->makeRasterized(rasterizationScale, sampling));
+      std::static_pointer_cast<TextureImage>(source->makeRasterized(rasterizationScale, sampling));
   if (newSource == source) {
     return weakThis.lock();
   }
@@ -44,7 +44,7 @@ std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
 }
 
 std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const {
-  auto newSource = std::static_pointer_cast<RasterImage>(source->onMakeDecoded(context, false));
+  auto newSource = std::static_pointer_cast<TextureImage>(source->onMakeDecoded(context, false));
   if (newSource == nullptr) {
     return nullptr;
   }

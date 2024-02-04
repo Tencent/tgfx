@@ -51,7 +51,7 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
 
 FilterImage::FilterImage(std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter,
                          const Rect& bounds)
-    : NestedImage(std::move(source)), filter(std::move(filter)), bounds(bounds) {
+    : TransformImage(std::move(source)), filter(std::move(filter)), bounds(bounds) {
 }
 
 std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource) const {

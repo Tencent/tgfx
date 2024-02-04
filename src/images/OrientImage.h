@@ -19,7 +19,7 @@
 #pragma once
 
 #include <optional>
-#include "images/NestedImage.h"
+#include "images/TransformImage.h"
 
 namespace tgfx {
 struct MatrixAndClipResult {
@@ -38,7 +38,7 @@ struct MatrixAndClipResult {
 /**
  * OrientImage wraps an existing image and applies an orientation transform.
  */
-class OrientedImage : public NestedImage {
+class OrientImage : public TransformImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation);
 
@@ -49,7 +49,7 @@ class OrientedImage : public NestedImage {
  protected:
   Orientation orientation = Orientation::TopLeft;
 
-  OrientedImage(std::shared_ptr<Image> source, Orientation orientation);
+  OrientImage(std::shared_ptr<Image> source, Orientation orientation);
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 

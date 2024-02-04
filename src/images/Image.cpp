@@ -24,9 +24,8 @@
 #include "images/BufferImage.h"
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
-#include "images/ScaledImage.h"
+#include "images/RasterImage.h"
 #include "images/SubsetImage.h"
-#include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Surface.h"
@@ -101,7 +100,7 @@ std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& b
     return nullptr;
   }
   auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, false);
-  return TextureImage::MakeFrom(std::move(textureProxy));
+  return TextureImage::Wrap(std::move(textureProxy));
 }
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
@@ -110,7 +109,7 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
     return nullptr;
   }
   auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, true);
-  return TextureImage::MakeFrom(std::move(textureProxy));
+  return TextureImage::Wrap(std::move(textureProxy));
 }
 
 BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
@@ -119,7 +118,7 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
 
 std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
                                              SamplingOptions sampling) const {
-  return ScaledImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
+  return RasterImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
@@ -179,7 +178,7 @@ std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
 }
 
 std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
-  return OrientedImage::MakeFrom(weakThis.lock(), orientation);
+  return OrientImage::MakeFrom(weakThis.lock(), orientation);
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset) {

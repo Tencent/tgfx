@@ -31,7 +31,7 @@ std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orie
 }
 
 SubsetImage::SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds)
-    : OrientedImage(std::move(source), orientation), bounds(bounds) {
+    : OrientImage(std::move(source), orientation), bounds(bounds) {
 }
 
 std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<Image> newSource) const {
@@ -45,8 +45,8 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
 
 std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) const {
   auto newOrientation = concatOrientation(orientation);
-  auto orientedWidth = OrientedImage::width();
-  auto orientedHeight = OrientedImage::height();
+  auto orientedWidth = OrientImage::width();
+  auto orientedHeight = OrientImage::height();
   auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
   auto newBounds = matrix.mapRect(bounds);
   return SubsetImage::MakeFrom(source, newOrientation, newBounds);
@@ -72,6 +72,6 @@ MatrixAndClipResult SubsetImage::concatMatrixAndClip(const Matrix* localMatrix,
     }
   }
   auto matrixResult = matrix ? std::addressof(*matrix) : nullptr;
-  return OrientedImage::concatMatrixAndClip(matrixResult, &clipRect);
+  return OrientImage::concatMatrixAndClip(matrixResult, &clipRect);
 }
 }  // namespace tgfx
