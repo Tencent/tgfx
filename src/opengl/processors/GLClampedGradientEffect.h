@@ -27,7 +27,7 @@ class GLClampedGradientEffect : public ClampedGradientEffect {
  public:
   GLClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                           std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
-                          Color rightBorderColor, bool makePremultiply);
+                          Color rightBorderColor);
 
   void emitCode(EmitArgs& args) const override;
 

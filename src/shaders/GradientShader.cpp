@@ -154,20 +154,13 @@ GradientShaderBase::GradientShaderBase(const std::vector<Color>& colors,
   }
 }
 
-// Combines the colorizer and layout with an appropriately configured master effect based on the
+// Combines the colorizer and layout with an appropriately configured primary effect based on the
 // gradient's tile mode
 static std::unique_ptr<FragmentProcessor> MakeGradient(const Context* context,
                                                        const GradientShaderBase& shader,
                                                        std::unique_ptr<FragmentProcessor> layout) {
   if (layout == nullptr) {
     return nullptr;
-  }
-  bool allOpaque = true;
-  for (const auto& color : shader.originalColors) {
-    if (!FloatNearlyEqual(color.alpha, 1.0)) {
-      allOpaque = false;
-      break;
-    }
   }
   // All gradients are colorized the same way, regardless of layout
   std::unique_ptr<FragmentProcessor> colorizer =
@@ -177,12 +170,12 @@ static std::unique_ptr<FragmentProcessor> MakeGradient(const Context* context,
     return nullptr;
   }
 
-  // The master effect has to export premultiply colors, but under certain conditions it doesn't
-  // need to do anything to achieve that: i.e. all the colors have a = 1, in which case
+  // The primary effect has to export premultiply colors, but under certain conditions it doesn't
+  // need to do anything to achieve that: i.e., all the colors have a = 1, in which case
   // premultiply is a no op.
-  return ClampedGradientEffect::Make(
-      std::move(colorizer), std::move(layout), shader.originalColors[0],
-      shader.originalColors[shader.originalColors.size() - 1], !allOpaque);
+  return ClampedGradientEffect::Make(std::move(colorizer), std::move(layout),
+                                     shader.originalColors[0],
+                                     shader.originalColors[shader.originalColors.size() - 1]);
 }
 
 static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint) {
