@@ -197,12 +197,9 @@ LinearGradient::LinearGradient(const Point& startPoint, const Point& endPoint,
 }
 
 std::unique_ptr<FragmentProcessor> LinearGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto matrix = Matrix::I();
-  if (!ComputeTotalInverse(args, &matrix)) {
-    return nullptr;
-  }
-  matrix.postConcat(pointsToUnit);
-  return MakeGradient(args.context, *this, LinearGradientLayout::Make(matrix));
+  auto localMatrix = args.localMatrix;
+  localMatrix.postConcat(pointsToUnit);
+  return MakeGradient(args.context, *this, LinearGradientLayout::Make(localMatrix));
 }
 
 static Matrix RadialToUnitMatrix(const Point& center, float radius) {
@@ -218,12 +215,9 @@ RadialGradient::RadialGradient(const Point& center, float radius, const std::vec
 }
 
 std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto matrix = Matrix::I();
-  if (!ComputeTotalInverse(args, &matrix)) {
-    return nullptr;
-  }
-  matrix.postConcat(pointsToUnit);
-  return MakeGradient(args.context, *this, RadialGradientLayout::Make(matrix));
+  auto localMatrix = args.localMatrix;
+  localMatrix.postConcat(pointsToUnit);
+  return MakeGradient(args.context, *this, RadialGradientLayout::Make(localMatrix));
 }
 
 SweepGradient::SweepGradient(const Point& center, float t0, float t1,
@@ -233,12 +227,9 @@ SweepGradient::SweepGradient(const Point& center, float t0, float t1,
 }
 
 std::unique_ptr<FragmentProcessor> SweepGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto matrix = Matrix::I();
-  if (!ComputeTotalInverse(args, &matrix)) {
-    return nullptr;
-  }
-  matrix.postConcat(pointsToUnit);
-  return MakeGradient(args.context, *this, SweepGradientLayout::Make(matrix, bias, scale));
+  auto localMatrix = args.localMatrix;
+  localMatrix.postConcat(pointsToUnit);
+  return MakeGradient(args.context, *this, SweepGradientLayout::Make(localMatrix, bias, scale));
 }
 
 std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,

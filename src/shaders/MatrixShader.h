@@ -22,25 +22,22 @@
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class LocalMatrixShader final : public Shader {
+class MatrixShader final : public Shader {
  public:
-  LocalMatrixShader(std::shared_ptr<Shader> proxy, const Matrix& preLocalMatrix,
-                    const Matrix& postLocalMatrix)
-      : proxyShader(std::move(proxy)), _preLocalMatrix(preLocalMatrix),
-        _postLocalMatrix(postLocalMatrix) {
-  }
+  static std::shared_ptr<Shader> MakeFrom(std::shared_ptr<Shader> source, const Matrix& viewMatrix);
 
   bool isOpaque() const override {
-    return proxyShader->isOpaque();
+    return source->isOpaque();
   }
 
-  std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix, bool isPre) const override;
+  std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
-  std::shared_ptr<Shader> proxyShader;
-  const Matrix _preLocalMatrix;
-  const Matrix _postLocalMatrix;
+  std::shared_ptr<Shader> source = nullptr;
+  Matrix matrix = Matrix::I();
+
+  MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
 };
 }  // namespace tgfx

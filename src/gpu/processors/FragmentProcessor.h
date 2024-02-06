@@ -35,11 +35,8 @@ struct FPArgs {
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
-  Matrix preLocalMatrix = Matrix::I();
-  Matrix postLocalMatrix = Matrix::I();
+  Matrix localMatrix = Matrix::I();
 };
-
-bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse);
 
 struct ImageFPArgs {
   ImageFPArgs(Context* context, const SamplingOptions& sampling, uint32_t renderFlags = 0,

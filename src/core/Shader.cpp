@@ -16,24 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageShader.h"
-#include "gpu/TextureSampler.h"
-#include "gpu/processors/TiledTextureEffect.h"
+#include "tgfx/core/Shader.h"
+#include "shaders/MatrixShader.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, TileMode tileModeX,
-                                                TileMode tileModeY, SamplingOptions sampling) {
-  if (image == nullptr) {
-    return nullptr;
-  }
-  auto shader = std::shared_ptr<ImageShader>(
-      new ImageShader(std::move(image), tileModeX, tileModeY, sampling));
-  shader->weakThis = shader;
-  return shader;
-}
-
-std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args) const {
-  ImageFPArgs imageFpArgs(args.context, sampling, args.renderFlags, tileModeX, tileModeY);
-  return FragmentProcessor::MakeFromImage(image, imageFpArgs, &args.localMatrix);
+std::shared_ptr<Shader> Shader::makeWithMatrix(const Matrix& viewMatrix) const {
+  return MatrixShader::MakeFrom(weakThis.lock(), viewMatrix);
 }
 }  // namespace tgfx
