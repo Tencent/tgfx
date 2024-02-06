@@ -64,17 +64,16 @@ class FragmentProcessor : public Processor {
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
    *  only consider the input color's alpha. However, there is a competing desire to have reusable
    *  FragmentProcessor subclasses that can be used in other scenarios where the entire input
-   *  color is considered. This function exists to filter the input color and pass it to a FP. It
-   *  does so by returning a parent FP that multiplies the passed in FPs output by the parent's
-   *  input alpha. The passed in FP will not receive an input color.
+   *  color is considered or ignored. This function exists to filter the input color and pass it to
+   *  an FP. It does so by returning a parent FP that multiplies the passed in FPs output by the
+   *  parent's input alpha. The passed in FP will not receive an input color.
    */
   static std::unique_ptr<FragmentProcessor> MulChildByInputAlpha(
       std::unique_ptr<FragmentProcessor> child);
 
   /**
-   * Returns the input modulated by the child's alpha. The passed in FP will not receive an input
-   * color.
-   *
+   * Returns the input color, modulated by the child's alpha. The passed in FP will not receive an
+   * input color.
    * @param inverted false: output = input * child.a; true: output = input * (1 - child.a)
    */
   static std::unique_ptr<FragmentProcessor> MulInputByChildAlpha(

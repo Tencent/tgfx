@@ -223,7 +223,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
       sampling.shaderModeY == TiledTextureEffect::ShaderMode::None) {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
     fragBuilder->appendTextureLookup((*args.textureSamplers)[0], vertexColor);
-    fragBuilder->codeAppendf(" * %s;", args.inputColor.c_str());
+    fragBuilder->codeAppend(";");
   } else {
     fragBuilder->codeAppendf("vec2 inCoord = %s;", vertexColor.c_str());
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
@@ -383,8 +383,14 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
       fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
       fragBuilder->codeAppend("}");
     }
-    fragBuilder->codeAppendf("%s = textureColor * %s;", args.outputColor.c_str(),
-                             args.inputColor.c_str());
+    fragBuilder->codeAppendf("%s = textureColor;", args.outputColor.c_str());
+  }
+  if (textureProxy->isAlphaOnly()) {
+    args.fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(),
+                                  args.outputColor.c_str(), args.inputColor.c_str());
+  } else {
+    args.fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(),
+                                  args.outputColor.c_str(), args.inputColor.c_str());
   }
 }
 

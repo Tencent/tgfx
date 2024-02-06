@@ -38,13 +38,6 @@ std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs
     return nullptr;
   }
   ImageFPArgs imageFpArgs(args.context, sampling, args.renderFlags, tileModeX, tileModeY);
-  auto processor = FragmentProcessor::MakeFromImage(image, imageFpArgs, &matrix);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  if (image->isAlphaOnly()) {
-    return processor;
-  }
-  return FragmentProcessor::MulChildByInputAlpha(std::move(processor));
+  return FragmentProcessor::MakeFromImage(image, imageFpArgs, &matrix);
 }
 }  // namespace tgfx
