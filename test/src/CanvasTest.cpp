@@ -216,7 +216,7 @@ TGFX_TEST(CanvasTest, TileMode) {
   auto canvas = surface->getCanvas();
   Paint paint;
   paint.setShader(Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror)
-                      ->makeWithPreLocalMatrix(Matrix::MakeScale(0.125f)));
+                      ->makeWithMatrix(Matrix::MakeScale(0.125f)));
   canvas->drawRect(Rect::MakeWH(static_cast<float>(surface->width()),
                                 static_cast<float>(surface->height()) * 0.9f),
                    paint);
@@ -274,7 +274,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   Paint paint;
-  paint.setShader(Shader::MakeImageShader(image)->makeWithPreLocalMatrix(
+  paint.setShader(Shader::MakeImageShader(image)->makeWithMatrix(
       Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(image->width()),
                         static_cast<float>(height) / static_cast<float>(image->height()))));
   int tileSize = 8;
@@ -593,7 +593,7 @@ TGFX_TEST(CanvasTest, mipmap) {
   Paint paint;
   paint.setShader(Shader::MakeImageShader(imageMipmapped, TileMode::Mirror, TileMode::Repeat,
                                           SamplingOptions(FilterMode::Linear, MipmapMode::Linear))
-                      ->makeWithPreLocalMatrix(imageMatrix));
+                      ->makeWithMatrix(imageMatrix));
   canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_texture_effect"));
   device->unlock();

@@ -33,20 +33,6 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::MakeFromImage(std::shared_
   return image->asFragmentProcessor(args, localMatrix, clipRect);
 }
 
-bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse) {
-  if (totalInverse == nullptr) {
-    return false;
-  }
-  totalInverse->reset();
-  if (!args.preLocalMatrix.isIdentity()) {
-    totalInverse->preConcat(args.preLocalMatrix);
-  }
-  if (!args.postLocalMatrix.isIdentity()) {
-    totalInverse->postConcat(args.postLocalMatrix);
-  }
-  return totalInverse->invert(totalInverse);
-}
-
 std::unique_ptr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
     std::unique_ptr<FragmentProcessor> child) {
   if (child == nullptr) {
