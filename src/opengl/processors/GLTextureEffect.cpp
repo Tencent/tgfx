@@ -66,9 +66,9 @@ GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Poin
 
 void GLTextureEffect::emitCode(EmitArgs& args) const {
   auto texture = getTexture();
+  auto fragBuilder = args.fragBuilder;
   if (texture == nullptr) {
     // emit a transparent color as the output color.
-    auto* fragBuilder = args.fragBuilder;
     fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
     return;
   }
@@ -76,6 +76,13 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
     emitYUVTextureCode(args);
   } else {
     emitPlainTextureCode(args);
+  }
+  if (textureProxy->isAlphaOnly()) {
+    fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(), args.outputColor.c_str(),
+                             args.inputColor.c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), args.outputColor.c_str(),
+                             args.inputColor.c_str());
   }
 }
 void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
@@ -102,7 +109,7 @@ void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend("alpha = clamp(alpha, 0.0, 1.0);");
     fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
   }
-  fragBuilder->codeAppendf("%s = color * %s;", args.outputColor.c_str(), args.inputColor.c_str());
+  fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
 }
 
 void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
@@ -135,8 +142,7 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
       uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float3x3, "Mat3ColorConversion");
   fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
   if (alphaStart == Point::Zero()) {
-    fragBuilder->codeAppendf("%s = vec4(rgb, 1.0) * %s;", args.outputColor.c_str(),
-                             args.inputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(rgb, 1.0);", args.outputColor.c_str());
   } else {
     auto alphaStartName =
         uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "AlphaStart");
@@ -148,8 +154,7 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend(".r;");
     fragBuilder->codeAppend("yuv_a = (yuv_a - 16.0/255.0) / (219.0/255.0 - 1.0/255.0);");
     fragBuilder->codeAppend("yuv_a = clamp(yuv_a, 0.0, 1.0);");
-    fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a) * %s;", args.outputColor.c_str(),
-                             args.inputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a);", args.outputColor.c_str());
   }
 }
 

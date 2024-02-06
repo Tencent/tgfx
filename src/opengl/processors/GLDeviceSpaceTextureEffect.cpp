@@ -45,6 +45,13 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
   fragBuilder->codeAppend(";");
+  if (textureProxy->isAlphaOnly()) {
+    fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(), args.outputColor.c_str(),
+                             args.inputColor.c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), args.outputColor.c_str(),
+                             args.inputColor.c_str());
+  }
 }
 
 void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
