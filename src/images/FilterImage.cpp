@@ -22,7 +22,7 @@
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
-                                             std::shared_ptr<ImageFilter> filter, Point* offset) {
+                                             std::shared_ptr<Filter> filter, Point* offset) {
   if (source == nullptr) {
     return nullptr;
   }
@@ -42,15 +42,14 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
 }
 
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
-                                             std::shared_ptr<ImageFilter> filter,
-                                             const Rect& bounds) {
+                                             std::shared_ptr<Filter> filter, const Rect& bounds) {
   auto image =
       std::shared_ptr<FilterImage>(new FilterImage(std::move(source), std::move(filter), bounds));
   image->weakThis = image;
   return image;
 }
 
-FilterImage::FilterImage(std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter,
+FilterImage::FilterImage(std::shared_ptr<Image> source, std::shared_ptr<Filter> filter,
                          const Rect& bounds)
     : TransformImage(std::move(source)), filter(std::move(filter)), bounds(bounds) {
 }

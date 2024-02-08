@@ -23,13 +23,12 @@
 
 namespace tgfx {
 /**
- * FilterImage wraps an existing image and applies an ImageFilter to it.
+ * FilterImage wraps an existing image and applies a Filter to it.
  */
 class FilterImage : public TransformImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         std::shared_ptr<ImageFilter> filter,
-                                         Point* offset = nullptr);
+                                         std::shared_ptr<Filter> filter, Point* offset = nullptr);
 
   int width() const override {
     return static_cast<int>(bounds.width());
@@ -40,8 +39,7 @@ class FilterImage : public TransformImage {
   }
 
  protected:
-  FilterImage(std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter,
-              const Rect& bounds);
+  FilterImage(std::shared_ptr<Image> source, std::shared_ptr<Filter> filter, const Rect& bounds);
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
@@ -53,10 +51,10 @@ class FilterImage : public TransformImage {
                                                          TileMode tileModeY) const override;
 
  private:
-  std::shared_ptr<ImageFilter> filter = nullptr;
+  std::shared_ptr<Filter> filter = nullptr;
   Rect bounds = Rect::MakeEmpty();
 
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         std::shared_ptr<ImageFilter> filter, const Rect& bounds);
+                                         std::shared_ptr<Filter> filter, const Rect& bounds);
 };
 }  // namespace tgfx

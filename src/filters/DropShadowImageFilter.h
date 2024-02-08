@@ -24,7 +24,7 @@ namespace tgfx {
 class DropShadowImageFilter : public ImageFilter {
  public:
   DropShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
-                        const Color& color, bool shadowOnly, const Rect* cropRect);
+                        const Color& color, bool shadowOnly);
 
  private:
   float dx = 0;
