@@ -27,8 +27,9 @@ class BlendShader : public Shader {
       : mode(mode), dst(std::move(dst)), src(std::move(src)) {
   }
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                         const Matrix* localMatrix) const override;
+ protected:
+  std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(
+      const DrawArgs& args, const Matrix* localMatrix) const override;
 
  private:
   BlendMode mode;

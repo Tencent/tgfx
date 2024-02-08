@@ -29,11 +29,10 @@ class ColorMatrixFilter : public ColorFilter {
     return alphaIsUnchanged;
   }
 
- protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
-
  private:
   std::array<float, 20> matrix;
   bool alphaIsUnchanged;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 };
 }  // namespace tgfx

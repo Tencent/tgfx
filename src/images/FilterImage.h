@@ -45,10 +45,10 @@ class FilterImage : public TransformImage {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                         const Matrix* localMatrix,
-                                                         TileMode tileModeX,
-                                                         TileMode tileModeY) const override;
+  std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(const DrawArgs& args,
+                                                             const Matrix* localMatrix,
+                                                             TileMode tileModeX,
+                                                             TileMode tileModeY) const override;
 
  private:
   std::shared_ptr<Filter> filter = nullptr;

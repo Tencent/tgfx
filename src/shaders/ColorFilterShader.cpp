@@ -20,16 +20,13 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> ColorFilterShader::onMakeFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
   auto fp1 = FragmentProcessor::Make(shader, args, localMatrix);
   if (fp1 == nullptr) {
     return nullptr;
   }
   auto fp2 = colorFilter->asFragmentProcessor();
-  if (fp2 == nullptr) {
-    return fp1;
-  }
   return FragmentProcessor::Compose(std::move(fp1), std::move(fp2));
 }
 }  // namespace tgfx

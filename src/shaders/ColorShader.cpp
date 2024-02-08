@@ -30,8 +30,8 @@ bool ColorShader::isOpaque() const {
   return color.isOpaque();
 }
 
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const DrawArgs&,
-                                                                    const Matrix*) const {
+std::unique_ptr<FragmentProcessor> ColorShader::onMakeFragmentProcessor(const DrawArgs&,
+                                                                        const Matrix*) const {
   return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
 }
 

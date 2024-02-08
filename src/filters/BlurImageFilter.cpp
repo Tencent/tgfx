@@ -105,7 +105,7 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
 }
 
-std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> BlurImageFilter::onMakeFragmentProcessor(
     std::shared_ptr<Image> source, const DrawArgs& args, const Matrix* localMatrix,
     TileMode tileModeX, TileMode tileModeY) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());

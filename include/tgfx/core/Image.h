@@ -280,13 +280,13 @@ class Image {
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
 
-  virtual std::unique_ptr<DrawOp> makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
-                                             TileMode tileModeX, TileMode tileModeY) const;
+  virtual std::unique_ptr<DrawOp> onMakeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                               TileMode tileModeX, TileMode tileModeY) const;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                                 const Matrix* localMatrix,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY) const = 0;
+  virtual std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(const DrawArgs& args,
+                                                                     const Matrix* localMatrix,
+                                                                     TileMode tileModeX,
+                                                                     TileMode tileModeY) const = 0;
 
   friend class DrawOp;
   friend class FragmentProcessor;

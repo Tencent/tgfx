@@ -20,7 +20,7 @@
 #include "gpu/processors/LumaColorFilterEffect.h"
 
 namespace tgfx {
-std::shared_ptr<ColorFilter> ColorFilter::MakeLumaColorFilter() {
+std::shared_ptr<ColorFilter> ColorFilter::Luma() {
   return std::make_shared<LumaColorFilter>();
 }
 

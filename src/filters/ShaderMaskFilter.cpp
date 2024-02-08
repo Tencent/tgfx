@@ -20,7 +20,7 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<MaskFilter> MaskFilter::Make(std::shared_ptr<Shader> shader, bool inverted) {
+std::shared_ptr<MaskFilter> MaskFilter::MakeShader(std::shared_ptr<Shader> shader, bool inverted) {
   if (shader == nullptr) {
     return nullptr;
   }

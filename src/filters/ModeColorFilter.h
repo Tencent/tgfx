@@ -28,11 +28,10 @@ class ModeColorFilter : public ColorFilter {
 
   bool isAlphaUnchanged() const override;
 
- protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
-
  private:
   Color color;
   BlendMode mode;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 };
 }  // namespace tgfx

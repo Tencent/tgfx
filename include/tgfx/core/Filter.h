@@ -35,20 +35,23 @@ class Filter {
   /**
    * Returns the bounds of the filtered image by the given bounds of the source image.
    */
-  virtual Rect filterBounds(const Rect& rect) const;
+  virtual Rect filterBounds(const Rect& rect) const {
+    return rect;
+  }
 
  protected:
-  virtual std::unique_ptr<DrawOp> makeDrawOp(std::shared_ptr<Image> source, const DrawArgs& args,
-                                             const Matrix* localMatrix = nullptr,
-                                             TileMode tileModeX = TileMode::Clamp,
-                                             TileMode tileModeY = TileMode::Clamp) const;
+  virtual std::unique_ptr<DrawOp> onMakeDrawOp(std::shared_ptr<Image> source, const DrawArgs& args,
+                                               const Matrix* localMatrix, TileMode tileModeX,
+                                               TileMode tileModeY) const = 0;
 
   /**
    * The returned processor is in the coordinate space of the source image.
    */
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      std::shared_ptr<Image> source, const DrawArgs& args, const Matrix* localMatrix = nullptr,
-      TileMode tileModeX = TileMode::Clamp, TileMode tileModeY = TileMode::Clamp) const;
+  virtual std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(std::shared_ptr<Image> source,
+                                                                     const DrawArgs& args,
+                                                                     const Matrix* localMatrix,
+                                                                     TileMode tileModeX,
+                                                                     TileMode tileModeY) const = 0;
 
   friend class FilterImage;
 };

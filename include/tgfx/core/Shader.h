@@ -59,7 +59,7 @@ class Shader {
    * @param startPoint The start point for the gradient.
    * @param endPoint The end point for the gradient.
    * @param colors The array of colors, to be distributed between the two points.
-   * @param positions May be empty. The relative position of each corresponding color in the colors
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
@@ -73,7 +73,7 @@ class Shader {
    * @param center The center of the circle for this gradient
    * @param radius Must be positive. The radius of the circle for this gradient.
    * @param colors The array of colors, to be distributed between the center and edge of the circle.
-   * @param positions May be empty. The relative position of each corresponding color in the colors
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
@@ -89,7 +89,7 @@ class Shader {
    * @param endAngle End of the angular range, corresponding to pos == 1.
    * @param colors The array of colors, to be distributed around the center, within the gradient
    * angle range.
-   * @param positions May be empty. The relative position of each corresponding color in the colors
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
@@ -115,12 +115,16 @@ class Shader {
    */
   virtual std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const;
 
+  /**
+   * Create a new shader that produces the same colors as invoking this shader and then applying
+   * the ColorFilter.
+   */
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
  protected:
   std::weak_ptr<Shader> weakThis;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+  virtual std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(
       const DrawArgs& args, const Matrix* localMatrix) const = 0;
 
   friend class FragmentProcessor;

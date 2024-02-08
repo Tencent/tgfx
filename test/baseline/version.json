@@ -2,14 +2,10 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
-        "blur": "cb3e6f6",
         "drawImage": "9208ab7",
-        "dropShadow": "7bcc0cd",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
-        "greyColorMatrix": "d010fb8",
         "hardware_render_target_blend": "d010fb8",
-        "identityMatrix": "d010fb8",
         "merge_draw_call_rect": "d010fb8",
         "merge_draw_call_rrect": "d010fb8",
         "merge_draw_call_triangle": "d010fb8",
@@ -32,6 +28,13 @@
         "ImageWithShadow": "7bcc0cd",
         "SimpleText": "46b2963",
         "SweepGradient": "5a1fb11"
+    },
+    "FilterTest": {
+        "blur": "a30de8b",
+        "dropShadow": "a30de8b",
+        "greyColorMatrix": "a30de8b",
+        "identityMatrix": "a30de8b",
+        "shaderMaskFilter": "a30de8b"
     },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
