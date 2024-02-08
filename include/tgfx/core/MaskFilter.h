@@ -29,8 +29,8 @@ class MaskFilter {
   virtual ~MaskFilter() = default;
 
  protected:
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                                 const Matrix* localMatrix) const;
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      const DrawArgs& args, const Matrix* localMatrix) const = 0;
 
   friend class Canvas;
 };
