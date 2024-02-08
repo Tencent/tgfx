@@ -28,7 +28,10 @@ class MaskFilter {
 
   virtual ~MaskFilter() = default;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      const DrawArgs& args, const Matrix* localMatrix = nullptr) const;
+ protected:
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                                 const Matrix* localMatrix) const;
+
+  friend class Canvas;
 };
 }  // namespace tgfx

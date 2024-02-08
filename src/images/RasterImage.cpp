@@ -103,7 +103,7 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
   auto drawRect = Rect::MakeWH(width(), height());
   DrawArgs args(context, sourceFlags, Color::White(), drawRect, Matrix::I(), sampling);
   auto localMatrix = Matrix::MakeScale(1.0f / rasterizationScale);
-  auto drawOp = source->makeDrawOp(args, &localMatrix);
+  auto drawOp = DrawOp::Make(source, args, &localMatrix);
   if (drawOp == nullptr) {
     return nullptr;
   }

@@ -117,10 +117,12 @@ class Shader {
 
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      const DrawArgs& args, const Matrix* localMatrix = nullptr) const;
-
  protected:
   std::weak_ptr<Shader> weakThis;
+
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      const DrawArgs& args, const Matrix* localMatrix) const = 0;
+
+  friend class FragmentProcessor;
 };
 }  // namespace tgfx

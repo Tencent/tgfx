@@ -37,6 +37,6 @@ std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
   auto imageArgs = args;
   imageArgs.sampling = sampling;
-  return image->asFragmentProcessor(imageArgs, localMatrix, tileModeX, tileModeY);
+  return FragmentProcessor::Make(image, imageArgs, localMatrix, tileModeX, tileModeY);
 }
 }  // namespace tgfx

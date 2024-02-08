@@ -76,9 +76,6 @@ std::unique_ptr<FragmentProcessor> ImageFilter::asFragmentProcessor(std::shared_
                                                                     const Matrix* localMatrix,
                                                                     TileMode tileModeX,
                                                                     TileMode tileModeY) const {
-  if (source == nullptr) {
-    return nullptr;
-  }
-  return source->asFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
+  return FragmentProcessor::Make(source, args, localMatrix, tileModeX, tileModeY);
 }
 }  // namespace tgfx

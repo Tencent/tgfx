@@ -55,6 +55,6 @@ std::unique_ptr<FragmentProcessor> MatrixShader::asFragmentProcessor(
   if (localMatrix) {
     totalMatrix.preConcat(*localMatrix);
   }
-  return source->asFragmentProcessor(args, &totalMatrix);
+  return FragmentProcessor::Make(source, args, &totalMatrix);
 }
 }  // namespace tgfx

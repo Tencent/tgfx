@@ -96,7 +96,7 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
 std::unique_ptr<DrawOp> OrientImage::makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
                                                 TileMode tileModeX, TileMode tileModeY) const {
   auto matrix = concatLocalMatrix(localMatrix);
-  return source->makeDrawOp(args, AddressOf(matrix), tileModeX, tileModeY);
+  return DrawOp::Make(source, args, AddressOf(matrix), tileModeX, tileModeY);
 }
 
 std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const DrawArgs& args,
@@ -104,7 +104,7 @@ std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const DrawAr
                                                                     TileMode tileModeX,
                                                                     TileMode tileModeY) const {
   auto matrix = concatLocalMatrix(localMatrix);
-  return source->asFragmentProcessor(args, AddressOf(matrix), tileModeX, tileModeY);
+  return FragmentProcessor::Make(source, args, AddressOf(matrix), tileModeX, tileModeY);
 }
 
 std::optional<Matrix> OrientImage::concatLocalMatrix(const Matrix* localMatrix) const {

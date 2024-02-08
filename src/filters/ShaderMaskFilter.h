@@ -28,6 +28,7 @@ class ShaderMaskFilter : public MaskFilter {
       : shader(std::move(shader)), inverted(inverted) {
   }
 
+ protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
                                                          const Matrix* localMatrix) const override;
 

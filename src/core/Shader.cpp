@@ -35,9 +35,4 @@ std::shared_ptr<Shader> Shader::makeWithColorFilter(
   shader->weakThis = shader;
   return shader;
 }
-
-std::unique_ptr<FragmentProcessor> Shader::asFragmentProcessor(const DrawArgs&,
-                                                               const Matrix*) const {
-  return nullptr;
-}
 }  // namespace tgfx

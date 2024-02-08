@@ -368,7 +368,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   }
   DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(realPaint),
                 localBounds, state->matrix, sampling);
-  auto op = image->makeDrawOp(args);
+  auto op = DrawOp::Make(std::move(image), args);
   if (op == nullptr) {
     return;
   }
@@ -584,7 +584,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   DrawArgs args(getContext(), surface->options()->renderFlags(), Color::White(), drawRect,
                 state->matrix, sampling);
   for (auto& rectOp : ops) {
-    auto processor = atlas->asFragmentProcessor(args, nullptr, TileMode::Clamp, TileMode::Clamp);
+    auto processor = FragmentProcessor::Make(atlas, args);
     if (colors) {
       processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
     }
@@ -682,7 +682,7 @@ bool Canvas::getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* dra
     return false;
   }
   if (auto shader = paint.getShader()) {
-    auto shaderFP = shader->asFragmentProcessor(args);
+    auto shaderFP = FragmentProcessor::Make(shader, args);
     if (shaderFP == nullptr) {
       return false;
     }
@@ -696,7 +696,7 @@ bool Canvas::getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* dra
     }
   }
   if (auto maskFilter = paint.getMaskFilter()) {
-    if (auto processor = maskFilter->asFragmentProcessor(args)) {
+    if (auto processor = maskFilter->asFragmentProcessor(args, nullptr)) {
       drawOp->addMaskFP(std::move(processor));
     } else {
       return false;

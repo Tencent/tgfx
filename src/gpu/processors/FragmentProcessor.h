@@ -31,9 +31,25 @@
 namespace tgfx {
 class Pipeline;
 class Image;
+class Shader;
 
 class FragmentProcessor : public Processor {
  public:
+  /**
+   * Creates a fragment processor that will draw the given image with the given options.
+   */
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const DrawArgs& args,
+                                                 const Matrix* localMatrix = nullptr,
+                                                 TileMode tileModeX = TileMode::Clamp,
+                                                 TileMode tileModeY = TileMode::Clamp);
+
+  /**
+   * Creates a fragment processor that will draw the given Shader with the given options.
+   */
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Shader> shader,
+                                                 const DrawArgs& args,
+                                                 const Matrix* localMatrix = nullptr);
+
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
    *  only consider the input color's alpha. However, there is a competing desire to have reusable

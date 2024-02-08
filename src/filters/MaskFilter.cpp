@@ -25,9 +25,4 @@ std::shared_ptr<MaskFilter> MaskFilter::Make(std::shared_ptr<Shader> shader, boo
   }
   return std::make_shared<ShaderMaskFilter>(std::move(shader), inverted);
 }
-
-std::unique_ptr<FragmentProcessor> MaskFilter::asFragmentProcessor(const DrawArgs&,
-                                                                   const Matrix*) const {
-  return nullptr;
-}
 }  // namespace tgfx

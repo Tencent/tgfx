@@ -22,7 +22,7 @@
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
-  return FragmentProcessor::MulInputByChildAlpha(shader->asFragmentProcessor(args, localMatrix),
-                                                 inverted);
+  auto processor = FragmentProcessor::Make(shader, args, localMatrix);
+  return FragmentProcessor::MulInputByChildAlpha(std::move(processor), inverted);
 }
 }  // namespace tgfx
