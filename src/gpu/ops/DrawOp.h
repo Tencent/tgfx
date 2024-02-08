@@ -58,9 +58,9 @@ class DrawOp : public Op {
   }
 
  protected:
-  bool onCombineIfPossible(Op* op) override;
-
   AAType aa = AAType::None;
+
+  bool onCombineIfPossible(Op* op) override;
 
  private:
   Rect _scissorRect = Rect::MakeEmpty();

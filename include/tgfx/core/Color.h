@@ -122,7 +122,7 @@ struct Color {
   bool isOpaque() const;
 
   /**
-   * Returns a Color with alpha set to 1.0.
+   * Returns a Color with the alpha set to 1.0.
    */
   Color makeOpaque() const {
     return {red, green, blue, 1.0f};

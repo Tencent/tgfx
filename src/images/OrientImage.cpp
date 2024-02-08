@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OrientImage.h"
+#include "gpu/ops/DrawOp.h"
 #include "images/SubsetImage.h"
 
 namespace tgfx {
@@ -92,25 +93,34 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
   return OrientImage::MakeFrom(source, newOrientation);
 }
 
-std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const ImageFPArgs& args,
-                                                                    const Matrix* localMatrix,
-                                                                    const Rect* clipBounds) const {
-  auto result = concatMatrixAndClip(localMatrix, clipBounds);
-  return FragmentProcessor::MakeFromImage(source, args, result.getMatrix(), result.getClip());
+std::unique_ptr<DrawOp> OrientImage::makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                                TileMode tileModeX, TileMode tileModeY) const {
+  auto matrix = concatLocalMatrix(localMatrix);
+  return source->makeDrawOp(args, AddressOf(matrix), tileModeX, tileModeY);
 }
 
-MatrixAndClipResult OrientImage::concatMatrixAndClip(const Matrix* localMatrix,
-                                                     const Rect* clipBounds) const {
-  auto matrix = OrientationToMatrix(orientation, source->width(), source->height());
-  matrix.invert(&matrix);
-  std::optional<Rect> clipRect = std::nullopt;
-  if (clipBounds != nullptr) {
-    clipRect = matrix.mapRect(*clipBounds);
+std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const DrawArgs& args,
+                                                                    const Matrix* localMatrix,
+                                                                    TileMode tileModeX,
+                                                                    TileMode tileModeY) const {
+  auto matrix = concatLocalMatrix(localMatrix);
+  return source->asFragmentProcessor(args, AddressOf(matrix), tileModeX, tileModeY);
+}
+
+std::optional<Matrix> OrientImage::concatLocalMatrix(const Matrix* localMatrix) const {
+  std::optional<Matrix> matrix = std::nullopt;
+  if (orientation != Orientation::TopLeft) {
+    matrix = OrientationToMatrix(orientation, source->width(), source->height());
+    matrix->invert(AddressOf(matrix));
   }
   if (localMatrix != nullptr) {
-    matrix.preConcat(*localMatrix);
+    if (matrix) {
+      matrix->preConcat(*localMatrix);
+    } else {
+      matrix = *localMatrix;
+    }
   }
-  return {matrix, clipRect};
+  return matrix;
 }
 
 Orientation OrientImage::concatOrientation(Orientation newOrientation) const {

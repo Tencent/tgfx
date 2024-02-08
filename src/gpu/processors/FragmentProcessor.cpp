@@ -23,16 +23,6 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> FragmentProcessor::MakeFromImage(std::shared_ptr<Image> image,
-                                                                    const ImageFPArgs& args,
-                                                                    const Matrix* localMatrix,
-                                                                    const Rect* clipRect) {
-  if (image == nullptr) {
-    return nullptr;
-  }
-  return image->asFragmentProcessor(args, localMatrix, clipRect);
-}
-
 std::unique_ptr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
     std::unique_ptr<FragmentProcessor> child) {
   if (child == nullptr) {

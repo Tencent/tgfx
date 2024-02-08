@@ -18,7 +18,6 @@
 
 #include "tgfx/core/ImageFilter.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/FragmentProcessor.h"
 
@@ -42,15 +41,17 @@ Rect ImageFilter::filterBounds(const Rect& rect) const {
 
 bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds) const {
   *dstRect = onFilterBounds(srcRect);
-  dstRect->roundOut();
   if (cropRect) {
     if (!dstRect->intersect(*cropRect)) {
       return false;
     }
   }
   if (clipBounds) {
-    return dstRect->intersect(*clipBounds);
+    if (!dstRect->intersect(*clipBounds)) {
+      return false;
+    }
   }
+  dstRect->roundOut();
   return true;
 }
 
@@ -58,11 +59,26 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
 }
 
-std::unique_ptr<FragmentProcessor> ImageFilter::asFragmentProcessor(std::shared_ptr<Image> source,
-                                                                    const ImageFPArgs& args,
-                                                                    const Matrix* localMatrix,
-                                                                    const Rect* clipBounds) const {
+std::unique_ptr<DrawOp> ImageFilter::makeDrawOp(std::shared_ptr<Image> source, const DrawArgs& args,
+                                                const Matrix* localMatrix, TileMode tileModeX,
+                                                TileMode tileModeY) const {
+  auto processor = asFragmentProcessor(std::move(source), args, localMatrix, tileModeX, tileModeY);
+  if (processor == nullptr) {
+    return nullptr;
+  }
+  auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
+  drawOp->addColorFP(std::move(processor));
+  return drawOp;
+}
 
-  return FragmentProcessor::MakeFromImage(std::move(source), args, localMatrix, clipBounds);
+std::unique_ptr<FragmentProcessor> ImageFilter::asFragmentProcessor(std::shared_ptr<Image> source,
+                                                                    const DrawArgs& args,
+                                                                    const Matrix* localMatrix,
+                                                                    TileMode tileModeX,
+                                                                    TileMode tileModeY) const {
+  if (source == nullptr) {
+    return nullptr;
+  }
+  return source->asFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
 }
 }  // namespace tgfx

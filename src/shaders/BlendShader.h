@@ -18,27 +18,21 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class ImageShader : public Shader {
+class BlendShader : public Shader {
  public:
+  BlendShader(BlendMode mode, std::shared_ptr<Shader> dst, std::shared_ptr<Shader> src)
+      : mode(mode), dst(std::move(dst)), src(std::move(src)) {
+  }
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
                                                          const Matrix* localMatrix) const override;
 
  private:
-  ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
-              SamplingOptions sampling)
-      : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
-  }
-
-  std::shared_ptr<Image> image = nullptr;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
-  SamplingOptions sampling;
-
-  friend class Shader;
+  BlendMode mode;
+  std::shared_ptr<Shader> dst;
+  std::shared_ptr<Shader> src;
 };
 }  // namespace tgfx

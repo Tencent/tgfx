@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAAImage.h"
+#include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
@@ -46,12 +47,19 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
   return image;
 }
 
-std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const ImageFPArgs& args,
+std::unique_ptr<DrawOp> RGBAAAImage::makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                                TileMode tileModeX, TileMode tileModeY) const {
+
+  return Image::makeDrawOp(args, localMatrix, tileModeX,  // NOLINT(*-parent-virtual-call)
+                           tileModeY);
+}
+
+std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const DrawArgs& args,
                                                                     const Matrix* localMatrix,
-                                                                    const Rect*) const {
+                                                                    TileMode, TileMode) const {
   auto proxy = std::static_pointer_cast<TextureImage>(source)->lockTextureProxy(args.context,
                                                                                 args.renderFlags);
-  auto result = concatMatrixAndClip(localMatrix, nullptr);
-  return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, args.sampling, result.getMatrix());
+  auto matrix = concatLocalMatrix(localMatrix);
+  return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, args.sampling, AddressOf(matrix));
 }
 }  // namespace tgfx

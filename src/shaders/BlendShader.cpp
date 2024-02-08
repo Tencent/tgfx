@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ShaderBlend.h"
+#include "BlendShader.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 
@@ -36,17 +36,18 @@ std::shared_ptr<Shader> Shader::MakeBlend(BlendMode mode, std::shared_ptr<Shader
   if (dst == nullptr || src == nullptr) {
     return nullptr;
   }
-  auto shader = std::make_shared<ShaderBlend>(mode, std::move(dst), std::move(src));
+  auto shader = std::make_shared<BlendShader>(mode, std::move(dst), std::move(src));
   shader->weakThis = shader;
   return shader;
 }
 
-std::unique_ptr<FragmentProcessor> ShaderBlend::asFragmentProcessor(const FPArgs& args) const {
-  auto fpA = dst->asFragmentProcessor(args);
+std::unique_ptr<FragmentProcessor> BlendShader::asFragmentProcessor(
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto fpA = dst->asFragmentProcessor(args, localMatrix);
   if (fpA == nullptr) {
     return nullptr;
   }
-  auto fpB = src->asFragmentProcessor(args);
+  auto fpB = src->asFragmentProcessor(args, localMatrix);
   if (fpB == nullptr) {
     return nullptr;
   }

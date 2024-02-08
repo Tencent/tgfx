@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterImage.h"
+#include "SubsetImage.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -64,14 +65,11 @@ std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
   return FilterImage::MakeFrom(source, filter, newBounds);
 }
 
-std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const ImageFPArgs& args,
+std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const DrawArgs& args,
                                                                     const Matrix* localMatrix,
-                                                                    const Rect* clipBounds) const {
-  auto matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  if (localMatrix != nullptr) {
-    matrix.preConcat(*localMatrix);
-  }
-  auto clipRect = clipBounds ? clipBounds->makeOffset(bounds.x(), bounds.y()) : bounds;
-  return filter->asFragmentProcessor(source, args, &matrix, &clipRect);
+                                                                    TileMode tileModeX,
+                                                                    TileMode tileModeY) const {
+  auto matrix = SubsetImage::ConcatLocalMatrix(bounds, localMatrix);
+  return filter->asFragmentProcessor(source, args, AddressOf(matrix), tileModeX, tileModeY);
 }
 }  // namespace tgfx

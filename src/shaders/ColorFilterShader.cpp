@@ -20,23 +20,9 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::makeWithColorFilter(
-    std::shared_ptr<ColorFilter> colorFilter) const {
-  auto strongThis = weakThis.lock();
-  if (strongThis == nullptr) {
-    return nullptr;
-  }
-  if (colorFilter == nullptr) {
-    return strongThis;
-  }
-  auto shader = std::make_shared<ColorFilterShader>(std::move(strongThis), std::move(colorFilter));
-  shader->weakThis = shader;
-  return shader;
-}
-
 std::unique_ptr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
-    const FPArgs& args) const {
-  auto fp1 = shader->asFragmentProcessor(args);
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto fp1 = shader->asFragmentProcessor(args, localMatrix);
   if (fp1 == nullptr) {
     return nullptr;
   }

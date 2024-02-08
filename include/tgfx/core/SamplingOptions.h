@@ -53,7 +53,7 @@ struct SamplingOptions {
       : filterMode(filterMode), mipmapMode(mipmapMode) {
   }
 
-  const FilterMode filterMode = FilterMode::Linear;
-  const MipmapMode mipmapMode = MipmapMode::None;
+  FilterMode filterMode = FilterMode::Linear;
+  MipmapMode mipmapMode = MipmapMode::None;
 };
 }  // namespace tgfx

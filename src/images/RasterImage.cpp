@@ -19,6 +19,7 @@
 #include "RasterImage.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "gpu/ops/DrawOp.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -87,25 +88,28 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
                                                               uint32_t renderFlags) const {
   auto proxyProvider = context->proxyProvider();
   auto hasCache = proxyProvider->hasResourceProxy(key);
-  auto format = isAlphaOnly() ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   auto textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, mipmapped,
                                                         ImageOrigin::TopLeft, renderFlags);
   if (hasCache) {
     return textureProxy;
   }
-  auto sourceFlags = renderFlags | RenderFlags::DisableCache;
-  ImageFPArgs imageArgs(context, sampling, sourceFlags);
-  auto processor = FragmentProcessor::MakeFromImage(source, imageArgs);
-  if (processor == nullptr) {
-    return nullptr;
-  }
   auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  RenderContext renderContext(renderTarget);
+  auto sourceFlags = renderFlags | RenderFlags::DisableCache;
+  auto drawRect = Rect::MakeWH(width(), height());
+  DrawArgs args(context, sourceFlags, Color::White(), drawRect, Matrix::I(), sampling);
   auto localMatrix = Matrix::MakeScale(1.0f / rasterizationScale);
-  renderContext.fillWithFP(std::move(processor), localMatrix, true);
+  auto drawOp = source->makeDrawOp(args, &localMatrix);
+  if (drawOp == nullptr) {
+    return nullptr;
+  }
+  drawOp->setBlendMode(BlendMode::Src);
+  RenderContext renderContext(renderTarget);
+  renderContext.addOp(std::move(drawOp));
   return textureProxy;
 }
 

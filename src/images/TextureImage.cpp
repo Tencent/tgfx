@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureImage.h"
+#include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "images/MipmapImage.h"
 #include "images/RGBAAAImage.h"
@@ -137,11 +138,19 @@ std::shared_ptr<Image> TextureImage::onMakeRGBAAA(int displayWidth, int displayH
                                alphaStartY);
 }
 
-std::unique_ptr<FragmentProcessor> TextureImage::asFragmentProcessor(const ImageFPArgs& args,
+std::unique_ptr<FragmentProcessor> TextureImage::asFragmentProcessor(const DrawArgs& args,
                                                                      const Matrix* localMatrix,
-                                                                     const Rect*) const {
+                                                                     TileMode tileModeX,
+                                                                     TileMode tileModeY) const {
   auto proxy = lockTextureProxy(args.context, args.renderFlags);
-  return TiledTextureEffect::Make(std::move(proxy), args.tileModeX, args.tileModeY, args.sampling,
-                                  localMatrix);
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  auto processor =
+      TiledTextureEffect::Make(proxy, tileModeX, tileModeY, args.sampling, localMatrix);
+  if (isAlphaOnly() && !proxy->isAlphaOnly()) {
+    return FragmentProcessor::MulInputByChildAlpha(std::move(processor));
+  }
+  return processor;
 }
 }  // namespace tgfx

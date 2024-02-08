@@ -21,7 +21,7 @@
 namespace tgfx {
 void Paint::reset() {
   style = PaintStyle::Fill;
-  color = Color::Black();
+  color = Color::White();
   stroke = Stroke(0);
   shader = nullptr;
 }

@@ -196,10 +196,13 @@ LinearGradient::LinearGradient(const Point& startPoint, const Point& endPoint,
     : GradientShaderBase(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
 }
 
-std::unique_ptr<FragmentProcessor> LinearGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto localMatrix = args.localMatrix;
-  localMatrix.postConcat(pointsToUnit);
-  return MakeGradient(args.context, *this, LinearGradientLayout::Make(localMatrix));
+std::unique_ptr<FragmentProcessor> LinearGradient::asFragmentProcessor(
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto totalMatrix = pointsToUnit;
+  if (localMatrix) {
+    totalMatrix.preConcat(*localMatrix);
+  }
+  return MakeGradient(args.context, *this, LinearGradientLayout::Make(totalMatrix));
 }
 
 static Matrix RadialToUnitMatrix(const Point& center, float radius) {
@@ -214,10 +217,13 @@ RadialGradient::RadialGradient(const Point& center, float radius, const std::vec
     : GradientShaderBase(colors, positions, RadialToUnitMatrix(center, radius)) {
 }
 
-std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto localMatrix = args.localMatrix;
-  localMatrix.postConcat(pointsToUnit);
-  return MakeGradient(args.context, *this, RadialGradientLayout::Make(localMatrix));
+std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto totalMatrix = pointsToUnit;
+  if (localMatrix != nullptr) {
+    totalMatrix.preConcat(*localMatrix);
+  }
+  return MakeGradient(args.context, *this, RadialGradientLayout::Make(totalMatrix));
 }
 
 SweepGradient::SweepGradient(const Point& center, float t0, float t1,
@@ -226,10 +232,13 @@ SweepGradient::SweepGradient(const Point& center, float t0, float t1,
       scale(1.f / (t1 - t0)) {
 }
 
-std::unique_ptr<FragmentProcessor> SweepGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto localMatrix = args.localMatrix;
-  localMatrix.postConcat(pointsToUnit);
-  return MakeGradient(args.context, *this, SweepGradientLayout::Make(localMatrix, bias, scale));
+std::unique_ptr<FragmentProcessor> SweepGradient::asFragmentProcessor(
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto totalMatrix = pointsToUnit;
+  if (localMatrix != nullptr) {
+    totalMatrix.preConcat(*localMatrix);
+  }
+  return MakeGradient(args.context, *this, SweepGradientLayout::Make(totalMatrix, bias, scale));
 }
 
 std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,

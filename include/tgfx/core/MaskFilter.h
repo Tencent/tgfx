@@ -22,16 +22,13 @@
 #include "Shader.h"
 
 namespace tgfx {
-struct FPArgs;
-
-class FragmentProcessor;
-
 class MaskFilter {
  public:
   static std::shared_ptr<MaskFilter> Make(std::shared_ptr<Shader> shader, bool inverted = false);
 
   virtual ~MaskFilter() = default;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      const DrawArgs& args, const Matrix* localMatrix = nullptr) const;
 };
 }  // namespace tgfx

@@ -175,7 +175,8 @@ class Paint {
 
   /**
    * Sets optional colors used when filling a path, such as a gradient. If nullptr, color is used
-   * instead.
+   * instead. The shader remains unaffected by the canvas matrix and always exists in the coordinate
+   * space of the associated surface.
    */
   void setShader(std::shared_ptr<Shader> newShader) {
     shader = std::move(newShader);
@@ -208,7 +209,7 @@ class Paint {
 
  private:
   PaintStyle style = PaintStyle::Fill;
-  Color color = Color::Black();
+  Color color = Color::White();
   Stroke stroke = Stroke(0);
   std::shared_ptr<Shader> shader = nullptr;
   std::shared_ptr<MaskFilter> maskFilter = nullptr;

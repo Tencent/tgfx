@@ -30,6 +30,22 @@ std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orie
   return image;
 }
 
+std::optional<Matrix> SubsetImage::ConcatLocalMatrix(const Rect& subset,
+                                                     const Matrix* localMatrix) {
+  std::optional<Matrix> matrix = std::nullopt;
+  if (subset.x() != 0 || subset.y() != 0) {
+    matrix = Matrix::MakeTrans(subset.x(), subset.y());
+  }
+  if (localMatrix != nullptr) {
+    if (matrix) {
+      matrix->preConcat(*localMatrix);
+    } else {
+      matrix = *localMatrix;
+    }
+  }
+  return matrix;
+}
+
 SubsetImage::SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds)
     : OrientImage(std::move(source), orientation), bounds(bounds) {
 }
@@ -52,26 +68,8 @@ std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) cons
   return SubsetImage::MakeFrom(source, newOrientation, newBounds);
 }
 
-MatrixAndClipResult SubsetImage::concatMatrixAndClip(const Matrix* localMatrix,
-                                                     const Rect* clipBounds) const {
-  std::optional<Matrix> matrix = std::nullopt;
-  if (bounds.x() != 0 || bounds.y() != 0) {
-    matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  }
-  if (localMatrix != nullptr) {
-    if (matrix) {
-      matrix->preConcat(*localMatrix);
-    } else {
-      matrix = *localMatrix;
-    }
-  }
-  auto clipRect = bounds;
-  if (clipBounds != nullptr) {
-    if (!clipRect.intersect(*clipBounds)) {
-      clipRect.setEmpty();
-    }
-  }
-  auto matrixResult = matrix ? std::addressof(*matrix) : nullptr;
-  return OrientImage::concatMatrixAndClip(matrixResult, &clipRect);
+std::optional<Matrix> SubsetImage::concatLocalMatrix(const Matrix* localMatrix) const {
+  auto matrix = ConcatLocalMatrix(bounds, localMatrix);
+  return OrientImage::concatLocalMatrix(AddressOf(matrix));
 }
 }  // namespace tgfx

@@ -16,29 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/Texture.h"
-#include "tgfx/core/Image.h"
-#include "tgfx/core/Shader.h"
+#include "ShaderMaskFilter.h"
 
 namespace tgfx {
-class ImageShader : public Shader {
- public:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                         const Matrix* localMatrix) const override;
-
- private:
-  ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
-              SamplingOptions sampling)
-      : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
+std::shared_ptr<MaskFilter> MaskFilter::Make(std::shared_ptr<Shader> shader, bool inverted) {
+  if (shader == nullptr) {
+    return nullptr;
   }
+  return std::make_shared<ShaderMaskFilter>(std::move(shader), inverted);
+}
 
-  std::shared_ptr<Image> image = nullptr;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
-  SamplingOptions sampling;
-
-  friend class Shader;
-};
+std::unique_ptr<FragmentProcessor> MaskFilter::asFragmentProcessor(const DrawArgs&,
+                                                                   const Matrix*) const {
+  return nullptr;
+}
 }  // namespace tgfx
