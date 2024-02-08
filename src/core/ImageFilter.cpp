@@ -22,30 +22,18 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-ImageFilter::ImageFilter(const Rect* rect) {
-  if (rect != nullptr) {
-    cropRect = new Rect(*rect);
-    cropRect->roundOut();
-  }
-}
-
-ImageFilter::~ImageFilter() {
-  delete cropRect;
-}
-
 Rect ImageFilter::filterBounds(const Rect& rect) const {
   auto dstBounds = Rect::MakeEmpty();
   applyCropRect(rect, &dstBounds);
   return dstBounds;
 }
 
+Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
+  return srcRect;
+}
+
 bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds) const {
   *dstRect = onFilterBounds(srcRect);
-  if (cropRect) {
-    if (!dstRect->intersect(*cropRect)) {
-      return false;
-    }
-  }
   if (clipBounds) {
     if (!dstRect->intersect(*clipBounds)) {
       return false;
@@ -53,29 +41,5 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   }
   dstRect->roundOut();
   return true;
-}
-
-Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return srcRect;
-}
-
-std::unique_ptr<DrawOp> ImageFilter::makeDrawOp(std::shared_ptr<Image> source, const DrawArgs& args,
-                                                const Matrix* localMatrix, TileMode tileModeX,
-                                                TileMode tileModeY) const {
-  auto processor = asFragmentProcessor(std::move(source), args, localMatrix, tileModeX, tileModeY);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
-  drawOp->addColorFP(std::move(processor));
-  return drawOp;
-}
-
-std::unique_ptr<FragmentProcessor> ImageFilter::asFragmentProcessor(std::shared_ptr<Image> source,
-                                                                    const DrawArgs& args,
-                                                                    const Matrix* localMatrix,
-                                                                    TileMode tileModeX,
-                                                                    TileMode tileModeY) const {
-  return FragmentProcessor::Make(source, args, localMatrix, tileModeX, tileModeY);
 }
 }  // namespace tgfx

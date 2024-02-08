@@ -68,22 +68,20 @@ static std::tuple<int, float, float> Get(float blurriness) {
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
-                                               TileMode tileMode, const Rect* cropRect) {
-  if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0) ||
-      (cropRect && cropRect->isEmpty())) {
+                                               TileMode tileMode) {
+  if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
   auto x = Get(blurrinessX);
   auto y = Get(blurrinessY);
-  return std::make_shared<BlurImageFilter>(
-      Point::Make(std::get<2>(x), std::get<2>(y)), std::max(std::get<1>(x), std::get<1>(y)),
-      std::max(std::get<0>(x), std::get<0>(y)), tileMode, cropRect);
+  return std::make_shared<BlurImageFilter>(Point::Make(std::get<2>(x), std::get<2>(y)),
+                                           std::max(std::get<1>(x), std::get<1>(y)),
+                                           std::max(std::get<0>(x), std::get<0>(y)), tileMode);
 }
 
 BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iteration,
-                                 TileMode tileMode, const Rect* cropRect)
-    : ImageFilter(cropRect), blurOffset(blurOffset), downScaling(downScaling), iteration(iteration),
-      tileMode(tileMode) {
+                                 TileMode tileMode)
+    : blurOffset(blurOffset), downScaling(downScaling), iteration(iteration), tileMode(tileMode) {
 }
 
 void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -121,7 +119,7 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
   }
   DrawArgs imageArgs = args;
   imageArgs.sampling = {};
-  auto processor = ImageFilter::asFragmentProcessor(source, imageArgs, nullptr, tileMode, tileMode);
+  auto processor = FragmentProcessor::Make(source, imageArgs, nullptr, tileMode, tileMode);
   auto imageBounds = dstBounds;
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   auto mipmapped = source->hasMipmaps() && args.sampling.mipmapMode != MipmapMode::None;

@@ -27,30 +27,18 @@
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
-                                                     float blurrinessY, const Color& color,
-                                                     const Rect* cropRect) {
-  if (cropRect && cropRect->isEmpty()) {
-    return nullptr;
-  }
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false,
-                                                 cropRect);
+                                                     float blurrinessY, const Color& color) {
+  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
-                                                         float blurrinessY, const Color& color,
-                                                         const Rect* cropRect) {
-  if (cropRect && cropRect->isEmpty()) {
-    return nullptr;
-  }
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true,
-                                                 cropRect);
+                                                         float blurrinessY, const Color& color) {
+  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 
 DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrinessX,
-                                             float blurrinessY, const Color& color, bool shadowOnly,
-                                             const Rect* cropRect)
-    : ImageFilter(cropRect), dx(dx), dy(dy),
-      blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
+                                             float blurrinessY, const Color& color, bool shadowOnly)
+    : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
       shadowOnly(shadowOnly) {
 }
 
@@ -117,8 +105,8 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::getFragmentProcessor(
     shadowProcessor = blurFilter->asFragmentProcessor(source, args, &shadowMatrix, TileMode::Decal,
                                                       TileMode::Decal);
   } else {
-    shadowProcessor = ImageFilter::asFragmentProcessor(source, args, &shadowMatrix, TileMode::Decal,
-                                                       TileMode::Decal);
+    shadowProcessor =
+        FragmentProcessor::Make(source, args, &shadowMatrix, TileMode::Decal, TileMode::Decal);
   }
   if (shadowProcessor == nullptr) {
     return nullptr;
@@ -129,8 +117,8 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::getFragmentProcessor(
   if (shadowOnly) {
     return colorShadowProcessor;
   }
-  auto imageProcessor =
-      ImageFilter::asFragmentProcessor(source, args, localMatrix, TileMode::Decal, TileMode::Decal);
+  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, localMatrix,
+                                                TileMode::Decal, TileMode::Decal);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }

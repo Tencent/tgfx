@@ -100,13 +100,25 @@ TGFX_TEST(CanvasTest, Blur) {
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
+  paint.setImageFilter(nullptr);
 
   canvas->concat(Matrix::MakeTrans(-imageWidth - padding, imageHeight + padding));
   canvas->save();
   canvas->concat(imageMatrix);
-  auto cropRect = Rect::MakeWH(image->width(), image->height());
-  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Repeat, &cropRect));
-  canvas->drawImage(image, &paint);
+  Point filterOffset = Point::Zero();
+  auto filterImage =
+      image->makeWithFilter(ImageFilter::Blur(130, 130, TileMode::Repeat), &filterOffset);
+  ASSERT_TRUE(filterImage != nullptr);
+  EXPECT_EQ(filterImage->width(), 3226);
+  EXPECT_EQ(filterImage->height(), 4234);
+  EXPECT_EQ(filterOffset.x, -101.0f);
+  EXPECT_EQ(filterOffset.y, -101.0f);
+  auto cropImage =
+      filterImage->makeSubset(Rect::MakeXYWH(101, 101, image->width(), image->height()));
+  ASSERT_TRUE(cropImage != nullptr);
+  EXPECT_EQ(cropImage->width(), image->width());
+  EXPECT_EQ(cropImage->height(), image->height());
+  canvas->drawImage(cropImage, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
@@ -114,17 +126,14 @@ TGFX_TEST(CanvasTest, Blur) {
   canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
   canvas->save();
   canvas->concat(imageMatrix);
-  cropRect = Rect::MakeLTRB(2000, -100, 3124, 2000);
-  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp, &cropRect));
-  canvas->drawImage(image, &paint);
-  cropRect = Rect::MakeXYWH(1000, 1000, 1000, 1000);
-  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp, &cropRect));
-  canvas->drawImage(image, &paint);
-  cropRect = Rect::MakeXYWH(1000, 2000, 1000, 1000);
-  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp, &cropRect));
-  canvas->drawImage(image, &paint);
+  filterImage = image->makeWithFilter(ImageFilter::Blur(130, 130, TileMode::Clamp), &filterOffset);
+  cropImage = filterImage->makeSubset(Rect::MakeLTRB(2101, 1, 3225, 2101));
+  canvas->drawImage(cropImage, 2000, -100, &paint);
+  cropImage = filterImage->makeSubset(Rect::MakeXYWH(1101, 1101, 1000, 1000));
+  canvas->drawImage(cropImage, 1000, 1000, &paint);
+  cropImage = filterImage->makeSubset(Rect::MakeXYWH(1101, 2101, 1000, 1000));
+  canvas->drawImage(cropImage, 1000, 2000, &paint);
   canvas->restore();
-  paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/blur"));

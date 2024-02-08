@@ -24,8 +24,7 @@
 namespace tgfx {
 class BlurImageFilter : public ImageFilter {
  public:
-  BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode,
-                  const Rect* cropRect);
+  BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
 
  private:
   Point blurOffset;

@@ -198,7 +198,6 @@ class Paint {
     colorFilter = std::move(newColorFilter);
   }
 
-  // TODO(pengweilv): Used when drawing, currently only works with drawTexture.
   void setImageFilter(std::shared_ptr<ImageFilter> newImageFilter) {
     imageFilter = std::move(newImageFilter);
   }
