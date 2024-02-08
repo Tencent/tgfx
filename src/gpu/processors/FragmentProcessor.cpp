@@ -21,16 +21,26 @@
 #include "gpu/Pipeline.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> FragmentProcessor::MakeFromImage(std::shared_ptr<Image> image,
-                                                                    const ImageFPArgs& args,
-                                                                    const Matrix* localMatrix,
-                                                                    const Rect* clipRect) {
+std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
+                                                           const DrawArgs& args,
+                                                           const Matrix* localMatrix,
+                                                           TileMode tileModeX, TileMode tileModeY) {
   if (image == nullptr) {
     return nullptr;
   }
-  return image->asFragmentProcessor(args, localMatrix, clipRect);
+  return image->asFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
+}
+
+std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
+                                                           const DrawArgs& args,
+                                                           const Matrix* localMatrix) {
+  if (shader == nullptr) {
+    return nullptr;
+  }
+  return shader->asFragmentProcessor(args, localMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(

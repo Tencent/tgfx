@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/DrawArgs.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/utils/BytesKey.h"
 #include "utils/UniqueID.h"

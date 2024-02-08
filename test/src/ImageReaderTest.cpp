@@ -44,7 +44,9 @@ TGFX_TEST(ImageReaderTest, updateMask) {
   auto maskImage = Image::MakeFrom(buffer);
   auto newBuffer = reader->acquireNextBuffer();
   EXPECT_FALSE(newBuffer != nullptr);
-  canvas->drawImage(maskImage);
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  canvas->drawImage(maskImage, &paint);
   canvas->flush();
 
   path.reset();
@@ -54,7 +56,7 @@ TGFX_TEST(ImageReaderTest, updateMask) {
   EXPECT_TRUE(newBuffer != nullptr);
   maskImage = Image::MakeFrom(newBuffer);
   canvas->setMatrix(Matrix::MakeTrans(50, 0));
-  canvas->drawImage(maskImage);
+  canvas->drawImage(maskImage, &paint);
   EXPECT_FALSE(buffer->expired());
   canvas->flush();
   EXPECT_TRUE(buffer->expired());

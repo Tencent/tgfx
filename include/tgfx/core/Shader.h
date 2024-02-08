@@ -29,14 +29,12 @@
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
-struct FPArgs;
-class Texture;
 class FragmentProcessor;
 
 /**
  * Shaders specify the source color(s) for what is being drawn. If a paint has no shader, then the
- * paint's color is used. If the paint has a shader, then the shader's color(s) are use instead, but
- * they are modulated by the paint's alpha.
+ * paint's color is used. If the paint has a shader, then the shader's color(s) are used instead,
+ * but they are modulated by the paint's alpha. Shaders are in
  */
 class Shader {
  public:
@@ -46,8 +44,7 @@ class Shader {
   static std::shared_ptr<Shader> MakeColorShader(Color color);
 
   /**
-   * Creates a shader that draws the specified image. The tile modes will be ignored if the image is
-   * an RGBAAA Image.
+   * Creates a shader that draws the specified image.
    */
   static std::shared_ptr<Shader> MakeImageShader(std::shared_ptr<Image> image,
                                                  TileMode tileModeX = TileMode::Clamp,
@@ -63,7 +60,7 @@ class Shader {
    * @param endPoint The end point for the gradient.
    * @param colors The array of colors, to be distributed between the two points.
    * @param positions May be empty. The relative position of each corresponding color in the colors
-   * array. If this is empty, the the colors are distributed evenly between the start and end point.
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
@@ -77,7 +74,7 @@ class Shader {
    * @param radius Must be positive. The radius of the circle for this gradient.
    * @param colors The array of colors, to be distributed between the center and edge of the circle.
    * @param positions May be empty. The relative position of each corresponding color in the colors
-   * array. If this is empty, the the colors are distributed evenly between the start and end point.
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
@@ -93,7 +90,7 @@ class Shader {
    * @param colors The array of colors, to be distributed around the center, within the gradient
    * angle range.
    * @param positions May be empty. The relative position of each corresponding color in the colors
-   * array. If this is empty, the the colors are distributed evenly between the start and end point.
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
@@ -120,9 +117,12 @@ class Shader {
 
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
-
  protected:
   std::weak_ptr<Shader> weakThis;
+
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      const DrawArgs& args, const Matrix* localMatrix) const = 0;
+
+  friend class FragmentProcessor;
 };
 }  // namespace tgfx

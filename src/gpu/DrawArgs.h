@@ -18,20 +18,23 @@
 
 #pragma once
 
-#include "tgfx/core/Shader.h"
+#include "tgfx/core/SamplingOptions.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class ShaderBlend : public Shader {
+class DrawArgs {
  public:
-  ShaderBlend(BlendMode mode, std::shared_ptr<Shader> dst, std::shared_ptr<Shader> src)
-      : mode(mode), dst(std::move(dst)), src(std::move(src)) {
+  DrawArgs(Context* context, uint32_t renderFlags, const Color& color, const Rect& drawRect,
+           const Matrix& viewMatrix = Matrix::I(), const SamplingOptions& sampling = {})
+      : context(context), renderFlags(renderFlags), color(color), drawRect(drawRect),
+        viewMatrix(viewMatrix), sampling(sampling) {
   }
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-
- private:
-  BlendMode mode;
-  std::shared_ptr<Shader> dst;
-  std::shared_ptr<Shader> src;
+  Context* context = nullptr;
+  uint32_t renderFlags = 0;
+  Color color = Color::White();
+  Rect drawRect = Rect::MakeEmpty();
+  Matrix viewMatrix = Matrix::I();
+  SamplingOptions sampling = {};
 };
 }  // namespace tgfx

@@ -227,14 +227,16 @@ class Canvas {
   std::pair<std::optional<Rect>, bool> getClipRect();
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
   Rect clipLocalBounds(Rect localBounds);
-  void drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, const Paint& paint);
+  void drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> maskTexture,
+                const Paint& paint);
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);
   void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
   void fillPath(const Path& path, const Paint& paint);
   bool drawAsClear(const Path& path, const Paint& paint);
-  void drawOp(std::unique_ptr<DrawOp> op, const Paint& paint, bool aa = false);
+  void drawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint,
+              bool aa = false);
   Color getInputColor(const Paint& paint);
-  bool getProcessors(const Paint& paint, DrawOp* drawOp);
+  bool getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp);
 };
 }  // namespace tgfx

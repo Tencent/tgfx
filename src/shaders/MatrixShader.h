@@ -32,7 +32,8 @@ class MatrixShader final : public Shader {
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                         const Matrix* localMatrix) const override;
 
  private:
   std::shared_ptr<Shader> source = nullptr;

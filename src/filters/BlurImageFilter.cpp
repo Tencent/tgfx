@@ -108,15 +108,20 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
-    std::shared_ptr<Image> source, const ImageFPArgs& args, const Matrix* localMatrix,
-    const Rect* clipBounds) const {
+    std::shared_ptr<Image> source, const DrawArgs& args, const Matrix* localMatrix,
+    TileMode tileModeX, TileMode tileModeY) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  auto clipBounds = args.drawRect;
+  if (localMatrix) {
+    clipBounds = localMatrix->mapRect(clipBounds);
+  }
   Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, clipBounds)) {
+  if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }
-  ImageFPArgs imageArgs(args.context, {}, args.renderFlags, tileMode, tileMode);
-  auto processor = FragmentProcessor::MakeFromImage(source, imageArgs, nullptr, &dstBounds);
+  DrawArgs imageArgs = args;
+  imageArgs.sampling = {};
+  auto processor = ImageFilter::asFragmentProcessor(source, imageArgs, nullptr, tileMode, tileMode);
   auto imageBounds = dstBounds;
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   auto mipmapped = source->hasMipmaps() && args.sampling.mipmapMode != MipmapMode::None;
@@ -152,7 +157,7 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
   if (localMatrix != nullptr) {
     matrix.preConcat(*localMatrix);
   }
-  return TiledTextureEffect::Make(lastRenderTarget->getTextureProxy(), args.tileModeX,
-                                  args.tileModeY, args.sampling, &matrix);
+  return TiledTextureEffect::Make(lastRenderTarget->getTextureProxy(), tileModeX, tileModeY,
+                                  args.sampling, &matrix);
 }
 }  // namespace tgfx

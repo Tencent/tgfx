@@ -22,7 +22,7 @@
 
 namespace tgfx {
 class LumaColorFilter : public ColorFilter {
- public:
+ protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 };
 }  // namespace tgfx

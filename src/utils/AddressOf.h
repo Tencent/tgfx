@@ -18,27 +18,18 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
-#include "tgfx/core/Image.h"
-#include "tgfx/core/Shader.h"
+#include <optional>
 
 namespace tgfx {
-class ImageShader : public Shader {
- public:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                         const Matrix* localMatrix) const override;
 
- private:
-  ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
-              SamplingOptions sampling)
-      : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
-  }
+template <class T>
+inline const T* AddressOf(const std::optional<T>& value) {
+  return value ? std::addressof(*value) : nullptr;
+}
 
-  std::shared_ptr<Image> image = nullptr;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
-  SamplingOptions sampling;
+template <class T>
+inline T* AddressOf(std::optional<T>& value) {
+  return value ? std::addressof(*value) : nullptr;
+}
 
-  friend class Shader;
-};
 }  // namespace tgfx

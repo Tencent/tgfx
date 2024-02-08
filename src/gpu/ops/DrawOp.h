@@ -23,10 +23,16 @@
 #include "gpu/AAType.h"
 #include "gpu/Pipeline.h"
 #include "gpu/RenderPass.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 class DrawOp : public Op {
  public:
+  static std::unique_ptr<DrawOp> Make(std::shared_ptr<Image> image, const DrawArgs& args,
+                                      const Matrix* localMatrix = nullptr,
+                                      TileMode tileModeX = TileMode::Clamp,
+                                      TileMode tileModeY = TileMode::Clamp);
+
   explicit DrawOp(uint8_t classID) : Op(classID) {
   }
 
@@ -58,9 +64,9 @@ class DrawOp : public Op {
   }
 
  protected:
-  bool onCombineIfPossible(Op* op) override;
-
   AAType aa = AAType::None;
+
+  bool onCombineIfPossible(Op* op) override;
 
  private:
   Rect _scissorRect = Rect::MakeEmpty();

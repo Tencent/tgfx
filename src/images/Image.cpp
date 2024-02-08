@@ -20,7 +20,7 @@
 #include "core/RasterBuffer.h"
 #include "core/RasterGenerator.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/Texture.h"
+#include "gpu/ops/FillRectOp.h"
 #include "images/BufferImage.h"
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
@@ -195,5 +195,16 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 
 std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
   return nullptr;
+}
+
+std::unique_ptr<DrawOp> Image::makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                          TileMode tileModeX, TileMode tileModeY) const {
+  auto processor = asFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
+  if (processor == nullptr) {
+    return nullptr;
+  }
+  auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
+  drawOp->addColorFP(std::move(processor));
+  return drawOp;
 }
 }  // namespace tgfx

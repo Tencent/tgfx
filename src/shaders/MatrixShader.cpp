@@ -46,12 +46,15 @@ std::shared_ptr<Shader> MatrixShader::makeWithMatrix(const Matrix& viewMatrix) c
   return MatrixShader::MakeFrom(source, totalMatrix);
 }
 
-std::unique_ptr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args) const {
-  FPArgs fpArgs(args);
-  auto localMatrix = Matrix::I();
-  if (matrix.invert(&localMatrix)) {
-    fpArgs.localMatrix.postConcat(localMatrix);
+std::unique_ptr<FragmentProcessor> MatrixShader::asFragmentProcessor(
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto totalMatrix = Matrix::I();
+  if (!matrix.invert(&totalMatrix)) {
+    return nullptr;
   }
-  return source->asFragmentProcessor(fpArgs);
+  if (localMatrix) {
+    totalMatrix.preConcat(*localMatrix);
+  }
+  return FragmentProcessor::Make(source, args, &totalMatrix);
 }
 }  // namespace tgfx

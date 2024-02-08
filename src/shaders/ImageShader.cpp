@@ -18,6 +18,7 @@
 
 #include "ImageShader.h"
 #include "gpu/TextureSampler.h"
+#include "gpu/ops/DrawOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -32,8 +33,10 @@ std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, Ti
   return shader;
 }
 
-std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args) const {
-  ImageFPArgs imageFpArgs(args.context, sampling, args.renderFlags, tileModeX, tileModeY);
-  return FragmentProcessor::MakeFromImage(image, imageFpArgs, &args.localMatrix);
+std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto imageArgs = args;
+  imageArgs.sampling = sampling;
+  return FragmentProcessor::Make(image, imageArgs, localMatrix, tileModeX, tileModeY);
 }
 }  // namespace tgfx

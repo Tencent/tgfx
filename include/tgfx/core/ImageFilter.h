@@ -55,13 +55,17 @@ class ImageFilter {
 
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
+  virtual std::unique_ptr<DrawOp> makeDrawOp(std::shared_ptr<Image> source, const DrawArgs& args,
+                                             const Matrix* localMatrix = nullptr,
+                                             TileMode tileModeX = TileMode::Clamp,
+                                             TileMode tileModeY = TileMode::Clamp) const;
+
   /**
    * The returned processor is in the coordinate space of the source image.
    */
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                                 const ImageFPArgs& args,
-                                                                 const Matrix* localMatrix,
-                                                                 const Rect* clipBounds) const;
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      std::shared_ptr<Image> source, const DrawArgs& args, const Matrix* localMatrix = nullptr,
+      TileMode tileModeX = TileMode::Clamp, TileMode tileModeY = TileMode::Clamp) const;
 
  private:
   Rect* cropRect = nullptr;

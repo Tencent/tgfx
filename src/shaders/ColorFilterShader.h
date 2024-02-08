@@ -27,7 +27,8 @@ class ColorFilterShader : public Shader {
       : shader(std::move(shader)), colorFilter(std::move(colorFilter)) {
   }
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                         const Matrix* localMatrix) const override;
 
  private:
   std::shared_ptr<Shader> shader;

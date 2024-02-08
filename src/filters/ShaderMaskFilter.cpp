@@ -20,14 +20,9 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<MaskFilter> MaskFilter::Make(std::shared_ptr<Shader> shader, bool inverted) {
-  if (shader == nullptr) {
-    return nullptr;
-  }
-  return std::make_shared<ShaderMaskFilter>(std::move(shader), inverted);
-}
-
-std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(const FPArgs& args) const {
-  return FragmentProcessor::MulInputByChildAlpha(shader->asFragmentProcessor(args), inverted);
+std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
+    const DrawArgs& args, const Matrix* localMatrix) const {
+  auto processor = FragmentProcessor::Make(shader, args, localMatrix);
+  return FragmentProcessor::MulInputByChildAlpha(std::move(processor), inverted);
 }
 }  // namespace tgfx

@@ -21,6 +21,15 @@
 #include "utils/Log.h"
 
 namespace tgfx {
+std::unique_ptr<DrawOp> DrawOp::Make(std::shared_ptr<Image> image, const DrawArgs& args,
+                                     const Matrix* localMatrix, TileMode tileModeX,
+                                     TileMode tileModeY) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return image->makeDrawOp(args, localMatrix, tileModeX, tileModeY);
+}
+
 static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect) {
   DstTextureInfo dstTextureInfo = {};
   auto context = renderPass->getContext();

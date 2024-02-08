@@ -28,9 +28,9 @@ namespace tgfx {
 class RectPaint {
  public:
   RectPaint(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-            const Matrix& localMatrix)
+            const Matrix* localMatrix)
       : color(color.value_or(Color::White())), rect(rect), viewMatrix(viewMatrix),
-        localMatrix(localMatrix) {
+        localMatrix(localMatrix ? *localMatrix : Matrix::I()) {
   }
 
   Color color;
@@ -134,22 +134,21 @@ class RectNonCoverageVerticesProvider : public DataProvider {
 };
 
 std::unique_ptr<FillRectOp> FillRectOp::Make(std::optional<Color> color, const Rect& rect,
-                                             const Matrix& viewMatrix, const Matrix& localMatrix) {
+                                             const Matrix& viewMatrix, const Matrix* localMatrix) {
   return std::unique_ptr<FillRectOp>(new FillRectOp(color, rect, viewMatrix, localMatrix));
 }
 
 FillRectOp::FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-                       const Matrix& localMatrix)
+                       const Matrix* localMatrix)
     : DrawOp(ClassID()), hasColor(color) {
   auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix, localMatrix);
   rectPaints.push_back(std::move(rectPaint));
-  auto bounds = Rect::MakeEmpty();
-  bounds.join(viewMatrix.mapRect(rect));
+  auto bounds = viewMatrix.mapRect(rect);
   setBounds(bounds);
 }
 
 bool FillRectOp::add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-                     const Matrix& localMatrix) {
+                     const Matrix* localMatrix) {
   if (!color == hasColor || !canAdd(1)) {
     return false;
   }

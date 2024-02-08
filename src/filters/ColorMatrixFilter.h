@@ -25,11 +25,12 @@ class ColorMatrixFilter : public ColorFilter {
  public:
   explicit ColorMatrixFilter(const std::array<float, 20>& matrix);
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
-
   bool isAlphaUnchanged() const override {
     return alphaIsUnchanged;
   }
+
+ protected:
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 
  private:
   std::array<float, 20> matrix;

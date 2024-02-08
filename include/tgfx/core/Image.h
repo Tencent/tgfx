@@ -31,11 +31,12 @@
 #include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
-struct ImageFPArgs;
+class DrawArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
 class ImageCodec;
+class DrawOp;
 
 /**
  * The Image class represents a two-dimensional array of pixels for drawing. These pixels can be
@@ -278,10 +279,15 @@ class Image {
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
-                                                                 const Matrix* localMatrix,
-                                                                 const Rect* clipBounds) const = 0;
+  virtual std::unique_ptr<DrawOp> makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                             TileMode tileModeX, TileMode tileModeY) const;
 
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                                 const Matrix* localMatrix,
+                                                                 TileMode tileModeX,
+                                                                 TileMode tileModeY) const = 0;
+
+  friend class DrawOp;
   friend class FragmentProcessor;
   friend class TransformImage;
   friend class RasterImage;

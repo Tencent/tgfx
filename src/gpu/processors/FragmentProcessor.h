@@ -29,34 +29,27 @@
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-struct FPArgs {
-  FPArgs(Context* context, uint32_t renderFlags) : context(context), renderFlags(renderFlags) {
-  }
-
-  Context* context = nullptr;
-  uint32_t renderFlags = 0;
-  Matrix localMatrix = Matrix::I();
-};
-
-struct ImageFPArgs {
-  ImageFPArgs(Context* context, const SamplingOptions& sampling, uint32_t renderFlags = 0,
-              TileMode tileModeX = TileMode::Clamp, TileMode tileModeY = TileMode::Clamp)
-      : context(context), sampling(sampling), renderFlags(renderFlags), tileModeX(tileModeX),
-        tileModeY(tileModeY) {
-  }
-
-  Context* context = nullptr;
-  SamplingOptions sampling = {};
-  uint32_t renderFlags = 0;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
-};
-
 class Pipeline;
 class Image;
+class Shader;
 
 class FragmentProcessor : public Processor {
  public:
+  /**
+   * Creates a fragment processor that will draw the given image with the given options.
+   */
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const DrawArgs& args,
+                                                 const Matrix* localMatrix = nullptr,
+                                                 TileMode tileModeX = TileMode::Clamp,
+                                                 TileMode tileModeY = TileMode::Clamp);
+
+  /**
+   * Creates a fragment processor that will draw the given Shader with the given options.
+   */
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Shader> shader,
+                                                 const DrawArgs& args,
+                                                 const Matrix* localMatrix = nullptr);
+
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
    *  only consider the input color's alpha. However, there is a competing desire to have reusable
@@ -83,14 +76,6 @@ class FragmentProcessor : public Processor {
    */
   static std::unique_ptr<FragmentProcessor> Compose(std::unique_ptr<FragmentProcessor> f,
                                                     std::unique_ptr<FragmentProcessor> g);
-
-  /**
-   * Creates a fragment processor that will draw the given image with the ImageFPArgs options.
-   */
-  static std::unique_ptr<FragmentProcessor> MakeFromImage(std::shared_ptr<Image> image,
-                                                          const ImageFPArgs& args,
-                                                          const Matrix* localMatrix = nullptr,
-                                                          const Rect* clipRect = nullptr);
 
   size_t numTextureSamplers() const {
     return onCountTextureSamplers();
@@ -148,8 +133,6 @@ class FragmentProcessor : public Processor {
 
   /**
    * Iterates over all the CoordTransforms owned by the forest of FragmentProcessors in a Pipeline.
-   * FPs are visited in the same order as Iter and each of an FP's CoordTransforms are visited in
-   * order.
    */
   class CoordTransformIter {
    public:

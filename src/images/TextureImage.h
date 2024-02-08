@@ -50,9 +50,10 @@ class TextureImage : public Image {
   std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                       int alphaStartY) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
                                                          const Matrix* localMatrix,
-                                                         const Rect* clipBounds) const override;
+                                                         TileMode tileModeX,
+                                                         TileMode tileModeY) const override;
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
                                                            bool mipmapped,

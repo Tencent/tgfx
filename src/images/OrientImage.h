@@ -20,21 +20,9 @@
 
 #include <optional>
 #include "images/TransformImage.h"
+#include "utils/AddressOf.h"
 
 namespace tgfx {
-struct MatrixAndClipResult {
-  std::optional<Matrix> matrix = std::nullopt;
-  std::optional<Rect> clip = std::nullopt;
-
-  const Matrix* getMatrix() const {
-    return matrix ? std::addressof(*matrix) : nullptr;
-  }
-
-  const Rect* getClip() const {
-    return clip ? std::addressof(*clip) : nullptr;
-  }
-};
-
 /**
  * OrientImage wraps an existing image and applies an orientation transform.
  */
@@ -57,12 +45,14 @@ class OrientImage : public TransformImage {
 
   std::shared_ptr<Image> onMakeOriented(Orientation newOrientation) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const ImageFPArgs& args,
-                                                         const Matrix* localMatrix,
-                                                         const Rect* clipBounds) const override;
+  std::unique_ptr<DrawOp> makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                     TileMode tileModeX, TileMode tileModeY) const override;
 
-  virtual MatrixAndClipResult concatMatrixAndClip(const Matrix* localMatrix,
-                                                  const Rect* clipBounds) const;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                         const Matrix* localMatrix, TileMode,
+                                                         TileMode) const override;
+
+  virtual std::optional<Matrix> concatLocalMatrix(const Matrix* localMatrix) const;
 
   Orientation concatOrientation(Orientation newOrientation) const;
 };
