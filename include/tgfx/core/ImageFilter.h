@@ -65,6 +65,10 @@ class ImageFilter : public Filter {
   Rect filterBounds(const Rect& rect) const override;
 
  protected:
+  std::unique_ptr<DrawOp> onMakeDrawOp(std::shared_ptr<Image> source, const DrawArgs& args,
+                                       const Matrix* localMatrix, TileMode tileModeX,
+                                       TileMode tileModeY) const override;
+
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;

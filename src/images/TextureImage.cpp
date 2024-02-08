@@ -138,10 +138,10 @@ std::shared_ptr<Image> TextureImage::onMakeRGBAAA(int displayWidth, int displayH
                                alphaStartY);
 }
 
-std::unique_ptr<FragmentProcessor> TextureImage::asFragmentProcessor(const DrawArgs& args,
-                                                                     const Matrix* localMatrix,
-                                                                     TileMode tileModeX,
-                                                                     TileMode tileModeY) const {
+std::unique_ptr<FragmentProcessor> TextureImage::onMakeFragmentProcessor(const DrawArgs& args,
+                                                                         const Matrix* localMatrix,
+                                                                         TileMode tileModeX,
+                                                                         TileMode tileModeY) const {
   auto proxy = lockTextureProxy(args.context, args.renderFlags);
   if (proxy == nullptr) {
     return nullptr;

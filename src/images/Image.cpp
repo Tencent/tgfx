@@ -197,9 +197,9 @@ std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
   return nullptr;
 }
 
-std::unique_ptr<DrawOp> Image::makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
-                                          TileMode tileModeX, TileMode tileModeY) const {
-  auto processor = asFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
+std::unique_ptr<DrawOp> Image::onMakeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                            TileMode tileModeX, TileMode tileModeY) const {
+  auto processor = onMakeFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
   if (processor == nullptr) {
     return nullptr;
   }

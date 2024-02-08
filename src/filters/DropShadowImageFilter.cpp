@@ -54,7 +54,7 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
   return bounds;
 }
 
-std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onMakeFragmentProcessor(
     std::shared_ptr<Image> source, const tgfx::DrawArgs& args, const Matrix* localMatrix,
     TileMode tileModeX, TileMode tileModeY) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
@@ -102,8 +102,8 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::getFragmentProcessor(
     shadowMatrix.preConcat(*localMatrix);
   }
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(source, args, &shadowMatrix, TileMode::Decal,
-                                                      TileMode::Decal);
+    shadowProcessor = blurFilter->onMakeFragmentProcessor(source, args, &shadowMatrix,
+                                                          TileMode::Decal, TileMode::Decal);
   } else {
     shadowProcessor =
         FragmentProcessor::Make(source, args, &shadowMatrix, TileMode::Decal, TileMode::Decal);

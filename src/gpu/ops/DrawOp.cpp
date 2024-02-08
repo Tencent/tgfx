@@ -27,7 +27,7 @@ std::unique_ptr<DrawOp> DrawOp::Make(std::shared_ptr<Image> image, const DrawArg
   if (image == nullptr) {
     return nullptr;
   }
-  return image->makeDrawOp(args, localMatrix, tileModeX, tileModeY);
+  return image->onMakeDrawOp(args, localMatrix, tileModeX, tileModeY);
 }
 
 static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect) {

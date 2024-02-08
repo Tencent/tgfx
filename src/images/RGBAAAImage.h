@@ -30,13 +30,13 @@ class RGBAAAImage : public SubsetImage {
  protected:
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::unique_ptr<DrawOp> makeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
-                                     TileMode tileModeX, TileMode tileModeY) const override;
+  std::unique_ptr<DrawOp> onMakeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
+                                       TileMode tileModeX, TileMode tileModeY) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                         const Matrix* localMatrix,
-                                                         TileMode tileModeX,
-                                                         TileMode tileModeY) const override;
+  std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(const DrawArgs& args,
+                                                             const Matrix* localMatrix,
+                                                             TileMode tileModeX,
+                                                             TileMode tileModeY) const override;
 
  private:
   Point alphaStart = Point::Zero();

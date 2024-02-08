@@ -31,7 +31,7 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image
   if (image == nullptr) {
     return nullptr;
   }
-  return image->asFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
+  return image->onMakeFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
@@ -40,7 +40,7 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shade
   if (shader == nullptr) {
     return nullptr;
   }
-  return shader->asFragmentProcessor(args, localMatrix);
+  return shader->onMakeFragmentProcessor(args, localMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(

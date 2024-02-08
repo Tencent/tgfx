@@ -41,7 +41,7 @@ std::shared_ptr<Shader> Shader::MakeBlend(BlendMode mode, std::shared_ptr<Shader
   return shader;
 }
 
-std::unique_ptr<FragmentProcessor> BlendShader::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> BlendShader::onMakeFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
   auto fpA = FragmentProcessor::Make(dst, args, localMatrix);
   if (fpA == nullptr) {
