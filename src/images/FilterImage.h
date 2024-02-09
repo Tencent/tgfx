@@ -27,8 +27,12 @@ namespace tgfx {
  */
 class FilterImage : public TransformImage {
  public:
+  /**
+   * Creates a new FilterImage from the given source image, filter, and clipRect.
+   */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         std::shared_ptr<Filter> filter, Point* offset = nullptr);
+                                         std::shared_ptr<Filter> filter, Point* offset = nullptr,
+                                         const Rect* clipRect = nullptr);
 
   int width() const override {
     return static_cast<int>(bounds.width());

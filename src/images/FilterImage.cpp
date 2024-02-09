@@ -22,7 +22,8 @@
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
-                                             std::shared_ptr<Filter> filter, Point* offset) {
+                                             std::shared_ptr<Filter> filter, Point* offset,
+                                             const Rect* clipRect) {
   if (source == nullptr) {
     return nullptr;
   }
@@ -33,6 +34,12 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
   bounds = filter->filterBounds(bounds);
   if (bounds.isEmpty()) {
     return nullptr;
+  }
+  if (clipRect != nullptr) {
+    if (!bounds.intersect(*clipRect)) {
+      return nullptr;
+    }
+    bounds.roundOut();
   }
   if (offset != nullptr) {
     offset->x = bounds.left;
