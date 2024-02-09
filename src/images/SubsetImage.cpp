@@ -24,6 +24,10 @@ std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orie
   if (source == nullptr || bounds.isEmpty()) {
     return nullptr;
   }
+  auto sourceBounds = Rect::MakeWH(source->width(), source->height());
+  if (sourceBounds == bounds) {
+    return source;
+  }
   auto image =
       std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), orientation, bounds));
   image->weakThis = image;

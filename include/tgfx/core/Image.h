@@ -246,11 +246,12 @@ class Image {
 
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
-   * bounds of the source Image. The offset stores the translation information for the filtered
-   * Image. If the filter is nullptr or fails to apply, nullptr is returned.
+   * bounds of the source Image. If the clipRect is not nullptr, the filtered Image will be clipped
+   * accordingly. The offset stores the translation information for the filtered Image. If the
+   * filter is nullptr or fails to apply, nullptr is returned.
    */
-  std::shared_ptr<Image> makeWithFilter(std::shared_ptr<Filter> filter,
-                                        Point* offset = nullptr) const;
+  std::shared_ptr<Image> makeWithFilter(std::shared_ptr<Filter> filter, Point* offset = nullptr,
+                                        const Rect* clipRect = nullptr) const;
 
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
