@@ -227,9 +227,12 @@ void FlipYIfNeeded(Rect* rect, const Surface* surface) {
   }
 }
 
-std::pair<std::optional<Rect>, bool> Canvas::getClipRect() {
+std::pair<std::optional<Rect>, bool> Canvas::getClipRect(const Rect* drawBounds) {
   auto rect = Rect::MakeEmpty();
   if (state->clip.asRect(&rect)) {
+    if (drawBounds != nullptr && !rect.intersect(*drawBounds)) {
+      return {{}, false};
+    }
     FlipYIfNeeded(&rect, surface);
     if (IsPixelAligned(rect)) {
       rect.round();
@@ -253,16 +256,21 @@ std::unique_ptr<FragmentProcessor> Canvas::getClipMask(const Rect& deviceBounds,
   }
   auto [rect, useScissor] = getClipRect();
   if (rect.has_value()) {
-    if (useScissor) {
+    if (!rect->isEmpty()) {
       *scissorRect = *rect;
-    } else if (!rect->isEmpty()) {
-      return AARectEffect::Make(*rect);
+      if (!useScissor) {
+        scissorRect->roundOut();
+        return AARectEffect::Make(*rect);
+      }
     }
     return nullptr;
-  } else {
-    return FragmentProcessor::MulInputByChildAlpha(
-        DeviceSpaceTextureEffect::Make(getClipTexture(), surface->origin()));
   }
+  auto clipBounds = clipPath.getBounds();
+  FlipYIfNeeded(&clipBounds, surface);
+  clipBounds.roundOut();
+  *scissorRect = clipBounds;
+  return FragmentProcessor::MulInputByChildAlpha(
+      DeviceSpaceTextureEffect::Make(getClipTexture(), surface->origin()));
 }
 
 Rect Canvas::clipLocalBounds(Rect localBounds) {
@@ -317,7 +325,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   }
   DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, localBounds,
                 state->matrix);
-  drawOp(std::move(op), args, paint);
+  addDrawOp(std::move(op), args, paint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
@@ -372,7 +380,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (op == nullptr) {
     return;
   }
-  drawOp(std::move(op), args, realPaint, true);
+  addDrawOp(std::move(op), args, realPaint, true);
   setMatrix(oldMatrix);
 }
 
@@ -405,24 +413,24 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
                 state->matrix);
   auto op = MakeSimplePathOp(path, inputColor, state->matrix);
   if (op) {
-    drawOp(std::move(op), args, paint);
+    addDrawOp(std::move(op), args, paint);
     return;
   }
   auto localMatrix = Matrix::I();
   if (!state->matrix.invert(&localMatrix)) {
     return;
   }
+  auto deviceBounds = args.viewMatrix.mapRect(args.drawRect);
   auto tempPath = path;
   tempPath.transform(state->matrix);
-  op = TriangulatingPathOp::Make(inputColor, tempPath, state->clip.getBounds(), localMatrix);
+  op = TriangulatingPathOp::Make(inputColor, tempPath, deviceBounds, localMatrix);
   if (op) {
     save();
     resetMatrix();
-    drawOp(std::move(op), args, paint);
+    addDrawOp(std::move(op), args, paint);
     restore();
     return;
   }
-  auto deviceBounds = state->matrix.mapRect(localBounds);
   auto width = ceilf(deviceBounds.width());
   auto height = ceilf(deviceBounds.height());
   auto totalMatrix = state->matrix;
@@ -459,7 +467,7 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, co
     return;
   }
   op->addMaskFP(std::move(maskProcessor));
-  drawOp(std::move(op), args, paint);
+  addDrawOp(std::move(op), args, paint);
   setMatrix(oldMatrix);
 }
 
@@ -592,7 +600,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
       return;
     }
     rectOp->addColorFP(std::move(processor));
-    drawOp(std::move(rectOp), args, {});
+    addDrawOp(std::move(rectOp), args, {});
   }
 }
 
@@ -618,57 +626,22 @@ bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
     return false;
   }
   state->matrix.mapRect(&bounds);
-  if (!IsPixelAligned(bounds)) {
-    return false;
-  }
-  auto format = surface->renderTargetProxy->format();
-  const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
-  color = writeSwizzle.applyTo(color);
-  auto [clipRect, useScissor] = getClipRect();
+  auto [clipRect, useScissor] = getClipRect(&bounds);
   if (clipRect.has_value()) {
+    auto format = surface->renderTargetProxy->format();
+    const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
+    color = writeSwizzle.applyTo(color);
     if (useScissor) {
-      FlipYIfNeeded(&bounds, surface);
-      clipRect->intersect(bounds);
       surface->aboutToDraw();
       surface->addOp(ClearOp::Make(color, *clipRect));
       return true;
     } else if (clipRect->isEmpty()) {
-      auto discardContent = bounds == Rect::MakeWH(surface->width(), surface->height());
-      surface->aboutToDraw(discardContent);
-      FlipYIfNeeded(&bounds, surface);
+      surface->aboutToDraw(true);
       surface->addOp(ClearOp::Make(color, bounds));
       return true;
     }
   }
   return false;
-}
-
-void Canvas::drawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint, bool aa) {
-  if (!getProcessors(args, paint, op.get())) {
-    return;
-  }
-  auto aaType = AAType::None;
-  if (surface->renderTargetProxy->sampleCount() > 1) {
-    aaType = AAType::MSAA;
-  } else if (aa && !IsPixelAligned(op->bounds())) {
-    aaType = AAType::Coverage;
-  } else {
-    const auto& matrix = state->matrix;
-    auto rotation = std::round(RadiansToDegrees(atan2f(matrix.getSkewX(), matrix.getScaleX())));
-    if (static_cast<int>(rotation) % 90 != 0) {
-      aaType = AAType::Coverage;
-    }
-  }
-  Rect scissorRect = Rect::MakeEmpty();
-  auto clipMask = getClipMask(op->bounds(), &scissorRect);
-  if (clipMask) {
-    op->addMaskFP(std::move(clipMask));
-  }
-  op->setScissorRect(scissorRect);
-  op->setBlendMode(state->blendMode);
-  op->setAA(aaType);
-  surface->aboutToDraw(false);
-  surface->addOp(std::move(op));
 }
 
 Color Canvas::getInputColor(const Paint& paint) {
@@ -703,5 +676,34 @@ bool Canvas::getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* dra
     }
   }
   return true;
+}
+
+void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint,
+                       bool aa) {
+  if (!getProcessors(args, paint, op.get())) {
+    return;
+  }
+  auto aaType = AAType::None;
+  if (surface->renderTargetProxy->sampleCount() > 1) {
+    aaType = AAType::MSAA;
+  } else if (aa && !IsPixelAligned(op->bounds())) {
+    aaType = AAType::Coverage;
+  } else {
+    const auto& matrix = state->matrix;
+    auto rotation = std::round(RadiansToDegrees(atan2f(matrix.getSkewX(), matrix.getScaleX())));
+    if (static_cast<int>(rotation) % 90 != 0) {
+      aaType = AAType::Coverage;
+    }
+  }
+  Rect scissorRect = Rect::MakeEmpty();
+  auto clipMask = getClipMask(op->bounds(), &scissorRect);
+  if (clipMask) {
+    op->addMaskFP(std::move(clipMask));
+  }
+  op->setScissorRect(scissorRect);
+  op->setBlendMode(state->blendMode);
+  op->setAA(aaType);
+  surface->aboutToDraw(false);
+  surface->addOp(std::move(op));
 }
 }  // namespace tgfx
