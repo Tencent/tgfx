@@ -27,7 +27,7 @@ namespace tgfx {
  */
 class ResourceTask {
  public:
-  explicit ResourceTask(ResourceKey strongKey);
+  explicit ResourceTask(ResourceKey resourceKey);
 
   virtual ~ResourceTask() = default;
 

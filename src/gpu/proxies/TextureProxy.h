@@ -24,7 +24,7 @@
 
 namespace tgfx {
 /**
- * This class delays the acquisition of textures until they are actually required.
+ * This class defers the acquisition of textures until they are actually required.
  */
 class TextureProxy : public ResourceProxy {
  public:
@@ -83,7 +83,7 @@ class TextureProxy : public ResourceProxy {
   ImageOrigin _origin = ImageOrigin::TopLeft;
   bool _externallyOwned = false;
 
-  TextureProxy(int width, int height, bool mipmapped, bool isAlphaOnly,
+  TextureProxy(ResourceKey resourceKey, int width, int height, bool mipmapped, bool isAlphaOnly,
                ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
 
   friend class ProxyProvider;

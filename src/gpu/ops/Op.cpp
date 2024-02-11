@@ -20,10 +20,10 @@
 #include <atomic>
 
 namespace tgfx {
-static std::atomic_uint8_t currentOpClassID = {1};
 
 uint8_t Op::GenOpClassID() {
-  return currentOpClassID++;
+  static std::atomic_uint8_t currentOpClassID = {1};
+  return currentOpClassID.fetch_add(1, std::memory_order_relaxed);
 }
 
 bool Op::combineIfPossible(Op* op) {

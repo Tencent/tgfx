@@ -38,7 +38,7 @@ std::shared_ptr<Image> RasterImage::MakeFrom(std::shared_ptr<Image> source,
     }
   }
   auto rasterImage = std::shared_ptr<RasterImage>(
-      new RasterImage(ResourceKey::NewWeak(), std::move(source), rasterizationScale, sampling));
+      new RasterImage(ResourceKey::Make(), std::move(source), rasterizationScale, sampling));
   rasterImage->weakThis = rasterImage;
   return hasMipmap ? rasterImage->makeMipmapped(true) : rasterImage;
 }
@@ -87,12 +87,16 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
                                                               bool mipmapped,
                                                               uint32_t renderFlags) const {
   auto proxyProvider = context->proxyProvider();
-  auto hasCache = proxyProvider->hasResourceProxy(key);
+  auto textureProxy = std::static_pointer_cast<TextureProxy>(proxyProvider->findProxy(key));
+  if (textureProxy != nullptr) {
+    return textureProxy;
+  }
+  auto hasResourceCache = context->resourceCache()->hasResource(key);
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, mipmapped,
-                                                        ImageOrigin::TopLeft, renderFlags);
-  if (hasCache) {
+  textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, mipmapped,
+                                                   ImageOrigin::TopLeft, renderFlags);
+  if (hasResourceCache) {
     return textureProxy;
   }
   auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);

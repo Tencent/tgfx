@@ -24,7 +24,7 @@ void Resource::assignResourceKey(const ResourceKey& newKey) {
     removeResourceKey();
     return;
   }
-  if (newKey.domain() != resourceKey.domain()) {
+  if (newKey != resourceKey) {
     context->resourceCache()->changeResourceKey(this, newKey);
   }
 }

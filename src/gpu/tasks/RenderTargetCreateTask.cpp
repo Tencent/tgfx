@@ -22,17 +22,17 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(ResourceKey strongKey,
+std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(ResourceKey resourceKey,
                                                                          ResourceKey textureKey,
                                                                          PixelFormat pixelFormat,
                                                                          int sampleCount) {
   return std::shared_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
-      std::move(strongKey), std::move(textureKey), pixelFormat, sampleCount));
+      std::move(resourceKey), std::move(textureKey), pixelFormat, sampleCount));
 }
 
-RenderTargetCreateTask::RenderTargetCreateTask(ResourceKey strongKey, ResourceKey textureKey,
+RenderTargetCreateTask::RenderTargetCreateTask(ResourceKey resourceKey, ResourceKey textureKey,
                                                PixelFormat pixelFormat, int sampleCount)
-    : ResourceTask(std::move(strongKey)), textureKey(std::move(textureKey)),
+    : ResourceTask(std::move(resourceKey)), textureKey(std::move(textureKey)),
       pixelFormat(pixelFormat), sampleCount(sampleCount) {
 }
 

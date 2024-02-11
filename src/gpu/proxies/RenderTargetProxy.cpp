@@ -88,9 +88,10 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int
   return proxyProvider->createRenderTargetProxy(std::move(textureProxy), format, sampleCount);
 }
 
-RenderTargetProxy::RenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
-                                     ImageOrigin origin)
-    : _width(width), _height(height), _format(format), _sampleCount(sampleCount), _origin(origin) {
+RenderTargetProxy::RenderTargetProxy(ResourceKey resourceKey, int width, int height,
+                                     PixelFormat format, int sampleCount, ImageOrigin origin)
+    : ResourceProxy(std::move(resourceKey)), _width(width), _height(height), _format(format),
+      _sampleCount(sampleCount), _origin(origin) {
 }
 
 bool RenderTargetProxy::isTextureBacked() const {
@@ -103,7 +104,7 @@ std::shared_ptr<Texture> RenderTargetProxy::getTexture() const {
 }
 
 std::shared_ptr<RenderTarget> RenderTargetProxy::getRenderTarget() const {
-  return Resource::Get<RenderTarget>(context, resourceKey);
+  return Resource::Get<RenderTarget>(context, handle.key());
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy() const {

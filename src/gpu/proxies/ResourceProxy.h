@@ -19,10 +19,11 @@
 #pragma once
 
 #include "gpu/Resource.h"
+#include "gpu/ResourceHandle.h"
 
 namespace tgfx {
 /**
- * The base class for all proxy-derived objects. It delays the acquisition of resources until they
+ * The base class for all proxy-derived objects. It defers the acquisition of resources until they
  * are actually required.
  */
 class ResourceProxy {
@@ -40,14 +41,15 @@ class ResourceProxy {
    * Returns the ResourceKey associated with this ResourceProxy.
    */
   const ResourceKey& getResourceKey() const {
-    return resourceKey;
+    return handle.key();
   }
 
  protected:
   Context* context = nullptr;
-  ResourceKey resourceKey = {};
+  ResourceHandle handle = {};
 
-  ResourceProxy() = default;
+  explicit ResourceProxy(ResourceKey resourceKey) : handle(std::move(resourceKey)) {
+  }
 
   friend class ProxyProvider;
 };

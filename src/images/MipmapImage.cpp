@@ -24,7 +24,7 @@ std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<TextureImage> sourc
     return nullptr;
   }
   auto image =
-      std::shared_ptr<MipmapImage>(new MipmapImage(ResourceKey::NewWeak(), std::move(source)));
+      std::shared_ptr<MipmapImage>(new MipmapImage(ResourceKey::Make(), std::move(source)));
   image->weakThis = image;
   return image;
 }

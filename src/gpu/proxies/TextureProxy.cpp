@@ -19,14 +19,14 @@
 #include "TextureProxy.h"
 
 namespace tgfx {
-TextureProxy::TextureProxy(int width, int height, bool mipmapped, bool isAlphaOnly,
-                           ImageOrigin origin, bool externallyOwned)
-    : _width(width), _height(height), mipmapped(mipmapped), _isAlphaOnly(isAlphaOnly),
-      _origin(origin), _externallyOwned(externallyOwned) {
+TextureProxy::TextureProxy(ResourceKey resourceKey, int width, int height, bool mipmapped,
+                           bool isAlphaOnly, ImageOrigin origin, bool externallyOwned)
+    : ResourceProxy(std::move(resourceKey)), _width(width), _height(height), mipmapped(mipmapped),
+      _isAlphaOnly(isAlphaOnly), _origin(origin), _externallyOwned(externallyOwned) {
 }
 
 std::shared_ptr<Texture> TextureProxy::getTexture() const {
-  return Resource::Get<Texture>(context, resourceKey);
+  return Resource::Get<Texture>(context, handle.key());
 }
 
 }  // namespace tgfx

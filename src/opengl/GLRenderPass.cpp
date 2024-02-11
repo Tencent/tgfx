@@ -47,9 +47,9 @@ static AttribLayout GetAttribLayout(SLType type) {
 
 GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
   if (GLCaps::Get(context)->vertexArrayObjectSupport) {
-    vertexArrayKey = ResourceKey::NewStrong();
+    vertexArrayHandle = ResourceKey::Make();
     // Using VAO is required in the core profile.
-    auto task = std::make_shared<GLVertexArrayCreateTask>(vertexArrayKey);
+    auto task = std::make_shared<GLVertexArrayCreateTask>(vertexArrayHandle.key());
     context->drawingManager()->addResourceTask(std::move(task));
   }
 }
@@ -142,7 +142,7 @@ void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, 
 
 void GLRenderPass::draw(const std::function<void()>& func) {
   auto gl = GLFunctions::Get(context);
-  auto vertexArray = Resource::Get<GLVertexArray>(context, vertexArrayKey);
+  auto vertexArray = Resource::Get<GLVertexArray>(context, vertexArrayHandle.key());
   if (vertexArray) {
     gl->bindVertexArray(vertexArray->id());
   }

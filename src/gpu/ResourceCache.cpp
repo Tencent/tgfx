@@ -132,7 +132,7 @@ void ResourceCache::changeResourceKey(Resource* resource, const ResourceKey& res
   if (!resource->resourceKey.empty()) {
     resourceKeyMap.erase(resource->resourceKey.domain());
   }
-  resource->resourceKey = resourceKey.makeWeak();
+  resource->resourceKey = resourceKey;
   resourceKeyMap[resourceKey.domain()] = resource;
 }
 

@@ -22,7 +22,7 @@
 
 namespace tgfx {
 /**
- * DataProvider delays the data generation until it is needed.
+ * DataProvider defers the data generation until it is needed.
  */
 class DataProvider {
  public:

@@ -44,7 +44,7 @@ class GLRenderPass : public RenderPass {
   void onClear(const Rect& scissor, Color color) override;
 
  private:
-  ResourceKey vertexArrayKey = {};
+  ResourceHandle vertexArrayHandle = {};
 
   void draw(const std::function<void()>& func);
 };

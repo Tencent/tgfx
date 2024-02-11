@@ -19,24 +19,43 @@
 #include "UniqueDomain.h"
 
 namespace tgfx {
-static std::atomic_uint64_t DomainIDCount = {1};
+static constexpr uint32_t InvalidDomain = 0;
 
-UniqueDomain::UniqueDomain() : _uniqueID(DomainIDCount++) {
+static uint32_t NextDomainID() {
+  static std::atomic<uint32_t> nextID{1};
+  uint32_t id;
+  do {
+    id = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (id == InvalidDomain);
+  return id;
 }
 
-void UniqueDomain::addReference(bool strong) {
-  _useCount++;
-  if (strong) {
-    _strongCount++;
-  }
+UniqueDomain::UniqueDomain() : _uniqueID(NextDomainID()) {
 }
 
-void UniqueDomain::releaseReference(bool strong) {
-  if (strong) {
-    _strongCount--;
-  }
-  if (--_useCount <= 0) {
+long UniqueDomain::useCount() const {
+  return _useCount.load(std::memory_order_relaxed);
+}
+
+long UniqueDomain::strongCount() const {
+  return _strongCount.load(std::memory_order_relaxed);
+}
+
+void UniqueDomain::addReference() {
+  _useCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void UniqueDomain::releaseReference() {
+  if (_useCount.fetch_add(-1, std::memory_order_acq_rel) <= 1) {
     delete this;
   }
+}
+
+void UniqueDomain::addStrong() {
+  _strongCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void UniqueDomain::releaseStrong() {
+  _strongCount.fetch_add(-1, std::memory_order_acq_rel);
 }
 }  // namespace tgfx

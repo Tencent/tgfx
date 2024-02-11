@@ -27,25 +27,18 @@ class UniqueDomain;
 /**
  * ResourceKey allows a code path to create cached resources for which it is the exclusive user.
  * The code path generates a unique domain which it sets on its keys. This guarantees that there are
- * no cross-domain collisions. Please refer to the comments in Resource::getResourceKey() for more
- * details.
+ * no cross-domain collisions. When a resource is only referenced by ResourceKeys, it falls under
+ * the management of the Context and can be destroyed at any time. To maintain a strong reference to
+ * the resource, use the ResourceHandle class. For further details on the differences between
+ * ResourceKeys and recycle keys, please refer to the comments in Resource::getResourceKey() and
+ * Resource::getRecycleKey().
  */
 class ResourceKey {
  public:
   /**
-   * Creates a weak ResourceKey that contains a valid domain and holds a weak reference to the
-   * corresponding resource. When a resource is solely referenced by weak ResourceKeys, it falls
-   * under the management of the Context and can be destroyed at any time.
+   * Creates a new ResourceKey with a valid domain.
    */
-  static ResourceKey NewWeak();
-
-  /**
-   * Creates a strong ResourceKey that contains a valid domain and holds a strong reference to the
-   * corresponding resource. When a resource is referenced by strong ResourceKeys, the Context
-   * ensures that the resource is not destroyed until all strong ResourceKeys are released or the
-   * Context itself is destroyed.
-   */
-  static ResourceKey NewStrong();
+  static ResourceKey Make();
 
   /**
    * Creates an empty ResourceKey.
@@ -61,7 +54,7 @@ class ResourceKey {
   /**
    * Returns a global unique ID of the domain. Returns 0 if the ResourceKey is empty.
    */
-  uint64_t domain() const;
+  uint32_t domain() const;
 
   /**
    * Returns true if the ResourceKey has no valid domain.
@@ -71,29 +64,12 @@ class ResourceKey {
   }
 
   /**
-   * Returns true if the ResourceKey holds a strong reference to the corresponding resource.
-   */
-  bool isStrong() const {
-    return strong;
-  }
-
-  /**
-   * Returns a strong ResourceKey that contains the same domain as the original key.
-   */
-  ResourceKey makeStrong() const;
-
-  /**
-   * Returns a weak ResourceKey that contains the same domain as the original key.
-   */
-  ResourceKey makeWeak() const;
-
-  /**
    * Returns the total number of times the domain has been referenced.
    */
   long useCount() const;
 
   /**
-   * Returns the number of times the domain has been referenced strongly.
+   * Returns the number of times the domain has been strongly referenced.
    */
   long strongCount() const;
 
@@ -101,10 +77,19 @@ class ResourceKey {
 
   ResourceKey& operator=(ResourceKey&& key) noexcept;
 
+  bool operator==(const ResourceKey& key) const;
+
+  bool operator!=(const ResourceKey& key) const;
+
  private:
   UniqueDomain* uniqueDomain = nullptr;
-  bool strong = false;
 
-  ResourceKey(UniqueDomain* block, bool strong);
+  explicit ResourceKey(UniqueDomain* block);
+
+  void addStrong();
+
+  void releaseStrong();
+
+  friend class ResourceHandle;
 };
 }  // namespace tgfx
