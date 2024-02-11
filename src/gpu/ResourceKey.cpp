@@ -21,47 +21,33 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-ResourceKey ResourceKey::NewWeak() {
-  return {new UniqueDomain(), false};
+ResourceKey ResourceKey::Make() {
+  return ResourceKey(new UniqueDomain());
 }
 
-ResourceKey ResourceKey::NewStrong() {
-  return {new UniqueDomain(), true};
-}
-
-ResourceKey::ResourceKey(UniqueDomain* block, bool strong) : uniqueDomain(block), strong(strong) {
+ResourceKey::ResourceKey(UniqueDomain* block) : uniqueDomain(block) {
   DEBUG_ASSERT(uniqueDomain != nullptr);
-  uniqueDomain->addReference(strong);
+  uniqueDomain->addReference();
 }
 
-ResourceKey::ResourceKey(const ResourceKey& key)
-    : uniqueDomain(key.uniqueDomain), strong(key.strong) {
+ResourceKey::ResourceKey(const ResourceKey& key) : uniqueDomain(key.uniqueDomain) {
   if (uniqueDomain != nullptr) {
-    uniqueDomain->addReference(strong);
+    uniqueDomain->addReference();
   }
 }
 
-ResourceKey::ResourceKey(ResourceKey&& key) noexcept
-    : uniqueDomain(key.uniqueDomain), strong(key.strong) {
+ResourceKey::ResourceKey(ResourceKey&& key) noexcept : uniqueDomain(key.uniqueDomain) {
   key.uniqueDomain = nullptr;
 }
 
 ResourceKey::~ResourceKey() {
   if (uniqueDomain != nullptr) {
-    uniqueDomain->releaseReference(strong);
+    uniqueDomain->releaseReference();
   }
 }
 
-uint64_t ResourceKey::domain() const {
+uint32_t ResourceKey::domain() const {
   return uniqueDomain != nullptr ? uniqueDomain->uniqueID() : 0;
-}
-
-ResourceKey ResourceKey::makeStrong() const {
-  return {uniqueDomain, true};
-}
-
-ResourceKey ResourceKey::makeWeak() const {
-  return {uniqueDomain, false};
 }
 
 long ResourceKey::useCount() const {
@@ -77,12 +63,11 @@ ResourceKey& ResourceKey::operator=(const ResourceKey& key) {
     return *this;
   }
   if (uniqueDomain != nullptr) {
-    uniqueDomain->releaseReference(strong);
+    uniqueDomain->releaseReference();
   }
   uniqueDomain = key.uniqueDomain;
-  strong = key.strong;
   if (uniqueDomain != nullptr) {
-    uniqueDomain->addReference(strong);
+    uniqueDomain->addReference();
   }
   return *this;
 }
@@ -92,11 +77,30 @@ ResourceKey& ResourceKey::operator=(ResourceKey&& key) noexcept {
     return *this;
   }
   if (uniqueDomain != nullptr) {
-    uniqueDomain->releaseReference(strong);
+    uniqueDomain->releaseReference();
   }
   uniqueDomain = key.uniqueDomain;
-  strong = key.strong;
   key.uniqueDomain = nullptr;
   return *this;
+}
+
+bool ResourceKey::operator==(const ResourceKey& key) const {
+  return uniqueDomain == key.uniqueDomain;
+}
+
+bool ResourceKey::operator!=(const ResourceKey& key) const {
+  return uniqueDomain != key.uniqueDomain;
+}
+
+void ResourceKey::addStrong() {
+  if (uniqueDomain != nullptr) {
+    uniqueDomain->addStrong();
+  }
+}
+
+void ResourceKey::releaseStrong() {
+  if (uniqueDomain != nullptr) {
+    uniqueDomain->releaseStrong();
+  }
 }
 }  // namespace tgfx

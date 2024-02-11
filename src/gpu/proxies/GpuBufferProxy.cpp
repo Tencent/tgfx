@@ -38,7 +38,11 @@ std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
   return context->proxyProvider()->createGpuBufferProxy({}, std::move(dataProvider), bufferType);
 }
 
+GpuBufferProxy::GpuBufferProxy(ResourceKey resourceKey, BufferType bufferType)
+    : ResourceProxy(std::move(resourceKey)), _bufferType(bufferType) {
+}
+
 std::shared_ptr<GpuBuffer> GpuBufferProxy::getBuffer() const {
-  return Resource::Get<GpuBuffer>(context, resourceKey);
+  return Resource::Get<GpuBuffer>(context, handle.key());
 }
 }  // namespace tgfx

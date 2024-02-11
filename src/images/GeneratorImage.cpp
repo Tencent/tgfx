@@ -26,7 +26,7 @@ std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> 
     return nullptr;
   }
   auto image = std::shared_ptr<GeneratorImage>(
-      new GeneratorImage(ResourceKey::NewWeak(), std::move(generator)));
+      new GeneratorImage(ResourceKey::Make(), std::move(generator)));
   image->weakThis = image;
   return image;
 }
@@ -37,8 +37,11 @@ GeneratorImage::GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGen
 
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryHardware) const {
   if (context != nullptr) {
-    if (context->proxyProvider()->hasResourceProxy(resourceKey) ||
-        context->resourceCache()->hasResource(resourceKey)) {
+    auto proxy = context->proxyProvider()->findProxy(resourceKey);
+    if (proxy != nullptr && proxy->getResourceKey() == resourceKey) {
+      return nullptr;
+    }
+    if (context->resourceCache()->hasResource(resourceKey)) {
       return nullptr;
     }
   }

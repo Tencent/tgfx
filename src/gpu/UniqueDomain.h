@@ -29,37 +29,43 @@ class UniqueDomain {
   /**
    * Returns a global unique ID for the UniqueDomain.
    */
-  uint64_t uniqueID() const {
+  uint32_t uniqueID() const {
     return _uniqueID;
   }
 
   /**
    * Returns the total number of times the UniqueDomain has been referenced.
    */
-  long useCount() const {
-    return _useCount;
-  }
+  long useCount() const;
 
   /**
    * Returns the number of times the UniqueDomain has been referenced strongly.
    */
-  long strongCount() const {
-    return _strongCount;
-  }
+  long strongCount() const;
 
   /**
    * Increments the number of times the UniqueDomain has been referenced.
    */
-  void addReference(bool strong);
+  void addReference();
 
   /**
    * Decrements the number of times the UniqueDomain has been referenced.
    */
-  void releaseReference(bool strong);
+  void releaseReference();
+
+  /**
+   * Increments the number of times the UniqueDomain has been referenced strongly.
+   */
+  void addStrong();
+
+  /**
+   * Decrements the number of times the UniqueDomain has been referenced strongly.
+   */
+  void releaseStrong();
 
  private:
-  uint64_t _uniqueID = 0;
-  std::atomic_long _useCount = {0};
-  std::atomic_long _strongCount = {0};
+  uint32_t _uniqueID = 0;
+  std::atomic<long> _useCount = {0};
+  std::atomic<long> _strongCount = {0};
 };
 }  // namespace tgfx

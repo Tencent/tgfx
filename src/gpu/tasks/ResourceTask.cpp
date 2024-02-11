@@ -19,11 +19,11 @@
 #include "ResourceTask.h"
 
 namespace tgfx {
-ResourceTask::ResourceTask(ResourceKey strongKey) : resourceKey(std::move(strongKey)) {
+ResourceTask::ResourceTask(ResourceKey resourceKey) : resourceKey(std::move(resourceKey)) {
 }
 
 bool ResourceTask::execute(Context* context) {
-  if (resourceKey.strongCount() <= 1) {
+  if (resourceKey.strongCount() <= 0) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;
   }

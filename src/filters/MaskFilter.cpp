@@ -21,8 +21,7 @@
 
 namespace tgfx {
 std::unique_ptr<DrawOp> MaskFilter::onMakeDrawOp(std::shared_ptr<Image> source,
-                                                 const DrawArgs& args,
-                                                 const tgfx::Matrix* localMatrix,
+                                                 const DrawArgs& args, const Matrix* localMatrix,
                                                  TileMode tileModeX, TileMode tileModeY) const {
   auto drawOp = DrawOp::Make(std::move(source), args, localMatrix, tileModeX, tileModeY);
   if (drawOp == nullptr) {
@@ -37,7 +36,7 @@ std::unique_ptr<DrawOp> MaskFilter::onMakeDrawOp(std::shared_ptr<Image> source,
 }
 
 std::unique_ptr<FragmentProcessor> MaskFilter::onMakeFragmentProcessor(
-    std::shared_ptr<Image> source, const DrawArgs& args, const tgfx::Matrix* localMatrix,
+    std::shared_ptr<Image> source, const DrawArgs& args, const Matrix* localMatrix,
     TileMode tileModeX, TileMode tileModeY) const {
   auto imageProcessor =
       FragmentProcessor::Make(std::move(source), args, localMatrix, tileModeX, tileModeY);

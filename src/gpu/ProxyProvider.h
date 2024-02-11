@@ -34,15 +34,23 @@ class ProxyProvider {
   explicit ProxyProvider(Context* context);
 
   /**
-   * Returns true if the proxy provider has a proxy for the given ResourceKey.
+   * Returns the proxy for the given ResourceKey. If the proxy does not exist, returns nullptr.
    */
-  bool hasResourceProxy(const ResourceKey& resourceKey);
+  std::shared_ptr<ResourceProxy> findProxy(const ResourceKey& resourceKey);
 
+  /**
+   * Creates a GpuBufferProxy for the given Data. The data will be released after being uploaded to
+   * the GPU.
+   */
   std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const ResourceKey& resourceKey,
                                                        std::shared_ptr<Data> data,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
 
+  /**
+   * Creates a GpuBufferProxy for the given DataProvider. The provider will be released after being
+   * uploaded to the GPU.
+   */
   std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const ResourceKey& resourceKey,
                                                        std::shared_ptr<DataProvider> provider,
                                                        BufferType bufferType,
@@ -109,17 +117,14 @@ class ProxyProvider {
 
  private:
   Context* context = nullptr;
-  std::unordered_map<uint64_t, std::weak_ptr<ResourceProxy>> proxyMap = {};
+  std::unordered_map<uint32_t, std::weak_ptr<ResourceProxy>> proxyMap = {};
 
-  static ResourceKey GetStrongKey(const ResourceKey& resourceKey, uint32_t renderFlags);
+  static ResourceKey GetProxyKey(const ResourceKey& resourceKey, uint32_t renderFlags);
 
   std::shared_ptr<GpuBufferProxy> findGpuBufferProxy(const ResourceKey& resourceKey);
 
   std::shared_ptr<TextureProxy> findTextureProxy(const ResourceKey& resourceKey);
 
-  std::shared_ptr<ResourceProxy> findResourceProxy(const ResourceKey& resourceKey);
-
-  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, ResourceKey strongKey,
-                        uint64_t domainID);
+  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, uint32_t domainID);
 };
 }  // namespace tgfx

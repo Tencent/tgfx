@@ -39,13 +39,14 @@
 #include "utils/SimpleTextShaper.h"
 
 namespace tgfx {
+static constexpr uint32_t FirstUnreservedClipID = 1;
+
 static uint32_t NextClipID() {
-  static const uint32_t kFirstUnreservedClipID = 1;
-  static std::atomic_uint32_t nextID{kFirstUnreservedClipID};
+  static std::atomic<uint32_t> nextID{FirstUnreservedClipID};
   uint32_t id;
   do {
-    id = nextID++;
-  } while (id < kFirstUnreservedClipID);
+    id = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (id < FirstUnreservedClipID);
   return id;
 }
 
