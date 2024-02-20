@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include "tgfx/utils/BytesKey.h"
 
@@ -91,5 +92,29 @@ class ResourceKey {
   void releaseStrong();
 
   friend class ResourceHandle;
+  friend class LazyResourceKey;
+};
+
+/**
+ * LazyResourceKey defers the acquisition of the ResourceKey until it is actually needed.
+ */
+class LazyResourceKey {
+ public:
+  ~LazyResourceKey();
+
+  /**
+   * Returns the associated ResourceKey. If the ResourceKey is empty, it will create a new one
+   * immediately. Calling this method from multiple threads will not create multiple ResourceKeys.
+   * This method is thread-safe as long as there is no concurrent reset() call.
+   */
+  ResourceKey get();
+
+  /**
+   * Resets the LazyResourceKey to an empty state. This method is not thread-safe.
+   */
+  void reset();
+
+ private:
+  std::atomic<UniqueDomain*> uniqueDomain = nullptr;
 };
 }  // namespace tgfx

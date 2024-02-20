@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/ResourceKey.h"
 #include "pathkit.h"
 
 namespace tgfx {
@@ -30,16 +31,19 @@ class PathRef {
 
   static pk::SkPath& WriteAccess(Path& path);
 
+  static ResourceKey GetResourceKey(const Path& path);
+
   PathRef() = default;
 
   explicit PathRef(const pk::SkPath& path) : path(path) {
   }
 
  private:
+  LazyResourceKey resourceKey = {};
   pk::SkPath path = {};
 
-  friend class Path;
   friend bool operator==(const Path& a, const Path& b);
   friend bool operator!=(const Path& a, const Path& b);
+  friend class Path;
 };
 }  // namespace tgfx

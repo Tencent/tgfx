@@ -65,7 +65,7 @@ class UniqueDomain {
 
  private:
   uint32_t _uniqueID = 0;
-  std::atomic<long> _useCount = {0};
+  std::atomic<long> _useCount = {1};
   std::atomic<long> _strongCount = {0};
 };
 }  // namespace tgfx

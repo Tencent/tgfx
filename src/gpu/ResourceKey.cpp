@@ -27,7 +27,6 @@ ResourceKey ResourceKey::Make() {
 
 ResourceKey::ResourceKey(UniqueDomain* block) : uniqueDomain(block) {
   DEBUG_ASSERT(uniqueDomain != nullptr);
-  uniqueDomain->addReference();
 }
 
 ResourceKey::ResourceKey(const ResourceKey& key) : uniqueDomain(key.uniqueDomain) {
@@ -101,6 +100,31 @@ void ResourceKey::addStrong() {
 void ResourceKey::releaseStrong() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->releaseStrong();
+  }
+}
+
+LazyResourceKey::~LazyResourceKey() {
+  reset();
+}
+
+ResourceKey LazyResourceKey::get() {
+  auto domain = uniqueDomain.load(std::memory_order_acquire);
+  if (domain == nullptr) {
+    auto newDomain = new UniqueDomain();
+    if (uniqueDomain.compare_exchange_strong(domain, newDomain, std::memory_order_acq_rel)) {
+      domain = newDomain;
+    } else {
+      newDomain->releaseReference();
+    }
+  }
+  domain->addReference();
+  return ResourceKey(domain);
+}
+
+void LazyResourceKey::reset() {
+  auto oldDomain = uniqueDomain.exchange(nullptr, std::memory_order_acq_rel);
+  if (oldDomain != nullptr) {
+    oldDomain->releaseReference();
   }
 }
 }  // namespace tgfx
