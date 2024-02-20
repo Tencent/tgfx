@@ -35,25 +35,24 @@ class Resource {
    */
   template <class T>
   static std::shared_ptr<T> AddToCache(Context* context, T* resource,
-                                       const BytesKey& recycleKey = {}) {
-    return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource, recycleKey));
+                                       const ScratchKey& scratchKey = {}) {
+    return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource, scratchKey));
   }
 
   /**
-   * A convenient method to retrieve the corresponding resource in the cache by the specified
-   * ResourceKey.
+   * A convenient method to retrieve a unique resource in the cache by the specified UniqueKey.
    */
   template <class T>
-  static std::shared_ptr<T> Get(Context* context, const ResourceKey& resourceKey) {
-    return std::static_pointer_cast<T>(context->resourceCache()->getResource(resourceKey));
+  static std::shared_ptr<T> Find(Context* context, const UniqueKey& uniqueKey) {
+    return std::static_pointer_cast<T>(context->resourceCache()->findUniqueResource(uniqueKey));
   }
 
   /**
-   * A convenient method to retrieve a recycled resource in the cache by the specified recycle key.
+   * A convenient method to retrieve a scratch resource in the cache by the specified ScratchKey.
    */
   template <class T>
-  static std::shared_ptr<T> FindRecycled(Context* context, const BytesKey& recycleKey) {
-    return std::static_pointer_cast<T>(context->resourceCache()->findRecycledResource(recycleKey));
+  static std::shared_ptr<T> Find(Context* context, const ScratchKey& scratchKey) {
+    return std::static_pointer_cast<T>(context->resourceCache()->findScratchResource(scratchKey));
   }
 
   virtual ~Resource() = default;
@@ -71,47 +70,17 @@ class Resource {
   virtual size_t memoryUsage() const = 0;
 
   /**
-   * Returns the associated recycle key. There are three important rules about recycle keys:
-   *
-   *    1) Multiple resources can share the same recycle key. Therefore, resources assigned the same
-   *       recycle key should be interchangeable with respect to the code that uses them.
-   *    2) A resource can have at most one recycle key, and it is set at resource creation by the
-   *       resource itself.
-   *    3) When a recycled resource is referenced, it will not be returned from the cache for a
-   *       subsequent cache request until all refs are released.
-   */
-  const BytesKey getRecycleKey() const {
-    return recycleKey;
-  }
-
-  /**
-   * Returns the associated ResourceKey. There are three rules governing the use of ResourceKeys:
-   *
-   *    1) Only one resource can have a given ResourceKey at a time.
-   *    2) A resource can have at most one ResourceKey at a time.
-   *    3) Unlike recycle keys, multiple requests for a ResourceKey will return the same resource
-   *       even if the resource already has refs.
-   *
-   * ResourceKeys preempt recycle keys. While a resource has a valid ResourceKey, it is inaccessible
-   * via its recycle key. It can become recyclable again if the ResourceKey is removed or no longer
-   * has any external references.
-   */
-  const ResourceKey& getResourceKey() const {
-    return resourceKey;
-  }
-
-  /**
-   * Assigns a ResourceKey to the resource. The resource will be findable via this ResourceKey using
-   * ResourceCache.getResource(). This method is not thread safe, call it only when the
+   * Assigns a UniqueKey to the resource. The resource will be findable via this UniqueKey using
+   * ResourceCache.findUniqueResource(). This method is not thread safe, call it only when the
    * associated context is locked.
    */
-  void assignResourceKey(const ResourceKey& newKey);
+  void assignUniqueKey(const UniqueKey& newKey);
 
   /*
-   * Removes the ResourceKey from the resource. This method is not thread safe, call it only when
+   * Removes the UniqueKey from the resource. This method is not thread safe, call it only when
    * the associated context is locked.
    */
-  void removeResourceKey();
+  void removeUniqueKey();
 
  protected:
   Context* context = nullptr;
@@ -123,18 +92,18 @@ class Resource {
 
  private:
   std::shared_ptr<Resource> reference;
-  BytesKey recycleKey = {};
-  ResourceKey resourceKey = {};
+  ScratchKey scratchKey = {};
+  UniqueKey uniqueKey = {};
   std::list<Resource*>* cachedList = nullptr;
   std::list<Resource*>::iterator cachedPosition;
   std::chrono::steady_clock::time_point lastUsedTime = {};
 
   virtual bool isPurgeable() const {
-    return reference.use_count() <= 1 && resourceKey.strongCount() == 0;
+    return reference.use_count() <= 1 && uniqueKey.strongCount() == 0;
   }
 
   bool hasExternalReferences() const {
-    return resourceKey.useCount() > 1;
+    return uniqueKey.useCount() > 1;
   }
 
   void release(bool releaseGPU);

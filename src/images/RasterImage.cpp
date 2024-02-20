@@ -38,14 +38,14 @@ std::shared_ptr<Image> RasterImage::MakeFrom(std::shared_ptr<Image> source,
     }
   }
   auto rasterImage = std::shared_ptr<RasterImage>(
-      new RasterImage(ResourceKey::Make(), std::move(source), rasterizationScale, sampling));
+      new RasterImage(UniqueKey::Next(), std::move(source), rasterizationScale, sampling));
   rasterImage->weakThis = rasterImage;
   return hasMipmap ? rasterImage->makeMipmapped(true) : rasterImage;
 }
 
-RasterImage::RasterImage(ResourceKey resourceKey, std::shared_ptr<Image> source,
+RasterImage::RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
                          float rasterizationScale, SamplingOptions sampling)
-    : TextureImage(std::move(resourceKey)), source(std::move(source)),
+    : TextureImage(std::move(uniqueKey)), source(std::move(source)),
       rasterizationScale(rasterizationScale), sampling(sampling) {
 }
 
@@ -77,21 +77,20 @@ std::shared_ptr<Image> RasterImage::onMakeDecoded(Context* context, bool) const 
     return nullptr;
   }
   auto newImage = std::shared_ptr<RasterImage>(
-      new RasterImage(resourceKey, std::move(newSource), rasterizationScale, sampling));
+      new RasterImage(uniqueKey, std::move(newSource), rasterizationScale, sampling));
   newImage->weakThis = newImage;
   return newImage;
 }
 
 std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
-                                                              const ResourceKey& key,
-                                                              bool mipmapped,
+                                                              const UniqueKey& key, bool mipmapped,
                                                               uint32_t renderFlags) const {
   auto proxyProvider = context->proxyProvider();
   auto textureProxy = std::static_pointer_cast<TextureProxy>(proxyProvider->findProxy(key));
   if (textureProxy != nullptr) {
     return textureProxy;
   }
-  auto hasResourceCache = context->resourceCache()->hasResource(key);
+  auto hasResourceCache = context->resourceCache()->hasUniqueResource(key);
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, mipmapped,

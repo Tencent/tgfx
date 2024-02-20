@@ -50,9 +50,8 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
 std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* context,
                                                                    CVPixelBufferRef pixelBuffer) {
   std::shared_ptr<EAGLHardwareTexture> glTexture = nullptr;
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, pixelBuffer);
-  glTexture = Resource::FindRecycled<EAGLHardwareTexture>(context, recycleKey);
+  auto scratchKey = ComputeScratchKey(pixelBuffer);
+  glTexture = Resource::Find<EAGLHardwareTexture>(context, scratchKey);
   if (glTexture) {
     return glTexture;
   }
@@ -72,19 +71,21 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   sampler->format = format;
   sampler->target = CVOpenGLESTextureGetTarget(texture);
   sampler->id = CVOpenGLESTextureGetName(texture);
-  glTexture = Resource::AddToCache(context, new EAGLHardwareTexture(pixelBuffer), recycleKey);
+  glTexture = Resource::AddToCache(context, new EAGLHardwareTexture(pixelBuffer), scratchKey);
   glTexture->sampler = std::move(sampler);
   glTexture->texture = texture;
   return glTexture;
 }
 
-void EAGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer) {
+ScratchKey EAGLHardwareTexture::ComputeScratchKey(CVPixelBufferRef pixelBuffer) {
   static const uint32_t HardwareType = UniqueID::Next();
-  recycleKey->write(HardwareType);
-  // 这里可以直接用指针做为 key 是因为缓存的 holder 会持有 CVPixelBuffer，只要 holder
-  // 缓存存在，对应的 CVPixelBuffer
-  // 指针就是有效的，不会出现指针地址被其他新创建对象占用的情况。其他情况下应该避免使用指针做 key。
-  recycleKey->write(pixelBuffer);
+  ScratchKey scratchKey = {};
+  scratchKey.write(HardwareType);
+  // The pointer can be used as the key directly because the cache holder retains the CVPixelBuffer.
+  // As long as the holder cache exists, the CVPixelBuffer pointer remains valid, avoiding conflicts
+  // with new objects. In other scenarios, it's best to avoid using pointers as keys.
+  scratchKey.write(pixelBuffer);
+  return scratchKey;
 }
 
 EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer)

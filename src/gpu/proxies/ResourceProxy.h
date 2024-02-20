@@ -38,9 +38,9 @@ class ResourceProxy {
   }
 
   /**
-   * Returns the ResourceKey associated with this ResourceProxy.
+   * Returns the UniqueKey associated with this ResourceProxy.
    */
-  const ResourceKey& getResourceKey() const {
+  const UniqueKey& getUniqueKey() const {
     return handle.key();
   }
 
@@ -48,7 +48,7 @@ class ResourceProxy {
   Context* context = nullptr;
   ResourceHandle handle = {};
 
-  explicit ResourceProxy(ResourceKey resourceKey) : handle(std::move(resourceKey)) {
+  explicit ResourceProxy(UniqueKey uniqueKey) : handle(std::move(uniqueKey)) {
   }
 
   friend class ProxyProvider;

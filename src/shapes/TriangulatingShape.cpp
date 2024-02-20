@@ -46,7 +46,7 @@ class TriangleVerticesProvider : public DataProvider {
 TriangulatingShape::TriangulatingShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
   auto path = getFillPath();
-  resourceKey = ResourceKey::Make();
+  uniqueKey = UniqueKey::Next();
   triangulator = std::make_shared<TriangleVerticesProvider>(path, bounds);
 }
 
@@ -54,8 +54,8 @@ std::unique_ptr<DrawOp> TriangulatingShape::makeOp(Context* context, const Color
                                                    const Matrix& viewMatrix,
                                                    uint32_t renderFlags) const {
   auto proxyProvider = context->proxyProvider();
-  auto bufferProxy = proxyProvider->createGpuBufferProxy(resourceKey, triangulator,
-                                                         BufferType::Vertex, renderFlags);
+  auto bufferProxy =
+      proxyProvider->createGpuBufferProxy(uniqueKey, triangulator, BufferType::Vertex, renderFlags);
   if (bufferProxy == nullptr) {
     return nullptr;
   }

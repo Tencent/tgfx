@@ -94,16 +94,16 @@ std::vector<SamplerInfo> Pipeline::getSamplers() const {
   return samplers;
 }
 
-void Pipeline::computeUniqueKey(Context* context, BytesKey* uniqueKey) const {
-  geometryProcessor->computeProcessorKey(context, uniqueKey);
+void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
+  geometryProcessor->computeProcessorKey(context, programKey);
   if (dstTextureInfo.texture != nullptr) {
-    dstTextureInfo.texture->getSampler()->computeKey(context, uniqueKey);
+    dstTextureInfo.texture->getSampler()->computeKey(context, programKey);
   }
   for (const auto& processor : fragmentProcessors) {
-    processor->computeProcessorKey(context, uniqueKey);
+    processor->computeProcessorKey(context, programKey);
   }
-  getXferProcessor()->computeProcessorKey(context, uniqueKey);
-  uniqueKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
+  getXferProcessor()->computeProcessorKey(context, programKey);
+  programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
 }
 
 std::unique_ptr<Program> Pipeline::createProgram(Context* context) const {

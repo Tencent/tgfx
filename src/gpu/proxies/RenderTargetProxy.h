@@ -133,8 +133,8 @@ class RenderTargetProxy : public ResourceProxy {
   std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy() const;
 
  protected:
-  RenderTargetProxy(ResourceKey resourceKey, int width, int height, PixelFormat format,
-                    int sampleCount, ImageOrigin origin);
+  RenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format, int sampleCount,
+                    ImageOrigin origin);
 
  private:
   int _width = 0;

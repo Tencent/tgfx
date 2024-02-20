@@ -23,7 +23,6 @@
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/Device.h"
-#include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
 class ProgramCache;
@@ -93,21 +92,21 @@ class Context {
   /**
    * Purges GPU resources that haven't been used since the passed point in time.
    * @param purgeTime A time point previously returned by std::chrono::steady_clock::now().
-   * @param recycledResourcesOnly If true, purgeable resources with external weak references are
-   * spared. If false, all purgeable resources will be deleted.
+   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
+   * If false, then all purgeable resources will be deleted.
    */
   void purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                  bool recycledResourcesOnly = false);
+                                  bool scratchResourcesOnly = false);
 
   /**
    * Purge unreferenced resources from the cache until the provided bytesLimit has been reached, or
    * we have purged all unreferenced resources. Returns true if the total resource bytes is not over
    * the specified bytesLimit after purging.
    * @param bytesLimit The desired number of bytes after puring.
-   * @param recycledResourcesOnly If true, purgeable resources with external weak references are
-   * spared. If false, all purgeable resources will be deleted.
+   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
+   * If false, then all purgeable resources will be deleted.
    */
-  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly = false);
+  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly = false);
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more

@@ -18,11 +18,7 @@
 
 #include "gpu/ResourceCache.h"
 #include <unordered_map>
-#include <unordered_set>
 #include "gpu/Resource.h"
-#include "tgfx/utils/BytesKey.h"
-#include "tgfx/utils/Clock.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 // Default maximum limit for the amount of GPU memory allocated to resources.
@@ -44,8 +40,8 @@ void ResourceCache::releaseAll(bool releaseGPU) {
     resource->release(releaseGPU);
   }
   purgeableResources.clear();
-  recycleKeyMap.clear();
-  resourceKeyMap.clear();
+  scratchKeyMap.clear();
+  uniqueKeyMap.clear();
   purgeableBytes = 0;
   totalBytes = 0;
 }
@@ -58,9 +54,9 @@ void ResourceCache::setCacheLimit(size_t bytesLimit) {
   purgeUntilMemoryTo(maxBytes);
 }
 
-std::shared_ptr<Resource> ResourceCache::findRecycledResource(const BytesKey& recycleKey) {
-  auto result = recycleKeyMap.find(recycleKey);
-  if (result == recycleKeyMap.end()) {
+std::shared_ptr<Resource> ResourceCache::findScratchResource(const ScratchKey& scratchKey) {
+  auto result = scratchKeyMap.find(scratchKey);
+  if (result == scratchKeyMap.end()) {
     return nullptr;
   }
   auto& list = result->second;
@@ -80,30 +76,30 @@ std::shared_ptr<Resource> ResourceCache::findRecycledResource(const BytesKey& re
   return refResource(resource);
 }
 
-std::shared_ptr<Resource> ResourceCache::getResource(const ResourceKey& resourceKey) {
-  auto resource = getUniqueResource(resourceKey);
+std::shared_ptr<Resource> ResourceCache::findUniqueResource(const UniqueKey& uniqueKey) {
+  auto resource = getUniqueResource(uniqueKey);
   if (resource == nullptr) {
     return nullptr;
   }
   return refResource(resource);
 }
 
-bool ResourceCache::hasResource(const ResourceKey& resourceKey) {
-  return getUniqueResource(resourceKey) != nullptr;
+bool ResourceCache::hasUniqueResource(const UniqueKey& uniqueKey) {
+  return getUniqueResource(uniqueKey) != nullptr;
 }
 
-Resource* ResourceCache::getUniqueResource(const ResourceKey& resourceKey) {
-  if (resourceKey.empty()) {
+Resource* ResourceCache::getUniqueResource(const UniqueKey& uniqueKey) {
+  if (uniqueKey.empty()) {
     return nullptr;
   }
-  auto result = resourceKeyMap.find(resourceKey.domain());
-  if (result == resourceKeyMap.end()) {
+  auto result = uniqueKeyMap.find(uniqueKey.domain());
+  if (result == uniqueKeyMap.end()) {
     return nullptr;
   }
   auto resource = result->second;
   if (!resource->hasExternalReferences()) {
-    resourceKeyMap.erase(result);
-    resource->resourceKey = {};
+    uniqueKeyMap.erase(result);
+    resource->uniqueKey = {};
     return nullptr;
   }
   return resource;
@@ -124,29 +120,29 @@ bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* res
   return resource->cachedList == &list;
 }
 
-void ResourceCache::changeResourceKey(Resource* resource, const ResourceKey& resourceKey) {
-  auto result = resourceKeyMap.find(resourceKey.domain());
-  if (result != resourceKeyMap.end()) {
-    result->second->removeResourceKey();
+void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
+  auto result = uniqueKeyMap.find(uniqueKey.domain());
+  if (result != uniqueKeyMap.end()) {
+    result->second->removeUniqueKey();
   }
-  if (!resource->resourceKey.empty()) {
-    resourceKeyMap.erase(resource->resourceKey.domain());
+  if (!resource->uniqueKey.empty()) {
+    uniqueKeyMap.erase(resource->uniqueKey.domain());
   }
-  resource->resourceKey = resourceKey;
-  resourceKeyMap[resourceKey.domain()] = resource;
+  resource->uniqueKey = uniqueKey;
+  uniqueKeyMap[uniqueKey.domain()] = resource;
 }
 
-void ResourceCache::removeResourceKey(Resource* resource) {
-  resourceKeyMap.erase(resource->resourceKey.domain());
-  resource->resourceKey = {};
+void ResourceCache::removeUniqueKey(Resource* resource) {
+  uniqueKeyMap.erase(resource->uniqueKey.domain());
+  resource->uniqueKey = {};
 }
 
 std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
-                                                     const BytesKey& recycleKey) {
+                                                     const ScratchKey& scratchKey) {
   resource->context = context;
-  resource->recycleKey = recycleKey;
-  if (resource->recycleKey.isValid()) {
-    recycleKeyMap[resource->recycleKey].push_back(resource);
+  resource->scratchKey = scratchKey;
+  if (resource->scratchKey.isValid()) {
+    scratchKeyMap[resource->scratchKey].push_back(resource);
   }
   totalBytes += resource->memoryUsage();
   auto result = std::shared_ptr<Resource>(resource);
@@ -167,16 +163,16 @@ std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
 }
 
 void ResourceCache::removeResource(Resource* resource) {
-  if (!resource->resourceKey.empty()) {
-    removeResourceKey(resource);
+  if (!resource->uniqueKey.empty()) {
+    removeUniqueKey(resource);
   }
-  if (resource->recycleKey.isValid()) {
-    auto result = recycleKeyMap.find(resource->recycleKey);
-    if (result != recycleKeyMap.end()) {
+  if (resource->scratchKey.isValid()) {
+    auto result = scratchKeyMap.find(resource->scratchKey);
+    if (result != scratchKeyMap.end()) {
       auto& list = result->second;
       list.erase(std::remove(list.begin(), list.end(), resource), list.end());
       if (list.empty()) {
-        recycleKeyMap.erase(resource->recycleKey);
+        scratchKeyMap.erase(resource->scratchKey);
       }
     }
   }
@@ -185,13 +181,13 @@ void ResourceCache::removeResource(Resource* resource) {
 }
 
 void ResourceCache::purgeNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                      bool recycledResourceOnly) {
-  purgeResourcesByLRU(recycledResourceOnly,
+                                      bool scratchResourcesOnly) {
+  purgeResourcesByLRU(scratchResourcesOnly,
                       [&](Resource* resource) { return resource->lastUsedTime >= purgeTime; });
 }
 
-bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourceOnly) {
-  purgeResourcesByLRU(recycledResourceOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
+bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly) {
+  purgeResourcesByLRU(scratchResourcesOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
   return totalBytes <= bytesLimit;
 }
 
@@ -202,7 +198,7 @@ bool ResourceCache::purgeToCacheLimit(std::chrono::steady_clock::time_point notU
   return totalBytes <= maxBytes;
 }
 
-void ResourceCache::purgeResourcesByLRU(bool recycledResourceOnly,
+void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
   processUnreferencedResources();
   auto item = purgeableResources.begin();
@@ -211,7 +207,7 @@ void ResourceCache::purgeResourcesByLRU(bool recycledResourceOnly,
     if (satisfied(resource)) {
       break;
     }
-    if (!recycledResourceOnly || !resource->hasExternalReferences()) {
+    if (!scratchResourceOnly || !resource->hasExternalReferences()) {
       item = purgeableResources.erase(item);
       purgeableBytes -= resource->memoryUsage();
       removeResource(resource);
@@ -234,7 +230,7 @@ void ResourceCache::processUnreferencedResources() {
   auto currentTime = std::chrono::steady_clock::now();
   for (auto& resource : needToPurge) {
     RemoveFromList(nonpurgeableResources, resource);
-    if (resource->recycleKey.isValid()) {
+    if (resource->scratchKey.isValid()) {
       AddToList(purgeableResources, resource);
       purgeableBytes += resource->memoryUsage();
       resource->lastUsedTime = currentTime;

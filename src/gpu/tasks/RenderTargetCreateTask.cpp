@@ -22,22 +22,22 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(ResourceKey resourceKey,
-                                                                         ResourceKey textureKey,
+std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(UniqueKey uniqueKey,
+                                                                         UniqueKey textureKey,
                                                                          PixelFormat pixelFormat,
                                                                          int sampleCount) {
   return std::shared_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
-      std::move(resourceKey), std::move(textureKey), pixelFormat, sampleCount));
+      std::move(uniqueKey), std::move(textureKey), pixelFormat, sampleCount));
 }
 
-RenderTargetCreateTask::RenderTargetCreateTask(ResourceKey resourceKey, ResourceKey textureKey,
+RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey textureKey,
                                                PixelFormat pixelFormat, int sampleCount)
-    : ResourceTask(std::move(resourceKey)), textureKey(std::move(textureKey)),
+    : ResourceTask(std::move(uniqueKey)), textureKey(std::move(textureKey)),
       pixelFormat(pixelFormat), sampleCount(sampleCount) {
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* context) {
-  auto texture = Resource::Get<Texture>(context, textureKey);
+  auto texture = Resource::Find<Texture>(context, textureKey);
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");
     return nullptr;

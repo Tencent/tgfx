@@ -27,7 +27,7 @@ namespace tgfx {
  */
 class ResourceTask {
  public:
-  explicit ResourceTask(ResourceKey resourceKey);
+  explicit ResourceTask(UniqueKey uniqueKey);
 
   virtual ~ResourceTask() = default;
 
@@ -40,7 +40,7 @@ class ResourceTask {
   virtual std::shared_ptr<Resource> onMakeResource(Context* context) = 0;
 
  private:
-  ResourceKey resourceKey = {};
+  UniqueKey uniqueKey = {};
 
   friend class DrawingManager;
 };

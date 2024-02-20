@@ -29,7 +29,7 @@ class TriangulatingShape : public PathShape {
   explicit TriangulatingShape(std::shared_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
  private:
-  ResourceKey resourceKey = {};
+  UniqueKey uniqueKey = {};
   std::shared_ptr<DataProvider> triangulator = nullptr;
 
   std::unique_ptr<DrawOp> makeOp(Context* context, const Color& color, const Matrix& viewMatrix,

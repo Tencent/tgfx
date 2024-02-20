@@ -22,15 +22,16 @@
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, PixelFormat format,
-                              bool mipmapped) {
+static ScratchKey ComputeScratchKey(int width, int height, PixelFormat format, bool mipmapped) {
   static const uint32_t PlainTextureType = UniqueID::Next();
-  recycleKey->write(PlainTextureType);
-  recycleKey->write(static_cast<uint32_t>(width));
-  recycleKey->write(static_cast<uint32_t>(height));
+  ScratchKey scratchKey = {};
+  scratchKey.write(PlainTextureType);
+  scratchKey.write(static_cast<uint32_t>(width));
+  scratchKey.write(static_cast<uint32_t>(height));
   auto formatValue = static_cast<uint32_t>(format);
   auto mipmapValue = static_cast<uint32_t>(mipmapped ? 1 : 0);
-  recycleKey->write(formatValue | (mipmapValue << 30));
+  scratchKey.write(formatValue | (mipmapValue << 30));
+  return scratchKey;
 }
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
@@ -42,9 +43,8 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   }
   auto caps = context->caps();
   int maxMipmapLevel = mipmapped ? caps->getMaxMipmapLevel(width, height) : 0;
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, width, height, pixelFormat, maxMipmapLevel > 0);
-  auto texture = Resource::FindRecycled<Texture>(context, recycleKey);
+  auto scratchKey = ComputeScratchKey(width, height, pixelFormat, maxMipmapLevel > 0);
+  auto texture = Resource::Find<Texture>(context, scratchKey);
   if (texture) {
     texture->_origin = origin;
   } else {
@@ -53,7 +53,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
       return nullptr;
     }
     auto plainTexture = new PlainTexture(std::move(sampler), width, height, origin);
-    texture = Resource::AddToCache(context, plainTexture, recycleKey);
+    texture = Resource::AddToCache(context, plainTexture, scratchKey);
   }
   if (pixels != nullptr) {
     context->gpu()->writePixels(texture->getSampler(), Rect::MakeWH(width, height), pixels,

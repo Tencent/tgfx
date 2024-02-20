@@ -61,7 +61,7 @@ class ProgramInfo {
   /**
    * Computes a unique key for the program.
    */
-  virtual void computeUniqueKey(Context* context, BytesKey* uniqueKey) const = 0;
+  virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
 
   /**
    * Creates a new program.

@@ -49,7 +49,7 @@ class EGLHardwareTexture : public Texture {
   AHardwareBuffer* hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
-  static void ComputeRecycleKey(BytesKey* recycleKey, void* hardwareBuffer);
+  static ScratchKey ComputeScratchKey(void* hardwareBuffer);
 
   EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage, int width, int height);
 

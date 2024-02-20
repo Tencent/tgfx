@@ -30,7 +30,7 @@ SkPath& PathRef::WriteAccess(Path& path) {
   return path.writableRef()->path;
 }
 
-ResourceKey PathRef::GetResourceKey(const Path& path) {
-  return path.pathRef->resourceKey.get();
+UniqueKey PathRef::GetUniqueKey(const Path& path) {
+  return path.pathRef->uniqueKey.get();
 }
 }  // namespace tgfx

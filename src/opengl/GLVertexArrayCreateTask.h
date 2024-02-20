@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLVertexArrayCreateTask : public ResourceTask {
  public:
-  explicit GLVertexArrayCreateTask(ResourceKey resourceKey);
+  explicit GLVertexArrayCreateTask(UniqueKey uniqueKey);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 };

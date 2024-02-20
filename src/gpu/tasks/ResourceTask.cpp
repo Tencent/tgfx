@@ -19,11 +19,11 @@
 #include "ResourceTask.h"
 
 namespace tgfx {
-ResourceTask::ResourceTask(ResourceKey resourceKey) : resourceKey(std::move(resourceKey)) {
+ResourceTask::ResourceTask(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
 bool ResourceTask::execute(Context* context) {
-  if (resourceKey.strongCount() <= 0) {
+  if (uniqueKey.strongCount() <= 0) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;
   }
@@ -31,7 +31,7 @@ bool ResourceTask::execute(Context* context) {
   if (resource == nullptr) {
     return false;
   }
-  resource->assignResourceKey(resourceKey);
+  resource->assignUniqueKey(uniqueKey);
   return true;
 }
 }  // namespace tgfx

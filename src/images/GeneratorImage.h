@@ -47,13 +47,13 @@ class GeneratorImage : public TextureImage {
  protected:
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
                                                    bool mipmapped,
                                                    uint32_t renderFlags) const override;
 
  protected:
   std::shared_ptr<ImageGenerator> generator = nullptr;
 
-  GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator);
+  GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator);
 };
 }  // namespace tgfx

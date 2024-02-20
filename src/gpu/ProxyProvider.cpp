@@ -41,7 +41,7 @@ class DataWrapper : public DataProvider {
   std::shared_ptr<Data> data = nullptr;
 };
 
-std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const ResourceKey& resourceKey,
+std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const UniqueKey& uniqueKey,
                                                                     std::shared_ptr<Data> data,
                                                                     BufferType bufferType,
                                                                     uint32_t renderFlags) {
@@ -50,17 +50,17 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const Resour
   }
   auto provider = std::make_shared<DataWrapper>(std::move(data));
   renderFlags |= RenderFlags::DisableAsyncTask;
-  return createGpuBufferProxy(resourceKey, std::move(provider), bufferType, renderFlags);
+  return createGpuBufferProxy(uniqueKey, std::move(provider), bufferType, renderFlags);
 }
 
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
-    const ResourceKey& resourceKey, std::shared_ptr<DataProvider> provider, BufferType bufferType,
+    const UniqueKey& uniqueKey, std::shared_ptr<DataProvider> provider, BufferType bufferType,
     uint32_t renderFlags) {
-  auto proxy = findGpuBufferProxy(resourceKey);
+  auto proxy = findGpuBufferProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
-  auto proxyKey = GetProxyKey(resourceKey, renderFlags);
+  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
   auto async = !(renderFlags & RenderFlags::DisableAsyncTask);
   auto task = GpuBufferCreateTask::MakeFrom(proxyKey, bufferType, std::move(provider), async);
   if (task == nullptr) {
@@ -68,33 +68,33 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   }
   context->drawingManager()->addResourceTask(std::move(task));
   proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(proxyKey, bufferType));
-  addResourceProxy(proxy, resourceKey.domain());
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const ResourceKey& resourceKey, std::shared_ptr<ImageBuffer> imageBuffer, bool mipmapped,
+    const UniqueKey& uniqueKey, std::shared_ptr<ImageBuffer> imageBuffer, bool mipmapped,
     uint32_t renderFlags) {
   auto decoder = ImageDecoder::Wrap(std::move(imageBuffer));
-  return createTextureProxy(resourceKey, std::move(decoder), mipmapped, renderFlags);
+  return createTextureProxy(uniqueKey, std::move(decoder), mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const ResourceKey& resourceKey, std::shared_ptr<ImageGenerator> generator, bool mipmapped,
+    const UniqueKey& uniqueKey, std::shared_ptr<ImageGenerator> generator, bool mipmapped,
     uint32_t renderFlags) {
   auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
   auto decoder = ImageDecoder::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
-  return createTextureProxy(resourceKey, std::move(decoder), mipmapped, renderFlags);
+  return createTextureProxy(uniqueKey, std::move(decoder), mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const ResourceKey& resourceKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped,
+    const UniqueKey& uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped,
     uint32_t renderFlags) {
-  auto proxy = findTextureProxy(resourceKey);
+  auto proxy = findTextureProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
-  auto proxyKey = GetProxyKey(resourceKey, renderFlags);
+  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
   auto task = TextureCreateTask::MakeFrom(proxyKey, decoder, mipmapped);
   if (task == nullptr) {
     return nullptr;
@@ -102,23 +102,23 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   context->drawingManager()->addResourceTask(std::move(task));
   proxy = std::shared_ptr<TextureProxy>(new TextureProxy(
       proxyKey, decoder->width(), decoder->height(), mipmapped, decoder->isAlphaOnly()));
-  addResourceProxy(proxy, resourceKey.domain());
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const ResourceKey& resourceKey,
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey& uniqueKey,
                                                                 int width, int height,
                                                                 PixelFormat format, bool mipmapped,
                                                                 ImageOrigin origin,
                                                                 uint32_t renderFlags) {
-  auto proxy = findTextureProxy(resourceKey);
+  auto proxy = findTextureProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
   if (!PlainTexture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
-  auto proxyKey = GetProxyKey(resourceKey, renderFlags);
+  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
   auto task = TextureCreateTask::MakeFrom(proxyKey, width, height, format, mipmapped, origin);
   if (task == nullptr) {
     return nullptr;
@@ -127,7 +127,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const ResourceKe
   auto isAlphaOnly = format == PixelFormat::ALPHA_8;
   proxy = std::shared_ptr<TextureProxy>(
       new TextureProxy(proxyKey, width, height, mipmapped, isAlphaOnly, origin));
-  addResourceProxy(proxy, resourceKey.domain());
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
@@ -142,12 +142,12 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
   if (texture == nullptr) {
     return nullptr;
   }
-  auto resourceKey = ResourceKey::Make();
-  texture->assignResourceKey(resourceKey);
+  auto uniqueKey = UniqueKey::Next();
+  texture->assignUniqueKey(uniqueKey);
   auto proxy = std::shared_ptr<TextureProxy>(
-      new TextureProxy(resourceKey, texture->width(), texture->height(), texture->hasMipmaps(),
+      new TextureProxy(uniqueKey, texture->width(), texture->height(), texture->hasMipmaps(),
                        texture->isAlphaOnly(), texture->origin(), !adopted));
-  addResourceProxy(proxy, resourceKey.domain());
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
@@ -161,16 +161,16 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto resourceKey = ResourceKey::Make();
-  auto task = RenderTargetCreateTask::MakeFrom(resourceKey, textureProxy->getResourceKey(), format,
+  auto uniqueKey = UniqueKey::Next();
+  auto task = RenderTargetCreateTask::MakeFrom(uniqueKey, textureProxy->getUniqueKey(), format,
                                                sampleCount);
   if (task == nullptr) {
     return nullptr;
   }
   context->drawingManager()->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<RenderTargetProxy>(
-      new TextureRenderTargetProxy(resourceKey, std::move(textureProxy), format, sampleCount));
-  addResourceProxy(proxy, resourceKey.domain());
+      new TextureRenderTargetProxy(uniqueKey, std::move(textureProxy), format, sampleCount));
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
@@ -180,12 +180,12 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::wrapBackendRenderTarget(
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto resourceKey = ResourceKey::Make();
-  renderTarget->assignResourceKey(resourceKey);
+  auto uniqueKey = UniqueKey::Next();
+  renderTarget->assignUniqueKey(uniqueKey);
   auto proxy = std::shared_ptr<RenderTargetProxy>(new RenderTargetProxy(
-      resourceKey, renderTarget->width(), renderTarget->height(), renderTarget->format(),
+      uniqueKey, renderTarget->width(), renderTarget->height(), renderTarget->format(),
       renderTarget->sampleCount(), renderTarget->origin()));
-  addResourceProxy(proxy, resourceKey.domain());
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
@@ -201,49 +201,49 @@ void ProxyProvider::purgeExpiredProxies() {
   }
 }
 
-ResourceKey ProxyProvider::GetProxyKey(const ResourceKey& resourceKey, uint32_t renderFlags) {
-  if (resourceKey.empty() || renderFlags & RenderFlags::DisableCache) {
-    // Disable cache, generate a temporary ResourceKey exclusively for proxy usage.
-    return ResourceKey::Make();
+UniqueKey ProxyProvider::GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags) {
+  if (uniqueKey.empty() || renderFlags & RenderFlags::DisableCache) {
+    // Disable cache, generate a temporary UniqueKey exclusively for proxy usage.
+    return UniqueKey::Next();
   }
-  return resourceKey;
+  return uniqueKey;
 }
 
-std::shared_ptr<GpuBufferProxy> ProxyProvider::findGpuBufferProxy(const ResourceKey& resourceKey) {
-  auto proxy = std::static_pointer_cast<GpuBufferProxy>(findProxy(resourceKey));
+std::shared_ptr<GpuBufferProxy> ProxyProvider::findGpuBufferProxy(const UniqueKey& uniqueKey) {
+  auto proxy = std::static_pointer_cast<GpuBufferProxy>(findProxy(uniqueKey));
   if (proxy != nullptr) {
     return proxy;
   }
-  auto gpuBuffer = Resource::Get<GpuBuffer>(context, resourceKey);
+  auto gpuBuffer = Resource::Find<GpuBuffer>(context, uniqueKey);
   if (gpuBuffer == nullptr) {
     return nullptr;
   }
-  proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(resourceKey, gpuBuffer->bufferType()));
-  addResourceProxy(proxy, resourceKey.domain());
+  proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(uniqueKey, gpuBuffer->bufferType()));
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::findTextureProxy(const ResourceKey& resourceKey) {
-  auto proxy = std::static_pointer_cast<TextureProxy>(findProxy(resourceKey));
+std::shared_ptr<TextureProxy> ProxyProvider::findTextureProxy(const UniqueKey& uniqueKey) {
+  auto proxy = std::static_pointer_cast<TextureProxy>(findProxy(uniqueKey));
   if (proxy != nullptr) {
     return proxy;
   }
-  auto texture = Resource::Get<Texture>(context, resourceKey);
+  auto texture = Resource::Find<Texture>(context, uniqueKey);
   if (texture == nullptr) {
     return nullptr;
   }
   proxy = std::shared_ptr<TextureProxy>(
-      new TextureProxy(resourceKey, texture->width(), texture->height(), texture->hasMipmaps(),
+      new TextureProxy(uniqueKey, texture->width(), texture->height(), texture->hasMipmaps(),
                        texture->isAlphaOnly(), texture->origin()));
-  addResourceProxy(proxy, resourceKey.domain());
+  addResourceProxy(proxy, uniqueKey.domain());
   return proxy;
 }
 
-std::shared_ptr<ResourceProxy> ProxyProvider::findProxy(const ResourceKey& resourceKey) {
-  if (resourceKey.empty()) {
+std::shared_ptr<ResourceProxy> ProxyProvider::findProxy(const UniqueKey& uniqueKey) {
+  if (uniqueKey.empty()) {
     return nullptr;
   }
-  auto result = proxyMap.find(resourceKey.domain());
+  auto result = proxyMap.find(uniqueKey.domain());
   if (result != proxyMap.end()) {
     auto proxy = result->second.lock();
     if (proxy != nullptr) {

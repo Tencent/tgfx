@@ -41,13 +41,13 @@ class BufferImage : public TextureImage {
   }
 
  protected:
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
                                                    bool mipmapped,
                                                    uint32_t renderFlags) const override;
 
  private:
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 
-  BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer);
+  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
 };
 }  // namespace tgfx

@@ -22,9 +22,9 @@
 namespace tgfx {
 class GpuBufferCreator : public GpuBufferCreateTask {
  public:
-  GpuBufferCreator(ResourceKey resourceKey, BufferType bufferType,
+  GpuBufferCreator(UniqueKey uniqueKey, BufferType bufferType,
                    std::shared_ptr<DataProvider> provider)
-      : GpuBufferCreateTask(std::move(resourceKey), bufferType), provider(std::move(provider)) {
+      : GpuBufferCreateTask(std::move(uniqueKey), bufferType), provider(std::move(provider)) {
   }
 
  protected:
@@ -45,9 +45,9 @@ struct DataHolder {
 
 class AsyncGpuBufferCreator : public GpuBufferCreateTask {
  public:
-  AsyncGpuBufferCreator(ResourceKey resourceKey, BufferType bufferType,
+  AsyncGpuBufferCreator(UniqueKey uniqueKey, BufferType bufferType,
                         std::shared_ptr<DataProvider> dataProvider)
-      : GpuBufferCreateTask(std::move(resourceKey), bufferType), provider(std::move(dataProvider)) {
+      : GpuBufferCreateTask(std::move(uniqueKey), bufferType), provider(std::move(dataProvider)) {
     holder = std::make_shared<DataHolder>();
     task = Task::Run(
         [result = holder, dataProvider = provider]() { result->data = dataProvider->getData(); });
@@ -79,21 +79,20 @@ class AsyncGpuBufferCreator : public GpuBufferCreateTask {
 };
 
 std::shared_ptr<GpuBufferCreateTask> GpuBufferCreateTask::MakeFrom(
-    ResourceKey resourceKey, BufferType bufferType, std::shared_ptr<DataProvider> provider,
+    UniqueKey uniqueKey, BufferType bufferType, std::shared_ptr<DataProvider> provider,
     bool async) {
   if (provider == nullptr) {
     return nullptr;
   }
   if (async) {
-    return std::make_shared<AsyncGpuBufferCreator>(std::move(resourceKey), bufferType,
+    return std::make_shared<AsyncGpuBufferCreator>(std::move(uniqueKey), bufferType,
                                                    std::move(provider));
   }
-  return std::make_shared<GpuBufferCreator>(std::move(resourceKey), bufferType,
-                                            std::move(provider));
+  return std::make_shared<GpuBufferCreator>(std::move(uniqueKey), bufferType, std::move(provider));
 }
 
-GpuBufferCreateTask::GpuBufferCreateTask(ResourceKey resourceKey, BufferType bufferType)
-    : ResourceTask(std::move(resourceKey)), bufferType(bufferType) {
+GpuBufferCreateTask::GpuBufferCreateTask(UniqueKey uniqueKey, BufferType bufferType)
+    : ResourceTask(std::move(uniqueKey)), bufferType(bufferType) {
 }
 
 std::shared_ptr<Resource> GpuBufferCreateTask::onMakeResource(Context* context) {
