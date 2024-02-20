@@ -29,4 +29,8 @@ const SkPath& PathRef::ReadAccess(const Path& path) {
 SkPath& PathRef::WriteAccess(Path& path) {
   return path.writableRef()->path;
 }
+
+ResourceKey PathRef::GetResourceKey(const Path& path) {
+  return path.pathRef->resourceKey.get();
+}
 }  // namespace tgfx

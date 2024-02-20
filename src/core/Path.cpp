@@ -399,6 +399,8 @@ void Path::decompose(const PathIterator& iterator, void* info) const {
 PathRef* Path::writableRef() {
   if (pathRef.use_count() != 1) {
     pathRef = std::make_shared<PathRef>(pathRef->path);
+  } else {
+    pathRef->resourceKey.reset();
   }
   return pathRef.get();
 }
