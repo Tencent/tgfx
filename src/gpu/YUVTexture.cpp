@@ -23,12 +23,14 @@
 namespace tgfx {
 static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};
 
-static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, YUVPixelFormat format) {
+static ScratchKey ComputeScratchKey(int width, int height, YUVPixelFormat format) {
   static const uint32_t YUVTextureType = UniqueID::Next();
-  recycleKey->write(YUVTextureType);
-  recycleKey->write(static_cast<uint32_t>(width));
-  recycleKey->write(static_cast<uint32_t>(height));
-  recycleKey->write(static_cast<uint32_t>(format));
+  ScratchKey scratchKey = {};
+  scratchKey.write(YUVTextureType);
+  scratchKey.write(static_cast<uint32_t>(width));
+  scratchKey.write(static_cast<uint32_t>(height));
+  scratchKey.write(static_cast<uint32_t>(format));
+  return scratchKey;
 }
 
 static std::vector<std::unique_ptr<TextureSampler>> MakeTexturePlanes(Context* context,
@@ -72,9 +74,8 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
   }
   PixelFormat yuvFormats[YUVData::I420_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::GRAY_8,
                                                        PixelFormat::GRAY_8};
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, yuvData->width(), yuvData->height(), YUVPixelFormat::I420);
-  auto texture = Resource::FindRecycled<YUVTexture>(context, recycleKey);
+  auto scratchKey = ComputeScratchKey(yuvData->width(), yuvData->height(), YUVPixelFormat::I420);
+  auto texture = Resource::Find<YUVTexture>(context, scratchKey);
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(context, yuvData, yuvFormats);
     if (texturePlanes.empty()) {
@@ -84,7 +85,7 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
         new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::I420, colorSpace);
     yuvTexture->samplers = std::move(texturePlanes);
     texture =
-        std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture, recycleKey));
+        std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture, scratchKey));
   }
   SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;
@@ -97,9 +98,8 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
     return nullptr;
   }
   PixelFormat yuvFormats[YUVData::NV12_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::RG_88};
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, yuvData->width(), yuvData->height(), YUVPixelFormat::NV12);
-  auto texture = Resource::FindRecycled<YUVTexture>(context, recycleKey);
+  auto scratchKey = ComputeScratchKey(yuvData->width(), yuvData->height(), YUVPixelFormat::NV12);
+  auto texture = Resource::Find<YUVTexture>(context, scratchKey);
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(context, yuvData, yuvFormats);
     if (texturePlanes.empty()) {
@@ -109,7 +109,7 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
         new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::NV12, colorSpace);
     yuvTexture->samplers = std::move(texturePlanes);
     texture =
-        std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture, recycleKey));
+        std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture, scratchKey));
   }
   SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;

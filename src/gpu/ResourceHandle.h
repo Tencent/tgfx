@@ -33,9 +33,9 @@ class ResourceHandle {
    */
   ResourceHandle() = default;
 
-  explicit ResourceHandle(const ResourceKey& key);
+  explicit ResourceHandle(const UniqueKey& key);
 
-  explicit ResourceHandle(ResourceKey&& key) noexcept;
+  explicit ResourceHandle(UniqueKey&& key) noexcept;
 
   ResourceHandle(const ResourceHandle& key);
 
@@ -44,43 +44,43 @@ class ResourceHandle {
   virtual ~ResourceHandle();
 
   /**
-   * Returns the ResourceKey associated with the ResourceHandle.
+   * Returns the UniqueKey associated with the ResourceHandle.
    */
-  const ResourceKey& key() const {
-    return resourceKey;
+  const UniqueKey& key() const {
+    return uniqueKey;
   }
 
   /**
    * Returns a global unique ID of the domain. Returns 0 if the ResourceHandle is empty.
    */
   uint32_t domain() const {
-    return resourceKey.domain();
+    return uniqueKey.domain();
   }
 
   /**
    * Returns true if the ResourceHandle is empty.
    */
   bool empty() const {
-    return resourceKey.empty();
+    return uniqueKey.empty();
   }
 
   /**
    * Returns the total number of times the domain has been referenced.
    */
   long useCount() const {
-    return resourceKey.useCount();
+    return uniqueKey.useCount();
   }
 
   /**
    * Returns the number of times the domain has been strongly referenced.
    */
   long strongCount() const {
-    return resourceKey.strongCount();
+    return uniqueKey.strongCount();
   }
 
-  ResourceHandle& operator=(const ResourceKey& key);
+  ResourceHandle& operator=(const UniqueKey& key);
 
-  ResourceHandle& operator=(ResourceKey&& key) noexcept;
+  ResourceHandle& operator=(UniqueKey&& key) noexcept;
 
   ResourceHandle& operator=(const ResourceHandle& handle);
 
@@ -91,6 +91,6 @@ class ResourceHandle {
   bool operator!=(const ResourceHandle& handle) const;
 
  private:
-  ResourceKey resourceKey = {};
+  UniqueKey uniqueKey = {};
 };
 }  // namespace tgfx

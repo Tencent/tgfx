@@ -23,14 +23,13 @@ std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<TextureImage> sourc
   if (source == nullptr) {
     return nullptr;
   }
-  auto image =
-      std::shared_ptr<MipmapImage>(new MipmapImage(ResourceKey::Make(), std::move(source)));
+  auto image = std::shared_ptr<MipmapImage>(new MipmapImage(UniqueKey::Next(), std::move(source)));
   image->weakThis = image;
   return image;
 }
 
-MipmapImage::MipmapImage(ResourceKey resourceKey, std::shared_ptr<TextureImage> source)
-    : TextureImage(std::move(resourceKey)), source(std::move(source)) {
+MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<TextureImage> source)
+    : TextureImage(std::move(uniqueKey)), source(std::move(source)) {
 }
 
 std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
@@ -48,7 +47,7 @@ std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const 
   if (newSource == nullptr) {
     return nullptr;
   }
-  auto newImage = std::shared_ptr<MipmapImage>(new MipmapImage(resourceKey, std::move(newSource)));
+  auto newImage = std::shared_ptr<MipmapImage>(new MipmapImage(uniqueKey, std::move(newSource)));
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -58,7 +57,7 @@ std::shared_ptr<Image> MipmapImage::onMakeMipmapped(bool enabled) const {
 }
 
 std::shared_ptr<TextureProxy> MipmapImage::onLockTextureProxy(Context* context,
-                                                              const ResourceKey& key, bool,
+                                                              const UniqueKey& key, bool,
                                                               uint32_t renderFlags) const {
   return source->onLockTextureProxy(context, key, true, renderFlags);
 }

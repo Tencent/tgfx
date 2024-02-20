@@ -23,9 +23,8 @@
 namespace tgfx {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
     Context* context, CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, pixelBuffer);
-  auto glTexture = Resource::FindRecycled<CGLHardwareTexture>(context, recycleKey);
+  auto scratchKey = ComputeScratchKey(pixelBuffer);
+  auto glTexture = Resource::Find<CGLHardwareTexture>(context, scratchKey);
   if (glTexture) {
     return glTexture;
   }
@@ -45,7 +44,7 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
       CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
           ? PixelFormat::ALPHA_8
           : PixelFormat::RGBA_8888;
-  glTexture = Resource::AddToCache(context, new CGLHardwareTexture(pixelBuffer), recycleKey);
+  glTexture = Resource::AddToCache(context, new CGLHardwareTexture(pixelBuffer), scratchKey);
   glTexture->sampler = std::move(glSampler);
   glTexture->texture = texture;
   glTexture->textureCache = textureCache;
@@ -54,13 +53,15 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
   return glTexture;
 }
 
-void CGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer) {
-  static const uint32_t BGRAType = UniqueID::Next();
-  recycleKey->write(BGRAType);
-  // 这里可以直接用指针做为 key 是因为缓存的 holder 会持有 CVPixelBuffer，只要 holder
-  // 缓存存在，对应的 CVPixelBuffer
-  // 指针就是有效的，不会出现指针地址被其他新创建对象占用的情况。其他情况下应该避免使用指针做 key。
-  recycleKey->write(pixelBuffer);
+ScratchKey CGLHardwareTexture::ComputeScratchKey(CVPixelBufferRef pixelBuffer) {
+  static const uint32_t CGLHardwareTextureType = UniqueID::Next();
+  ScratchKey scratchKey = {};
+  scratchKey.write(CGLHardwareTextureType);
+  // The pointer can be used as the key directly because the cache holder retains the CVPixelBuffer.
+  // As long as the holder cache exists, the CVPixelBuffer pointer remains valid, avoiding conflicts
+  // with new objects. In other scenarios, it's best to avoid using pointers as keys.
+  scratchKey.write(pixelBuffer);
+  return scratchKey;
 }
 
 CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer)

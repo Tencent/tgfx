@@ -83,7 +83,7 @@ class TextureProxy : public ResourceProxy {
   ImageOrigin _origin = ImageOrigin::TopLeft;
   bool _externallyOwned = false;
 
-  TextureProxy(ResourceKey resourceKey, int width, int height, bool mipmapped, bool isAlphaOnly,
+  TextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
                ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
 
   friend class ProxyProvider;

@@ -21,43 +21,43 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-ResourceKey ResourceKey::Make() {
-  return ResourceKey(new UniqueDomain());
+UniqueKey UniqueKey::Next() {
+  return UniqueKey(new UniqueDomain());
 }
 
-ResourceKey::ResourceKey(UniqueDomain* block) : uniqueDomain(block) {
+UniqueKey::UniqueKey(UniqueDomain* block) : uniqueDomain(block) {
   DEBUG_ASSERT(uniqueDomain != nullptr);
 }
 
-ResourceKey::ResourceKey(const ResourceKey& key) : uniqueDomain(key.uniqueDomain) {
+UniqueKey::UniqueKey(const UniqueKey& key) : uniqueDomain(key.uniqueDomain) {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addReference();
   }
 }
 
-ResourceKey::ResourceKey(ResourceKey&& key) noexcept : uniqueDomain(key.uniqueDomain) {
+UniqueKey::UniqueKey(UniqueKey&& key) noexcept : uniqueDomain(key.uniqueDomain) {
   key.uniqueDomain = nullptr;
 }
 
-ResourceKey::~ResourceKey() {
+UniqueKey::~UniqueKey() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->releaseReference();
   }
 }
 
-uint32_t ResourceKey::domain() const {
+uint32_t UniqueKey::domain() const {
   return uniqueDomain != nullptr ? uniqueDomain->uniqueID() : 0;
 }
 
-long ResourceKey::useCount() const {
+long UniqueKey::useCount() const {
   return uniqueDomain != nullptr ? uniqueDomain->useCount() : 0;
 }
 
-long ResourceKey::strongCount() const {
+long UniqueKey::strongCount() const {
   return uniqueDomain != nullptr ? uniqueDomain->strongCount() : 0;
 }
 
-ResourceKey& ResourceKey::operator=(const ResourceKey& key) {
+UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
   if (this == &key) {
     return *this;
   }
@@ -71,7 +71,7 @@ ResourceKey& ResourceKey::operator=(const ResourceKey& key) {
   return *this;
 }
 
-ResourceKey& ResourceKey::operator=(ResourceKey&& key) noexcept {
+UniqueKey& UniqueKey::operator=(UniqueKey&& key) noexcept {
   if (this == &key) {
     return *this;
   }
@@ -83,31 +83,31 @@ ResourceKey& ResourceKey::operator=(ResourceKey&& key) noexcept {
   return *this;
 }
 
-bool ResourceKey::operator==(const ResourceKey& key) const {
+bool UniqueKey::operator==(const UniqueKey& key) const {
   return uniqueDomain == key.uniqueDomain;
 }
 
-bool ResourceKey::operator!=(const ResourceKey& key) const {
+bool UniqueKey::operator!=(const UniqueKey& key) const {
   return uniqueDomain != key.uniqueDomain;
 }
 
-void ResourceKey::addStrong() {
+void UniqueKey::addStrong() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addStrong();
   }
 }
 
-void ResourceKey::releaseStrong() {
+void UniqueKey::releaseStrong() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->releaseStrong();
   }
 }
 
-LazyResourceKey::~LazyResourceKey() {
+LazyUniqueKey::~LazyUniqueKey() {
   reset();
 }
 
-ResourceKey LazyResourceKey::get() {
+UniqueKey LazyUniqueKey::get() {
   auto domain = uniqueDomain.load(std::memory_order_acquire);
   if (domain == nullptr) {
     auto newDomain = new UniqueDomain();
@@ -118,10 +118,10 @@ ResourceKey LazyResourceKey::get() {
     }
   }
   domain->addReference();
-  return ResourceKey(domain);
+  return UniqueKey(domain);
 }
 
-void LazyResourceKey::reset() {
+void LazyUniqueKey::reset() {
   auto oldDomain = uniqueDomain.exchange(nullptr, std::memory_order_acq_rel);
   if (oldDomain != nullptr) {
     oldDomain->releaseReference();

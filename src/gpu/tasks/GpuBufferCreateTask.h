@@ -30,15 +30,14 @@ class GpuBufferCreateTask : public ResourceTask {
    * is true, the data provider will be read from an asynchronous thread immediately. Otherwise, the
    * data provider will be read from the current thread when the GpuBufferCreateTask is executed.
    */
-  static std::shared_ptr<GpuBufferCreateTask> MakeFrom(ResourceKey resourceKey,
-                                                       BufferType bufferType,
+  static std::shared_ptr<GpuBufferCreateTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
                                                        std::shared_ptr<DataProvider> provider,
                                                        bool async);
 
  protected:
   BufferType bufferType = BufferType::Vertex;
 
-  GpuBufferCreateTask(ResourceKey resourceKey, BufferType bufferType);
+  GpuBufferCreateTask(UniqueKey uniqueKey, BufferType bufferType);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

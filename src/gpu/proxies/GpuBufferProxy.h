@@ -53,7 +53,7 @@ class GpuBufferProxy : public ResourceProxy {
   BufferType _bufferType = BufferType::Vertex;
   size_t _size = 0;
 
-  GpuBufferProxy(ResourceKey resourceKey, BufferType bufferType);
+  GpuBufferProxy(UniqueKey uniqueKey, BufferType bufferType);
 
   friend class ProxyProvider;
 };

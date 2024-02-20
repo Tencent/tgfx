@@ -22,9 +22,9 @@
 namespace tgfx {
 class EmptyTextureTask : public TextureCreateTask {
  public:
-  EmptyTextureTask(ResourceKey resourceKey, int width, int height, PixelFormat format,
-                   bool mipmapped, ImageOrigin origin)
-      : TextureCreateTask(std::move(resourceKey)), width(width), height(height), format(format),
+  EmptyTextureTask(UniqueKey uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
+                   ImageOrigin origin)
+      : TextureCreateTask(std::move(uniqueKey)), width(width), height(height), format(format),
         mipmapped(mipmapped), origin(origin) {
   }
 
@@ -44,21 +44,20 @@ class EmptyTextureTask : public TextureCreateTask {
   ImageOrigin origin = ImageOrigin::TopLeft;
 };
 
-std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(ResourceKey resourceKey, int width,
+std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(UniqueKey uniqueKey, int width,
                                                                int height, PixelFormat format,
                                                                bool mipmapped, ImageOrigin origin) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
   return std::shared_ptr<TextureCreateTask>(
-      new EmptyTextureTask(std::move(resourceKey), width, height, format, mipmapped, origin));
+      new EmptyTextureTask(std::move(uniqueKey), width, height, format, mipmapped, origin));
 }
 
 class ImageDecoderTask : public TextureCreateTask {
  public:
-  ImageDecoderTask(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped)
-      : TextureCreateTask(std::move(resourceKey)), decoder(std::move(decoder)),
-        mipmapped(mipmapped) {
+  ImageDecoderTask(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped)
+      : TextureCreateTask(std::move(uniqueKey)), decoder(std::move(decoder)), mipmapped(mipmapped) {
   }
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override {
@@ -86,10 +85,10 @@ class ImageDecoderTask : public TextureCreateTask {
 };
 
 std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(
-    ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped) {
+    UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped) {
   if (decoder == nullptr) {
     return nullptr;
   }
-  return std::make_shared<ImageDecoderTask>(std::move(resourceKey), std::move(decoder), mipmapped);
+  return std::make_shared<ImageDecoderTask>(std::move(uniqueKey), std::move(decoder), mipmapped);
 }
 }  // namespace tgfx

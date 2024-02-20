@@ -86,7 +86,7 @@ class Pipeline : public ProgramInfo {
 
   std::vector<SamplerInfo> getSamplers() const override;
 
-  void computeUniqueKey(Context* context, BytesKey* uniqueKey) const override;
+  void computeProgramKey(Context* context, BytesKey* programKey) const override;
 
   std::unique_ptr<Program> createProgram(Context* context) const override;
 

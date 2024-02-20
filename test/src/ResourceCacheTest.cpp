@@ -27,10 +27,10 @@ class TestResource : public Resource {
  public:
   static std::shared_ptr<const TestResource> Make(Context* context, uint32_t id) {
     static const uint32_t TestResourceType = UniqueID::Next();
-    BytesKey recycleKey = {};
-    recycleKey.write(TestResourceType);
-    recycleKey.write(id);
-    return Resource::AddToCache(context, new TestResource(), recycleKey);
+    ScratchKey scratchKey = {};
+    scratchKey.write(TestResourceType);
+    scratchKey.write(id);
+    return Resource::AddToCache(context, new TestResource(), scratchKey);
   }
 
   size_t memoryUsage() const override {

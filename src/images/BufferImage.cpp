@@ -24,19 +24,17 @@ std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto image =
-      std::shared_ptr<BufferImage>(new BufferImage(ResourceKey::Make(), std::move(buffer)));
+  auto image = std::shared_ptr<BufferImage>(new BufferImage(UniqueKey::Next(), std::move(buffer)));
   image->weakThis = image;
   return image;
 }
 
-BufferImage::BufferImage(ResourceKey resourceKey, std::shared_ptr<ImageBuffer> buffer)
-    : TextureImage(std::move(resourceKey)), imageBuffer(std::move(buffer)) {
+BufferImage::BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer)
+    : TextureImage(std::move(uniqueKey)), imageBuffer(std::move(buffer)) {
 }
 
 std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(Context* context,
-                                                              const ResourceKey& key,
-                                                              bool mipmapped,
+                                                              const UniqueKey& key, bool mipmapped,
                                                               uint32_t renderFlags) const {
   return context->proxyProvider()->createTextureProxy(key, imageBuffer, mipmapped, renderFlags);
 }

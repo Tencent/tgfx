@@ -19,37 +19,37 @@
 #include "ResourceHandle.h"
 
 namespace tgfx {
-ResourceHandle::ResourceHandle(const ResourceKey& key) : resourceKey(key) {
-  resourceKey.addStrong();
+ResourceHandle::ResourceHandle(const UniqueKey& key) : uniqueKey(key) {
+  uniqueKey.addStrong();
 }
 
-ResourceHandle::ResourceHandle(ResourceKey&& key) noexcept : resourceKey(std::move(key)) {
-  resourceKey.addStrong();
+ResourceHandle::ResourceHandle(UniqueKey&& key) noexcept : uniqueKey(std::move(key)) {
+  uniqueKey.addStrong();
 }
 
-ResourceHandle::ResourceHandle(const ResourceHandle& handle) : resourceKey(handle.resourceKey) {
-  resourceKey.addStrong();
+ResourceHandle::ResourceHandle(const ResourceHandle& handle) : uniqueKey(handle.uniqueKey) {
+  uniqueKey.addStrong();
 }
 
 ResourceHandle::ResourceHandle(ResourceHandle&& handle) noexcept
-    : resourceKey(std::move(handle.resourceKey)) {
+    : uniqueKey(std::move(handle.uniqueKey)) {
 }
 
 ResourceHandle::~ResourceHandle() {
-  resourceKey.releaseStrong();
+  uniqueKey.releaseStrong();
 }
 
-ResourceHandle& ResourceHandle::operator=(const ResourceKey& key) {
-  resourceKey.releaseStrong();
-  resourceKey = key;
-  resourceKey.addStrong();
+ResourceHandle& ResourceHandle::operator=(const UniqueKey& key) {
+  uniqueKey.releaseStrong();
+  uniqueKey = key;
+  uniqueKey.addStrong();
   return *this;
 }
 
-ResourceHandle& ResourceHandle::operator=(ResourceKey&& key) noexcept {
-  resourceKey.releaseStrong();
-  resourceKey = std::move(key);
-  resourceKey.addStrong();
+ResourceHandle& ResourceHandle::operator=(UniqueKey&& key) noexcept {
+  uniqueKey.releaseStrong();
+  uniqueKey = std::move(key);
+  uniqueKey.addStrong();
   return *this;
 }
 
@@ -57,9 +57,9 @@ ResourceHandle& ResourceHandle::operator=(const ResourceHandle& handle) {
   if (this == &handle) {
     return *this;
   }
-  resourceKey.releaseStrong();
-  resourceKey = handle.resourceKey;
-  resourceKey.addStrong();
+  uniqueKey.releaseStrong();
+  uniqueKey = handle.uniqueKey;
+  uniqueKey.addStrong();
   return *this;
 }
 
@@ -67,16 +67,16 @@ ResourceHandle& ResourceHandle::operator=(ResourceHandle&& handle) noexcept {
   if (this == &handle) {
     return *this;
   }
-  resourceKey.releaseStrong();
-  resourceKey = std::move(handle.resourceKey);
+  uniqueKey.releaseStrong();
+  uniqueKey = std::move(handle.uniqueKey);
   return *this;
 }
 
 bool ResourceHandle::operator==(const ResourceHandle& handle) const {
-  return resourceKey == handle.resourceKey;
+  return uniqueKey == handle.uniqueKey;
 }
 
 bool ResourceHandle::operator!=(const ResourceHandle& handle) const {
-  return resourceKey != handle.resourceKey;
+  return uniqueKey != handle.uniqueKey;
 }
 }  // namespace tgfx

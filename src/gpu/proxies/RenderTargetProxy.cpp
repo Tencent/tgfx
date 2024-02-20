@@ -88,9 +88,9 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int
   return proxyProvider->createRenderTargetProxy(std::move(textureProxy), format, sampleCount);
 }
 
-RenderTargetProxy::RenderTargetProxy(ResourceKey resourceKey, int width, int height,
-                                     PixelFormat format, int sampleCount, ImageOrigin origin)
-    : ResourceProxy(std::move(resourceKey)), _width(width), _height(height), _format(format),
+RenderTargetProxy::RenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format,
+                                     int sampleCount, ImageOrigin origin)
+    : ResourceProxy(std::move(uniqueKey)), _width(width), _height(height), _format(format),
       _sampleCount(sampleCount), _origin(origin) {
 }
 
@@ -104,7 +104,7 @@ std::shared_ptr<Texture> RenderTargetProxy::getTexture() const {
 }
 
 std::shared_ptr<RenderTarget> RenderTargetProxy::getRenderTarget() const {
-  return Resource::Get<RenderTarget>(context, handle.key());
+  return Resource::Find<RenderTarget>(context, handle.key());
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy() const {

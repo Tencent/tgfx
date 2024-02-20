@@ -28,7 +28,7 @@ class TextureShape : public PathShape {
   explicit TextureShape(std::shared_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
  private:
-  ResourceKey resourceKey = {};
+  UniqueKey uniqueKey = {};
   std::shared_ptr<Rasterizer> rasterizer = nullptr;
 
   std::unique_ptr<DrawOp> makeOp(Context* context, const Color& color, const Matrix& viewMatrix,

@@ -27,7 +27,7 @@ namespace tgfx {
  */
 class DecoderImage : public TextureImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(ResourceKey resourceKey,
+  static std::shared_ptr<Image> MakeFrom(UniqueKey uniqueKey,
                                          std::shared_ptr<ImageDecoder> decoder);
 
   int width() const override {
@@ -43,13 +43,13 @@ class DecoderImage : public TextureImage {
   }
 
  protected:
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey& key,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
                                                    bool mipmapped,
                                                    uint32_t renderFlags) const override;
 
  private:
   std::shared_ptr<ImageDecoder> decoder = nullptr;
 
-  DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder);
+  DecoderImage(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder);
 };
 }  // namespace tgfx

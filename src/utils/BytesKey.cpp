@@ -58,11 +58,7 @@ void BytesKey::write(float value) {
 }
 
 size_t BytesKeyHasher::operator()(const BytesKey& key) const {
-  auto size = key.values.size();
-  if (size == 1) {
-    return key.values[0];
-  }
-  auto hash = size;
+  auto hash = key.values.size();
   for (auto& value : key.values) {
     hash ^= value + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
   }

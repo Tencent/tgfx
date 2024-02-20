@@ -31,7 +31,7 @@ class PathRef {
 
   static pk::SkPath& WriteAccess(Path& path);
 
-  static ResourceKey GetResourceKey(const Path& path);
+  static UniqueKey GetUniqueKey(const Path& path);
 
   PathRef() = default;
 
@@ -39,7 +39,7 @@ class PathRef {
   }
 
  private:
-  LazyResourceKey resourceKey = {};
+  LazyUniqueKey uniqueKey = {};
   pk::SkPath path = {};
 
   friend bool operator==(const Path& a, const Path& b);

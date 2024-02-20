@@ -25,32 +25,32 @@ std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> 
   if (generator == nullptr) {
     return nullptr;
   }
-  auto image = std::shared_ptr<GeneratorImage>(
-      new GeneratorImage(ResourceKey::Make(), std::move(generator)));
+  auto image =
+      std::shared_ptr<GeneratorImage>(new GeneratorImage(UniqueKey::Next(), std::move(generator)));
   image->weakThis = image;
   return image;
 }
 
-GeneratorImage::GeneratorImage(ResourceKey resourceKey, std::shared_ptr<ImageGenerator> generator)
-    : TextureImage(std::move(resourceKey)), generator(std::move(generator)) {
+GeneratorImage::GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator)
+    : TextureImage(std::move(uniqueKey)), generator(std::move(generator)) {
 }
 
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryHardware) const {
   if (context != nullptr) {
-    auto proxy = context->proxyProvider()->findProxy(resourceKey);
-    if (proxy != nullptr && proxy->getResourceKey() == resourceKey) {
+    auto proxy = context->proxyProvider()->findProxy(uniqueKey);
+    if (proxy != nullptr && proxy->getUniqueKey() == uniqueKey) {
       return nullptr;
     }
-    if (context->resourceCache()->hasResource(resourceKey)) {
+    if (context->resourceCache()->hasUniqueResource(uniqueKey)) {
       return nullptr;
     }
   }
   auto decoder = ImageDecoder::MakeFrom(generator, tryHardware, true);
-  return DecoderImage::MakeFrom(resourceKey, std::move(decoder));
+  return DecoderImage::MakeFrom(uniqueKey, std::move(decoder));
 }
 
 std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(Context* context,
-                                                                 const ResourceKey& key,
+                                                                 const UniqueKey& key,
                                                                  bool mipmapped,
                                                                  uint32_t renderFlags) const {
   return context->proxyProvider()->createTextureProxy(key, generator, mipmapped, renderFlags);

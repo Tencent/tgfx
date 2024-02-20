@@ -20,8 +20,8 @@
 #include "GLVertexArray.h"
 
 namespace tgfx {
-GLVertexArrayCreateTask::GLVertexArrayCreateTask(ResourceKey resourceKey)
-    : ResourceTask(std::move(resourceKey)) {
+GLVertexArrayCreateTask::GLVertexArrayCreateTask(UniqueKey uniqueKey)
+    : ResourceTask(std::move(uniqueKey)) {
 }
 
 std::shared_ptr<Resource> GLVertexArrayCreateTask::onMakeResource(Context* context) {

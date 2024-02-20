@@ -50,7 +50,7 @@ class Program {
   virtual void onReleaseGPU() = 0;
 
  private:
-  BytesKey uniqueKey = {};
+  BytesKey programKey = {};
 
   friend class ProgramCache;
 };

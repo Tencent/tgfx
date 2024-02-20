@@ -21,24 +21,23 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Image> DecoderImage::MakeFrom(ResourceKey resourceKey,
+std::shared_ptr<Image> DecoderImage::MakeFrom(UniqueKey uniqueKey,
                                               std::shared_ptr<ImageDecoder> decoder) {
   if (decoder == nullptr) {
     return nullptr;
   }
   auto image =
-      std::shared_ptr<DecoderImage>(new DecoderImage(std::move(resourceKey), std::move(decoder)));
+      std::shared_ptr<DecoderImage>(new DecoderImage(std::move(uniqueKey), std::move(decoder)));
   image->weakThis = image;
   return image;
 }
 
-DecoderImage::DecoderImage(ResourceKey resourceKey, std::shared_ptr<ImageDecoder> decoder)
-    : TextureImage(std::move(resourceKey)), decoder(std::move(decoder)) {
+DecoderImage::DecoderImage(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder)
+    : TextureImage(std::move(uniqueKey)), decoder(std::move(decoder)) {
 }
 
 std::shared_ptr<TextureProxy> DecoderImage::onLockTextureProxy(Context* context,
-                                                               const ResourceKey& key,
-                                                               bool mipmapped,
+                                                               const UniqueKey& key, bool mipmapped,
                                                                uint32_t renderFlags) const {
   return context->proxyProvider()->createTextureProxy(key, decoder, mipmapped, renderFlags);
 }

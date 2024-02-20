@@ -52,6 +52,6 @@ class CGLHardwareTexture : public Texture {
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
+  static ScratchKey ComputeScratchKey(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace tgfx

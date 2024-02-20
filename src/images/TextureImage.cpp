@@ -29,7 +29,7 @@ namespace tgfx {
 class TextureProxyImage : public TextureImage {
  public:
   explicit TextureProxyImage(std::shared_ptr<TextureProxy> textureProxy)
-      : TextureImage(textureProxy->getResourceKey()), textureProxy(std::move(textureProxy)) {
+      : TextureImage(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)) {
   }
 
   int width() const override {
@@ -79,7 +79,7 @@ class TextureProxyImage : public TextureImage {
     return nullptr;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const ResourceKey&, bool,
+  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey&, bool,
                                                    uint32_t) const override {
     if (textureProxy->getContext() != context) {
       return nullptr;
@@ -100,7 +100,7 @@ std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureP
   return textureImage;
 }
 
-TextureImage::TextureImage(ResourceKey resourceKey) : resourceKey(std::move(resourceKey)) {
+TextureImage::TextureImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
 std::shared_ptr<Image> TextureImage::makeRasterized(float rasterizationScale,
@@ -120,7 +120,7 @@ std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(tgfx::Context* cont
   if (context == nullptr) {
     return nullptr;
   }
-  return onLockTextureProxy(context, resourceKey, false, renderFlags);
+  return onLockTextureProxy(context, uniqueKey, false, renderFlags);
 }
 
 std::shared_ptr<Image> TextureImage::onMakeMipmapped(bool enabled) const {

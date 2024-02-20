@@ -106,12 +106,12 @@ void Context::setCacheLimit(size_t bytesLimit) {
 }
 
 void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                         bool recycledResourcesOnly) {
-  _resourceCache->purgeNotUsedSince(purgeTime, recycledResourcesOnly);
+                                         bool scratchResourcesOnly) {
+  _resourceCache->purgeNotUsedSince(purgeTime, scratchResourcesOnly);
 }
 
-bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly) {
-  return _resourceCache->purgeUntilMemoryTo(bytesLimit, recycledResourcesOnly);
+bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly) {
+  return _resourceCache->purgeUntilMemoryTo(bytesLimit, scratchResourcesOnly);
 }
 
 void Context::releaseAll(bool releaseGPU) {

@@ -30,9 +30,9 @@ class TextureRenderTargetProxy : public RenderTargetProxy {
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
 
-  TextureRenderTargetProxy(ResourceKey resourceKey, std::shared_ptr<TextureProxy> textureProxy,
+  TextureRenderTargetProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy,
                            PixelFormat format, int sampleCount)
-      : RenderTargetProxy(std::move(resourceKey), textureProxy->width(), textureProxy->height(),
+      : RenderTargetProxy(std::move(uniqueKey), textureProxy->width(), textureProxy->height(),
                           format, sampleCount, textureProxy->origin()),
         textureProxy(std::move(textureProxy)) {
   }

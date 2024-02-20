@@ -29,9 +29,9 @@ bool ProgramCache::empty() const {
 }
 
 Program* ProgramCache::getProgram(const ProgramInfo* programInfo) {
-  BytesKey uniqueKey = {};
-  programInfo->computeUniqueKey(context, &uniqueKey);
-  auto result = programMap.find(uniqueKey);
+  BytesKey programKey = {};
+  programInfo->computeProgramKey(context, &programKey);
+  auto result = programMap.find(programKey);
   if (result != programMap.end()) {
     programLRU.remove(result->second);
     programLRU.push_front(result->second);
@@ -41,9 +41,9 @@ Program* ProgramCache::getProgram(const ProgramInfo* programInfo) {
   if (program == nullptr) {
     return nullptr;
   }
-  program->uniqueKey = uniqueKey;
+  program->programKey = programKey;
   programLRU.push_front(program);
-  programMap[uniqueKey] = program;
+  programMap[programKey] = program;
   while (programLRU.size() > MAX_PROGRAM_COUNT) {
     removeOldestProgram();
   }
@@ -53,7 +53,7 @@ Program* ProgramCache::getProgram(const ProgramInfo* programInfo) {
 void ProgramCache::removeOldestProgram(bool releaseGPU) {
   auto program = programLRU.back();
   programLRU.pop_back();
-  programMap.erase(program->uniqueKey);
+  programMap.erase(program->programKey);
   if (releaseGPU) {
     program->onReleaseGPU();
   }
