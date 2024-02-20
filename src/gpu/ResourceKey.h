@@ -105,12 +105,12 @@ class LazyResourceKey {
   /**
    * Returns the associated ResourceKey. If the ResourceKey is empty, it will create a new one
    * immediately. Calling this method from multiple threads will not create multiple ResourceKeys.
-   * This method is thread-safe as long as the LazyResourceKey is not reset.
+   * This method is thread-safe as long as there is no concurrent reset() call.
    */
   ResourceKey get();
 
   /**
-   * Resets the LazyResourceKey to an empty state.
+   * Resets the LazyResourceKey to an empty state. This method is not thread-safe.
    */
   void reset();
 
