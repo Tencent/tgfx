@@ -69,12 +69,12 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
   if (resourceTask == nullptr) {
     return;
   }
-  auto result = resourceTaskMap.find(resourceTask->uniqueKey.domain());
+  auto result = resourceTaskMap.find(resourceTask->uniqueKey);
   if (result != resourceTaskMap.end()) {
     // Remove the UniqueKey from the old task, so it will be skipped when the task is executed.
     result->second->uniqueKey = {};
   }
-  resourceTaskMap[resourceTask->uniqueKey.domain()] = resourceTask.get();
+  resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
   resourceTasks.push_back(std::move(resourceTask));
 }
 

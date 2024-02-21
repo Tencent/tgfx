@@ -25,7 +25,7 @@ static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};
 
 static ScratchKey ComputeScratchKey(int width, int height, YUVPixelFormat format) {
   static const uint32_t YUVTextureType = UniqueID::Next();
-  BytesKey bytesKey = {};
+  BytesKey bytesKey(4);
   bytesKey.write(YUVTextureType);
   bytesKey.write(width);
   bytesKey.write(height);

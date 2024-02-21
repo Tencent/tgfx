@@ -117,7 +117,7 @@ class ProxyProvider {
 
  private:
   Context* context = nullptr;
-  std::unordered_map<uint32_t, std::weak_ptr<ResourceProxy>> proxyMap = {};
+  UniqueKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
 
   static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
@@ -125,6 +125,6 @@ class ProxyProvider {
 
   std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
 
-  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, uint32_t domainID);
+  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
 };
 }  // namespace tgfx

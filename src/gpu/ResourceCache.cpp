@@ -92,7 +92,7 @@ Resource* ResourceCache::getUniqueResource(const UniqueKey& uniqueKey) {
   if (uniqueKey.empty()) {
     return nullptr;
   }
-  auto result = uniqueKeyMap.find(uniqueKey.domain());
+  auto result = uniqueKeyMap.find(uniqueKey);
   if (result == uniqueKeyMap.end()) {
     return nullptr;
   }
@@ -121,19 +121,19 @@ bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* res
 }
 
 void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
-  auto result = uniqueKeyMap.find(uniqueKey.domain());
+  auto result = uniqueKeyMap.find(uniqueKey);
   if (result != uniqueKeyMap.end()) {
     result->second->removeUniqueKey();
   }
   if (!resource->uniqueKey.empty()) {
-    uniqueKeyMap.erase(resource->uniqueKey.domain());
+    uniqueKeyMap.erase(resource->uniqueKey);
   }
   resource->uniqueKey = uniqueKey;
-  uniqueKeyMap[uniqueKey.domain()] = resource;
+  uniqueKeyMap[uniqueKey] = resource;
 }
 
 void ResourceCache::removeUniqueKey(Resource* resource) {
-  uniqueKeyMap.erase(resource->uniqueKey.domain());
+  uniqueKeyMap.erase(resource->uniqueKey);
   resource->uniqueKey = {};
 }
 

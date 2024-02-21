@@ -108,7 +108,7 @@ EGLHardwareTexture::~EGLHardwareTexture() {
 
 ScratchKey EGLHardwareTexture::ComputeScratchKey(void* hardwareBuffer) {
   static const uint32_t ResourceType = UniqueID::Next();
-  BytesKey bytesKey = {};
+  BytesKey bytesKey(3);
   bytesKey.write(ResourceType);
   bytesKey.write(hardwareBuffer);
   return bytesKey;

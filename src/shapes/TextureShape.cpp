@@ -25,7 +25,7 @@
 namespace tgfx {
 TextureShape::TextureShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
-  uniqueKey = UniqueKey::Next();
+  uniqueKey = UniqueKey::Make();
   auto path = getFillPath();
   auto width = ceilf(bounds.width());
   auto height = ceilf(bounds.height());
