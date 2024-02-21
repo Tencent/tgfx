@@ -16,8 +16,8 @@
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
         "rasterized": "e8e31de",
-        "rasterized_mipmap": "9f3d256",
-        "rasterized_scale_up": "9f3d256",
+        "rasterized_mipmap": "1f657af",
+        "rasterized_scale_up": "1f657af",
         "shape": "d010fb8",
         "text_shape": "f885927",
         "tileMode": "d010fb8"
@@ -34,7 +34,7 @@
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
-        "shaderMaskFilter": "a30de8b"
+        "shaderMaskFilter": "1f657af"
     },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
