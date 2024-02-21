@@ -29,6 +29,15 @@ namespace tgfx {
  */
 class BytesKey {
  public:
+  BytesKey() = default;
+
+  /**
+   * Creates a key with the given capacity of uint32_t values.
+   */
+  explicit BytesKey(size_t capacity) {
+    values.reserve(capacity);
+  }
+
   /**
    * Returns true if this key is valid.
    */

@@ -53,11 +53,11 @@ class ResourceKey {
 
   ResourceKey(const ResourceKey& that);
 
+  ResourceKey(ResourceKey&& key) noexcept;
+
   bool equal(const ResourceKey& that) const;
 
   void copy(const ResourceKey& that);
-
-  void copy(const uint32_t* newData, size_t newCount, size_t offset = 0);
 
   uint32_t* data = nullptr;
   size_t count = 0;
@@ -71,7 +71,7 @@ class ResourceKey {
  *    2) A resource can have at most one scratch key, and it is set at resource creation by the
  *       resource itself.
  *    3) When a scratch resource is referenced, it will not be returned from the cache for a
- *       subsequent cache request until all refs are released.
+ *       subsequent cache request until all references are released.
  */
 class ScratchKey : public ResourceKey {
  public:
@@ -81,6 +81,9 @@ class ScratchKey : public ResourceKey {
   ScratchKey() = default;
 
   ScratchKey(const ScratchKey& that) : ResourceKey(that) {
+  }
+
+  ScratchKey(ScratchKey&& that) noexcept : ResourceKey(std::move(that)) {
   }
 
   ScratchKey(const BytesKey& that) {
@@ -124,19 +127,26 @@ class UniqueDomain;
  *    1) Only one resource can have a given unique key at a time. Hence, "unique".
  *    2) A resource can have at most one unique key at a time.
  *    3) Unlike scratch keys, multiple requests for a unique key will return the same resource even
- *       if the resource already has refs.
+ *       if the resource already has references.
  *
  * This key type allows a code path to create cached resources for which it is the exclusive user.
  * The code path creates a domain which it sets on its keys. This guarantees that there are no
  * cross-domain collisions. Unique keys preempt scratch keys. While a resource has a unique key, it
- * is inaccessible via its scratch key. It can become scratch again if the unique key is removed.
+ * is inaccessible via its scratch key. It can become scratch again if the unique key is removed or
+ * no longer has any external references.
  */
-class UniqueKey {
+class UniqueKey : public ResourceKey {
  public:
   /**
    * Creates a new UniqueKey with a valid domain.
    */
-  static UniqueKey Next();
+  static UniqueKey Make();
+
+  /**
+   * Creates a new UniqueKey by combining an existing UniqueKey and a BytesKey. The returned
+   * UniqueKey will share the same unique domain as the original UniqueKey.
+   */
+  static UniqueKey Combine(const UniqueKey& uniqueKey, const BytesKey& bytesKey);
 
   /**
    * Creates an empty UniqueKey.
@@ -148,18 +158,6 @@ class UniqueKey {
   UniqueKey(UniqueKey&& key) noexcept;
 
   virtual ~UniqueKey();
-
-  /**
-   * Returns a global unique ID of the domain. Returns 0 if the UniqueKey is empty.
-   */
-  uint32_t domain() const;
-
-  /**
-   * Returns true if the UniqueKey has no valid domain.
-   */
-  bool empty() const {
-    return uniqueDomain == nullptr;
-  }
 
   /**
    * Returns the total number of times the domain has been referenced.
@@ -175,14 +173,20 @@ class UniqueKey {
 
   UniqueKey& operator=(UniqueKey&& key) noexcept;
 
-  bool operator==(const UniqueKey& key) const;
+  bool operator==(const UniqueKey& that) const {
+    return equal(that);
+  }
 
-  bool operator!=(const UniqueKey& key) const;
+  bool operator!=(const UniqueKey& that) const {
+    return !equal(that);
+  }
 
  private:
   UniqueDomain* uniqueDomain = nullptr;
 
-  explicit UniqueKey(UniqueDomain* block);
+  explicit UniqueKey(UniqueDomain* domain);
+
+  UniqueKey(uint32_t* data, size_t count, UniqueDomain* domain);
 
   void addStrong();
 
@@ -191,6 +195,15 @@ class UniqueKey {
   friend class ResourceHandle;
   friend class LazyUniqueKey;
 };
+
+struct UniqueKeyHasher {
+  size_t operator()(const UniqueKey& uniqueKey) const {
+    return uniqueKey.hash();
+  }
+};
+
+template <typename T>
+using UniqueKeyMap = std::unordered_map<UniqueKey, T, UniqueKeyHasher>;
 
 /**
  * LazyUniqueKey defers the acquisition of the UniqueKey until it is actually needed.

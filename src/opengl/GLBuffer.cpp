@@ -24,7 +24,7 @@
 namespace tgfx {
 static ScratchKey ComputeScratchKey(BufferType bufferType) {
   static const uint32_t Type = UniqueID::Next();
-  BytesKey bytesKey = {};
+  BytesKey bytesKey(2);
   bytesKey.write(Type);
   bytesKey.write(static_cast<uint32_t>(bufferType));
   return bytesKey;

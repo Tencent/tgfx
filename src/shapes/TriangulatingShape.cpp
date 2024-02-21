@@ -46,7 +46,7 @@ class TriangleVerticesProvider : public DataProvider {
 TriangulatingShape::TriangulatingShape(std::shared_ptr<PathProxy> pathProxy, float resolutionScale)
     : PathShape(std::move(pathProxy), resolutionScale) {
   auto path = getFillPath();
-  uniqueKey = UniqueKey::Next();
+  uniqueKey = UniqueKey::Make();
   triangulator = std::make_shared<TriangleVerticesProvider>(path, bounds);
 }
 

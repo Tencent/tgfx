@@ -79,7 +79,7 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
 
 ScratchKey EAGLHardwareTexture::ComputeScratchKey(CVPixelBufferRef pixelBuffer) {
   static const uint32_t HardwareType = UniqueID::Next();
-  BytesKey bytesKey = {};
+  BytesKey bytesKey(3);
   bytesKey.write(HardwareType);
   // The pointer can be used as the key directly because the cache holder retains the CVPixelBuffer.
   // As long as the holder cache exists, the CVPixelBuffer pointer remains valid, avoiding conflicts

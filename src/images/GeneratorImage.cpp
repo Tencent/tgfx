@@ -26,7 +26,7 @@ std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> 
     return nullptr;
   }
   auto image =
-      std::shared_ptr<GeneratorImage>(new GeneratorImage(UniqueKey::Next(), std::move(generator)));
+      std::shared_ptr<GeneratorImage>(new GeneratorImage(UniqueKey::Make(), std::move(generator)));
   image->weakThis = image;
   return image;
 }

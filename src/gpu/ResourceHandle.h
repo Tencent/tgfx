@@ -51,13 +51,6 @@ class ResourceHandle {
   }
 
   /**
-   * Returns a global unique ID of the domain. Returns 0 if the ResourceHandle is empty.
-   */
-  uint32_t domain() const {
-    return uniqueKey.domain();
-  }
-
-  /**
    * Returns true if the ResourceHandle is empty.
    */
   bool empty() const {

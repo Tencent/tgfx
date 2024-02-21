@@ -24,7 +24,7 @@ std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto image = std::shared_ptr<BufferImage>(new BufferImage(UniqueKey::Next(), std::move(buffer)));
+  auto image = std::shared_ptr<BufferImage>(new BufferImage(UniqueKey::Make(), std::move(buffer)));
   image->weakThis = image;
   return image;
 }

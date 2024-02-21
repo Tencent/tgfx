@@ -22,6 +22,19 @@
 #include "utils/Log.h"
 
 namespace tgfx {
+static uint32_t* CopyData(const uint32_t* data, size_t count, size_t offset = 0) {
+  if (data == nullptr || count == 0) {
+    return nullptr;
+  }
+  auto newData = new (std::nothrow) uint32_t[count + offset];
+  if (newData == nullptr) {
+    LOGE("Failed to allocate the data of ResourceKey!");
+    return nullptr;
+  }
+  memcpy(newData + offset, data, count * sizeof(uint32_t));
+  return newData;
+}
+
 ResourceKey::ResourceKey(uint32_t* data, size_t count) : data(data), count(count) {
   DEBUG_ASSERT(data == nullptr || count >= 1);
 }
@@ -30,8 +43,13 @@ ResourceKey::~ResourceKey() {
   delete[] data;
 }
 
-ResourceKey::ResourceKey(const ResourceKey& that) {
-  copy(that);
+ResourceKey::ResourceKey(const ResourceKey& that)
+    : data(CopyData(that.data, that.count)), count(that.count) {
+}
+
+ResourceKey::ResourceKey(ResourceKey&& key) noexcept : data(key.data), count(key.count) {
+  key.data = nullptr;
+  key.count = 0;
 }
 
 bool ResourceKey::equal(const ResourceKey& that) const {
@@ -45,51 +63,67 @@ void ResourceKey::copy(const ResourceKey& that) {
   if (data == that.data) {
     return;
   }
-  copy(that.data, that.count);
-}
-
-void ResourceKey::copy(const uint32_t* newData, size_t newCount, size_t offset) {
-  delete[] data;
-  count = newCount + offset;
-  if (count > 0) {
-    data = new (std::nothrow) uint32_t[count];
-    if (data == nullptr) {
-      count = 0;
-      LOGE("Failed to allocate the data of ResourceKey!");
-      return;
-    }
-    memcpy(data + offset, newData, newCount * sizeof(uint32_t));
-  } else {
-    data = nullptr;
-  }
+  data = CopyData(that.data, that.count);
+  count = that.count;
 }
 
 ScratchKey::ScratchKey(uint32_t* data, size_t count) : ResourceKey(data, count) {
 }
 
 ScratchKey& ScratchKey::operator=(const BytesKey& that) {
-  copy(that.data(), that.size(), 1);
+  data = CopyData(that.data(), that.size(), 1);
   if (data != nullptr) {
     data[0] = HashRange(that.data(), that.size());
+    count = that.size() + 1;
+  } else {
+    count = 0;
   }
   return *this;
 }
 
-UniqueKey UniqueKey::Next() {
+UniqueKey UniqueKey::Make() {
   return UniqueKey(new UniqueDomain());
 }
 
-UniqueKey::UniqueKey(UniqueDomain* block) : uniqueDomain(block) {
-  DEBUG_ASSERT(uniqueDomain != nullptr);
+UniqueKey UniqueKey::Combine(const UniqueKey& uniqueKey, const BytesKey& bytesKey) {
+  if (uniqueKey.empty()) {
+    return {};
+  }
+  auto data = CopyData(bytesKey.data(), bytesKey.size(), 2);
+  if (data == nullptr) {
+    return uniqueKey;
+  }
+  auto count = bytesKey.size() + 2;
+  auto domain = uniqueKey.uniqueDomain;
+  data[1] = domain->uniqueID();
+  data[0] = HashRange(data + 1, count - 1);
+  domain->addReference();
+  return {data, count, domain};
 }
 
-UniqueKey::UniqueKey(const UniqueKey& key) : uniqueDomain(key.uniqueDomain) {
+static uint32_t* MakeDomainData(UniqueDomain* uniqueDomain) {
+  DEBUG_ASSERT(uniqueDomain != nullptr);
+  return new uint32_t[1]{uniqueDomain->uniqueID()};
+}
+
+UniqueKey::UniqueKey(UniqueDomain* domain)
+    : ResourceKey(MakeDomainData(domain), 1), uniqueDomain(domain) {
+}
+
+UniqueKey::UniqueKey(uint32_t* data, size_t count, UniqueDomain* domain)
+    : ResourceKey(data, count), uniqueDomain(domain) {
+}
+
+UniqueKey::UniqueKey(const UniqueKey& key) : ResourceKey(key), uniqueDomain(key.uniqueDomain) {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addReference();
   }
 }
 
-UniqueKey::UniqueKey(UniqueKey&& key) noexcept : uniqueDomain(key.uniqueDomain) {
+UniqueKey::UniqueKey(UniqueKey&& key) noexcept
+    : ResourceKey(key.data, key.count), uniqueDomain(key.uniqueDomain) {
+  key.data = nullptr;
+  key.count = 0;
   key.uniqueDomain = nullptr;
 }
 
@@ -97,10 +131,6 @@ UniqueKey::~UniqueKey() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->releaseReference();
   }
-}
-
-uint32_t UniqueKey::domain() const {
-  return uniqueDomain != nullptr ? uniqueDomain->uniqueID() : 0;
 }
 
 long UniqueKey::useCount() const {
@@ -122,6 +152,7 @@ UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addReference();
   }
+  copy(key);
   return *this;
 }
 
@@ -133,16 +164,13 @@ UniqueKey& UniqueKey::operator=(UniqueKey&& key) noexcept {
     uniqueDomain->releaseReference();
   }
   uniqueDomain = key.uniqueDomain;
+  delete[] data;
+  data = key.data;
+  count = key.count;
   key.uniqueDomain = nullptr;
+  key.data = nullptr;
+  key.count = 0;
   return *this;
-}
-
-bool UniqueKey::operator==(const UniqueKey& key) const {
-  return uniqueDomain == key.uniqueDomain;
-}
-
-bool UniqueKey::operator!=(const UniqueKey& key) const {
-  return uniqueDomain != key.uniqueDomain;
 }
 
 void UniqueKey::addStrong() {

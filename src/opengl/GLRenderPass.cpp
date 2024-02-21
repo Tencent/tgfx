@@ -47,7 +47,7 @@ static AttribLayout GetAttribLayout(SLType type) {
 
 GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
   if (GLCaps::Get(context)->vertexArrayObjectSupport) {
-    vertexArrayHandle = UniqueKey::Next();
+    vertexArrayHandle = UniqueKey::Make();
     // Using VAO is required in the core profile.
     auto task = std::make_shared<GLVertexArrayCreateTask>(vertexArrayHandle.key());
     context->drawingManager()->addResourceTask(std::move(task));

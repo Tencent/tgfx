@@ -24,7 +24,7 @@
 namespace tgfx {
 static ScratchKey ComputeScratchKey(int width, int height, PixelFormat format, bool mipmapped) {
   static const uint32_t PlainTextureType = UniqueID::Next();
-  BytesKey bytesKey = {};
+  BytesKey bytesKey(4);
   bytesKey.write(PlainTextureType);
   bytesKey.write(width);
   bytesKey.write(height);

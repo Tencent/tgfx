@@ -113,7 +113,7 @@ class ResourceCache {
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   ScratchKeyMap<std::vector<Resource*>> scratchKeyMap = {};
-  std::unordered_map<uint32_t, Resource*> uniqueKeyMap = {};
+  UniqueKeyMap<Resource*> uniqueKeyMap = {};
 
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);

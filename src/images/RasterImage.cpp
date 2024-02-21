@@ -38,7 +38,7 @@ std::shared_ptr<Image> RasterImage::MakeFrom(std::shared_ptr<Image> source,
     }
   }
   auto rasterImage = std::shared_ptr<RasterImage>(
-      new RasterImage(UniqueKey::Next(), std::move(source), rasterizationScale, sampling));
+      new RasterImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
   rasterImage->weakThis = rasterImage;
   return hasMipmap ? rasterImage->makeMipmapped(true) : rasterImage;
 }
