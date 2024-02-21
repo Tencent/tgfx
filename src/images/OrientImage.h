@@ -45,12 +45,9 @@ class OrientImage : public TransformImage {
 
   std::shared_ptr<Image> onMakeOriented(Orientation newOrientation) const override;
 
-  std::unique_ptr<DrawOp> onMakeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
-                                       TileMode tileModeX, TileMode tileModeY) const override;
-
-  std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(const DrawArgs& args,
-                                                             const Matrix* localMatrix, TileMode,
-                                                             TileMode) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                         const Matrix* localMatrix, TileMode,
+                                                         TileMode) const override;
 
   virtual std::optional<Matrix> concatLocalMatrix(const Matrix* localMatrix) const;
 

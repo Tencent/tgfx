@@ -21,7 +21,7 @@
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
-#include "images/TextureImage.h"
+#include "images/ResourceImage.h"
 #include "images/TransformImage.h"
 #include "opengl/GLCaps.h"
 #include "opengl/GLSampler.h"
@@ -382,13 +382,13 @@ TGFX_TEST(CanvasTest, rasterized) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto rasterImageUniqueKey = std::static_pointer_cast<TextureImage>(rasterImage)->uniqueKey;
+  auto rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
   auto texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
   auto source = std::static_pointer_cast<TransformImage>(image)->source;
-  auto imageUniqueKey = std::static_pointer_cast<TextureImage>(source)->uniqueKey;
+  auto imageUniqueKey = std::static_pointer_cast<ResourceImage>(source)->uniqueKey;
   texture = Resource::Find<Texture>(context, imageUniqueKey);
   EXPECT_TRUE(texture == nullptr);
   canvas->clear();
@@ -401,7 +401,7 @@ TGFX_TEST(CanvasTest, rasterized) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
   texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture == nullptr);
-  rasterImageUniqueKey = std::static_pointer_cast<TextureImage>(rasterImage)->uniqueKey;
+  rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
   texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();

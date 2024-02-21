@@ -20,25 +20,11 @@
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-std::unique_ptr<DrawOp> ColorFilter::onMakeDrawOp(std::shared_ptr<Image> source,
-                                                  const DrawArgs& args,
-                                                  const tgfx::Matrix* localMatrix,
-                                                  TileMode tileModeX, TileMode tileModeY) const {
-  auto drawOp = DrawOp::Make(std::move(source), args, localMatrix, tileModeX, tileModeY);
-  if (drawOp == nullptr) {
-    return nullptr;
-  }
-  auto colorProcessor = asFragmentProcessor();
-  if (colorProcessor == nullptr) {
-    return nullptr;
-  }
-  drawOp->addColorFP(std::move(colorProcessor));
-  return drawOp;
-}
-
-std::unique_ptr<FragmentProcessor> ColorFilter::onMakeFragmentProcessor(
-    std::shared_ptr<Image> source, const DrawArgs& args, const tgfx::Matrix* localMatrix,
-    TileMode tileModeX, TileMode tileModeY) const {
+std::unique_ptr<FragmentProcessor> ColorFilter::onFilterImage(std::shared_ptr<Image> source,
+                                                              const DrawArgs& args,
+                                                              const tgfx::Matrix* localMatrix,
+                                                              TileMode tileModeX,
+                                                              TileMode tileModeY) const {
   auto imageProcessor =
       FragmentProcessor::Make(std::move(source), args, localMatrix, tileModeX, tileModeY);
   if (imageProcessor == nullptr) {

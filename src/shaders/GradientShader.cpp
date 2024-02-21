@@ -196,7 +196,7 @@ LinearGradient::LinearGradient(const Point& startPoint, const Point& endPoint,
     : GradientShaderBase(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
 }
 
-std::unique_ptr<FragmentProcessor> LinearGradient::onMakeFragmentProcessor(
+std::unique_ptr<FragmentProcessor> LinearGradient::asFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
   auto totalMatrix = pointsToUnit;
   if (localMatrix) {
@@ -217,7 +217,7 @@ RadialGradient::RadialGradient(const Point& center, float radius, const std::vec
     : GradientShaderBase(colors, positions, RadialToUnitMatrix(center, radius)) {
 }
 
-std::unique_ptr<FragmentProcessor> RadialGradient::onMakeFragmentProcessor(
+std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
   auto totalMatrix = pointsToUnit;
   if (localMatrix != nullptr) {
@@ -232,7 +232,7 @@ SweepGradient::SweepGradient(const Point& center, float t0, float t1,
       scale(1.f / (t1 - t0)) {
 }
 
-std::unique_ptr<FragmentProcessor> SweepGradient::onMakeFragmentProcessor(
+std::unique_ptr<FragmentProcessor> SweepGradient::asFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
   auto totalMatrix = pointsToUnit;
   if (localMatrix != nullptr) {

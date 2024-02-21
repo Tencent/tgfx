@@ -34,11 +34,10 @@ class BlurImageFilter : public ImageFilter {
 
   Rect onFilterBounds(const Rect& srcRect) const override;
 
-  std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(std::shared_ptr<Image> source,
-                                                             const DrawArgs& args,
-                                                             const Matrix* localMatrix,
-                                                             TileMode tileModeX,
-                                                             TileMode tileModeY) const override;
+  std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
+                                                   const DrawArgs& args, const Matrix* localMatrix,
+                                                   TileMode tileModeX,
+                                                   TileMode tileModeY) const override;
 
   void draw(std::shared_ptr<RenderTargetProxy> renderTarget,
             std::unique_ptr<FragmentProcessor> imageProcessor, const Rect& imageBounds,

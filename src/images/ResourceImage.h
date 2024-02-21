@@ -18,47 +18,42 @@
 
 #pragma once
 
-#include "images/TransformImage.h"
-#include "tgfx/core/ImageFilter.h"
+#include "gpu/Resource.h"
+#include "gpu/proxies/TextureProxy.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
- * FilterImage wraps an existing image and applies a Filter to it.
+ * The base class for all images that contains a UniqueKey and can be cached as a GPU resource.
  */
-class FilterImage : public TransformImage {
+class ResourceImage : public Image {
  public:
-  /**
-   * Creates a new FilterImage from the given source image, filter, and clipRect.
-   */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         std::shared_ptr<Filter> filter, Point* offset = nullptr,
-                                         const Rect* clipRect = nullptr);
+  explicit ResourceImage(UniqueKey uniqueKey);
 
-  int width() const override {
-    return static_cast<int>(bounds.width());
-  }
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
+                                        SamplingOptions sampling = {}) const override;
 
-  int height() const override {
-    return static_cast<int>(bounds.height());
-  }
+  std::shared_ptr<Image> makeTextureImage(Context* context) const override;
+
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t renderFlags = 0) const;
 
  protected:
-  FilterImage(std::shared_ptr<Image> source, std::shared_ptr<Filter> filter, const Rect& bounds);
+  UniqueKey uniqueKey = {};
 
-  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
+  std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                      int alphaStartY) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
                                                          const Matrix* localMatrix,
                                                          TileMode tileModeX,
                                                          TileMode tileModeY) const override;
 
- private:
-  std::shared_ptr<Filter> filter = nullptr;
-  Rect bounds = Rect::MakeEmpty();
+  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
+                                                           bool mipmapped,
+                                                           uint32_t renderFlags) const = 0;
 
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         std::shared_ptr<Filter> filter, const Rect& bounds);
+  friend class MipmapImage;
 };
 }  // namespace tgfx

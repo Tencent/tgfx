@@ -26,6 +26,7 @@
 #include "images/GeneratorImage.h"
 #include "images/RasterImage.h"
 #include "images/SubsetImage.h"
+#include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Surface.h"
@@ -196,16 +197,5 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 
 std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
   return nullptr;
-}
-
-std::unique_ptr<DrawOp> Image::onMakeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
-                                            TileMode tileModeX, TileMode tileModeY) const {
-  auto processor = onMakeFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
-  drawOp->addColorFP(std::move(processor));
-  return drawOp;
 }
 }  // namespace tgfx

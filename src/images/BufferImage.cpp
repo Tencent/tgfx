@@ -30,7 +30,7 @@ std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer
 }
 
 BufferImage::BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer)
-    : TextureImage(std::move(uniqueKey)), imageBuffer(std::move(buffer)) {
+    : ResourceImage(std::move(uniqueKey)), imageBuffer(std::move(buffer)) {
 }
 
 std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(Context* context,

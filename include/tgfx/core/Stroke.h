@@ -20,7 +20,7 @@
 
 namespace tgfx {
 /**
- * Cap draws at the beginning and end of an open path contour.
+ * LineCap draws at the beginning and end of an open path contour.
  */
 enum class LineCap {
   /**
@@ -38,7 +38,7 @@ enum class LineCap {
 };
 
 /**
- * Join specifies how corners are drawn when a shape is stroked. Join affects the four corners
+ * LineJoin specifies how corners are drawn when a shape is stroked. Join affects the four corners
  * of a stroked rectangle, and the connected segments in a stroked path. Choose miter join to draw
  * sharp corners. Choose round join to draw a circle with a radius equal to the stroke width on
  * top of the corner. Choose bevel join to minimally connect the thick strokes.

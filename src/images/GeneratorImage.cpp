@@ -32,7 +32,7 @@ std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> 
 }
 
 GeneratorImage::GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator)
-    : TextureImage(std::move(uniqueKey)), generator(std::move(generator)) {
+    : ResourceImage(std::move(uniqueKey)), generator(std::move(generator)) {
 }
 
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryHardware) const {

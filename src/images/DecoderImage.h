@@ -25,7 +25,7 @@ namespace tgfx {
 /**
  * DecoderImage wraps an ImageDecoder that can decode ImageBuffers asynchronously.
  */
-class DecoderImage : public TextureImage {
+class DecoderImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(UniqueKey uniqueKey,
                                          std::shared_ptr<ImageDecoder> decoder);
