@@ -25,8 +25,8 @@
 namespace tgfx {
 class ImageShader : public Shader {
  protected:
-  std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(
-      const DrawArgs& args, const Matrix* localMatrix) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                         const Matrix* localMatrix) const override;
 
  private:
   ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,

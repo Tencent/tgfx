@@ -28,19 +28,6 @@ Rect ImageFilter::filterBounds(const Rect& rect) const {
   return dstBounds;
 }
 
-std::unique_ptr<DrawOp> ImageFilter::onMakeDrawOp(std::shared_ptr<Image> source,
-                                                  const DrawArgs& args, const Matrix* localMatrix,
-                                                  TileMode tileModeX, TileMode tileModeY) const {
-  auto processor =
-      onMakeFragmentProcessor(std::move(source), args, localMatrix, tileModeX, tileModeY);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
-  drawOp->addColorFP(std::move(processor));
-  return drawOp;
-}
-
 Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
 }

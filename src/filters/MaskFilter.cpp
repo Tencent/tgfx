@@ -20,24 +20,11 @@
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-std::unique_ptr<DrawOp> MaskFilter::onMakeDrawOp(std::shared_ptr<Image> source,
-                                                 const DrawArgs& args, const Matrix* localMatrix,
-                                                 TileMode tileModeX, TileMode tileModeY) const {
-  auto drawOp = DrawOp::Make(std::move(source), args, localMatrix, tileModeX, tileModeY);
-  if (drawOp == nullptr) {
-    return nullptr;
-  }
-  auto maskProcessor = asFragmentProcessor(args, localMatrix);
-  if (maskProcessor == nullptr) {
-    return nullptr;
-  }
-  drawOp->addMaskFP(std::move(maskProcessor));
-  return drawOp;
-}
-
-std::unique_ptr<FragmentProcessor> MaskFilter::onMakeFragmentProcessor(
-    std::shared_ptr<Image> source, const DrawArgs& args, const Matrix* localMatrix,
-    TileMode tileModeX, TileMode tileModeY) const {
+std::unique_ptr<FragmentProcessor> MaskFilter::onFilterImage(std::shared_ptr<Image> source,
+                                                             const DrawArgs& args,
+                                                             const Matrix* localMatrix,
+                                                             TileMode tileModeX,
+                                                             TileMode tileModeY) const {
   auto imageProcessor =
       FragmentProcessor::Make(std::move(source), args, localMatrix, tileModeX, tileModeY);
   if (imageProcessor == nullptr) {

@@ -21,16 +21,12 @@
 #include "gpu/ops/FillRectOp.h"
 
 namespace tgfx {
-void RenderContext::addOp(std::unique_ptr<Op> op, bool resolveNow) {
+void RenderContext::addOp(std::unique_ptr<Op> op) {
   if (opsTask == nullptr || opsTask->isClosed()) {
     auto drawingManager = renderTargetProxy->getContext()->drawingManager();
     opsTask = drawingManager->addOpsTask(renderTargetProxy);
   }
   opsTask->addOp(std::move(op));
-  if (resolveNow) {
-    auto drawingManager = renderTargetProxy->getContext()->drawingManager();
-    drawingManager->addTextureResolveTask(renderTargetProxy);
-  }
 }
 
 void RenderContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,

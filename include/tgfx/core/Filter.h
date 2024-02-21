@@ -40,18 +40,14 @@ class Filter {
   }
 
  protected:
-  virtual std::unique_ptr<DrawOp> onMakeDrawOp(std::shared_ptr<Image> source, const DrawArgs& args,
-                                               const Matrix* localMatrix, TileMode tileModeX,
-                                               TileMode tileModeY) const = 0;
-
   /**
    * The returned processor is in the coordinate space of the source image.
    */
-  virtual std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(std::shared_ptr<Image> source,
-                                                                     const DrawArgs& args,
-                                                                     const Matrix* localMatrix,
-                                                                     TileMode tileModeX,
-                                                                     TileMode tileModeY) const = 0;
+  virtual std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
+                                                           const DrawArgs& args,
+                                                           const Matrix* localMatrix,
+                                                           TileMode tileModeX,
+                                                           TileMode tileModeY) const = 0;
 
   friend class FilterImage;
 };

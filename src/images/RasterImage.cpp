@@ -45,7 +45,7 @@ std::shared_ptr<Image> RasterImage::MakeFrom(std::shared_ptr<Image> source,
 
 RasterImage::RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
                          float rasterizationScale, SamplingOptions sampling)
-    : TextureImage(std::move(uniqueKey)), source(std::move(source)),
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
       rasterizationScale(rasterizationScale), sampling(sampling) {
 }
 
@@ -105,14 +105,13 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
   auto sourceFlags = renderFlags | RenderFlags::DisableCache;
   auto drawRect = Rect::MakeWH(width(), height());
   DrawArgs args(context, sourceFlags, Color::White(), drawRect, Matrix::I(), sampling);
-  auto localMatrix = Matrix::MakeScale(1.0f / rasterizationScale);
-  auto drawOp = DrawOp::Make(source, args, &localMatrix);
-  if (drawOp == nullptr) {
+  auto processor = FragmentProcessor::Make(source, args);
+  if (processor == nullptr) {
     return nullptr;
   }
-  drawOp->setBlendMode(BlendMode::Src);
   RenderContext renderContext(renderTarget);
-  renderContext.addOp(std::move(drawOp));
+  auto localMatrix = Matrix::MakeScale(1.0f / rasterizationScale);
+  renderContext.fillWithFP(std::move(processor), localMatrix, true);
   return textureProxy;
 }
 

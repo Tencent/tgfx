@@ -377,11 +377,13 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   }
   DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(realPaint),
                 localBounds, state->matrix, sampling);
-  auto op = DrawOp::Make(std::move(image), args);
-  if (op == nullptr) {
+  auto processor = FragmentProcessor::Make(std::move(image), args);
+  if (processor == nullptr) {
     return;
   }
-  addDrawOp(std::move(op), args, realPaint, true);
+  auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
+  drawOp->addColorFP(std::move(processor));
+  addDrawOp(std::move(drawOp), args, realPaint, true);
   setMatrix(oldMatrix);
 }
 

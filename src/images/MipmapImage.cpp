@@ -17,25 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MipmapImage.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
-std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<TextureImage> source) {
+static BytesKey MakeMipmapBytesKey() {
+  BytesKey bytesKey(1);
+  bytesKey.write(1);
+  return bytesKey;
+}
+
+std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<ResourceImage> source) {
   if (source == nullptr) {
     return nullptr;
   }
-  auto image = std::shared_ptr<MipmapImage>(new MipmapImage(UniqueKey::Make(), std::move(source)));
+  static const auto MipmapBytesKey = MakeMipmapBytesKey();
+  auto uniqueKey = UniqueKey::Combine(source->uniqueKey, MipmapBytesKey);
+  auto image =
+      std::shared_ptr<MipmapImage>(new MipmapImage(std::move(uniqueKey), std::move(source)));
   image->weakThis = image;
   return image;
 }
 
-MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<TextureImage> source)
-    : TextureImage(std::move(uniqueKey)), source(std::move(source)) {
+MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source)
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
 }
 
 std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
                                                    SamplingOptions sampling) const {
   auto newSource =
-      std::static_pointer_cast<TextureImage>(source->makeRasterized(rasterizationScale, sampling));
+      std::static_pointer_cast<ResourceImage>(source->makeRasterized(rasterizationScale, sampling));
   if (newSource == source) {
     return weakThis.lock();
   }
@@ -43,7 +53,7 @@ std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
 }
 
 std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const {
-  auto newSource = std::static_pointer_cast<TextureImage>(source->onMakeDecoded(context, false));
+  auto newSource = std::static_pointer_cast<ResourceImage>(source->onMakeDecoded(context, false));
   if (newSource == nullptr) {
     return nullptr;
   }

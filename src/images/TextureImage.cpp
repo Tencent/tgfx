@@ -17,140 +17,48 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureImage.h"
-#include "gpu/ops/FillRectOp.h"
-#include "gpu/processors/TiledTextureEffect.h"
-#include "images/MipmapImage.h"
-#include "images/RGBAAAImage.h"
 
 namespace tgfx {
-/**
- * TextureImage wraps an existing texture proxy.
- */
-class TextureProxyImage : public TextureImage {
- public:
-  explicit TextureProxyImage(std::shared_ptr<TextureProxy> textureProxy)
-      : TextureImage(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)) {
-  }
-
-  int width() const override {
-    return textureProxy->width();
-  }
-
-  int height() const override {
-    return textureProxy->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return textureProxy->isAlphaOnly();
-  }
-
-  bool hasMipmaps() const override {
-    return textureProxy->hasMipmaps();
-  }
-
-  bool isTextureBacked() const override {
-    return true;
-  }
-
-  BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const override {
-    if (context == nullptr) {
-      return {};
-    }
-    context->flush();
-    auto texture = textureProxy->getTexture();
-    if (texture == nullptr) {
-      return {};
-    }
-    if (origin != nullptr) {
-      *origin = textureProxy->origin();
-    }
-    return texture->getBackendTexture();
-  }
-
-  std::shared_ptr<Image> makeTextureImage(Context* context) const override {
-    if (textureProxy->getContext() == context) {
-      return std::static_pointer_cast<Image>(weakThis.lock());
-    }
-    return nullptr;
-  }
-
- protected:
-  std::shared_ptr<Image> onMakeMipmapped(bool) const override {
-    return nullptr;
-  }
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey&, bool,
-                                                   uint32_t) const override {
-    if (textureProxy->getContext() != context) {
-      return nullptr;
-    }
-    return textureProxy;
-  }
-
- private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-};
-
 std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto textureImage = std::make_shared<TextureProxyImage>(std::move(textureProxy));
+  auto textureImage = std::shared_ptr<TextureImage>(new TextureImage(std::move(textureProxy)));
   textureImage->weakThis = textureImage;
   return textureImage;
 }
 
-TextureImage::TextureImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
+TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy)
+    : ResourceImage(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)) {
 }
 
-std::shared_ptr<Image> TextureImage::makeRasterized(float rasterizationScale,
-                                                    SamplingOptions sampling) const {
-  if (rasterizationScale == 1.0f) {
-    return weakThis.lock();
+BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
+  if (context == nullptr) {
+    return {};
   }
-  return Image::makeRasterized(rasterizationScale, sampling);
+  context->flush();
+  auto texture = textureProxy->getTexture();
+  if (texture == nullptr) {
+    return {};
+  }
+  if (origin != nullptr) {
+    *origin = textureProxy->origin();
+  }
+  return texture->getBackendTexture();
 }
 
 std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
-  return TextureImage::Wrap(lockTextureProxy(context));
+  if (textureProxy->getContext() == context) {
+    return std::static_pointer_cast<Image>(weakThis.lock());
+  }
+  return nullptr;
 }
 
-std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(tgfx::Context* context,
-                                                             uint32_t renderFlags) const {
-  if (context == nullptr) {
+std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(Context* context, const UniqueKey&,
+                                                               bool, uint32_t) const {
+  if (textureProxy->getContext() != context) {
     return nullptr;
   }
-  return onLockTextureProxy(context, uniqueKey, false, renderFlags);
-}
-
-std::shared_ptr<Image> TextureImage::onMakeMipmapped(bool enabled) const {
-  auto source = std::static_pointer_cast<TextureImage>(weakThis.lock());
-  return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
-}
-
-std::shared_ptr<Image> TextureImage::onMakeRGBAAA(int displayWidth, int displayHeight,
-                                                  int alphaStartX, int alphaStartY) const {
-  if (isAlphaOnly()) {
-    return nullptr;
-  }
-  auto textureImage = std::static_pointer_cast<TextureImage>(weakThis.lock());
-  return RGBAAAImage::MakeFrom(std::move(textureImage), displayWidth, displayHeight, alphaStartX,
-                               alphaStartY);
-}
-
-std::unique_ptr<FragmentProcessor> TextureImage::onMakeFragmentProcessor(const DrawArgs& args,
-                                                                         const Matrix* localMatrix,
-                                                                         TileMode tileModeX,
-                                                                         TileMode tileModeY) const {
-  auto proxy = lockTextureProxy(args.context, args.renderFlags);
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  auto processor =
-      TiledTextureEffect::Make(proxy, tileModeX, tileModeY, args.sampling, localMatrix);
-  if (isAlphaOnly() && !proxy->isAlphaOnly()) {
-    return FragmentProcessor::MulInputByChildAlpha(std::move(processor));
-  }
-  return processor;
+  return textureProxy;
 }
 }  // namespace tgfx

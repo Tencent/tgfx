@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "images/TextureImage.h"
+#include "images/ResourceImage.h"
 #include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
-class RasterImage : public TextureImage {
+class RasterImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
                                          float rasterizationScale = 1.0f,

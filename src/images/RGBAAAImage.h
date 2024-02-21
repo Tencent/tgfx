@@ -19,24 +19,21 @@
 #pragma once
 
 #include "SubsetImage.h"
-#include "images/TextureImage.h"
+#include "images/ResourceImage.h"
 
 namespace tgfx {
 class RGBAAAImage : public SubsetImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<TextureImage> source, int displayWidth,
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source, int displayWidth,
                                          int displayHeight, int alphaStartX, int alphaStartY);
 
  protected:
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::unique_ptr<DrawOp> onMakeDrawOp(const DrawArgs& args, const Matrix* localMatrix,
-                                       TileMode tileModeX, TileMode tileModeY) const override;
-
-  std::unique_ptr<FragmentProcessor> onMakeFragmentProcessor(const DrawArgs& args,
-                                                             const Matrix* localMatrix,
-                                                             TileMode tileModeX,
-                                                             TileMode tileModeY) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+                                                         const Matrix* localMatrix,
+                                                         TileMode tileModeX,
+                                                         TileMode tileModeY) const override;
 
  private:
   Point alphaStart = Point::Zero();

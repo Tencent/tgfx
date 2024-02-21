@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "TextureImage.h"
+#include "ResourceImage.h"
 
 namespace tgfx {
 /**
  * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
  */
-class BufferImage : public TextureImage {
+class BufferImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> buffer);
 

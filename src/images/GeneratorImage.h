@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "TextureImage.h"
+#include "ResourceImage.h"
 
 namespace tgfx {
 /**
  * GeneratorImage wraps an ImageGenerator that can generate ImageBuffers on demand.
  */
-class GeneratorImage : public TextureImage {
+class GeneratorImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 

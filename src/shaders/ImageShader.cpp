@@ -33,7 +33,7 @@ std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, Ti
   return shader;
 }
 
-std::unique_ptr<FragmentProcessor> ImageShader::onMakeFragmentProcessor(
+std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
   auto imageArgs = args;
   imageArgs.sampling = sampling;
