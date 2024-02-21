@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MipmapImage.h"
+#include "utils/Log.h"
 #include "utils/UniqueID.h"
 
 namespace tgfx {
 static BytesKey MakeMipmapBytesKey() {
+  auto mipmapFlag = UniqueID::Next();
   BytesKey bytesKey(1);
-  bytesKey.write(1);
+  bytesKey.write(mipmapFlag);
   return bytesKey;
 }
 
@@ -30,6 +32,7 @@ std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<ResourceImage> sour
   if (source == nullptr) {
     return nullptr;
   }
+  DEBUG_ASSERT(!source->hasMipmaps());
   static const auto MipmapBytesKey = MakeMipmapBytesKey();
   auto uniqueKey = UniqueKey::Combine(source->uniqueKey, MipmapBytesKey);
   auto image =
@@ -44,12 +47,15 @@ MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> sou
 
 std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
                                                    SamplingOptions sampling) const {
-  auto newSource =
-      std::static_pointer_cast<ResourceImage>(source->makeRasterized(rasterizationScale, sampling));
-  if (newSource == source) {
+  if (rasterizationScale == 1.0f) {
     return weakThis.lock();
   }
-  return MipmapImage::MakeFrom(std::move(newSource));
+  auto newSource =
+      std::static_pointer_cast<ResourceImage>(source->makeRasterized(rasterizationScale, sampling));
+  if (newSource != nullptr) {
+    return newSource->makeMipmapped(true);
+  }
+  return newSource;
 }
 
 std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const {

@@ -24,13 +24,16 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-std::shared_ptr<Image> RasterImage::MakeFrom(std::shared_ptr<Image> source,
-                                             float rasterizationScale, SamplingOptions sampling) {
+std::shared_ptr<RasterImage> RasterImage::MakeFrom(std::shared_ptr<Image> source,
+                                                   float rasterizationScale,
+                                                   SamplingOptions sampling) {
   if (source == nullptr || rasterizationScale <= 0) {
     return nullptr;
   }
   auto hasMipmap = source->hasMipmaps();
   auto needMipmap = sampling.mipmapMode != MipmapMode::None;
+  // The source image's mipmap state is controlled by sampling options, while the caller defines the
+  // mipmap state of the returned raster image.
   if (hasMipmap != needMipmap) {
     auto newSource = source->makeMipmapped(needMipmap);
     if (newSource != nullptr) {
@@ -40,7 +43,7 @@ std::shared_ptr<Image> RasterImage::MakeFrom(std::shared_ptr<Image> source,
   auto rasterImage = std::shared_ptr<RasterImage>(
       new RasterImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
   rasterImage->weakThis = rasterImage;
-  return hasMipmap ? rasterImage->makeMipmapped(true) : rasterImage;
+  return rasterImage;
 }
 
 RasterImage::RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
