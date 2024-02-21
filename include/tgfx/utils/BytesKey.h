@@ -42,12 +42,17 @@ class BytesKey {
   void write(uint32_t value);
 
   /**
+   * Writes an int value into the key.
+   */
+  void write(int value);
+
+  /**
    * Writes a pointer value into the key.
    */
   void write(const void* value);
 
   /**
-   * Writes a uint32 value into the key.
+   * Writes an uint32 value into the key.
    */
   void write(const uint8_t value[4]);
 
@@ -55,6 +60,20 @@ class BytesKey {
    * Writes a float value into the key.
    */
   void write(float value);
+
+  /**
+   * Pointer to the key data
+   */
+  const uint32_t* data() const {
+    return values.data();
+  }
+
+  /**
+   * Returns the number of uint32_t values in the key.
+   */
+  size_t size() const {
+    return values.size();
+  }
 
   friend bool operator==(const BytesKey& a, const BytesKey& b) {
     return a.values == b.values;

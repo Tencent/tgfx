@@ -18,9 +18,63 @@
 
 #include "gpu/ResourceKey.h"
 #include "gpu/UniqueDomain.h"
+#include "utils/HashRange.h"
 #include "utils/Log.h"
 
 namespace tgfx {
+ResourceKey::ResourceKey(uint32_t* data, size_t count) : data(data), count(count) {
+  DEBUG_ASSERT(data == nullptr || count >= 1);
+}
+
+ResourceKey::~ResourceKey() {
+  delete[] data;
+}
+
+ResourceKey::ResourceKey(const ResourceKey& that) {
+  copy(that);
+}
+
+bool ResourceKey::equal(const ResourceKey& that) const {
+  if (count != that.count) {
+    return false;
+  }
+  return memcmp(data, that.data, count * sizeof(uint32_t)) == 0;
+}
+
+void ResourceKey::copy(const ResourceKey& that) {
+  if (data == that.data) {
+    return;
+  }
+  copy(that.data, that.count);
+}
+
+void ResourceKey::copy(const uint32_t* newData, size_t newCount, size_t offset) {
+  delete[] data;
+  count = newCount + offset;
+  if (count > 0) {
+    data = new (std::nothrow) uint32_t[count];
+    if (data == nullptr) {
+      count = 0;
+      LOGE("Failed to allocate the data of ResourceKey!");
+      return;
+    }
+    memcpy(data + offset, newData, newCount * sizeof(uint32_t));
+  } else {
+    data = nullptr;
+  }
+}
+
+ScratchKey::ScratchKey(uint32_t* data, size_t count) : ResourceKey(data, count) {
+}
+
+ScratchKey& ScratchKey::operator=(const BytesKey& that) {
+  copy(that.data(), that.size(), 1);
+  if (data != nullptr) {
+    data[0] = HashRange(that.data(), that.size());
+  }
+  return *this;
+}
+
 UniqueKey UniqueKey::Next() {
   return UniqueKey(new UniqueDomain());
 }

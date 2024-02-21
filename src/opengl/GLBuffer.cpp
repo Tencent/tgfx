@@ -24,10 +24,10 @@
 namespace tgfx {
 static ScratchKey ComputeScratchKey(BufferType bufferType) {
   static const uint32_t Type = UniqueID::Next();
-  ScratchKey scratchKey = {};
-  scratchKey.write(Type);
-  scratchKey.write(static_cast<uint32_t>(bufferType));
-  return scratchKey;
+  BytesKey bytesKey = {};
+  bytesKey.write(Type);
+  bytesKey.write(static_cast<uint32_t>(bufferType));
+  return bytesKey;
 }
 
 std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, const void* buffer, size_t size,

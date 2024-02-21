@@ -18,10 +18,12 @@
 
 #include "tgfx/utils/BytesKey.h"
 #include <cstring>
+#include "utils/HashRange.h"
 
 namespace tgfx {
 union DataConverter {
   float floatValue;
+  int intValue;
   uint8_t bytes[4];
   uint32_t uintValue;
 };
@@ -33,6 +35,12 @@ union PointerConverter {
 
 void BytesKey::write(uint32_t value) {
   values.push_back(value);
+}
+
+void BytesKey::write(int value) {
+  DataConverter converter = {};
+  converter.intValue = value;
+  values.push_back(converter.uintValue);
 }
 
 void BytesKey::write(const void* value) {
@@ -58,10 +66,6 @@ void BytesKey::write(float value) {
 }
 
 size_t BytesKeyHasher::operator()(const BytesKey& key) const {
-  auto hash = key.values.size();
-  for (auto& value : key.values) {
-    hash ^= value + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);
-  }
-  return hash;
+  return HashRange(key.values.data(), key.values.size());
 }
 }  // namespace tgfx
