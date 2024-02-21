@@ -405,7 +405,11 @@ TGFX_TEST(CanvasTest, rasterized) {
   texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();
+  rasterImage = rasterImage->makeMipmapped(false);
+  EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeRasterized(2.0f, sampling);
+  EXPECT_FALSE(rasterImage->hasMipmaps());
+  rasterImage = rasterImage->makeMipmapped(true);
   EXPECT_EQ(rasterImage->width(), 908);
   EXPECT_EQ(rasterImage->height(), 1210);
   canvas->drawImage(rasterImage, 100, 100);
