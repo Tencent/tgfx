@@ -24,6 +24,45 @@
 
 namespace tgfx {
 /**
+ * Base class for all gpu Resource cache keys. There are two types of cache keys. Refer to the
+ * comments for each key type below.
+ */
+class ResourceKey {
+ public:
+  virtual ~ResourceKey();
+
+  /**
+   * Returns true if the resource key is empty.
+   */
+  bool empty() const {
+    return data == nullptr;
+  }
+
+  /**
+   * Returns the hash of the key. This is used to quickly compare keys.
+   */
+  size_t hash() const {
+    return data == nullptr ? 0 : data[0];
+  }
+
+ protected:
+  ResourceKey() = default;
+
+  ResourceKey(uint32_t* data, size_t count);
+
+  ResourceKey(const ResourceKey& that);
+
+  bool equal(const ResourceKey& that) const;
+
+  void copy(const ResourceKey& that);
+
+  void copy(const uint32_t* newData, size_t newCount, size_t offset = 0);
+
+  uint32_t* data = nullptr;
+  size_t count = 0;
+};
+
+/**
  * A key used for scratch resources. There are three important rules about scratch keys:
  *
  *    1) Multiple resources can share the same scratch key. Therefore, resources assigned the same
@@ -33,10 +72,47 @@ namespace tgfx {
  *    3) When a scratch resource is referenced, it will not be returned from the cache for a
  *       subsequent cache request until all refs are released.
  */
-using ScratchKey = BytesKey;
+class ScratchKey : public ResourceKey {
+ public:
+  /**
+   * Creates an empty ScratchKey.
+   */
+  ScratchKey() = default;
+
+  ScratchKey(const ScratchKey& that) : ResourceKey(that) {
+  }
+
+  ScratchKey(const BytesKey& that) {
+    *this = that;
+  }
+
+  ScratchKey& operator=(const ScratchKey& that) {
+    copy(that);
+    return *this;
+  }
+
+  ScratchKey& operator=(const BytesKey& that);
+
+  bool operator==(const ScratchKey& that) const {
+    return equal(that);
+  }
+
+  bool operator!=(const ScratchKey& that) const {
+    return !equal(that);
+  }
+
+ private:
+  ScratchKey(uint32_t* data, size_t count);
+};
+
+struct ScratchKeyHasher {
+  size_t operator()(const ScratchKey& scratchKey) const {
+    return scratchKey.hash();
+  }
+};
 
 template <typename T>
-using ScratchKeyMap = BytesKeyMap<T>;
+using ScratchKeyMap = std::unordered_map<ScratchKey, T, ScratchKeyHasher>;
 
 class UniqueDomain;
 

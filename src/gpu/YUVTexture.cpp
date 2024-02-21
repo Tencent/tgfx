@@ -25,12 +25,12 @@ static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};
 
 static ScratchKey ComputeScratchKey(int width, int height, YUVPixelFormat format) {
   static const uint32_t YUVTextureType = UniqueID::Next();
-  ScratchKey scratchKey = {};
-  scratchKey.write(YUVTextureType);
-  scratchKey.write(static_cast<uint32_t>(width));
-  scratchKey.write(static_cast<uint32_t>(height));
-  scratchKey.write(static_cast<uint32_t>(format));
-  return scratchKey;
+  BytesKey bytesKey = {};
+  bytesKey.write(YUVTextureType);
+  bytesKey.write(width);
+  bytesKey.write(height);
+  bytesKey.write(static_cast<uint32_t>(format));
+  return bytesKey;
 }
 
 static std::vector<std::unique_ptr<TextureSampler>> MakeTexturePlanes(Context* context,

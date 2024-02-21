@@ -141,7 +141,7 @@ std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
                                                      const ScratchKey& scratchKey) {
   resource->context = context;
   resource->scratchKey = scratchKey;
-  if (resource->scratchKey.isValid()) {
+  if (!resource->scratchKey.empty()) {
     scratchKeyMap[resource->scratchKey].push_back(resource);
   }
   totalBytes += resource->memoryUsage();
@@ -166,7 +166,7 @@ void ResourceCache::removeResource(Resource* resource) {
   if (!resource->uniqueKey.empty()) {
     removeUniqueKey(resource);
   }
-  if (resource->scratchKey.isValid()) {
+  if (!resource->scratchKey.empty()) {
     auto result = scratchKeyMap.find(resource->scratchKey);
     if (result != scratchKeyMap.end()) {
       auto& list = result->second;
@@ -230,7 +230,7 @@ void ResourceCache::processUnreferencedResources() {
   auto currentTime = std::chrono::steady_clock::now();
   for (auto& resource : needToPurge) {
     RemoveFromList(nonpurgeableResources, resource);
-    if (resource->scratchKey.isValid()) {
+    if (!resource->scratchKey.empty()) {
       AddToList(purgeableResources, resource);
       purgeableBytes += resource->memoryUsage();
       resource->lastUsedTime = currentTime;

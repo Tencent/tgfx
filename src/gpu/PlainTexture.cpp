@@ -24,14 +24,14 @@
 namespace tgfx {
 static ScratchKey ComputeScratchKey(int width, int height, PixelFormat format, bool mipmapped) {
   static const uint32_t PlainTextureType = UniqueID::Next();
-  ScratchKey scratchKey = {};
-  scratchKey.write(PlainTextureType);
-  scratchKey.write(static_cast<uint32_t>(width));
-  scratchKey.write(static_cast<uint32_t>(height));
+  BytesKey bytesKey = {};
+  bytesKey.write(PlainTextureType);
+  bytesKey.write(width);
+  bytesKey.write(height);
   auto formatValue = static_cast<uint32_t>(format);
   auto mipmapValue = static_cast<uint32_t>(mipmapped ? 1 : 0);
-  scratchKey.write(formatValue | (mipmapValue << 30));
-  return scratchKey;
+  bytesKey.write(formatValue | (mipmapValue << 30));
+  return bytesKey;
 }
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,

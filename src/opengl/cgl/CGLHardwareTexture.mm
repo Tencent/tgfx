@@ -55,13 +55,13 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
 
 ScratchKey CGLHardwareTexture::ComputeScratchKey(CVPixelBufferRef pixelBuffer) {
   static const uint32_t CGLHardwareTextureType = UniqueID::Next();
-  ScratchKey scratchKey = {};
-  scratchKey.write(CGLHardwareTextureType);
+  BytesKey bytesKey = {};
+  bytesKey.write(CGLHardwareTextureType);
   // The pointer can be used as the key directly because the cache holder retains the CVPixelBuffer.
   // As long as the holder cache exists, the CVPixelBuffer pointer remains valid, avoiding conflicts
   // with new objects. In other scenarios, it's best to avoid using pointers as keys.
-  scratchKey.write(pixelBuffer);
-  return scratchKey;
+  bytesKey.write(pixelBuffer);
+  return bytesKey;
 }
 
 CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer)
