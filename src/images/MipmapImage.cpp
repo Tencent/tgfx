@@ -17,23 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MipmapImage.h"
-#include "utils/UniqueID.h"
 
 namespace tgfx {
-static BytesKey MakeMipmapBytesKey() {
-  BytesKey bytesKey(1);
-  bytesKey.write(1);
-  return bytesKey;
-}
-
 std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<ResourceImage> source) {
   if (source == nullptr) {
     return nullptr;
   }
-  static const auto MipmapBytesKey = MakeMipmapBytesKey();
-  auto uniqueKey = UniqueKey::Combine(source->uniqueKey, MipmapBytesKey);
-  auto image =
-      std::shared_ptr<MipmapImage>(new MipmapImage(std::move(uniqueKey), std::move(source)));
+  auto image = std::shared_ptr<MipmapImage>(new MipmapImage(UniqueKey::Make(), std::move(source)));
   image->weakThis = image;
   return image;
 }
