@@ -18,11 +18,13 @@
 
 #include "MipmapImage.h"
 #include "utils/Log.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 static BytesKey MakeMipmapBytesKey() {
+  auto mipmapFlag = UniqueID::Next();
   BytesKey bytesKey(1);
-  bytesKey.write(1);
+  bytesKey.write(mipmapFlag);
   return bytesKey;
 }
 
