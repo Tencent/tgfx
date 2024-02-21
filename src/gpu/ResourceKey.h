@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstring>
 #include <memory>
 #include "tgfx/utils/BytesKey.h"
 
