@@ -662,16 +662,24 @@ class Matrix {
   }
 
   /**
-   * Returns the minimum scaling factor of the Matrix by decomposing the scaling and skewing
-   * elements. Returns -1 if scale factor overflows.
+   * Returns the minimum scale factor of the Matrix by decomposing the scaling and skewing elements.
+   * The scale factor is an absolute value and may not align with the x/y axes. Returns -1 if the
+   * scale factor overflows.
    */
   float getMinScale() const;
 
   /**
-   * Returns the maximum scaling factor of the Matrix by decomposing the scaling and skewing
-   * elements. Returns -1 if scale factor overflows.
+   * Returns the maximum scale factor of the Matrix by decomposing the scaling and skewing elements.
+   * The scale factor is an absolute value and may not align with the x/y axes. Returns -1 if the
+   * scale factor overflows.
    */
   float getMaxScale() const;
+
+  /**
+   * Returns the scale components of the Matrix along the x and y axes. Both components are
+   * absolute values.
+   */
+  Point getAxisScales() const;
 
   /**
    * Returns true if all elements of the matrix are finite. Returns false if any element is

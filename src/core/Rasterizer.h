@@ -56,6 +56,6 @@ class Rasterizer : public ImageGenerator {
 
  private:
   Matrix matrix = Matrix::I();
-  Stroke* strokeStyle = nullptr;
+  Stroke* stroke = nullptr;
 };
 }  // namespace tgfx

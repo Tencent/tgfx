@@ -21,8 +21,8 @@
 namespace tgfx {
 void Rect::scale(float scaleX, float scaleY) {
   left *= scaleX;
-  right *= scaleY;
-  top *= scaleX;
+  right *= scaleX;
+  top *= scaleY;
   bottom *= scaleY;
 }
 

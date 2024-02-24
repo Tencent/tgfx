@@ -125,6 +125,11 @@ class ProxyProvider {
 
   std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
 
+  std::shared_ptr<TextureProxy> doCreateTextureProxy(const UniqueKey& uniqueKey,
+                                                     std::shared_ptr<ImageDecoder> decoder,
+                                                     bool mipmapped = false,
+                                                     uint32_t renderFlags = 0);
+
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
 };
 }  // namespace tgfx

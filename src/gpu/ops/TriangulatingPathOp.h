@@ -23,23 +23,11 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
-class PathPaint;
-
 class TriangulatingPathOp : public DrawOp {
  public:
-  static std::unique_ptr<TriangulatingPathOp> Make(Color color, const Path& path,
-                                                   const Rect& clipBounds,
-                                                   const Matrix& localMatrix);
-
-  TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> buffer, const Rect& bounds,
-                      const Matrix& viewMatrix = Matrix::I(),
-                      const Matrix& localMatrix = Matrix::I());
-
-  TriangulatingPathOp(Color color, Path path, const Rect& bounds,
-                      const Matrix& viewMatrix = Matrix::I(),
-                      const Matrix& localMatrix = Matrix::I());
-
-  void prepare(Context* context) override;
+  static std::unique_ptr<TriangulatingPathOp> Make(Color color,
+                                                   std::shared_ptr<GpuBufferProxy> vertexBuffer,
+                                                   const Rect& bounds, const Matrix& viewMatrix);
 
   void execute(RenderPass* renderPass) override;
 
@@ -49,9 +37,10 @@ class TriangulatingPathOp : public DrawOp {
   bool onCombineIfPossible(Op* op) override;
 
   Color color = Color::Transparent();
-  std::shared_ptr<GpuBufferProxy> bufferProxy = nullptr;
-  std::vector<std::shared_ptr<PathPaint>> pathPaints = {};
+  std::shared_ptr<GpuBufferProxy> vertexBuffer = nullptr;
   Matrix viewMatrix = Matrix::I();
-  Matrix localMatrix = Matrix::I();
+
+  TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> vertexBuffer, const Rect& bounds,
+                      const Matrix& viewMatrix);
 };
 }  // namespace tgfx

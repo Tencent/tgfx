@@ -19,7 +19,9 @@
 #include "tgfx/core/Canvas.h"
 #include <atomic>
 #include "CanvasState.h"
+#include "core/PathRef.h"
 #include "core/Rasterizer.h"
+#include "gpu/PathAATriangles.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
@@ -39,6 +41,12 @@
 #include "utils/SimpleTextShaper.h"
 
 namespace tgfx {
+// https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
+static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
+// A factor used to estimate the memory size of a tessellated path, based on the average value of
+// Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
+static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
+
 static constexpr uint32_t FirstUnreservedClipID = 1;
 
 static uint32_t NextClipID() {
@@ -293,40 +301,141 @@ Rect Canvas::clipLocalBounds(Rect localBounds) {
   return clippedLocalBounds;
 }
 
-void Canvas::drawPath(const Path& path, const Paint& paint) {
-  if (nothingToDraw(paint)) {
-    return;
+static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const DrawArgs& args) {
+  Rect rect = {};
+  if (path.asRect(&rect)) {
+    return FillRectOp::Make(args.color, rect, args.viewMatrix);
   }
-  if (paint.getStyle() == PaintStyle::Fill) {
-    fillPath(path, paint);
-    return;
+  RRect rRect;
+  if (path.asRRect(&rRect)) {
+    return RRectOp::Make(args.color, rRect, args.viewMatrix);
   }
-  auto strokePath = path;
-  auto strokeEffect = PathEffect::MakeStroke(paint.getStroke());
-  if (strokeEffect == nullptr) {
-    return;
-  }
-  strokeEffect->applyTo(&strokePath);
-  fillPath(strokePath, paint);
+  return nullptr;
 }
 
-void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
-  if (shape == nullptr || nothingToDraw(paint)) {
+static std::unique_ptr<DrawOp> MakeTriangulatingPathOp(const Path& path, const DrawArgs& args,
+                                                       const Point& scales, const Stroke* stroke) {
+  static const auto TriangulatingPathType = UniqueID::Next();
+  BytesKey bytesKey = {};
+  Matrix rasterizeMatrix = {};
+  if (scales.x == scales.y) {
+    rasterizeMatrix.setScale(scales.x, scales.y);
+    bytesKey.reserve(2);
+    bytesKey.write(TriangulatingPathType);
+    bytesKey.write(scales.x);
+  } else {
+    rasterizeMatrix = args.viewMatrix;
+    rasterizeMatrix.setTranslateX(0);
+    rasterizeMatrix.setTranslateY(0);
+    bytesKey.reserve(5);
+    bytesKey.write(TriangulatingPathType);
+    bytesKey.write(rasterizeMatrix.getScaleX());
+    bytesKey.write(rasterizeMatrix.getSkewX());
+    bytesKey.write(rasterizeMatrix.getSkewY());
+    bytesKey.write(rasterizeMatrix.getScaleY());
+  }
+  auto uniqueKey = UniqueKey::Combine(PathRef::GetUniqueKey(path), bytesKey);
+  auto pathTriangles = PathAATriangles::Make(path, rasterizeMatrix, stroke);
+  auto proxyProvider = args.context->proxyProvider();
+  auto bufferProxy = proxyProvider->createGpuBufferProxy(uniqueKey, pathTriangles,
+                                                         BufferType::Vertex, args.renderFlags);
+  if (bufferProxy == nullptr) {
+    return nullptr;
+  }
+  auto viewMatrix = args.viewMatrix;
+  auto drawBounds = viewMatrix.mapRect(args.drawRect);
+  Matrix invert = {};
+  if (!rasterizeMatrix.invert(&invert)) {
+    return nullptr;
+  }
+  viewMatrix.preConcat(invert);
+  return TriangulatingPathOp::Make(args.color, std::move(bufferProxy), drawBounds, viewMatrix);
+}
+
+static std::unique_ptr<DrawOp> MakeTexturePathOp(const Path& path, const DrawArgs& args,
+                                                 const Point& scales, const Rect& bounds,
+                                                 const Stroke* stroke) {
+  static const auto TexturePathType = UniqueID::Next();
+  BytesKey bytesKey(3);
+  bytesKey.write(TexturePathType);
+  bytesKey.write(scales.x);
+  bytesKey.write(scales.y);
+  auto uniqueKey = UniqueKey::Combine(PathRef::GetUniqueKey(path), bytesKey);
+  auto width = ceilf(bounds.width());
+  auto height = ceilf(bounds.height());
+  auto localMatrix = Matrix::MakeScale(scales.x, scales.y);
+  localMatrix.postTranslate(-bounds.x(), -bounds.y());
+  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), localMatrix, stroke);
+  auto proxyProvider = args.context->proxyProvider();
+  auto textureProxy =
+      proxyProvider->createTextureProxy(uniqueKey, rasterizer, false, args.renderFlags);
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  auto maskProcessor =
+      TextureEffect::Make(std::move(textureProxy), SamplingOptions(), &localMatrix);
+  if (maskProcessor == nullptr) {
+    return nullptr;
+  }
+  auto op = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
+  op->addColorFP(std::move(maskProcessor));
+  return op;
+}
+
+static Path GetSimpleFillPath(const Path& path, const Paint& paint) {
+  if (paint.getStyle() == PaintStyle::Fill) {
+    return path;
+  }
+  if (path.isLine()) {
+    auto effect = PathEffect::MakeStroke(paint.getStroke());
+    if (effect != nullptr) {
+      auto tempPath = path;
+      effect->applyTo(&tempPath);
+      return tempPath;
+    }
+  }
+  return {};
+}
+
+void Canvas::drawPath(const Path& path, const Paint& paint) {
+  if (path.isEmpty() || nothingToDraw(paint)) {
     return;
   }
-  auto localBounds = clipLocalBounds(shape->getBounds());
+  auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
+  auto pathBounds = path.getBounds();
+  if (stroke != nullptr) {
+    pathBounds.outset(stroke->width, stroke->width);
+  }
+  auto localBounds = clipLocalBounds(pathBounds);
   if (localBounds.isEmpty()) {
     return;
   }
-  auto inputColor = getInputColor(paint);
-  auto op =
-      shape->makeOp(getContext(), inputColor, state->matrix, surface->options()->renderFlags());
-  if (op == nullptr) {
+  auto fillPath = GetSimpleFillPath(path, paint);
+  if (drawAsClear(fillPath, paint)) {
     return;
   }
-  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, localBounds,
+  DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(paint), localBounds,
                 state->matrix);
-  addDrawOp(std::move(op), args, paint);
+  auto drawOp = MakeSimplePathOp(fillPath, args);
+  if (drawOp != nullptr) {
+    addDrawOp(std::move(drawOp), args, paint);
+    return;
+  }
+  auto scales = state->matrix.getAxisScales();
+  if (FloatNearlyZero(scales.x) || FloatNearlyZero(scales.y)) {
+    return;
+  }
+  auto scaledBounds = pathBounds;
+  scaledBounds.scale(scales.x, scales.y);
+  auto width = static_cast<int>(ceilf(scaledBounds.width()));
+  auto height = static_cast<int>(ceilf(scaledBounds.height()));
+  if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT ||
+      width * height >= path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR) {
+    drawOp = MakeTriangulatingPathOp(path, args, scales, stroke);
+  } else {
+    drawOp = MakeTexturePathOp(path, args, scales, scaledBounds, stroke);
+  }
+  addDrawOp(std::move(drawOp), args, paint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
@@ -387,67 +496,9 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   setMatrix(oldMatrix);
 }
 
-static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const Color& color,
-                                                const Matrix& viewMatrix) {
-  auto rect = Rect::MakeEmpty();
-  if (path.asRect(&rect)) {
-    return FillRectOp::Make(color, rect, viewMatrix);
-  }
-  RRect rRect;
-  if (path.asRRect(&rRect)) {
-    return RRectOp::Make(color, rRect, viewMatrix);
-  }
-  return nullptr;
-}
-
-void Canvas::fillPath(const Path& path, const Paint& paint) {
-  if (path.isEmpty()) {
-    return;
-  }
-  auto localBounds = clipLocalBounds(path.getBounds());
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  if (drawAsClear(path, paint)) {
-    return;
-  }
-  auto inputColor = getInputColor(paint);
-  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, localBounds,
-                state->matrix);
-  auto op = MakeSimplePathOp(path, inputColor, state->matrix);
-  if (op) {
-    addDrawOp(std::move(op), args, paint);
-    return;
-  }
-  auto localMatrix = Matrix::I();
-  if (!state->matrix.invert(&localMatrix)) {
-    return;
-  }
-  auto deviceBounds = args.viewMatrix.mapRect(args.drawRect);
-  auto tempPath = path;
-  tempPath.transform(state->matrix);
-  op = TriangulatingPathOp::Make(inputColor, tempPath, deviceBounds, localMatrix);
-  if (op) {
-    save();
-    resetMatrix();
-    addDrawOp(std::move(op), args, paint);
-    restore();
-    return;
-  }
-  auto width = ceilf(deviceBounds.width());
-  auto height = ceilf(deviceBounds.height());
-  auto totalMatrix = state->matrix;
-  auto matrix = Matrix::MakeTrans(-deviceBounds.x(), -deviceBounds.y());
-  matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
-  totalMatrix.postConcat(matrix);
-  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), totalMatrix);
-  auto textureProxy = getContext()->proxyProvider()->createTextureProxy(
-      {}, std::move(rasterizer), false, surface->options()->renderFlags());
-  drawMask(deviceBounds, std::move(textureProxy), paint);
-}
-
-void Canvas::drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, const Paint& paint) {
-  if (mask == nullptr) {
+void Canvas::drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> textureProxy,
+                      const Paint& paint) {
+  if (textureProxy == nullptr) {
     return;
   }
   auto localMatrix = Matrix::I();
@@ -456,16 +507,16 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<TextureProxy> mask, co
     return;
   }
   maskLocalMatrix.postConcat(state->matrix);
-  maskLocalMatrix.postTranslate(-bounds.x(), -bounds.y());
-  maskLocalMatrix.postScale(static_cast<float>(mask->width()) / bounds.width(),
-                            static_cast<float>(mask->height()) / bounds.height());
+  maskLocalMatrix.postTranslate(-deviceBounds.x(), -deviceBounds.y());
+  maskLocalMatrix.postScale(static_cast<float>(textureProxy->width()) / deviceBounds.width(),
+                            static_cast<float>(textureProxy->height()) / deviceBounds.height());
   auto oldMatrix = state->matrix;
   resetMatrix();
-  DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(paint), bounds,
+  DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(paint), deviceBounds,
                 Matrix::I());
   auto op = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix, &localMatrix);
   auto maskProcessor = FragmentProcessor::MulInputByChildAlpha(
-      TextureEffect::Make(std::move(mask), SamplingOptions(), &maskLocalMatrix));
+      TextureEffect::Make(std::move(textureProxy), SamplingOptions(), &maskLocalMatrix));
   if (maskProcessor == nullptr) {
     return;
   }
@@ -490,9 +541,7 @@ void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_
   if (nothingToDraw(paint) || glyphCount == 0) {
     return;
   }
-  auto scaleX = state->matrix.getScaleX();
-  auto skewY = state->matrix.getSkewY();
-  auto scale = std::sqrt(scaleX * scaleX + skewY * skewY);
+  auto scale = state->matrix.getMaxScale();
   auto scaledFont = font.makeWithSize(font.getSize() * scale);
   auto scaledPaint = paint;
   scaledPaint.setStrokeWidth(paint.getStrokeWidth() * scale);

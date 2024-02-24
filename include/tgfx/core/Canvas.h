@@ -25,7 +25,6 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -150,14 +149,9 @@ class Canvas {
   void drawRect(const Rect& rect, const Paint& paint);
 
   /**
-   * Draws a path with using current clip, matrix and specified paint.
+   * Draws a path using the current clip, matrix, and the specified paint.
    */
   void drawPath(const Path& path, const Paint& paint);
-
-  /**
-   * Draws a shape with using current clip, matrix and specified paint.
-   */
-  void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
 
   /**
    * Draws an image, with its top-left corner at (left, top), using current clip, matrix and
@@ -168,7 +162,7 @@ class Canvas {
   void drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint = nullptr);
 
   /**
-   * Draws a Image, with its top-left corner at (0, 0), using current alpha, clip and matrix
+   * Draws an Image, with its top-left corner at (0, 0), using current alpha, clip and matrix
    * premultiplied with existing Matrix. If image->hasMipmaps() is true, uses FilterMode::Linear
    * and MipmapMode::Linear as the sampling options. Otherwise, uses FilterMode::Linear and
    * MipmapMode::None as the sampling options.
@@ -227,12 +221,11 @@ class Canvas {
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
   Rect clipLocalBounds(Rect localBounds);
-  void drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> maskTexture,
+  void drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> textureProxy,
                 const Paint& paint);
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);
   void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
-  void fillPath(const Path& path, const Paint& paint);
   bool drawAsClear(const Path& path, const Paint& paint);
   Color getInputColor(const Paint& paint);
   bool getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp);
