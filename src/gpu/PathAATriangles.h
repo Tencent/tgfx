@@ -18,21 +18,25 @@
 
 #pragma once
 
-#include "tgfx/core/Shape.h"
+#include "core/DataProvider.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-class RectShape : public Shape {
+class PathAATriangles : public DataProvider {
  public:
-  explicit RectShape(const Rect& rect, float resolutionScale = 1.0f);
+  static std::shared_ptr<PathAATriangles> Make(Path path, const Matrix& matrix,
+                                               const Stroke* stroke = nullptr);
 
-  Rect getBounds() const override {
-    return rect;
-  }
+  ~PathAATriangles() override;
+
+  std::shared_ptr<Data> getData() const override;
 
  private:
-  Rect rect = {};
+  Path path = {};
+  Matrix matrix = Matrix::I();
+  Stroke* stroke = nullptr;
 
-  std::unique_ptr<DrawOp> makeOp(Context* context, const Color& color, const Matrix& viewMatrix,
-                                 uint32_t renderFlags) const override;
+  PathAATriangles(Path path, const Matrix& matrix, const Stroke* stroke);
 };
 }  // namespace tgfx

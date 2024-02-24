@@ -389,6 +389,17 @@ float Matrix::getMaxScale() const {
   return -1.0f;
 }
 
+Point Matrix::getAxisScales() const {
+  Point scale = {};
+  double a = values[SCALE_X];
+  double c = values[SKEW_X];
+  double b = values[SKEW_Y];
+  double d = values[SCALE_Y];
+  scale.x = static_cast<float>(sqrt(a * a + b * b));
+  scale.y = static_cast<float>(sqrt(c * c + d * d));
+  return scale;
+}
+
 bool Matrix::getMinMaxScaleFactors(float* results) const {
   float a = sdot(values[SCALE_X], values[SCALE_X], values[SKEW_Y], values[SKEW_Y]);
   float b = sdot(values[SCALE_X], values[SKEW_X], values[SCALE_Y], values[SKEW_Y]);

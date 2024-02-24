@@ -21,7 +21,7 @@
 namespace tgfx {
 enum class FilterMode {
   /**
-   * Single sample point (nearest neighbor)
+   * Single sample point (the nearest neighbor)
    */
   Nearest,
 

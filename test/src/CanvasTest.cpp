@@ -125,54 +125,6 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   device->unlock();
 }
 
-TGFX_TEST(CanvasTest, merge_draw_call_triangle) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  int width = 72;
-  int height = 72;
-  auto surface = Surface::Make(context, width, height);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-  Paint paint;
-  paint.setShader(Shader::MakeImageShader(image)->makeWithMatrix(
-      Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(image->width()),
-                        static_cast<float>(height) / static_cast<float>(image->height()))));
-  int tileSize = 8;
-  int drawCallCount = 0;
-  for (int y = 0; y < height; y += tileSize) {
-    bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < width; x += tileSize) {
-      if (draw) {
-        auto rect = Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
-                                   static_cast<float>(tileSize), static_cast<float>(tileSize));
-        auto centerX = rect.x() + rect.width() / 2.f;
-        auto centerY = rect.y() + rect.height() / 2.f;
-        Path path;
-        path.addRect(rect);
-        Matrix matrix = Matrix::I();
-        matrix.postRotate(45, centerX, centerY);
-        path.transform(matrix);
-        canvas->drawPath(path, paint);
-        drawCallCount += 1;
-      }
-      draw = !draw;
-    }
-  }
-  auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
-  EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->pathPaints.size(),
-            static_cast<size_t>(drawCallCount));
-  canvas->flush();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_triangle"));
-  device->unlock();
-}
-
 TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -498,7 +450,7 @@ TGFX_TEST(CanvasTest, hardwareMipmap) {
   device->unlock();
 }
 
-TGFX_TEST(CanvasTest, shape) {
+TGFX_TEST(CanvasTest, path) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
@@ -507,28 +459,45 @@ TGFX_TEST(CanvasTest, shape) {
   auto canvas = surface->getCanvas();
   Path path;
   path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
-  auto shape = Shape::MakeFromFill(path);
   Paint paint;
   paint.setColor(Color::White());
-  canvas->drawShape(shape, paint);
+  canvas->drawPath(path, paint);
   path.reset();
   path.addRoundRect(Rect::MakeXYWH(10, 120, 100, 100), 10, 10);
-  shape = Shape::MakeFromFill(path);
-  canvas->drawShape(shape, paint);
+  canvas->drawPath(path, paint);
   path.reset();
-  path.addRect(Rect::MakeXYWH(10, 250, 100, 100));
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   auto matrix = Matrix::I();
-  matrix.postRotate(30, 60, 300);
+  matrix.postRotate(30, 50, 50);
   path.transform(matrix);
-  shape = Shape::MakeFromFill(path);
-  canvas->drawShape(shape, paint);
-  paint.setColor(Color::Black());
-  paint.setAlpha(0.3f);
   matrix.reset();
-  matrix.postScale(0.5, 0.5, 60, 300);
+  matrix.postTranslate(20, 250);
   canvas->setMatrix(matrix);
-  canvas->drawShape(shape, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
+  canvas->drawPath(path, paint);
+  paint.setColor(Color::Black());
+  paint.setAlpha(0.7f);
+  matrix.reset();
+  matrix.postScale(0.5, 0.5, 50, 50);
+  matrix.postTranslate(20, 250);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+  matrix.reset();
+  matrix.postRotate(15, 50, 50);
+  matrix.postScale(2, 2, 50, 50);
+  matrix.postTranslate(250, 150);
+  paint.setColor(Color::White());
+  paint.setAlpha(1.0f);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+  matrix.reset();
+  matrix.postRotate(15, 50, 50);
+  matrix.postScale(1.5f, 0.3f, 50, 50);
+  matrix.postTranslate(250, 150);
+  paint.setColor(Color::Black());
+  paint.setAlpha(0.7f);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
   device->unlock();
 }
 

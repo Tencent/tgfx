@@ -39,6 +39,13 @@ class BytesKey {
   }
 
   /**
+   * Reserves the capacity of uint32_t values.
+   */
+  void reserve(size_t capacity) {
+    values.reserve(capacity);
+  }
+
+  /**
    * Returns true if this key is valid.
    */
   bool isValid() const {

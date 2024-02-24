@@ -67,15 +67,15 @@ std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(Path path, const ISize& clipSiz
   return std::make_shared<PathRasterizer>(std::move(path), clipSize, matrix, stroke);
 }
 
-Rasterizer::Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* stroke)
+Rasterizer::Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* s)
     : ImageGenerator(clipSize.width, clipSize.height), matrix(matrix) {
-  if (stroke != nullptr) {
-    strokeStyle = new Stroke(*stroke);
+  if (s != nullptr) {
+    stroke = new Stroke(*s);
   }
 }
 
 Rasterizer::~Rasterizer() {
-  delete strokeStyle;
+  delete stroke;
 }
 
 std::shared_ptr<ImageBuffer> Rasterizer::onMakeBuffer(bool tryHardware) const {
@@ -84,7 +84,7 @@ std::shared_ptr<ImageBuffer> Rasterizer::onMakeBuffer(bool tryHardware) const {
     return nullptr;
   }
   mask->setMatrix(matrix);
-  onRasterize(mask.get(), strokeStyle);
+  onRasterize(mask.get(), stroke);
   return mask->makeBuffer();
 }
 }  // namespace tgfx

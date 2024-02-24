@@ -22,9 +22,6 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
-// https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
-static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
-
 /**
  * Provides utility functions for converting paths to a collection of triangles.
  */
