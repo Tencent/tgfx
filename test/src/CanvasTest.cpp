@@ -481,6 +481,11 @@ TGFX_TEST(CanvasTest, path) {
   matrix.postTranslate(20, 250);
   canvas->setMatrix(matrix);
   canvas->drawPath(path, paint);
+  Path roundPath = {};
+  roundPath.addRoundRect(Rect::MakeXYWH(0, 0, 100, 100), 20, 20);
+  matrix.reset();
+  matrix.postRotate(30, 50, 50);
+  roundPath.transform(matrix);
   matrix.reset();
   matrix.postRotate(15, 50, 50);
   matrix.postScale(2, 2, 50, 50);
@@ -488,7 +493,7 @@ TGFX_TEST(CanvasTest, path) {
   paint.setColor(Color::White());
   paint.setAlpha(1.0f);
   canvas->setMatrix(matrix);
-  canvas->drawPath(path, paint);
+  canvas->drawPath(roundPath, paint);
   matrix.reset();
   matrix.postRotate(15, 50, 50);
   matrix.postScale(1.5f, 0.3f, 50, 50);
