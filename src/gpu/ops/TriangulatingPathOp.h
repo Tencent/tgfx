@@ -27,7 +27,8 @@ class TriangulatingPathOp : public DrawOp {
  public:
   static std::unique_ptr<TriangulatingPathOp> Make(Color color,
                                                    std::shared_ptr<GpuBufferProxy> vertexBuffer,
-                                                   const Rect& bounds, const Matrix& viewMatrix);
+                                                   const Rect& bounds, const Matrix& viewMatrix,
+                                                   const Matrix& localMatrix = Matrix::I());
 
   void execute(RenderPass* renderPass) override;
 
@@ -39,8 +40,9 @@ class TriangulatingPathOp : public DrawOp {
   Color color = Color::Transparent();
   std::shared_ptr<GpuBufferProxy> vertexBuffer = nullptr;
   Matrix viewMatrix = Matrix::I();
+  Matrix localMatrix = Matrix::I();
 
   TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> vertexBuffer, const Rect& bounds,
-                      const Matrix& viewMatrix);
+                      const Matrix& viewMatrix, const Matrix& localMatrix);
 };
 }  // namespace tgfx

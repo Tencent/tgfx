@@ -24,18 +24,19 @@
 namespace tgfx {
 std::unique_ptr<TriangulatingPathOp> TriangulatingPathOp::Make(
     Color color, std::shared_ptr<GpuBufferProxy> vertexBuffer, const Rect& bounds,
-    const Matrix& viewMatrix) {
+    const Matrix& viewMatrix, const Matrix& localMatrix) {
   if (vertexBuffer == nullptr || bounds.isEmpty()) {
     return nullptr;
   }
   return std::unique_ptr<TriangulatingPathOp>(
-      new TriangulatingPathOp(color, std::move(vertexBuffer), bounds, viewMatrix));
+      new TriangulatingPathOp(color, std::move(vertexBuffer), bounds, viewMatrix, localMatrix));
 }
 
 TriangulatingPathOp::TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> vertexBuffer,
-                                         const Rect& bounds, const Matrix& viewMatrix)
+                                         const Rect& bounds, const Matrix& viewMatrix,
+                                         const Matrix& localMatrix)
     : DrawOp(ClassID()), color(color), vertexBuffer(std::move(vertexBuffer)),
-      viewMatrix(viewMatrix) {
+      viewMatrix(viewMatrix), localMatrix(localMatrix) {
   setBounds(bounds);
 }
 
@@ -51,7 +52,7 @@ void TriangulatingPathOp::execute(RenderPass* renderPass) {
   auto pipeline = createPipeline(
       renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
                                                  renderPass->renderTarget()->height(), viewMatrix,
-                                                 Matrix::I()));
+                                                 localMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(nullptr, buffer);
   auto vertexCount = PathTriangulator::GetAATriangleCount(buffer->size());
