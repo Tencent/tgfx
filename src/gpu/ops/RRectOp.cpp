@@ -112,8 +112,6 @@ class RRectPaint {
   float innerYRadius;
   RRect rRect;
   Matrix viewMatrix;
-
-  void writeToVertices(std::vector<float>& vertices, bool useScale, AAType aa) const;
 };
 
 void WriteColor(float* vertices, int& index, const Color& color) {
@@ -144,6 +142,9 @@ class RRectVerticesProvider : public DataProvider {
       auto& color = rRectPaint->color;
       auto& innerXRadius = rRectPaint->innerXRadius;
       auto& innerYRadius = rRectPaint->innerYRadius;
+      auto scales = viewMatrix.getAxisScales();
+      rRect.scale(scales.x, scales.y);
+      viewMatrix.preScale(1 / scales.x, 1 / scales.y);
       float reciprocalRadii[4] = {1e6f, 1e6f, 1e6f, 1e6f};
       if (rRect.radii.x > 0) {
         reciprocalRadii[0] = 1.f / rRect.radii.x;
