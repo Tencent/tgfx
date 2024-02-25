@@ -299,14 +299,14 @@ void Path::addRoundRect(const Rect& rect, float radiusX, float radiusY, bool rev
 }
 
 void Path::addPath(const Path& src, PathOp op) {
-  if (isEmpty()) {
-    *this = src;
-    return;
-  }
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
   if (op == PathOp::Append) {
-    path.addPath(newPath);
+    if (path.isEmpty()) {
+      path = newPath;
+    } else {
+      path.addPath(newPath);
+    }
     return;
   }
   SkPathOp pathOp;
