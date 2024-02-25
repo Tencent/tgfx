@@ -344,12 +344,13 @@ static std::unique_ptr<DrawOp> MakeTriangulatingPathOp(const Path& path, const D
   }
   auto viewMatrix = args.viewMatrix;
   auto drawBounds = viewMatrix.mapRect(args.drawRect);
-  Matrix invert = {};
-  if (!rasterizeMatrix.invert(&invert)) {
+  Matrix localMatrix = {};
+  if (!rasterizeMatrix.invert(&localMatrix)) {
     return nullptr;
   }
-  viewMatrix.preConcat(invert);
-  return TriangulatingPathOp::Make(args.color, std::move(bufferProxy), drawBounds, viewMatrix);
+  viewMatrix.preConcat(localMatrix);
+  return TriangulatingPathOp::Make(args.color, std::move(bufferProxy), drawBounds, viewMatrix,
+                                   localMatrix);
 }
 
 static std::unique_ptr<DrawOp> MakeTexturePathOp(const Path& path, const DrawArgs& args,

@@ -20,7 +20,6 @@
 #include "gpu/Texture.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
-#include "gpu/ops/TriangulatingPathOp.h"
 #include "images/ResourceImage.h"
 #include "images/TransformImage.h"
 #include "opengl/GLCaps.h"
@@ -490,14 +489,16 @@ TGFX_TEST(CanvasTest, path) {
   matrix.postRotate(15, 50, 50);
   matrix.postScale(2, 2, 50, 50);
   matrix.postTranslate(250, 150);
-  paint.setColor(Color::White());
-  paint.setAlpha(1.0f);
+  paint.setShader(Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{static_cast<float>(25), static_cast<float>(100)},
+      {Color{0.f, 1.f, 0.f, 1.f}, Color{1.f, 0.f, 0.f, 0.f}}, {}));
   canvas->setMatrix(matrix);
   canvas->drawPath(roundPath, paint);
   matrix.reset();
   matrix.postRotate(15, 50, 50);
   matrix.postScale(1.5f, 0.3f, 50, 50);
   matrix.postTranslate(250, 150);
+  paint.setShader(nullptr);
   paint.setColor(Color::Black());
   paint.setAlpha(0.7f);
   canvas->setMatrix(matrix);
