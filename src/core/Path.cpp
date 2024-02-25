@@ -161,16 +161,7 @@ bool Path::isLine(Point line[2]) const {
 }
 
 Rect Path::getBounds() const {
-  // Internally, SkPath lazily computes bounds. Use this function instead of path.getBounds()
-  // for thread safety.
-  const auto& path = pathRef->path;
-  auto count = path.countPoints();
-  auto points = new SkPoint[static_cast<size_t>(count)];
-  path.getPoints(points, count);
-  auto rect = SkRect::MakeEmpty();
-  rect.setBounds(points, count);
-  delete[] points;
-  return {rect.fLeft, rect.fTop, rect.fRight, rect.fBottom};
+  return pathRef->getBounds();
 }
 
 bool Path::isEmpty() const {
@@ -401,6 +392,7 @@ PathRef* Path::writableRef() {
     pathRef = std::make_shared<PathRef>(pathRef->path);
   } else {
     pathRef->uniqueKey.reset();
+    pathRef->resetBounds();
   }
   return pathRef.get();
 }
