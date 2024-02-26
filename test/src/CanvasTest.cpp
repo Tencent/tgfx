@@ -658,8 +658,9 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   canvas->drawImage(image);
   image = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
-  canvas->setBlendMode(BlendMode::Multiply);
-  canvas->drawImage(image);
+  Paint paint = {};
+  paint.setBlendMode(BlendMode::Multiply);
+  canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
   GLFunctions::Get(context)->deleteTextures(1, &(sampler.id));
   device->unlock();

@@ -75,6 +75,54 @@ class Canvas {
   void restore();
 
   /**
+   * Translates the current matrix by dx along the x-axis and dy along the y-axis. Mathematically,
+   * it replaces the current matrix with a translation matrix premultiplied with the current matrix.
+   * This has the effect of moving the drawing by (dx, dy) before transforming the result with the
+   * current matrix.
+   */
+  void translate(float dx, float dy);
+
+  /**
+   * Scales the current matrix by sx along the x-axis and sy along the y-axis. Mathematically, it
+   * replaces the current matrix with a scale matrix premultiplied with the current matrix. This has
+   * the effect of scaling the drawing by (sx, sy) before transforming the result with the current
+   * matrix.
+   */
+  void scale(float sx, float sy);
+
+  /**
+   * Rotates the current matrix by degrees. Positive values rotate the drawing clockwise.
+   * Mathematically, it replaces the current matrix with a rotation matrix premultiplied with the
+   * current matrix. This has the effect of rotating the drawing by degrees before transforming the
+   * result with the current matrix.
+   */
+  void rotate(float degrees);
+
+  /**
+   * Rotates the current matrix by degrees around the point (px, py). Positive values rotate the
+   * drawing clockwise. Mathematically, it replaces the current matrix with a rotation matrix
+   * premultiplied with the current matrix. This has the effect of rotating the drawing around the
+   * point (px, py) by degrees before transforming the result with the current matrix.
+   */
+  void rotate(float degress, float px, float py);
+
+  /**
+   * Skews the current matrix by sx along the x-axis and sy along the y-axis. A positive value of sx
+   * skews the drawing right as y-axis values increase; a positive value of sy skews the drawing
+   * down as x-axis values increase. Mathematically, it replaces the current matrix with a skew
+   * matrix premultiplied with the current matrix. This has the effect of skewing the drawing by
+   * (sx, sy) before transforming the result with the current matrix.
+   */
+  void skew(float sx, float sy);
+
+  /**
+   * Replaces the current Matrix with matrix premultiplied with the existing one. This has the
+   * effect of transforming the drawn geometry by matrix, before transforming the result with the
+   * existing Matrix.
+   */
+  void concat(const Matrix& matrix);
+
+  /**
    * Returns the current total matrix.
    */
   Matrix getMatrix() const;
@@ -92,34 +140,7 @@ class Canvas {
   void resetMatrix();
 
   /**
-   * Replaces the current Matrix with matrix premultiplied with the existing one. This has the
-   * effect of transforming the drawn geometry by matrix, before transforming the result with the
-   * existing Matrix.
-   */
-  void concat(const Matrix& matrix);
-
-  /**
-   * Returns the current global alpha.
-   */
-  float getAlpha() const;
-
-  /**
-   * Replaces the global alpha with specified newAlpha.
-   */
-  void setAlpha(float newAlpha);
-
-  /**
-   * Returns the current global blend mode.
-   */
-  BlendMode getBlendMode() const;
-
-  /**
-   * Replaces the global blend mode with specified new blend mode.
-   */
-  void setBlendMode(BlendMode blendMode);
-
-  /**
-   * Returns the current total clip.
+   * Returns the current total clip Path.
    */
   Path getTotalClip() const;
 
@@ -143,36 +164,75 @@ class Canvas {
   void clear(const Color& color = Color::Transparent());
 
   /**
-   * Draws a rectangle with specified paint, using current alpha, blend mode, clip and
-   * matrix.
+   * Draws a line from (x0, y0) to (x1, y1) using the current clip, matrix, and specified paint.
+   * The Paint::style is ignored, as if set to PaintStyle::Stroke.
+   */
+  void drawLine(float x0, float y0, float x1, float y1, const Paint& paint);
+
+  /**
+   * Draws a line from p0 to p1 using the current clip, matrix, and specified paint. The
+   * Paint::style is ignored, as if it were set to PaintStyle::Stroke.
+   */
+  void drawLine(const Point& p0, const Point& p1, const Paint& paint) {
+    drawLine(p0.x, p0.y, p1.x, p1.y, paint);
+  }
+
+  /**
+   * Draws a rectangle using the current clip, matrix, and specified paint.
    */
   void drawRect(const Rect& rect, const Paint& paint);
 
   /**
-   * Draws a path using the current clip, matrix, and the specified paint.
+   * Draws an oval using the current clip, matrix, and specified paint.
+   */
+  void drawOval(const Rect& oval, const Paint& paint);
+
+  /**
+   * Draws a circle using the current clip, matrix, and specified paint.
+   */
+  void drawCircle(float centerX, float centerY, float radius, const Paint& paint);
+
+  /**
+   * Draws a circle using the current clip, matrix, and specified paint.
+   */
+  void drawCircle(const Point& center, float radius, const Paint& paint) {
+    drawCircle(center.x, center.y, radius, paint);
+  }
+
+  /**
+   * Draws a round rectangle using the current clip, matrix, and specified paint.
+   * @param rect bounds of the round rectangle to draw
+   * @param radiusX axis length on x-axis of the rounded corners.
+   * @param radiusY axis length on y-axis of the rounded corners.
+   * @param paint stroke, blend, color, and so on, used to draw.
+   */
+  void drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint);
+
+  /**
+   * Draws a path using the current clip, matrix, and specified paint.
    */
   void drawPath(const Path& path, const Paint& paint);
 
   /**
    * Draws an image, with its top-left corner at (left, top), using current clip, matrix and
-   * optional paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipmapMode::Linear
-   * as the sampling options. Otherwise, uses FilterMode::Linear and MipmapMode::None as the
-   * sampling options.
+   * optional paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and
+   * MipmapMode::Linear as the sampling options. Otherwise, it uses FilterMode::Linear and
+   * MipmapMode::None as the sampling options.
    */
   void drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint = nullptr);
 
   /**
-   * Draws an Image, with its top-left corner at (0, 0), using current alpha, clip and matrix
-   * premultiplied with existing Matrix. If image->hasMipmaps() is true, uses FilterMode::Linear
-   * and MipmapMode::Linear as the sampling options. Otherwise, uses FilterMode::Linear and
+   * Draws an Image, with its top-left corner at (0, 0), using current clip and matrix premultiplied
+   * with existing Matrix. If image->hasMipmaps() is true, it uses FilterMode::Linear and
+   * MipmapMode::Linear as the sampling options. Otherwise, it uses FilterMode::Linear and
    * MipmapMode::None as the sampling options.
    */
   void drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint = nullptr);
 
   /**
    * Draws an image, with its top-left corner at (0, 0), using current clip, matrix and optional
-   * paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipmapMode::Linear as the
-   * sampling options. Otherwise, uses FilterMode::Linear and MipmapMode::None as the sampling
+   * paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and MipmapMode::Linear as the
+   * sampling options. Otherwise, it uses FilterMode::Linear and MipmapMode::None as the sampling
    * options.
    */
   void drawImage(std::shared_ptr<Image> image, const Paint* paint = nullptr);
@@ -194,13 +254,25 @@ class Canvas {
                       const Paint& paint);
 
   /**
-   * Draw an array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.
-   */
-  void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
+    * Draws an array of glyphs from glyphIDs at positions using clip, matrix, font, and paint.
+    * @param glyphs the array of glyphIDs to draw.
+    * @param positions where to draw each glyph.
+    * @param glyphCount number of glyphs to draw.
+    * @param font typeface and size to draw the glyphs.
+    * @param paint blend, color, and so on, used to draw.
+    */
+  void drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint);
 
-  // TODO(pengweilv): Support blend mode, atlas as source, colors as destination, colors can be
-  //  nullptr.
+  /**
+   * Draws a set of sprites from the atlas using the current clip, matrix, and specified paint.
+   * @param atlas Image containing the sprites.
+   * @param matrix
+   * @param tex Rect locations of sprites in the atlas.
+   * @param colors one per sprite, may be nullptr.
+   * @param count number of sprites to draw.
+   * @param sampling SamplingOptions used to sample the atlas image.
+   */
   void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count, SamplingOptions sampling = SamplingOptions());
 
@@ -216,7 +288,6 @@ class Canvas {
   std::shared_ptr<CanvasState> state = nullptr;
   std::vector<std::shared_ptr<CanvasState>> savedStateList = {};
 
-  bool nothingToDraw(const Paint& paint) const;
   std::shared_ptr<TextureProxy> getClipTexture();
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
@@ -227,7 +298,6 @@ class Canvas {
                        const Font& font, const Paint& paint);
   void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
   bool drawAsClear(const Path& path, const Paint& paint);
-  Color getInputColor(const Paint& paint);
   bool getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp);
   void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint,
                  bool aa = false);
