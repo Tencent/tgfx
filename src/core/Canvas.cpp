@@ -176,10 +176,6 @@ static Paint CleanPaintForDrawImage(const Paint* paint) {
   return cleaned;
 }
 
-void Canvas::flush() {
-  surface->flush();
-}
-
 Context* Canvas::getContext() const {
   return surface->getContext();
 }
@@ -611,7 +607,8 @@ void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& pai
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
-                       const Color colors[], size_t count, SamplingOptions sampling) {
+                       const Color colors[], size_t count, SamplingOptions sampling,
+                       const Paint* paint) {
   // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
   if (atlas == nullptr || count == 0) {
     return;
@@ -646,7 +643,9 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   if (ops.empty()) {
     return;
   }
-  DrawArgs args(getContext(), surface->options()->renderFlags(), Color::White(), drawRect,
+  auto realPaint = CleanPaintForDrawImage(paint);
+  auto inputColor = realPaint.getColor().premultiply();
+  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, drawRect,
                 state->matrix, sampling);
   for (auto& rectOp : ops) {
     auto processor = FragmentProcessor::Make(atlas, args);
@@ -657,7 +656,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
       return;
     }
     rectOp->addColorFP(std::move(processor));
-    addDrawOp(std::move(rectOp), args, {});
+    addDrawOp(std::move(rectOp), args, realPaint);
   }
 }
 
