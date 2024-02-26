@@ -182,29 +182,67 @@ class Paint {
     shader = std::move(newShader);
   }
 
+  /**
+   * Returns the mask filter used to modify the alpha channel of the paint when drawing.
+   */
   std::shared_ptr<MaskFilter> getMaskFilter() const {
     return maskFilter;
   }
 
+  /**
+   * Sets the mask filter used to modify the alpha channel of the paint when drawing.
+   */
   void setMaskFilter(std::shared_ptr<MaskFilter> newMaskFilter) {
     maskFilter = std::move(newMaskFilter);
   }
 
+  /**
+   * Returns the color filter used to modify the color of the paint when drawing.
+   */
   std::shared_ptr<ColorFilter> getColorFilter() const {
     return colorFilter;
   }
 
+  /**
+   * Sets the color filter used to modify the color of the paint when drawing.
+   */
   void setColorFilter(std::shared_ptr<ColorFilter> newColorFilter) {
     colorFilter = std::move(newColorFilter);
   }
 
+  /**
+   * Returns the image filter used to modify the image of the paint when drawing.
+   */
+  std::shared_ptr<ImageFilter> getImageFilter() const {
+    return imageFilter;
+  }
+
+  /**
+   * Sets the image filter used to modify the image of the paint when drawing.
+   */
   void setImageFilter(std::shared_ptr<ImageFilter> newImageFilter) {
     imageFilter = std::move(newImageFilter);
   }
 
-  std::shared_ptr<ImageFilter> getImageFilter() const {
-    return imageFilter;
+  /**
+   * Returns the blend mode used to combine the paint with the destination pixels.
+   */
+  BlendMode getBlendMode() const {
+    return blendMode;
   }
+
+  /**
+   * Sets the blend mode used to combine the paint with the destination pixels.
+   */
+  void setBlendMode(BlendMode mode) {
+    blendMode = mode;
+  }
+
+  /**
+   * Returns true if the Paint prevents any drawing.
+   * @return
+   */
+  bool nothingToDraw() const;
 
  private:
   PaintStyle style = PaintStyle::Fill;
@@ -214,5 +252,6 @@ class Paint {
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
   std::shared_ptr<ImageFilter> imageFilter = nullptr;
+  BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

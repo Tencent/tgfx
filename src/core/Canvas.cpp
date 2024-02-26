@@ -79,6 +79,30 @@ void Canvas::restore() {
   savedStateList.pop_back();
 }
 
+void Canvas::translate(float dx, float dy) {
+  state->matrix.preTranslate(dx, dy);
+}
+
+void Canvas::scale(float sx, float sy) {
+  state->matrix.preScale(sx, sy);
+}
+
+void Canvas::rotate(float degrees) {
+  state->matrix.preRotate(degrees);
+}
+
+void Canvas::rotate(float degress, float px, float py) {
+  state->matrix.preRotate(degress, px, py);
+}
+
+void Canvas::skew(float sx, float sy) {
+  state->matrix.preSkew(sx, sy);
+}
+
+void Canvas::concat(const Matrix& matrix) {
+  state->matrix.preConcat(matrix);
+}
+
 Matrix Canvas::getMatrix() const {
   return state->matrix;
 }
@@ -89,26 +113,6 @@ void Canvas::setMatrix(const Matrix& matrix) {
 
 void Canvas::resetMatrix() {
   state->matrix.reset();
-}
-
-void Canvas::concat(const Matrix& matrix) {
-  state->matrix.preConcat(matrix);
-}
-
-float Canvas::getAlpha() const {
-  return state->alpha;
-}
-
-void Canvas::setAlpha(float newAlpha) {
-  state->alpha = newAlpha;
-}
-
-BlendMode Canvas::getBlendMode() const {
-  return state->blendMode;
-}
-
-void Canvas::setBlendMode(BlendMode blendMode) {
-  state->blendMode = blendMode;
 }
 
 Path Canvas::getTotalClip() const {
@@ -129,42 +133,38 @@ void Canvas::clipPath(const Path& path) {
 }
 
 void Canvas::clear(const Color& color) {
-  auto oldBlend = getBlendMode();
-  setBlendMode(BlendMode::Src);
   Paint paint;
   paint.setColor(color);
+  paint.setBlendMode(BlendMode::Src);
   auto rect = Rect::MakeWH(surface->width(), surface->height());
   drawRect(rect, paint);
-  setBlendMode(oldBlend);
 }
 
-static bool AffectsAlpha(const ColorFilter* cf) {
-  return cf && !cf->isAlphaUnchanged();
-}
-
-bool Canvas::nothingToDraw(const Paint& paint) const {
-  switch (getBlendMode()) {
-    case BlendMode::SrcOver:
-    case BlendMode::SrcATop:
-    case BlendMode::DstOut:
-    case BlendMode::DstOver:
-    case BlendMode::Plus:
-      if (0 == getAlpha() || 0 == paint.getAlpha()) {
-        return !AffectsAlpha(paint.getColorFilter().get()) && paint.getImageFilter() == nullptr;
-      }
-      break;
-    case BlendMode::Dst:
-      return true;
-    default:
-      break;
-  }
-  return false;
+void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
+  Path path = {};
+  path.moveTo(x0, y0);
+  path.lineTo(x1, y1);
+  auto realPaint = paint;
+  realPaint.setStyle(PaintStyle::Stroke);
+  drawPath(path, realPaint);
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   Path path = {};
   path.addRect(rect);
   drawPath(path, paint);
+}
+
+void Canvas::drawOval(const Rect& oval, const Paint& paint) {
+  Path path = {};
+  path.addOval(oval);
+  drawPath(path, paint);
+}
+
+void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint& paint) {
+  Rect rect =
+      Rect::MakeLTRB(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
+  drawOval(rect, paint);
 }
 
 static Paint CleanPaintForDrawImage(const Paint* paint) {
@@ -399,7 +399,7 @@ static Path GetSimpleFillPath(const Path& path, const Paint& paint) {
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
-  if (path.isEmpty() || nothingToDraw(paint)) {
+  if (path.isEmpty() || paint.nothingToDraw()) {
     return;
   }
   auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
@@ -415,7 +415,8 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (drawAsClear(fillPath, paint)) {
     return;
   }
-  DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(paint), localBounds,
+  auto inputColor = paint.getColor().premultiply();
+  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, localBounds,
                 state->matrix);
   auto drawOp = MakeSimplePathOp(fillPath, args);
   if (drawOp != nullptr) {
@@ -464,7 +465,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
     return;
   }
   auto realPaint = CleanPaintForDrawImage(paint);
-  if (nothingToDraw(realPaint)) {
+  if (realPaint.nothingToDraw()) {
     return;
   }
   auto oldMatrix = getMatrix();
@@ -485,8 +486,9 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (realPaint.getShader() != nullptr && !image->isAlphaOnly()) {
     realPaint.setShader(nullptr);
   }
-  DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(realPaint),
-                localBounds, state->matrix, sampling);
+  auto inputColor = realPaint.getColor().premultiply();
+  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, localBounds,
+                state->matrix, sampling);
   auto processor = FragmentProcessor::Make(std::move(image), args);
   if (processor == nullptr) {
     return;
@@ -513,7 +515,8 @@ void Canvas::drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> te
                             static_cast<float>(textureProxy->height()) / deviceBounds.height());
   auto oldMatrix = state->matrix;
   resetMatrix();
-  DrawArgs args(getContext(), surface->options()->renderFlags(), getInputColor(paint), deviceBounds,
+  auto inputColor = paint.getColor().premultiply();
+  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, deviceBounds,
                 Matrix::I());
   auto op = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix, &localMatrix);
   auto maskProcessor = FragmentProcessor::MulInputByChildAlpha(
@@ -537,9 +540,9 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgf
   drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
 }
 
-void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
+void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
-  if (nothingToDraw(paint) || glyphCount == 0) {
+  if (glyphCount == 0 || paint.nothingToDraw()) {
     return;
   }
   auto scale = state->matrix.getMaxScale();
@@ -553,11 +556,11 @@ void Canvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_
   save();
   concat(Matrix::MakeScale(1.f / scale));
   if (scaledFont.getTypeface()->hasColor()) {
-    drawColorGlyphs(glyphIDs, scaledPositions.data(), glyphCount, scaledFont, scaledPaint);
+    drawColorGlyphs(glyphs, scaledPositions.data(), glyphCount, scaledFont, scaledPaint);
     restore();
     return;
   }
-  auto textBlob = TextBlob::MakeFrom(glyphIDs, scaledPositions.data(), glyphCount, scaledFont);
+  auto textBlob = TextBlob::MakeFrom(glyphs, scaledPositions.data(), glyphCount, scaledFont);
   if (textBlob) {
     drawMaskGlyphs(textBlob, scaledPaint);
   }
@@ -609,6 +612,7 @@ void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& pai
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                        const Color colors[], size_t count, SamplingOptions sampling) {
+  // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
   if (atlas == nullptr || count == 0) {
     return;
   }
@@ -666,10 +670,11 @@ bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
   if (!HasColorOnly(paint) || !state->matrix.rectStaysRect()) {
     return false;
   }
-  auto color = getInputColor(paint);
-  if (getBlendMode() == BlendMode::Clear) {
+  auto color = paint.getColor().premultiply();
+  auto blendMode = paint.getBlendMode();
+  if (blendMode == BlendMode::Clear) {
     color = Color::Transparent();
-  } else if (getBlendMode() != BlendMode::Src) {
+  } else if (blendMode != BlendMode::Src) {
     if (!color.isOpaque()) {
       return false;
     }
@@ -695,12 +700,6 @@ bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
     }
   }
   return false;
-}
-
-Color Canvas::getInputColor(const Paint& paint) {
-  auto color = paint.getColor();
-  color.alpha *= state->alpha;
-  return color.premultiply();
 }
 
 bool Canvas::getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp) {
@@ -754,7 +753,7 @@ void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const P
     op->addMaskFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
-  op->setBlendMode(state->blendMode);
+  op->setBlendMode(paint.getBlendMode());
   op->setAA(aaType);
   surface->aboutToDraw(false);
   surface->addOp(std::move(op));

@@ -24,5 +24,32 @@ void Paint::reset() {
   color = Color::White();
   stroke = Stroke(0);
   shader = nullptr;
+  maskFilter = nullptr;
+  colorFilter = nullptr;
+  imageFilter = nullptr;
+  blendMode = BlendMode::SrcOver;
+}
+
+static bool AffectsAlpha(const ColorFilter* cf) {
+  return cf && !cf->isAlphaUnchanged();
+}
+
+bool Paint::nothingToDraw() const {
+  switch (blendMode) {
+    case BlendMode::SrcOver:
+    case BlendMode::SrcATop:
+    case BlendMode::DstOut:
+    case BlendMode::DstOver:
+    case BlendMode::Plus:
+      if (color.alpha == 0) {
+        return !AffectsAlpha(colorFilter.get()) && imageFilter == nullptr;
+      }
+      break;
+    case BlendMode::Dst:
+      return true;
+    default:
+      break;
+  }
+  return false;
 }
 }  // namespace tgfx
