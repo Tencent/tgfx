@@ -275,7 +275,7 @@ class Canvas {
    * @param paint blend, alpha, and so on, used to draw.
    */
   void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
-                 const Color colors[], size_t count, SamplingOptions sampling,
+                 const Color colors[], size_t count, SamplingOptions sampling = {},
                  const Paint* paint = nullptr);
 
  private:
