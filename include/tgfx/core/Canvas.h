@@ -272,14 +272,11 @@ class Canvas {
    * @param colors one per sprite, may be nullptr.
    * @param count number of sprites to draw.
    * @param sampling SamplingOptions used to sample the atlas image.
+   * @param paint blend, alpha, and so on, used to draw.
    */
   void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
-                 const Color colors[], size_t count, SamplingOptions sampling = SamplingOptions());
-
-  /**
-   * Triggers the immediate execution of all pending draw operations.
-   */
-  void flush();
+                 const Color colors[], size_t count, SamplingOptions sampling,
+                 const Paint* paint = nullptr);
 
  private:
   Surface* surface = nullptr;
