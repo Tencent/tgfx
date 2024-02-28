@@ -411,9 +411,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (drawAsClear(fillPath, paint)) {
     return;
   }
-  auto inputColor = paint.getColor().premultiply();
-  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, localBounds,
-                state->matrix);
+  DrawArgs args(surface, paint, localBounds, state->matrix);
   auto drawOp = MakeSimplePathOp(fillPath, args);
   if (drawOp != nullptr) {
     addDrawOp(std::move(drawOp), args, paint);
@@ -437,7 +435,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
-  drawImage(image, Matrix::MakeTrans(left, top), paint);
+  drawImage(std::move(image), Matrix::MakeTrans(left, top), paint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
@@ -482,10 +480,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (realPaint.getShader() != nullptr && !image->isAlphaOnly()) {
     realPaint.setShader(nullptr);
   }
-  auto inputColor = realPaint.getColor().premultiply();
-  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, localBounds,
-                state->matrix, sampling);
-  auto processor = FragmentProcessor::Make(std::move(image), args);
+  DrawArgs args(surface, realPaint, localBounds, state->matrix);
+  auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
   }
@@ -511,9 +507,7 @@ void Canvas::drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> te
                             static_cast<float>(textureProxy->height()) / deviceBounds.height());
   auto oldMatrix = state->matrix;
   resetMatrix();
-  auto inputColor = paint.getColor().premultiply();
-  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, deviceBounds,
-                Matrix::I());
+  DrawArgs args(surface, paint, deviceBounds, Matrix::I());
   auto op = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix, &localMatrix);
   auto maskProcessor = FragmentProcessor::MulInputByChildAlpha(
       TextureEffect::Make(std::move(textureProxy), SamplingOptions(), &maskLocalMatrix));
@@ -644,11 +638,9 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     return;
   }
   auto realPaint = CleanPaintForDrawImage(paint);
-  auto inputColor = realPaint.getColor().premultiply();
-  DrawArgs args(getContext(), surface->options()->renderFlags(), inputColor, drawRect,
-                state->matrix, sampling);
+  DrawArgs args(surface, realPaint, drawRect, state->matrix);
   for (auto& rectOp : ops) {
-    auto processor = FragmentProcessor::Make(atlas, args);
+    auto processor = FragmentProcessor::Make(atlas, args, sampling);
     if (colors) {
       processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
     }

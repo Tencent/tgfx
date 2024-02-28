@@ -22,11 +22,11 @@
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> MaskFilter::onFilterImage(std::shared_ptr<Image> source,
                                                              const DrawArgs& args,
-                                                             const Matrix* localMatrix,
-                                                             TileMode tileModeX,
-                                                             TileMode tileModeY) const {
+                                                             TileMode tileModeX, TileMode tileModeY,
+                                                             const SamplingOptions& sampling,
+                                                             const Matrix* localMatrix) const {
   auto imageProcessor =
-      FragmentProcessor::Make(std::move(source), args, localMatrix, tileModeX, tileModeY);
+      FragmentProcessor::Make(std::move(source), args, tileModeX, tileModeY, sampling, localMatrix);
   if (imageProcessor == nullptr) {
     return nullptr;
   }

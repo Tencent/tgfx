@@ -48,12 +48,12 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
   return image;
 }
 
-std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const DrawArgs& args,
-                                                                    const Matrix* localMatrix,
-                                                                    TileMode, TileMode) const {
+std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
+    const DrawArgs& args, TileMode, TileMode, const SamplingOptions& sampling,
+    const Matrix* localMatrix) const {
   auto proxy = std::static_pointer_cast<ResourceImage>(source)->lockTextureProxy(args.context,
                                                                                  args.renderFlags);
   auto matrix = concatLocalMatrix(localMatrix);
-  return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, args.sampling, AddressOf(matrix));
+  return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
 }
 }  // namespace tgfx

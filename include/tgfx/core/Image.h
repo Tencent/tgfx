@@ -281,10 +281,9 @@ class Image {
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                                 const Matrix* localMatrix,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY) const = 0;
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      const DrawArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+      const Matrix* localMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class TransformImage;

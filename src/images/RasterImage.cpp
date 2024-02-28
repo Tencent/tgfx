@@ -107,9 +107,9 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
   }
   auto sourceFlags = renderFlags | RenderFlags::DisableCache;
   auto drawRect = Rect::MakeWH(width(), height());
-  DrawArgs args(context, sourceFlags, Color::White(), drawRect, Matrix::I(), sampling);
+  DrawArgs args(context, sourceFlags, Color::White(), drawRect, Matrix::I());
   auto localMatrix = Matrix::MakeScale(1.0f / rasterizationScale);
-  auto processor = FragmentProcessor::Make(source, args, &localMatrix);
+  auto processor = FragmentProcessor::Make(source, args, sampling, &localMatrix);
   if (processor == nullptr) {
     return nullptr;
   }

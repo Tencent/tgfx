@@ -19,15 +19,21 @@
 #pragma once
 
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
 class DrawArgs {
  public:
   DrawArgs(Context* context, uint32_t renderFlags, const Color& color, const Rect& drawRect,
-           const Matrix& viewMatrix = Matrix::I(), const SamplingOptions& sampling = {})
+           const Matrix& viewMatrix = Matrix::I())
       : context(context), renderFlags(renderFlags), color(color), drawRect(drawRect),
-        viewMatrix(viewMatrix), sampling(sampling) {
+        viewMatrix(viewMatrix) {
+  }
+
+  DrawArgs(Surface* surface, const Paint& paint, const Rect& drawRect,
+           const Matrix& viewMatrix = Matrix::I())
+      : context(surface->getContext()), renderFlags(surface->options()->renderFlags()),
+        color(paint.getColor().premultiply()), drawRect(drawRect), viewMatrix(viewMatrix) {
   }
 
   Context* context = nullptr;
@@ -35,6 +41,5 @@ class DrawArgs {
   Color color = Color::White();
   Rect drawRect = Rect::MakeEmpty();
   Matrix viewMatrix = Matrix::I();
-  SamplingOptions sampling = {};
 };
 }  // namespace tgfx

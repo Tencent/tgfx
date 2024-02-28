@@ -45,10 +45,10 @@ class ResourceImage : public Image {
   std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                       int alphaStartY) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
-                                                         const Matrix* localMatrix,
-                                                         TileMode tileModeX,
-                                                         TileMode tileModeY) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* localMatrix) const override;
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
                                                            bool mipmapped,

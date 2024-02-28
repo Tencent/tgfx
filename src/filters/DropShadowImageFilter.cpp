@@ -55,8 +55,8 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onFilterImage(
-    std::shared_ptr<Image> source, const tgfx::DrawArgs& args, const Matrix* localMatrix,
-    TileMode tileModeX, TileMode tileModeY) const {
+    std::shared_ptr<Image> source, const DrawArgs& args, TileMode tileModeX, TileMode tileModeY,
+    const SamplingOptions& sampling, const Matrix* localMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (localMatrix) {
@@ -68,18 +68,16 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onFilterImage(
   }
   if (dstBounds.contains(clipBounds) ||
       (tileModeX == TileMode::Decal && tileModeY == TileMode::Decal)) {
-    return getFragmentProcessor(std::move(source), args, localMatrix);
+    return getFragmentProcessor(std::move(source), args, sampling, localMatrix);
   }
-  auto mipmapped = source->hasMipmaps() && args.sampling.mipmapMode != MipmapMode::None;
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstBounds.width()),
                                               static_cast<int>(dstBounds.height()),
                                               PixelFormat::RGBA_8888, 1, mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  DrawArgs shadowArgs = args;
-  shadowArgs.sampling = {};
-  auto processor = getFragmentProcessor(std::move(source), shadowArgs);
+  auto processor = getFragmentProcessor(std::move(source), args, {});
   if (processor == nullptr) {
     return nullptr;
   }
@@ -90,23 +88,24 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onFilterImage(
   if (localMatrix != nullptr) {
     matrix.preConcat(*localMatrix);
   }
-  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY,
-                                  args.sampling, &matrix);
+  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
+                                  &matrix);
 }
 
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::getFragmentProcessor(
-    std::shared_ptr<Image> source, const DrawArgs& args, const Matrix* localMatrix) const {
+    std::shared_ptr<Image> source, const DrawArgs& args, const SamplingOptions& sampling,
+    const Matrix* localMatrix) const {
   std::unique_ptr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (localMatrix != nullptr) {
     shadowMatrix.preConcat(*localMatrix);
   }
   if (blurFilter != nullptr) {
-    shadowProcessor =
-        blurFilter->onFilterImage(source, args, &shadowMatrix, TileMode::Decal, TileMode::Decal);
+    shadowProcessor = blurFilter->onFilterImage(source, args, TileMode::Decal, TileMode::Decal,
+                                                sampling, &shadowMatrix);
   } else {
-    shadowProcessor =
-        FragmentProcessor::Make(source, args, &shadowMatrix, TileMode::Decal, TileMode::Decal);
+    shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                              sampling, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {
     return nullptr;
@@ -117,8 +116,8 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::getFragmentProcessor(
   if (shadowOnly) {
     return colorShadowProcessor;
   }
-  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, localMatrix,
-                                                TileMode::Decal, TileMode::Decal);
+  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
+                                                TileMode::Decal, sampling, localMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }

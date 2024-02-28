@@ -71,11 +71,10 @@ std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
   return FilterImage::MakeFrom(source, filter, newBounds);
 }
 
-std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const DrawArgs& args,
-                                                                    const Matrix* localMatrix,
-                                                                    TileMode tileModeX,
-                                                                    TileMode tileModeY) const {
+std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(
+    const DrawArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+    const Matrix* localMatrix) const {
   auto matrix = SubsetImage::ConcatLocalMatrix(bounds, localMatrix);
-  return filter->onFilterImage(source, args, AddressOf(matrix), tileModeX, tileModeY);
+  return filter->onFilterImage(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
 }
 }  // namespace tgfx
