@@ -26,12 +26,23 @@
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                            const DrawArgs& args,
-                                                           const Matrix* localMatrix,
-                                                           TileMode tileModeX, TileMode tileModeY) {
+                                                           const SamplingOptions& sampling,
+                                                           const Matrix* localMatrix) {
   if (image == nullptr) {
     return nullptr;
   }
-  return image->asFragmentProcessor(args, localMatrix, tileModeX, tileModeY);
+  return image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, localMatrix);
+}
+
+std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
+                                                           const tgfx::DrawArgs& args,
+                                                           TileMode tileModeX, TileMode tileModeY,
+                                                           const SamplingOptions& sampling,
+                                                           const Matrix* localMatrix) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, localMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,

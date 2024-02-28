@@ -36,12 +36,20 @@ class Shader;
 class FragmentProcessor : public Processor {
  public:
   /**
+   * Creates a fragment processor that will draw the given image with the given options. The both
+   * tileModeX and tileModeY are set to TileMode::Clamp.
+   */
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const DrawArgs& args,
+                                                 const SamplingOptions& sampling,
+                                                 const Matrix* localMatrix = nullptr);
+
+  /**
    * Creates a fragment processor that will draw the given image with the given options.
    */
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const DrawArgs& args,
-                                                 const Matrix* localMatrix = nullptr,
-                                                 TileMode tileModeX = TileMode::Clamp,
-                                                 TileMode tileModeY = TileMode::Clamp);
+                                                 TileMode tileModeX, TileMode tileModeY,
+                                                 const SamplingOptions& sampling,
+                                                 const Matrix* localMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.

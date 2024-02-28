@@ -105,11 +105,9 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
 }
 
-std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(std::shared_ptr<Image> source,
-                                                                  const DrawArgs& args,
-                                                                  const Matrix* localMatrix,
-                                                                  TileMode tileModeX,
-                                                                  TileMode tileModeY) const {
+std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(
+    std::shared_ptr<Image> source, const DrawArgs& args, TileMode tileModeX, TileMode tileModeY,
+    const SamplingOptions& sampling, const Matrix* localMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (localMatrix) {
@@ -119,12 +117,10 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(std::shared_pt
   if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }
-  DrawArgs imageArgs = args;
-  imageArgs.sampling = {};
-  auto processor = FragmentProcessor::Make(source, imageArgs, nullptr, tileMode, tileMode);
+  auto processor = FragmentProcessor::Make(source, args, tileMode, tileMode, {});
   auto imageBounds = dstBounds;
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
-  auto mipmapped = source->hasMipmaps() && args.sampling.mipmapMode != MipmapMode::None;
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   auto lastRenderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(imageBounds.width()), static_cast<int>(imageBounds.height()),
       PixelFormat::RGBA_8888, 1, mipmapped);
@@ -158,6 +154,6 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(std::shared_pt
     matrix.preConcat(*localMatrix);
   }
   return TiledTextureEffect::Make(lastRenderTarget->getTextureProxy(), tileModeX, tileModeY,
-                                  args.sampling, &matrix);
+                                  sampling, &matrix);
 }
 }  // namespace tgfx

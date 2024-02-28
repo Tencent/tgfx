@@ -38,9 +38,10 @@ class MaskFilter : public Filter {
 
  protected:
   std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                   const DrawArgs& args, const Matrix* localMatrix,
-                                                   TileMode tileModeX,
-                                                   TileMode tileModeY) const override;
+                                                   const DrawArgs& args, TileMode tileModeX,
+                                                   TileMode tileModeY,
+                                                   const SamplingOptions& sampling,
+                                                   const Matrix* localMatrix) const override;
 
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
