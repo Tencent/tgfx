@@ -62,15 +62,15 @@ class Canvas {
   const SurfaceOptions* surfaceOptions() const;
 
   /**
-   * Saves alpha, blend mode, matrix, and clip. Calling restore() discards changes to them,
-   * restoring them to their state when save() was called. Saved Canvas state is put on a stack,
-   * multiple calls to save() should be balanced by an equal number of calls to restore().
+   * Saves matrix and clip. Calling restore() discards changes to them, restoring them to their state
+   * when save() was called. Saved Canvas state is put on a stack, multiple calls to save() should
+   * be balanced by an equal number of calls to restore().
    */
   void save();
 
   /**
-   * Removes changes to alpha, blend mode, matrix and clips since Canvas state was last saved. The
-   * state is removed from the stack. Does nothing if the stack is empty.
+   * Removes changes to matrix and clip since Canvas state was last saved. The state is removed from
+   * the stack. Does nothing if the stack is empty.
    */
   void restore();
 

@@ -309,6 +309,15 @@ static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const DrawArgs
   return nullptr;
 }
 
+static constexpr size_t StrokeKeyCount = 3;
+
+static void WriteStrokeKey(BytesKey* bytesKey, const Stroke* stroke) {
+  auto flags = static_cast<uint32_t>(stroke->join) << 16 | static_cast<uint32_t>(stroke->cap);
+  bytesKey->write(flags);
+  bytesKey->write(stroke->width);
+  bytesKey->write(stroke->miterLimit);
+}
+
 static std::unique_ptr<DrawOp> MakeTriangulatingPathOp(const Path& path, const DrawArgs& args,
                                                        const Point& scales, const Stroke* stroke) {
   static const auto TriangulatingPathType = UniqueID::Next();
@@ -316,19 +325,22 @@ static std::unique_ptr<DrawOp> MakeTriangulatingPathOp(const Path& path, const D
   Matrix rasterizeMatrix = {};
   if (scales.x == scales.y) {
     rasterizeMatrix.setScale(scales.x, scales.y);
-    bytesKey.reserve(2);
+    bytesKey.reserve(2 + (stroke ? StrokeKeyCount : 0));
     bytesKey.write(TriangulatingPathType);
     bytesKey.write(scales.x);
   } else {
     rasterizeMatrix = args.viewMatrix;
     rasterizeMatrix.setTranslateX(0);
     rasterizeMatrix.setTranslateY(0);
-    bytesKey.reserve(5);
+    bytesKey.reserve(5 + (stroke ? StrokeKeyCount : 0));
     bytesKey.write(TriangulatingPathType);
     bytesKey.write(rasterizeMatrix.getScaleX());
     bytesKey.write(rasterizeMatrix.getSkewX());
     bytesKey.write(rasterizeMatrix.getSkewY());
     bytesKey.write(rasterizeMatrix.getScaleY());
+  }
+  if (stroke) {
+    WriteStrokeKey(&bytesKey, stroke);
   }
   auto uniqueKey = UniqueKey::Combine(PathRef::GetUniqueKey(path), bytesKey);
   auto pathTriangles = PathAATriangles::Make(path, rasterizeMatrix, stroke);
@@ -353,10 +365,13 @@ static std::unique_ptr<DrawOp> MakeTexturePathOp(const Path& path, const DrawArg
                                                  const Point& scales, const Rect& bounds,
                                                  const Stroke* stroke) {
   static const auto TexturePathType = UniqueID::Next();
-  BytesKey bytesKey(3);
+  BytesKey bytesKey(3 + (stroke ? StrokeKeyCount : 0));
   bytesKey.write(TexturePathType);
   bytesKey.write(scales.x);
   bytesKey.write(scales.y);
+  if (stroke) {
+    WriteStrokeKey(&bytesKey, stroke);
+  }
   auto uniqueKey = UniqueKey::Combine(PathRef::GetUniqueKey(path), bytesKey);
   auto width = ceilf(bounds.width());
   auto height = ceilf(bounds.height());
