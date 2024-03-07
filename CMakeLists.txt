@@ -83,7 +83,6 @@ file(GLOB_RECURSE SRC_FILES
         src/filters/*.*
         src/images/*.*
         src/shaders/*.*
-        src/shapes/*.*
         src/utils/*.*
         src/gpu/*.*)
 list(APPEND TGFX_FILES ${SRC_FILES})
