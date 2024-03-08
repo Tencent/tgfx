@@ -37,7 +37,7 @@ class TextBlob {
   static std::shared_ptr<TextBlob> MakeFrom(const std::string& text, const Font& font);
 
   /**
-   * Creates a new TextBlob from the given glyphs, positions and text font.
+   * Creates a new TextBlob from the given glyphs, positions, and text font.
    */
   static std::shared_ptr<TextBlob> MakeFrom(const GlyphID glyphIDs[], const Point positions[],
                                             size_t glyphCount, const Font& font);

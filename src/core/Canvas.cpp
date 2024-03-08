@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
-#include <atomic>
-#include "CanvasState.h"
+#include "core/MCStack.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
 #include "gpu/PathAATriangles.h"
@@ -47,89 +46,70 @@ static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 // Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
 static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
 
-static constexpr uint32_t FirstUnreservedClipID = 1;
-
-static uint32_t NextClipID() {
-  static std::atomic<uint32_t> nextID{FirstUnreservedClipID};
-  uint32_t id;
-  do {
-    id = nextID.fetch_add(1, std::memory_order_relaxed);
-  } while (id < FirstUnreservedClipID);
-  return id;
+Canvas::Canvas(Surface* surface) : surface(surface) {
+  Path clip = {};
+  clip.addRect(0, 0, static_cast<float>(surface->width()), static_cast<float>(surface->height()));
+  mcStack = new MCStack(clip);
 }
 
-Canvas::Canvas(Surface* surface) : surface(surface), clipID(kDefaultClipID) {
-  state = std::make_shared<CanvasState>();
-  state->clip.addRect(0, 0, static_cast<float>(surface->width()),
-                      static_cast<float>(surface->height()));
-  state->clipID = NextClipID();
+Canvas::~Canvas() {
+  delete mcStack;
 }
 
 void Canvas::save() {
-  auto canvasState = std::make_shared<CanvasState>();
-  *canvasState = *state;
-  savedStateList.push_back(canvasState);
+  mcStack->save();
 }
 
 void Canvas::restore() {
-  if (savedStateList.empty()) {
-    return;
-  }
-  state = savedStateList.back();
-  savedStateList.pop_back();
+  mcStack->restore();
 }
 
 void Canvas::translate(float dx, float dy) {
-  state->matrix.preTranslate(dx, dy);
+  mcStack->translate(dx, dy);
 }
 
 void Canvas::scale(float sx, float sy) {
-  state->matrix.preScale(sx, sy);
+  mcStack->scale(sx, sy);
 }
 
 void Canvas::rotate(float degrees) {
-  state->matrix.preRotate(degrees);
+  mcStack->rotate(degrees);
 }
 
 void Canvas::rotate(float degress, float px, float py) {
-  state->matrix.preRotate(degress, px, py);
+  mcStack->rotate(degress, px, py);
 }
 
 void Canvas::skew(float sx, float sy) {
-  state->matrix.preSkew(sx, sy);
+  mcStack->skew(sx, sy);
 }
 
 void Canvas::concat(const Matrix& matrix) {
-  state->matrix.preConcat(matrix);
+  mcStack->concat(matrix);
 }
 
 Matrix Canvas::getMatrix() const {
-  return state->matrix;
+  return mcStack->getMatrix();
 }
 
 void Canvas::setMatrix(const Matrix& matrix) {
-  state->matrix = matrix;
+  mcStack->setMatrix(matrix);
 }
 
 void Canvas::resetMatrix() {
-  state->matrix.reset();
+  mcStack->resetMatrix();
 }
 
 Path Canvas::getTotalClip() const {
-  return state->clip;
+  return mcStack->getClip();
 }
 
 void Canvas::clipRect(const tgfx::Rect& rect) {
-  Path path = {};
-  path.addRect(rect);
-  clipPath(path);
+  mcStack->clipRect(rect);
 }
 
 void Canvas::clipPath(const Path& path) {
-  auto clipPath = path;
-  clipPath.transform(state->matrix);
-  state->clip.addPath(clipPath, PathOp::Intersect);
-  state->clipID = NextClipID();
+  mcStack->clipPath(path);
 }
 
 void Canvas::clear(const Color& color) {
@@ -189,9 +169,8 @@ const SurfaceOptions* Canvas::surfaceOptions() const {
 }
 
 std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
-  if (clipID != state->clipID) {
-    _clipSurface = nullptr;
-  }
+  auto& clip = mcStack->getClip();
+  auto domainID = PathRef::GetUniqueKey(mcStack->getClip()).domainID();
   if (_clipSurface == nullptr) {
     _clipSurface = Surface::Make(getContext(), surface->width(), surface->height(), true);
     if (_clipSurface == nullptr) {
@@ -201,13 +180,13 @@ std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
   if (_clipSurface == nullptr) {
     return nullptr;
   }
-  if (clipID != state->clipID) {
+  if (clipID != domainID) {
     auto clipCanvas = _clipSurface->getCanvas();
     clipCanvas->clear();
     Paint paint = {};
     paint.setColor(Color::White());
-    clipCanvas->drawPath(state->clip, paint);
-    clipID = state->clipID;
+    clipCanvas->drawPath(clip, paint);
+    clipID = domainID;
   }
   return _clipSurface->getTextureProxy();
 }
@@ -234,7 +213,7 @@ void FlipYIfNeeded(Rect* rect, const Surface* surface) {
 
 std::pair<std::optional<Rect>, bool> Canvas::getClipRect(const Rect* drawBounds) {
   auto rect = Rect::MakeEmpty();
-  if (state->clip.asRect(&rect)) {
+  if (mcStack->getClip().asRect(&rect)) {
     if (drawBounds != nullptr && !rect.intersect(*drawBounds)) {
       return {{}, false};
     }
@@ -255,7 +234,7 @@ std::pair<std::optional<Rect>, bool> Canvas::getClipRect(const Rect* drawBounds)
 
 std::unique_ptr<FragmentProcessor> Canvas::getClipMask(const Rect& deviceBounds,
                                                        Rect* scissorRect) {
-  const auto& clipPath = state->clip;
+  const auto& clipPath = mcStack->getClip();
   if (clipPath.contains(deviceBounds)) {
     return nullptr;
   }
@@ -279,18 +258,19 @@ std::unique_ptr<FragmentProcessor> Canvas::getClipMask(const Rect& deviceBounds,
 }
 
 Rect Canvas::clipLocalBounds(Rect localBounds) {
-  auto deviceBounds = state->matrix.mapRect(localBounds);
-  auto clipBounds = state->clip.getBounds();
+  auto& viewMatrix = mcStack->getMatrix();
+  auto deviceBounds = viewMatrix.mapRect(localBounds);
+  auto clipBounds = mcStack->getClip().getBounds();
   clipBounds.roundOut();
   auto clippedDeviceBounds = deviceBounds;
   if (!clippedDeviceBounds.intersect(clipBounds)) {
     return Rect::MakeEmpty();
   }
   auto clippedLocalBounds = localBounds;
-  if (state->matrix.getSkewX() == 0 && state->matrix.getSkewY() == 0 &&
+  if (viewMatrix.getSkewX() == 0 && viewMatrix.getSkewY() == 0 &&
       clippedDeviceBounds != deviceBounds) {
     Matrix inverse = Matrix::I();
-    state->matrix.invert(&inverse);
+    viewMatrix.invert(&inverse);
     clippedLocalBounds = inverse.mapRect(clippedDeviceBounds);
     clippedLocalBounds.intersect(localBounds);
   }
@@ -426,13 +406,14 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (drawAsClear(fillPath, paint)) {
     return;
   }
-  DrawArgs args(surface, paint, localBounds, state->matrix);
+  auto viewMatrix = mcStack->getMatrix();
+  DrawArgs args(surface, paint, localBounds, viewMatrix);
   auto drawOp = MakeSimplePathOp(fillPath, args);
   if (drawOp != nullptr) {
     addDrawOp(std::move(drawOp), args, paint);
     return;
   }
-  auto scales = state->matrix.getAxisScales();
+  auto scales = viewMatrix.getAxisScales();
   if (FloatNearlyZero(scales.x) || FloatNearlyZero(scales.y)) {
     return;
   }
@@ -495,7 +476,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (realPaint.getShader() != nullptr && !image->isAlphaOnly()) {
     realPaint.setShader(nullptr);
   }
-  DrawArgs args(surface, realPaint, localBounds, state->matrix);
+  DrawArgs args(surface, realPaint, localBounds, mcStack->getMatrix());
   auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
@@ -513,14 +494,14 @@ void Canvas::drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> te
   }
   auto localMatrix = Matrix::I();
   auto maskLocalMatrix = Matrix::I();
-  if (!state->matrix.invert(&localMatrix)) {
+  auto& viewMatrix = mcStack->getMatrix();
+  if (!viewMatrix.invert(&localMatrix)) {
     return;
   }
-  maskLocalMatrix.postConcat(state->matrix);
+  maskLocalMatrix.postConcat(viewMatrix);
   maskLocalMatrix.postTranslate(-deviceBounds.x(), -deviceBounds.y());
   maskLocalMatrix.postScale(static_cast<float>(textureProxy->width()) / deviceBounds.width(),
                             static_cast<float>(textureProxy->height()) / deviceBounds.height());
-  auto oldMatrix = state->matrix;
   resetMatrix();
   DrawArgs args(surface, paint, deviceBounds, Matrix::I());
   auto op = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix, &localMatrix);
@@ -529,9 +510,9 @@ void Canvas::drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> te
   if (maskProcessor == nullptr) {
     return;
   }
-  op->addMaskFP(std::move(maskProcessor));
+  op->addCoverageFP(std::move(maskProcessor));
   addDrawOp(std::move(op), args, paint);
-  setMatrix(oldMatrix);
+  setMatrix(viewMatrix);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
@@ -550,7 +531,7 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0 || paint.nothingToDraw()) {
     return;
   }
-  auto scale = state->matrix.getMaxScale();
+  auto scale = mcStack->getMatrix().getMaxScale();
   auto scaledFont = font.makeWithSize(font.getSize() * scale);
   auto scaledPaint = paint;
   scaledPaint.setStrokeWidth(paint.getStrokeWidth() * scale);
@@ -601,10 +582,11 @@ void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& pai
   if (localBounds.isEmpty()) {
     return;
   }
-  auto deviceBounds = state->matrix.mapRect(localBounds);
+  auto& viewMatrix = mcStack->getMatrix();
+  auto deviceBounds = viewMatrix.mapRect(localBounds);
   auto width = ceilf(deviceBounds.width());
   auto height = ceilf(deviceBounds.height());
-  auto totalMatrix = state->matrix;
+  auto totalMatrix = viewMatrix;
   auto matrix = Matrix::I();
   matrix.postTranslate(-deviceBounds.x(), -deviceBounds.y());
   matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
@@ -638,12 +620,13 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     drawRect.join(localBounds);
     auto localMatrix = Matrix::MakeTrans(tex[i].x(), tex[i].y());
     auto color = colors ? std::optional<Color>(colors[i].premultiply()) : std::nullopt;
+    auto& viewMatrix = mcStack->getMatrix();
     if (op == nullptr) {
-      ops.emplace_back(FillRectOp::Make(color, localBounds, state->matrix, &localMatrix));
+      ops.emplace_back(FillRectOp::Make(color, localBounds, viewMatrix, &localMatrix));
       op = ops.back().get();
     } else {
-      if (!op->add(color, localBounds, state->matrix, &localMatrix)) {
-        ops.emplace_back(FillRectOp::Make(color, localBounds, state->matrix, &localMatrix));
+      if (!op->add(color, localBounds, viewMatrix, &localMatrix)) {
+        ops.emplace_back(FillRectOp::Make(color, localBounds, viewMatrix, &localMatrix));
         op = ops.back().get();
       }
     }
@@ -653,7 +636,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     return;
   }
   auto realPaint = CleanPaintForDrawImage(paint);
-  DrawArgs args(surface, realPaint, drawRect, state->matrix);
+  DrawArgs args(surface, realPaint, drawRect, mcStack->getMatrix());
   for (auto& rectOp : ops) {
     auto processor = FragmentProcessor::Make(atlas, args, sampling);
     if (colors) {
@@ -673,7 +656,7 @@ static bool HasColorOnly(const Paint& paint) {
 }
 
 bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
-  if (!HasColorOnly(paint) || !state->matrix.rectStaysRect()) {
+  if (!HasColorOnly(paint) || !mcStack->getMatrix().rectStaysRect()) {
     return false;
   }
   auto color = paint.getColor().premultiply();
@@ -689,7 +672,7 @@ bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
   if (!path.asRect(&bounds)) {
     return false;
   }
-  state->matrix.mapRect(&bounds);
+  mcStack->getMatrix().mapRect(&bounds);
   auto [clipRect, useScissor] = getClipRect(&bounds);
   if (clipRect.has_value()) {
     auto format = surface->renderTargetProxy->format();
@@ -728,7 +711,7 @@ bool Canvas::getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* dra
   }
   if (auto maskFilter = paint.getMaskFilter()) {
     if (auto processor = maskFilter->asFragmentProcessor(args, nullptr)) {
-      drawOp->addMaskFP(std::move(processor));
+      drawOp->addCoverageFP(std::move(processor));
     } else {
       return false;
     }
@@ -747,7 +730,7 @@ void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const P
   } else if (aa && !IsPixelAligned(op->bounds())) {
     aaType = AAType::Coverage;
   } else {
-    const auto& matrix = state->matrix;
+    const auto& matrix = mcStack->getMatrix();
     auto rotation = std::round(RadiansToDegrees(atan2f(matrix.getSkewX(), matrix.getScaleX())));
     if (static_cast<int>(rotation) % 90 != 0) {
       aaType = AAType::Coverage;
@@ -756,7 +739,7 @@ void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const P
   Rect scissorRect = Rect::MakeEmpty();
   auto clipMask = getClipMask(op->bounds(), &scissorRect);
   if (clipMask) {
-    op->addMaskFP(std::move(clipMask));
+    op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
   op->setBlendMode(paint.getBlendMode());

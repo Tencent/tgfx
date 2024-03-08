@@ -58,9 +58,9 @@ std::unique_ptr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
                                                  std::unique_ptr<GeometryProcessor> gp) {
   auto numColorProcessors = _colors.size();
   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.resize(numColorProcessors + _masks.size());
+  fragmentProcessors.resize(numColorProcessors + _coverages.size());
   std::move(_colors.begin(), _colors.end(), fragmentProcessors.begin());
-  std::move(_masks.begin(), _masks.end(),
+  std::move(_coverages.begin(), _coverages.end(),
             fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
   DstTextureInfo dstTextureInfo = {};
   auto caps = renderPass->getContext()->caps();
@@ -89,8 +89,8 @@ static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor
 bool DrawOp::onCombineIfPossible(Op* op) {
   auto* that = static_cast<DrawOp*>(op);
   return aa == that->aa && _scissorRect == that->_scissorRect &&
-         CompareFragments(_colors, that->_colors) && CompareFragments(_masks, that->_masks) &&
-         blendMode == that->blendMode;
+         CompareFragments(_colors, that->_colors) &&
+         CompareFragments(_coverages, that->_coverages) && blendMode == that->blendMode;
 }
 
 }  // namespace tgfx

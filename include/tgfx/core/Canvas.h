@@ -30,10 +30,8 @@
 namespace tgfx {
 class Surface;
 class SurfaceOptions;
-class RenderContext;
-class Texture;
 class TextureProxy;
-struct CanvasState;
+class MCStack;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
@@ -44,6 +42,8 @@ struct CanvasState;
 class Canvas {
  public:
   explicit Canvas(Surface* surface);
+
+  ~Canvas();
 
   /**
    * Retrieves the context associated with this Surface.
@@ -282,8 +282,7 @@ class Canvas {
   Surface* surface = nullptr;
   std::shared_ptr<Surface> _clipSurface = nullptr;
   uint32_t clipID = 0;
-  std::shared_ptr<CanvasState> state = nullptr;
-  std::vector<std::shared_ptr<CanvasState>> savedStateList = {};
+  MCStack* mcStack = nullptr;
 
   std::shared_ptr<TextureProxy> getClipTexture();
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
