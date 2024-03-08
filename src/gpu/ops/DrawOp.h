@@ -53,8 +53,8 @@ class DrawOp : public Op {
     _colors.emplace_back(std::move(colorProcessor));
   }
 
-  void addMaskFP(std::unique_ptr<FragmentProcessor> maskProcessor) {
-    _masks.emplace_back(std::move(maskProcessor));
+  void addCoverageFP(std::unique_ptr<FragmentProcessor> coverageProcessor) {
+    _coverages.emplace_back(std::move(coverageProcessor));
   }
 
  protected:
@@ -65,7 +65,7 @@ class DrawOp : public Op {
  private:
   Rect _scissorRect = Rect::MakeEmpty();
   std::vector<std::unique_ptr<FragmentProcessor>> _colors;
-  std::vector<std::unique_ptr<FragmentProcessor>> _masks;
+  std::vector<std::unique_ptr<FragmentProcessor>> _coverages;
   BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

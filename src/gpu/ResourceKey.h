@@ -160,6 +160,11 @@ class UniqueKey : public ResourceKey {
   virtual ~UniqueKey();
 
   /**
+   * Returns the domain ID of the unique key.
+   */
+  uint32_t domainID() const;
+
+  /**
    * Returns the total number of times the domain has been referenced.
    */
   long useCount() const;

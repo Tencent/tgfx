@@ -30,7 +30,6 @@ class Context;
 class RenderContext;
 class RenderTarget;
 class RenderTargetProxy;
-class OpsRenderTask;
 class Op;
 
 /**

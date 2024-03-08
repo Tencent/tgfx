@@ -133,6 +133,10 @@ UniqueKey::~UniqueKey() {
   }
 }
 
+uint32_t UniqueKey::domainID() const {
+  return uniqueDomain != nullptr ? uniqueDomain->uniqueID() : 0;
+}
+
 long UniqueKey::useCount() const {
   return uniqueDomain != nullptr ? uniqueDomain->useCount() : 0;
 }
