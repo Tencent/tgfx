@@ -34,7 +34,6 @@ class RenderContext {
       : renderTargetProxy(std::move(renderTargetProxy)) {
   }
 
-
   void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,
                   bool autoResolve = false);
 

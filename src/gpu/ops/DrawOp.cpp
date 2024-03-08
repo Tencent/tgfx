@@ -89,8 +89,8 @@ static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor
 bool DrawOp::onCombineIfPossible(Op* op) {
   auto* that = static_cast<DrawOp*>(op);
   return aa == that->aa && _scissorRect == that->_scissorRect &&
-         CompareFragments(_colors, that->_colors) && CompareFragments(_coverages, that->_coverages) &&
-         blendMode == that->blendMode;
+         CompareFragments(_colors, that->_colors) &&
+         CompareFragments(_coverages, that->_coverages) && blendMode == that->blendMode;
 }
 
 }  // namespace tgfx
