@@ -18,25 +18,11 @@
 
 #pragma once
 
-#include "core/DataProvider.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
-class PathAATriangles : public DataProvider {
- public:
-  static std::shared_ptr<PathAATriangles> Make(Path path, const Matrix& matrix,
-                                               const Stroke* stroke = nullptr);
+static constexpr size_t StrokeKeyCount = 3;
 
-  ~PathAATriangles() override;
-
-  std::shared_ptr<Data> getData() const override;
-
- private:
-  Path path = {};
-  Matrix matrix = Matrix::I();
-  Stroke* stroke = nullptr;
-
-  PathAATriangles(Path path, const Matrix& matrix, const Stroke* stroke);
-};
+void WriteStrokeKey(BytesKey* bytesKey, const Stroke* stroke);
 }  // namespace tgfx

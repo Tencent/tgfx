@@ -21,28 +21,37 @@
 #include "DrawOp.h"
 #include "gpu/GpuBuffer.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class TriangulatingPathOp : public DrawOp {
  public:
-  static std::unique_ptr<TriangulatingPathOp> Make(Color color,
-                                                   std::shared_ptr<GpuBufferProxy> vertexBuffer,
-                                                   const Rect& bounds, const Matrix& viewMatrix,
-                                                   const Matrix& localMatrix = Matrix::I());
+  DEFINE_OP_CLASS_ID
+
+  static std::unique_ptr<TriangulatingPathOp> Make(Color color, const Path& path,
+                                                   const Matrix& viewMatrix,
+                                                   const Stroke* stroke = nullptr,
+                                                   uint32_t renderFlags = 0);
+
+  ~TriangulatingPathOp() override;
+
+  void prepare(Context* context) override;
 
   void execute(RenderPass* renderPass) override;
 
- private:
-  DEFINE_OP_CLASS_ID
-
+ protected:
   bool onCombineIfPossible(Op* op) override;
 
+ private:
   Color color = Color::Transparent();
-  std::shared_ptr<GpuBufferProxy> vertexBuffer = nullptr;
+  Path path = {};
   Matrix viewMatrix = Matrix::I();
-  Matrix localMatrix = Matrix::I();
+  Matrix rasterizeMatrix = Matrix::I();
+  Stroke* stroke = nullptr;
+  uint32_t renderFlags = 0;
+  std::shared_ptr<GpuBufferProxy> vertexBuffer = nullptr;
 
-  TriangulatingPathOp(Color color, std::shared_ptr<GpuBufferProxy> vertexBuffer, const Rect& bounds,
-                      const Matrix& viewMatrix, const Matrix& localMatrix);
+  TriangulatingPathOp(Color color, Path path, const Matrix& viewMatrix, const Stroke* stroke,
+                      uint32_t renderFlags);
 };
 }  // namespace tgfx

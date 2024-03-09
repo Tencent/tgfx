@@ -26,6 +26,8 @@ class RectPaint;
 
 class FillRectOp : public DrawOp {
  public:
+  DEFINE_OP_CLASS_ID
+
   static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
                                           const Matrix& viewMatrix,
                                           const Matrix* localMatrix = nullptr);
@@ -38,8 +40,6 @@ class FillRectOp : public DrawOp {
   void execute(RenderPass* renderPass) override;
 
  private:
-  DEFINE_OP_CLASS_ID
-
   FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
              const Matrix* localMatrix = nullptr);
 

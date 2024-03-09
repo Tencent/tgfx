@@ -26,6 +26,8 @@ class RRectPaint;
 
 class RRectOp : public DrawOp {
  public:
+  DEFINE_OP_CLASS_ID
+
   static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix);
 
   void prepare(Context* context) override;
@@ -33,8 +35,6 @@ class RRectOp : public DrawOp {
   void execute(RenderPass* renderPass) override;
 
  private:
-  DEFINE_OP_CLASS_ID
-
   RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
 
   bool onCombineIfPossible(Op* op) override;

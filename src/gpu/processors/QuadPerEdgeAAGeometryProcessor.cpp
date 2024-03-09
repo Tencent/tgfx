@@ -29,10 +29,12 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
     position = {"aPosition", SLType::Float2};
   }
   localCoord = {"localCoord", SLType::Float2};
+  int attributeCount = 2;
   if (hasColor) {
+    attributeCount++;
     color = {"inColor", SLType::Float4};
   }
-  setVertexAttributes(&position, 3);
+  setVertexAttributes(&position, attributeCount);
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

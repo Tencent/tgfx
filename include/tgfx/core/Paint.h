@@ -51,6 +51,21 @@ class Paint {
   void reset();
 
   /**
+   * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
+   * default value is true.
+   */
+  bool isAntiAlias() const {
+    return antiAlias;
+  }
+
+  /**
+   * Requests, but does not require, that edge pixels draw opaque or with partial transparency.
+   */
+  void setAntiAlias(bool aa) {
+    antiAlias = aa;
+  }
+
+  /**
    * Returns whether the geometry is filled, stroked, or filled and stroked.
    */
   PaintStyle getStyle() const {
@@ -245,6 +260,7 @@ class Paint {
   bool nothingToDraw() const;
 
  private:
+  bool antiAlias = true;
   PaintStyle style = PaintStyle::Fill;
   Color color = Color::White();
   Stroke stroke = Stroke(0);

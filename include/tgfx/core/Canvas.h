@@ -295,7 +295,6 @@ class Canvas {
   void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
   bool drawAsClear(const Path& path, const Paint& paint);
   bool getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint,
-                 bool aa = false);
+  void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint);
 };
 }  // namespace tgfx

@@ -51,6 +51,10 @@ class Op {
     return _bounds;
   }
 
+  uint8_t classID() const {
+    return _classID;
+  }
+
  protected:
   static uint8_t GenOpClassID();
 

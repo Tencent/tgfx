@@ -20,7 +20,6 @@
 #include "core/MCStack.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
-#include "gpu/PathAATriangles.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
@@ -38,6 +37,7 @@
 #include "tgfx/utils/UTF.h"
 #include "utils/MathExtra.h"
 #include "utils/SimpleTextShaper.h"
+#include "utils/StrokeKey.h"
 
 namespace tgfx {
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
@@ -191,19 +191,25 @@ std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
   return _clipSurface->getTextureProxy();
 }
 
-static constexpr float BOUNDS_TO_LERANCE = 1e-3f;
+/**
+ * Defines the maximum distance a draw can extend beyond a clip's boundary and still be considered
+ * 'on the other side'. This tolerance accounts for potential floating point rounding errors. The
+ * value of 1e-3 is chosen because, in the coverage case, as long as coverage stays within
+ * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
+ */
+static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
 /**
  * Returns true if the given rect counts as aligned with pixel boundaries.
  */
 static bool IsPixelAligned(const Rect& rect) {
-  return fabsf(roundf(rect.left) - rect.left) <= BOUNDS_TO_LERANCE &&
-         fabsf(roundf(rect.top) - rect.top) <= BOUNDS_TO_LERANCE &&
-         fabsf(roundf(rect.right) - rect.right) <= BOUNDS_TO_LERANCE &&
-         fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TO_LERANCE;
+  return fabsf(roundf(rect.left) - rect.left) <= BOUNDS_TOLERANCE &&
+         fabsf(roundf(rect.top) - rect.top) <= BOUNDS_TOLERANCE &&
+         fabsf(roundf(rect.right) - rect.right) <= BOUNDS_TOLERANCE &&
+         fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
 }
 
-void FlipYIfNeeded(Rect* rect, const Surface* surface) {
+static void FlipYIfNeeded(Rect* rect, const Surface* surface) {
   if (surface->origin() == ImageOrigin::BottomLeft) {
     auto height = rect->height();
     rect->top = static_cast<float>(surface->height()) - rect->bottom;
@@ -289,58 +295,6 @@ static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const DrawArgs
   return nullptr;
 }
 
-static constexpr size_t StrokeKeyCount = 3;
-
-static void WriteStrokeKey(BytesKey* bytesKey, const Stroke* stroke) {
-  auto flags = static_cast<uint32_t>(stroke->join) << 16 | static_cast<uint32_t>(stroke->cap);
-  bytesKey->write(flags);
-  bytesKey->write(stroke->width);
-  bytesKey->write(stroke->miterLimit);
-}
-
-static std::unique_ptr<DrawOp> MakeTriangulatingPathOp(const Path& path, const DrawArgs& args,
-                                                       const Point& scales, const Stroke* stroke) {
-  static const auto TriangulatingPathType = UniqueID::Next();
-  BytesKey bytesKey = {};
-  Matrix rasterizeMatrix = {};
-  if (scales.x == scales.y) {
-    rasterizeMatrix.setScale(scales.x, scales.y);
-    bytesKey.reserve(2 + (stroke ? StrokeKeyCount : 0));
-    bytesKey.write(TriangulatingPathType);
-    bytesKey.write(scales.x);
-  } else {
-    rasterizeMatrix = args.viewMatrix;
-    rasterizeMatrix.setTranslateX(0);
-    rasterizeMatrix.setTranslateY(0);
-    bytesKey.reserve(5 + (stroke ? StrokeKeyCount : 0));
-    bytesKey.write(TriangulatingPathType);
-    bytesKey.write(rasterizeMatrix.getScaleX());
-    bytesKey.write(rasterizeMatrix.getSkewX());
-    bytesKey.write(rasterizeMatrix.getSkewY());
-    bytesKey.write(rasterizeMatrix.getScaleY());
-  }
-  if (stroke) {
-    WriteStrokeKey(&bytesKey, stroke);
-  }
-  auto uniqueKey = UniqueKey::Combine(PathRef::GetUniqueKey(path), bytesKey);
-  auto pathTriangles = PathAATriangles::Make(path, rasterizeMatrix, stroke);
-  auto proxyProvider = args.context->proxyProvider();
-  auto bufferProxy = proxyProvider->createGpuBufferProxy(uniqueKey, pathTriangles,
-                                                         BufferType::Vertex, args.renderFlags);
-  if (bufferProxy == nullptr) {
-    return nullptr;
-  }
-  auto viewMatrix = args.viewMatrix;
-  auto drawBounds = viewMatrix.mapRect(args.drawRect);
-  Matrix localMatrix = {};
-  if (!rasterizeMatrix.invert(&localMatrix)) {
-    return nullptr;
-  }
-  viewMatrix.preConcat(localMatrix);
-  return TriangulatingPathOp::Make(args.color, std::move(bufferProxy), drawBounds, viewMatrix,
-                                   localMatrix);
-}
-
 static std::unique_ptr<DrawOp> MakeTexturePathOp(const Path& path, const DrawArgs& args,
                                                  const Point& scales, const Rect& bounds,
                                                  const Stroke* stroke) {
@@ -423,7 +377,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   auto height = static_cast<int>(ceilf(scaledBounds.height()));
   if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT ||
       width * height >= path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR) {
-    drawOp = MakeTriangulatingPathOp(path, args, scales, stroke);
+    drawOp = TriangulatingPathOp::Make(args.color, path, args.viewMatrix, stroke, args.renderFlags);
   } else {
     drawOp = MakeTexturePathOp(path, args, scales, scaledBounds, stroke);
   }
@@ -483,7 +437,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   }
   auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
   drawOp->addColorFP(std::move(processor));
-  addDrawOp(std::move(drawOp), args, realPaint, true);
+  addDrawOp(std::move(drawOp), args, realPaint);
   setMatrix(oldMatrix);
 }
 
@@ -719,31 +673,27 @@ bool Canvas::getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* dra
   return true;
 }
 
-void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint,
-                       bool aa) {
+void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint) {
   if (!getProcessors(args, paint, op.get())) {
     return;
   }
   auto aaType = AAType::None;
   if (surface->renderTargetProxy->sampleCount() > 1) {
     aaType = AAType::MSAA;
-  } else if (aa && !IsPixelAligned(op->bounds())) {
-    aaType = AAType::Coverage;
-  } else {
-    const auto& matrix = mcStack->getMatrix();
-    auto rotation = std::round(RadiansToDegrees(atan2f(matrix.getSkewX(), matrix.getScaleX())));
-    if (static_cast<int>(rotation) % 90 != 0) {
+  } else if (paint.isAntiAlias()) {
+    auto isFillRect = op->classID() == FillRectOp::ClassID();
+    if (!isFillRect || !args.viewMatrix.rectStaysRect() || !IsPixelAligned(op->bounds())) {
       aaType = AAType::Coverage;
     }
   }
+  op->setAA(aaType);
+  op->setBlendMode(paint.getBlendMode());
   Rect scissorRect = Rect::MakeEmpty();
   auto clipMask = getClipMask(op->bounds(), &scissorRect);
   if (clipMask) {
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
-  op->setBlendMode(paint.getBlendMode());
-  op->setAA(aaType);
   surface->aboutToDraw(false);
   surface->addOp(std::move(op));
 }

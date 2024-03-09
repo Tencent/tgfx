@@ -19,12 +19,13 @@
 #pragma once
 
 #include "GeometryProcessor.h"
+#include "gpu/AAType.h"
 
 namespace tgfx {
 class DefaultGeometryProcessor : public GeometryProcessor {
  public:
   static std::unique_ptr<DefaultGeometryProcessor> Make(Color color, int width, int height,
-                                                        const Matrix& viewMatrix,
+                                                        AAType aa, const Matrix& viewMatrix,
                                                         const Matrix& localMatrix);
 
   std::string name() const override {
@@ -34,8 +35,10 @@ class DefaultGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  DefaultGeometryProcessor(Color color, int width, int height, const Matrix& viewMatrix,
+  DefaultGeometryProcessor(Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
                            const Matrix& localMatrix);
+
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position;
   Attribute coverage;
@@ -43,6 +46,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   Color color;
   int width = 1;
   int height = 1;
+  AAType aa = AAType::None;
   Matrix viewMatrix = Matrix::I();
   Matrix localMatrix = Matrix::I();
 };
