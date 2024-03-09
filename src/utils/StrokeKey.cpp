@@ -16,27 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "Op.h"
+#include "StrokeKey.h"
 
 namespace tgfx {
-class ClearOp : public Op {
- public:
-  DEFINE_OP_CLASS_ID
-
-  static std::unique_ptr<ClearOp> Make(Color color, const Rect& scissor);
-
-  void execute(RenderPass* renderPass) override;
-
- private:
-  explicit ClearOp(Color color, const Rect& scissor)
-      : Op(ClassID()), color(color), scissor(scissor) {
-  }
-
-  bool onCombineIfPossible(Op* op) override;
-
-  Color color = Color::Transparent();
-  Rect scissor = Rect::MakeEmpty();
-};
+void WriteStrokeKey(BytesKey* bytesKey, const Stroke* stroke) {
+  auto flags = static_cast<uint32_t>(stroke->join) << 16 | static_cast<uint32_t>(stroke->cap);
+  bytesKey->write(flags);
+  bytesKey->write(stroke->width);
+  bytesKey->write(stroke->miterLimit);
+}
 }  // namespace tgfx

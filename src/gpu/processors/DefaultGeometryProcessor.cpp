@@ -19,13 +19,22 @@
 #include "DefaultGeometryProcessor.h"
 
 namespace tgfx {
-DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height,
+DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height, AAType aa,
                                                    const Matrix& viewMatrix,
                                                    const Matrix& localMatrix)
-    : GeometryProcessor(ClassID()), color(color), width(width), height(height),
+    : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
       viewMatrix(viewMatrix), localMatrix(localMatrix) {
   position = {"aPosition", SLType::Float2};
-  coverage = {"inCoverage", SLType::Float};
-  setVertexAttributes(&position, 2);
+  int attributeCount = 1;
+  if (aa == AAType::Coverage) {
+    attributeCount = 2;
+    coverage = {"inCoverage", SLType::Float};
+  }
+  setVertexAttributes(&position, attributeCount);
+}
+
+void DefaultGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  uint32_t flags = aa == AAType::Coverage ? 1 : 0;
+  bytesKey->write(flags);
 }
 }  // namespace tgfx

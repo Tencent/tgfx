@@ -24,8 +24,8 @@
 namespace tgfx {
 class GLDefaultGeometryProcessor : public DefaultGeometryProcessor {
  public:
-  GLDefaultGeometryProcessor(Color color, int width, int height, const Matrix& viewMatrix,
-                             const Matrix& localMatrix);
+  GLDefaultGeometryProcessor(Color color, int width, int height, AAType aa,
+                             const Matrix& viewMatrix, const Matrix& localMatrix);
 
   void emitCode(EmitArgs& args) const override;
 

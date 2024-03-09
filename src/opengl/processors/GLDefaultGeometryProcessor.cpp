@@ -20,15 +20,16 @@
 
 namespace tgfx {
 std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
-    Color color, int width, int height, const Matrix& viewMatrix, const Matrix& localMatrix) {
+    Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
+    const Matrix& localMatrix) {
   return std::unique_ptr<DefaultGeometryProcessor>(
-      new GLDefaultGeometryProcessor(color, width, height, viewMatrix, localMatrix));
+      new GLDefaultGeometryProcessor(color, width, height, aa, viewMatrix, localMatrix));
 }
 
 GLDefaultGeometryProcessor::GLDefaultGeometryProcessor(Color color, int width, int height,
-                                                       const Matrix& viewMatrix,
+                                                       AAType aa, const Matrix& viewMatrix,
                                                        const Matrix& localMatrix)
-    : DefaultGeometryProcessor(color, width, height, viewMatrix, localMatrix) {
+    : DefaultGeometryProcessor(color, width, height, aa, viewMatrix, localMatrix) {
 }
 
 void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -48,10 +49,14 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
                  args.fpCoordTransformHandler);
 
-  auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-  vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-  fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                           coverageVar.fsIn().c_str());
+  if (aa == AAType::Coverage) {
+    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
+                             coverageVar.fsIn().c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+  }
 
   auto colorName = args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
