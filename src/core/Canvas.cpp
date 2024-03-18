@@ -20,6 +20,7 @@
 #include "core/MCStack.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
@@ -45,6 +46,18 @@ static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 // A factor used to estimate the memory size of a tessellated path, based on the average value of
 // Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
 static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
+
+static bool ShouldTriangulatePath(const Path& path, const Matrix& viewMatrix) {
+  if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
+    return true;
+  }
+  auto scales = viewMatrix.getAxisScales();
+  auto bounds = path.getBounds();
+  bounds.scale(scales.x, scales.y);
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
+}
 
 Canvas::Canvas(Surface* surface) : surface(surface) {
   Path clip = {};
@@ -178,29 +191,6 @@ const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
 }
 
-std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
-  auto& clip = mcStack->getClip();
-  auto domainID = PathRef::GetUniqueKey(mcStack->getClip()).domainID();
-  if (_clipSurface == nullptr) {
-    _clipSurface = Surface::Make(getContext(), surface->width(), surface->height(), true);
-    if (_clipSurface == nullptr) {
-      _clipSurface = Surface::Make(getContext(), surface->width(), surface->height());
-    }
-  }
-  if (_clipSurface == nullptr) {
-    return nullptr;
-  }
-  if (clipID != domainID) {
-    auto clipCanvas = _clipSurface->getCanvas();
-    clipCanvas->clear();
-    Paint paint = {};
-    paint.setColor(Color::White());
-    clipCanvas->drawPath(clip, paint);
-    clipID = domainID;
-  }
-  return _clipSurface->getTextureProxy();
-}
-
 /**
  * Defines the maximum distance a draw can extend beyond a clip's boundary and still be considered
  * 'on the other side'. This tolerance accounts for potential floating point rounding errors. The
@@ -227,10 +217,11 @@ static void FlipYIfNeeded(Rect* rect, const Surface* surface) {
   }
 }
 
-std::pair<std::optional<Rect>, bool> Canvas::getClipRect(const Rect* drawBounds) {
+std::pair<std::optional<Rect>, bool> Canvas::getClipRect(const Rect* deviceBounds) {
+  auto& clip = mcStack->getClip();
   auto rect = Rect::MakeEmpty();
-  if (mcStack->getClip().asRect(&rect)) {
-    if (drawBounds != nullptr && !rect.intersect(*drawBounds)) {
+  if (clip.asRect(&rect)) {
+    if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
       return {{}, false};
     }
     FlipYIfNeeded(&rect, surface);
@@ -248,10 +239,46 @@ std::pair<std::optional<Rect>, bool> Canvas::getClipRect(const Rect* drawBounds)
   return {{}, false};
 }
 
+std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
+  auto& clip = mcStack->getClip();
+  auto domainID = PathRef::GetUniqueKey(clip).domainID();
+  if (domainID == clipID) {
+    return clipTexture;
+  }
+  auto bounds = clip.getBounds();
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  auto renderFlags = surfaceOptions()->renderFlags();
+  if (ShouldTriangulatePath(clip, rasterizeMatrix)) {
+    auto drawOp =
+        TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
+    auto renderTarget = RenderTargetProxy::Make(getContext(), width, height, PixelFormat::ALPHA_8);
+    if (renderTarget == nullptr) {
+      renderTarget = RenderTargetProxy::Make(getContext(), width, height, PixelFormat::RGBA_8888);
+      if (renderTarget == nullptr) {
+        return nullptr;
+      }
+    }
+    auto drawingManager = getContext()->drawingManager();
+    auto renderTask = drawingManager->addOpsTask(renderTarget);
+    renderTask->addOp(std::move(drawOp));
+    clipTexture = renderTarget->getTextureProxy();
+  } else {
+    auto uniqueKey = PathRef::GetUniqueKey(clip);
+    auto rasterizer = Rasterizer::MakeFrom(clip, ISize::Make(width, height), rasterizeMatrix);
+    auto proxyProvider = getContext()->proxyProvider();
+    clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
+  }
+  clipID = domainID;
+  return clipTexture;
+}
+
 std::unique_ptr<FragmentProcessor> Canvas::getClipMask(const Rect& deviceBounds,
                                                        Rect* scissorRect) {
-  const auto& clipPath = mcStack->getClip();
-  if (clipPath.contains(deviceBounds)) {
+  auto& clip = mcStack->getClip();
+  auto viewMatrix = mcStack->getMatrix();
+  if (!clip.isEmpty() && clip.contains(deviceBounds)) {
     return nullptr;
   }
   auto [rect, useScissor] = getClipRect();
@@ -265,32 +292,36 @@ std::unique_ptr<FragmentProcessor> Canvas::getClipMask(const Rect& deviceBounds,
     }
     return nullptr;
   }
-  auto clipBounds = clipPath.getBounds();
-  FlipYIfNeeded(&clipBounds, surface);
-  clipBounds.roundOut();
+  auto clipBounds = clip.getBounds();
   *scissorRect = clipBounds;
-  return FragmentProcessor::MulInputByChildAlpha(
-      DeviceSpaceTextureEffect::Make(getClipTexture(), surface->origin()));
+  FlipYIfNeeded(scissorRect, surface);
+  scissorRect->roundOut();
+  auto texture = getClipTexture();
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  auto localMatrix = viewMatrix;
+  localMatrix.postTranslate(-clipBounds.left, -clipBounds.top);
+  auto maskEffect = TextureEffect::Make(texture, {}, &localMatrix);
+  if (!texture->isAlphaOnly()) {
+    maskEffect = FragmentProcessor::MulInputByChildAlpha(std::move(maskEffect));
+  }
+  return maskEffect;
 }
 
-Rect Canvas::clipLocalBounds(Rect localBounds) {
+Rect Canvas::clipLocalBounds(const Rect& localBounds) {
   auto& viewMatrix = mcStack->getMatrix();
-  auto deviceBounds = viewMatrix.mapRect(localBounds);
+  Matrix invert = {};
+  if (!viewMatrix.invert(&invert)) {
+    return {};
+  }
+  auto drawRect = localBounds;
   auto clipBounds = mcStack->getClip().getBounds();
-  clipBounds.roundOut();
-  auto clippedDeviceBounds = deviceBounds;
-  if (!clippedDeviceBounds.intersect(clipBounds)) {
-    return Rect::MakeEmpty();
+  invert.mapRect(&clipBounds);
+  if (!drawRect.intersect(clipBounds)) {
+    return {};
   }
-  auto clippedLocalBounds = localBounds;
-  if (viewMatrix.getSkewX() == 0 && viewMatrix.getSkewY() == 0 &&
-      clippedDeviceBounds != deviceBounds) {
-    Matrix inverse = Matrix::I();
-    viewMatrix.invert(&inverse);
-    clippedLocalBounds = inverse.mapRect(clippedDeviceBounds);
-    clippedLocalBounds.intersect(localBounds);
-  }
-  return clippedLocalBounds;
+  return drawRect;
 }
 
 static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const DrawArgs& args) {
@@ -306,8 +337,10 @@ static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const DrawArgs
 }
 
 static std::unique_ptr<DrawOp> MakeTexturePathOp(const Path& path, const DrawArgs& args,
-                                                 const Point& scales, const Rect& bounds,
                                                  const Stroke* stroke) {
+  auto scales = args.viewMatrix.getAxisScales();
+  auto bounds = path.getBounds();
+  bounds.scale(scales.x, scales.y);
   static const auto TexturePathType = UniqueID::Next();
   BytesKey bytesKey(3 + (stroke ? StrokeKeyCount : 0));
   bytesKey.write(TexturePathType);
@@ -378,19 +411,10 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
     addDrawOp(std::move(drawOp), args, realPaint);
     return;
   }
-  auto scales = viewMatrix.getAxisScales();
-  if (FloatNearlyZero(scales.x) || FloatNearlyZero(scales.y)) {
-    return;
-  }
-  auto scaledBounds = pathBounds;
-  scaledBounds.scale(scales.x, scales.y);
-  auto width = static_cast<int>(ceilf(scaledBounds.width()));
-  auto height = static_cast<int>(ceilf(scaledBounds.height()));
-  if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT ||
-      width * height >= path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR) {
-    drawOp = TriangulatingPathOp::Make(args.color, path, args.viewMatrix, stroke, args.renderFlags);
+  if (ShouldTriangulatePath(path, viewMatrix)) {
+    drawOp = TriangulatingPathOp::Make(args.color, path, viewMatrix, stroke, args.renderFlags);
   } else {
-    drawOp = MakeTexturePathOp(path, args, scales, scaledBounds, stroke);
+    drawOp = MakeTexturePathOp(path, args, stroke);
   }
   addDrawOp(std::move(drawOp), args, realPaint);
 }
