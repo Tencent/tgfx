@@ -280,14 +280,14 @@ class Canvas {
 
  private:
   Surface* surface = nullptr;
-  std::shared_ptr<Surface> _clipSurface = nullptr;
+  std::shared_ptr<TextureProxy> clipTexture = nullptr;
   uint32_t clipID = 0;
   MCStack* mcStack = nullptr;
 
   std::shared_ptr<TextureProxy> getClipTexture();
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
-  Rect clipLocalBounds(Rect localBounds);
+  Rect clipLocalBounds(const Rect& localBounds);
   void drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> textureProxy,
                 const Paint& paint);
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
