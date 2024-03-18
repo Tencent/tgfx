@@ -147,11 +147,21 @@ void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint&
   drawOval(rect, paint);
 }
 
-static Paint CleanPaintForDrawImage(const Paint* paint) {
-  Paint cleaned;
-  if (paint) {
-    cleaned = *paint;
+static Paint CleanPaint(const Paint* paint, bool forImage = false) {
+  if (paint == nullptr) {
+    return {};
+  }
+  auto cleaned = *paint;
+  if (forImage) {
     cleaned.setStyle(PaintStyle::Fill);
+  }
+  if (auto shader = cleaned.getShader()) {
+    Color shaderColor = {};
+    if (shader->asColor(&shaderColor)) {
+      shaderColor.alpha *= cleaned.getAlpha();
+      cleaned.setColor(shaderColor);
+      cleaned.setShader(nullptr);
+    }
   }
   return cleaned;
 }
@@ -347,7 +357,8 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (path.isEmpty() || paint.nothingToDraw()) {
     return;
   }
-  auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
+  auto realPaint = CleanPaint(&paint);
+  auto stroke = realPaint.getStroke();
   auto pathBounds = path.getBounds();
   if (stroke != nullptr) {
     pathBounds.outset(stroke->width, stroke->width);
@@ -356,15 +367,15 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (localBounds.isEmpty()) {
     return;
   }
-  auto fillPath = GetSimpleFillPath(path, paint);
-  if (drawAsClear(fillPath, paint)) {
+  auto fillPath = GetSimpleFillPath(path, realPaint);
+  if (drawAsClear(fillPath, realPaint)) {
     return;
   }
   auto viewMatrix = mcStack->getMatrix();
-  DrawArgs args(surface, paint, localBounds, viewMatrix);
+  DrawArgs args(surface, realPaint, localBounds, viewMatrix);
   auto drawOp = MakeSimplePathOp(fillPath, args);
   if (drawOp != nullptr) {
-    addDrawOp(std::move(drawOp), args, paint);
+    addDrawOp(std::move(drawOp), args, realPaint);
     return;
   }
   auto scales = viewMatrix.getAxisScales();
@@ -381,7 +392,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   } else {
     drawOp = MakeTexturePathOp(path, args, scales, scaledBounds, stroke);
   }
-  addDrawOp(std::move(drawOp), args, paint);
+  addDrawOp(std::move(drawOp), args, realPaint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
@@ -408,7 +419,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (image == nullptr) {
     return;
   }
-  auto realPaint = CleanPaintForDrawImage(paint);
+  auto realPaint = CleanPaint(paint, true);
   if (realPaint.nothingToDraw()) {
     return;
   }
@@ -485,10 +496,10 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0 || paint.nothingToDraw()) {
     return;
   }
+  auto realPaint = CleanPaint(&paint);
   auto scale = mcStack->getMatrix().getMaxScale();
   auto scaledFont = font.makeWithSize(font.getSize() * scale);
-  auto scaledPaint = paint;
-  scaledPaint.setStrokeWidth(paint.getStrokeWidth() * scale);
+  realPaint.setStrokeWidth(realPaint.getStrokeWidth() * scale);
   std::vector<Point> scaledPositions;
   for (size_t i = 0; i < glyphCount; ++i) {
     scaledPositions.push_back(Point::Make(positions[i].x * scale, positions[i].y * scale));
@@ -496,13 +507,13 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   save();
   concat(Matrix::MakeScale(1.f / scale));
   if (scaledFont.getTypeface()->hasColor()) {
-    drawColorGlyphs(glyphs, scaledPositions.data(), glyphCount, scaledFont, scaledPaint);
+    drawColorGlyphs(glyphs, scaledPositions.data(), glyphCount, scaledFont, realPaint);
     restore();
     return;
   }
   auto textBlob = TextBlob::MakeFrom(glyphs, scaledPositions.data(), glyphCount, scaledFont);
   if (textBlob) {
-    drawMaskGlyphs(textBlob, scaledPaint);
+    drawMaskGlyphs(textBlob, realPaint);
   }
   restore();
 }
@@ -531,7 +542,7 @@ void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& pai
   if (textBlob == nullptr) {
     return;
   }
-  auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
+  auto stroke = paint.getStroke();
   auto localBounds = clipLocalBounds(textBlob->getBounds(stroke));
   if (localBounds.isEmpty()) {
     return;
@@ -559,7 +570,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     return;
   }
   auto totalMatrix = mcStack->getMatrix();
-  auto realPaint = CleanPaintForDrawImage(paint);
+  auto realPaint = CleanPaint(paint, true);
   for (size_t i = 0; i < count; ++i) {
     concat(matrix[i]);
     auto width = static_cast<float>(tex[i].width());

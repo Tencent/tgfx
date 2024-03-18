@@ -288,5 +288,6 @@ class Image {
   friend class FragmentProcessor;
   friend class TransformImage;
   friend class RasterImage;
+  friend class ImageShader;
 };
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {

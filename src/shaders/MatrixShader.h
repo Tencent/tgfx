@@ -30,6 +30,10 @@ class MatrixShader final : public Shader {
     return source->isOpaque();
   }
 
+  bool asColor(Color* color) const override {
+    return source->asColor(color);
+  }
+
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
  protected:
