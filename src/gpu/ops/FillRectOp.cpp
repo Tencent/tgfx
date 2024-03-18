@@ -147,19 +147,6 @@ FillRectOp::FillRectOp(std::optional<Color> color, const Rect& rect, const Matri
   setBounds(bounds);
 }
 
-bool FillRectOp::add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-                     const Matrix* localMatrix) {
-  if (!color == hasColor || !canAdd(1)) {
-    return false;
-  }
-  auto b = bounds();
-  b.join(viewMatrix.mapRect(rect));
-  setBounds(b);
-  auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix, localMatrix);
-  rectPaints.push_back(std::move(rectPaint));
-  return true;
-}
-
 bool FillRectOp::canAdd(size_t count) const {
   return rectPaints.size() + count <=
          static_cast<size_t>(aa == AAType::Coverage ? ResourceProvider::MaxNumAAQuads()

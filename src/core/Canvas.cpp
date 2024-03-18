@@ -558,10 +558,8 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   if (atlas == nullptr || count == 0) {
     return;
   }
-  auto totalMatrix = getMatrix();
-  std::vector<std::unique_ptr<FillRectOp>> ops;
-  FillRectOp* op = nullptr;
-  Rect drawRect = Rect::MakeEmpty();
+  auto totalMatrix = mcStack->getMatrix();
+  auto realPaint = CleanPaintForDrawImage(paint);
   for (size_t i = 0; i < count; ++i) {
     concat(matrix[i]);
     auto width = static_cast<float>(tex[i].width());
@@ -571,36 +569,18 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
       setMatrix(totalMatrix);
       continue;
     }
-    drawRect.join(localBounds);
     auto localMatrix = Matrix::MakeTrans(tex[i].x(), tex[i].y());
     auto color = colors ? std::optional<Color>(colors[i].premultiply()) : std::nullopt;
     auto& viewMatrix = mcStack->getMatrix();
-    if (op == nullptr) {
-      ops.emplace_back(FillRectOp::Make(color, localBounds, viewMatrix, &localMatrix));
-      op = ops.back().get();
-    } else {
-      if (!op->add(color, localBounds, viewMatrix, &localMatrix)) {
-        ops.emplace_back(FillRectOp::Make(color, localBounds, viewMatrix, &localMatrix));
-        op = ops.back().get();
-      }
-    }
-    setMatrix(totalMatrix);
-  }
-  if (ops.empty()) {
-    return;
-  }
-  auto realPaint = CleanPaintForDrawImage(paint);
-  DrawArgs args(surface, realPaint, drawRect, mcStack->getMatrix());
-  for (auto& rectOp : ops) {
+    auto drawOp = FillRectOp::Make(color, localBounds, viewMatrix, &localMatrix);
+    DrawArgs args(surface, realPaint, localBounds, totalMatrix);
     auto processor = FragmentProcessor::Make(atlas, args, sampling);
-    if (colors) {
-      processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
-    }
     if (processor == nullptr) {
       return;
     }
-    rectOp->addColorFP(std::move(processor));
-    addDrawOp(std::move(rectOp), args, realPaint);
+    drawOp->addColorFP(std::move(processor));
+    addDrawOp(std::move(drawOp), args, realPaint);
+    setMatrix(totalMatrix);
   }
 }
 
