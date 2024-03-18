@@ -32,9 +32,6 @@ class FillRectOp : public DrawOp {
                                           const Matrix& viewMatrix,
                                           const Matrix* localMatrix = nullptr);
 
-  bool add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-           const Matrix* localMatrix = nullptr);
-
   void prepare(Context* context) override;
 
   void execute(RenderPass* renderPass) override;
