@@ -49,8 +49,11 @@ class Shader {
   static std::shared_ptr<Shader> MakeImageShader(std::shared_ptr<Image> image,
                                                  TileMode tileModeX = TileMode::Clamp,
                                                  TileMode tileModeY = TileMode::Clamp,
-                                                 SamplingOptions sampling = SamplingOptions());
+                                                 SamplingOptions sampling = {});
 
+  /**
+   * Creates a shader that blends the two specified shaders.
+   */
   static std::shared_ptr<Shader> MakeBlend(BlendMode mode, std::shared_ptr<Shader> dst,
                                            std::shared_ptr<Shader> src);
 
@@ -110,6 +113,14 @@ class Shader {
   }
 
   /**
+   * If the shader has a constant color, this method returns true and updates the color parameter.
+   * Otherwise, it returns false and leaves the color parameter unchanged.
+   */
+  virtual bool asColor(Color*) const {
+    return false;
+  }
+
+  /**
    * Returns a shader that will apply the specified viewMatrix to this shader when drawing. The
    * specified matrix will be applied after any matrix associated with this shader.
    */
@@ -128,5 +139,6 @@ class Shader {
       const DrawArgs& args, const Matrix* localMatrix) const = 0;
 
   friend class FragmentProcessor;
+  friend class Canvas;
 };
 }  // namespace tgfx

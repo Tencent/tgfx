@@ -35,6 +35,6 @@ std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, Ti
 
 std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(
     const DrawArgs& args, const Matrix* localMatrix) const {
-  return FragmentProcessor::Make(image, args, tileModeX, tileModeY, sampling, localMatrix);
+  return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, localMatrix);
 }
 }  // namespace tgfx

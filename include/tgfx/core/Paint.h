@@ -168,10 +168,10 @@ class Paint {
   }
 
   /**
-   * Returns the stroke options.
+   * Returns the stroke options if the paint's style is set to PaintStyle::Stroke.
    */
   const Stroke* getStroke() const {
-    return &stroke;
+    return style == PaintStyle::Stroke ? &stroke : nullptr;
   }
 
   /**
@@ -255,7 +255,6 @@ class Paint {
 
   /**
    * Returns true if the Paint prevents any drawing.
-   * @return
    */
   bool nothingToDraw() const;
 

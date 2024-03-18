@@ -22,8 +22,6 @@
 #include <unordered_map>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/Path.h"
 
 namespace tgfx {
 /**

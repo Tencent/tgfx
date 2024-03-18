@@ -30,6 +30,11 @@ bool ColorShader::isOpaque() const {
   return color.isOpaque();
 }
 
+bool ColorShader::asColor(Color* output) const {
+  *output = color;
+  return true;
+}
+
 std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const DrawArgs&,
                                                                     const Matrix*) const {
   return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);

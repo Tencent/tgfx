@@ -28,6 +28,8 @@ class ColorShader : public Shader {
 
   bool isOpaque() const override;
 
+  bool asColor(Color* color) const override;
+
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
                                                          const Matrix* localMatrix) const override;
