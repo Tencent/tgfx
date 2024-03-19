@@ -8,7 +8,7 @@
   "typings": "types/tgfx.d.ts",
   "scripts": {
     "clean:tgfx": "rimraf lib/ types/",
-    "clean": "npm run clean:tgfx && rimraf demo/build demo/wasm demo/*.js demo/*.map demo/cmake-build-*",
+    "clean": "npm run clean:tgfx && rimraf demo/build demo/wasm demo/*.md5 demo/*.js demo/*.map demo/cmake-build-*",
     "build:tgfx": "npm run clean:tgfx && tsc -p ./tsconfig.type.json && rollup -c ./script/rollup.tgfx.js",
     "build": "node script/cmake.demo.js && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
     "build:debug": "node script/cmake.demo.js --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",

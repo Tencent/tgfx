@@ -267,7 +267,7 @@ class Canvas {
   /**
    * Draws a set of sprites from the atlas using the current clip, matrix, and specified paint.
    * @param atlas Image containing the sprites.
-   * @param matrix
+   * @param matrix Matrix mappings for sprites in atlas.
    * @param tex Rect locations of sprites in the atlas.
    * @param colors one per sprite, may be nullptr.
    * @param count number of sprites to draw.
@@ -288,11 +288,8 @@ class Canvas {
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
   Rect clipLocalBounds(const Rect& localBounds);
-  void drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> textureProxy,
-                const Paint& paint);
-  void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
-                       const Font& font, const Paint& paint);
-  void drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint);
+  void drawGlyphs(GlyphRun glyphRun, const Paint& paint);
+  void drawColorGlyphs(const GlyphRun& glyphRun, const Paint& paint);
   bool drawAsClear(const Path& path, const Paint& paint);
   bool getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp);
   void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint);

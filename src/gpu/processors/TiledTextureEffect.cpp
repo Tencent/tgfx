@@ -130,6 +130,9 @@ void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   if (texture == nullptr) {
     return;
   }
+  // Sometimes textureProxy->isAlphaOnly() != texture->isAlphaOnly(), we use
+  // textureProxy->isAlphaOnly() to determine the alpha-only flag.
+  bytesKey->write(textureProxy->isAlphaOnly());
   auto subset = Rect::MakeWH(texture->width(), texture->height());
   Sampling sampling(texture, samplerState, subset);
   auto flags = static_cast<uint32_t>(sampling.shaderModeX);

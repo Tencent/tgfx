@@ -48,7 +48,7 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) cons
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
   auto startPoint = tgfx::Point::Make(0.0f, 0.0f);
-  auto endPoint = tgfx::Point::Make(screenWidth, 0.0f);
+  auto endPoint = tgfx::Point::Make(bounds.width(), 0.0f);
   auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
   paint.setShader(shader);
   canvas->drawSimpleText(text, 0, 0, font, paint);

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Mask.h"
+#include "core/GlyphRun.h"
 #include "core/ImageStream.h"
 #include "tgfx/core/PathEffect.h"
 
@@ -36,21 +37,37 @@ void Mask::fillPath(const Path& path, const Stroke* stroke) {
 }
 
 bool Mask::fillText(const TextBlob* textBlob, const Stroke* stroke) {
-  if (textBlob == nullptr || textBlob->hasColor()) {
+  if (textBlob == nullptr) {
     return false;
   }
-  if (onFillText(textBlob, stroke, matrix)) {
-    return true;
+  auto runCount = textBlob->glyphRunCount();
+  float maxScale = -1.0f;
+  auto pathMatrix = matrix;
+  for (size_t i = 0; i < runCount; ++i) {
+    auto glyphRun = textBlob->getGlyphRun(i);
+    if (glyphRun->hasColor()) {
+      return false;
+    }
+    if (onFillText(glyphRun, stroke, matrix)) {
+      continue;
+    }
+    if (maxScale == -1.0f) {
+      maxScale = matrix.getMaxScale();
+      if (maxScale <= 0) {
+        return false;
+      }
+      pathMatrix.preScale(1.0f / maxScale, 1.0f / maxScale);
+    }
+    Path path = {};
+    if (!glyphRun->getPath(&path, maxScale, stroke)) {
+      return false;
+    }
+    onFillPath(path, pathMatrix, true);
   }
-  Path path = {};
-  if (textBlob->getPath(&path, stroke)) {
-    onFillPath(path, matrix, true);
-    return true;
-  }
-  return false;
+  return true;
 }
 
-bool Mask::onFillText(const TextBlob*, const Stroke*, const Matrix&) {
+bool Mask::onFillText(const GlyphRun*, const Stroke*, const Matrix&) {
   return false;
 }
 }  // namespace tgfx

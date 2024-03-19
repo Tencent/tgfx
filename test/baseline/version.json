@@ -14,18 +14,18 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "1177ea0",
+        "path": "f1d64c1",
         "rasterized": "e8e31de",
         "rasterized_mipmap": "1f657af",
         "rasterized_scale_up": "1f657af",
-        "text_shape": "3bfc2e8",
+        "text_shape": "f1d64c1",
         "tileMode": "3bfc2e8"
     },
     "DrawersTest": {
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "1bf873d",
-        "SimpleText": "3bfc2e8",
+        "SimpleText": "f1d64c1",
         "SweepGradient": "5a1fb11"
     },
     "FilterTest": {

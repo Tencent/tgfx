@@ -20,6 +20,7 @@
 #include "core/MCStack.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
+#include "core/SimpleTextBlob.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/ClearOp.h"
@@ -27,11 +28,9 @@
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
 #include "gpu/processors/AARectEffect.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/Surface.h"
@@ -476,114 +475,90 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   setMatrix(oldMatrix);
 }
 
-void Canvas::drawMask(const Rect& deviceBounds, std::shared_ptr<TextureProxy> textureProxy,
-                      const Paint& paint) {
-  if (textureProxy == nullptr) {
-    return;
-  }
-  auto localMatrix = Matrix::I();
-  auto maskLocalMatrix = Matrix::I();
-  auto& viewMatrix = mcStack->getMatrix();
-  if (!viewMatrix.invert(&localMatrix)) {
-    return;
-  }
-  maskLocalMatrix.postConcat(viewMatrix);
-  maskLocalMatrix.postTranslate(-deviceBounds.x(), -deviceBounds.y());
-  maskLocalMatrix.postScale(static_cast<float>(textureProxy->width()) / deviceBounds.width(),
-                            static_cast<float>(textureProxy->height()) / deviceBounds.height());
-  resetMatrix();
-  DrawArgs args(surface, paint, deviceBounds, Matrix::I());
-  auto op = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix, &localMatrix);
-  auto maskProcessor = FragmentProcessor::MulInputByChildAlpha(
-      TextureEffect::Make(std::move(textureProxy), SamplingOptions(), &maskLocalMatrix));
-  if (maskProcessor == nullptr) {
-    return;
-  }
-  op->addCoverageFP(std::move(maskProcessor));
-  addDrawOp(std::move(op), args, paint);
-  setMatrix(viewMatrix);
-}
-
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
                             const tgfx::Paint& paint) {
-  auto [glyphIDs, positions] = SimpleTextShaper::Shape(text, font);
-  if (x != 0 && y != 0) {
-    for (auto& position : positions) {
-      position.offset(x, y);
-    }
-  }
-  drawGlyphs(glyphIDs.data(), positions.data(), glyphIDs.size(), font, paint);
+  auto glyphRun = SimpleTextShaper::Shape(text, font);
+  auto oldMatrix = mcStack->getMatrix();
+  mcStack->translate(x, y);
+  drawGlyphs(std::move(glyphRun), paint);
+  mcStack->setMatrix(oldMatrix);
 }
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
-  if (glyphCount == 0 || paint.nothingToDraw()) {
+  if (glyphCount == 0) {
+    return;
+  }
+  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  drawGlyphs(std::move(glyphRun), paint);
+}
+
+void Canvas::drawGlyphs(GlyphRun glyphRun, const Paint& paint) {
+  if (glyphRun.empty() || paint.nothingToDraw()) {
+    return;
+  }
+  if (glyphRun.hasColor()) {
+    drawColorGlyphs(glyphRun, paint);
     return;
   }
   auto realPaint = CleanPaint(&paint);
-  auto scale = mcStack->getMatrix().getMaxScale();
-  auto scaledFont = font.makeWithSize(font.getSize() * scale);
-  realPaint.setStrokeWidth(realPaint.getStrokeWidth() * scale);
-  std::vector<Point> scaledPositions;
-  for (size_t i = 0; i < glyphCount; ++i) {
-    scaledPositions.push_back(Point::Make(positions[i].x * scale, positions[i].y * scale));
-  }
-  save();
-  concat(Matrix::MakeScale(1.f / scale));
-  if (scaledFont.getTypeface()->hasColor()) {
-    drawColorGlyphs(glyphs, scaledPositions.data(), glyphCount, scaledFont, realPaint);
-    restore();
-    return;
-  }
-  auto textBlob = TextBlob::MakeFrom(glyphs, scaledPositions.data(), glyphCount, scaledFont);
-  if (textBlob) {
-    drawMaskGlyphs(textBlob, realPaint);
-  }
-  restore();
-}
-
-void Canvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
-                             const Font& font, const Paint& paint) {
-  for (size_t i = 0; i < glyphCount; ++i) {
-    const auto& glyphID = glyphIDs[i];
-    const auto& position = positions[i];
-
-    auto glyphMatrix = Matrix::I();
-    auto glyphBuffer = font.getImage(glyphID, &glyphMatrix);
-    if (glyphBuffer == nullptr) {
-      continue;
-    }
-    glyphMatrix.postTranslate(position.x, position.y);
-    save();
-    concat(glyphMatrix);
-    auto image = Image::MakeFrom(glyphBuffer);
-    drawImage(std::move(image), &paint);
-    restore();
-  }
-}
-
-void Canvas::drawMaskGlyphs(std::shared_ptr<TextBlob> textBlob, const Paint& paint) {
-  if (textBlob == nullptr) {
-    return;
-  }
-  auto stroke = paint.getStroke();
-  auto localBounds = clipLocalBounds(textBlob->getBounds(stroke));
+  auto& viewMatrix = mcStack->getMatrix();
+  auto maxScale = viewMatrix.getMaxScale();
+  auto stroke = realPaint.getStroke();
+  // Scale the glyphs before measuring to prevent precision loss with small font sizes.
+  auto bounds = glyphRun.getBounds(maxScale, stroke);
+  auto localBounds = bounds;
+  localBounds.scale(1.0f / maxScale, 1.0f / maxScale);
+  localBounds = clipLocalBounds(localBounds);
   if (localBounds.isEmpty()) {
     return;
   }
+  DrawArgs args(surface, realPaint, localBounds, viewMatrix);
+  auto rasterizeMatrix = Matrix::MakeScale(maxScale, maxScale);
+  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto textBlob = std::make_shared<SimpleTextBlob>(std::move(glyphRun));
+  auto rasterizer = Rasterizer::MakeFrom(std::move(textBlob), ISize::Make(width, height),
+                                         rasterizeMatrix, stroke);
+  auto proxyProvider = getContext()->proxyProvider();
+  auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, args.renderFlags);
+  if (textureProxy == nullptr) {
+    return;
+  }
+  auto isAlphaOnly = textureProxy->isAlphaOnly();
+  auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix);
+  if (processor == nullptr) {
+    return;
+  }
+  if (!isAlphaOnly) {
+    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
+  }
+  auto drawOp = FillRectOp::Make(args.color, args.drawRect, viewMatrix);
+  drawOp->addCoverageFP(std::move(processor));
+  addDrawOp(std::move(drawOp), args, realPaint);
+}
+
+void Canvas::drawColorGlyphs(const GlyphRun& glyphRun, const Paint& paint) {
   auto& viewMatrix = mcStack->getMatrix();
-  auto deviceBounds = viewMatrix.mapRect(localBounds);
-  auto width = ceilf(deviceBounds.width());
-  auto height = ceilf(deviceBounds.height());
-  auto totalMatrix = viewMatrix;
-  auto matrix = Matrix::I();
-  matrix.postTranslate(-deviceBounds.x(), -deviceBounds.y());
-  matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
-  totalMatrix.postConcat(matrix);
-  auto rasterizer = Rasterizer::MakeFrom(textBlob, ISize::Make(width, height), totalMatrix, stroke);
-  auto textureProxy = getContext()->proxyProvider()->createTextureProxy(
-      {}, std::move(rasterizer), false, surface->options()->renderFlags());
-  drawMask(deviceBounds, std::move(textureProxy), paint);
+  auto scale = viewMatrix.getMaxScale();
+  auto font = glyphRun.font();
+  font = font.makeWithSize(font.getSize() * scale);
+  auto glyphCount = glyphRun.runSize();
+  auto& glyphIDs = glyphRun.glyphIDs();
+  auto& positions = glyphRun.positions();
+  for (size_t i = 0; i < glyphCount; ++i) {
+    const auto& glyphID = glyphIDs[i];
+    const auto& position = positions[i];
+    auto glyphMatrix = Matrix::I();
+    auto glyphImage = font.getImage(glyphID, &glyphMatrix);
+    if (glyphImage == nullptr) {
+      continue;
+    }
+    glyphMatrix.postScale(1.0f / scale, 1.0f / scale);
+    glyphMatrix.postTranslate(position.x, position.y);
+    drawImage(std::move(glyphImage), glyphMatrix, &paint);
+  }
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],

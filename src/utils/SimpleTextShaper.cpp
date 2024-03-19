@@ -20,8 +20,7 @@
 #include "tgfx/utils/UTF.h"
 
 namespace tgfx {
-std::pair<std::vector<GlyphID>, std::vector<Point>> SimpleTextShaper::Shape(
-    const std::string& text, const tgfx::Font& font) {
+GlyphRun SimpleTextShaper::Shape(const std::string& text, const tgfx::Font& font) {
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
   std::vector<GlyphID> glyphs = {};
@@ -41,6 +40,6 @@ std::pair<std::vector<GlyphID>, std::vector<Point>> SimpleTextShaper::Shape(
       xOffset += emptyAdvance;
     }
   }
-  return {glyphs, positions};
+  return {font, std::move(glyphs), std::move(positions)};
 }
 }  // namespace tgfx

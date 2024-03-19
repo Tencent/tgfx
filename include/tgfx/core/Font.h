@@ -136,11 +136,11 @@ class Font {
   bool getPath(GlyphID glyphID, Path* path) const;
 
   /**
-   * Creates an image buffer capturing the content of the specified glyph. The returned matrix
-   * should apply to the glyph image when drawing. Please note that the fauxBold is not supported
-   * for this method.
+   * Creates an Image capturing the content of the specified glyph. The returned matrix should apply
+   * to the glyph image when drawing. Please note that the fauxBold is not supported for this
+   * method.
    */
-  std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, Matrix* matrix) const;
+  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const;
 
  private:
   std::shared_ptr<ScalerContext> scalerContext = nullptr;

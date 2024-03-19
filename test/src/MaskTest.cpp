@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
+#include "images/BufferImage.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/opengl/GLDevice.h"
@@ -68,11 +69,12 @@ TGFX_TEST(MaskTest, Rasterize) {
   font.setTypeface(typeface);
   font.setFauxItalic(true);
   font.setFauxBold(true);
-  auto buffer = font.getImage(glyphID, &matrix);
-  ASSERT_TRUE(buffer != nullptr);
+  auto glyphImage = font.getImage(glyphID, &matrix);
+  ASSERT_TRUE(glyphImage != nullptr);
   EXPECT_TRUE(fabsf(matrix.getScaleX() - 2.75229359f) < FLT_EPSILON);
   EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.550458729f) < FLT_EPSILON);
-  EXPECT_TRUE(
-      Baseline::Compare(std::static_pointer_cast<PixelBuffer>(buffer), "MaskTest/rasterize_emoji"));
+  auto bufferImage = std::static_pointer_cast<BufferImage>(glyphImage);
+  EXPECT_TRUE(Baseline::Compare(std::static_pointer_cast<PixelBuffer>(bufferImage->imageBuffer),
+                                "MaskTest/rasterize_emoji"));
 }
 }  // namespace tgfx

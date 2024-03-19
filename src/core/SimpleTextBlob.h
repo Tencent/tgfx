@@ -18,33 +18,31 @@
 
 #pragma once
 
+#include "core/GlyphRun.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
+/**
+ * A simple implementation of TextBlob that uses a single GlyphRun.
+ */
 class SimpleTextBlob : public TextBlob {
  public:
-  bool hasColor() const override;
-
-  Rect getBounds(const Stroke* stroke = nullptr) const override;
-
-  bool getPath(Path* path, const Stroke* stroke = nullptr) const override;
-
-  const Font& getFont() const {
-    return font;
+  explicit SimpleTextBlob(GlyphRun glyphRun) : glyphRun(std::move(glyphRun)) {
   }
 
-  const std::vector<GlyphID>& getGlyphIDs() const {
-    return glyphIDs;
+  Rect getBounds() const override;
+
+ protected:
+  size_t glyphRunCount() const override {
+    return 1;
   }
 
-  const std::vector<Point>& getPositions() const {
-    return positions;
+  const GlyphRun* getGlyphRun(size_t i) const override {
+    return i == 0 ? &glyphRun : nullptr;
   }
 
  private:
-  Font font = {};
-  std::vector<GlyphID> glyphIDs = {};
-  std::vector<Point> positions = {};
+  GlyphRun glyphRun = {};
 
   friend class TextBlob;
 };

@@ -102,10 +102,11 @@ bool Font::getPath(GlyphID glyphID, Path* path) const {
   return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
 }
 
-std::shared_ptr<ImageBuffer> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
+std::shared_ptr<Image> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
-  return scalerContext->generateImage(glyphID, fauxItalic, matrix);
+  auto buffer = scalerContext->generateImage(glyphID, fauxItalic, matrix);
+  return Image::MakeFrom(buffer);
 }
 }  // namespace tgfx
