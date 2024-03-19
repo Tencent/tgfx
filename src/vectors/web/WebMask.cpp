@@ -97,11 +97,11 @@ void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool) {
   webMask.call<void>("fillPath", path2D, path.getFillType());
 }
 
-static void GetTextsAndPositions(const SimpleTextBlob* textBlob, std::vector<std::string>* texts,
+static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::string>* texts,
                                  std::vector<Point>* points) {
-  auto& font = textBlob->getFont();
-  auto& glyphIDs = textBlob->getGlyphIDs();
-  auto& positions = textBlob->getPositions();
+  auto& font = glyphRun->font();
+  auto& glyphIDs = glyphRun->glyphIDs();
+  auto& positions = glyphRun->positions();
   auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
   for (size_t i = 0; i < glyphIDs.size(); ++i) {
     texts->push_back(typeface->getText(glyphIDs[i]));
@@ -109,16 +109,21 @@ static void GetTextsAndPositions(const SimpleTextBlob* textBlob, std::vector<std
   }
 }
 
-bool WebMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {
+bool WebMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix) {
   aboutToFill();
-  auto bounds = textBlob->getBounds(stroke);
+  auto scale = matrix.getMaxScale();
+  // Scale the glyphs before measuring to prevent precision loss with small font sizes.
+  auto bounds = glyphRun->getBounds(scale, stroke);
+  if (bounds.isEmpty()) {
+    return false;
+  }
+  bounds.scale(1.0f / scale, 1.0f / scale);
   matrix.mapRect(&bounds);
   stream->markContentDirty(bounds);
   std::vector<std::string> texts = {};
   std::vector<Point> points = {};
-  auto blob = static_cast<const SimpleTextBlob*>(textBlob);
-  GetTextsAndPositions(blob, &texts, &points);
-  const auto& font = blob->getFont();
+  GetTextsAndPositions(glyphRun, &texts, &points);
+  const auto& font = glyphRun->font();
   const auto* typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
   auto webFont = val::object();
   webFont.set("name", typeFace->fontFamily());

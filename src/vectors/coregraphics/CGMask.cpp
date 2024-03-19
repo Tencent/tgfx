@@ -173,12 +173,12 @@ static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
       static_cast<CGFloat>(matrix.getTranslateX()), static_cast<CGFloat>(matrix.getTranslateY()));
 }
 
-bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {
-  if (textBlob == nullptr || stroke) {
+bool CGMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix) {
+  if (glyphRun == nullptr || stroke) {
     return false;
   }
-  auto blob = static_cast<const SimpleTextBlob*>(textBlob);
-  if (blob->getFont().isFauxBold()) {
+  const auto& font = glyphRun->font();
+  if (font.isFauxBold()) {
     return false;
   }
   auto pixels = pixelRef->lockWritablePixels();
@@ -196,7 +196,7 @@ bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Ma
   CGContextSetShouldSubpixelQuantizeFonts(cgContext, false);
   CGContextSetAllowsFontSubpixelPositioning(cgContext, true);
   CGContextSetShouldSubpixelPositionFonts(cgContext, true);
-  const auto& font = blob->getFont();
+
   CTFontRef ctFont = std::static_pointer_cast<CGTypeface>(font.getTypeface())->getCTFont();
   ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
                                           nullptr);
@@ -206,14 +206,16 @@ bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Ma
   CGContextTranslateCTM(cgContext, 0.f, static_cast<CGFloat>(height()));
   CGContextScaleCTM(cgContext, 1.f, -1.f);
   CGContextConcatCTM(cgContext, MatrixToCGAffineTransform(matrix));
+  auto& glyphIDs = glyphRun->glyphIDs();
+  auto& positions = glyphRun->positions();
+  auto glyphCount = glyphRun->runSize();
   auto point = CGPointZero;
-  for (size_t i = 0; i < blob->getGlyphIDs().size(); ++i) {
-    auto position = blob->getPositions()[i];
+  for (size_t i = 0; i < glyphCount; ++i) {
+    auto position = positions[i];
     CGContextSaveGState(cgContext);
     CGContextTranslateCTM(cgContext, position.x, position.y);
     CGContextScaleCTM(cgContext, 1.f, -1.f);
-    CTFontDrawGlyphs(ctFont, static_cast<const CGGlyph*>(&blob->getGlyphIDs()[i]), &point, 1,
-                     cgContext);
+    CTFontDrawGlyphs(ctFont, static_cast<const CGGlyph*>(&glyphIDs[i]), &point, 1, cgContext);
     CGContextRestoreGState(cgContext);
   }
   CFRelease(ctFont);

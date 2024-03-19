@@ -119,7 +119,7 @@ class Mask {
 
   virtual void onFillPath(const Path& path, const Matrix& m, bool needsGammaCorrection) = 0;
 
-  virtual bool onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix);
+  virtual bool onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix);
 
  private:
   Matrix matrix = Matrix::I();

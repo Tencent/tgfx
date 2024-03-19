@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "tgfx/core/Font.h"
+#include "core/GlyphRun.h"
 
 namespace tgfx {
 class SimpleTextShaper {
  public:
-  static std::pair<std::vector<GlyphID>, std::vector<Point>> Shape(const std::string& text,
-                                                                   const Font& font);
+  static GlyphRun Shape(const std::string& text, const Font& font);
 };
 }  // namespace tgfx

@@ -53,7 +53,7 @@ class WebMask : public Mask {
 
   void onFillPath(const Path& path, const Matrix& matrix, bool) override;
 
-  bool onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) override;
+  bool onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix) override;
 
  private:
   std::shared_ptr<ImageBuffer> buffer = nullptr;

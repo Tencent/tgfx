@@ -23,6 +23,8 @@
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+class GlyphRun;
+
 /**
  * TextBlob combines multiple glyphs, Font, and positions into an immutable container.
  */
@@ -45,21 +47,21 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
-   * Returns true if this TextBlob has color glyphs, for example, color emojis.
-   */
-  virtual bool hasColor() const = 0;
-
-  /**
    * Returns the bounds of the text blob's glyphs.
    */
-  virtual Rect getBounds(const Stroke* stroke = nullptr) const = 0;
+  virtual Rect getBounds() const = 0;
+
+ protected:
+  /**
+   * Returns the number of glyph runs in the text blob.
+   */
+  virtual size_t glyphRunCount() const = 0;
 
   /**
-   * Creates a path corresponding to glyph shapes in the text blob. Copies the glyph fills to the
-   * path if the stroke is not passed in, otherwise copies the glyph outlines to the path. If text
-   * font is backed by bitmaps or cannot generate outlines, returns false and leaves the path
-   * unchanged.
+   * Returns the glyph runs at the given index.
    */
-  virtual bool getPath(Path* path, const Stroke* stroke = nullptr) const = 0;
+  virtual const GlyphRun* getGlyphRun(size_t i) const = 0;
+
+  friend class Mask;
 };
 }  // namespace tgfx

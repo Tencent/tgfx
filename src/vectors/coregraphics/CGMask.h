@@ -29,6 +29,6 @@ class CGMask : public PixelRefMask {
  protected:
   void onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) override;
 
-  bool onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) override;
+  bool onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix) override;
 };
 }  // namespace tgfx

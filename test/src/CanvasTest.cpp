@@ -503,6 +503,11 @@ TGFX_TEST(CanvasTest, path) {
   paint.setAlpha(0.7f);
   canvas->setMatrix(matrix);
   canvas->drawPath(path, paint);
+  canvas->resetMatrix();
+  paint.setStrokeWidth(20);
+  canvas->drawLine(200, 50, 400, 50, paint);
+  paint.setLineCap(LineCap::Round);
+  canvas->drawLine(200, 320, 400, 320, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
   device->unlock();
 }

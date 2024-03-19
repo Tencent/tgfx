@@ -18,6 +18,7 @@
 
 #include "TextureEffect.h"
 #include "gpu/ProxyProvider.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
@@ -45,10 +46,13 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
     return;
   }
   uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
+  // Sometimes textureProxy->isAlphaOnly() != texture->isAlphaOnly(), we use
+  // textureProxy->isAlphaOnly() to determine the alpha-only flag.
+  flags |= textureProxy->isAlphaOnly() ? 2 : 0;
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
-    flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 2;
-    flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 4;
+    flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 4;
+    flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 8;
   }
   bytesKey->write(flags);
 }
