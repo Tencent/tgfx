@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
-#include "core/RasterBuffer.h"
-#include "core/RasterGenerator.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/FillRectOp.h"
 #include "images/BufferImage.h"
@@ -32,6 +30,34 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
+class PixelDataConverter : public ImageGenerator {
+ public:
+  PixelDataConverter(const ImageInfo& info, std::shared_ptr<Data> pixels)
+      : ImageGenerator(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
+  }
+
+  bool isAlphaOnly() const override {
+    return info.isAlphaOnly();
+  }
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
+    Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);
+    if (bitmap.isEmpty()) {
+      return nullptr;
+    }
+    auto success = bitmap.writePixels(info, pixels->data());
+    if (!success) {
+      return nullptr;
+    }
+    return bitmap.makeBuffer();
+  }
+
+ private:
+  ImageInfo info = {};
+  std::shared_ptr<Data> pixels = nullptr;
+};
+
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   auto codec = ImageCodec::MakeFrom(filePath);
   auto image = MakeFrom(codec);
@@ -64,12 +90,15 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
-  auto imageBuffer = RasterBuffer::MakeFrom(info, pixels);
+  if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
+    return nullptr;
+  }
+  auto imageBuffer = ImageBuffer::MakeFrom(info, pixels);
   if (imageBuffer != nullptr) {
     return MakeFrom(std::move(imageBuffer));
   }
-  auto imageGenerator = RasterGenerator::MakeFrom(info, std::move(pixels));
-  return MakeFrom(std::move(imageGenerator));
+  auto converter = std::make_shared<PixelDataConverter>(info, std::move(pixels));
+  return MakeFrom(std::move(converter));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {

@@ -22,6 +22,10 @@
 #include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
+/**
+ * RasterImage takes an Image and rasterizes it to a new Image with a different scale and sampling
+ * options.
+ */
 class RasterImage : public ResourceImage {
  public:
   /**
