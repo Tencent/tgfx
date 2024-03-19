@@ -51,13 +51,10 @@ class ImageBuffer {
 
   /**
    * Creates an ImageBuffer from the ImageInfo and shares pixels from the immutable Data object. The
-   * pixel data may be copied and converted to a new format which is more efficient for texture
-   * uploading. However, if the ImageInfo is suitable for direct texture uploading, the pixel data
-   * will be shared instead of copied. In that case, the caller must ensure the pixel data stay
-   * unchanged for the lifetime of the returned ImageBuffer. Returns nullptr if the info is empty or
-   * the pixels are nullptr.
-   * ImageInfo parameters suitable for direct texture uploading include:
-   * The alpha type is not AlphaType::Unpremultiplied;
+   * caller must ensure the pixel data stay unchanged for the lifetime of the returned ImageBuffer.
+   * Returns nullptr if the pixels are nullptr or the ImageInfo is not suitable for direct texture
+   * uploading. ImageInfo parameters suitable for direct texture uploading include:
+   * The alpha type is either AlphaType::Premultiplied or AlphaType::Opaque;
    * The color type is one of ColorType::ALPHA_8, ColorType::RGBA_8888, and ColorType::BGRA_8888.
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
