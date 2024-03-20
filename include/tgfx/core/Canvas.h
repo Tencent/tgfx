@@ -32,6 +32,7 @@ class Surface;
 class SurfaceOptions;
 class TextureProxy;
 class MCStack;
+class FillStyle;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
@@ -286,12 +287,20 @@ class Canvas {
 
   std::shared_ptr<TextureProxy> getClipTexture();
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
-  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
-  Rect clipLocalBounds(const Rect& localBounds);
-  void drawGlyphs(GlyphRun glyphRun, const Paint& paint);
-  void drawColorGlyphs(const GlyphRun& glyphRun, const Paint& paint);
-  bool drawAsClear(const Path& path, const Paint& paint);
-  bool getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint);
+  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, const Matrix& viewMatrix,
+                                                 Rect* scissorRect);
+  DrawArgs makeDrawArgs(const Rect& localBounds, const Matrix& viewMatrix);
+  std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
+                                                     const Stroke* stroke = nullptr);
+  bool drawSimplePath(const Path& path, const FillStyle& style);
+  void drawRect(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
+  bool drawAsClear(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
+  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint,
+                 const Matrix* extraMatrix);
+  void drawGlyphs(GlyphRun glyphRun, const Matrix& viewMatrix, const FillStyle& style,
+                  const Stroke* stroke = nullptr);
+  void drawColorGlyphs(const GlyphRun& glyphRun, const Matrix& viewMatrix, const FillStyle& style);
+  bool wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args, const FillStyle& style) const;
+  void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const FillStyle& style);
 };
 }  // namespace tgfx

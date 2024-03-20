@@ -18,26 +18,43 @@
 
 #pragma once
 
-#include "tgfx/core/SamplingOptions.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class DrawArgs {
+class FillStyle {
  public:
-  DrawArgs() = default;
+  /**
+   * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
+   * default value is true.
+   */
+  bool antiAlias = true;
 
-  DrawArgs(Context* context, uint32_t renderFlags, const Rect& drawRect,
-           const Matrix& viewMatrix = Matrix::I())
-      : context(context), renderFlags(renderFlags), drawRect(drawRect), viewMatrix(viewMatrix) {
-  }
+  /**
+   * The input color, premultiplied, as four floating point values.
+   */
+  Color color = Color::White();
 
-  bool empty() const {
-    return context == nullptr || drawRect.isEmpty();
-  }
+  /**
+   * Optional colors used when filling a geometry if set, such as a gradient.
+   */
+  std::shared_ptr<Shader> shader = nullptr;
 
-  Context* context = nullptr;
-  uint32_t renderFlags = 0;
-  Rect drawRect = Rect::MakeEmpty();
-  Matrix viewMatrix = Matrix::I();
+  /**
+   * Optional mask filter used to modify the alpha channel of the fill when drawing.
+   */
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+
+  /**
+   * Optional color filter used to modify the color of the fill when drawing.
+   */
+  std::shared_ptr<ColorFilter> colorFilter = nullptr;
+
+  /**
+   * The blend mode used to combine the fill with the destination pixels.
+   */
+  BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

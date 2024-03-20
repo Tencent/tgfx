@@ -33,16 +33,16 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) cons
   auto textBlob = tgfx::TextBlob::MakeFrom(text, font);
   auto bounds = textBlob->getBounds();
   auto textScale = screenWidth / bounds.width();
-  auto matrix =
-      tgfx::Matrix::MakeTrans((width - bounds.width()) / 2, height / 2 - bounds.bottom * 1.2f);
-  matrix.postScale(textScale, textScale, width / 2, height / 2);
+  tgfx::Point textStart = {(width - bounds.width()) / 2, height / 2 - bounds.bottom * 1.2f};
+  auto matrix = tgfx::Matrix::I();
+  matrix.setScale(textScale, textScale, width / 2, height / 2);
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   tgfx::Paint paint = {};
   paint.setColor({1.0f, 1.0f, 1.0f, 1.0f});
   paint.setStyle(tgfx::PaintStyle::Stroke);
   paint.setStrokeWidth(2 * scale);
-  canvas->drawSimpleText(text, 0, 0, font, paint);
+  canvas->drawSimpleText(text, textStart.x, textStart.y, font, paint);
   paint.setStyle(tgfx::PaintStyle::Fill);
   tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
@@ -51,7 +51,7 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) cons
   auto endPoint = tgfx::Point::Make(bounds.width(), 0.0f);
   auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
   paint.setShader(shader);
-  canvas->drawSimpleText(text, 0, 0, font, paint);
+  canvas->drawSimpleText(text, textStart.x, textStart.y, font, paint);
   canvas->setMatrix(oldMatrix);
 
   std::string emojis = "🤡👻🐠🤩😃🤪🙈🙊🐒";

@@ -216,11 +216,9 @@ class Surface {
 
   std::shared_ptr<TextureProxy> getTextureProxy();
 
-  void aboutToDraw(bool discardContent = false);
+  bool aboutToDraw(bool discardContent = false);
 
-  void replaceRenderTargetProxy(std::shared_ptr<RenderTargetProxy> proxy);
-
-  void addOp(std::unique_ptr<Op> op);
+  void addOp(std::unique_ptr<Op> op, bool discardContent = false);
 
   friend class DrawingManager;
   friend class Canvas;
