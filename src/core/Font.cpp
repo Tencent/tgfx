@@ -22,6 +22,27 @@
 namespace tgfx {
 static auto EmptyContext = ScalerContext::MakeEmpty(0);
 
+class GlyphImageGenerator : public ImageGenerator {
+ public:
+  GlyphImageGenerator(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
+                      GlyphID glyphID)
+      : ImageGenerator(width, height), scalerContext(std::move(scalerContext)), glyphID(glyphID) {
+  }
+
+  bool isAlphaOnly() const override {
+    return !scalerContext->getTypeface()->hasColor();
+  }
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
+    return scalerContext->generateImage(glyphID, tryHardware);
+  }
+
+ private:
+  std::shared_ptr<ScalerContext> scalerContext = nullptr;
+  GlyphID glyphID = 0;
+};
+
 Font::Font() : scalerContext(EmptyContext) {
 }
 
@@ -106,7 +127,16 @@ std::shared_ptr<Image> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
-  auto buffer = scalerContext->generateImage(glyphID, fauxItalic, matrix);
-  return Image::MakeFrom(buffer);
+  auto bounds = scalerContext->getImageTransform(glyphID, matrix);
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
+  if (matrix && fauxItalic) {
+    matrix->postSkew(ITALIC_SKEW, 0);
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto generator = std::make_shared<GlyphImageGenerator>(width, height, scalerContext, glyphID);
+  return Image::MakeFrom(std::move(generator));
 }
 }  // namespace tgfx

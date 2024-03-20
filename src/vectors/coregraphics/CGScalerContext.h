@@ -40,8 +40,9 @@ class CGScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxItalic,
-                                             Matrix* matrix) const override;
+  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
+
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const override;
 
  private:
   float fauxBoldScale = 1.0f;

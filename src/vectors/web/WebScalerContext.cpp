@@ -64,17 +64,23 @@ bool WebScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;
 }
 
-std::shared_ptr<ImageBuffer> WebScalerContext::generateImage(GlyphID glyphID, bool fauxItalic,
-                                                             Matrix* matrix) const {
-  // the fauxBold is not supported for this method on other platforms, so we set it to false.
-  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, fauxItalic);
+Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
   if (bounds.isEmpty()) {
-    return nullptr;
+    return {};
   }
-  auto buffer = scalerContext.call<val>("generateImage", getText(glyphID), fauxItalic, bounds);
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
   }
+  return bounds;
+}
+
+std::shared_ptr<ImageBuffer> WebScalerContext::generateImage(GlyphID glyphID, bool) const {
+  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
+  auto buffer = scalerContext.call<val>("generateImage", getText(glyphID), bounds);
   return WebImageBuffer::MakeAdopted(std::move(buffer));
 }
 

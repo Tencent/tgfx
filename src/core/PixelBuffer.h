@@ -33,7 +33,7 @@ class PixelBuffer : public ImageBuffer {
    * height is not greater than zero. If the alphaOnly is true, sets colorType to
    * ColorType::ALPHA_8, otherwise sets to the native 32-bit color type of the current platform. If
    * the tryHardware is true, a PixelBuffer backed by hardware is returned if it is available on the
-   * current platform. Otherwise, a raster PixelBuffer is returned.
+   * current platform. Otherwise, a CPU-backed PixelBuffer is returned.
    */
   static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
                                            bool tryHardware = true);
