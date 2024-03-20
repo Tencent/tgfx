@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
+#include "core/FillStyle.h"
 #include "core/MCStack.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
@@ -30,12 +31,8 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/utils/UTF.h"
-#include "utils/MathExtra.h"
 #include "utils/SimpleTextShaper.h"
 #include "utils/StrokeKey.h"
 
@@ -45,18 +42,23 @@ static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 // A factor used to estimate the memory size of a tessellated path, based on the average value of
 // Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
 static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
+/**
+ * Defines the maximum distance a draw can extend beyond a clip's boundary and still be considered
+ * 'on the other side'. This tolerance accounts for potential floating point rounding errors. The
+ * value of 1e-3 is chosen because, in the coverage case, as long as coverage stays within
+ * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
+ */
+static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
-static bool ShouldTriangulatePath(const Path& path, const Matrix& viewMatrix) {
-  if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
-    return true;
-  }
-  auto scales = viewMatrix.getAxisScales();
-  auto bounds = path.getBounds();
-  bounds.scale(scales.x, scales.y);
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
-}
+enum class SrcColorOpacity {
+  Unknown,
+  // The src color is known to be opaque (alpha == 255)
+  Opaque,
+  // The src color is known to be fully transparent (color == 0)
+  TransparentBlack,
+  // The src alpha is known to be fully transparent (alpha == 0)
+  TransparentAlpha,
+};
 
 Canvas::Canvas(Surface* surface) : surface(surface) {
   Path clip = {};
@@ -159,25 +161,6 @@ void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint&
   drawOval(rect, paint);
 }
 
-static Paint CleanPaint(const Paint* paint, bool forImage = false) {
-  if (paint == nullptr) {
-    return {};
-  }
-  auto cleaned = *paint;
-  if (forImage) {
-    cleaned.setStyle(PaintStyle::Fill);
-  }
-  if (auto shader = cleaned.getShader()) {
-    Color shaderColor = {};
-    if (shader->asColor(&shaderColor)) {
-      shaderColor.alpha *= cleaned.getAlpha();
-      cleaned.setColor(shaderColor);
-      cleaned.setShader(nullptr);
-    }
-  }
-  return cleaned;
-}
-
 Context* Canvas::getContext() const {
   return surface->getContext();
 }
@@ -190,13 +173,369 @@ const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
 }
 
-/**
- * Defines the maximum distance a draw can extend beyond a clip's boundary and still be considered
- * 'on the other side'. This tolerance accounts for potential floating point rounding errors. The
- * value of 1e-3 is chosen because, in the coverage case, as long as coverage stays within
- * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
- */
-static constexpr float BOUNDS_TOLERANCE = 1e-3f;
+static FillStyle CreateFillStyle(const Paint& paint) {
+  FillStyle style = {};
+  auto shader = paint.getShader();
+  Color color = {};
+  if (shader && shader->asColor(&color)) {
+    color.alpha *= paint.getAlpha();
+    style.color = color.premultiply();
+    shader = nullptr;
+  } else {
+    style.color = paint.getColor().premultiply();
+  }
+  style.shader = shader;
+  style.antiAlias = paint.isAntiAlias();
+  style.colorFilter = paint.getColorFilter();
+  style.maskFilter = paint.getMaskFilter();
+  style.blendMode = paint.getBlendMode();
+  return style;
+}
+
+static FillStyle CreateFillStyle(std::shared_ptr<Image> image, SamplingOptions sampling,
+                                 const Paint* paint) {
+  auto isAlphaOnly = image->isAlphaOnly();
+  auto shader =
+      Shader::MakeImageShader(std::move(image), TileMode::Clamp, TileMode::Clamp, sampling);
+  if (!paint) {
+    FillStyle style = {};
+    style.shader = shader;
+    return style;
+  }
+  auto style = CreateFillStyle(*paint);
+  if (isAlphaOnly && style.shader) {
+    style.shader = Shader::MakeBlend(BlendMode::DstIn, std::move(shader), std::move(style.shader));
+  } else {
+    style.shader = shader;
+  }
+  return style;
+}
+
+static bool ShouldTriangulatePath(const Path& path, const Matrix& viewMatrix) {
+  if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
+    return true;
+  }
+  auto scales = viewMatrix.getAxisScales();
+  auto bounds = path.getBounds();
+  bounds.scale(scales.x, scales.y);
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
+}
+
+DrawArgs Canvas::makeDrawArgs(const Rect& localBounds, const Matrix& viewMatrix) {
+  Matrix invert = {};
+  if (!viewMatrix.invert(&invert)) {
+    return {};
+  }
+  auto drawRect = localBounds;
+  auto clipBounds = mcStack->getClip().getBounds();
+  invert.mapRect(&clipBounds);
+  if (!drawRect.intersect(clipBounds)) {
+    return {};
+  }
+  return {getContext(), surfaceOptions()->renderFlags(), drawRect, viewMatrix};
+}
+
+void Canvas::drawPath(const Path& path, const Paint& paint) {
+  if (path.isEmpty() || paint.nothingToDraw()) {
+    return;
+  }
+  auto stroke = paint.getStroke();
+  auto style = CreateFillStyle(paint);
+  if (stroke && path.isLine()) {
+    auto effect = PathEffect::MakeStroke(stroke);
+    if (effect != nullptr) {
+      auto fillPath = path;
+      effect->applyTo(&fillPath);
+      if (drawSimplePath(fillPath, style)) {
+        return;
+      }
+    }
+  }
+  if (!stroke && drawSimplePath(path, style)) {
+    return;
+  }
+  auto pathBounds = path.getBounds();
+  if (stroke != nullptr) {
+    pathBounds.outset(stroke->width, stroke->width);
+  }
+  auto args = makeDrawArgs(pathBounds, mcStack->getMatrix());
+  if (args.empty()) {
+    return;
+  }
+  std::unique_ptr<DrawOp> drawOp = nullptr;
+  if (ShouldTriangulatePath(path, args.viewMatrix)) {
+    drawOp =
+        TriangulatingPathOp::Make(style.color, path, args.viewMatrix, stroke, args.renderFlags);
+  } else {
+    auto maskFP = makeTextureMask(path, args.viewMatrix, stroke);
+    if (maskFP != nullptr) {
+      drawOp = FillRectOp::Make(style.color, args.drawRect, args.viewMatrix);
+      drawOp->addCoverageFP(std::move(maskFP));
+    }
+  }
+  addDrawOp(std::move(drawOp), args, style);
+}
+
+static std::unique_ptr<FragmentProcessor> CreateMaskFP(std::shared_ptr<TextureProxy> textureProxy,
+                                                       const Matrix* localMatrix = nullptr) {
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  auto isAlphaOnly = textureProxy->isAlphaOnly();
+  auto processor = TextureEffect::Make(std::move(textureProxy), {}, localMatrix);
+  if (processor == nullptr) {
+    return nullptr;
+  }
+  if (!isAlphaOnly) {
+    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
+  }
+  return processor;
+}
+
+std::unique_ptr<FragmentProcessor> Canvas::makeTextureMask(const Path& path,
+                                                           const Matrix& viewMatrix,
+                                                           const Stroke* stroke) {
+  auto scales = viewMatrix.getAxisScales();
+  auto bounds = path.getBounds();
+  bounds.scale(scales.x, scales.y);
+  static const auto TexturePathType = UniqueID::Next();
+  BytesKey bytesKey(3 + (stroke ? StrokeKeyCount : 0));
+  bytesKey.write(TexturePathType);
+  bytesKey.write(scales.x);
+  bytesKey.write(scales.y);
+  if (stroke) {
+    WriteStrokeKey(&bytesKey, stroke);
+  }
+  auto uniqueKey = UniqueKey::Combine(PathRef::GetUniqueKey(path), bytesKey);
+  auto width = ceilf(bounds.width());
+  auto height = ceilf(bounds.height());
+  auto rasterizeMatrix = Matrix::MakeScale(scales.x, scales.y);
+  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
+  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), rasterizeMatrix, stroke);
+  auto proxyProvider = getContext()->proxyProvider();
+  auto textureProxy = proxyProvider->createTextureProxy(uniqueKey, rasterizer, false,
+                                                        surfaceOptions()->renderFlags());
+  return CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
+}
+
+bool Canvas::drawSimplePath(const Path& path, const FillStyle& style) {
+  Rect rect = {};
+  if (path.asRect(&rect)) {
+    drawRect(rect, mcStack->getMatrix(), style);
+    return true;
+  }
+  RRect rRect;
+  if (path.asRRect(&rRect)) {
+    auto args = makeDrawArgs(rRect.rect, mcStack->getMatrix());
+    auto drawOp = RRectOp::Make(style.color, rRect, args.viewMatrix);
+    addDrawOp(std::move(drawOp), args, style);
+    return true;
+  }
+  return false;
+}
+
+void Canvas::drawRect(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style) {
+  if (drawAsClear(rect, viewMatrix, style)) {
+    return;
+  }
+  auto args = makeDrawArgs(rect, viewMatrix);
+  if (args.empty()) {
+    return;
+  }
+  auto drawOp = FillRectOp::Make(style.color, args.drawRect, args.viewMatrix);
+  addDrawOp(std::move(drawOp), args, style);
+}
+
+static bool HasColorOnly(const FillStyle& style) {
+  return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
+}
+
+bool Canvas::drawAsClear(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style) {
+  if (!HasColorOnly(style) || !viewMatrix.rectStaysRect()) {
+    return false;
+  }
+  auto color = style.color;
+  if (style.blendMode == BlendMode::Clear) {
+    color = Color::Transparent();
+  } else if (style.blendMode != BlendMode::Src) {
+    if (!color.isOpaque()) {
+      return false;
+    }
+  }
+  auto bounds = rect;
+  viewMatrix.mapRect(&bounds);
+  auto [clipRect, useScissor] = getClipRect(&bounds);
+  if (clipRect.has_value()) {
+    auto format = surface->renderTargetProxy->format();
+    const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
+    color = writeSwizzle.applyTo(color);
+    if (useScissor) {
+      surface->addOp(ClearOp::Make(color, *clipRect));
+      return true;
+    } else if (clipRect->isEmpty()) {
+      surface->addOp(ClearOp::Make(color, bounds), true);
+      return true;
+    }
+  }
+  return false;
+}
+
+static SamplingOptions GetDefaultSamplingOptions(std::shared_ptr<Image> image) {
+  if (image == nullptr) {
+    return {};
+  }
+  auto mipmapMode = image->hasMipmaps() ? MipmapMode::Linear : MipmapMode::None;
+  return SamplingOptions(FilterMode::Linear, mipmapMode);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
+  drawImage(std::move(image), Matrix::MakeTrans(left, top), paint);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
+  auto sampling = GetDefaultSamplingOptions(image);
+  drawImage(std::move(image), sampling, paint, &matrix);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
+  auto sampling = GetDefaultSamplingOptions(image);
+  drawImage(std::move(image), sampling, paint, nullptr);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {
+  drawImage(std::move(image), sampling, paint, nullptr);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint,
+                       const Matrix* extraMatrix) {
+  if (image == nullptr || (paint && paint->nothingToDraw())) {
+    return;
+  }
+  auto viewMatrix = mcStack->getMatrix();
+  if (extraMatrix) {
+    viewMatrix.preConcat(*extraMatrix);
+  }
+  auto imageFilter = paint ? paint->getImageFilter() : nullptr;
+  if (imageFilter != nullptr) {
+    auto offset = Point::Zero();
+    image = image->makeWithFilter(std::move(imageFilter), &offset);
+    if (image == nullptr) {
+      return;
+    }
+    viewMatrix.preTranslate(offset.x, offset.y);
+  }
+  auto rect = Rect::MakeWH(image->width(), image->height());
+  auto style = CreateFillStyle(std::move(image), sampling, paint);
+  drawRect(rect, viewMatrix, style);
+}
+
+void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
+                            const tgfx::Paint& paint) {
+  if (text.empty() || paint.nothingToDraw()) {
+    return;
+  }
+  auto glyphRun = SimpleTextShaper::Shape(text, font);
+  auto viewMatrix = mcStack->getMatrix();
+  viewMatrix.preTranslate(x, y);
+  auto style = CreateFillStyle(paint);
+  drawGlyphs(std::move(glyphRun), viewMatrix, style, paint.getStroke());
+}
+
+void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
+                        const Font& font, const Paint& paint) {
+  if (glyphCount == 0 || paint.nothingToDraw()) {
+    return;
+  }
+  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  auto style = CreateFillStyle(paint);
+  drawGlyphs(std::move(glyphRun), mcStack->getMatrix(), style, paint.getStroke());
+}
+
+void Canvas::drawGlyphs(GlyphRun glyphRun, const Matrix& viewMatrix, const FillStyle& style,
+                        const Stroke* stroke) {
+  if (glyphRun.empty()) {
+    return;
+  }
+  if (glyphRun.hasColor()) {
+    drawColorGlyphs(glyphRun, viewMatrix, style);
+    return;
+  }
+  auto maxScale = viewMatrix.getMaxScale();
+  // Scale the glyphs before measuring to prevent precision loss with small font sizes.
+  auto bounds = glyphRun.getBounds(maxScale, stroke);
+  auto localBounds = bounds;
+  localBounds.scale(1.0f / maxScale, 1.0f / maxScale);
+  auto args = makeDrawArgs(localBounds, viewMatrix);
+  if (args.empty()) {
+    return;
+  }
+  auto rasterizeMatrix = Matrix::MakeScale(maxScale, maxScale);
+  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto textBlob = std::make_shared<SimpleTextBlob>(std::move(glyphRun));
+  auto rasterizer = Rasterizer::MakeFrom(std::move(textBlob), ISize::Make(width, height),
+                                         rasterizeMatrix, stroke);
+  auto proxyProvider = getContext()->proxyProvider();
+  auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, args.renderFlags);
+  auto processor = CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
+  if (processor == nullptr) {
+    return;
+  }
+  auto drawOp = FillRectOp::Make(style.color, args.drawRect, viewMatrix);
+  drawOp->addCoverageFP(std::move(processor));
+  addDrawOp(std::move(drawOp), args, style);
+}
+
+void Canvas::drawColorGlyphs(const GlyphRun& glyphRun, const Matrix& viewMatrix,
+                             const FillStyle& style) {
+  auto scale = viewMatrix.getMaxScale();
+  auto drawMatrix = viewMatrix;
+  drawMatrix.preScale(1.0f / scale, 1.0f / scale);
+  auto font = glyphRun.font();
+  font = font.makeWithSize(font.getSize() * scale);
+  auto glyphCount = glyphRun.runSize();
+  auto& glyphIDs = glyphRun.glyphIDs();
+  auto& positions = glyphRun.positions();
+  for (size_t i = 0; i < glyphCount; ++i) {
+    const auto& glyphID = glyphIDs[i];
+    const auto& position = positions[i];
+    auto glyphMatrix = Matrix::I();
+    auto glyphImage = font.getImage(glyphID, &glyphMatrix);
+    if (glyphImage == nullptr) {
+      continue;
+    }
+    glyphMatrix.postTranslate(position.x * scale, position.y * scale);
+    glyphMatrix.postConcat(drawMatrix);
+    auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
+    auto glyphStyle = style;
+    glyphStyle.shader = Shader::MakeImageShader(std::move(glyphImage));
+    drawRect(rect, glyphMatrix, glyphStyle);
+  }
+}
+
+void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
+                       const Color colors[], size_t count, SamplingOptions sampling,
+                       const Paint* paint) {
+  // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
+  if (atlas == nullptr || count == 0 || (paint && paint->nothingToDraw())) {
+    return;
+  }
+  auto style = CreateFillStyle(std::move(atlas), sampling, paint);
+  for (size_t i = 0; i < count; ++i) {
+    auto rect = tex[i];
+    auto viewMatrix = mcStack->getMatrix();
+    viewMatrix.preConcat(matrix[i]);
+    viewMatrix.preTranslate(-rect.x(), -rect.y());
+    auto glyphStyle = style;
+    if (colors) {
+      glyphStyle.color = colors[i].premultiply();
+    }
+    drawRect(rect, viewMatrix, glyphStyle);
+  }
+}
 
 /**
  * Returns true if the given rect counts as aligned with pixel boundaries.
@@ -274,9 +613,9 @@ std::shared_ptr<TextureProxy> Canvas::getClipTexture() {
 }
 
 std::unique_ptr<FragmentProcessor> Canvas::getClipMask(const Rect& deviceBounds,
+                                                       const Matrix& viewMatrix,
                                                        Rect* scissorRect) {
   auto& clip = mcStack->getClip();
-  auto viewMatrix = mcStack->getMatrix();
   if (!clip.isEmpty() && clip.contains(deviceBounds)) {
     return nullptr;
   }
@@ -308,383 +647,113 @@ std::unique_ptr<FragmentProcessor> Canvas::getClipMask(const Rect& deviceBounds,
   return maskEffect;
 }
 
-Rect Canvas::clipLocalBounds(const Rect& localBounds) {
-  auto& viewMatrix = mcStack->getMatrix();
-  Matrix invert = {};
-  if (!viewMatrix.invert(&invert)) {
-    return {};
-  }
-  auto drawRect = localBounds;
-  auto clipBounds = mcStack->getClip().getBounds();
-  invert.mapRect(&clipBounds);
-  if (!drawRect.intersect(clipBounds)) {
-    return {};
-  }
-  return drawRect;
-}
-
-static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const DrawArgs& args) {
-  Rect rect = {};
-  if (path.asRect(&rect)) {
-    return FillRectOp::Make(args.color, rect, args.viewMatrix);
-  }
-  RRect rRect;
-  if (path.asRRect(&rRect)) {
-    return RRectOp::Make(args.color, rRect, args.viewMatrix);
-  }
-  return nullptr;
-}
-
-static std::unique_ptr<DrawOp> MakeTexturePathOp(const Path& path, const DrawArgs& args,
-                                                 const Stroke* stroke) {
-  auto scales = args.viewMatrix.getAxisScales();
-  auto bounds = path.getBounds();
-  bounds.scale(scales.x, scales.y);
-  static const auto TexturePathType = UniqueID::Next();
-  BytesKey bytesKey(3 + (stroke ? StrokeKeyCount : 0));
-  bytesKey.write(TexturePathType);
-  bytesKey.write(scales.x);
-  bytesKey.write(scales.y);
-  if (stroke) {
-    WriteStrokeKey(&bytesKey, stroke);
-  }
-  auto uniqueKey = UniqueKey::Combine(PathRef::GetUniqueKey(path), bytesKey);
-  auto width = ceilf(bounds.width());
-  auto height = ceilf(bounds.height());
-  auto localMatrix = Matrix::MakeScale(scales.x, scales.y);
-  localMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), localMatrix, stroke);
-  auto proxyProvider = args.context->proxyProvider();
-  auto textureProxy =
-      proxyProvider->createTextureProxy(uniqueKey, rasterizer, false, args.renderFlags);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  auto maskProcessor =
-      TextureEffect::Make(std::move(textureProxy), SamplingOptions(), &localMatrix);
-  if (maskProcessor == nullptr) {
-    return nullptr;
-  }
-  auto op = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
-  op->addColorFP(std::move(maskProcessor));
-  return op;
-}
-
-static Path GetSimpleFillPath(const Path& path, const Paint& paint) {
-  if (paint.getStyle() == PaintStyle::Fill) {
-    return path;
-  }
-  if (path.isLine()) {
-    auto effect = PathEffect::MakeStroke(paint.getStroke());
-    if (effect != nullptr) {
-      auto tempPath = path;
-      effect->applyTo(&tempPath);
-      return tempPath;
-    }
-  }
-  return {};
-}
-
-void Canvas::drawPath(const Path& path, const Paint& paint) {
-  if (path.isEmpty() || paint.nothingToDraw()) {
-    return;
-  }
-  auto realPaint = CleanPaint(&paint);
-  auto stroke = realPaint.getStroke();
-  auto pathBounds = path.getBounds();
-  if (stroke != nullptr) {
-    pathBounds.outset(stroke->width, stroke->width);
-  }
-  auto localBounds = clipLocalBounds(pathBounds);
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  auto fillPath = GetSimpleFillPath(path, realPaint);
-  if (drawAsClear(fillPath, realPaint)) {
-    return;
-  }
-  auto viewMatrix = mcStack->getMatrix();
-  DrawArgs args(surface, realPaint, localBounds, viewMatrix);
-  auto drawOp = MakeSimplePathOp(fillPath, args);
-  if (drawOp != nullptr) {
-    addDrawOp(std::move(drawOp), args, realPaint);
-    return;
-  }
-  if (ShouldTriangulatePath(path, viewMatrix)) {
-    drawOp = TriangulatingPathOp::Make(args.color, path, viewMatrix, stroke, args.renderFlags);
-  } else {
-    drawOp = MakeTexturePathOp(path, args, stroke);
-  }
-  addDrawOp(std::move(drawOp), args, realPaint);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
-  drawImage(std::move(image), Matrix::MakeTrans(left, top), paint);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
-  auto oldMatrix = getMatrix();
-  concat(matrix);
-  drawImage(std::move(image), paint);
-  setMatrix(oldMatrix);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
-  if (image == nullptr) {
-    return;
-  }
-  auto mipmapMode = image->hasMipmaps() ? MipmapMode::Linear : MipmapMode::None;
-  SamplingOptions sampling(FilterMode::Linear, mipmapMode);
-  drawImage(std::move(image), sampling, paint);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {
-  if (image == nullptr) {
-    return;
-  }
-  auto realPaint = CleanPaint(paint, true);
-  if (realPaint.nothingToDraw()) {
-    return;
-  }
-  auto oldMatrix = getMatrix();
-  auto imageFilter = realPaint.getImageFilter();
-  if (imageFilter != nullptr) {
-    auto offset = Point::Zero();
-    image = image->makeWithFilter(std::move(imageFilter), &offset);
-    if (image == nullptr) {
-      return;
-    }
-    realPaint.setImageFilter(nullptr);
-    concat(Matrix::MakeTrans(offset.x, offset.y));
-  }
-  auto localBounds = clipLocalBounds(Rect::MakeWH(image->width(), image->height()));
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  if (realPaint.getShader() != nullptr && !image->isAlphaOnly()) {
-    realPaint.setShader(nullptr);
-  }
-  DrawArgs args(surface, realPaint, localBounds, mcStack->getMatrix());
-  auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
-  if (processor == nullptr) {
-    return;
-  }
-  auto drawOp = FillRectOp::Make(args.color, args.drawRect, args.viewMatrix);
-  drawOp->addColorFP(std::move(processor));
-  addDrawOp(std::move(drawOp), args, realPaint);
-  setMatrix(oldMatrix);
-}
-
-void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
-                            const tgfx::Paint& paint) {
-  auto glyphRun = SimpleTextShaper::Shape(text, font);
-  auto oldMatrix = mcStack->getMatrix();
-  mcStack->translate(x, y);
-  drawGlyphs(std::move(glyphRun), paint);
-  mcStack->setMatrix(oldMatrix);
-}
-
-void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
-                        const Font& font, const Paint& paint) {
-  if (glyphCount == 0) {
-    return;
-  }
-  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
-  drawGlyphs(std::move(glyphRun), paint);
-}
-
-void Canvas::drawGlyphs(GlyphRun glyphRun, const Paint& paint) {
-  if (glyphRun.empty() || paint.nothingToDraw()) {
-    return;
-  }
-  if (glyphRun.hasColor()) {
-    drawColorGlyphs(glyphRun, paint);
-    return;
-  }
-  auto realPaint = CleanPaint(&paint);
-  auto& viewMatrix = mcStack->getMatrix();
-  auto maxScale = viewMatrix.getMaxScale();
-  auto stroke = realPaint.getStroke();
-  // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-  auto bounds = glyphRun.getBounds(maxScale, stroke);
-  auto localBounds = bounds;
-  localBounds.scale(1.0f / maxScale, 1.0f / maxScale);
-  localBounds = clipLocalBounds(localBounds);
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  DrawArgs args(surface, realPaint, localBounds, viewMatrix);
-  auto rasterizeMatrix = Matrix::MakeScale(maxScale, maxScale);
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  auto textBlob = std::make_shared<SimpleTextBlob>(std::move(glyphRun));
-  auto rasterizer = Rasterizer::MakeFrom(std::move(textBlob), ISize::Make(width, height),
-                                         rasterizeMatrix, stroke);
-  auto proxyProvider = getContext()->proxyProvider();
-  auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, args.renderFlags);
-  if (textureProxy == nullptr) {
-    return;
-  }
-  auto isAlphaOnly = textureProxy->isAlphaOnly();
-  auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix);
-  if (processor == nullptr) {
-    return;
-  }
-  if (!isAlphaOnly) {
-    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
-  }
-  auto drawOp = FillRectOp::Make(args.color, args.drawRect, viewMatrix);
-  drawOp->addCoverageFP(std::move(processor));
-  addDrawOp(std::move(drawOp), args, realPaint);
-}
-
-void Canvas::drawColorGlyphs(const GlyphRun& glyphRun, const Paint& paint) {
-  auto& viewMatrix = mcStack->getMatrix();
-  auto scale = viewMatrix.getMaxScale();
-  auto font = glyphRun.font();
-  font = font.makeWithSize(font.getSize() * scale);
-  auto glyphCount = glyphRun.runSize();
-  auto& glyphIDs = glyphRun.glyphIDs();
-  auto& positions = glyphRun.positions();
-  for (size_t i = 0; i < glyphCount; ++i) {
-    const auto& glyphID = glyphIDs[i];
-    const auto& position = positions[i];
-    auto glyphMatrix = Matrix::I();
-    auto glyphImage = font.getImage(glyphID, &glyphMatrix);
-    if (glyphImage == nullptr) {
-      continue;
-    }
-    glyphMatrix.postScale(1.0f / scale, 1.0f / scale);
-    glyphMatrix.postTranslate(position.x, position.y);
-    drawImage(std::move(glyphImage), glyphMatrix, &paint);
-  }
-}
-
-void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
-                       const Color colors[], size_t count, SamplingOptions sampling,
-                       const Paint* paint) {
-  // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
-  if (atlas == nullptr || count == 0) {
-    return;
-  }
-  auto totalMatrix = mcStack->getMatrix();
-  auto realPaint = CleanPaint(paint, true);
-  for (size_t i = 0; i < count; ++i) {
-    concat(matrix[i]);
-    auto width = static_cast<float>(tex[i].width());
-    auto height = static_cast<float>(tex[i].height());
-    auto localBounds = clipLocalBounds(Rect::MakeWH(width, height));
-    if (localBounds.isEmpty()) {
-      setMatrix(totalMatrix);
-      continue;
-    }
-    auto localMatrix = Matrix::MakeTrans(tex[i].x(), tex[i].y());
-    auto color = colors ? std::optional<Color>(colors[i].premultiply()) : std::nullopt;
-    auto& viewMatrix = mcStack->getMatrix();
-    auto drawOp = FillRectOp::Make(color, localBounds, viewMatrix, &localMatrix);
-    DrawArgs args(surface, realPaint, localBounds, totalMatrix);
-    auto processor = FragmentProcessor::Make(atlas, args, sampling);
-    if (processor == nullptr) {
-      return;
-    }
-    drawOp->addColorFP(std::move(processor));
-    addDrawOp(std::move(drawOp), args, realPaint);
-    setMatrix(totalMatrix);
-  }
-}
-
-static bool HasColorOnly(const Paint& paint) {
-  return paint.getColorFilter() == nullptr && paint.getShader() == nullptr &&
-         paint.getImageFilter() == nullptr && paint.getMaskFilter() == nullptr;
-}
-
-bool Canvas::drawAsClear(const Path& path, const Paint& paint) {
-  if (!HasColorOnly(paint) || !mcStack->getMatrix().rectStaysRect()) {
+static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
+  BlendInfo blendInfo = {};
+  if (!BlendModeAsCoeff(mode, &blendInfo)) {
     return false;
   }
-  auto color = paint.getColor().premultiply();
-  auto blendMode = paint.getBlendMode();
-  if (blendMode == BlendMode::Clear) {
-    color = Color::Transparent();
-  } else if (blendMode != BlendMode::Src) {
-    if (!color.isOpaque()) {
+  switch (blendInfo.srcBlend) {
+    case BlendModeCoeff::DA:
+    case BlendModeCoeff::DC:
+    case BlendModeCoeff::IDA:
+    case BlendModeCoeff::IDC:
       return false;
-    }
+    default:
+      break;
   }
-  auto bounds = Rect::MakeEmpty();
-  if (!path.asRect(&bounds)) {
-    return false;
-  }
-  mcStack->getMatrix().mapRect(&bounds);
-  auto [clipRect, useScissor] = getClipRect(&bounds);
-  if (clipRect.has_value()) {
-    auto format = surface->renderTargetProxy->format();
-    const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
-    color = writeSwizzle.applyTo(color);
-    if (useScissor) {
-      surface->aboutToDraw();
-      surface->addOp(ClearOp::Make(color, *clipRect));
+  switch (blendInfo.dstBlend) {
+    case BlendModeCoeff::Zero:
       return true;
-    } else if (clipRect->isEmpty()) {
-      surface->aboutToDraw(true);
-      surface->addOp(ClearOp::Make(color, bounds));
-      return true;
-    }
+    case BlendModeCoeff::ISA:
+      return opacityType == SrcColorOpacity::Opaque;
+    case BlendModeCoeff::SA:
+      return opacityType == SrcColorOpacity::TransparentBlack ||
+             opacityType == SrcColorOpacity::TransparentAlpha;
+    case BlendModeCoeff::SC:
+      return opacityType == SrcColorOpacity::TransparentBlack;
+    default:
+      return false;
   }
-  return false;
 }
 
-bool Canvas::getProcessors(const DrawArgs& args, const Paint& paint, DrawOp* drawOp) {
-  if (drawOp == nullptr) {
+bool Canvas::wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args,
+                                         const FillStyle& style) const {
+  if (op == nullptr || op->classID() != FillRectOp::ClassID()) {
     return false;
   }
-  if (auto shader = paint.getShader()) {
-    auto shaderFP = FragmentProcessor::Make(shader, args);
-    if (shaderFP == nullptr) {
-      return false;
-    }
-    drawOp->addColorFP(std::move(shaderFP));
+  // Since wouldOverwriteEntireSurface() may not be complete free to call, we only do so if there is
+  // a cached image snapshot in the surface.
+  if (surface == nullptr || surface->cachedImage == nullptr) {
+    return false;
   }
-  if (auto colorFilter = paint.getColorFilter()) {
-    if (auto processor = colorFilter->asFragmentProcessor()) {
-      drawOp->addColorFP(std::move(processor));
+  auto clipRect = Rect::MakeEmpty();
+  if (!mcStack->getClip().asRect(&clipRect) || !args.viewMatrix.rectStaysRect()) {
+    return false;
+  }
+  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  if (clipRect != surfaceRect) {
+    return false;
+  }
+  auto deviceRect = args.viewMatrix.mapRect(args.drawRect);
+  if (!deviceRect.contains(surfaceRect)) {
+    return false;
+  }
+  if (style.maskFilter) {
+    return false;
+  }
+  if (style.colorFilter && style.colorFilter->isAlphaUnchanged()) {
+    return false;
+  }
+  auto opacityType = SrcColorOpacity::Unknown;
+  auto alpha = style.color.alpha;
+  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
+    opacityType = SrcColorOpacity::Opaque;
+  } else if (alpha == 0) {
+    if (style.shader) {
+      opacityType = SrcColorOpacity::TransparentAlpha;
     } else {
-      return false;
+      opacityType = SrcColorOpacity::TransparentBlack;
     }
   }
-  if (auto maskFilter = paint.getMaskFilter()) {
-    if (auto processor = maskFilter->asFragmentProcessor(args, nullptr)) {
-      drawOp->addCoverageFP(std::move(processor));
-    } else {
-      return false;
-    }
-  }
-  return true;
+  return BlendModeIsOpaque(style.blendMode, opacityType);
 }
 
-void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const Paint& paint) {
-  if (!getProcessors(args, paint, op.get())) {
+void Canvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const FillStyle& style) {
+  if (op == nullptr || args.empty()) {
     return;
   }
   auto aaType = AAType::None;
   if (surface->renderTargetProxy->sampleCount() > 1) {
     aaType = AAType::MSAA;
-  } else if (paint.isAntiAlias()) {
+  } else if (style.antiAlias) {
     auto isFillRect = op->classID() == FillRectOp::ClassID();
     if (!isFillRect || !args.viewMatrix.rectStaysRect() || !IsPixelAligned(op->bounds())) {
       aaType = AAType::Coverage;
     }
   }
   op->setAA(aaType);
-  op->setBlendMode(paint.getBlendMode());
+  op->setBlendMode(style.blendMode);
+  auto shaderFP = FragmentProcessor::Make(style.shader, args);
+  if (shaderFP != nullptr) {
+    op->addColorFP(std::move(shaderFP));
+  }
+  if (style.colorFilter) {
+    if (auto processor = style.colorFilter->asFragmentProcessor()) {
+      op->addColorFP(std::move(processor));
+    }
+  }
+  if (style.maskFilter) {
+    if (auto processor = style.maskFilter->asFragmentProcessor(args, nullptr)) {
+      op->addCoverageFP(std::move(processor));
+    }
+  }
   Rect scissorRect = Rect::MakeEmpty();
-  auto clipMask = getClipMask(op->bounds(), &scissorRect);
+  auto clipMask = getClipMask(op->bounds(), args.viewMatrix, &scissorRect);
   if (clipMask) {
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
-  surface->aboutToDraw(false);
-  surface->addOp(std::move(op));
+  auto discardContent = wouldOverwriteEntireSurface(op.get(), args, style);
+  surface->addOp(std::move(op), discardContent);
 }
 }  // namespace tgfx
