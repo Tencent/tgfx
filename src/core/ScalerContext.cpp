@@ -44,7 +44,11 @@ class EmptyScalerContext : public ScalerContext {
     return false;
   }
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID, bool, Matrix*) const override {
+  Rect getImageTransform(GlyphID, Matrix*) const override {
+    return Rect::MakeEmpty();
+  }
+
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID, bool) const override {
     return nullptr;
   }
 };

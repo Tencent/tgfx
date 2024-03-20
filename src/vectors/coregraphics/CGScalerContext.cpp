@@ -260,16 +260,32 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID, bool fauxItalic,
-                                                            Matrix* matrix) const {
+Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
-  auto transform = GetTransform(fauxItalic);
-  cgBounds = CGRectApplyAffineTransform(cgBounds, transform);
+  if (CGRectIsEmpty(cgBounds)) {
+    return Rect::MakeEmpty();
+  }
+  // Convert cgBounds to Glyph units (pixels, y down).
+  auto bounds = Rect::MakeXYWH(static_cast<float>(cgBounds.origin.x),
+                               static_cast<float>(-cgBounds.origin.y - cgBounds.size.height),
+                               static_cast<float>(cgBounds.size.width),
+                               static_cast<float>(cgBounds.size.height));
+  bounds.roundOut();
+  if (matrix) {
+    matrix->setTranslate(bounds.left, bounds.top);
+  }
+  return bounds;
+}
+
+std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID,
+                                                            bool tryHardware) const {
+  auto bounds = getImageTransform(glyphID, nullptr);
   CTFontSymbolicTraits traits = CTFontGetSymbolicTraits(ctFont);
   auto hasColor = static_cast<bool>(traits & kCTFontTraitColorGlyphs);
-  auto pixelBuffer = PixelBuffer::Make(static_cast<int>(cgBounds.size.width),
-                                       static_cast<int>(cgBounds.size.height), !hasColor);
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  auto pixelBuffer = PixelBuffer::Make(width, height, !hasColor, tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
@@ -279,20 +295,15 @@ std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID, boo
     pixelBuffer->unlockPixels();
     return nullptr;
   }
-  CGContextClearRect(cgContext, CGRectMake(0, 0, cgBounds.size.width, cgBounds.size.height));
-  CGContextSetTextMatrix(cgContext, transform);
+  CGContextClearRect(cgContext, CGRectMake(0, 0, bounds.width(), bounds.height()));
   CGContextSetBlendMode(cgContext, kCGBlendModeCopy);
   CGContextSetTextDrawingMode(cgContext, kCGTextFill);
   CGContextSetShouldAntialias(cgContext, true);
   CGContextSetShouldSmoothFonts(cgContext, true);
-  auto point = CGPointMake(-cgBounds.origin.x, -cgBounds.origin.y);
+  auto point = CGPointMake(-bounds.left, bounds.bottom);
   CTFontDrawGlyphs(ctFont, &glyphID, &point, 1, cgContext);
   CGContextRelease(cgContext);
   pixelBuffer->unlockPixels();
-  if (matrix) {
-    matrix->setTranslate(static_cast<float>(cgBounds.origin.x),
-                         static_cast<float>(-cgBounds.origin.y - cgBounds.size.height));
-  }
   return pixelBuffer;
 }
 }  // namespace tgfx

@@ -42,8 +42,9 @@ class FTScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool fauxItalic,
-                                             Matrix* matrix) const override;
+  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
+
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const override;
 
  private:
   int setupSize(bool fauxItalic) const;
@@ -55,6 +56,8 @@ class FTScalerContext : public ScalerContext {
   bool getCBoxForLetter(char letter, FT_BBox* bbox) const;
 
   void getBBoxForCurrentGlyph(FT_BBox* bbox) const;
+
+  bool loadBitmapGlyph(GlyphID glyphID, FT_Int32 glyphFlags) const;
 
   Matrix getExtraMatrix(bool fauxItalic) const;
 

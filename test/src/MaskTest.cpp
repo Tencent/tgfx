@@ -55,7 +55,6 @@ TGFX_TEST(MaskTest, Rasterize) {
   pixmap.clear();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);
-  device->unlock();
   EXPECT_TRUE(Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture"));
 
   auto typeface =
@@ -73,8 +72,10 @@ TGFX_TEST(MaskTest, Rasterize) {
   ASSERT_TRUE(glyphImage != nullptr);
   EXPECT_TRUE(fabsf(matrix.getScaleX() - 2.75229359f) < FLT_EPSILON);
   EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.550458729f) < FLT_EPSILON);
-  auto bufferImage = std::static_pointer_cast<BufferImage>(glyphImage);
-  EXPECT_TRUE(Baseline::Compare(std::static_pointer_cast<PixelBuffer>(bufferImage->imageBuffer),
-                                "MaskTest/rasterize_emoji"));
+  surface = Surface::Make(context, glyphImage->width(), glyphImage->height());
+  canvas = surface->getCanvas();
+  canvas->drawImage(glyphImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "MaskTest/rasterize_emoji"));
+  device->unlock();
 }
 }  // namespace tgfx
