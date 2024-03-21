@@ -65,10 +65,7 @@ struct RasterTarget {
 static void SpanFunc(int y, int, const FT_Span* spans, void* user) {
   auto* target = reinterpret_cast<RasterTarget*>(user);
   auto* q = target->origin - target->pitch * y + spans->x;
-  auto c = spans->coverage;
-  if (target->gammaTable) {
-    c = target->gammaTable[c];
-  }
+  auto c = target->gammaTable[spans->coverage];
   auto aCount = spans->len;
   /**
    * For small-spans it is faster to do it by ourselves than calling memset.
@@ -118,21 +115,36 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   ftPath.setFillType(path.getFillType());
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = GetLibrary().library();
+  if (!needsGammaCorrection) {
+    FT_Bitmap bitmap;
+    bitmap.width = static_cast<unsigned>(info.width());
+    bitmap.rows = static_cast<unsigned>(info.height());
+    bitmap.pitch = static_cast<int>(info.rowBytes());
+    bitmap.buffer = static_cast<unsigned char*>(pixels);
+    bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
+    bitmap.num_grays = 256;
+    for (auto& outline : outlines) {
+      FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
+    }
+    pixelRef->unlockPixels();
+    return;
+  }
   auto buffer = static_cast<unsigned char*>(pixels);
   int rows = info.height();
   int pitch = static_cast<int>(info.rowBytes());
-  RasterTarget target{};
+  RasterTarget target = {};
   target.origin = buffer + (rows - 1) * pitch;
   target.pitch = pitch;
-  if (needsGammaCorrection) {
-    target.gammaTable = PixelRefMask::GammaTable().data();
-  } else {
-    target.gammaTable = nullptr;
-  }
+  target.gammaTable = PixelRefMask::GammaTable().data();
   FT_Raster_Params params;
-  params.flags = FT_RASTER_FLAG_AA | FT_RASTER_FLAG_DIRECT;
+  params.flags = FT_RASTER_FLAG_AA | FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP;
   params.gray_spans = SpanFunc;
   params.user = &target;
+  auto& clip = params.clip_box;
+  clip.xMin = 0;
+  clip.yMin = 0;
+  clip.xMax = (FT_Pos)info.width();
+  clip.yMax = (FT_Pos)info.height();
   for (auto& outline : outlines) {
     FT_Outline_Render(ftLibrary, &(outline->outline), &params);
   }
