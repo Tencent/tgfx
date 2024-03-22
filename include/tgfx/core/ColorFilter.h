@@ -19,15 +19,18 @@
 #pragma once
 
 #include <array>
+#include <memory>
 #include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Filter.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
+class FragmentProcessor;
+
 /**
  * ColorFilter is the base class for filters that perform color transformations in the drawing
  * pipeline.
  */
-class ColorFilter : public Filter {
+class ColorFilter {
  public:
   /**
    * Creates a new ColorFilter that transforms the input color into its corresponding brightness.
@@ -45,19 +48,14 @@ class ColorFilter : public Filter {
    */
   static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
 
+  virtual ~ColorFilter() = default;
+
   /**
    * Returns true if the filter is guaranteed to never change the alpha of a color it filters.
    */
   virtual bool isAlphaUnchanged() const {
     return false;
   }
-
- protected:
-  std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                   const DrawArgs& args, TileMode tileModeX,
-                                                   TileMode tileModeY,
-                                                   const SamplingOptions& sampling,
-                                                   const tgfx::Matrix* localMatrix) const override;
 
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;

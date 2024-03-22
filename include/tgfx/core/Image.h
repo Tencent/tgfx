@@ -33,7 +33,7 @@
 namespace tgfx {
 class DrawArgs;
 class Context;
-class Filter;
+class ImageFilter;
 class FragmentProcessor;
 class ImageCodec;
 class DrawOp;
@@ -250,7 +250,8 @@ class Image {
    * accordingly. The offset stores the translation information for the filtered Image. If the
    * filter is nullptr or fails to apply, nullptr is returned.
    */
-  std::shared_ptr<Image> makeWithFilter(std::shared_ptr<Filter> filter, Point* offset = nullptr,
+  std::shared_ptr<Image> makeWithFilter(std::shared_ptr<ImageFilter> filter,
+                                        Point* offset = nullptr,
                                         const Rect* clipRect = nullptr) const;
 
   /**

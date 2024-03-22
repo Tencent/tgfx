@@ -18,7 +18,10 @@
 
 #pragma once
 
-#include "tgfx/core/Filter.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/TileMode.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 /**
@@ -26,7 +29,7 @@ namespace tgfx {
  * and rasterizes the input Image to a texture before applying the filter. The rasterized Image is
  * then altered by the ImageFilter, potentially changing its bounds.
  */
-class ImageFilter : public Filter {
+class ImageFilter {
  public:
   /**
    * Create a filter that blurs its input by the separate X and Y blurriness. The provided tile mode
@@ -62,13 +65,25 @@ class ImageFilter : public Filter {
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color);
 
-  Rect filterBounds(const Rect& rect) const override;
+  virtual ~ImageFilter() = default;
+
+  Rect filterBounds(const Rect& rect) const;
 
  protected:
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
+  /**
+   * The returned processor is in the coordinate space of the source image.
+   */
+  virtual std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
+                                                           const DrawArgs& args, TileMode tileModeX,
+                                                           TileMode tileModeY,
+                                                           const SamplingOptions& sampling,
+                                                           const Matrix* localMatrix) const = 0;
+
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
   friend class DropShadowImageFilter;
+  friend class FilterImage;
 };
 }  // namespace tgfx

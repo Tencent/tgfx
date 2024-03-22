@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include "tgfx/core/Filter.h"
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
@@ -27,7 +26,7 @@ namespace tgfx {
  * MaskFilter is the base class for filters that perform transformations on the mask before drawing
  * it.
  */
-class MaskFilter : public Filter {
+class MaskFilter {
  public:
   /**
    * Creates a new MaskFilter that draws the mask using the alpha channel of the given shader.
@@ -36,12 +35,7 @@ class MaskFilter : public Filter {
   static std::shared_ptr<MaskFilter> MakeShader(std::shared_ptr<Shader> shader,
                                                 bool inverted = false);
 
- protected:
-  std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                   const DrawArgs& args, TileMode tileModeX,
-                                                   TileMode tileModeY,
-                                                   const SamplingOptions& sampling,
-                                                   const Matrix* localMatrix) const override;
+  virtual ~MaskFilter() = default;
 
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
