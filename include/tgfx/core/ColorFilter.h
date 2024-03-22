@@ -19,6 +19,7 @@
 #pragma once
 
 #include <array>
+#include <memory>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 
