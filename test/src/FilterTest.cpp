@@ -47,11 +47,6 @@ TGFX_TEST(FilterTest, ColorMatrixFilter) {
   paint.setColorFilter(ColorFilter::Matrix(greyColorMatrix));
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/greyColorMatrix"));
-  canvas->clear();
-  auto filterImage = image->makeWithFilter(ColorFilter::Matrix(greyColorMatrix));
-  ASSERT_TRUE(filterImage != nullptr);
-  canvas->drawImage(filterImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/greyColorMatrix"));
   device->unlock();
 }
 
@@ -77,11 +72,6 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   Paint paint;
   paint.setMaskFilter(maskFilter);
   canvas->drawImage(image, &paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/shaderMaskFilter"));
-  canvas->clear();
-  auto filterImage = image->makeWithFilter(maskFilter);
-  ASSERT_TRUE(filterImage != nullptr);
-  canvas->drawImage(filterImage);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/shaderMaskFilter"));
   device->unlock();
 }

@@ -215,7 +215,7 @@ std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
   return OrientImage::MakeFrom(weakThis.lock(), orientation);
 }
 
-std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<Filter> filter, Point* offset,
+std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                              const Rect* clipRect) const {
   return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect);
 }
