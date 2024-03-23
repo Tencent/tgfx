@@ -41,6 +41,6 @@ class MaskFilter {
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       const DrawArgs& args, const Matrix* localMatrix) const = 0;
 
-  friend class Canvas;
+  friend class SurfaceDrawContext;
 };
 }  // namespace tgfx

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -30,21 +29,18 @@
 namespace tgfx {
 class Surface;
 class SurfaceOptions;
-class TextureProxy;
-class MCStack;
+class DrawContext;
 class FillStyle;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
  * contains a stack of opacity, blend mode, matrix and clip values. Each Canvas draw call transforms
  * the geometry of the object by the concatenation of all matrix values in the stack. The
- * transformed geometry is clipped by the intersection of all of clip values in the stack.
+ * transformed geometry is clipped by the intersection of all the clip values in the stack.
  */
 class Canvas {
  public:
-  explicit Canvas(Surface* surface);
-
-  ~Canvas();
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
 
   /**
    * Retrieves the context associated with this Surface.
@@ -280,27 +276,13 @@ class Canvas {
                  const Paint* paint = nullptr);
 
  private:
+  DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
-  std::shared_ptr<TextureProxy> clipTexture = nullptr;
-  uint32_t clipID = 0;
-  MCStack* mcStack = nullptr;
 
-  std::shared_ptr<TextureProxy> getClipTexture();
-  std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
-  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, const Matrix& viewMatrix,
-                                                 Rect* scissorRect);
-  DrawArgs makeDrawArgs(const Rect& localBounds, const Matrix& viewMatrix);
-  std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
-                                                     const Stroke* stroke = nullptr);
   bool drawSimplePath(const Path& path, const FillStyle& style);
-  void drawRect(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
-  bool drawAsClear(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint,
                  const Matrix* extraMatrix);
-  void drawGlyphs(GlyphRun glyphRun, const Matrix& viewMatrix, const FillStyle& style,
-                  const Stroke* stroke = nullptr);
-  void drawColorGlyphs(const GlyphRun& glyphRun, const Matrix& viewMatrix, const FillStyle& style);
-  bool wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args, const FillStyle& style) const;
-  void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const FillStyle& style);
+  void drawRect(const Rect& rect, const FillStyle& style, const Matrix* extraMatrix = nullptr);
+  bool wouldOverwriteEntireSurface(const Rect& rect, const FillStyle& style) const;
 };
 }  // namespace tgfx

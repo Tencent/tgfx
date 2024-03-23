@@ -18,9 +18,7 @@
 
 #include "tgfx/gpu/Surface.h"
 #include "DrawingManager.h"
-#include "core/PixelBuffer.h"
-#include "gpu/ProxyProvider.h"
-#include "gpu/RenderContext.h"
+#include "gpu/SurfaceDrawContext.h"
 #include "images/TextureImage.h"
 #include "utils/Log.h"
 #include "utils/PixelFormatUtil.h"
@@ -80,12 +78,14 @@ Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions*
   if (options != nullptr) {
     surfaceOptions = *options;
   }
-  renderContext = new RenderContext(renderTargetProxy);
+  drawContext = new SurfaceDrawContext(renderTargetProxy, surfaceOptions.renderFlags());
+  auto rect = Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height());
+  drawContext->clipRect(rect);
 }
 
 Surface::~Surface() {
   delete canvas;
-  delete renderContext;
+  delete drawContext;
 }
 
 Context* Surface::getContext() const {
@@ -152,7 +152,7 @@ bool Surface::wait(const BackendSemaphore& waitSemaphore) {
 
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
-    canvas = new Canvas(this);
+    canvas = new Canvas(drawContext, this);
   }
   return canvas;
 }
@@ -244,15 +244,7 @@ bool Surface::aboutToDraw(bool discardContent) {
                                             Rect::MakeWH(width(), height()), Point::Zero());
   }
   renderTargetProxy = std::move(newRenderTargetProxy);
-  delete renderContext;
-  renderContext = new RenderContext(renderTargetProxy);
+  drawContext->replaceRenderTarget(renderTargetProxy);
   return true;
-}
-
-void Surface::addOp(std::unique_ptr<Op> op, bool discardContent) {
-  if (!aboutToDraw(discardContent)) {
-    return;
-  }
-  renderContext->addOp(std::move(op));
 }
 }  // namespace tgfx
