@@ -16,25 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "MCStack.h"
+#include "DrawContext.h"
 
 namespace tgfx {
-MCStack::MCStack(const Path& initClip) : state({Matrix::I(), initClip}) {
+DrawContext::DrawContext() {
+  // Set the clip to wide open.
+  state.clip.toggleInverseFillType();
 }
 
-MCStack::MCStack(const Matrix& initMatrix, const Path& initClip)
-    : initMatrix(new Matrix(initMatrix)), state({initMatrix, initClip}) {
-}
-
-MCStack::~MCStack() {
-  delete initMatrix;
-}
-
-void MCStack::save() {
+void DrawContext::save() {
   stack.push(state);
 }
 
-void MCStack::restore() {
+void DrawContext::restore() {
   if (stack.empty()) {
     return;
   }
@@ -42,48 +36,45 @@ void MCStack::restore() {
   stack.pop();
 }
 
-void MCStack::translate(float dx, float dy) {
+void DrawContext::translate(float dx, float dy) {
   state.matrix.preTranslate(dx, dy);
 }
 
-void MCStack::scale(float sx, float sy) {
+void DrawContext::scale(float sx, float sy) {
   state.matrix.preScale(sx, sy);
 }
 
-void MCStack::rotate(float degrees) {
+void DrawContext::rotate(float degrees) {
   state.matrix.preRotate(degrees);
 }
 
-void MCStack::rotate(float degress, float px, float py) {
+void DrawContext::rotate(float degress, float px, float py) {
   state.matrix.preRotate(degress, px, py);
 }
 
-void MCStack::skew(float sx, float sy) {
+void DrawContext::skew(float sx, float sy) {
   state.matrix.preSkew(sx, sy);
 }
 
-void MCStack::concat(const Matrix& matrix) {
+void DrawContext::concat(const Matrix& matrix) {
   state.matrix.preConcat(matrix);
 }
 
-void MCStack::setMatrix(const Matrix& matrix) {
+void DrawContext::setMatrix(const Matrix& matrix) {
   state.matrix = matrix;
-  if (initMatrix != nullptr) {
-    state.matrix.postConcat(*initMatrix);
-  }
 }
 
-void MCStack::resetMatrix() {
-  state.matrix = initMatrix ? *initMatrix : Matrix::I();
+void DrawContext::resetMatrix() {
+  state.matrix.reset();
 }
 
-void MCStack::clipRect(const tgfx::Rect& rect) {
+void DrawContext::clipRect(const tgfx::Rect& rect) {
   Path path = {};
   path.addRect(rect);
   clipPath(path);
 }
 
-void MCStack::clipPath(const Path& path) {
+void DrawContext::clipPath(const Path& path) {
   auto clipPath = path;
   clipPath.transform(state.matrix);
   state.clip.addPath(clipPath, PathOp::Intersect);

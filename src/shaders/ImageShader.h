@@ -37,7 +37,7 @@ class ImageShader : public Shader {
   std::shared_ptr<Image> image = nullptr;
   TileMode tileModeX = TileMode::Clamp;
   TileMode tileModeY = TileMode::Clamp;
-  SamplingOptions sampling;
+  SamplingOptions sampling = {};
 
   friend class Shader;
 };
