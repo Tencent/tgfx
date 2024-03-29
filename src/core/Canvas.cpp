@@ -42,23 +42,23 @@ void Canvas::restore() {
 }
 
 void Canvas::translate(float dx, float dy) {
-  drawContext->translate(dx, dy);
+  drawContext->concat(Matrix::MakeTrans(dx, dy));
 }
 
 void Canvas::scale(float sx, float sy) {
-  drawContext->scale(sx, sy);
+  drawContext->concat(Matrix::MakeScale(sx, sy));
 }
 
 void Canvas::rotate(float degrees) {
-  drawContext->rotate(degrees);
+  drawContext->concat(Matrix::MakeRotate(degrees));
 }
 
 void Canvas::rotate(float degress, float px, float py) {
-  drawContext->rotate(degress, px, py);
+  drawContext->concat(Matrix::MakeRotate(degress, px, py));
 }
 
 void Canvas::skew(float sx, float sy) {
-  drawContext->skew(sx, sy);
+  drawContext->concat(Matrix::MakeSkew(sx, sy));
 }
 
 void Canvas::concat(const Matrix& matrix) {
@@ -224,27 +224,22 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, cons
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
   auto sampling = GetDefaultSamplingOptions(image);
-  drawImage(std::move(image), sampling, paint, &matrix);
+  drawImage(std::move(image), sampling, paint, matrix);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
   auto sampling = GetDefaultSamplingOptions(image);
-  drawImage(std::move(image), sampling, paint, nullptr);
+  drawImage(std::move(image), sampling, paint, Matrix::I());
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {
-  drawImage(std::move(image), sampling, paint, nullptr);
+  drawImage(std::move(image), sampling, paint, Matrix::I());
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint,
-                       const Matrix* extraMatrix) {
+                       Matrix extraMatrix) {
   if (image == nullptr || (paint && paint->nothingToDraw())) {
     return;
-  }
-  auto oldMatrix = drawContext->getMatrix();
-  auto matrixChanged = extraMatrix != nullptr;
-  if (extraMatrix) {
-    drawContext->concat(*extraMatrix);
   }
   auto imageFilter = paint ? paint->getImageFilter() : nullptr;
   if (imageFilter != nullptr) {
@@ -253,15 +248,11 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
     if (image == nullptr) {
       return;
     }
-    matrixChanged = true;
-    drawContext->translate(offset.x, offset.y);
+    extraMatrix.preTranslate(offset.x, offset.y);
   }
   auto rect = Rect::MakeWH(image->width(), image->height());
   auto style = CreateFillStyle(std::move(image), sampling, paint);
-  drawRect(rect, style);
-  if (matrixChanged) {
-    drawContext->setMatrix(oldMatrix);
-  }
+  drawRect(rect, style, &extraMatrix);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
@@ -271,12 +262,13 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgf
   }
   auto glyphRun = SimpleTextShaper::Shape(text, font);
   if (x != 0 || y != 0) {
-    drawContext->translate(x, y);
+    drawContext->save();
+    translate(x, y);
   }
   auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRun(std::move(glyphRun), style, paint.getStroke());
   if (x != 0 || y != 0) {
-    drawContext->translate(-x, -y);
+    drawContext->restore();
   }
 }
 
@@ -311,8 +303,9 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
 }
 
 void Canvas::drawRect(const Rect& rect, const FillStyle& style, const Matrix* extraMatrix) {
-  auto oldMatrix = drawContext->getMatrix();
-  if (extraMatrix) {
+  auto hasExtraMatrix = extraMatrix && !extraMatrix->isIdentity();
+  if (hasExtraMatrix) {
+    drawContext->save();
     drawContext->concat(*extraMatrix);
   }
   if (surface) {
@@ -320,8 +313,8 @@ void Canvas::drawRect(const Rect& rect, const FillStyle& style, const Matrix* ex
     surface->aboutToDraw(discardContent);
   }
   drawContext->drawRect(rect, style);
-  if (extraMatrix) {
-    drawContext->setMatrix(oldMatrix);
+  if (hasExtraMatrix) {
+    drawContext->restore();
   }
 }
 

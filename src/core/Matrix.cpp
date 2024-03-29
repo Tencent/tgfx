@@ -34,6 +34,12 @@ bool operator==(const Matrix& a, const Matrix& b) {
          ma[5] == mb[5];
 }
 
+Matrix operator*(const Matrix& a, const Matrix& b) {
+  Matrix result = {};
+  result.setConcat(a, b);
+  return result;
+}
+
 void Matrix::setAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
                     float transY) {
   values[SCALE_X] = scaleX;
