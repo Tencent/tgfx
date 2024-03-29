@@ -281,7 +281,7 @@ class Canvas {
 
   bool drawSimplePath(const Path& path, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint,
-                 const Matrix* extraMatrix);
+                 Matrix extraMatrix);
   void drawRect(const Rect& rect, const FillStyle& style, const Matrix* extraMatrix = nullptr);
   bool wouldOverwriteEntireSurface(const Rect& rect, const FillStyle& style) const;
 };

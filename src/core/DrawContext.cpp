@@ -28,32 +28,20 @@ void DrawContext::save() {
   stack.push(state);
 }
 
-void DrawContext::restore() {
+bool DrawContext::restore() {
   if (stack.empty()) {
-    return;
+    return false;
   }
   state = stack.top();
   stack.pop();
+  return true;
 }
 
-void DrawContext::translate(float dx, float dy) {
-  state.matrix.preTranslate(dx, dy);
-}
-
-void DrawContext::scale(float sx, float sy) {
-  state.matrix.preScale(sx, sy);
-}
-
-void DrawContext::rotate(float degrees) {
-  state.matrix.preRotate(degrees);
-}
-
-void DrawContext::rotate(float degress, float px, float py) {
-  state.matrix.preRotate(degress, px, py);
-}
-
-void DrawContext::skew(float sx, float sy) {
-  state.matrix.preSkew(sx, sy);
+void DrawContext::restoreToCount(size_t saveCount) {
+  auto n = stack.size() - saveCount;
+  for (size_t i = 0; i < n; i++) {
+    restore();
+  }
 }
 
 void DrawContext::concat(const Matrix& matrix) {

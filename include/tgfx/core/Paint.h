@@ -262,7 +262,7 @@ class Paint {
   bool antiAlias = true;
   PaintStyle style = PaintStyle::Fill;
   Color color = Color::White();
-  Stroke stroke = Stroke(0);
+  Stroke stroke = {};
   std::shared_ptr<Shader> shader = nullptr;
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   std::shared_ptr<ColorFilter> colorFilter = nullptr;

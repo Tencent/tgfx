@@ -82,6 +82,42 @@ class Matrix {
   }
 
   /**
+   * Sets Matrix to skew by (kx, ky) about pivot point (0, 0).
+   * @param kx  horizontal skew factor
+   * @param ky  vertical skew factor
+   * @return    Matrix with skew
+   */
+  static Matrix MakeSkew(float kx, float ky) {
+    Matrix m = {};
+    m.setSkew(kx, ky);
+    return m;
+  }
+
+  /**
+   * Sets Matrix to rotate by |degrees| about a pivot point at (0, 0).
+   * @param degrees  rotation angle in degrees (positive rotates clockwise)
+   * @return     Matrix with rotation
+   */
+  static Matrix MakeRotate(float degrees) {
+    Matrix m = {};
+    m.setRotate(degrees);
+    return m;
+  }
+
+  /**
+   * Sets Matrix to rotate by |degrees| about a pivot point at (px, py).
+   * @param degrees  rotation angle in degrees (positive rotates clockwise)
+   * @param px       pivot on x-axis
+   * @param py       pivot on y-axis
+   * @return         Matrix with rotation
+   */
+  static Matrix MakeRotate(float degrees, float px, float py) {
+    Matrix m = {};
+    m.setRotate(degrees, px, py);
+    return m;
+  }
+
+  /**
    * Sets Matrix to:
    *
    *      | scaleX  skewX transX |
@@ -102,6 +138,17 @@ class Matrix {
     m.setAll(scaleX, skewX, transX, skewY, scaleY, transY);
     return m;
   }
+
+  /**
+   * Returns reference to const identity Matrix. Returned Matrix is set to:
+   *
+   *       | 1 0 0 |
+   *       | 0 1 0 |
+   *       | 0 0 1 |
+   *
+   *   @return  const identity Matrix
+   */
+  static const Matrix& I();
 
   /**
    * Returns true if Matrix is identity. The identity matrix is:
@@ -662,6 +709,11 @@ class Matrix {
   }
 
   /**
+   * Returns Matrix A multiplied by Matrix B.
+   */
+  friend Matrix operator*(const Matrix& a, const Matrix& b);
+
+  /**
    * Returns the minimum scale factor of the Matrix by decomposing the scaling and skewing elements.
    * The scale factor is an absolute value and may not align with the x/y axes. Returns -1 if the
    * scale factor overflows.
@@ -686,17 +738,6 @@ class Matrix {
    * infinity, or NaN.
    */
   bool isFinite() const;
-
-  /**
-   * Returns reference to const identity Matrix. Returned Matrix is set to:
-   *
-   *       | 1 0 0 |
-   *       | 0 1 0 |
-   *       | 0 0 1 |
-   *
-   *   @return  const identity Matrix
-   */
-  static const Matrix& I();
 
  private:
   float values[6];

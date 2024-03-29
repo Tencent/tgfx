@@ -42,16 +42,30 @@ class DrawContext {
   /**
    * Returns the current total matrix.
    */
-  virtual const Matrix& getMatrix() const {
+  const Matrix& getMatrix() const {
     return state.matrix;
   }
 
   /**
    * Returns the current total clip Path.
    */
-  virtual const Path& getClip() const {
+  const Path& getClip() const {
     return state.clip;
   }
+
+  /**
+   * Returns the number of saved states. This is the number of times save() has been called minus
+   * the number of times restore() has been called.
+   */
+  size_t getSaveCount() const {
+    return stack.size();
+  }
+
+  /**
+   * Restores state to the specified saveCount. If saveCount is greater than the number of saved
+   * states, this method does nothing.
+   */
+  void restoreToCount(size_t saveCount);
 
   /**
    * Saves matrix and clip. Calling restore() discards changes to them, restoring them to their
@@ -64,48 +78,7 @@ class DrawContext {
    * Removes changes to matrix and clip since Canvas state was last saved. The state is removed from
    * the stack. Does nothing if the stack is empty.
    */
-  virtual void restore();
-
-  /**
-   * Translates the current matrix by dx along the x-axis and dy along the y-axis. Mathematically,
-   * it replaces the current matrix with a translation matrix premultiplied with the current matrix.
-   * This has the effect of moving the drawing by (dx, dy) before transforming the result with the
-   * current matrix.
-   */
-  virtual void translate(float dx, float dy);
-
-  /**
-   * Scales the current matrix by sx along the x-axis and sy along the y-axis. Mathematically, it
-   * replaces the current matrix with a scale matrix premultiplied with the current matrix. This has
-   * the effect of scaling the drawing by (sx, sy) before transforming the result with the current
-   * matrix.
-   */
-  virtual void scale(float sx, float sy);
-
-  /**
-   * Rotates the current matrix by degrees. Positive values rotate the drawing clockwise.
-   * Mathematically, it replaces the current matrix with a rotation matrix premultiplied with the
-   * current matrix. This has the effect of rotating the drawing by degrees before transforming the
-   * result with the current matrix.
-   */
-  virtual void rotate(float degrees);
-
-  /**
-   * Rotates the current matrix by degrees around the point (px, py). Positive values rotate the
-   * drawing clockwise. Mathematically, it replaces the current matrix with a rotation matrix
-   * premultiplied with the current matrix. This has the effect of rotating the drawing around the
-   * point (px, py) by degrees before transforming the result with the current matrix.
-   */
-  virtual void rotate(float degress, float px, float py);
-
-  /**
-   * Skews the current matrix by sx along the x-axis and sy along the y-axis. A positive value of sx
-   * skews the drawing right as y-axis values increase; a positive value of sy skews the drawing
-   * down as x-axis values increase. Mathematically, it replaces the current matrix with a skew
-   * matrix premultiplied with the current matrix. This has the effect of skewing the drawing by
-   * (sx, sy) before transforming the result with the current matrix.
-   */
-  virtual void skew(float sx, float sy);
+  virtual bool restore();
 
   /**
    * Replaces the current Matrix with matrix premultiplied with the existing one. This has the
