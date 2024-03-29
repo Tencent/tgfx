@@ -22,7 +22,6 @@
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 void DrawingManager::closeActiveOpsTask() {

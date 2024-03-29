@@ -213,11 +213,8 @@ class Surface {
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options);
 
-  std::shared_ptr<TextureProxy> getTextureProxy();
-
   bool aboutToDraw(bool discardContent = false);
 
-  friend class DrawingManager;
-  friend class Canvas;
+  friend class SurfaceDrawContext;
 };
 }  // namespace tgfx

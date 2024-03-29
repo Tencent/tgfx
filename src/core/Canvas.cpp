@@ -29,8 +29,7 @@
 #include "utils/StrokeKey.h"
 
 namespace tgfx {
-Canvas::Canvas(DrawContext* drawContext, Surface* surface)
-    : drawContext(drawContext), surface(surface) {
+Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {
 }
 
 void Canvas::save() {
@@ -93,6 +92,8 @@ void Canvas::clear(const Color& color) {
   Paint paint;
   paint.setColor(color);
   paint.setBlendMode(BlendMode::Src);
+  // TODO: We can't access the surface directly.
+  auto surface = drawContext->getSurface();
   auto rect = Rect::MakeWH(surface->width(), surface->height());
   drawRect(rect, paint);
 }
@@ -125,15 +126,17 @@ void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint&
 }
 
 Context* Canvas::getContext() const {
-  return surface->getContext();
+  auto surface = drawContext->getSurface();
+  return surface ? surface->getContext() : nullptr;
 }
 
 Surface* Canvas::getSurface() const {
-  return surface;
+  return drawContext->getSurface();
 }
 
 const SurfaceOptions* Canvas::surfaceOptions() const {
-  return surface->options();
+  auto surface = drawContext->getSurface();
+  return surface ? surface->options() : nullptr;
 }
 
 static FillStyle CreateFillStyle(const Paint& paint) {
@@ -155,23 +158,8 @@ static FillStyle CreateFillStyle(const Paint& paint) {
   return style;
 }
 
-static FillStyle CreateFillStyle(std::shared_ptr<Image> image, SamplingOptions sampling,
-                                 const Paint* paint) {
-  auto isAlphaOnly = image->isAlphaOnly();
-  auto shader =
-      Shader::MakeImageShader(std::move(image), TileMode::Clamp, TileMode::Clamp, sampling);
-  if (!paint) {
-    FillStyle style = {};
-    style.shader = shader;
-    return style;
-  }
-  auto style = CreateFillStyle(*paint);
-  if (isAlphaOnly && style.shader) {
-    style.shader = Shader::MakeBlend(BlendMode::DstIn, std::move(shader), std::move(style.shader));
-  } else {
-    style.shader = shader;
-  }
-  return style;
+static FillStyle CreateFillStyle(const Paint* paint) {
+  return paint ? CreateFillStyle(*paint) : FillStyle();
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
@@ -199,7 +187,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 bool Canvas::drawSimplePath(const Path& path, const FillStyle& style) {
   Rect rect = {};
   if (path.asRect(&rect)) {
-    drawRect(rect, style);
+    drawContext->drawRect(rect, style);
     return true;
   }
   RRect rRect;
@@ -224,23 +212,24 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, cons
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
   auto sampling = GetDefaultSamplingOptions(image);
-  drawImage(std::move(image), sampling, paint, matrix);
+  drawImage(std::move(image), sampling, &matrix, paint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
   auto sampling = GetDefaultSamplingOptions(image);
-  drawImage(std::move(image), sampling, paint, Matrix::I());
+  drawImage(std::move(image), sampling, nullptr, paint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {
-  drawImage(std::move(image), sampling, paint, Matrix::I());
+  drawImage(std::move(image), sampling, nullptr, paint);
 }
 
-void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint,
-                       Matrix extraMatrix) {
+void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling,
+                       const Matrix* extraMatrix, const Paint* paint) {
   if (image == nullptr || (paint && paint->nothingToDraw())) {
     return;
   }
+  auto matrix = extraMatrix ? *extraMatrix : Matrix::I();
   auto imageFilter = paint ? paint->getImageFilter() : nullptr;
   if (imageFilter != nullptr) {
     auto offset = Point::Zero();
@@ -248,11 +237,24 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
     if (image == nullptr) {
       return;
     }
-    extraMatrix.preTranslate(offset.x, offset.y);
+    matrix.preTranslate(offset.x, offset.y);
   }
   auto rect = Rect::MakeWH(image->width(), image->height());
-  auto style = CreateFillStyle(std::move(image), sampling, paint);
-  drawRect(rect, style, &extraMatrix);
+  auto style = CreateFillStyle(paint);
+  drawImageRect(rect, std::move(image), sampling, style, matrix);
+}
+
+void Canvas::drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
+                           const FillStyle& style, const Matrix& extraMatrix) {
+  auto hasExtraMatrix = !extraMatrix.isIdentity();
+  if (hasExtraMatrix) {
+    drawContext->save();
+    drawContext->concat(extraMatrix);
+  }
+  drawContext->drawImageRect(rect, std::move(image), sampling, style);
+  if (hasExtraMatrix) {
+    drawContext->restore();
+  }
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
@@ -289,7 +291,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   if (atlas == nullptr || count == 0 || (paint && paint->nothingToDraw())) {
     return;
   }
-  auto style = CreateFillStyle(std::move(atlas), sampling, paint);
+  auto style = CreateFillStyle(paint);
   for (size_t i = 0; i < count; ++i) {
     auto rect = tex[i];
     auto glyphMatrix = matrix[i];
@@ -298,102 +300,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     if (colors) {
       glyphStyle.color = colors[i].premultiply();
     }
-    drawRect(rect, glyphStyle, &glyphMatrix);
+    drawImageRect(rect, atlas, sampling, glyphStyle, glyphMatrix);
   }
-}
-
-void Canvas::drawRect(const Rect& rect, const FillStyle& style, const Matrix* extraMatrix) {
-  auto hasExtraMatrix = extraMatrix && !extraMatrix->isIdentity();
-  if (hasExtraMatrix) {
-    drawContext->save();
-    drawContext->concat(*extraMatrix);
-  }
-  if (surface) {
-    auto discardContent = wouldOverwriteEntireSurface(rect, style);
-    surface->aboutToDraw(discardContent);
-  }
-  drawContext->drawRect(rect, style);
-  if (hasExtraMatrix) {
-    drawContext->restore();
-  }
-}
-
-enum class SrcColorOpacity {
-  Unknown,
-  // The src color is known to be opaque (alpha == 255)
-  Opaque,
-  // The src color is known to be fully transparent (color == 0)
-  TransparentBlack,
-  // The src alpha is known to be fully transparent (alpha == 0)
-  TransparentAlpha,
-};
-
-static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
-  BlendInfo blendInfo = {};
-  if (!BlendModeAsCoeff(mode, &blendInfo)) {
-    return false;
-  }
-  switch (blendInfo.srcBlend) {
-    case BlendModeCoeff::DA:
-    case BlendModeCoeff::DC:
-    case BlendModeCoeff::IDA:
-    case BlendModeCoeff::IDC:
-      return false;
-    default:
-      break;
-  }
-  switch (blendInfo.dstBlend) {
-    case BlendModeCoeff::Zero:
-      return true;
-    case BlendModeCoeff::ISA:
-      return opacityType == SrcColorOpacity::Opaque;
-    case BlendModeCoeff::SA:
-      return opacityType == SrcColorOpacity::TransparentBlack ||
-             opacityType == SrcColorOpacity::TransparentAlpha;
-    case BlendModeCoeff::SC:
-      return opacityType == SrcColorOpacity::TransparentBlack;
-    default:
-      return false;
-  }
-}
-
-bool Canvas::wouldOverwriteEntireSurface(const Rect& rect, const FillStyle& style) const {
-  // Since wouldOverwriteEntireSurface() may not be complete free to call, we only do so if there is
-  // a cached image snapshot in the surface.
-  if (surface->cachedImage == nullptr) {
-    return false;
-  }
-  auto& clip = drawContext->getClip();
-  auto& viewMatrix = drawContext->getMatrix();
-  auto clipRect = Rect::MakeEmpty();
-  if (!clip.asRect(&clipRect) || !viewMatrix.rectStaysRect()) {
-    return false;
-  }
-  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  if (clipRect != surfaceRect) {
-    return false;
-  }
-  auto deviceRect = viewMatrix.mapRect(rect);
-  if (!deviceRect.contains(surfaceRect)) {
-    return false;
-  }
-  if (style.maskFilter) {
-    return false;
-  }
-  if (style.colorFilter && style.colorFilter->isAlphaUnchanged()) {
-    return false;
-  }
-  auto opacityType = SrcColorOpacity::Unknown;
-  auto alpha = style.color.alpha;
-  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
-    opacityType = SrcColorOpacity::Opaque;
-  } else if (alpha == 0) {
-    if (style.shader) {
-      opacityType = SrcColorOpacity::TransparentAlpha;
-    } else {
-      opacityType = SrcColorOpacity::TransparentBlack;
-    }
-  }
-  return BlendModeIsOpaque(style.blendMode, opacityType);
 }
 }  // namespace tgfx

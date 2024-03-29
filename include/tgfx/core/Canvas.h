@@ -40,15 +40,17 @@ class FillStyle;
  */
 class Canvas {
  public:
-  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  explicit Canvas(DrawContext* drawContext);
 
   /**
-   * Retrieves the context associated with this Surface.
+   * Retrieves the associated Context if the canvas is created from a Surface. Otherwise, returns
+   * nullptr.
    */
   Context* getContext() const;
 
   /**
-   * Returns the Surface this canvas draws into.
+   * Sometimes a canvas is owned by a surface. If it is, getSurface() will return a bare pointer to
+   * that surface, else this will return nullptr.
    */
   Surface* getSurface() const;
 
@@ -277,12 +279,11 @@ class Canvas {
 
  private:
   DrawContext* drawContext = nullptr;
-  Surface* surface = nullptr;
 
   bool drawSimplePath(const Path& path, const FillStyle& style);
-  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint,
-                 Matrix extraMatrix);
-  void drawRect(const Rect& rect, const FillStyle& style, const Matrix* extraMatrix = nullptr);
-  bool wouldOverwriteEntireSurface(const Rect& rect, const FillStyle& style) const;
+  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Matrix* extraMatrix,
+                 const Paint* paint);
+  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
+                     const FillStyle& style, const Matrix& extraMatrix);
 };
 }  // namespace tgfx

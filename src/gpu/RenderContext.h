@@ -18,40 +18,30 @@
 
 #pragma once
 
-#include <unordered_map>
-#include <vector>
+#include "gpu/processors/FragmentProcessor.h"
 #include "gpu/tasks/OpsRenderTask.h"
-#include "gpu/tasks/RenderTask.h"
-#include "gpu/tasks/ResourceTask.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class DrawingManager {
+/**
+ * A helper class to orchestrate Op commands for RenderTargets.
+ */
+class RenderContext {
  public:
-  explicit DrawingManager(Context* context) : context(context) {
+  explicit RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+      : renderTargetProxy(std::move(renderTargetProxy)) {
   }
 
-  std::shared_ptr<OpsRenderTask> addOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,
+                  bool autoResolve = false);
 
-  void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  void fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
+                      const Matrix& localMatrix);
 
-  void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                               std::shared_ptr<TextureProxy> dest, Rect srcRect, Point dstPoint);
-
-  void addResourceTask(std::shared_ptr<ResourceTask> resourceTask);
-
-  /**
-   * Returns true if any render tasks were executed.
-   */
-  bool flush();
+  void addOp(std::unique_ptr<Op> op);
 
  private:
-  void closeActiveOpsTask();
-
-  Context* context = nullptr;
-  UniqueKeyMap<ResourceTask*> resourceTaskMap = {};
-  std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
-  std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
-  OpsRenderTask* activeOpsTask = nullptr;
+  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
+  std::shared_ptr<OpsRenderTask> opsTask = nullptr;
 };
 }  // namespace tgfx

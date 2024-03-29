@@ -22,6 +22,7 @@
 #include "core/SimpleTextBlob.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/RenderContext.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
@@ -44,13 +45,16 @@ static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
-SurfaceDrawContext::SurfaceDrawContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                       uint32_t renderFlags)
-    : renderTargetProxy(std::move(renderTargetProxy)), renderFlags(renderFlags) {
+SurfaceDrawContext::SurfaceDrawContext(Surface* surface) : surface(surface) {
+  renderContext = new RenderContext(surface->renderTargetProxy);
+}
+
+SurfaceDrawContext::~SurfaceDrawContext() {
+  delete renderContext;
 }
 
 Context* SurfaceDrawContext::getContext() const {
-  return renderTargetProxy->getContext();
+  return surface->getContext();
 }
 
 DrawArgs SurfaceDrawContext::makeDrawArgs(const Rect& localBounds, const Matrix& viewMatrix) {
@@ -64,15 +68,11 @@ DrawArgs SurfaceDrawContext::makeDrawArgs(const Rect& localBounds, const Matrix&
   if (!drawRect.intersect(clipBounds)) {
     return {};
   }
-  return {getContext(), renderFlags, drawRect, viewMatrix};
+  return {getContext(), surface->surfaceOptions.renderFlags(), drawRect, viewMatrix};
 }
 
 void SurfaceDrawContext::drawRect(const Rect& rect, const FillStyle& style) {
-  drawRect(rect, getMatrix(), style);
-}
-
-void SurfaceDrawContext::drawRect(const Rect& rect, const Matrix& viewMatrix,
-                                  const FillStyle& style) {
+  auto& viewMatrix = getMatrix();
   if (drawAsClear(rect, viewMatrix, style)) {
     return;
   }
@@ -105,14 +105,14 @@ bool SurfaceDrawContext::drawAsClear(const Rect& rect, const Matrix& viewMatrix,
   viewMatrix.mapRect(&bounds);
   auto [clipRect, useScissor] = getClipRect(&bounds);
   if (clipRect.has_value()) {
-    auto format = renderTargetProxy->format();
+    auto format = surface->renderTargetProxy->format();
     const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
     color = writeSwizzle.applyTo(color);
     if (useScissor) {
-      addOp(ClearOp::Make(color, *clipRect));
+      addOp(ClearOp::Make(color, *clipRect), false);
       return true;
     } else if (clipRect->isEmpty()) {
-      addOp(ClearOp::Make(color, bounds));
+      addOp(ClearOp::Make(color, bounds), true);
       return true;
     }
   }
@@ -200,8 +200,40 @@ std::unique_ptr<FragmentProcessor> SurfaceDrawContext::makeTextureMask(const Pat
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
+  auto renderFlags = surface->surfaceOptions.renderFlags();
   auto textureProxy = proxyProvider->createTextureProxy(uniqueKey, rasterizer, false, renderFlags);
   return CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
+}
+
+void SurfaceDrawContext::drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                                       SamplingOptions sampling, const FillStyle& style) {
+  if (image == nullptr) {
+    return;
+  }
+  drawImageRect(rect, std::move(image), sampling, getMatrix(), style);
+}
+
+void SurfaceDrawContext::drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                                       SamplingOptions sampling, const Matrix& viewMatrix,
+                                       const FillStyle& style) {
+  auto args = makeDrawArgs(rect, viewMatrix);
+  if (args.empty()) {
+    return;
+  }
+  auto isAlphaOnly = image->isAlphaOnly();
+  auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
+  if (processor == nullptr) {
+    return;
+  }
+  auto drawOp = FillRectOp::Make(style.color, args.drawRect, args.viewMatrix);
+  drawOp->addColorFP(std::move(processor));
+  if (style.shader && !isAlphaOnly) {
+    auto imageStyle = style;
+    imageStyle.shader = nullptr;
+    addDrawOp(std::move(drawOp), args, imageStyle);
+  } else {
+    addDrawOp(std::move(drawOp), args, style);
+  }
 }
 
 void SurfaceDrawContext::drawGlyphRun(GlyphRun glyphRun, const FillStyle& style,
@@ -261,9 +293,7 @@ void SurfaceDrawContext::drawColorGlyphs(const GlyphRun& glyphRun, const FillSty
     glyphMatrix.postTranslate(position.x * scale, position.y * scale);
     glyphMatrix.postConcat(viewMatrix);
     auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-    auto glyphStyle = style;
-    glyphStyle.shader = Shader::MakeImageShader(std::move(glyphImage));
-    drawRect(rect, glyphMatrix, glyphStyle);
+    drawImageRect(rect, std::move(glyphImage), {}, glyphMatrix, style);
   }
 }
 
@@ -277,10 +307,10 @@ static bool IsPixelAligned(const Rect& rect) {
          fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
 }
 
-static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* rt) {
-  if (rt->origin() == ImageOrigin::BottomLeft) {
+static void FlipYIfNeeded(Rect* rect, const Surface* surface) {
+  if (surface->origin() == ImageOrigin::BottomLeft) {
     auto height = rect->height();
-    rect->top = static_cast<float>(rt->height()) - rect->bottom;
+    rect->top = static_cast<float>(surface->height()) - rect->bottom;
     rect->bottom = rect->top + height;
   }
 }
@@ -292,10 +322,10 @@ std::pair<std::optional<Rect>, bool> SurfaceDrawContext::getClipRect(const Rect*
     if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
       return {{}, false};
     }
-    FlipYIfNeeded(&rect, renderTargetProxy.get());
+    FlipYIfNeeded(&rect, surface);
     if (IsPixelAligned(rect)) {
       rect.round();
-      if (rect != Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height())) {
+      if (rect != Rect::MakeWH(surface->width(), surface->height())) {
         return {rect, true};
       } else {
         return {Rect::MakeEmpty(), false};
@@ -317,6 +347,7 @@ std::shared_ptr<TextureProxy> SurfaceDrawContext::getClipTexture() {
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  auto renderFlags = surface->surfaceOptions.renderFlags();
   if (ShouldTriangulatePath(clip, rasterizeMatrix)) {
     auto drawOp =
         TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
@@ -361,7 +392,7 @@ std::unique_ptr<FragmentProcessor> SurfaceDrawContext::getClipMask(const Rect& d
   }
   auto clipBounds = clip.getBounds();
   *scissorRect = clipBounds;
-  FlipYIfNeeded(scissorRect, renderTargetProxy.get());
+  FlipYIfNeeded(scissorRect, surface);
   scissorRect->roundOut();
   auto texture = getClipTexture();
   if (texture == nullptr) {
@@ -382,11 +413,11 @@ void SurfaceDrawContext::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& a
     return;
   }
   auto aaType = AAType::None;
-  if (renderTargetProxy->sampleCount() > 1) {
+  if (surface->renderTargetProxy->sampleCount() > 1) {
     aaType = AAType::MSAA;
   } else if (style.antiAlias) {
-    auto isFillRect = op->classID() == FillRectOp::ClassID();
-    if (!isFillRect || !args.viewMatrix.rectStaysRect() || !IsPixelAligned(op->bounds())) {
+    auto isFillRectOp = op->classID() == FillRectOp::ClassID();
+    if (!isFillRectOp || !args.viewMatrix.rectStaysRect() || !IsPixelAligned(op->bounds())) {
       aaType = AAType::Coverage;
     }
   }
@@ -412,42 +443,104 @@ void SurfaceDrawContext::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& a
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
-  addOp(std::move(op));
+  auto discardContent = wouldOverwriteEntireSurface(op.get(), args, style);
+  addOp(std::move(op), discardContent);
 }
 
-void SurfaceDrawContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp,
-                                    const Matrix& localMatrix, bool autoResolve) {
-  fillRectWithFP(Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height()),
-                 std::move(fp), localMatrix);
-  if (autoResolve) {
-    auto drawingManager = renderTargetProxy->getContext()->drawingManager();
-    drawingManager->addTextureResolveTask(renderTargetProxy);
-  }
-}
-
-void SurfaceDrawContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                                        const Matrix& localMatrix) {
-  if (fp == nullptr) {
+void SurfaceDrawContext::addOp(std::unique_ptr<Op> op, bool discardContent) {
+  if (!surface->aboutToDraw(discardContent)) {
     return;
   }
-  auto op = FillRectOp::Make(std::nullopt, dstRect, Matrix::I(), &localMatrix);
-  op->addColorFP(std::move(fp));
-  op->setBlendMode(BlendMode::Src);
-  addOp(std::move(op));
+  renderContext->addOp(std::move(op));
 }
 
-void SurfaceDrawContext::addOp(std::unique_ptr<Op> op) {
-  if (opsTask == nullptr || opsTask->isClosed()) {
-    auto drawingManager = renderTargetProxy->getContext()->drawingManager();
-    opsTask = drawingManager->addOpsTask(renderTargetProxy);
+enum class SrcColorOpacity {
+  Unknown,
+  // The src color is known to be opaque (alpha == 255)
+  Opaque,
+  // The src color is known to be fully transparent (color == 0)
+  TransparentBlack,
+  // The src alpha is known to be fully transparent (alpha == 0)
+  TransparentAlpha,
+};
+
+static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
+  BlendInfo blendInfo = {};
+  if (!BlendModeAsCoeff(mode, &blendInfo)) {
+    return false;
   }
-  opsTask->addOp(std::move(op));
+  switch (blendInfo.srcBlend) {
+    case BlendModeCoeff::DA:
+    case BlendModeCoeff::DC:
+    case BlendModeCoeff::IDA:
+    case BlendModeCoeff::IDC:
+      return false;
+    default:
+      break;
+  }
+  switch (blendInfo.dstBlend) {
+    case BlendModeCoeff::Zero:
+      return true;
+    case BlendModeCoeff::ISA:
+      return opacityType == SrcColorOpacity::Opaque;
+    case BlendModeCoeff::SA:
+      return opacityType == SrcColorOpacity::TransparentBlack ||
+             opacityType == SrcColorOpacity::TransparentAlpha;
+    case BlendModeCoeff::SC:
+      return opacityType == SrcColorOpacity::TransparentBlack;
+    default:
+      return false;
+  }
+}
+
+bool SurfaceDrawContext::wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args,
+                                                     const FillStyle& style) const {
+  if (op->classID() != FillRectOp::ClassID()) {
+    return false;
+  }
+  // Since wouldOverwriteEntireSurface() may not be complete free to call, we only do so if there is
+  // a cached image snapshot in the surface.
+  if (surface->cachedImage == nullptr) {
+    return false;
+  }
+  auto& clip = getClip();
+  auto& viewMatrix = args.viewMatrix;
+  auto clipRect = Rect::MakeEmpty();
+  if (!clip.asRect(&clipRect) || !viewMatrix.rectStaysRect()) {
+    return false;
+  }
+  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  if (clipRect != surfaceRect) {
+    return false;
+  }
+  auto deviceRect = viewMatrix.mapRect(args.drawRect);
+  if (!deviceRect.contains(surfaceRect)) {
+    return false;
+  }
+  if (style.maskFilter) {
+    return false;
+  }
+  if (style.colorFilter && style.colorFilter->isAlphaUnchanged()) {
+    return false;
+  }
+  auto opacityType = SrcColorOpacity::Unknown;
+  auto alpha = style.color.alpha;
+  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
+    opacityType = SrcColorOpacity::Opaque;
+  } else if (alpha == 0) {
+    if (style.shader) {
+      opacityType = SrcColorOpacity::TransparentAlpha;
+    } else {
+      opacityType = SrcColorOpacity::TransparentBlack;
+    }
+  }
+  return BlendModeIsOpaque(style.blendMode, opacityType);
 }
 
 void SurfaceDrawContext::replaceRenderTarget(
     std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {
-  renderTargetProxy = std::move(newRenderTargetProxy);
-  opsTask = nullptr;
+  delete renderContext;
+  renderContext = new RenderContext(std::move(newRenderTargetProxy));
 }
 
 }  // namespace tgfx
