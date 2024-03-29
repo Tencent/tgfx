@@ -24,10 +24,17 @@
 #include "gpu/tasks/OpsRenderTask.h"
 
 namespace tgfx {
+class RenderContext;
+
 class SurfaceDrawContext : public DrawContext {
  public:
-  explicit SurfaceDrawContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                              uint32_t renderFlags = 0);
+  explicit SurfaceDrawContext(Surface* surface);
+
+  ~SurfaceDrawContext() override;
+
+  Surface* getSurface() const override {
+    return surface;
+  }
 
   Context* getContext() const;
 
@@ -37,21 +44,15 @@ class SurfaceDrawContext : public DrawContext {
 
   void drawPath(const Path& path, const FillStyle& style, const Stroke* stroke) override;
 
+  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
+                     const FillStyle& style) override;
+
   void drawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) override;
 
-  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,
-                  bool autoResolve = false);
-
-  void fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                      const Matrix& localMatrix);
-
-  void addOp(std::unique_ptr<Op> op);
-
  private:
-  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  std::shared_ptr<OpsRenderTask> opsTask = nullptr;
+  Surface* surface = nullptr;
+  RenderContext* renderContext = nullptr;
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
-  uint32_t renderFlags = 0;
   uint32_t clipID = 0;
 
   std::shared_ptr<TextureProxy> getClipTexture();
@@ -61,10 +62,13 @@ class SurfaceDrawContext : public DrawContext {
   DrawArgs makeDrawArgs(const Rect& localBounds, const Matrix& viewMatrix);
   std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
                                                      const Stroke* stroke = nullptr);
-  void drawRect(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
   bool drawAsClear(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
+  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
+                     const Matrix& viewMatrix, const FillStyle& style);
   void drawColorGlyphs(const GlyphRun& glyphRun, const FillStyle& style);
   void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const FillStyle& style);
+  void addOp(std::unique_ptr<Op> op, bool discardContent);
+  bool wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args, const FillStyle& style) const;
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);
 
   friend class Surface;

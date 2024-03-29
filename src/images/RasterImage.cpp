@@ -18,7 +18,7 @@
 
 #include "RasterImage.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/SurfaceDrawContext.h"
+#include "gpu/RenderContext.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/RenderFlags.h"
@@ -113,7 +113,7 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
   if (processor == nullptr) {
     return nullptr;
   }
-  SurfaceDrawContext renderContext(renderTarget);
+  RenderContext renderContext(renderTarget);
   renderContext.fillWithFP(std::move(processor), Matrix::I(), true);
   return textureProxy;
 }

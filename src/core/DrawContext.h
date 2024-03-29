@@ -30,6 +30,8 @@ struct MCState {
   Path clip = {};
 };
 
+class Surface;
+
 /**
  * DrawContext is an abstract class that provides a drawing API for rendering graphics primitives.
  */
@@ -38,6 +40,13 @@ class DrawContext {
   DrawContext();
 
   virtual ~DrawContext() = default;
+
+  /**
+   * Returns the associated Surface if the DrawContext is backed by one, otherwise returns nullptr.
+   */
+  virtual Surface* getSurface() const {
+    return nullptr;
+  }
 
   /**
    * Returns the current total matrix.
@@ -126,6 +135,12 @@ class DrawContext {
    * Draws a complex Path with the specified FillStyle and optional Stroke.
    */
   virtual void drawPath(const Path& path, const FillStyle& style, const Stroke* stroke) = 0;
+
+  /**
+   * Draws a rectangle filled with the specified Image, sampling options, and FillStyle.
+   */
+  virtual void drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                             SamplingOptions sampling, const FillStyle& style) = 0;
 
   /**
    * Draws a GlyphRun with the specified FillStyle and optional Stroke.

@@ -78,7 +78,7 @@ Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions*
   if (options != nullptr) {
     surfaceOptions = *options;
   }
-  drawContext = new SurfaceDrawContext(renderTargetProxy, surfaceOptions.renderFlags());
+  drawContext = new SurfaceDrawContext(this);
   auto rect = Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height());
   drawContext->clipRect(rect);
 }
@@ -102,15 +102,6 @@ int Surface::height() const {
 
 ImageOrigin Surface::origin() const {
   return renderTargetProxy->origin();
-}
-
-std::shared_ptr<TextureProxy> Surface::getTextureProxy() {
-  if (!renderTargetProxy->isTextureBacked()) {
-    return nullptr;
-  }
-  auto drawingManager = getContext()->drawingManager();
-  drawingManager->addTextureResolveTask(renderTargetProxy);
-  return renderTargetProxy->getTextureProxy();
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
@@ -152,7 +143,7 @@ bool Surface::wait(const BackendSemaphore& waitSemaphore) {
 
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
-    canvas = new Canvas(drawContext, this);
+    canvas = new Canvas(drawContext);
   }
   return canvas;
 }

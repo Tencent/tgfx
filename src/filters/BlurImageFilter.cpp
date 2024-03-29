@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BlurImageFilter.h"
-#include "gpu/SurfaceDrawContext.h"
+#include "gpu/RenderContext.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/DualBlurFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -96,7 +96,7 @@ void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
-  SurfaceDrawContext renderContext(std::move(renderTarget));
+  RenderContext renderContext(std::move(renderTarget));
   renderContext.fillWithFP(std::move(blurProcessor), localMatrix, true);
 }
 
@@ -132,8 +132,8 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(
     if (processor == nullptr) {
       processor = TextureEffect::Make(lastRenderTarget->getTextureProxy());
     }
-    int downWidth = static_cast<int>(imageBounds.width() * downScaling);
-    int downHeight = static_cast<int>(imageBounds.height() * downScaling);
+    int downWidth = std::max(static_cast<int>(imageBounds.width() * downScaling), 1);
+    int downHeight = std::max(static_cast<int>(imageBounds.height() * downScaling), 1);
     auto renderTarget = RenderTargetProxy::Make(args.context, downWidth, downHeight);
     if (renderTarget == nullptr) {
       return nullptr;

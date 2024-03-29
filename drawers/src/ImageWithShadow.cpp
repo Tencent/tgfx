@@ -32,7 +32,7 @@ void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host)
   auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
   auto matrix = tgfx::Matrix::MakeScale(imageScale);
   tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
-  auto surface = tgfx::Surface::Make(canvas->getContext(), size, size);
+  auto surface = tgfx::Surface::Make(canvas->getSurface()->getContext(), size, size);
   auto scaledCanvas = surface->getCanvas();
   tgfx::Path path = {};
   path.addOval(tgfx::Rect::MakeXYWH(0, 0, size, size));
