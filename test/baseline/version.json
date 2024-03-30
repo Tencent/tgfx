@@ -24,12 +24,12 @@
     "DrawersTest": {
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
-        "ImageWithShadow": "1bf873d",
+        "ImageWithShadow": "4d6ab20",
         "SimpleText": "f1d64c1",
         "SweepGradient": "5a1fb11"
     },
     "FilterTest": {
-        "blur": "5f4f655",
+        "blur": "4d6ab20",
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
