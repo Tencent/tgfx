@@ -329,6 +329,5 @@ class Canvas {
   void drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
                      const SamplingOptions& sampling, const FillStyle& style,
                      const Matrix& extraMatrix);
-
 };
 }  // namespace tgfx
