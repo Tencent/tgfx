@@ -124,27 +124,37 @@ void Path::toggleInverseFillType() {
   }
 }
 
-bool Path::asRect(Rect* rect) const {
+bool Path::isLine(Point line[2]) const {
+  return pathRef->path.isLine(reinterpret_cast<SkPoint*>(line));
+}
+
+bool Path::isRect(Rect* rect) const {
+  if (!rect) {
+    return pathRef->path.isRect(nullptr);
+  }
   SkRect skRect = {};
   if (!pathRef->path.isRect(&skRect)) {
     return false;
   }
-  if (rect) {
-    rect->setLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
-  }
+  rect->setLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
   return true;
 }
 
-bool Path::asRRect(RRect* rRect) const {
-  SkRRect skRRect = {};
+bool Path::isOval(Rect* bounds) const {
+  if (!bounds) {
+    return pathRef->path.isOval(nullptr);
+  }
   SkRect skRect = {};
-  if (pathRef->path.isOval(&skRect)) {
-    skRRect.setOval(skRect);
-  } else if (pathRef->path.isRRect(&skRRect)) {
-    if (skRRect.isComplex() || skRRect.isNinePatch()) {
-      return false;
-    }
-  } else {
+  if (!pathRef->path.isOval(&skRect)) {
+    return false;
+  }
+  bounds->setLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
+  return true;
+}
+
+bool Path::isRRect(RRect* rRect) const {
+  SkRRect skRRect = {};
+  if (!pathRef->path.isRRect(&skRRect) || !skRRect.isSimple()) {
     return false;
   }
   if (rRect) {
@@ -154,10 +164,6 @@ bool Path::asRRect(RRect* rRect) const {
     rRect->radii.set(radii.fX, radii.fY);
   }
   return true;
-}
-
-bool Path::isLine(Point line[2]) const {
-  return pathRef->path.isLine(reinterpret_cast<SkPoint*>(line));
 }
 
 Rect Path::getBounds() const {

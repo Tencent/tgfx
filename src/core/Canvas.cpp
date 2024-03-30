@@ -237,12 +237,17 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 
 bool Canvas::drawSimplePath(const Path& path, const FillStyle& style) {
   Rect rect = {};
-  if (path.asRect(&rect)) {
+  if (path.isRect(&rect)) {
     onDrawRect(rect, style);
     return true;
   }
   RRect rRect;
-  if (path.asRRect(&rRect)) {
+  if (path.isOval(&rect)) {
+    rRect.setOval(rect);
+    onDrawRRect(rRect, style);
+    return true;
+  }
+  if (path.isRRect(&rRect)) {
     onDrawRRect(rRect, style);
     return true;
   }

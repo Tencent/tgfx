@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/RRect.h"
 
 namespace tgfx {
 class PathRef;
@@ -69,22 +70,32 @@ class Path {
   void toggleInverseFillType();
 
   /**
-   * Returns true if Path is equivalent to Rect when filled, Otherwise returns false, and leaves
-   * rect unchanged. The rect may be smaller than the Path bounds. Path bounds may include
-   * PathVerb::Move points that do not alter the area drawn by the returned rect.
-   */
-  bool asRect(Rect* rect) const;
-
-  /**
-   * Returns true if Path is equivalent to RRect when filled, Otherwise returns false, and leaves
-   * rRect unchanged.
-   */
-  bool asRRect(RRect* rRect) const;
-
-  /**
    * Returns true if Path contains only one line;
    */
   bool isLine(Point line[2] = nullptr) const;
+
+  /**
+   * Returns true if Path is equivalent to Rect when filled, Otherwise returns false, and leaves
+   * rect unchanged. The rect may be smaller than the Path bounds. Path bounds may include
+   * PathVerb::Move points that do not alter the area drawn by the returned rect.
+   * @param rect storage for bounds of Rect; may be nullptr.
+   */
+  bool isRect(Rect* rect) const;
+
+  /**
+   * Returns true if this path is equivalent to an oval or circle when filled. Otherwise, returns
+   * false and leaves the bounds unchanged.
+   * @param bounds  storage for bounding Rect of oval; may be nullptr.
+   */
+  bool isOval(Rect* bounds) const;
+
+  /**
+   * Returns true if Path is equivalent to RRect when filled, Otherwise returns false, and leaves
+   * rRect unchanged. Please note that this method returns false if the path is representable as
+   * oval, circle, or Rect.
+   * @param rRect  storage for RRect; may be nullptr.
+   */
+  bool isRRect(RRect* rRect) const;
 
   /**
    * Returns the bounds of the path's points. If the path contains 0 or 1 points, the bounds is set
