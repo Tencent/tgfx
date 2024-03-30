@@ -336,7 +336,7 @@ static void FlipYIfNeeded(Rect* rect, const Surface* surface) {
 std::pair<std::optional<Rect>, bool> SurfaceCanvas::getClipRect(const Rect* deviceBounds) {
   auto& clip = getTotalClip();
   auto rect = Rect::MakeEmpty();
-  if (clip.asRect(&rect)) {
+  if (clip.isRect(&rect)) {
     if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
       return {{}, false};
     }
@@ -524,7 +524,7 @@ bool SurfaceCanvas::wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args
   auto& clip = getTotalClip();
   auto& viewMatrix = args.viewMatrix;
   auto clipRect = Rect::MakeEmpty();
-  if (!clip.asRect(&clipRect) || !viewMatrix.rectStaysRect()) {
+  if (!clip.isRect(&clipRect) || !viewMatrix.rectStaysRect()) {
     return false;
   }
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
