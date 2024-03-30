@@ -53,6 +53,14 @@ struct SamplingOptions {
       : filterMode(filterMode), mipmapMode(mipmapMode) {
   }
 
+  friend bool operator==(const SamplingOptions& a, const SamplingOptions& b) {
+    return a.filterMode == b.filterMode && a.mipmapMode == b.mipmapMode;
+  }
+
+  friend bool operator!=(const SamplingOptions& a, const SamplingOptions& b) {
+    return !(a == b);
+  }
+
   FilterMode filterMode = FilterMode::Linear;
   MipmapMode mipmapMode = MipmapMode::None;
 };

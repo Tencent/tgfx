@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <stack>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
@@ -29,7 +30,6 @@
 namespace tgfx {
 class Surface;
 class SurfaceOptions;
-class DrawContext;
 class FillStyle;
 
 /**
@@ -40,25 +40,14 @@ class FillStyle;
  */
 class Canvas {
  public:
-  explicit Canvas(DrawContext* drawContext);
+  virtual ~Canvas() = default;
 
   /**
-   * Retrieves the associated Context if the canvas is created from a Surface. Otherwise, returns
-   * nullptr.
+   * Returns the associated Surface if the Canvas is backed by one, otherwise returns nullptr.
    */
-  Context* getContext() const;
-
-  /**
-   * Sometimes a canvas is owned by a surface. If it is, getSurface() will return a bare pointer to
-   * that surface, else this will return nullptr.
-   */
-  Surface* getSurface() const;
-
-  /**
-   * Returns the SurfaceOptions associated with the Canvas. Returns nullptr if the Canvas is not
-   * created from a Surface.
-   */
-  const SurfaceOptions* surfaceOptions() const;
+  virtual Surface* getSurface() const {
+    return nullptr;
+  }
 
   /**
    * Saves matrix and clip. Calling restore() discards changes to them, restoring them to their state
@@ -72,6 +61,18 @@ class Canvas {
    * the stack. Does nothing if the stack is empty.
    */
   void restore();
+
+  /**
+   * Returns the number of saved states. This is the number of times save() has been called minus
+   * the number of times restore() has been called. The save count of a new canvas is zero.
+   */
+  size_t getSaveCount() const;
+
+  /**
+   * Restores state to the specified saveCount. If saveCount is greater than the number of saved
+   * states, this method does nothing.
+   */
+  void restoreToCount(size_t saveCount);
 
   /**
    * Translates the current matrix by dx along the x-axis and dy along the y-axis. Mathematically,
@@ -103,7 +104,7 @@ class Canvas {
    * premultiplied with the current matrix. This has the effect of rotating the drawing around the
    * point (px, py) by degrees before transforming the result with the current matrix.
    */
-  void rotate(float degress, float px, float py);
+  void rotate(float degrees, float px, float py);
 
   /**
    * Skews the current matrix by sx along the x-axis and sy along the y-axis. A positive value of sx
@@ -124,7 +125,7 @@ class Canvas {
   /**
    * Returns the current total matrix.
    */
-  Matrix getMatrix() const;
+  const Matrix& getMatrix() const;
 
   /**
    * Replaces transformation with specified matrix. Unlike concat(), any prior matrix state is
@@ -141,7 +142,7 @@ class Canvas {
   /**
    * Returns the current total clip Path.
    */
-  Path getTotalClip() const;
+  const Path& getTotalClip() const;
 
   /**
    * Replaces clip with the intersection of clip and rect. The resulting clip is aliased; pixels are
@@ -157,10 +158,16 @@ class Canvas {
   void clipPath(const Path& path);
 
   /**
-   * Fills clip with color. This has the effect of replacing all pixels contained by clip with
-   * color.
+   * Fills the entire clip region to a transparent color using BlendMode::Src. This has the effect
+   * of replacing all pixels within the clip region with a transparent color.
    */
-  void clear(const Color& color = Color::Transparent());
+  void clear();
+
+  /**
+   * Fills a specified rectangle with a given color using the current clip and BlendMode::Src. This
+   * has the effect of replacing all pixels within the rectangle with the specified color.
+   */
+  void clearRect(const Rect& rect, const Color& color = Color::Transparent());
 
   /**
    * Draws a line from (x0, y0) to (x1, y1) using the current clip, matrix, and specified paint.
@@ -208,6 +215,12 @@ class Canvas {
   void drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint);
 
   /**
+   * Draws a RRect using the current clip, matrix, and specified paint. The rrect may represent a
+   * rectangle, circle, oval, rounded rectangle.
+   */
+  void drawRRect(const RRect& rRect, const Paint& paint);
+
+  /**
    * Draws a path using the current clip, matrix, and specified paint.
    */
   void drawPath(const Path& path, const Paint& paint);
@@ -240,7 +253,7 @@ class Canvas {
    * Draws an image, with its top-left corner at (0, 0), using current clip, matrix, sampling
    * options and optional paint.
    */
-  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling,
+  void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const Paint* paint = nullptr);
 
   /**
@@ -274,16 +287,47 @@ class Canvas {
    * @param paint blend, alpha, and so on, used to draw.
    */
   void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
-                 const Color colors[], size_t count, SamplingOptions sampling = {},
+                 const Color colors[], size_t count, const SamplingOptions& sampling = {},
                  const Paint* paint = nullptr);
 
+ protected:
+  explicit Canvas(const Path& initClip);
+  void resetMCState(const Path& initClip);
+
+  virtual void onSave();
+  virtual bool onRestore();
+  virtual void onTranslate(float dx, float dy);
+  virtual void onScale(float sx, float sy);
+  virtual void onRotate(float degrees);
+  virtual void onSkew(float sx, float sy);
+  virtual void onConcat(const Matrix& matrix);
+  virtual void onSetMatrix(const Matrix& matrix);
+  virtual void onResetMatrix();
+  virtual void onClipRect(const Rect& rect);
+  virtual void onClipPath(const Path& path);
+
+  virtual void onClear() = 0;
+  virtual void onDrawRect(const Rect& rect, const FillStyle& style) = 0;
+  virtual void onDrawRRect(const RRect& rRect, const FillStyle& style) = 0;
+  virtual void onDrawPath(const Path& path, const FillStyle& style, const Stroke* stroke) = 0;
+  virtual void onDrawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                               const SamplingOptions& sampling, const FillStyle& style) = 0;
+  virtual void onDrawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) = 0;
+
  private:
-  DrawContext* drawContext = nullptr;
+  struct MCState {
+    Matrix matrix = Matrix::I();
+    Path clip = {};
+  };
+
+  MCState state = {};
+  std::stack<MCState> stack = {};
 
   bool drawSimplePath(const Path& path, const FillStyle& style);
-  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Matrix* extraMatrix,
-                 const Paint* paint);
-  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
-                     const FillStyle& style, const Matrix& extraMatrix);
+  void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
+                 const Matrix* extraMatrix);
+  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                     const SamplingOptions& sampling, const FillStyle& style,
+                     const Matrix& extraMatrix);
 };
 }  // namespace tgfx

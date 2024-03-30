@@ -28,7 +28,7 @@ ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKe
 }
 
 std::shared_ptr<Image> ResourceImage::makeRasterized(float rasterizationScale,
-                                                     SamplingOptions sampling) const {
+                                                     const SamplingOptions& sampling) const {
   if (rasterizationScale == 1.0f) {
     return weakThis.lock();
   }

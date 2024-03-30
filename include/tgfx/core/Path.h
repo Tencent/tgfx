@@ -228,6 +228,20 @@ class Path {
                     unsigned startIndex = 0);
 
   /**
+   * Adds a RRect to the path, creating a new closed contour. The round rect begins at startIndex
+   * point and continues clockwise if reversed is false, counterclockwise if reversed is true.
+   * The indices of all points are as follows:
+   *      0      1
+   *      *------*
+   *   7 *        * 2
+   *     |        |
+   *   6 *        * 3
+   *      *------*
+   *      5      4
+   */
+  void addRRect(const RRect& rRect, bool reversed = false, unsigned startIndex = 0);
+
+  /**
    * Adds a src to this Path.
    */
   void addPath(const Path& src, PathOp op = PathOp::Append);

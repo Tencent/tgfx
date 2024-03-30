@@ -60,7 +60,7 @@ class ColorFilter {
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
 
-  friend class SurfaceDrawContext;
+  friend class SurfaceCanvas;
   friend class ColorFilterShader;
 };
 }  // namespace tgfx

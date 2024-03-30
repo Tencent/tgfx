@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
-#include "core/DrawContext.h"
 #include "core/FillStyle.h"
 #include "core/PathRef.h"
 #include "gpu/DrawingManager.h"
@@ -29,114 +28,107 @@
 #include "utils/StrokeKey.h"
 
 namespace tgfx {
-Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {
+Canvas::Canvas(const Path& initClip) {
+  state.clip = initClip;
 }
 
 void Canvas::save() {
-  drawContext->save();
+  onSave();
 }
 
 void Canvas::restore() {
-  drawContext->restore();
+  onRestore();
+}
+
+size_t Canvas::getSaveCount() const {
+  return stack.size();
+}
+
+void Canvas::restoreToCount(size_t saveCount) {
+  auto n = stack.size() - saveCount;
+  for (size_t i = 0; i < n; i++) {
+    restore();
+  }
 }
 
 void Canvas::translate(float dx, float dy) {
-  drawContext->concat(Matrix::MakeTrans(dx, dy));
+  if (dx == 0 && dy == 0) {
+    return;
+  }
+  onTranslate(dx, dy);
 }
 
 void Canvas::scale(float sx, float sy) {
-  drawContext->concat(Matrix::MakeScale(sx, sy));
+  if (sx == 1.0f && sy == 1.0f) {
+    return;
+  }
+  onScale(sx, sy);
 }
 
 void Canvas::rotate(float degrees) {
-  drawContext->concat(Matrix::MakeRotate(degrees));
+  if (fmodf(degrees, 360.0f) == 0) {
+    return;
+  }
+  onRotate(degrees);
 }
 
-void Canvas::rotate(float degress, float px, float py) {
-  drawContext->concat(Matrix::MakeRotate(degress, px, py));
+void Canvas::rotate(float degrees, float px, float py) {
+  if (fmodf(degrees, 360.0f) == 0) {
+    return;
+  }
+  Matrix m = {};
+  m.setRotate(degrees, px, py);
+  state.matrix.preConcat(m);
+  onConcat(m);
 }
 
 void Canvas::skew(float sx, float sy) {
-  drawContext->concat(Matrix::MakeSkew(sx, sy));
+  if (sx == 0 && sy == 0) {
+    return;
+  }
+  onSkew(sx, sy);
 }
 
 void Canvas::concat(const Matrix& matrix) {
-  drawContext->concat(matrix);
+  if (matrix.isIdentity()) {
+    return;
+  }
+  onConcat(matrix);
 }
 
-Matrix Canvas::getMatrix() const {
-  return drawContext->getMatrix();
+const Matrix& Canvas::getMatrix() const {
+  return state.matrix;
 }
 
 void Canvas::setMatrix(const Matrix& matrix) {
-  drawContext->setMatrix(matrix);
+  onSetMatrix(matrix);
 }
 
 void Canvas::resetMatrix() {
-  drawContext->resetMatrix();
+  onResetMatrix();
 }
 
-Path Canvas::getTotalClip() const {
-  return drawContext->getClip();
+const Path& Canvas::getTotalClip() const {
+  return state.clip;
 }
 
-void Canvas::clipRect(const tgfx::Rect& rect) {
-  drawContext->clipRect(rect);
+void Canvas::clipRect(const Rect& rect) {
+  onClipRect(rect);
 }
 
 void Canvas::clipPath(const Path& path) {
-  drawContext->clipPath(path);
+  onClipPath(path);
 }
 
-void Canvas::clear(const Color& color) {
+void Canvas::clear() {
+  onClear();
+}
+
+void Canvas::clearRect(const Rect& rect, const Color& color) {
   Paint paint;
   paint.setColor(color);
   paint.setBlendMode(BlendMode::Src);
-  // TODO: We can't access the surface directly.
-  auto surface = drawContext->getSurface();
-  auto rect = Rect::MakeWH(surface->width(), surface->height());
   drawRect(rect, paint);
-}
-
-void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
-  Path path = {};
-  path.moveTo(x0, y0);
-  path.lineTo(x1, y1);
-  auto realPaint = paint;
-  realPaint.setStyle(PaintStyle::Stroke);
-  drawPath(path, realPaint);
-}
-
-void Canvas::drawRect(const Rect& rect, const Paint& paint) {
-  Path path = {};
-  path.addRect(rect);
-  drawPath(path, paint);
-}
-
-void Canvas::drawOval(const Rect& oval, const Paint& paint) {
-  Path path = {};
-  path.addOval(oval);
-  drawPath(path, paint);
-}
-
-void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint& paint) {
-  Rect rect =
-      Rect::MakeLTRB(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
-  drawOval(rect, paint);
-}
-
-Context* Canvas::getContext() const {
-  auto surface = drawContext->getSurface();
-  return surface ? surface->getContext() : nullptr;
-}
-
-Surface* Canvas::getSurface() const {
-  return drawContext->getSurface();
-}
-
-const SurfaceOptions* Canvas::surfaceOptions() const {
-  auto surface = drawContext->getSurface();
-  return surface ? surface->options() : nullptr;
 }
 
 static FillStyle CreateFillStyle(const Paint& paint) {
@@ -162,6 +154,65 @@ static FillStyle CreateFillStyle(const Paint* paint) {
   return paint ? CreateFillStyle(*paint) : FillStyle();
 }
 
+void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
+  Path path = {};
+  path.moveTo(x0, y0);
+  path.lineTo(x1, y1);
+  auto realPaint = paint;
+  realPaint.setStyle(PaintStyle::Stroke);
+  drawPath(path, realPaint);
+}
+
+void Canvas::drawRect(const Rect& rect, const Paint& paint) {
+  if (paint.getStroke()) {
+    Path path = {};
+    path.addRect(rect);
+    drawPath(path, paint);
+    return;
+  }
+  if (rect.isEmpty() || paint.nothingToDraw()) {
+    return;
+  }
+  auto style = CreateFillStyle(paint);
+  onDrawRect(rect, style);
+}
+
+void Canvas::drawOval(const Rect& oval, const Paint& paint) {
+  RRect rRect = {};
+  rRect.setOval(oval);
+  drawRRect(rRect, paint);
+}
+
+void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint& paint) {
+  Rect rect =
+      Rect::MakeLTRB(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
+  drawOval(rect, paint);
+}
+
+void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint) {
+  RRect rRect = {};
+  rRect.setRectXY(rect, radiusX, radiusY);
+  drawRRect(rRect, paint);
+}
+
+void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
+  if (rRect.radii.isZero()) {
+    drawRect(rRect.rect, paint);
+    return;
+  }
+  if (paint.getStroke()) {
+    Path path = {};
+    path.addRRect(rRect);
+    drawPath(path, paint);
+    return;
+  }
+  if (rRect.rect.isEmpty() || paint.nothingToDraw()) {
+    return;
+  }
+  auto style = CreateFillStyle(paint);
+  onDrawRRect(rRect, style);
+}
+
 void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (path.isEmpty() || paint.nothingToDraw()) {
     return;
@@ -181,18 +232,18 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (!stroke && drawSimplePath(path, style)) {
     return;
   }
-  drawContext->drawPath(path, style, stroke);
+  onDrawPath(path, style, stroke);
 }
 
 bool Canvas::drawSimplePath(const Path& path, const FillStyle& style) {
   Rect rect = {};
   if (path.asRect(&rect)) {
-    drawContext->drawRect(rect, style);
+    onDrawRect(rect, style);
     return true;
   }
   RRect rRect;
   if (path.asRRect(&rRect)) {
-    drawContext->drawRRect(rRect, style);
+    onDrawRRect(rRect, style);
     return true;
   }
   return false;
@@ -212,20 +263,21 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, cons
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
   auto sampling = GetDefaultSamplingOptions(image);
-  drawImage(std::move(image), sampling, &matrix, paint);
+  drawImage(std::move(image), sampling, paint, &matrix);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
   auto sampling = GetDefaultSamplingOptions(image);
-  drawImage(std::move(image), sampling, nullptr, paint);
+  drawImage(std::move(image), sampling, paint, nullptr);
 }
 
-void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {
-  drawImage(std::move(image), sampling, nullptr, paint);
+void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                       const Paint* paint) {
+  drawImage(std::move(image), sampling, paint, nullptr);
 }
 
-void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling,
-                       const Matrix* extraMatrix, const Paint* paint) {
+void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                       const Paint* paint, const Matrix* extraMatrix) {
   if (image == nullptr || (paint && paint->nothingToDraw())) {
     return;
   }
@@ -244,33 +296,34 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling,
   drawImageRect(rect, std::move(image), sampling, style, matrix);
 }
 
-void Canvas::drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
-                           const FillStyle& style, const Matrix& extraMatrix) {
+void Canvas::drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                           const SamplingOptions& sampling, const FillStyle& style,
+                           const Matrix& extraMatrix) {
   auto hasExtraMatrix = !extraMatrix.isIdentity();
   if (hasExtraMatrix) {
-    drawContext->save();
-    drawContext->concat(extraMatrix);
+    save();
+    onConcat(extraMatrix);
   }
-  drawContext->drawImageRect(rect, std::move(image), sampling, style);
+  onDrawImageRect(rect, std::move(image), sampling, style);
   if (hasExtraMatrix) {
-    drawContext->restore();
+    restore();
   }
 }
 
-void Canvas::drawSimpleText(const std::string& text, float x, float y, const tgfx::Font& font,
-                            const tgfx::Paint& paint) {
+void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
+                            const Paint& paint) {
   if (text.empty() || paint.nothingToDraw()) {
     return;
   }
   auto glyphRun = SimpleTextShaper::Shape(text, font);
   if (x != 0 || y != 0) {
-    drawContext->save();
+    save();
     translate(x, y);
   }
   auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), style, paint.getStroke());
+  onDrawGlyphRun(std::move(glyphRun), style, paint.getStroke());
   if (x != 0 || y != 0) {
-    drawContext->restore();
+    restore();
   }
 }
 
@@ -281,11 +334,11 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   }
   GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), style, paint.getStroke());
+  onDrawGlyphRun(std::move(glyphRun), style, paint.getStroke());
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
-                       const Color colors[], size_t count, SamplingOptions sampling,
+                       const Color colors[], size_t count, const SamplingOptions& sampling,
                        const Paint* paint) {
   // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
   if (atlas == nullptr || count == 0 || (paint && paint->nothingToDraw())) {
@@ -302,5 +355,65 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     }
     drawImageRect(rect, atlas, sampling, glyphStyle, glyphMatrix);
   }
+}
+
+void Canvas::resetMCState(const Path& initClip) {
+  state = {};
+  state.clip = initClip;
+  std::stack<MCState>().swap(stack);
+}
+
+void Canvas::onSave() {
+  stack.push(state);
+}
+
+bool Canvas::onRestore() {
+  if (stack.empty()) {
+    return false;
+  }
+  state = stack.top();
+  stack.pop();
+  return true;
+}
+
+void Canvas::onTranslate(float dx, float dy) {
+  state.matrix.preTranslate(dx, dy);
+}
+
+void Canvas::onScale(float sx, float sy) {
+  state.matrix.preScale(sx, sy);
+}
+
+void Canvas::onRotate(float degrees) {
+  state.matrix.preRotate(degrees);
+}
+
+void Canvas::onSkew(float sx, float sy) {
+  state.matrix.preSkew(sx, sy);
+}
+
+void Canvas::onConcat(const Matrix& matrix) {
+  state.matrix.preConcat(matrix);
+}
+
+void Canvas::onSetMatrix(const Matrix& matrix) {
+  state.matrix = matrix;
+}
+
+void Canvas::onResetMatrix() {
+  state.matrix.reset();
+}
+
+void Canvas::onClipRect(const Rect& rect) {
+  Path path = {};
+  path.addRect(rect);
+  path.transform(state.matrix);
+  state.clip.addPath(path, PathOp::Intersect);
+}
+
+void Canvas::onClipPath(const Path& path) {
+  auto clipPath = path;
+  clipPath.transform(state.matrix);
+  state.clip.addPath(clipPath, PathOp::Intersect);
 }
 }  // namespace tgfx

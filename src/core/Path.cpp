@@ -298,6 +298,11 @@ void Path::addRoundRect(const Rect& rect, float radiusX, float radiusY, bool rev
                                ToSkDirection(reversed), startIndex);
 }
 
+void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {
+  auto skRRect = SkRRect::MakeRectXY(ToSkRect(rRect.rect), rRect.radii.x, rRect.radii.y);
+  writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
+}
+
 void Path::addPath(const Path& src, PathOp op) {
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;

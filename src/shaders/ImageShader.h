@@ -30,7 +30,7 @@ class ImageShader : public Shader {
 
  private:
   ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
-              SamplingOptions sampling)
+              const SamplingOptions& sampling)
       : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
   }
 

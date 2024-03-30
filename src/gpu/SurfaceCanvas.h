@@ -19,18 +19,18 @@
 #pragma once
 
 #include <optional>
-#include "core/DrawContext.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "gpu/tasks/OpsRenderTask.h"
+#include "core/FillStyle.h"
+#include "gpu/RenderContext.h"
+#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
 class RenderContext;
 
-class SurfaceDrawContext : public DrawContext {
+class SurfaceCanvas : public Canvas {
  public:
-  explicit SurfaceDrawContext(Surface* surface);
+  explicit SurfaceCanvas(Surface* surface);
 
-  ~SurfaceDrawContext() override;
+  ~SurfaceCanvas() override;
 
   Surface* getSurface() const override {
     return surface;
@@ -38,16 +38,19 @@ class SurfaceDrawContext : public DrawContext {
 
   Context* getContext() const;
 
-  void drawRect(const Rect& rect, const FillStyle& style) override;
+ protected:
+  void onClear() override;
 
-  void drawRRect(const RRect& rRect, const FillStyle& style) override;
+  void onDrawRect(const Rect& rect, const FillStyle& style) override;
 
-  void drawPath(const Path& path, const FillStyle& style, const Stroke* stroke) override;
+  void onDrawRRect(const RRect& rRect, const FillStyle& style) override;
 
-  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
-                     const FillStyle& style) override;
+  void onDrawPath(const Path& path, const FillStyle& style, const Stroke* stroke) override;
 
-  void drawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) override;
+  void onDrawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                       const SamplingOptions& sampling, const FillStyle& style) override;
+
+  void onDrawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) override;
 
  private:
   Surface* surface = nullptr;
@@ -63,8 +66,9 @@ class SurfaceDrawContext : public DrawContext {
   std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
                                                      const Stroke* stroke = nullptr);
   bool drawAsClear(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
-  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image, SamplingOptions sampling,
-                     const Matrix& viewMatrix, const FillStyle& style);
+  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
+                     const SamplingOptions& sampling, const Matrix& viewMatrix,
+                     const FillStyle& style);
   void drawColorGlyphs(const GlyphRun& glyphRun, const FillStyle& style);
   void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const FillStyle& style);
   void addOp(std::unique_ptr<Op> op, bool discardContent);

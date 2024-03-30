@@ -101,6 +101,16 @@ void Rect::join(float l, float t, float r, float b) {
   }
 }
 
+void RRect::setRectXY(const Rect& r, float radiusX, float radiusY) {
+  rect = r.makeSorted();
+  radii = {radiusX, radiusY};
+}
+
+void RRect::setOval(const Rect& oval) {
+  rect = oval.makeSorted();
+  radii = {rect.width() / 2, rect.height() / 2};
+}
+
 void RRect::scale(float scaleX, float scaleY) {
   rect.scale(scaleX, scaleY);
   radii.x *= scaleX;

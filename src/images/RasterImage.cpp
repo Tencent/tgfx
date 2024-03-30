@@ -26,7 +26,7 @@
 namespace tgfx {
 std::shared_ptr<RasterImage> RasterImage::MakeFrom(std::shared_ptr<Image> source,
                                                    float rasterizationScale,
-                                                   SamplingOptions sampling) {
+                                                   const SamplingOptions& sampling) {
   if (source == nullptr || rasterizationScale <= 0) {
     return nullptr;
   }
@@ -47,7 +47,7 @@ std::shared_ptr<RasterImage> RasterImage::MakeFrom(std::shared_ptr<Image> source
 }
 
 RasterImage::RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                         float rasterizationScale, SamplingOptions sampling)
+                         float rasterizationScale, const SamplingOptions& sampling)
     : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
       rasterizationScale(rasterizationScale), sampling(sampling) {
 }
@@ -65,7 +65,7 @@ int RasterImage::height() const {
 }
 
 std::shared_ptr<Image> RasterImage::makeRasterized(float scaleFactor,
-                                                   SamplingOptions options) const {
+                                                   const SamplingOptions& options) const {
   if (scaleFactor == 1.0f) {
     return weakThis.lock();
   }

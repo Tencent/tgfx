@@ -132,8 +132,8 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(
     if (processor == nullptr) {
       processor = TextureEffect::Make(lastRenderTarget->getTextureProxy());
     }
-    int downWidth = std::max(static_cast<int>(imageBounds.width() * downScaling), 1);
-    int downHeight = std::max(static_cast<int>(imageBounds.height() * downScaling), 1);
+    auto downWidth = std::max(static_cast<int>(roundf(imageBounds.width() * downScaling)), 1);
+    auto downHeight = std::max(static_cast<int>(roundf(imageBounds.height() * downScaling)), 1);
     auto renderTarget = RenderTargetProxy::Make(args.context, downWidth, downHeight);
     if (renderTarget == nullptr) {
       return nullptr;

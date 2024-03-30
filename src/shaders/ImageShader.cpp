@@ -23,7 +23,8 @@
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, TileMode tileModeX,
-                                                TileMode tileModeY, SamplingOptions sampling) {
+                                                TileMode tileModeY,
+                                                const SamplingOptions& sampling) {
   if (image == nullptr) {
     return nullptr;
   }

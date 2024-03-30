@@ -204,7 +204,7 @@ class Image {
    * returned. If the rasterizationScale is less than zero, nullptr is returned.
    */
   virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                                SamplingOptions sampling = {}) const;
+                                                const SamplingOptions& sampling = {}) const;
 
   /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a

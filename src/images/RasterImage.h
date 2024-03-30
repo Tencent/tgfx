@@ -33,7 +33,7 @@ class RasterImage : public ResourceImage {
    */
   static std::shared_ptr<RasterImage> MakeFrom(std::shared_ptr<Image> source,
                                                float rasterizationScale = 1.0f,
-                                               SamplingOptions sampling = {});
+                                               const SamplingOptions& sampling = {});
 
   int width() const override;
 
@@ -48,7 +48,7 @@ class RasterImage : public ResourceImage {
   }
 
   std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        SamplingOptions sampling = {}) const override;
+                                        const SamplingOptions& sampling = {}) const override;
 
  protected:
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
@@ -63,6 +63,6 @@ class RasterImage : public ResourceImage {
   SamplingOptions sampling = {};
 
   RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, float rasterizationScale,
-              SamplingOptions sampling);
+              const SamplingOptions& sampling);
 };
 }  // namespace tgfx

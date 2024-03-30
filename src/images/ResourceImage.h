@@ -31,7 +31,7 @@ class ResourceImage : public Image {
   explicit ResourceImage(UniqueKey uniqueKey);
 
   std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        SamplingOptions sampling = {}) const override;
+                                        const SamplingOptions& sampling = {}) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
