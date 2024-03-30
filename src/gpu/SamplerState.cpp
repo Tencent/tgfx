@@ -37,7 +37,7 @@ SamplerState::SamplerState(TileMode tileMode) {
   wrapModeY = wrapModeX;
 }
 
-SamplerState::SamplerState(TileMode tileModeX, TileMode tileModeY, SamplingOptions sampling)
+SamplerState::SamplerState(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling)
     : filterMode(sampling.filterMode), mipmapMode(sampling.mipmapMode) {
   wrapModeX = TileModeToWrapMode(tileModeX);
   wrapModeY = TileModeToWrapMode(tileModeY);

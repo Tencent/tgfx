@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/Surface.h"
 #include "DrawingManager.h"
-#include "gpu/SurfaceDrawContext.h"
+#include "gpu/SurfaceCanvas.h"
 #include "images/TextureImage.h"
 #include "utils/Log.h"
 #include "utils/PixelFormatUtil.h"
@@ -78,14 +78,10 @@ Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions*
   if (options != nullptr) {
     surfaceOptions = *options;
   }
-  drawContext = new SurfaceDrawContext(this);
-  auto rect = Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height());
-  drawContext->clipRect(rect);
 }
 
 Surface::~Surface() {
   delete canvas;
-  delete drawContext;
 }
 
 Context* Surface::getContext() const {
@@ -143,7 +139,7 @@ bool Surface::wait(const BackendSemaphore& waitSemaphore) {
 
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
-    canvas = new Canvas(drawContext);
+    canvas = new SurfaceCanvas(this);
   }
   return canvas;
 }
@@ -235,7 +231,7 @@ bool Surface::aboutToDraw(bool discardContent) {
                                             Rect::MakeWH(width(), height()), Point::Zero());
   }
   renderTargetProxy = std::move(newRenderTargetProxy);
-  drawContext->replaceRenderTarget(renderTargetProxy);
+  canvas->replaceRenderTarget(renderTargetProxy);
   return true;
 }
 }  // namespace tgfx

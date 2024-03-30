@@ -46,7 +46,7 @@ MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> sou
 }
 
 std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
-                                                   SamplingOptions sampling) const {
+                                                   const SamplingOptions& sampling) const {
   if (rasterizationScale == 1.0f) {
     return weakThis.lock();
   }

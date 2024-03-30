@@ -38,14 +38,14 @@ class SamplerState {
 
   explicit SamplerState(TileMode tileMode);
 
-  SamplerState(TileMode tileModeX, TileMode tileModeY, SamplingOptions sampling);
+  SamplerState(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling);
 
   SamplerState(WrapMode wrapModeX, WrapMode wrapModeY, FilterMode filterMode = FilterMode::Linear,
                MipmapMode mipmapMode = MipmapMode::None)
       : wrapModeX(wrapModeX), wrapModeY(wrapModeY), filterMode(filterMode), mipmapMode(mipmapMode) {
   }
 
-  explicit SamplerState(SamplingOptions sampling)
+  explicit SamplerState(const SamplingOptions& sampling)
       : filterMode(sampling.filterMode), mipmapMode(sampling.mipmapMode) {
   }
 

@@ -60,7 +60,7 @@ std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Tex
 }
 
 GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
-                                 SamplingOptions sampling, const Matrix& localMatrix)
+                                 const SamplingOptions& sampling, const Matrix& localMatrix)
     : TextureEffect(std::move(proxy), sampling, alphaStart, localMatrix) {
 }
 

@@ -63,7 +63,7 @@ struct Point {
    * Returns true if fX and fY are both zero.
    */
   bool isZero() const {
-    return (0 == x) & (0 == y);
+    return (0 == x) && (0 == y);
   }
 
   /**

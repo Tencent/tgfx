@@ -42,7 +42,7 @@ class TextureEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  TextureEffect(std::shared_ptr<TextureProxy> proxy, SamplingOptions sampling,
+  TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
                 const Point& alphaStart, const Matrix& localMatrix);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;

@@ -27,7 +27,7 @@ std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TexturePr
   return MakeRGBAAA(std::move(proxy), Point::Zero(), sampling, localMatrix);
 }
 
-TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, SamplingOptions sampling,
+TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
                              const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(sampling),
       alphaStart(alphaStart), coordTransform(localMatrix, textureProxy.get(), alphaStart) {

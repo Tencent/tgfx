@@ -49,7 +49,7 @@ class Shader {
   static std::shared_ptr<Shader> MakeImageShader(std::shared_ptr<Image> image,
                                                  TileMode tileModeX = TileMode::Clamp,
                                                  TileMode tileModeY = TileMode::Clamp,
-                                                 SamplingOptions sampling = {});
+                                                 const SamplingOptions& sampling = {});
 
   /**
    * Creates a shader that blends the two specified shaders.

@@ -147,7 +147,7 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
 }
 
 std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
-                                             SamplingOptions sampling) const {
+                                             const SamplingOptions& sampling) const {
   auto rasterImage = RasterImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
   if (rasterImage != nullptr && hasMipmaps()) {
     return rasterImage->makeMipmapped(true);
