@@ -80,14 +80,14 @@ class Path {
    * PathVerb::Move points that do not alter the area drawn by the returned rect.
    * @param rect storage for bounds of Rect; may be nullptr.
    */
-  bool isRect(Rect* rect) const;
+  bool isRect(Rect* rect = nullptr) const;
 
   /**
    * Returns true if this path is equivalent to an oval or circle when filled. Otherwise, returns
    * false and leaves the bounds unchanged.
    * @param bounds  storage for bounding Rect of oval; may be nullptr.
    */
-  bool isOval(Rect* bounds) const;
+  bool isOval(Rect* bounds = nullptr) const;
 
   /**
    * Returns true if Path is equivalent to RRect when filled, Otherwise returns false, and leaves
