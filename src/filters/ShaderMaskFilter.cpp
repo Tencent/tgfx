@@ -28,7 +28,7 @@ std::shared_ptr<MaskFilter> MaskFilter::MakeShader(std::shared_ptr<Shader> shade
 }
 
 std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
-    const DrawArgs& args, const Matrix* localMatrix) const {
+    const FPArgs& args, const Matrix* localMatrix) const {
   auto processor = FragmentProcessor::Make(shader, args, localMatrix);
   return FragmentProcessor::MulInputByChildAlpha(std::move(processor), inverted);
 }

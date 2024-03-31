@@ -33,20 +33,39 @@ class Pipeline;
 class Image;
 class Shader;
 
+class FPArgs {
+ public:
+  FPArgs() = default;
+
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect,
+           const Matrix& viewMatrix = Matrix::I())
+      : context(context), renderFlags(renderFlags), drawRect(drawRect), viewMatrix(viewMatrix) {
+  }
+
+  bool empty() const {
+    return context == nullptr || drawRect.isEmpty();
+  }
+
+  Context* context = nullptr;
+  uint32_t renderFlags = 0;
+  Rect drawRect = Rect::MakeEmpty();
+  Matrix viewMatrix = Matrix::I();
+};
+
 class FragmentProcessor : public Processor {
  public:
   /**
    * Creates a fragment processor that will draw the given image with the given options. The both
    * tileModeX and tileModeY are set to TileMode::Clamp.
    */
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const DrawArgs& args,
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                                  const SamplingOptions& sampling,
                                                  const Matrix* localMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
    */
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const DrawArgs& args,
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                                  TileMode tileModeX, TileMode tileModeY,
                                                  const SamplingOptions& sampling,
                                                  const Matrix* localMatrix = nullptr);
@@ -55,7 +74,7 @@ class FragmentProcessor : public Processor {
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Shader> shader,
-                                                 const DrawArgs& args,
+                                                 const FPArgs& args,
                                                  const Matrix* localMatrix = nullptr);
 
   /**

@@ -73,7 +73,7 @@ std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
 }
 
 std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(
-    const DrawArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+    const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* localMatrix) const {
   auto matrix = SubsetImage::ConcatLocalMatrix(bounds, localMatrix);
   return filter->onFilterImage(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));

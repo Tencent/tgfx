@@ -106,7 +106,7 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(
-    std::shared_ptr<Image> source, const DrawArgs& args, TileMode tileModeX, TileMode tileModeY,
+    std::shared_ptr<Image> source, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
     const SamplingOptions& sampling, const Matrix* localMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;

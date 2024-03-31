@@ -63,7 +63,7 @@ std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int display
 }
 
 std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
-    const DrawArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+    const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* localMatrix) const {
   auto proxy = lockTextureProxy(args.context, args.renderFlags);
   if (proxy == nullptr) {

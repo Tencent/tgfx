@@ -35,7 +35,7 @@ bool ColorShader::asColor(Color* output) const {
   return true;
 }
 
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const DrawArgs&,
+std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&,
                                                                     const Matrix*) const {
   return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
 }

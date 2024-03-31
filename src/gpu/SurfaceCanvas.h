@@ -62,7 +62,7 @@ class SurfaceCanvas : public Canvas {
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, const Matrix& viewMatrix,
                                                  Rect* scissorRect);
-  DrawArgs makeDrawArgs(const Rect& localBounds, const Matrix& viewMatrix);
+  FPArgs makeFPArgs(const Rect& localBounds, const Matrix& viewMatrix);
   std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
                                                      const Stroke* stroke = nullptr);
   bool drawAsClear(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
@@ -70,9 +70,9 @@ class SurfaceCanvas : public Canvas {
                      const SamplingOptions& sampling, const Matrix& viewMatrix,
                      const FillStyle& style);
   void drawColorGlyphs(const GlyphRun& glyphRun, const FillStyle& style);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args, const FillStyle& style);
+  void addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& args, const FillStyle& style);
   void addOp(std::unique_ptr<Op> op, bool discardContent);
-  bool wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args, const FillStyle& style) const;
+  bool wouldOverwriteEntireSurface(DrawOp* op, const FPArgs& args, const FillStyle& style) const;
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);
 
   friend class Surface;

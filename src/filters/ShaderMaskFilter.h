@@ -29,7 +29,7 @@ class ShaderMaskFilter : public MaskFilter {
   }
 
  protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args,
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* localMatrix) const override;
 
  private:
