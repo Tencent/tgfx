@@ -38,7 +38,7 @@ class FPArgs {
   FPArgs() = default;
 
   FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect,
-           const Matrix& viewMatrix = Matrix::I())
+         const Matrix& viewMatrix = Matrix::I())
       : context(context), renderFlags(renderFlags), drawRect(drawRect), viewMatrix(viewMatrix) {
   }
 
@@ -73,8 +73,7 @@ class FragmentProcessor : public Processor {
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Shader> shader,
-                                                 const FPArgs& args,
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
                                                  const Matrix* localMatrix = nullptr);
 
   /**
