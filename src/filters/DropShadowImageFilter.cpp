@@ -55,7 +55,7 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onFilterImage(
-    std::shared_ptr<Image> source, const DrawArgs& args, TileMode tileModeX, TileMode tileModeY,
+    std::shared_ptr<Image> source, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
     const SamplingOptions& sampling, const Matrix* localMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
@@ -93,7 +93,7 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onFilterImage(
 }
 
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::getFragmentProcessor(
-    std::shared_ptr<Image> source, const DrawArgs& args, const SamplingOptions& sampling,
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* localMatrix) const {
   std::unique_ptr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);

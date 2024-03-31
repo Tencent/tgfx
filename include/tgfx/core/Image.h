@@ -31,7 +31,7 @@
 #include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
-class DrawArgs;
+class FPArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
@@ -283,7 +283,7 @@ class Image {
                                               int alphaStartY) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      const DrawArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+      const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
       const Matrix* localMatrix) const = 0;
 
   friend class FragmentProcessor;

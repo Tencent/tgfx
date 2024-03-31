@@ -47,7 +47,7 @@ std::shared_ptr<Shader> MatrixShader::makeWithMatrix(const Matrix& viewMatrix) c
 }
 
 std::unique_ptr<FragmentProcessor> MatrixShader::asFragmentProcessor(
-    const DrawArgs& args, const Matrix* localMatrix) const {
+    const FPArgs& args, const Matrix* localMatrix) const {
   auto totalMatrix = Matrix::I();
   if (!matrix.invert(&totalMatrix)) {
     return nullptr;

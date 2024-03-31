@@ -25,7 +25,7 @@
 
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
-                                                           const DrawArgs& args,
+                                                           const FPArgs& args,
                                                            const SamplingOptions& sampling,
                                                            const Matrix* localMatrix) {
   if (image == nullptr) {
@@ -35,7 +35,7 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
-                                                           const tgfx::DrawArgs& args,
+                                                           const tgfx::FPArgs& args,
                                                            TileMode tileModeX, TileMode tileModeY,
                                                            const SamplingOptions& sampling,
                                                            const Matrix* localMatrix) {
@@ -46,7 +46,7 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
-                                                           const DrawArgs& args,
+                                                           const FPArgs& args,
                                                            const Matrix* localMatrix) {
   if (shader == nullptr) {
     return nullptr;

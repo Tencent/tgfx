@@ -76,7 +76,7 @@ class ImageFilter {
    * The returned processor is in the coordinate space of the source image.
    */
   virtual std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                           const DrawArgs& args, TileMode tileModeX,
+                                                           const FPArgs& args, TileMode tileModeX,
                                                            TileMode tileModeY,
                                                            const SamplingOptions& sampling,
                                                            const Matrix* localMatrix) const = 0;

@@ -30,7 +30,7 @@ class RGBAAAImage : public SubsetImage {
  protected:
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const DrawArgs& args, TileMode tileModeX,
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* localMatrix) const override;

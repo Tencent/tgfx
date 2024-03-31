@@ -63,7 +63,7 @@ Context* SurfaceCanvas::getContext() const {
   return surface->getContext();
 }
 
-DrawArgs SurfaceCanvas::makeDrawArgs(const Rect& localBounds, const Matrix& viewMatrix) {
+FPArgs SurfaceCanvas::makeFPArgs(const Rect& localBounds, const Matrix& viewMatrix) {
   Matrix invert = {};
   if (!viewMatrix.invert(&invert)) {
     return {};
@@ -94,7 +94,7 @@ void SurfaceCanvas::onDrawRect(const Rect& rect, const FillStyle& style) {
   if (drawAsClear(rect, viewMatrix, style)) {
     return;
   }
-  auto args = makeDrawArgs(rect, viewMatrix);
+  auto args = makeFPArgs(rect, viewMatrix);
   if (args.empty()) {
     return;
   }
@@ -138,7 +138,7 @@ bool SurfaceCanvas::drawAsClear(const Rect& rect, const Matrix& viewMatrix,
 }
 
 void SurfaceCanvas::onDrawRRect(const RRect& rRect, const FillStyle& style) {
-  auto args = makeDrawArgs(rRect.rect, getMatrix());
+  auto args = makeFPArgs(rRect.rect, getMatrix());
   if (args.empty()) {
     return;
   }
@@ -163,7 +163,7 @@ void SurfaceCanvas::onDrawPath(const Path& path, const FillStyle& style, const S
   if (stroke != nullptr) {
     pathBounds.outset(stroke->width, stroke->width);
   }
-  auto args = makeDrawArgs(pathBounds, getMatrix());
+  auto args = makeFPArgs(pathBounds, getMatrix());
   if (args.empty()) {
     return;
   }
@@ -234,7 +234,7 @@ void SurfaceCanvas::onDrawImageRect(const Rect& rect, std::shared_ptr<Image> ima
 void SurfaceCanvas::drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
                                   const SamplingOptions& sampling, const Matrix& viewMatrix,
                                   const FillStyle& style) {
-  auto args = makeDrawArgs(rect, viewMatrix);
+  auto args = makeFPArgs(rect, viewMatrix);
   if (args.empty()) {
     return;
   }
@@ -269,7 +269,7 @@ void SurfaceCanvas::onDrawGlyphRun(GlyphRun glyphRun, const FillStyle& style,
   auto bounds = glyphRun.getBounds(maxScale, stroke);
   auto localBounds = bounds;
   localBounds.scale(1.0f / maxScale, 1.0f / maxScale);
-  auto args = makeDrawArgs(localBounds, viewMatrix);
+  auto args = makeFPArgs(localBounds, viewMatrix);
   if (args.empty()) {
     return;
   }
@@ -425,7 +425,7 @@ std::unique_ptr<FragmentProcessor> SurfaceCanvas::getClipMask(const Rect& device
   return maskEffect;
 }
 
-void SurfaceCanvas::addDrawOp(std::unique_ptr<DrawOp> op, const DrawArgs& args,
+void SurfaceCanvas::addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& args,
                               const FillStyle& style) {
   if (op == nullptr || args.empty()) {
     return;
@@ -511,7 +511,7 @@ static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
   }
 }
 
-bool SurfaceCanvas::wouldOverwriteEntireSurface(DrawOp* op, const DrawArgs& args,
+bool SurfaceCanvas::wouldOverwriteEntireSurface(DrawOp* op, const FPArgs& args,
                                                 const FillStyle& style) const {
   if (op->classID() != FillRectOp::ClassID()) {
     return false;
