@@ -19,7 +19,6 @@
 #include "SurfaceDrawContext.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
-#include "core/Records.h"
 #include "core/SimpleTextBlob.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"

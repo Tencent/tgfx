@@ -23,7 +23,6 @@
 #include "core/GlyphRun.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/Picture.h"
 
 namespace tgfx {
 struct MCState {
@@ -184,11 +183,6 @@ class DrawContext {
    * Draws a GlyphRun with the specified FillStyle and optional Stroke.
    */
   virtual void drawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) = 0;
-
-  /**
-   * Draws a Picture.
-   */
-  virtual void drawPicture(std::shared_ptr<Picture> picture) = 0;
 
  protected:
   explicit DrawContext(const Path& initClip);
