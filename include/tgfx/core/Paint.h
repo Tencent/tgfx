@@ -226,14 +226,15 @@ class Paint {
   }
 
   /**
-   * Returns the image filter used to modify the image of the paint when drawing.
+   * Returns the image filter used to take the input drawings as an offscreen image and alter them
+   * before drawing them back to the destination.
    */
   std::shared_ptr<ImageFilter> getImageFilter() const {
     return imageFilter;
   }
 
   /**
-   * Sets the image filter used to modify the image of the paint when drawing.
+   * Sets the image filter.
    */
   void setImageFilter(std::shared_ptr<ImageFilter> newImageFilter) {
     imageFilter = std::move(newImageFilter);

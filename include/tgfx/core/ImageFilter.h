@@ -25,9 +25,11 @@
 
 namespace tgfx {
 /**
- * ImageFilter is the base class for all image filters. It accepts various Image types as its input
- * and rasterizes the input Image to a texture before applying the filter. The rasterized Image is
- * then altered by the ImageFilter, potentially changing its bounds.
+ * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
+ * drawings occur as usual, but they are as if the drawings happened into an offscreen (before the
+ * blend mode is applied). This offscreen image will then be handed to the image filter, which in
+ * turn creates a new image which is what will finally be drawn to the device (using the original
+ * blend mode).
  */
 class ImageFilter {
  public:
