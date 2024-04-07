@@ -19,18 +19,15 @@
 #pragma once
 
 #include <optional>
-#include "core/FillStyle.h"
+#include "core/DrawContext.h"
 #include "gpu/RenderContext.h"
-#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
-class RenderContext;
-
-class SurfaceCanvas : public Canvas {
+class SurfaceDrawContext : public DrawContext {
  public:
-  explicit SurfaceCanvas(Surface* surface);
+  explicit SurfaceDrawContext(Surface* surface);
 
-  ~SurfaceCanvas() override;
+  ~SurfaceDrawContext() override;
 
   Surface* getSurface() const override {
     return surface;
@@ -38,19 +35,18 @@ class SurfaceCanvas : public Canvas {
 
   Context* getContext() const;
 
- protected:
-  void onClear() override;
+  void clear() override;
 
-  void onDrawRect(const Rect& rect, const FillStyle& style) override;
+  void drawRect(const Rect& rect, const FillStyle& style) override;
 
-  void onDrawRRect(const RRect& rRect, const FillStyle& style) override;
+  void drawRRect(const RRect& rRect, const FillStyle& style) override;
 
-  void onDrawPath(const Path& path, const FillStyle& style, const Stroke* stroke) override;
+  void drawPath(const Path& path, const FillStyle& style, const Stroke* stroke) override;
 
-  void onDrawImageRect(const Rect& rect, std::shared_ptr<Image> image,
-                       const SamplingOptions& sampling, const FillStyle& style) override;
+  void drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                     const Rect& rect, const FillStyle& style) override;
 
-  void onDrawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) override;
+  void drawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) override;
 
  private:
   Surface* surface = nullptr;
@@ -66,11 +62,11 @@ class SurfaceCanvas : public Canvas {
   std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
                                                      const Stroke* stroke = nullptr);
   bool drawAsClear(const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
-  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
-                     const SamplingOptions& sampling, const Matrix& viewMatrix,
-                     const FillStyle& style);
+  void drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                     const Rect& rect, const Matrix& viewMatrix, const FillStyle& style);
   void drawColorGlyphs(const GlyphRun& glyphRun, const FillStyle& style);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& args, const FillStyle& style);
+  void addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& args, const FillStyle& style,
+                 bool ignoreShader = false);
   void addOp(std::unique_ptr<Op> op, bool discardContent);
   bool wouldOverwriteEntireSurface(DrawOp* op, const FPArgs& args, const FillStyle& style) const;
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);

@@ -29,8 +29,8 @@
 
 namespace tgfx {
 class Surface;
-class SurfaceOptions;
 class FillStyle;
+class DrawContext;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
@@ -40,14 +40,12 @@ class FillStyle;
  */
 class Canvas {
  public:
-  virtual ~Canvas() = default;
+  explicit Canvas(std::shared_ptr<DrawContext> drawContext);
 
   /**
    * Returns the associated Surface if the Canvas is backed by one, otherwise returns nullptr.
    */
-  virtual Surface* getSurface() const {
-    return nullptr;
-  }
+  Surface* getSurface() const;
 
   /**
    * Saves matrix and clip. Calling restore() discards changes to them, restoring them to their state
@@ -290,38 +288,8 @@ class Canvas {
                  const Color colors[], size_t count, const SamplingOptions& sampling = {},
                  const Paint* paint = nullptr);
 
- protected:
-  explicit Canvas(const Path& initClip);
-  void resetMCState(const Path& initClip);
-
-  virtual void onSave();
-  virtual bool onRestore();
-  virtual void onTranslate(float dx, float dy);
-  virtual void onScale(float sx, float sy);
-  virtual void onRotate(float degrees);
-  virtual void onSkew(float sx, float sy);
-  virtual void onConcat(const Matrix& matrix);
-  virtual void onSetMatrix(const Matrix& matrix);
-  virtual void onResetMatrix();
-  virtual void onClipRect(const Rect& rect);
-  virtual void onClipPath(const Path& path);
-
-  virtual void onClear() = 0;
-  virtual void onDrawRect(const Rect& rect, const FillStyle& style) = 0;
-  virtual void onDrawRRect(const RRect& rRect, const FillStyle& style) = 0;
-  virtual void onDrawPath(const Path& path, const FillStyle& style, const Stroke* stroke) = 0;
-  virtual void onDrawImageRect(const Rect& rect, std::shared_ptr<Image> image,
-                               const SamplingOptions& sampling, const FillStyle& style) = 0;
-  virtual void onDrawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) = 0;
-
  private:
-  struct MCState {
-    Matrix matrix = Matrix::I();
-    Path clip = {};
-  };
-
-  MCState state = {};
-  std::stack<MCState> stack = {};
+  std::shared_ptr<DrawContext> drawContext = nullptr;
 
   bool drawSimplePath(const Path& path, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
