@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "SamplerHandle.h"
 #include "ShaderVar.h"
 
