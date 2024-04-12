@@ -260,6 +260,8 @@ jobs:
 
   linux:
     runs-on: ubuntu-latest
+    compiler: gcc
+    gcc: 13
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
