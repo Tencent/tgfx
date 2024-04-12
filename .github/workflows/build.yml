@@ -260,8 +260,6 @@ jobs:
 
   linux:
     runs-on: ubuntu-latest
-    compiler: gcc
-    gcc: 13
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -288,6 +286,9 @@ jobs:
       - name: Build Linux
         run: |
           node build_tgfx -s ./linux Hello2D -o ./out/release/linux -a x64
+        env:
+          CC:   gcc-13
+          CXX:  g++-13
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
