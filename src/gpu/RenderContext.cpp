@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SurfaceDrawContext.h"
+#include "RenderContext.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
 #include "core/SimpleTextBlob.h"
@@ -50,27 +50,27 @@ static Path GetInitClip(RenderTargetProxy* renderTarget) {
   return path;
 }
 
-SurfaceDrawContext::SurfaceDrawContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                       uint32_t renderFlags)
+RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                             uint32_t renderFlags)
     : DrawContext(GetInitClip(renderTargetProxy.get())), renderFlags(renderFlags) {
   opContext = new OpContext(std::move(renderTargetProxy));
 }
 
-SurfaceDrawContext::SurfaceDrawContext(Surface* surface)
+RenderContext::RenderContext(Surface* surface)
     : DrawContext(GetInitClip(surface->renderTargetProxy.get())), surface(surface) {
   renderFlags = surface->surfaceOptions.renderFlags();
   opContext = new OpContext(surface->renderTargetProxy);
 }
 
-SurfaceDrawContext::~SurfaceDrawContext() {
+RenderContext::~RenderContext() {
   delete opContext;
 }
 
-Context* SurfaceDrawContext::getContext() const {
+Context* RenderContext::getContext() const {
   return opContext->renderTarget()->getContext();
 }
 
-FPArgs SurfaceDrawContext::makeFPArgs(const Rect& localBounds, const Matrix& viewMatrix) {
+FPArgs RenderContext::makeFPArgs(const Rect& localBounds, const Matrix& viewMatrix) {
   Matrix invert = {};
   if (!viewMatrix.invert(&invert)) {
     return {};
@@ -88,7 +88,7 @@ FPArgs SurfaceDrawContext::makeFPArgs(const Rect& localBounds, const Matrix& vie
   return {getContext(), renderFlags, drawRect, viewMatrix};
 }
 
-void SurfaceDrawContext::clear() {
+void RenderContext::clear() {
   FillStyle style = {};
   style.color = Color::Transparent();
   style.blendMode = BlendMode::Src;
@@ -97,7 +97,7 @@ void SurfaceDrawContext::clear() {
   drawRect(rect, style);
 }
 
-void SurfaceDrawContext::drawRect(const Rect& rect, const FillStyle& style) {
+void RenderContext::drawRect(const Rect& rect, const FillStyle& style) {
   auto& viewMatrix = getMatrix();
   if (drawAsClear(rect, viewMatrix, style)) {
     return;
@@ -114,8 +114,8 @@ static bool HasColorOnly(const FillStyle& style) {
   return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
 }
 
-bool SurfaceDrawContext::drawAsClear(const Rect& rect, const Matrix& viewMatrix,
-                                     const FillStyle& style) {
+bool RenderContext::drawAsClear(const Rect& rect, const Matrix& viewMatrix,
+                                const FillStyle& style) {
   if (!HasColorOnly(style) || !viewMatrix.rectStaysRect()) {
     return false;
   }
@@ -145,7 +145,7 @@ bool SurfaceDrawContext::drawAsClear(const Rect& rect, const Matrix& viewMatrix,
   return false;
 }
 
-void SurfaceDrawContext::drawRRect(const RRect& rRect, const FillStyle& style) {
+void RenderContext::drawRRect(const RRect& rRect, const FillStyle& style) {
   auto args = makeFPArgs(rRect.rect, getMatrix());
   if (args.empty()) {
     return;
@@ -166,7 +166,7 @@ static bool ShouldTriangulatePath(const Path& path, const Matrix& viewMatrix) {
   return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
 }
 
-void SurfaceDrawContext::drawPath(const Path& path, const FillStyle& style, const Stroke* stroke) {
+void RenderContext::drawPath(const Path& path, const FillStyle& style, const Stroke* stroke) {
   auto pathBounds = path.getBounds();
   if (stroke != nullptr) {
     pathBounds.outset(stroke->width, stroke->width);
@@ -205,9 +205,9 @@ static std::unique_ptr<FragmentProcessor> CreateMaskFP(std::shared_ptr<TexturePr
   return processor;
 }
 
-std::unique_ptr<FragmentProcessor> SurfaceDrawContext::makeTextureMask(const Path& path,
-                                                                       const Matrix& viewMatrix,
-                                                                       const Stroke* stroke) {
+std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& path,
+                                                                  const Matrix& viewMatrix,
+                                                                  const Stroke* stroke) {
   auto scales = viewMatrix.getAxisScales();
   auto bounds = path.getBounds();
   bounds.scale(scales.x, scales.y);
@@ -230,18 +230,17 @@ std::unique_ptr<FragmentProcessor> SurfaceDrawContext::makeTextureMask(const Pat
   return CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
 }
 
-void SurfaceDrawContext::drawImageRect(std::shared_ptr<Image> image,
-                                       const SamplingOptions& sampling, const Rect& rect,
-                                       const FillStyle& style) {
+void RenderContext::drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                                  const Rect& rect, const FillStyle& style) {
   if (image == nullptr) {
     return;
   }
   drawImageRect(std::move(image), sampling, rect, getMatrix(), style);
 }
 
-void SurfaceDrawContext::drawImageRect(std::shared_ptr<Image> image,
-                                       const SamplingOptions& sampling, const Rect& rect,
-                                       const Matrix& viewMatrix, const FillStyle& style) {
+void RenderContext::drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                                  const Rect& rect, const Matrix& viewMatrix,
+                                  const FillStyle& style) {
   auto args = makeFPArgs(rect, viewMatrix);
   if (args.empty()) {
     return;
@@ -256,8 +255,7 @@ void SurfaceDrawContext::drawImageRect(std::shared_ptr<Image> image,
   addDrawOp(std::move(drawOp), args, style, !isAlphaOnly);
 }
 
-void SurfaceDrawContext::drawGlyphRun(GlyphRun glyphRun, const FillStyle& style,
-                                      const Stroke* stroke) {
+void RenderContext::drawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) {
   if (glyphRun.empty()) {
     return;
   }
@@ -297,7 +295,7 @@ void SurfaceDrawContext::drawGlyphRun(GlyphRun glyphRun, const FillStyle& style,
   addDrawOp(std::move(drawOp), args, style);
 }
 
-void SurfaceDrawContext::drawColorGlyphs(const GlyphRun& glyphRun, const FillStyle& style) {
+void RenderContext::drawColorGlyphs(const GlyphRun& glyphRun, const FillStyle& style) {
   auto viewMatrix = getMatrix();
   auto scale = viewMatrix.getMaxScale();
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
@@ -339,7 +337,7 @@ static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
   }
 }
 
-std::pair<std::optional<Rect>, bool> SurfaceDrawContext::getClipRect(const Rect* deviceBounds) {
+std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Rect* deviceBounds) {
   auto& clip = getClip();
   auto rect = Rect::MakeEmpty();
   if (clip.isRect(&rect)) {
@@ -362,7 +360,7 @@ std::pair<std::optional<Rect>, bool> SurfaceDrawContext::getClipRect(const Rect*
   return {{}, false};
 }
 
-std::shared_ptr<TextureProxy> SurfaceDrawContext::getClipTexture() {
+std::shared_ptr<TextureProxy> RenderContext::getClipTexture() {
   auto& clip = getClip();
   auto domainID = PathRef::GetUniqueKey(clip).domainID();
   if (domainID == clipID) {
@@ -395,9 +393,9 @@ std::shared_ptr<TextureProxy> SurfaceDrawContext::getClipTexture() {
   return clipTexture;
 }
 
-std::unique_ptr<FragmentProcessor> SurfaceDrawContext::getClipMask(const Rect& deviceBounds,
-                                                                   const Matrix& viewMatrix,
-                                                                   Rect* scissorRect) {
+std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Rect& deviceBounds,
+                                                              const Matrix& viewMatrix,
+                                                              Rect* scissorRect) {
   auto& clip = getClip();
   if (!clip.isEmpty() && clip.contains(deviceBounds)) {
     return nullptr;
@@ -430,8 +428,8 @@ std::unique_ptr<FragmentProcessor> SurfaceDrawContext::getClipMask(const Rect& d
   return maskEffect;
 }
 
-void SurfaceDrawContext::addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& args,
-                                   const FillStyle& style, bool ignoreShader) {
+void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& args,
+                              const FillStyle& style, bool ignoreShader) {
   if (op == nullptr || args.empty()) {
     return;
   }
@@ -471,8 +469,7 @@ void SurfaceDrawContext::addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& arg
   addOp(std::move(op), [&] { return wouldOverwriteEntireRT(args, style, isFillRectOp); });
 }
 
-void SurfaceDrawContext::addOp(std::unique_ptr<Op> op,
-                               const std::function<bool()>& willDiscardContent) {
+void RenderContext::addOp(std::unique_ptr<Op> op, const std::function<bool()>& willDiscardContent) {
   if (surface && !surface->aboutToDraw(willDiscardContent)) {
     return;
   }
@@ -518,8 +515,8 @@ static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
   }
 }
 
-bool SurfaceDrawContext::wouldOverwriteEntireRT(const FPArgs& args, const FillStyle& style,
-                                                bool isRectOp) const {
+bool RenderContext::wouldOverwriteEntireRT(const FPArgs& args, const FillStyle& style,
+                                           bool isRectOp) const {
   if (!isRectOp) {
     return false;
   }
@@ -558,8 +555,7 @@ bool SurfaceDrawContext::wouldOverwriteEntireRT(const FPArgs& args, const FillSt
   return BlendModeIsOpaque(style.blendMode, opacityType);
 }
 
-void SurfaceDrawContext::replaceRenderTarget(
-    std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {
+void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {
   delete opContext;
   opContext = new OpContext(std::move(newRenderTargetProxy));
 }

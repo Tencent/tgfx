@@ -27,7 +27,7 @@
 namespace tgfx {
 class Canvas;
 class Context;
-class SurfaceDrawContext;
+class RenderContext;
 class RenderTargetProxy;
 class TextureProxy;
 
@@ -204,7 +204,7 @@ class Surface {
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   SurfaceOptions surfaceOptions = {};
-  SurfaceDrawContext* renderContext = nullptr;
+  RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
 
@@ -215,6 +215,6 @@ class Surface {
 
   bool aboutToDraw(const std::function<bool()>& willDiscardContent);
 
-  friend class SurfaceDrawContext;
+  friend class RenderContext;
 };
 }  // namespace tgfx
