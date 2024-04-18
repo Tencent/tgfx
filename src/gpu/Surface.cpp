@@ -82,6 +82,7 @@ Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions*
 
 Surface::~Surface() {
   delete canvas;
+  delete renderContext;
 }
 
 Context* Surface::getContext() const {
@@ -139,8 +140,8 @@ bool Surface::wait(const BackendSemaphore& waitSemaphore) {
 
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
-    drawContext = std::make_shared<SurfaceDrawContext>(this);
-    canvas = new Canvas(drawContext);
+    renderContext = new SurfaceDrawContext(this);
+    canvas = new Canvas(renderContext);
   }
   return canvas;
 }
@@ -207,7 +208,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
-bool Surface::aboutToDraw(bool discardContent) {
+bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
   if (cachedImage == nullptr) {
     return true;
   }
@@ -225,14 +226,14 @@ bool Surface::aboutToDraw(bool discardContent) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
     return false;
   }
-  if (!discardContent) {
+  if (!willDiscardContent()) {
     auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
     auto drawingManager = getContext()->drawingManager();
     drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy,
                                             Rect::MakeWH(width(), height()), Point::Zero());
   }
   renderTargetProxy = std::move(newRenderTargetProxy);
-  drawContext->replaceRenderTarget(renderTargetProxy);
+  renderContext->replaceRenderTarget(renderTargetProxy);
   return true;
 }
 }  // namespace tgfx

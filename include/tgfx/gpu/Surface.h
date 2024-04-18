@@ -204,7 +204,7 @@ class Surface {
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   SurfaceOptions surfaceOptions = {};
-  std::shared_ptr<SurfaceDrawContext> drawContext = nullptr;
+  SurfaceDrawContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
 
@@ -213,7 +213,7 @@ class Surface {
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options);
 
-  bool aboutToDraw(bool discardContent = false);
+  bool aboutToDraw(const std::function<bool()>& willDiscardContent);
 
   friend class SurfaceDrawContext;
 };

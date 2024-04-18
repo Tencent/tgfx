@@ -47,9 +47,9 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
-   * Returns the bounds of the text blob's glyphs.
+   * Returns the bounding box of the TextBlob when drawn with the given Matrix.
    */
-  virtual Rect getBounds() const = 0;
+  Rect getBounds(const Matrix& matrix = Matrix::I()) const;
 
  protected:
   /**

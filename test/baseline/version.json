@@ -18,14 +18,14 @@
         "rasterized": "e8e31de",
         "rasterized_mipmap": "1f657af",
         "rasterized_scale_up": "1f657af",
-        "text_shape": "f1d64c1",
+        "text_shape": "74f94c4",
         "tileMode": "3bfc2e8"
     },
     "DrawersTest": {
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "4d6ab20",
-        "SimpleText": "f1d64c1",
+        "SimpleText": "74f94c4",
         "SweepGradient": "5a1fb11"
     },
     "FilterTest": {

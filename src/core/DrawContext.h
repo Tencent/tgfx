@@ -185,11 +185,14 @@ class DrawContext {
   virtual void drawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) = 0;
 
  protected:
+  explicit DrawContext();
+
   explicit DrawContext(const Path& initClip);
 
-  void resetMCState(const Path& initClip);
+  void resetMCState();
 
  private:
+  Path initClip = {};
   MCState state = {};
   std::stack<MCState> stack = {};
 };

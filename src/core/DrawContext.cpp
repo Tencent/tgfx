@@ -19,7 +19,12 @@
 #include "DrawContext.h"
 
 namespace tgfx {
-DrawContext::DrawContext(const Path& initClip) {
+DrawContext::DrawContext() {
+  initClip.toggleInverseFillType();
+  state.clip = initClip;
+}
+
+DrawContext::DrawContext(const Path& initClip) : initClip(initClip) {
   state.clip = initClip;
 }
 
@@ -83,7 +88,7 @@ void DrawContext::clipPath(const Path& path) {
   state.clip.addPath(clipPath, PathOp::Intersect);
 }
 
-void DrawContext::resetMCState(const tgfx::Path& initClip) {
+void DrawContext::resetMCState() {
   state = {};
   state.clip = initClip;
   std::stack<MCState>().swap(stack);

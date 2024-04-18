@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RenderContext.h"
+#include "OpContext.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ops/FillRectOp.h"
 
 namespace tgfx {
-void RenderContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,
-                               bool autoResolve) {
+void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,
+                           bool autoResolve) {
   fillRectWithFP(Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height()),
                  std::move(fp), localMatrix);
   if (autoResolve) {
@@ -31,8 +31,8 @@ void RenderContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matr
   }
 }
 
-void RenderContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                                   const Matrix& localMatrix) {
+void OpContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
+                               const Matrix& localMatrix) {
   if (fp == nullptr) {
     return;
   }
@@ -42,7 +42,7 @@ void RenderContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<Fragment
   addOp(std::move(op));
 }
 
-void RenderContext::addOp(std::unique_ptr<Op> op) {
+void OpContext::addOp(std::unique_ptr<Op> op) {
   if (opsTask == nullptr || opsTask->isClosed()) {
     auto drawingManager = renderTargetProxy->getContext()->drawingManager();
     opsTask = drawingManager->addOpsTask(renderTargetProxy);

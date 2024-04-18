@@ -69,6 +69,10 @@ class ImageFilter {
 
   virtual ~ImageFilter() = default;
 
+  /**
+   * Returns the bounds of the image that will be produced by this filter when it is applied to an
+   * image of the given bounds.
+   */
   Rect filterBounds(const Rect& rect) const;
 
  protected:

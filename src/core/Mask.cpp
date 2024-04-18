@@ -41,8 +41,6 @@ bool Mask::fillText(const TextBlob* textBlob, const Stroke* stroke) {
     return false;
   }
   auto runCount = textBlob->glyphRunCount();
-  float maxScale = -1.0f;
-  auto pathMatrix = matrix;
   for (size_t i = 0; i < runCount; ++i) {
     auto glyphRun = textBlob->getGlyphRun(i);
     if (glyphRun->hasColor()) {
@@ -51,18 +49,11 @@ bool Mask::fillText(const TextBlob* textBlob, const Stroke* stroke) {
     if (onFillText(glyphRun, stroke, matrix)) {
       continue;
     }
-    if (maxScale == -1.0f) {
-      maxScale = matrix.getMaxScale();
-      if (maxScale <= 0) {
-        return false;
-      }
-      pathMatrix.preScale(1.0f / maxScale, 1.0f / maxScale);
-    }
     Path path = {};
-    if (!glyphRun->getPath(&path, maxScale, stroke)) {
+    if (!glyphRun->getPath(&path, matrix, stroke)) {
       return false;
     }
-    onFillPath(path, pathMatrix, true);
+    onFillPath(path, Matrix::I(), true);
   }
   return true;
 }
