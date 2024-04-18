@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/Surface.h"
 #include "DrawingManager.h"
-#include "gpu/SurfaceDrawContext.h"
+#include "gpu/RenderContext.h"
 #include "images/TextureImage.h"
 #include "utils/Log.h"
 #include "utils/PixelFormatUtil.h"
@@ -140,7 +140,7 @@ bool Surface::wait(const BackendSemaphore& waitSemaphore) {
 
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
-    renderContext = new SurfaceDrawContext(this);
+    renderContext = new RenderContext(this);
     canvas = new Canvas(renderContext);
   }
   return canvas;

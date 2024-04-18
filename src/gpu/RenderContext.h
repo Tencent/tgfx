@@ -23,11 +23,11 @@
 #include "gpu/OpContext.h"
 
 namespace tgfx {
-class SurfaceDrawContext : public DrawContext {
+class RenderContext : public DrawContext {
  public:
-  SurfaceDrawContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags);
+  RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags);
 
-  ~SurfaceDrawContext() override;
+  ~RenderContext() override;
 
   Surface* getSurface() const override {
     return surface;
@@ -53,7 +53,7 @@ class SurfaceDrawContext : public DrawContext {
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   uint32_t clipID = 0;
 
-  explicit SurfaceDrawContext(Surface* surface);
+  explicit RenderContext(Surface* surface);
   Context* getContext() const;
   std::shared_ptr<TextureProxy> getClipTexture();
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
