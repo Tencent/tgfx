@@ -22,7 +22,7 @@
 #include "utils/SimpleTextShaper.h"
 
 namespace tgfx {
-Canvas::Canvas(std::shared_ptr<DrawContext> drawContext) : drawContext(std::move(drawContext)) {
+Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {
 }
 
 Surface* Canvas::getSurface() const {

@@ -26,10 +26,14 @@ namespace tgfx {
 /**
  * A helper class to orchestrate Op commands for RenderTargets.
  */
-class RenderContext {
+class OpContext {
  public:
-  explicit RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+  explicit OpContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
       : renderTargetProxy(std::move(renderTargetProxy)) {
+  }
+
+  RenderTargetProxy* renderTarget() const {
+    return renderTargetProxy.get();
   }
 
   void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,

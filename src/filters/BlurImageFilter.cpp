@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BlurImageFilter.h"
-#include "gpu/RenderContext.h"
+#include "gpu/OpContext.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/DualBlurFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -96,8 +96,8 @@ void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
-  RenderContext renderContext(std::move(renderTarget));
-  renderContext.fillWithFP(std::move(blurProcessor), localMatrix, true);
+  OpContext opContext(std::move(renderTarget));
+  opContext.fillWithFP(std::move(blurProcessor), localMatrix, true);
 }
 
 Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {

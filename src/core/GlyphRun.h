@@ -77,15 +77,15 @@ class GlyphRun {
   }
 
   /**
-   * Returns the bounding box of the glyphs in this run.
+   * Returns the bounding box of the glyphs in this run when drawn with the given matrix and stroke.
    */
-  Rect getBounds(float scale = 1.0f, const Stroke* stroke = nullptr) const;
+  Rect getBounds(const Matrix& matrix, const Stroke* stroke = nullptr) const;
 
   /**
-   * Creates a path corresponding to the glyphs in this run. Returns false if failed and ignores the
-   * path parameter.
+   * Creates a path corresponding to the glyphs in this run when drawn with the given matrix and
+   * stroke. Returns true if the path was successfully created.
    */
-  bool getPath(Path* path, float scale = 1.0f, const Stroke* stroke = nullptr) const;
+  bool getPath(Path* path, const Matrix& matrix, const Stroke* stroke = nullptr) const;
 
  private:
   Font _font = {};

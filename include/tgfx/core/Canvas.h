@@ -40,8 +40,6 @@ class DrawContext;
  */
 class Canvas {
  public:
-  explicit Canvas(std::shared_ptr<DrawContext> drawContext);
-
   /**
    * Returns the associated Surface if the Canvas is backed by one, otherwise returns nullptr.
    */
@@ -289,13 +287,17 @@ class Canvas {
                  const Paint* paint = nullptr);
 
  private:
-  std::shared_ptr<DrawContext> drawContext = nullptr;
+  DrawContext* drawContext = nullptr;
 
+  explicit Canvas(DrawContext* drawContext);
   bool drawSimplePath(const Path& path, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
   void drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
                      const SamplingOptions& sampling, const FillStyle& style,
                      const Matrix& extraMatrix);
+
+  friend class Surface;
+  friend class Recorder;
 };
 }  // namespace tgfx

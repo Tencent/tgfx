@@ -30,8 +30,6 @@ class SimpleTextBlob : public TextBlob {
   explicit SimpleTextBlob(GlyphRun glyphRun) : glyphRun(std::move(glyphRun)) {
   }
 
-  Rect getBounds() const override;
-
  protected:
   size_t glyphRunCount() const override {
     return 1;

@@ -111,14 +111,10 @@ static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::stri
 
 bool WebMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix) {
   aboutToFill();
-  auto scale = matrix.getMaxScale();
-  // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-  auto bounds = glyphRun->getBounds(scale, stroke);
+  auto bounds = glyphRun->getBounds(matrix, stroke);
   if (bounds.isEmpty()) {
     return false;
   }
-  bounds.scale(1.0f / scale, 1.0f / scale);
-  matrix.mapRect(&bounds);
   stream->markContentDirty(bounds);
   std::vector<std::string> texts = {};
   std::vector<Point> points = {};

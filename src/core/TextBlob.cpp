@@ -16,8 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/TextBlob.h"
+#include "core/GlyphRun.h"
 #include "core/SimpleTextBlob.h"
-#include "tgfx/core/PathEffect.h"
 #include "utils/SimpleTextShaper.h"
 
 namespace tgfx {
@@ -38,7 +39,13 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Poi
   return std::make_shared<SimpleTextBlob>(std::move(glyphRun));
 }
 
-Rect SimpleTextBlob::getBounds() const {
-  return glyphRun.getBounds();
+Rect TextBlob::getBounds(const Matrix& matrix) const {
+  auto bounds = Rect::MakeEmpty();
+  auto runCount = glyphRunCount();
+  for (size_t i = 0; i < runCount; ++i) {
+    auto glyphRun = getGlyphRun(i);
+    bounds.join(glyphRun->getBounds(matrix));
+  }
+  return bounds;
 }
 }  // namespace tgfx

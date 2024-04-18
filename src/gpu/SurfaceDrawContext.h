@@ -20,20 +20,18 @@
 
 #include <optional>
 #include "core/DrawContext.h"
-#include "gpu/RenderContext.h"
+#include "gpu/OpContext.h"
 
 namespace tgfx {
 class SurfaceDrawContext : public DrawContext {
  public:
-  explicit SurfaceDrawContext(Surface* surface);
+  SurfaceDrawContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags);
 
   ~SurfaceDrawContext() override;
 
   Surface* getSurface() const override {
     return surface;
   }
-
-  Context* getContext() const;
 
   void clear() override;
 
@@ -49,11 +47,14 @@ class SurfaceDrawContext : public DrawContext {
   void drawGlyphRun(GlyphRun glyphRun, const FillStyle& style, const Stroke* stroke) override;
 
  private:
+  OpContext* opContext = nullptr;
+  uint32_t renderFlags = 0;
   Surface* surface = nullptr;
-  RenderContext* renderContext = nullptr;
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   uint32_t clipID = 0;
 
+  explicit SurfaceDrawContext(Surface* surface);
+  Context* getContext() const;
   std::shared_ptr<TextureProxy> getClipTexture();
   std::pair<std::optional<Rect>, bool> getClipRect(const Rect* drawBounds = nullptr);
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, const Matrix& viewMatrix,
@@ -67,9 +68,9 @@ class SurfaceDrawContext : public DrawContext {
   void drawColorGlyphs(const GlyphRun& glyphRun, const FillStyle& style);
   void addDrawOp(std::unique_ptr<DrawOp> op, const FPArgs& args, const FillStyle& style,
                  bool ignoreShader = false);
-  void addOp(std::unique_ptr<Op> op, bool discardContent);
-  bool wouldOverwriteEntireSurface(DrawOp* op, const FPArgs& args, const FillStyle& style) const;
+  void addOp(std::unique_ptr<Op> op, const std::function<bool()>& willDiscardContent);
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);
+  bool wouldOverwriteEntireRT(const FPArgs& args, const FillStyle& style, bool isRectOp) const;
 
   friend class Surface;
 };
