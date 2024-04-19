@@ -144,11 +144,13 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   int height = static_cast<int>(bounds.height());
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
   if (tempBuffer == nullptr) {
+    CGContextRelease(cgContext);
     pixelRef->unlockPixels();
     return;
   }
   auto* tempPixels = tempBuffer->lockPixels();
   if (tempPixels == nullptr) {
+    CGContextRelease(cgContext);
     pixelRef->unlockPixels();
     return;
   }
@@ -157,12 +159,15 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
                              PixelRefMask::GammaTable());
   tempBuffer->unlockPixels();
   if (image == nullptr) {
+    CGContextRelease(cgContext);
     pixelRef->unlockPixels();
     return;
   }
   auto rect = CGRectMake(bounds.left, bounds.top, bounds.width(), bounds.height());
   CGContextDrawImage(cgContext, rect, image);
+  CGContextRelease(cgContext);
   pixelRef->unlockPixels();
+  CGImageRelease(image);
 }
 
 bool CGMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {
