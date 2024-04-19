@@ -164,6 +164,8 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   auto rect = CGRectMake(bounds.left, bounds.top, bounds.width(), bounds.height());
   CGContextDrawImage(cgContext, rect, image);
   pixelRef->unlockPixels();
+  CGContextRelease(cgContext);
+  CGImageRelease(image);
 }
 
 static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
