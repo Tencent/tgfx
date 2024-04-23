@@ -40,7 +40,7 @@ Rect GlyphRun::getBounds(const Matrix& matrix, const Stroke* stroke) const {
     totalBounds.join(bounds);
     index++;
   }
-  if (!totalBounds.isEmpty() && stroke && !font.getTypeface()->hasColor()) {
+  if (!totalBounds.isEmpty() && stroke && !font.hasColor()) {
     auto strokeWidth = stroke->width * maxScale;
     totalBounds.outset(strokeWidth, strokeWidth);
   }

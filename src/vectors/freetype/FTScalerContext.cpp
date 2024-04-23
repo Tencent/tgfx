@@ -49,6 +49,7 @@ static FT_Fixed FloatToFTFixed(float x) {
 
 std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
                                                         float size) {
+  DEBUG_ASSERT(typeface != nullptr);
   return std::make_shared<FTScalerContext>(std::move(typeface), size);
 }
 

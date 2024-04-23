@@ -76,6 +76,7 @@ static CGAffineTransform GetTransform(bool fauxItalic) {
 
 std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
                                                         float size) {
+  DEBUG_ASSERT(typeface != nullptr);
   return std::make_shared<CGScalerContext>(std::move(typeface), size);
 }
 

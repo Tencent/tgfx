@@ -186,6 +186,10 @@ bool CGMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Ma
   if (font.isFauxBold()) {
     return false;
   }
+  auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
+  if (typeface == nullptr) {
+    return false;
+  }
   auto pixels = pixelRef->lockWritablePixels();
   auto cgContext = CreateBitmapContext(pixelRef->info(), pixels);
   if (cgContext == nullptr) {
@@ -202,7 +206,7 @@ bool CGMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Ma
   CGContextSetAllowsFontSubpixelPositioning(cgContext, true);
   CGContextSetShouldSubpixelPositionFonts(cgContext, true);
 
-  CTFontRef ctFont = std::static_pointer_cast<CGTypeface>(font.getTypeface())->getCTFont();
+  CTFontRef ctFont = typeface->getCTFont();
   ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
                                           nullptr);
   if (font.isFauxItalic()) {

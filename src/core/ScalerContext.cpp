@@ -82,6 +82,6 @@ std::shared_ptr<ScalerContext> ScalerContext::Make(std::shared_ptr<Typeface> typ
 }
 
 ScalerContext::ScalerContext(std::shared_ptr<Typeface> typeface, float size)
-    : typeface(typeface), textSize(size) {
+    : typeface(std::move(typeface)), textSize(size) {
 }
 }  // namespace tgfx

@@ -19,6 +19,7 @@
 #include "WebScalerContext.h"
 #include "WebTypeface.h"
 #include "platform/web/WebImageBuffer.h"
+#include "utils/Log.h"
 
 using namespace emscripten;
 
@@ -26,6 +27,7 @@ namespace tgfx {
 
 std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
                                                         float size) {
+  DEBUG_ASSERT(typeface != nullptr);
   auto scalerContextClass = val::module_property("ScalerContext");
   if (!scalerContextClass.as<bool>()) {
     return nullptr;
