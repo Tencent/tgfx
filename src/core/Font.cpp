@@ -30,7 +30,7 @@ class GlyphImageGenerator : public ImageGenerator {
   }
 
   bool isAlphaOnly() const override {
-    return !scalerContext->getTypeface()->hasColor();
+    return !scalerContext->hasColor();
   }
 
  protected:
@@ -58,6 +58,10 @@ Font Font::makeWithSize(float newSize) const {
 
 std::shared_ptr<Typeface> Font::getTypeface() const {
   return scalerContext->getTypeface();
+}
+
+bool Font::hasColor() const {
+  return scalerContext->hasColor();
 }
 
 void Font::setTypeface(std::shared_ptr<Typeface> newTypeface) {

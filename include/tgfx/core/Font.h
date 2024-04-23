@@ -49,6 +49,11 @@ class Font {
   std::shared_ptr<Typeface> getTypeface() const;
 
   /**
+   * Returns true if the font has color.
+   */
+  bool hasColor() const;
+
+  /**
    * Sets a new Typeface to this Font.
    */
   void setTypeface(std::shared_ptr<Typeface> newTypeface);

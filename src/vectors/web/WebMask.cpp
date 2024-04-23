@@ -100,9 +100,12 @@ void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool) {
 static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::string>* texts,
                                  std::vector<Point>* points) {
   auto& font = glyphRun->font();
+  auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
+  if (typeface == nullptr) {
+    return;
+  }
   auto& glyphIDs = glyphRun->glyphIDs();
   auto& positions = glyphRun->positions();
-  auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
   for (size_t i = 0; i < glyphIDs.size(); ++i) {
     texts->push_back(typeface->getText(glyphIDs[i]));
     points->push_back(positions[i]);
@@ -120,7 +123,10 @@ bool WebMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const M
   std::vector<Point> points = {};
   GetTextsAndPositions(glyphRun, &texts, &points);
   const auto& font = glyphRun->font();
-  const auto* typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
+  const auto typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
+  if (typeFace == nullptr) {
+    return false;
+  }
   auto webFont = val::object();
   webFont.set("name", typeFace->fontFamily());
   webFont.set("style", typeFace->fontStyle());

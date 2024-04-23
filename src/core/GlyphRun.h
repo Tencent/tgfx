@@ -52,7 +52,7 @@ class GlyphRun {
    * Returns true if the font has color.
    */
   bool hasColor() const {
-    return _font.getTypeface()->hasColor();
+    return _font.hasColor();
   }
 
   /**

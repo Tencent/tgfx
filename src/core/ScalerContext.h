@@ -37,6 +37,10 @@ class ScalerContext {
     return typeface;
   }
 
+  bool hasColor() const {
+    return typeface ? typeface->hasColor() : false;
+  }
+
   float getSize() const {
     return textSize;
   }
@@ -56,6 +60,7 @@ class ScalerContext {
   virtual std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const = 0;
 
  protected:
+  // Note: This could be nullptr.
   std::shared_ptr<Typeface> typeface = nullptr;
   float textSize = 0.0f;
 
