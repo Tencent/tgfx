@@ -211,13 +211,11 @@ TGFX_TEST(FilterTest, ImageFilterShader) {
   SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
   auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat, sampling);
   auto matrix = Matrix::MakeScale(imageScale);
-    matrix.postTranslate(120, 120);
+  matrix.postTranslate(120, 120);
   shader = shader->makeWithMatrix(matrix);
   Paint paint = {};
   paint.setShader(std::move(shader));
   canvas->drawRect(Rect::MakeWH(720, 720), paint);
-  canvas->scale(imageScale, imageScale);
-//  canvas->drawImage(image, sampling);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ImageFilterShader"));
   device->unlock();
 }
