@@ -194,4 +194,32 @@ TGFX_TEST(FilterTest, DropShadow) {
   EXPECT_EQ(bounds, Rect::MakeXYWH(13, 13, 10, 10));
 }
 
+TGFX_TEST(FilterTest, ImageFilterShader) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 720, 720);
+  auto canvas = surface->getCanvas();
+  image = image->makeMipmapped(true);
+  auto filter = tgfx::ImageFilter::DropShadow(0, 0, 300, 300, tgfx::Color::Black());
+  image = image->makeWithFilter(std::move(filter));
+  auto imageSize = 480.0f;
+  auto imageScale = imageSize / static_cast<float>(image->width());
+  SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
+  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat, sampling);
+  auto matrix = Matrix::MakeScale(imageScale);
+    matrix.postTranslate(120, 120);
+  shader = shader->makeWithMatrix(matrix);
+  Paint paint = {};
+  paint.setShader(std::move(shader));
+  canvas->drawRect(Rect::MakeWH(720, 720), paint);
+  canvas->scale(imageScale, imageScale);
+//  canvas->drawImage(image, sampling);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ImageFilterShader"));
+  device->unlock();
+}
+
 }  // namespace tgfx
