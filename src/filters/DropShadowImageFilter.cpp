@@ -58,15 +58,15 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onFilterImage(
     std::shared_ptr<Image> source, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
     const SamplingOptions& sampling, const Matrix* localMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
-  auto clipBounds = args.drawRect;
+  auto drawBounds = args.drawRect;
   if (localMatrix) {
-    clipBounds = localMatrix->mapRect(clipBounds);
+    drawBounds = localMatrix->mapRect(drawBounds);
   }
   Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
+  if (!applyCropRect(inputBounds, &dstBounds, &drawBounds)) {
     return nullptr;
   }
-  if (dstBounds.contains(clipBounds) ||
+  if (dstBounds.contains(drawBounds) ||
       (tileModeX == TileMode::Decal && tileModeY == TileMode::Decal)) {
     return getFragmentProcessor(std::move(source), args, sampling, localMatrix);
   }
@@ -77,14 +77,22 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::onFilterImage(
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto processor = getFragmentProcessor(std::move(source), args, {});
+  auto processor = getFragmentProcessor(std::move(source), args, {}, localMatrix);
   if (processor == nullptr) {
     return nullptr;
   }
   OpContext opContext(renderTarget);
-  opContext.fillWithFP(std::move(processor), Matrix::MakeTrans(dstBounds.x(), dstBounds.y()), true);
+  auto offsetMatrix = Matrix::MakeTrans(dstBounds.x(), dstBounds.y());
+  if (localMatrix) {
+    Matrix invert = {};
+    if (!localMatrix->invert(&invert)) {
+      return nullptr;
+    }
+    offsetMatrix.postConcat(invert);
+  }
+  opContext.fillWithFP(std::move(processor), offsetMatrix, true);
   auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
-  if (localMatrix != nullptr) {
+  if (localMatrix) {
     matrix.preConcat(*localMatrix);
   }
   return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
