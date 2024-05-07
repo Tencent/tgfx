@@ -50,6 +50,45 @@ TGFX_TEST(FilterTest, ColorMatrixFilter) {
   device->unlock();
 }
 
+TGFX_TEST(FilterTest, LumaColorFilter) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width() / 4, image->height() / 4);
+  auto canvas = surface->getCanvas();
+  canvas->scale(0.25f, 0.25f);
+  Paint paint;
+  paint.setColorFilter(ColorFilter::Luma());
+  canvas->drawImage(image, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/LumaColorFilter"));
+  device->unlock();
+}
+
+TGFX_TEST(FilterTest, ComposeColorFilter) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width() / 4, image->height() / 4);
+  auto canvas = surface->getCanvas();
+  canvas->scale(0.25f, 0.25f);
+  Paint paint;
+  auto matrixFilter = ColorFilter::Matrix({0.2f, 0,    0, 0, 0,  // red
+                                           0,    0.2f, 0, 0, 0,  // green
+                                           0,    0,    2, 0, 0,  // blue
+                                           0,    0,    0, 1, 0});
+  auto composeFilter = ColorFilter::Compose(matrixFilter, ColorFilter::Luma());
+  paint.setColorFilter(std::move(composeFilter));
+  canvas->drawImage(image, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeColorFilter"));
+  device->unlock();
+}
+
 TGFX_TEST(FilterTest, ShaderMaskFilter) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
