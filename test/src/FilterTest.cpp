@@ -248,9 +248,10 @@ TGFX_TEST(FilterTest, ComposeImageFilter) {
   filterImage = filterImage->makeWithFilter(greenFilter, nullptr, &filterBounds);
   filterBounds =
       blackFilter->filterBounds(Rect::MakeWH(filterImage->width(), filterImage->height()));
-  filterBounds.inset(50, 50);
+  filterBounds.inset(200, 200);
   filterImage = filterImage->makeWithFilter(blackFilter, nullptr, &filterBounds);
   canvas->clear();
+  canvas->translate(200, 200);
   canvas->drawImage(filterImage);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeImageFilter2"));
   device->unlock();
