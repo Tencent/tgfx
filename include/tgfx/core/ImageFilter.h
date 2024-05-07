@@ -34,6 +34,17 @@ namespace tgfx {
 class ImageFilter {
  public:
   /**
+   * Creates a filter that applies the inner filter and then applies the outer filter.
+   */
+  static std::shared_ptr<ImageFilter> Compose(std::shared_ptr<ImageFilter> inner,
+                                              std::shared_ptr<ImageFilter> outer);
+
+  /**
+   * Creates a filter that applies the filters in the order they are provided.
+   */
+  static std::shared_ptr<ImageFilter> Compose(std::vector<std::shared_ptr<ImageFilter>> filters);
+
+  /**
    * Create a filter that blurs its input by the separate X and Y blurriness. The provided tile mode
    * is used when the blur kernel goes outside the input image.
    * @param blurrinessX  The Gaussian sigma value for blurring along the X axis.
@@ -76,20 +87,31 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect) const;
 
  protected:
+  /**
+   * Returns the bounds of the image that will be produced by this filter when it is applied to an
+   * image of the given bounds.
+   */
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
   /**
    * The returned processor is in the coordinate space of the source image.
    */
   virtual std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                           const FPArgs& args, TileMode tileModeX,
-                                                           TileMode tileModeY,
+                                                           const FPArgs& args,
                                                            const SamplingOptions& sampling,
                                                            const Matrix* localMatrix) const = 0;
+
+  /**
+   * Returns true if this filter is a ComposeImageFilter.
+   */
+  virtual bool isComposeFilter() const {
+    return false;
+  }
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
   friend class DropShadowImageFilter;
+  friend class ComposeImageFilter;
   friend class FilterImage;
 };
 }  // namespace tgfx

@@ -18,37 +18,12 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientImage.h"
+#include <optional>
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-/**
- * An image that is a subset of another image.
- */
-class SubsetImage : public OrientImage {
+class LocalMatrix {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                         const Rect& bounds);
-
-  int width() const override {
-    return static_cast<int>(bounds.width());
-  }
-
-  int height() const override {
-    return static_cast<int>(bounds.height());
-  }
-
- protected:
-  Rect bounds = Rect::MakeEmpty();
-
-  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
-
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
-
-  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
-
-  std::optional<Matrix> concatLocalMatrix(const Matrix* localMatrix) const override;
-
-  SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds);
+  static std::optional<Matrix> Concat(const Rect& subset, const Matrix* localMatrix);
 };
 }  // namespace tgfx

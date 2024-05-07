@@ -79,6 +79,30 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int
   if (!context->caps()->isFormatRenderable(format)) {
     return nullptr;
   }
+  return Create(context, width, height, format, sampleCount, mipmapped, origin);
+}
+
+std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,
+                                                                   int height,
+                                                                   std::vector<PixelFormat> formats,
+                                                                   int sampleCount, bool mipmapped,
+                                                                   ImageOrigin origin) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto caps = context->caps();
+  for (auto& format : formats) {
+    if (caps->isFormatRenderable(format)) {
+      return Create(context, width, height, format, sampleCount, mipmapped, origin);
+    }
+  }
+  return nullptr;
+}
+
+std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Create(Context* context, int width,
+                                                             int height, PixelFormat format,
+                                                             int sampleCount, bool mipmapped,
+                                                             ImageOrigin origin) {
   auto proxyProvider = context->proxyProvider();
   auto textureProxy =
       proxyProvider->createTextureProxy({}, width, height, format, mipmapped, origin);

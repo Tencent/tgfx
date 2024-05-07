@@ -73,8 +73,8 @@ std::shared_ptr<Image> MipmapImage::onMakeMipmapped(bool enabled) const {
 }
 
 std::shared_ptr<TextureProxy> MipmapImage::onLockTextureProxy(Context* context,
-                                                              const UniqueKey& key, bool,
+                                                              const UniqueKey& key, bool mipmapped,
                                                               uint32_t renderFlags) const {
-  return source->onLockTextureProxy(context, key, true, renderFlags);
+  return source->onLockTextureProxy(context, key, mipmapped, renderFlags);
 }
 }  // namespace tgfx

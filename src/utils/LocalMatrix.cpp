@@ -16,31 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ImageFilter.h"
-#include "tgfx/gpu/Surface.h"
+#include "LocalMatrix.h"
 
 namespace tgfx {
-class BlurImageFilter : public ImageFilter {
- public:
-  BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
-
- private:
-  Point blurOffset;
-  float downScaling;
-  int iteration;
-  TileMode tileMode;
-
-  Rect onFilterBounds(const Rect& srcRect) const override;
-
-  std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                   const FPArgs& args,
-                                                   const SamplingOptions& sampling,
-                                                   const Matrix* localMatrix) const override;
-
-  void draw(std::shared_ptr<RenderTargetProxy> renderTarget,
-            std::unique_ptr<FragmentProcessor> imageProcessor, const Rect& imageBounds,
-            bool isDown) const;
-};
+std::optional<Matrix> LocalMatrix::Concat(const Rect& subset, const Matrix* localMatrix) {
+  std::optional<Matrix> matrix = std::nullopt;
+  if (subset.x() != 0 || subset.y() != 0) {
+    matrix = Matrix::MakeTrans(subset.x(), subset.y());
+  }
+  if (localMatrix != nullptr) {
+    if (matrix) {
+      matrix->preConcat(*localMatrix);
+    } else {
+      matrix = *localMatrix;
+    }
+  }
+  return matrix;
+}
 }  // namespace tgfx

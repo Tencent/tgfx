@@ -65,6 +65,21 @@ struct Color {
   static const Color& White();
 
   /**
+   * Returns a fully opaque red Color.
+   */
+  static const Color& Red();
+
+  /**
+   * Returns a fully opaque green Color.
+   */
+  static const Color& Green();
+
+  /**
+   * Returns a fully opaque blue Color.
+   */
+  static const Color& Blue();
+
+  /**
    * Returns color value from 8-bit component values.
    */
   static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);

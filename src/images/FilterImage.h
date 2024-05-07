@@ -50,6 +50,9 @@ class FilterImage : public TransformImage {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
+  std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
+                                          const Rect* clipRect) const override;
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
@@ -59,7 +62,7 @@ class FilterImage : public TransformImage {
   std::shared_ptr<ImageFilter> filter = nullptr;
   Rect bounds = Rect::MakeEmpty();
 
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         std::shared_ptr<ImageFilter> filter, const Rect& bounds);
+  static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source,
+                                     std::shared_ptr<ImageFilter> filter, const Rect& bounds);
 };
 }  // namespace tgfx
