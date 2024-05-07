@@ -18,7 +18,11 @@
 
 #include "FilterImage.h"
 #include "SubsetImage.h"
+#include "gpu/OpContext.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "utils/LocalMatrix.h"
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
@@ -45,12 +49,11 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
     offset->x = bounds.left;
     offset->y = bounds.top;
   }
-  return MakeFrom(std::move(source), std::move(filter), bounds);
+  return Wrap(std::move(source), std::move(filter), bounds);
 }
 
-std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
-                                             std::shared_ptr<ImageFilter> filter,
-                                             const Rect& bounds) {
+std::shared_ptr<Image> FilterImage::Wrap(std::shared_ptr<Image> source,
+                                         std::shared_ptr<ImageFilter> filter, const Rect& bounds) {
   auto image =
       std::shared_ptr<FilterImage>(new FilterImage(std::move(source), std::move(filter), bounds));
   image->weakThis = image;
@@ -63,19 +66,93 @@ FilterImage::FilterImage(std::shared_ptr<Image> source, std::shared_ptr<ImageFil
 }
 
 std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return FilterImage::MakeFrom(std::move(newSource), filter);
+  return FilterImage::Wrap(std::move(newSource), filter, bounds);
 }
 
 std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset;
   newBounds.offset(bounds.x(), bounds.y());
-  return FilterImage::MakeFrom(source, filter, newBounds);
+  return FilterImage::Wrap(source, filter, newBounds);
+}
+
+std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter> imageFilter,
+                                                     Point* offset, const Rect* clipRect) const {
+  if (imageFilter == nullptr) {
+    return nullptr;
+  }
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  if (filter->filterBounds(inputBounds) != bounds) {
+    return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect);
+  }
+  auto filterBounds = imageFilter->filterBounds(Rect::MakeWH(width(), height()));
+  if (filterBounds.isEmpty()) {
+    return nullptr;
+  }
+  bool hasClip = false;
+  if (clipRect != nullptr) {
+    auto oldBounds = filterBounds;
+    if (!filterBounds.intersect(*clipRect)) {
+      return nullptr;
+    }
+    filterBounds.roundOut();
+    hasClip = (filterBounds != oldBounds);
+  }
+  if (offset != nullptr) {
+    offset->x = filterBounds.left;
+    offset->y = filterBounds.top;
+  }
+  if (hasClip) {
+    return FilterImage::Wrap(weakThis.lock(), std::move(imageFilter), filterBounds);
+  }
+  filterBounds.offset(bounds.x(), bounds.y());
+  auto composeFilter = ImageFilter::Compose(filter, std::move(imageFilter));
+  return FilterImage::Wrap(source, std::move(composeFilter), filterBounds);
 }
 
 std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(
     const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* localMatrix) const {
-  auto matrix = SubsetImage::ConcatLocalMatrix(bounds, localMatrix);
-  return filter->onFilterImage(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+  auto fpMatrix = LocalMatrix::Concat(bounds, localMatrix);
+
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  auto drawBounds = args.drawRect;
+  if (fpMatrix) {
+    drawBounds = fpMatrix->mapRect(drawBounds);
+  }
+  Rect dstBounds = Rect::MakeEmpty();
+  if (!filter->applyCropRect(inputBounds, &dstBounds, &drawBounds)) {
+    return nullptr;
+  }
+  if (dstBounds.contains(drawBounds) ||
+      (tileModeX == TileMode::Decal && tileModeY == TileMode::Decal)) {
+    return filter->onFilterImage(source, args, sampling, AddressOf(fpMatrix));
+  }
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstBounds.width()),
+                                              static_cast<int>(dstBounds.height()),
+                                              PixelFormat::RGBA_8888, 1, mipmapped);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto processor = filter->onFilterImage(source, args, {}, AddressOf(fpMatrix));
+  if (processor == nullptr) {
+    return nullptr;
+  }
+  OpContext opContext(renderTarget);
+  auto offsetMatrix = Matrix::MakeTrans(dstBounds.x(), dstBounds.y());
+  if (fpMatrix) {
+    Matrix invert = {};
+    if (!fpMatrix->invert(&invert)) {
+      return nullptr;
+    }
+    offsetMatrix.postConcat(invert);
+  }
+  opContext.fillWithFP(std::move(processor), offsetMatrix, true);
+  auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  if (fpMatrix) {
+    matrix.preConcat(*fpMatrix);
+  }
+  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
+                                  &matrix);
 }
 }  // namespace tgfx

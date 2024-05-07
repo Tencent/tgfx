@@ -29,6 +29,7 @@
         "SweepGradient": "5a1fb11"
     },
     "FilterTest": {
+        "ComposeImageFilter": "ee36c4d",
         "ImageFilterShader": "7a51c74",
         "blur": "4d6ab20",
         "dropShadow": "a30de8b",

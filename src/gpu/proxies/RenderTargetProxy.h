@@ -62,6 +62,17 @@ class RenderTargetProxy : public ResourceProxy {
                                                  ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
+   * Creates a new RenderTargetProxy instance with specified context, with, height, formats, sample
+   * count, mipmap state and origin. If the first format is not supported, it will try the next one
+   * in the format list.
+   */
+  static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
+                                                         std::vector<PixelFormat> formats,
+                                                         int sampleCount = 1,
+                                                         bool mipmapped = false,
+                                                         ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /**
    * Returns the width of the render target.
    */
   int width() const {
@@ -142,6 +153,10 @@ class RenderTargetProxy : public ResourceProxy {
   PixelFormat _format = PixelFormat::RGBA_8888;
   int _sampleCount = 1;
   ImageOrigin _origin = ImageOrigin::TopLeft;
+
+  static std::shared_ptr<RenderTargetProxy> Create(Context* context, int width, int height,
+                                                   PixelFormat format, int sampleCount,
+                                                   bool mipmapped, ImageOrigin origin);
 
   friend class ProxyProvider;
 };

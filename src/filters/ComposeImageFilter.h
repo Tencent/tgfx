@@ -18,37 +18,27 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientImage.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-/**
- * An image that is a subset of another image.
- */
-class SubsetImage : public OrientImage {
+class ComposeImageFilter : public ImageFilter {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                         const Rect& bounds);
+  explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
 
-  int width() const override {
-    return static_cast<int>(bounds.width());
+ private:
+  std::vector<std::shared_ptr<ImageFilter>> filters = {};
+
+  Rect onFilterBounds(const Rect& srcRect) const override;
+
+  std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
+                                                   const FPArgs& args,
+                                                   const SamplingOptions& sampling,
+                                                   const Matrix* localMatrix) const override;
+
+  bool isComposeFilter() const override {
+    return true;
   }
 
-  int height() const override {
-    return static_cast<int>(bounds.height());
-  }
-
- protected:
-  Rect bounds = Rect::MakeEmpty();
-
-  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
-
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
-
-  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
-
-  std::optional<Matrix> concatLocalMatrix(const Matrix* localMatrix) const override;
-
-  SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds);
+  friend class ImageFilter;
 };
 }  // namespace tgfx

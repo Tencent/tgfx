@@ -44,7 +44,7 @@ std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(tgfx::Context* con
   if (context == nullptr) {
     return nullptr;
   }
-  return onLockTextureProxy(context, uniqueKey, false, renderFlags);
+  return onLockTextureProxy(context, uniqueKey, hasMipmaps(), renderFlags);
 }
 
 std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {

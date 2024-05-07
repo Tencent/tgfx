@@ -204,11 +204,11 @@ TGFX_TEST(FilterTest, ImageFilterShader) {
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  auto filter = tgfx::ImageFilter::DropShadow(0, 0, 300, 300, tgfx::Color::Black());
+  auto filter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
   image = image->makeWithFilter(std::move(filter));
   auto imageSize = 480.0f;
   auto imageScale = imageSize / static_cast<float>(image->width());
-  SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
+  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
   auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat, sampling);
   auto matrix = Matrix::MakeScale(imageScale);
   matrix.postTranslate(120, 120);
@@ -220,4 +220,39 @@ TGFX_TEST(FilterTest, ImageFilterShader) {
   device->unlock();
 }
 
+TGFX_TEST(FilterTest, ComposeImageFilter) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 720, 720);
+  auto canvas = surface->getCanvas();
+  image = image->makeMipmapped(true);
+  auto blueFilter = ImageFilter::DropShadow(100, 100, 0, 0, Color::Blue());
+  auto greenFilter = ImageFilter::DropShadow(-100, -100, 0, 0, Color::Green());
+  auto blackFilter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
+  auto composeFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
+  auto filterImage = image->makeWithFilter(std::move(composeFilter));
+  auto imageSize = 512.0f;
+  auto imageScale = imageSize / static_cast<float>(filterImage->width());
+  canvas->translate(104, 104);
+  canvas->scale(imageScale, imageScale);
+  canvas->drawImage(filterImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeImageFilter"));
+
+  filterImage = image->makeWithFilter(blueFilter);
+  auto filterBounds =
+      greenFilter->filterBounds(Rect::MakeWH(filterImage->width(), filterImage->height()));
+  filterImage = filterImage->makeWithFilter(greenFilter, nullptr, &filterBounds);
+  filterBounds =
+      blackFilter->filterBounds(Rect::MakeWH(filterImage->width(), filterImage->height()));
+  filterBounds.inset(50, 50);
+  filterImage = filterImage->makeWithFilter(blackFilter, nullptr, &filterBounds);
+  canvas->clear();
+  canvas->drawImage(filterImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeImageFilter"));
+  device->unlock();
+}
 }  // namespace tgfx
