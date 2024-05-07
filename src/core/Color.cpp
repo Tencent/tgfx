@@ -35,6 +35,21 @@ const Color& Color::White() {
   return color;
 }
 
+const Color& Color::Red() {
+  static const Color color = {1.0f, 0.0f, 0.0f, 1.0f};
+  return color;
+}
+
+const Color& Color::Green() {
+  static const Color color = {0.0f, 1.0f, 0.0f, 1.0f};
+  return color;
+}
+
+const Color& Color::Blue() {
+  static const Color color = {0.0f, 0.0f, 1.0f, 1.0f};
+  return color;
+}
+
 Color Color::FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   auto alpha = a == 255 ? 1.0f : static_cast<float>(a) / 255.0f;
   return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,

@@ -21,7 +21,6 @@
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/DualBlurFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
@@ -105,9 +104,10 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
 }
 
-std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(
-    std::shared_ptr<Image> source, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
-    const SamplingOptions& sampling, const Matrix* localMatrix) const {
+std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(std::shared_ptr<Image> source,
+                                                                  const FPArgs& args,
+                                                                  const SamplingOptions& sampling,
+                                                                  const Matrix* localMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (localMatrix) {
@@ -117,7 +117,9 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(
   if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }
-  auto processor = FragmentProcessor::Make(source, args, tileMode, tileMode, {});
+  inputBounds.intersect(clipBounds);
+  FPArgs newArgs(args.context, args.renderFlags, inputBounds, Matrix::I());
+  auto processor = FragmentProcessor::Make(source, newArgs, tileMode, tileMode, {});
   auto imageBounds = dstBounds;
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
@@ -149,11 +151,10 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(
     lastRenderTarget = renderTarget;
     imageBounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   }
-  auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
   if (localMatrix != nullptr) {
-    matrix.preConcat(*localMatrix);
+    fpMatrix.preConcat(*localMatrix);
   }
-  return TiledTextureEffect::Make(lastRenderTarget->getTextureProxy(), tileModeX, tileModeY,
-                                  sampling, &matrix);
+  return TextureEffect::Make(lastRenderTarget->getTextureProxy(), sampling, &fpMatrix);
 }
 }  // namespace tgfx

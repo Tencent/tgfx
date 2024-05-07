@@ -282,6 +282,9 @@ class Image {
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
 
+  virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
+                                                  Point* offset, const Rect* clipRect) const;
+
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
       const Matrix* localMatrix) const = 0;

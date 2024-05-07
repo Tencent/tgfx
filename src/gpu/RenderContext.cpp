@@ -94,7 +94,7 @@ void RenderContext::clear() {
   style.blendMode = BlendMode::Src;
   auto renderTarget = opContext->renderTarget();
   auto rect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  drawRect(rect, style);
+  drawAsClear(rect, Matrix::I(), style);
 }
 
 void RenderContext::drawRect(const Rect& rect, const FillStyle& style) {
@@ -373,12 +373,10 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture() {
   if (ShouldTriangulatePath(clip, rasterizeMatrix)) {
     auto drawOp =
         TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
-    auto renderTarget = RenderTargetProxy::Make(getContext(), width, height, PixelFormat::ALPHA_8);
+    auto renderTarget = RenderTargetProxy::MakeFallback(
+        getContext(), width, height, {PixelFormat::ALPHA_8, PixelFormat::RGBA_8888});
     if (renderTarget == nullptr) {
-      renderTarget = RenderTargetProxy::Make(getContext(), width, height, PixelFormat::RGBA_8888);
-      if (renderTarget == nullptr) {
-        return nullptr;
-      }
+      return nullptr;
     }
     OpContext context(renderTarget);
     context.addOp(std::move(drawOp));

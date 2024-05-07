@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
+#include "utils/LocalMatrix.h"
 
 namespace tgfx {
 std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
@@ -32,22 +33,6 @@ std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orie
       std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), orientation, bounds));
   image->weakThis = image;
   return image;
-}
-
-std::optional<Matrix> SubsetImage::ConcatLocalMatrix(const Rect& subset,
-                                                     const Matrix* localMatrix) {
-  std::optional<Matrix> matrix = std::nullopt;
-  if (subset.x() != 0 || subset.y() != 0) {
-    matrix = Matrix::MakeTrans(subset.x(), subset.y());
-  }
-  if (localMatrix != nullptr) {
-    if (matrix) {
-      matrix->preConcat(*localMatrix);
-    } else {
-      matrix = *localMatrix;
-    }
-  }
-  return matrix;
 }
 
 SubsetImage::SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds)
@@ -73,7 +58,7 @@ std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) cons
 }
 
 std::optional<Matrix> SubsetImage::concatLocalMatrix(const Matrix* localMatrix) const {
-  auto matrix = ConcatLocalMatrix(bounds, localMatrix);
+  auto matrix = LocalMatrix::Concat(bounds, localMatrix);
   return OrientImage::concatLocalMatrix(AddressOf(matrix));
 }
 }  // namespace tgfx
