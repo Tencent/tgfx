@@ -33,6 +33,12 @@ class FragmentProcessor;
 class ColorFilter {
  public:
   /**
+   * Creates a color filter whose effect is to first apply the inner filter and then apply the outer
+   * filter.
+   */
+  static std::shared_ptr<ColorFilter> Compose(std::shared_ptr<ColorFilter> inner,
+                                              std::shared_ptr<ColorFilter> outer);
+  /**
    * Creates a new ColorFilter that transforms the input color into its corresponding brightness.
    */
   static std::shared_ptr<ColorFilter> Luma();
@@ -62,5 +68,6 @@ class ColorFilter {
 
   friend class RenderContext;
   friend class ColorFilterShader;
+  friend class ComposeColorFilter;
 };
 }  // namespace tgfx
