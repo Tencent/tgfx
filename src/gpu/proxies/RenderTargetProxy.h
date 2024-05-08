@@ -136,12 +136,28 @@ class RenderTargetProxy : public ResourceProxy {
   /**
    * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.
    */
-  std::shared_ptr<TextureProxy> makeTextureProxy() const;
+  std::shared_ptr<TextureProxy> makeTextureProxy() const {
+    return makeTextureProxy(width(), height());
+  }
+
+  /**
+   * Creates a compatible TextureProxy instance of the specified size that matches the properties of
+   * the RenderTargetProxy.
+   */
+  std::shared_ptr<TextureProxy> makeTextureProxy(int width, int height) const;
 
   /**
    * Creates a compatible RenderTargetProxy instance matches the properties of this one.
    */
-  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy() const;
+  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy() const {
+    return makeRenderTargetProxy(width(), height());
+  }
+
+  /**
+   * Creates a compatible RenderTargetProxy instance of the specified size that matches the
+   * properties of this one.
+   */
+  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(int width, int height) const;
 
  protected:
   RenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format, int sampleCount,

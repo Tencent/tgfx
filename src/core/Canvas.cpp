@@ -18,11 +18,20 @@
 
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
+#include "core/LayerUnrollContext.h"
+#include "core/Records.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/gpu/Surface.h"
+#include "utils/Log.h"
 #include "utils/SimpleTextShaper.h"
 
 namespace tgfx {
 Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {
+  mcState = std::make_unique<MCState>();
+}
+
+Canvas::Canvas(DrawContext* drawContext, const Path& initClip) : drawContext(drawContext) {
+  mcState = std::make_unique<MCState>(initClip);
 }
 
 Surface* Canvas::getSurface() const {
@@ -30,91 +39,101 @@ Surface* Canvas::getSurface() const {
 }
 
 void Canvas::save() {
-  drawContext->save();
+  mcStack.push(std::make_unique<MCState>(*mcState));
 }
 
 void Canvas::restore() {
-  drawContext->restore();
+  if (mcStack.empty()) {
+    return;
+  }
+  *mcState = *mcStack.top();
+  mcStack.pop();
 }
 
 size_t Canvas::getSaveCount() const {
-  return drawContext->getSaveCount();
+  return mcStack.size();
 }
 
 void Canvas::restoreToCount(size_t saveCount) {
-  drawContext->restoreToCount(saveCount);
+  auto n = mcStack.size() - saveCount;
+  for (size_t i = 0; i < n; i++) {
+    restore();
+  }
 }
 
 void Canvas::translate(float dx, float dy) {
-  if (dx == 0 && dy == 0) {
-    return;
-  }
-  drawContext->translate(dx, dy);
+  mcState->matrix.preTranslate(dx, dy);
 }
 
 void Canvas::scale(float sx, float sy) {
-  if (sx == 1.0f && sy == 1.0f) {
-    return;
-  }
-  drawContext->scale(sx, sy);
+  mcState->matrix.preScale(sx, sy);
 }
 
 void Canvas::rotate(float degrees) {
-  if (fmodf(degrees, 360.0f) == 0) {
-    return;
-  }
-  drawContext->rotate(degrees);
+  mcState->matrix.preRotate(degrees);
 }
 
 void Canvas::rotate(float degrees, float px, float py) {
-  if (fmodf(degrees, 360.0f) == 0) {
-    return;
-  }
   Matrix m = {};
   m.setRotate(degrees, px, py);
-  drawContext->concat(m);
+  mcState->matrix.preConcat(m);
 }
 
 void Canvas::skew(float sx, float sy) {
-  if (sx == 0 && sy == 0) {
-    return;
-  }
-  drawContext->skew(sx, sy);
+  mcState->matrix.preSkew(sx, sy);
 }
 
 void Canvas::concat(const Matrix& matrix) {
-  if (matrix.isIdentity()) {
-    return;
-  }
-  drawContext->concat(matrix);
-}
-
-const Matrix& Canvas::getMatrix() const {
-  return drawContext->getMatrix();
+  mcState->matrix.preConcat(matrix);
 }
 
 void Canvas::setMatrix(const Matrix& matrix) {
-  drawContext->setMatrix(matrix);
+  mcState->matrix = matrix;
 }
 
 void Canvas::resetMatrix() {
-  drawContext->resetMatrix();
+  mcState->matrix.reset();
+}
+
+const Matrix& Canvas::getMatrix() const {
+  return mcState->matrix;
 }
 
 const Path& Canvas::getTotalClip() const {
-  return drawContext->getClip();
+  return mcState->clip;
 }
 
-void Canvas::clipRect(const Rect& rect) {
-  drawContext->clipRect(rect);
+void Canvas::clipRect(const tgfx::Rect& rect) {
+  Path path = {};
+  path.addRect(rect);
+  clipPath(path);
 }
 
 void Canvas::clipPath(const Path& path) {
-  drawContext->clipPath(path);
+  auto clipPath = path;
+  clipPath.transform(mcState->matrix);
+  mcState->clip.addPath(clipPath, PathOp::Intersect);
+}
+
+void Canvas::resetMCState() {
+  mcState = std::make_unique<MCState>();
+  std::stack<std::unique_ptr<MCState>>().swap(mcStack);
 }
 
 void Canvas::clear() {
-  drawContext->clear();
+  auto& clip = mcState->clip;
+  if (clip.isEmpty()) {
+    if (clip.isInverseFillType()) {
+      drawContext->clear();
+    }
+    return;
+  }
+  auto rect = clip.getBounds();
+  FillStyle style = {};
+  style.color = Color::Transparent();
+  style.blendMode = BlendMode::Src;
+  MCState state = {Matrix::I(), clip};
+  drawContext->drawRect(rect, state, style);
 }
 
 void Canvas::clearRect(const Rect& rect, const Color& color) {
@@ -167,7 +186,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
     return;
   }
   auto style = CreateFillStyle(paint);
-  drawContext->drawRect(rect, style);
+  drawContext->drawRect(rect, *mcState, style);
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
@@ -203,7 +222,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   auto style = CreateFillStyle(paint);
-  drawContext->drawRRect(rRect, style);
+  drawContext->drawRRect(rRect, *mcState, style);
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
@@ -225,23 +244,23 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   if (!stroke && drawSimplePath(path, style)) {
     return;
   }
-  drawContext->drawPath(path, style, stroke);
+  drawContext->drawPath(path, *mcState, style, stroke);
 }
 
 bool Canvas::drawSimplePath(const Path& path, const FillStyle& style) {
   Rect rect = {};
   if (path.isRect(&rect)) {
-    drawContext->drawRect(rect, style);
+    drawContext->drawRect(rect, *mcState, style);
     return true;
   }
   RRect rRect;
   if (path.isOval(&rect)) {
     rRect.setOval(rect);
-    drawContext->drawRRect(rRect, style);
+    drawContext->drawRRect(rRect, *mcState, style);
     return true;
   }
   if (path.isRRect(&rRect)) {
-    drawContext->drawRRect(rRect, style);
+    drawContext->drawRRect(rRect, *mcState, style);
     return true;
   }
   return false;
@@ -279,33 +298,23 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
   if (image == nullptr || (paint && paint->nothingToDraw())) {
     return;
   }
-  auto matrix = extraMatrix ? *extraMatrix : Matrix::I();
+  auto state = *mcState;
+  if (extraMatrix) {
+    state.matrix.preConcat(*extraMatrix);
+  }
   auto imageFilter = paint ? paint->getImageFilter() : nullptr;
   if (imageFilter != nullptr) {
     auto offset = Point::Zero();
     image = image->makeWithFilter(std::move(imageFilter), &offset);
     if (image == nullptr) {
+      LOGE("Canvas::drawImage() Failed to apply filter to image!");
       return;
     }
-    matrix.preTranslate(offset.x, offset.y);
+    state.matrix.preTranslate(offset.x, offset.y);
   }
   auto rect = Rect::MakeWH(image->width(), image->height());
   auto style = CreateFillStyle(paint);
-  drawImageRect(rect, std::move(image), sampling, style, matrix);
-}
-
-void Canvas::drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
-                           const SamplingOptions& sampling, const FillStyle& style,
-                           const Matrix& extraMatrix) {
-  auto hasExtraMatrix = !extraMatrix.isIdentity();
-  if (hasExtraMatrix) {
-    save();
-    drawContext->concat(extraMatrix);
-  }
-  drawContext->drawImageRect(std::move(image), sampling, rect, style);
-  if (hasExtraMatrix) {
-    restore();
-  }
+  drawContext->drawImageRect(std::move(image), sampling, rect, state, style);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
@@ -314,15 +323,10 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
     return;
   }
   auto glyphRun = SimpleTextShaper::Shape(text, font);
-  if (x != 0 || y != 0) {
-    save();
-    translate(x, y);
-  }
+  auto state = *mcState;
+  state.matrix.preTranslate(x, y);
   auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), style, paint.getStroke());
-  if (x != 0 || y != 0) {
-    restore();
-  }
+  drawContext->drawGlyphRun(std::move(glyphRun), state, style, paint.getStroke());
 }
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
@@ -332,7 +336,40 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   }
   GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), style, paint.getStroke());
+  drawContext->drawGlyphRun(std::move(glyphRun), *mcState, style, paint.getStroke());
+}
+
+void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
+  drawContext->drawPicture(std::move(picture), *mcState);
+}
+
+void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
+                         const Paint* paint) {
+  if (picture == nullptr) {
+    return;
+  }
+  auto state = *mcState;
+  if (matrix) {
+    state.matrix.preConcat(*matrix);
+  }
+  if (paint) {
+    auto style = CreateFillStyle(*paint);
+    drawLayer(std::move(picture), state, style, paint->getImageFilter());
+  } else {
+    drawContext->drawPicture(std::move(picture), state);
+  }
+}
+
+void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
+                       const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
+  if (picture->records.size() == 1) {
+    LayerUnrollContext layerContext(drawContext, style, filter);
+    picture->playback(&layerContext, state);
+    if (layerContext.hasUnrolled()) {
+      return;
+    }
+  }
+  drawContext->drawLayer(std::move(picture), state, style, std::move(filter));
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
@@ -343,15 +380,20 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     return;
   }
   auto style = CreateFillStyle(paint);
+  auto state = *mcState;
+  auto atlasRect = Rect::MakeWH(atlas->width(), atlas->height());
   for (size_t i = 0; i < count; ++i) {
     auto rect = tex[i];
-    auto glyphMatrix = matrix[i];
-    glyphMatrix.preTranslate(-rect.x(), -rect.y());
+    if (!rect.intersect(atlasRect)) {
+      continue;
+    }
+    state.matrix = mcState->matrix * matrix[i];
+    state.matrix.preTranslate(-rect.x(), -rect.y());
     auto glyphStyle = style;
     if (colors) {
       glyphStyle.color = colors[i].premultiply();
     }
-    drawImageRect(rect, atlas, sampling, glyphStyle, glyphMatrix);
+    drawContext->drawImageRect(atlas, sampling, rect, state, glyphStyle);
   }
 }
 }  // namespace tgfx

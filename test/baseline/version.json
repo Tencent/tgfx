@@ -2,6 +2,7 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
+        "Picture": "72edd24",
         "drawImage": "9208ab7",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
@@ -24,7 +25,7 @@
     "DrawersTest": {
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
-        "ImageWithShadow": "4d6ab20",
+        "ImageWithShadow": "72edd24",
         "SimpleText": "74f94c4",
         "SweepGradient": "5a1fb11"
     },

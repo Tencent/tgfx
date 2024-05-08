@@ -16,13 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DrawContext.h"
-#include "tgfx/core/Picture.h"
+#pragma once
+
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-void DrawContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  if (picture != nullptr) {
-    picture->playback(this, state);
+class MCState {
+ public:
+  explicit MCState(const Matrix& matrix) : matrix(matrix) {
+    clip.toggleInverseFillType();
   }
-}
+
+  explicit MCState(Path initClip) : clip(std::move(initClip)) {
+  }
+
+  MCState(const Matrix& matrix, Path clip) : matrix(matrix), clip(std::move(clip)) {
+  }
+
+  MCState() {
+    clip.toggleInverseFillType();
+  }
+
+  Matrix matrix = Matrix::I();
+  Path clip = {};
+};
 }  // namespace tgfx

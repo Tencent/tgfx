@@ -138,10 +138,16 @@ bool Surface::wait(const BackendSemaphore& waitSemaphore) {
   return renderTargetProxy->getContext()->wait(waitSemaphore);
 }
 
+static Path GetInitClip(int width, int height) {
+  Path path = {};
+  path.addRect(Rect::MakeWH(width, height));
+  return path;
+}
+
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
     renderContext = new RenderContext(this);
-    canvas = new Canvas(renderContext);
+    canvas = new Canvas(renderContext, GetInitClip(width(), height()));
   }
   return canvas;
 }

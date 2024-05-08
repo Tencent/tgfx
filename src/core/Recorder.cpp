@@ -16,13 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DrawContext.h"
-#include "tgfx/core/Picture.h"
+#include "tgfx/core/Recorder.h"
+#include "core/RecordingContext.h"
 
 namespace tgfx {
-void DrawContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  if (picture != nullptr) {
-    picture->playback(this, state);
+Recorder::~Recorder() {
+  delete canvas;
+  delete recordingContext;
+}
+
+Canvas* Recorder::getCanvas() {
+  if (canvas == nullptr) {
+    recordingContext = new RecordingContext();
+    canvas = new Canvas(recordingContext);
   }
+  return canvas;
+}
+
+std::shared_ptr<Picture> Recorder::finishRecordingAsPicture() {
+  if (recordingContext == nullptr) {
+    return nullptr;
+  }
+  canvas->resetMCState();
+  return recordingContext->finishRecordingAsPicture();
 }
 }  // namespace tgfx

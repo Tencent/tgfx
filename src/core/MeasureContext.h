@@ -18,19 +18,13 @@
 
 #pragma once
 
-#include <optional>
 #include "core/DrawContext.h"
-#include "gpu/OpContext.h"
 
 namespace tgfx {
-class RenderContext : public DrawContext {
+class MeasureContext : public DrawContext {
  public:
-  RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags);
-
-  ~RenderContext() override;
-
-  Surface* getSurface() const override {
-    return surface;
+  Rect getBounds() const {
+    return bounds;
   }
 
   void clear() override;
@@ -52,31 +46,9 @@ class RenderContext : public DrawContext {
                  std::shared_ptr<ImageFilter> filter) override;
 
  private:
-  OpContext* opContext = nullptr;
-  uint32_t renderFlags = 0;
-  Surface* surface = nullptr;
-  std::shared_ptr<TextureProxy> clipTexture = nullptr;
-  uint32_t clipID = 0;
+  Rect bounds = Rect::MakeEmpty();
 
-  explicit RenderContext(Surface* surface);
-  Context* getContext() const;
-  std::shared_ptr<TextureProxy> getClipTexture(const Path& clip);
-  std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip,
-                                                   const Rect* drawBounds = nullptr);
-  std::unique_ptr<FragmentProcessor> getClipMask(const Path& clip, const Rect& deviceBounds,
-                                                 const Matrix& viewMatrix, Rect* scissorRect);
-  Rect clipLocalBounds(const Rect& localBounds, const MCState& state);
-  std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
-                                                     const Stroke* stroke = nullptr);
-  bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
-  void drawColorGlyphs(const GlyphRun& glyphRun, const MCState& state, const FillStyle& style);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds, const MCState& state,
-                 const FillStyle& style);
-  void addOp(std::unique_ptr<Op> op, const std::function<bool()>& willDiscardContent);
-  void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);
-  bool wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state, const FillStyle& style,
-                              bool isRectOp) const;
-
-  friend class Surface;
+  void addLocalBounds(const Rect& localBounds, const MCState& state);
+  void addDeviceBounds(const Rect& deviceBounds, const Path& clip);
 };
 }  // namespace tgfx

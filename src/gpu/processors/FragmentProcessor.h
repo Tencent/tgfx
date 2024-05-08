@@ -37,13 +37,8 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect,
-         const Matrix& viewMatrix = Matrix::I())
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, const Matrix& viewMatrix)
       : context(context), renderFlags(renderFlags), drawRect(drawRect), viewMatrix(viewMatrix) {
-  }
-
-  bool empty() const {
-    return context == nullptr || drawRect.isEmpty();
   }
 
   Context* context = nullptr;

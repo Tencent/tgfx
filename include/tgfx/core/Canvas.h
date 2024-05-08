@@ -24,6 +24,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Picture.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -31,6 +32,7 @@ namespace tgfx {
 class Surface;
 class FillStyle;
 class DrawContext;
+class MCState;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
@@ -273,6 +275,23 @@ class Canvas {
                   const Font& font, const Paint& paint);
 
   /**
+   * Draws a Picture using the current clip and matrix. Clip and matrix are unchanged by picture
+   * contents, as if save() was called before and restore() was called after drawPicture().
+   */
+  void drawPicture(std::shared_ptr<Picture> picture);
+
+  /**
+   * Draws a Picture using the current clip, and matrix premultiplied with existing Matrix. If paint
+   * is non-null, then the picture is always drawn into a temporary layer before actually landing on
+   * the canvas. Note that drawing into a layer can also change its appearance if there are any
+   * non-associative blendModes inside any of the picture elements.
+   * @param picture recorded drawing commands to play back.
+   * @param matrix Matrix to rotate, scale, translate, and so on; may be nullptr.
+   * @param paint Paint to apply transparency, filtering, and so on; may be nullptr.
+   */
+  void drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix, const Paint* paint);
+
+  /**
    * Draws a set of sprites from the atlas using the current clip, matrix, and specified paint.
    * @param atlas Image containing the sprites.
    * @param matrix Matrix mappings for sprites in atlas.
@@ -288,16 +307,20 @@ class Canvas {
 
  private:
   DrawContext* drawContext = nullptr;
+  std::unique_ptr<MCState> mcState;
+  std::stack<std::unique_ptr<MCState>> mcStack;
 
   explicit Canvas(DrawContext* drawContext);
+  Canvas(DrawContext* drawContext, const Path& initClip);
   bool drawSimplePath(const Path& path, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
-  void drawImageRect(const Rect& rect, std::shared_ptr<Image> image,
-                     const SamplingOptions& sampling, const FillStyle& style,
-                     const Matrix& extraMatrix);
+  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
+                 std::shared_ptr<ImageFilter> filter = nullptr);
+  void resetMCState();
 
   friend class Surface;
+  friend class Picture;
   friend class Recorder;
 };
 }  // namespace tgfx
