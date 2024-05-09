@@ -131,16 +131,17 @@ std::shared_ptr<RenderTarget> RenderTargetProxy::getRenderTarget() const {
   return Resource::Find<RenderTarget>(context, handle.key());
 }
 
-std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy() const {
+std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int height) const {
   auto context = getContext();
   auto textureProxy = getTextureProxy();
   auto hasMipmaps = textureProxy && textureProxy->hasMipmaps();
-  return context->proxyProvider()->createTextureProxy({}, width(), height(), format(), hasMipmaps,
+  return context->proxyProvider()->createTextureProxy({}, width, height, format(), hasMipmaps,
                                                       origin());
 }
 
-std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy() const {
-  auto textureProxy = makeTextureProxy();
+std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int width,
+                                                                            int height) const {
+  auto textureProxy = makeTextureProxy(width, height);
   if (textureProxy == nullptr) {
     return nullptr;
   }

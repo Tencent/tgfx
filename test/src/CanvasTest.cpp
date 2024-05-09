@@ -29,6 +29,7 @@
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Recorder.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
@@ -686,6 +687,86 @@ TGFX_TEST(CanvasTest, NothingToDraw) {
   paint.setColor(Color::FromRGBA(0, 0, 0, 127));
   canvas->drawRect(Rect::MakeXYWH(20, 20, 20, 20), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NothingToDraw"));
+  device->unlock();
+}
+
+TGFX_TEST(CanvasTest, Picture) {
+  Recorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  EXPECT_TRUE(recorder.getRecordingCanvas() != nullptr);
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(0, 0, 200, 150));
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  paint.setAlpha(0.8f);
+  paint.setBlendMode(BlendMode::Multiply);
+  canvas->drawPath(path, paint);
+  paint.setBlendMode(BlendMode::SrcOver);
+  paint.setAlpha(1.0f);
+  auto singleRecordPicture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(singleRecordPicture != nullptr);
+  EXPECT_TRUE(recorder.getRecordingCanvas() == nullptr);
+
+  canvas = recorder.beginRecording();
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeMipmapped(true);
+  auto imageScale = 200.f / static_cast<float>(image->width());
+  canvas->scale(imageScale, imageScale);
+  canvas->drawImage(image);
+  canvas->resetMatrix();
+  canvas->translate(200, 0);
+  paint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeXYWH(10, 10, 100, 100), paint);
+  canvas->translate(150, 0);
+  path.reset();
+  path.addRoundRect(Rect::MakeXYWH(10, 10, 100, 100), 10, 10);
+  paint.setColor(Color::Green());
+  canvas->drawPath(path, paint);
+  path.reset();
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  auto matrix = Matrix::I();
+  matrix.postRotate(30, 50, 50);
+  path.transform(matrix);
+  canvas->resetMatrix();
+  canvas->save();
+  canvas->translate(450, 150);
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 100, 100));
+  canvas->drawPath(path, paint);
+  canvas->restore();
+  canvas->translate(200, 350);
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 50.f);
+  font.setFauxBold(true);
+  paint.setColor(Color::Red());
+  canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
+  paint.setColor(Color::White());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(1));
+  canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto bounds = picture->getBounds();
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height() + 20));
+  canvas = surface->getCanvas();
+  path.reset();
+  path.addOval(Rect::MakeWH(bounds.width(), bounds.height() + 100));
+  canvas->clipPath(path);
+  canvas->translate(0, 10);
+  canvas->drawPicture(picture);
+  canvas->translate(0, bounds.height() + 10);
+  paint.setBlendMode(BlendMode::Screen);
+  paint.setAlpha(0.8f);
+  matrix = Matrix::MakeTrans(0, -180);
+  canvas->drawPicture(singleRecordPicture, &matrix, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Picture"));
   device->unlock();
 }
 }  // namespace tgfx
