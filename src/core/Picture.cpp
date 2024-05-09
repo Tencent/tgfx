@@ -25,7 +25,13 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-Picture::Picture(std::vector<std::unique_ptr<Record>> records) : records(std::move(records)) {
+Picture::Picture(std::vector<Record*> records) : records(std::move(records)) {
+}
+
+Picture::~Picture() {
+  for (auto& record : records) {
+    delete record;
+  }
 }
 
 Rect Picture::getBounds(const Matrix& matrix) const {

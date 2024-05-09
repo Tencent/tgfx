@@ -25,18 +25,29 @@ Recorder::~Recorder() {
   delete recordingContext;
 }
 
-Canvas* Recorder::getCanvas() {
+Canvas* Recorder::beginRecording() {
   if (canvas == nullptr) {
     recordingContext = new RecordingContext();
     canvas = new Canvas(recordingContext);
   }
-  return canvas;
+  if (activelyRecording) {
+    canvas->resetMCState();
+    recordingContext->clear();
+  } else {
+    activelyRecording = true;
+  }
+  return getRecordingCanvas();
+}
+
+Canvas* Recorder::getRecordingCanvas() const {
+  return activelyRecording ? canvas : nullptr;
 }
 
 std::shared_ptr<Picture> Recorder::finishRecordingAsPicture() {
-  if (recordingContext == nullptr) {
+  if (!activelyRecording || recordingContext == nullptr) {
     return nullptr;
   }
+  activelyRecording = false;
   canvas->resetMCState();
   return recordingContext->finishRecordingAsPicture();
 }

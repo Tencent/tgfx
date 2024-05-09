@@ -34,6 +34,8 @@ class MCState;
  */
 class Picture {
  public:
+  ~Picture();
+
   /**
    * Returns the bounding box of the Picture when drawn with the given Matrix.
    */
@@ -47,9 +49,9 @@ class Picture {
   void playback(Canvas* canvas) const;
 
  private:
-  std::vector<std::unique_ptr<Record>> records = {};
+  std::vector<Record*> records = {};
 
-  explicit Picture(std::vector<std::unique_ptr<Record>> records);
+  explicit Picture(std::vector<Record*> records);
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 

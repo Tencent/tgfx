@@ -692,7 +692,8 @@ TGFX_TEST(CanvasTest, NothingToDraw) {
 
 TGFX_TEST(CanvasTest, Picture) {
   Recorder recorder = {};
-  auto canvas = recorder.getCanvas();
+  auto canvas = recorder.beginRecording();
+  EXPECT_TRUE(recorder.getRecordingCanvas() != nullptr);
   Path path = {};
   path.addOval(Rect::MakeXYWH(0, 0, 200, 150));
   Paint paint = {};
@@ -704,7 +705,9 @@ TGFX_TEST(CanvasTest, Picture) {
   paint.setAlpha(1.0f);
   auto singleRecordPicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(singleRecordPicture != nullptr);
+  EXPECT_TRUE(recorder.getRecordingCanvas() == nullptr);
 
+  canvas = recorder.beginRecording();
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   image = image->makeMipmapped(true);

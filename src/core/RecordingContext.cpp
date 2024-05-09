@@ -35,23 +35,26 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
 }
 
 void RecordingContext::clear() {
+  for (auto& record : records) {
+    delete record;
+  }
   records.resize(0);
 }
 
 void RecordingContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
-  records.push_back(std::make_unique<DrawRect>(rect, state, style));
+  records.push_back(new DrawRect(rect, state, style));
 }
 
 void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) {
-  records.push_back(std::make_unique<DrawRRect>(rRect, state, style));
+  records.push_back(new DrawRRect(rRect, state, style));
 }
 
 void RecordingContext::drawPath(const Path& path, const MCState& state, const FillStyle& style,
                                 const Stroke* stroke) {
   if (stroke && stroke->width > 0) {
-    records.push_back(std::make_unique<StrokePath>(path, state, style, *stroke));
+    records.push_back(new StrokePath(path, state, style, *stroke));
   } else {
-    records.push_back(std::make_unique<DrawPath>(path, state, style));
+    records.push_back(new DrawPath(path, state, style));
   }
 }
 
@@ -63,19 +66,18 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Samplin
   }
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   if (rect == imageRect) {
-    records.push_back(std::make_unique<DrawImage>(std::move(image), sampling, state, style));
+    records.push_back(new DrawImage(std::move(image), sampling, state, style));
   } else {
-    records.push_back(
-        std::make_unique<DrawImageRect>(std::move(image), sampling, rect, state, style));
+    records.push_back(new DrawImageRect(std::move(image), sampling, rect, state, style));
   }
 }
 
 void RecordingContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle& style,
                                     const Stroke* stroke) {
   if (stroke && stroke->width > 0) {
-    records.push_back(std::make_unique<StrokeGlyphRun>(std::move(glyphRun), state, style, *stroke));
+    records.push_back(new StrokeGlyphRun(std::move(glyphRun), state, style, *stroke));
   } else {
-    records.push_back(std::make_unique<DrawGlyphRun>(std::move(glyphRun), state, style));
+    records.push_back(new DrawGlyphRun(std::move(glyphRun), state, style));
   }
 }
 
@@ -84,8 +86,7 @@ void RecordingContext::drawLayer(std::shared_ptr<Picture> picture, const MCState
   if (picture == nullptr) {
     return;
   }
-  records.push_back(
-      std::make_unique<DrawLayer>(std::move(picture), state, style, std::move(filter)));
+  records.push_back(new DrawLayer(std::move(picture), state, style, std::move(filter)));
 }
 
 void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -93,7 +94,7 @@ void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCSta
     return;
   }
   if (picture->records.size() > MaxPictureDrawsToUnrollInsteadOfReference) {
-    records.push_back(std::make_unique<DrawPicture>(picture, state));
+    records.push_back(new DrawPicture(picture, state));
   } else {
     DrawContext::drawPicture(std::move(picture), state);
   }

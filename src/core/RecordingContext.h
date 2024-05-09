@@ -48,6 +48,6 @@ class RecordingContext : public DrawContext {
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
  private:
-  std::vector<std::unique_ptr<Record>> records = {};
+  std::vector<Record*> records = {};
 };
 }  // namespace tgfx

@@ -33,21 +33,26 @@ class Recorder {
   ~Recorder();
 
   /**
-   * Returns a Canvas that records the drawing commands. If the recording is already active, the
-   * same Canvas object is returned. The returned Canvas is managed and owned by Recorder, and is
-   * deleted when the Recorder is deleted.
+   * Begins recording drawing commands. If recording is already active, it clears the existing
+   * commands and starts afresh. Returns the canvas that captures the drawing commands. The returned
+   * Canvas is managed by the Recorder and is deleted when the Recorder is deleted.
    */
-  Canvas* getCanvas();
+  Canvas* beginRecording();
+
+  /**
+   * Returns the recording canvas if one is active, or NULL if recording is not active.
+   */
+  Canvas* getRecordingCanvas() const;
 
   /**
    * Signals that the caller is done recording and returns a Picture object that captures all the
-   * drawing commands made to the canvas. After this method is called, the Recorder is reset and can
-   * be used to record new commands. Returns nullptr if no recording is active or no commands were
-   * recorded.
+   * drawing commands made to the canvas. Returns nullptr if no recording is active or no commands
+   * were recorded.
    */
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
  private:
+  bool activelyRecording = false;
   RecordingContext* recordingContext = nullptr;
   Canvas* canvas = nullptr;
 };
