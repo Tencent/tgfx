@@ -1,0 +1,49 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/dom/.ohos/config/default_harmonyos_yQ8nAit9-rVCEops_bcdyLiKQ2mIT0leIE0pNeGMKks=.cer",
+          "storePassword": "0000001A7A4E3A895C11695E6B1DF6D4C0F5930B437380B3D79D2A5149BDCBC8303D29983241522D5423",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001A4AB6C3172F717A47A1145D26792A5C6CC28A550F0A4CF34173B56ADA0A7A9EB436170EEE6F52",
+          "profile": "/Users/dom/.ohos/config/default_harmonyos_yQ8nAit9-rVCEops_bcdyLiKQ2mIT0leIE0pNeGMKks=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/dom/.ohos/config/default_harmonyos_yQ8nAit9-rVCEops_bcdyLiKQ2mIT0leIE0pNeGMKks=.p12"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compatibleSdkVersion": "5.0.0(12)",
+        "runtimeOS": "HarmonyOS",
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "hello2d",
+      "srcPath": "./hello2d",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}
