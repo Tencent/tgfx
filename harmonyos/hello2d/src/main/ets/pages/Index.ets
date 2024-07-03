@@ -1,22 +1,25 @@
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import testNapi from 'libhello2d.so';
+import hello2d from 'libhello2d.so';
 
 @Entry
 @Component
 struct Index {
   @State message: string = 'Hello TGFX';
+  private drawIndex: number = 0;
 
   build() {
     Row() {
       Column() {
-        Text(this.message)
-          .fontSize(50)
-          .fontWeight(FontWeight.Bold)
-          .onClick(() => {
-            hilog.info(0x0000, 'testTag', 'Test NAPI 2 + 3 = %{public}d', testNapi.add(2, 3));
-          })
+        XComponent({
+          id: "xcomponent",
+          type: XComponentType.SURFACE,
+          libraryname: "hello2d"
+        })
       }
       .width('100%')
+      .onClick(() => {
+        hello2d.draw(this.drawIndex++);
+      })
     }
     .height('100%')
   }

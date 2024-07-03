@@ -11,5 +11,9 @@ endif()
 include_directories(${NATIVERENDER_ROOT_PATH}
                     ${NATIVERENDER_ROOT_PATH}/include)
 
-add_library(hello2d SHARED napi_init.cpp)
-target_link_libraries(hello2d PUBLIC libace_napi.z.so)
+find_library(EGL-lib EGL)
+find_library(GLES-lib GLESv3)
+find_library(libace-lib ace_ndk.z)
+find_library(hilog-lib hilog_ndk.z)
+add_library(hello2d SHARED napi_init.cpp egl_core.cpp)
+target_link_libraries(hello2d PUBLIC ${EGL-lib} ${GLES-lib} ${libace-lib} ${hilog-lib} libace_napi.z.so)
