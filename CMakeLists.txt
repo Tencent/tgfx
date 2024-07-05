@@ -23,7 +23,7 @@ endif ()
 
 if (IOS OR WEB)
     option(TGFX_USE_WEBP_DECODE "Enable embedded WEBP decoding support" ON)
-elseif (NOT ANDROID)
+elseif (NOT ANDROID AND NOT OHOS)
     option(TGFX_USE_PNG_DECODE "Enable embedded PNG decoding support" ON)
     option(TGFX_USE_PNG_ENCODE "Enable embedded PNG encoding support" ON)
     option(TGFX_USE_JPEG_DECODE "Enable embedded JPEG decoding support" ON)
@@ -93,7 +93,7 @@ file(GLOB PLATFORM_COMMON_FILES
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type)
+    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-error=unused-command-line-argument)
 endif ()
 
 if (MSVC)
@@ -118,7 +118,9 @@ endif ()
 
 if (TGFX_USE_FREETYPE)
     # Freetype needs libpng
-    set(TGFX_USE_PNG_DECODE ON)
+    if (NOT OHOS)
+        set(TGFX_USE_PNG_DECODE ON)
+    endif()
 endif ()
 
 if (TGFX_USE_PNG_DECODE)
