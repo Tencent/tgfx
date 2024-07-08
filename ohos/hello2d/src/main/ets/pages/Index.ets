@@ -1,11 +1,16 @@
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import hello2d from 'libhello2d.so';
+import display from '@ohos.display';
 
 @Entry
 @Component
 struct Index {
   @State message: string = 'Hello TGFX';
-  private drawIndex: number = 0;
+  private drawIndex: number = 1;
+
+  aboutToAppear(): void {
+    let displayInfo = display.getDefaultDisplaySync();
+    hello2d.updateDensity(displayInfo.densityPixels);
+  }
 
   build() {
     Row() {

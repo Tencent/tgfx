@@ -27,6 +27,9 @@ void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host)
   auto size = screenSize - static_cast<int>(150 * scale);
   size = std::max(size, 50);
   auto image = host->getImage("bridge");
+  if (image == nullptr) {
+    return;
+  }
   image = image->makeMipmapped(true);
   auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
   auto matrix = tgfx::Matrix::MakeScale(imageScale);
