@@ -118,9 +118,7 @@ endif ()
 
 if (TGFX_USE_FREETYPE)
     # Freetype needs libpng
-    if (NOT OHOS)
-        set(TGFX_USE_PNG_DECODE ON)
-    endif ()
+    set(TGFX_USE_PNG_DECODE ON)
 endif ()
 
 if (TGFX_USE_PNG_DECODE)
