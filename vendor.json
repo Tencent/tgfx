@@ -127,6 +127,30 @@
       }
     },
     {
+      "name": "libpng",
+      "deps": {
+        "ZLIB": "zlib"
+      },
+      "cmake": {
+        "targets": [
+          "png_static"
+        ],
+        "arguments": [
+          "-DANDROID=TRUE",
+          "-DPNG_BUILD_ZLIB=ON",
+          "-DPNG_ARM_NEON=on"
+        ],
+        "includes": [
+          "${SOURCE_DIR}/png.h",
+          "${SOURCE_DIR}/pngconf.h",
+          "${BUILD_DIR}/pnglibconf.h"
+        ],
+        "platforms": [
+          "ohos"
+        ]
+      }
+    },
+    {
       "name": "freetype",
       "deps": {
         "ZLIB": "zlib",
