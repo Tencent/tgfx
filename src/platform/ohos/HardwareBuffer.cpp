@@ -16,49 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/val.h>
-#elif defined(__ANDROID__) || defined(ANDROID)
-
-class _jobject;
-
-#elif defined(__APPLE__)
-
-struct CGImage;
-
-#elif defined(__OHOS__)
-#include <multimedia/image_framework/image_pixel_map_mdk.h>
-#include "tgfx/core/Orientation.h"
-#endif
+#include "tgfx/platform/HardwareBuffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-#if defined(__EMSCRIPTEN__)
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) { return nullptr; }
 
-typedef emscripten::val NativeImageRef;
+bool HardwareBufferCheck(HardwareBufferRef) { return false; }
 
-#elif defined(__ANDROID__) || defined(ANDROID)
+HardwareBufferRef HardwareBufferAllocate(int, int, bool) { return nullptr; }
 
-typedef _jobject* NativeImageRef;
+HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) { return buffer; }
 
-#elif defined(__APPLE__)
+void HardwareBufferRelease(HardwareBufferRef) {}
 
-typedef CGImage* NativeImageRef;
+void* HardwareBufferLock(HardwareBufferRef) { return nullptr; }
 
-#elif defined(__OHOS__)
+void HardwareBufferUnlock(HardwareBufferRef) {}
 
-struct NativeImage {
-  NativePixelMap* pixelMap = nullptr;
-  Orientation orientation = Orientation::TopLeft;
-};
-typedef NativeImage* NativeImageRef;
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef) { return {}; }
 
-#else
-
-struct NativeImage {};
-
-typedef NativeImage* NativeImageRef;
-
-#endif
+PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef) { return PixelFormat::Unknown; }
 }  // namespace tgfx

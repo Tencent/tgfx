@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,48 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/val.h>
-#elif defined(__ANDROID__) || defined(ANDROID)
-
-class _jobject;
-
-#elif defined(__APPLE__)
-
-struct CGImage;
-
-#elif defined(__OHOS__)
-#include <multimedia/image_framework/image_pixel_map_mdk.h>
-#include "tgfx/core/Orientation.h"
-#endif
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-#if defined(__EMSCRIPTEN__)
+class NativeImageCodec : public ImageCodec {
+ public:
+  bool readPixels(const ImageInfo &dstInfo, void *dstPixels) const override;
 
-typedef emscripten::val NativeImageRef;
+ private:
+  NativeImageCodec(int width, int height, Orientation orientation, std::shared_ptr<Data> data, const ImageInfo &info)
+      : ImageCodec(width, height, orientation), imageData(std::move(data)), imageInfo(info) {}
 
-#elif defined(__ANDROID__) || defined(ANDROID)
+  std::shared_ptr<Data> imageData;
+  ImageInfo imageInfo;
 
-typedef _jobject* NativeImageRef;
-
-#elif defined(__APPLE__)
-
-typedef CGImage* NativeImageRef;
-
-#elif defined(__OHOS__)
-
-struct NativeImage {
-  NativePixelMap* pixelMap = nullptr;
-  Orientation orientation = Orientation::TopLeft;
+  friend class ImageCodec;
 };
-typedef NativeImage* NativeImageRef;
-
-#else
-
-struct NativeImage {};
-
-typedef NativeImage* NativeImageRef;
-
-#endif
 }  // namespace tgfx

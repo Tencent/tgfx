@@ -1,13 +1,18 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
+#include <multimedia/image_framework/image_pixel_map_napi.h>
+#include <multimedia/image_framework/image_source_mdk.h>
+#include "tgfx/platform/ohos/HarmonyImage.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
+#include "tgfx/platform/NativeImage.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
-
 
 static float screenDensity = 1.0f;
 static std::shared_ptr<drawers::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
+
+static std::shared_ptr<drawers::AppHost> CreateAppHost();
 
 static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   size_t argc = 1;
@@ -19,6 +24,121 @@ static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static napi_value AddImageFromSource(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  size_t strSize;
+  char srcBuf[2048];
+  napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
+  std::string name(srcBuf, strSize);
+  ImageSourceNative *imageSource = OH_ImageSource_InitNative(env, args[1]);
+  if (!imageSource) {
+    return nullptr;
+  }
+  OhosImageSourceInfo sourceInfo;
+  auto errorCode = OH_ImageSource_GetImageInfo(imageSource, 0, &sourceInfo);
+  if (errorCode != IMAGE_RESULT_SUCCESS || sourceInfo.size.width < 1 || sourceInfo.size.height < 1) {
+    OH_ImageSource_Release(imageSource);
+    return nullptr;
+  }
+  OhosImageSourceProperty target;
+  char exifKey[] = "Orientation";
+  target.size = strlen(exifKey);
+  target.value = exifKey;
+
+  OhosImageSourceProperty response{};
+  char responseValue[20];
+  response.size = 20;
+  response.value = responseValue;
+  errorCode = OH_ImageSource_GetImageProperty(imageSource, &target, &response);
+
+  tgfx::Orientation orientation = tgfx::Orientation::TopLeft;
+  if (errorCode == IMAGE_RESULT_SUCCESS) {
+    orientation = tgfx::HarmonyImage::ToTGFXOrientation(response.value, response.size);
+  }
+
+  napi_value pixelMap;
+  errorCode = OH_ImageSource_CreatePixelMap(imageSource, nullptr, &pixelMap);
+  if (errorCode != IMAGE_RESULT_SUCCESS) {
+    OH_ImageSource_Release(imageSource);
+    return nullptr;
+  }
+  NativePixelMap *nativePixelMap = OH_PixelMap_InitNativePixelMap(env, pixelMap);
+  if (nativePixelMap == nullptr) {
+    OH_ImageSource_Release(imageSource);
+    return nullptr;
+  }
+  if (appHost == nullptr) {
+    appHost = CreateAppHost();
+  }
+  tgfx::NativeImage image{nativePixelMap, orientation};
+  appHost->addImage(name, tgfx::Image::MakeFrom(&image));
+  OH_ImageSource_Release(imageSource);
+  return nullptr;
+}
+
+static napi_value AddImageFromPixelMap(napi_env env, napi_callback_info info) {
+  size_t argc = 3;
+  napi_value args[3] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  size_t strSize;
+  char srcBuf[2048];
+  napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
+  std::string name(srcBuf, strSize);
+  NativePixelMap *pixelmap = OH_PixelMap_InitNativePixelMap(env, args[1]);
+  if (pixelmap == nullptr) {
+    return nullptr;
+  }
+  if (appHost == nullptr) {
+    appHost = CreateAppHost();
+  }
+  napi_get_value_string_utf8(env, args[2], srcBuf, sizeof(srcBuf), &strSize);
+  tgfx::NativeImage nativeImage{};
+  nativeImage.pixelMap = pixelmap;
+  nativeImage.orientation = tgfx::HarmonyImage::ToTGFXOrientation(srcBuf, strSize);
+  appHost->addImage(name, tgfx::Image::MakeFrom(&nativeImage));
+  return nullptr;
+}
+
+static napi_value AddImageFromPath(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  size_t strSize;
+  char srcBuf[2048];
+  napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
+  std::string name = srcBuf;
+  napi_get_value_string_utf8(env, args[1], srcBuf, sizeof(srcBuf), &strSize);
+  std::string path = srcBuf;
+  if (appHost == nullptr) {
+    appHost = CreateAppHost();
+  }
+  appHost->addImage(name, tgfx::Image::MakeFromFile(path));
+  return nullptr;
+}
+
+static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  size_t strSize;
+  char srcBuf[2048];
+  napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
+  std::string name = srcBuf;
+  size_t length;
+  void *data;
+  auto code = napi_get_arraybuffer_info(env, args[1], &data, &length);
+  if (code != napi_ok) {
+    return nullptr;
+  }
+  auto tgfxData = tgfx::Data::MakeWithCopy(data, length);
+  if (appHost == nullptr) {
+    appHost = CreateAppHost();
+  }
+  appHost->addImage(name, tgfx::Image::MakeFromEncoded(tgfxData));
+  return nullptr;
+}
 
 static void Draw(int index) {
   if (window == nullptr || appHost == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
@@ -63,9 +183,8 @@ static napi_value OnDraw(napi_env env, napi_callback_info info) {
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost() {
   auto appHost = std::make_shared<drawers::AppHost>();
-  static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
-                                                      "/system/fonts/HarmonyOS_Sans_SC.ttf",
-                                                      "/system/fonts/HarmonyOS_Sans_TC.ttf"};
+  static const std::string FallbackFontFileNames[] = {
+      "/system/fonts/HarmonyOS_Sans.ttf", "/system/fonts/HarmonyOS_Sans_SC.ttf", "/system/fonts/HarmonyOS_Sans_TC.ttf"};
   for (auto &fileName : FallbackFontFileNames) {
     auto typeface = tgfx::Typeface::MakeFromPath(fileName);
     if (typeface != nullptr) {
@@ -138,8 +257,11 @@ EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"draw", nullptr, OnDraw, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default,
-       nullptr}};
+      {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"addImageFromSource", nullptr, AddImageFromSource, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"addImageFromPixelMap", nullptr, AddImageFromPixelMap, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"addImageFromPath", nullptr, AddImageFromPath, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default, nullptr}};
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   RegisterCallback(env, exports);
   return exports;
@@ -148,6 +270,4 @@ EXTERN_C_END
 
 static napi_module demoModule = {1, 0, nullptr, Init, "hello2d", ((void *)0), {0}};
 
-extern "C" __attribute__((constructor)) void RegisterHello2dModule(void) {
-  napi_module_register(&demoModule);
-}
+extern "C" __attribute__((constructor)) void RegisterHello2dModule(void) { napi_module_register(&demoModule); }

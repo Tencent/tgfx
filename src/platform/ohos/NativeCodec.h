@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,47 +18,28 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/val.h>
-#elif defined(__ANDROID__) || defined(ANDROID)
+#include "tgfx/core/ImageCodec.h"
 
-class _jobject;
-
-#elif defined(__APPLE__)
-
-struct CGImage;
-
-#elif defined(__OHOS__)
-#include <multimedia/image_framework/image_pixel_map_mdk.h>
-#include "tgfx/core/Orientation.h"
-#endif
+struct OH_ImageSourceNative;
+struct OH_PixelmapNative;
 
 namespace tgfx {
-#if defined(__EMSCRIPTEN__)
+class NativeCodec : public ImageCodec {
+ public:
+  bool readPixels(const ImageInfo &dstInfo, void *dstPixels) const override;
 
-typedef emscripten::val NativeImageRef;
+ private:
+  std::string imagePath;
+  std::shared_ptr<Data> imageBytes;
 
-#elif defined(__ANDROID__) || defined(ANDROID)
+  static std::shared_ptr<NativeCodec> Make(OH_ImageSourceNative *imageSource);
 
-typedef _jobject* NativeImageRef;
+  static ImageInfo GetPixelmapInfo(OH_PixelmapNative *pixelmap);
 
-#elif defined(__APPLE__)
+  OH_ImageSourceNative *CreateImageSource() const;
 
-typedef CGImage* NativeImageRef;
+  NativeCodec(int width, int height, Orientation orientation) : ImageCodec(width, height, orientation) {}
 
-#elif defined(__OHOS__)
-
-struct NativeImage {
-  NativePixelMap* pixelMap = nullptr;
-  Orientation orientation = Orientation::TopLeft;
+  friend class ImageCodec;
 };
-typedef NativeImage* NativeImageRef;
-
-#else
-
-struct NativeImage {};
-
-typedef NativeImage* NativeImageRef;
-
-#endif
 }  // namespace tgfx
