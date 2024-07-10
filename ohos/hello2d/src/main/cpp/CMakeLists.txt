@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(NATIVERENDER_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-Wno-error=unused-command-line-argument)
+    add_compile_options(-Wno-unused-command-line-argument)
 endif ()
 
 if(DEFINED PACKAGE_FIND_FILE)
