@@ -26,19 +26,21 @@ struct OH_PixelmapNative;
 namespace tgfx {
 class NativeCodec : public ImageCodec {
  public:
-  bool readPixels(const ImageInfo &dstInfo, void *dstPixels) const override;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
 
-  static std::shared_ptr<NativeCodec> Make(OH_ImageSourceNative *imageSource);
+  static std::shared_ptr<NativeCodec> Make(OH_ImageSourceNative* imageSource);
 
-  static ImageInfo GetPixelmapInfo(OH_PixelmapNative *pixelmap);
+  static ImageInfo GetPixelmapInfo(OH_PixelmapNative* pixelmap);
 
-  OH_ImageSourceNative *CreateImageSource() const;
+  OH_ImageSourceNative* CreateImageSource() const;
 
-  NativeCodec(int width, int height, Orientation orientation) : ImageCodec(width, height, orientation) {}
+  NativeCodec(int width, int height, Orientation orientation)
+      : ImageCodec(width, height, orientation) {
+  }
 
   friend class ImageCodec;
 };

@@ -13,15 +13,16 @@ struct Index {
     hello2d.updateDensity(displayInfo.densityPixels);
     getContext(this).resourceManager.getRawFileContent("rotation.jpg", async (error, value) => {
       let name = "bridge";
-      // from pixelmap
+      //from pixelmap
       // const buffer = value.buffer.slice(0);
       // let img = image.createImageSource(buffer);
       // let pixelmap = img.createPixelMapSync();
+      // let imgInfo = await img.getImageInfo(0);
       // let orientation = await img.getImageProperty(image.PropertyKey.ORIENTATION);
       // if (orientation) {
-      //   hello2d.addImageFromPixelMap(name, pixelmap, orientation);
+      //   hello2d.addImageFromPixelMap(name, pixelmap, orientation, imgInfo.alphaType);
       // } else {
-      //   hello2d.addImageFromPixelMap(name, pixelmap, "Top-left");
+      //   hello2d.addImageFromPixelMap(name, pixelmap, "Top-left", imgInfo.alphaType);
       // }
       // pixelmap.release();
 

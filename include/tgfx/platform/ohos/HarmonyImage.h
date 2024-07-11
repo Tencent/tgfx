@@ -31,7 +31,7 @@ class HarmonyImage {
   /**
    * Convert the orientation attribute returned from HarmonyOS to the orientation of TGFX
    */
-  static Orientation ToTGFXOrientation(const char *value, size_t size);
+  static Orientation ToTGFXOrientation(const char* value, size_t size);
 
   /**
    * Convert the pixelFormat attribute returned from HarmonyOS to the colorType attribute of TGFX. If the corresponding

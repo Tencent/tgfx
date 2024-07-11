@@ -30,6 +30,7 @@ struct CGImage;
 
 #elif defined(__OHOS__)
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
+#include "tgfx/core/AlphaType.h"
 #include "tgfx/core/Orientation.h"
 #endif
 
@@ -51,6 +52,7 @@ typedef CGImage* NativeImageRef;
 struct NativeImage {
   NativePixelMap* pixelMap = nullptr;
   Orientation orientation = Orientation::TopLeft;
+  AlphaType alphaType = AlphaType::Unpremultiplied;
 };
 typedef NativeImage* NativeImageRef;
 

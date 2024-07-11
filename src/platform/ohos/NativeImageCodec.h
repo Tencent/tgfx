@@ -22,11 +22,13 @@
 namespace tgfx {
 class NativeImageCodec : public ImageCodec {
  public:
-  bool readPixels(const ImageInfo &dstInfo, void *dstPixels) const override;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  NativeImageCodec(int width, int height, Orientation orientation, std::shared_ptr<Data> data, const ImageInfo &info)
-      : ImageCodec(width, height, orientation), imageData(std::move(data)), imageInfo(info) {}
+  NativeImageCodec(int width, int height, Orientation orientation, std::shared_ptr<Data> data,
+                   const ImageInfo& info)
+      : ImageCodec(width, height, orientation), imageData(std::move(data)), imageInfo(info) {
+  }
 
   std::shared_ptr<Data> imageData;
   ImageInfo imageInfo;

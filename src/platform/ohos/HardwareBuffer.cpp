@@ -20,21 +20,37 @@
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) { return nullptr; }
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
+  return nullptr;
+}
 
-bool HardwareBufferCheck(HardwareBufferRef) { return false; }
+bool HardwareBufferCheck(HardwareBufferRef) {
+  return false;
+}
 
-HardwareBufferRef HardwareBufferAllocate(int, int, bool) { return nullptr; }
+HardwareBufferRef HardwareBufferAllocate(int, int, bool) {
+  return nullptr;
+}
 
-HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) { return buffer; }
+HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
+  return buffer;
+}
 
-void HardwareBufferRelease(HardwareBufferRef) {}
+void HardwareBufferRelease(HardwareBufferRef) {
+}
 
-void* HardwareBufferLock(HardwareBufferRef) { return nullptr; }
+void* HardwareBufferLock(HardwareBufferRef) {
+  return nullptr;
+}
 
-void HardwareBufferUnlock(HardwareBufferRef) {}
+void HardwareBufferUnlock(HardwareBufferRef) {
+}
 
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef) { return {}; }
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
+  return {};
+}
 
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef) { return PixelFormat::Unknown; }
+PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef) {
+  return PixelFormat::Unknown;
+}
 }  // namespace tgfx

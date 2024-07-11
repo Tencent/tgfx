@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeCodec.h"
-
 #include <multimedia/image_framework/image/image_source_native.h>
 #include <cstdint>
 #include "tgfx/core/AlphaType.h"
@@ -27,7 +26,7 @@
 
 namespace tgfx {
 
-Orientation GetOrientation(OH_ImageSourceNative *imageSource) {
+Orientation GetOrientation(OH_ImageSourceNative* imageSource) {
   char targetData[] = "Orientation";
   Image_String target;
   target.size = strlen(targetData);
@@ -44,10 +43,10 @@ Orientation GetOrientation(OH_ImageSourceNative *imageSource) {
   return Orientation::TopLeft;
 }
 
-std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string &filePath) {
-  OH_ImageSourceNative *imageSource = nullptr;
-  Image_ErrorCode errorCode = OH_ImageSourceNative_CreateFromUri(const_cast<char *>(filePath.c_str()),
-                                                                 static_cast<size_t>(filePath.length()), &imageSource);
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
+  OH_ImageSourceNative* imageSource = nullptr;
+  Image_ErrorCode errorCode = OH_ImageSourceNative_CreateFromUri(
+      const_cast<char*>(filePath.c_str()), static_cast<size_t>(filePath.length()), &imageSource);
   if (errorCode != IMAGE_SUCCESS) {
     LOGE("NativeCodec::CreateImageSource() Failed to CreateFromUri: %s", filePath.c_str());
     return nullptr;
@@ -59,9 +58,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string &fileP
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
-  OH_ImageSourceNative *imageSource = nullptr;
-  Image_ErrorCode errorCode =
-      OH_ImageSourceNative_CreateFromData(const_cast<uint8_t *>(imageBytes->bytes()), imageBytes->size(), &imageSource);
+  OH_ImageSourceNative* imageSource = nullptr;
+  Image_ErrorCode errorCode = OH_ImageSourceNative_CreateFromData(
+      const_cast<uint8_t*>(imageBytes->bytes()), imageBytes->size(), &imageSource);
   if (errorCode != IMAGE_SUCCESS) {
     LOGE("Could not create ImageCodec, OH_ImageSourceNative_CreateFromData failed");
     return nullptr;
@@ -72,9 +71,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   return result;
 }
 
-bool NativeCodec::readPixels(const ImageInfo &dstInfo, void *dstPixels) const {
+bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto image = CreateImageSource();
-  OH_DecodingOptions *options;
+  OH_DecodingOptions* options;
   auto errorCode = OH_DecodingOptions_Create(&options);
   if (errorCode != Image_ErrorCode::IMAGE_SUCCESS) {
     LOGE("NativeCodec::readPixels() Failed to Create Decode Option");
@@ -83,7 +82,7 @@ bool NativeCodec::readPixels(const ImageInfo &dstInfo, void *dstPixels) const {
   }
   OH_DecodingOptions_SetPixelFormat(options, HarmonyImage::ToOhPixelFormat(dstInfo.colorType()));
   // decode
-  OH_PixelmapNative *pixelmap = nullptr;
+  OH_PixelmapNative* pixelmap = nullptr;
   errorCode = OH_ImageSourceNative_CreatePixelmap(image, options, &pixelmap);
   if (errorCode != IMAGE_SUCCESS) {
     OH_ImageSourceNative_Release(image);
@@ -91,7 +90,7 @@ bool NativeCodec::readPixels(const ImageInfo &dstInfo, void *dstPixels) const {
     return false;
   }
   auto info = GetPixelmapInfo(pixelmap);
-  uint8_t *pixels = new uint8_t[info.byteSize()];
+  uint8_t* pixels = new uint8_t[info.byteSize()];
   size_t bufferSize = info.byteSize();
   OH_PixelmapNative_ReadPixels(pixelmap, pixels, &bufferSize);
   auto result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
@@ -101,11 +100,11 @@ bool NativeCodec::readPixels(const ImageInfo &dstInfo, void *dstPixels) const {
   return result;
 }
 
-std::shared_ptr<NativeCodec> NativeCodec::Make(OH_ImageSourceNative *imageSource) {
+std::shared_ptr<NativeCodec> NativeCodec::Make(OH_ImageSourceNative* imageSource) {
   if (imageSource == nullptr) {
     return nullptr;
   }
-  OH_ImageSource_Info *info = nullptr;
+  OH_ImageSource_Info* info = nullptr;
   Image_ErrorCode errorCode = OH_ImageSourceInfo_Create(&info);
   if (errorCode != IMAGE_SUCCESS) {
     LOGE("Could not create ImageCodec, OH_ImageSourceInfo_Create failed");
@@ -136,11 +135,12 @@ std::shared_ptr<NativeCodec> NativeCodec::Make(OH_ImageSourceNative *imageSource
   }
 
   OH_ImageSourceInfo_Release(info);
-  return std::shared_ptr<NativeCodec>(new NativeCodec(static_cast<int>(width), static_cast<int>(height), orientation));
+  return std::shared_ptr<NativeCodec>(
+      new NativeCodec(static_cast<int>(width), static_cast<int>(height), orientation));
 }
 
-ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative *pixelmap) {
-  OH_Pixelmap_ImageInfo *currentInfo = nullptr;
+ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative* pixelmap) {
+  OH_Pixelmap_ImageInfo* currentInfo = nullptr;
   auto errorCode = OH_PixelmapImageInfo_Create(&currentInfo);
   if (errorCode != Image_ErrorCode::IMAGE_SUCCESS) {
     LOGE("NativeCodec::readPixels() Failed to Decode Image");
@@ -168,18 +168,19 @@ ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative *pixelmap) {
   return ImageInfo::Make((int)width, (int)height, colorType, alphaType, rowBytes);
 }
 
-OH_ImageSourceNative *NativeCodec::CreateImageSource() const {
-  OH_ImageSourceNative *imageSource = nullptr;
+OH_ImageSourceNative* NativeCodec::CreateImageSource() const {
+  OH_ImageSourceNative* imageSource = nullptr;
   if (imagePath.empty()) {
-    auto errorCode = OH_ImageSourceNative_CreateFromData(const_cast<uint8_t *>(imageBytes->bytes()), imageBytes->size(),
-                                                         &imageSource);
+    auto errorCode = OH_ImageSourceNative_CreateFromData(const_cast<uint8_t*>(imageBytes->bytes()),
+                                                         imageBytes->size(), &imageSource);
     if (errorCode != IMAGE_SUCCESS) {
       LOGE("NativeCodec::CreateImageSource() Failed to CreateFromData");
       return nullptr;
     }
   } else {
-    auto errorCode = OH_ImageSourceNative_CreateFromUri(const_cast<char *>(imagePath.c_str()),
-                                                        static_cast<size_t>(imagePath.length()), &imageSource);
+    auto errorCode =
+        OH_ImageSourceNative_CreateFromUri(const_cast<char*>(imagePath.c_str()),
+                                           static_cast<size_t>(imagePath.length()), &imageSource);
     if (errorCode != IMAGE_SUCCESS) {
       LOGE("NativeCodec::CreateImageSource() Failed to CreateFromUri: %s", imagePath.c_str());
       return nullptr;

@@ -1,7 +1,7 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
-#include <multimedia/image_framework/image_pixel_map_napi.h>
 #include <multimedia/image_framework/image_source_mdk.h>
+#include "tgfx/core/AlphaType.h"
 #include "tgfx/platform/ohos/HarmonyImage.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
 #include "tgfx/platform/NativeImage.h"
@@ -32,13 +32,14 @@ static napi_value AddImageFromSource(napi_env env, napi_callback_info info) {
   char srcBuf[2048];
   napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
   std::string name(srcBuf, strSize);
-  ImageSourceNative *imageSource = OH_ImageSource_InitNative(env, args[1]);
+  ImageSourceNative* imageSource = OH_ImageSource_InitNative(env, args[1]);
   if (!imageSource) {
     return nullptr;
   }
   OhosImageSourceInfo sourceInfo;
   auto errorCode = OH_ImageSource_GetImageInfo(imageSource, 0, &sourceInfo);
-  if (errorCode != IMAGE_RESULT_SUCCESS || sourceInfo.size.width < 1 || sourceInfo.size.height < 1) {
+  if (errorCode != IMAGE_RESULT_SUCCESS || sourceInfo.size.width < 1 ||
+      sourceInfo.size.height < 1) {
     OH_ImageSource_Release(imageSource);
     return nullptr;
   }
@@ -64,7 +65,7 @@ static napi_value AddImageFromSource(napi_env env, napi_callback_info info) {
     OH_ImageSource_Release(imageSource);
     return nullptr;
   }
-  NativePixelMap *nativePixelMap = OH_PixelMap_InitNativePixelMap(env, pixelMap);
+  NativePixelMap* nativePixelMap = OH_PixelMap_InitNativePixelMap(env, pixelMap);
   if (nativePixelMap == nullptr) {
     OH_ImageSource_Release(imageSource);
     return nullptr;
@@ -72,31 +73,41 @@ static napi_value AddImageFromSource(napi_env env, napi_callback_info info) {
   if (appHost == nullptr) {
     appHost = CreateAppHost();
   }
-  tgfx::NativeImage image{nativePixelMap, orientation};
+  tgfx::AlphaType alphaType = tgfx::HarmonyImage::ToTGFXAlphaType(sourceInfo.alphaType);
+  alphaType = alphaType == tgfx::AlphaType::Unknown ? tgfx::AlphaType::Unpremultiplied : alphaType;
+  tgfx::NativeImage image{nativePixelMap, orientation, alphaType};
   appHost->addImage(name, tgfx::Image::MakeFrom(&image));
   OH_ImageSource_Release(imageSource);
   return nullptr;
 }
 
 static napi_value AddImageFromPixelMap(napi_env env, napi_callback_info info) {
-  size_t argc = 3;
-  napi_value args[3] = {nullptr};
+  size_t argc = 4;
+  napi_value args[4] = {nullptr};
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   size_t strSize;
   char srcBuf[2048];
   napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
   std::string name(srcBuf, strSize);
-  NativePixelMap *pixelmap = OH_PixelMap_InitNativePixelMap(env, args[1]);
+  NativePixelMap* pixelmap = OH_PixelMap_InitNativePixelMap(env, args[1]);
   if (pixelmap == nullptr) {
     return nullptr;
   }
   if (appHost == nullptr) {
     appHost = CreateAppHost();
   }
-  napi_get_value_string_utf8(env, args[2], srcBuf, sizeof(srcBuf), &strSize);
+  size_t orientationSize;
+  char orientation[2048];
+  napi_get_value_string_utf8(env, args[2], orientation, sizeof(orientation), &orientationSize);
+
+  int alphaType = 0;
+  napi_get_value_int32(env, args[3], &alphaType);
   tgfx::NativeImage nativeImage{};
   nativeImage.pixelMap = pixelmap;
-  nativeImage.orientation = tgfx::HarmonyImage::ToTGFXOrientation(srcBuf, strSize);
+  nativeImage.orientation = tgfx::HarmonyImage::ToTGFXOrientation(orientation, orientationSize);
+  auto tgfxAlphaType = tgfx::HarmonyImage::ToTGFXAlphaType(alphaType);
+  nativeImage.alphaType =
+      tgfxAlphaType == tgfx::AlphaType::Unknown ? tgfx::AlphaType::Unpremultiplied : tgfxAlphaType;
   appHost->addImage(name, tgfx::Image::MakeFrom(&nativeImage));
   return nullptr;
 }
@@ -127,7 +138,7 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
   std::string name = srcBuf;
   size_t length;
-  void *data;
+  void* data;
   auto code = napi_get_arraybuffer_info(env, args[1], &data, &length);
   if (code != napi_ok) {
     return nullptr;
@@ -186,7 +197,7 @@ static std::shared_ptr<drawers::AppHost> CreateAppHost() {
   static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_SC.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_TC.ttf"};
-  for (auto &fileName : FallbackFontFileNames) {
+  for (auto& fileName : FallbackFontFileNames) {
     auto typeface = tgfx::Typeface::MakeFromPath(fileName);
     if (typeface != nullptr) {
       appHost->addTypeface("default", std::move(typeface));
@@ -200,7 +211,7 @@ static std::shared_ptr<drawers::AppHost> CreateAppHost() {
   return appHost;
 }
 
-static void UpdateSize(OH_NativeXComponent *component, void *nativeWindow) {
+static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   uint64_t width;
   uint64_t height;
   int32_t ret = OH_NativeXComponent_GetXComponentSize(component, nativeWindow, &width, &height);
@@ -216,15 +227,18 @@ static void UpdateSize(OH_NativeXComponent *component, void *nativeWindow) {
   }
 }
 
-static void OnSurfaceChangedCB(OH_NativeXComponent *component, void *nativeWindow) {
+static void OnSurfaceChangedCB(OH_NativeXComponent* component, void* nativeWindow) {
   UpdateSize(component, nativeWindow);
 }
 
-static void OnSurfaceDestroyedCB(OH_NativeXComponent *, void *) { window = nullptr; }
+static void OnSurfaceDestroyedCB(OH_NativeXComponent*, void*) {
+  window = nullptr;
+}
 
-static void DispatchTouchEventCB(OH_NativeXComponent *, void *) {}
+static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {
+}
 
-static void OnSurfaceCreatedCB(OH_NativeXComponent *component, void *nativeWindow) {
+static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindow) {
   UpdateSize(component, nativeWindow);
   window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow));
   if (window == nullptr) {
@@ -237,12 +251,12 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent *component, void *nativeWindo
 static void RegisterCallback(napi_env env, napi_value exports) {
   napi_status status;
   napi_value exportInstance = nullptr;
-  OH_NativeXComponent *nativeXComponent = nullptr;
+  OH_NativeXComponent* nativeXComponent = nullptr;
   status = napi_get_named_property(env, exports, OH_NATIVE_XCOMPONENT_OBJ, &exportInstance);
   if (status != napi_ok) {
     return;
   }
-  status = napi_unwrap(env, exportInstance, reinterpret_cast<void **>(&nativeXComponent));
+  status = napi_unwrap(env, exportInstance, reinterpret_cast<void**>(&nativeXComponent));
   if (status != napi_ok) {
     return;
   }
@@ -259,17 +273,21 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"draw", nullptr, OnDraw, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromSource", nullptr, AddImageFromSource, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromPixelMap", nullptr, AddImageFromPixelMap, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromPath", nullptr, AddImageFromPath, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default, nullptr}};
+      {"addImageFromSource", nullptr, AddImageFromSource, nullptr, nullptr, nullptr, napi_default,
+       nullptr},
+      {"addImageFromPixelMap", nullptr, AddImageFromPixelMap, nullptr, nullptr, nullptr,
+       napi_default, nullptr},
+      {"addImageFromPath", nullptr, AddImageFromPath, nullptr, nullptr, nullptr, napi_default,
+       nullptr},
+      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default,
+       nullptr}};
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   RegisterCallback(env, exports);
   return exports;
 }
 EXTERN_C_END
 
-static napi_module demoModule = {1, 0, nullptr, Init, "hello2d", ((void *)0), {0}};
+static napi_module demoModule = {1, 0, nullptr, Init, "hello2d", ((void*)0), {0}};
 
 extern "C" __attribute__((constructor)) void RegisterHello2dModule(void) {
   napi_module_register(&demoModule);

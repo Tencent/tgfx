@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-Orientation HarmonyImage::ToTGFXOrientation(const char *value, size_t size) {
+Orientation HarmonyImage::ToTGFXOrientation(const char* value, size_t size) {
   std::string orientationStr = std::string(value, size);
   static const std::unordered_map<std::string, Orientation> OrientationMap = {
       {"Top-left", Orientation::TopLeft},         {"Top-right", Orientation::TopRight},
