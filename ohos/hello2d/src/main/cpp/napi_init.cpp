@@ -183,8 +183,9 @@ static napi_value OnDraw(napi_env env, napi_callback_info info) {
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost() {
   auto appHost = std::make_shared<drawers::AppHost>();
-  static const std::string FallbackFontFileNames[] = {
-      "/system/fonts/HarmonyOS_Sans.ttf", "/system/fonts/HarmonyOS_Sans_SC.ttf", "/system/fonts/HarmonyOS_Sans_TC.ttf"};
+  static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
+                                                      "/system/fonts/HarmonyOS_Sans_SC.ttf",
+                                                      "/system/fonts/HarmonyOS_Sans_TC.ttf"};
   for (auto &fileName : FallbackFontFileNames) {
     auto typeface = tgfx::Typeface::MakeFromPath(fileName);
     if (typeface != nullptr) {
@@ -270,4 +271,6 @@ EXTERN_C_END
 
 static napi_module demoModule = {1, 0, nullptr, Init, "hello2d", ((void *)0), {0}};
 
-extern "C" __attribute__((constructor)) void RegisterHello2dModule(void) { napi_module_register(&demoModule); }
+extern "C" __attribute__((constructor)) void RegisterHello2dModule(void) {
+  napi_module_register(&demoModule);
+}
