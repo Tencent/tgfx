@@ -1,12 +1,9 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
-#include <multimedia/image_framework/image_source_mdk.h>
-#include "tgfx/core/AlphaType.h"
-#include "tgfx/platform/ohos/HarmonyImage.h"
 #include "tgfx/opengl/egl/EGLWindow.h"
-#include "tgfx/platform/NativeImage.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
+#include "tgfx/platform/ohos/OHOSPixelMap.h"
 
 static float screenDensity = 1.0f;
 static std::shared_ptr<drawers::AppHost> appHost = nullptr;
@@ -24,7 +21,7 @@ static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static napi_value AddImageFromSource(napi_env env, napi_callback_info info) {
+static napi_value AddImageFromPixelMap(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value args[2] = {nullptr};
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
@@ -32,83 +29,11 @@ static napi_value AddImageFromSource(napi_env env, napi_callback_info info) {
   char srcBuf[2048];
   napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
   std::string name(srcBuf, strSize);
-  ImageSourceNative* imageSource = OH_ImageSource_InitNative(env, args[1]);
-  if (!imageSource) {
-    return nullptr;
-  }
-  OhosImageSourceInfo sourceInfo;
-  auto errorCode = OH_ImageSource_GetImageInfo(imageSource, 0, &sourceInfo);
-  if (errorCode != IMAGE_RESULT_SUCCESS || sourceInfo.size.width < 1 ||
-      sourceInfo.size.height < 1) {
-    OH_ImageSource_Release(imageSource);
-    return nullptr;
-  }
-  OhosImageSourceProperty target;
-  char exifKey[] = "Orientation";
-  target.size = strlen(exifKey);
-  target.value = exifKey;
 
-  OhosImageSourceProperty response{};
-  char responseValue[20];
-  response.size = 20;
-  response.value = responseValue;
-  errorCode = OH_ImageSource_GetImageProperty(imageSource, &target, &response);
-
-  tgfx::Orientation orientation = tgfx::Orientation::TopLeft;
-  if (errorCode == IMAGE_RESULT_SUCCESS) {
-    orientation = tgfx::HarmonyImage::ToTGFXOrientation(response.value, response.size);
-  }
-
-  napi_value pixelMap;
-  errorCode = OH_ImageSource_CreatePixelMap(imageSource, nullptr, &pixelMap);
-  if (errorCode != IMAGE_RESULT_SUCCESS) {
-    OH_ImageSource_Release(imageSource);
-    return nullptr;
-  }
-  NativePixelMap* nativePixelMap = OH_PixelMap_InitNativePixelMap(env, pixelMap);
-  if (nativePixelMap == nullptr) {
-    OH_ImageSource_Release(imageSource);
-    return nullptr;
-  }
   if (appHost == nullptr) {
     appHost = CreateAppHost();
   }
-  tgfx::AlphaType alphaType = tgfx::HarmonyImage::ToTGFXAlphaType(sourceInfo.alphaType);
-  alphaType = alphaType == tgfx::AlphaType::Unknown ? tgfx::AlphaType::Unpremultiplied : alphaType;
-  tgfx::NativeImage image{nativePixelMap, orientation, alphaType};
-  appHost->addImage(name, tgfx::Image::MakeFrom(&image));
-  OH_ImageSource_Release(imageSource);
-  return nullptr;
-}
-
-static napi_value AddImageFromPixelMap(napi_env env, napi_callback_info info) {
-  size_t argc = 4;
-  napi_value args[4] = {nullptr};
-  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  size_t strSize;
-  char srcBuf[2048];
-  napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
-  std::string name(srcBuf, strSize);
-  NativePixelMap* pixelmap = OH_PixelMap_InitNativePixelMap(env, args[1]);
-  if (pixelmap == nullptr) {
-    return nullptr;
-  }
-  if (appHost == nullptr) {
-    appHost = CreateAppHost();
-  }
-  size_t orientationSize;
-  char orientation[2048];
-  napi_get_value_string_utf8(env, args[2], orientation, sizeof(orientation), &orientationSize);
-
-  int alphaType = 0;
-  napi_get_value_int32(env, args[3], &alphaType);
-  tgfx::NativeImage nativeImage{};
-  nativeImage.pixelMap = pixelmap;
-  nativeImage.orientation = tgfx::HarmonyImage::ToTGFXOrientation(orientation, orientationSize);
-  auto tgfxAlphaType = tgfx::HarmonyImage::ToTGFXAlphaType(alphaType);
-  nativeImage.alphaType =
-      tgfxAlphaType == tgfx::AlphaType::Unknown ? tgfx::AlphaType::Unpremultiplied : tgfxAlphaType;
-  appHost->addImage(name, tgfx::Image::MakeFrom(&nativeImage));
+  appHost->addImage(name, tgfx::OHOSPixelMap::CopyImage(env, args[1]));
   return nullptr;
 }
 
@@ -273,8 +198,6 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"draw", nullptr, OnDraw, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromSource", nullptr, AddImageFromSource, nullptr, nullptr, nullptr, napi_default,
-       nullptr},
       {"addImageFromPixelMap", nullptr, AddImageFromPixelMap, nullptr, nullptr, nullptr,
        napi_default, nullptr},
       {"addImageFromPath", nullptr, AddImageFromPath, nullptr, nullptr, nullptr, napi_default,

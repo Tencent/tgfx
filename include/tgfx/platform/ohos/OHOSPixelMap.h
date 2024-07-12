@@ -17,22 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/ImageCodec.h"
+
+#include <memory>
+#include <napi/native_api.h>
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-class NativeImageCodec : public ImageCodec {
+/**
+ * OHOSBitmap provides a utility to access an OpenHarmony PixelMap object.
+ */
+class OHOSPixelMap {
  public:
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+  /**
+   * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
+   * specified OpenHarmony PixelMap object. Only AlphaType::Opaque or AlphaType::Premultiplied PixelMap is supported.
+   */
+  static ImageInfo GetInfo(napi_env env, napi_value value);
 
- private:
-  NativeImageCodec(int width, int height, Orientation orientation, std::shared_ptr<Data> data,
-                   const ImageInfo& info)
-      : ImageCodec(width, height, orientation), imageData(std::move(data)), imageInfo(info) {
-  }
-
-  std::shared_ptr<Data> imageData;
-  ImageInfo imageInfo;
-
-  friend class ImageCodec;
+  /**
+   * Copy PixelMap into an Image. Only AlphaType::Opaque or AlphaType::Premultiplied PixelMap is supported.
+   */
+  static std::shared_ptr<Image> CopyImage(napi_env env, napi_value value);
 };
 }  // namespace tgfx

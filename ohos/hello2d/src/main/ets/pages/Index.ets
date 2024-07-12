@@ -11,29 +11,21 @@ struct Index {
   aboutToAppear(): void {
     let displayInfo = display.getDefaultDisplaySync();
     hello2d.updateDensity(displayInfo.densityPixels);
-    getContext(this).resourceManager.getRawFileContent("rotation.jpg", async (error, value) => {
+    getContext(this).resourceManager.getRawFileContent("bridge.jpg", async (error, value) => {
+      if (error) {
+        return;
+      }
       let name = "bridge";
       //from pixelmap
-      // const buffer = value.buffer.slice(0);
-      // let img = image.createImageSource(buffer);
-      // let pixelmap = img.createPixelMapSync();
-      // let imgInfo = await img.getImageInfo(0);
-      // let orientation = await img.getImageProperty(image.PropertyKey.ORIENTATION);
-      // if (orientation) {
-      //   hello2d.addImageFromPixelMap(name, pixelmap, orientation, imgInfo.alphaType);
-      // } else {
-      //   hello2d.addImageFromPixelMap(name, pixelmap, "Top-left", imgInfo.alphaType);
-      // }
-      // pixelmap.release();
+      const buffer = value.buffer.slice(0);
+      let img = image.createImageSource(buffer);
+      let pixelmap = img.createPixelMapSync();
+      hello2d.addImageFromPixelMap(name, pixelmap);
+      pixelmap.release();
 
       // from data
       // const buffer = value.buffer.slice(0);
       // hello2d.addImageFromEncoded(name, buffer);
-
-      // from source
-      const buffer = value.buffer.slice(0);
-      let img = image.createImageSource(buffer);
-      hello2d.addImageFromSource(name, img);
     })
   }
 

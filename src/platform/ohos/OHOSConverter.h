@@ -22,30 +22,29 @@
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Orientation.h"
+
 namespace tgfx {
-/**
- * HarmonyImage provides methods for converting between Harmony ImageKit related attributes and TGFX attributes
- */
-class HarmonyImage {
+
+class OHOSConverter {
  public:
   /**
-   * Convert the orientation attribute returned from HarmonyOS to the orientation of TGFX
+   * Convert the orientation attribute returned from Openharmony to the orientation of TGFX
    */
   static Orientation ToTGFXOrientation(const char* value, size_t size);
 
   /**
-   * Convert the pixelFormat attribute returned from HarmonyOS to the colorType attribute of TGFX. If the corresponding
+   * Convert the pixelFormat attribute returned from Openharmony to the colorType attribute of TGFX. If the corresponding
    * attribute is not defined in TGFX, it will return tgfx::ColorType::Unknown.
    */
   static ColorType ToTGFXColorType(int ohPixelFormat);
 
   /**
-   * Convert the alphaType attribute returned from HarmonyOS to the alphaType attribute of TGFX.
+   * Convert the alphaType attribute returned from Openharmony to the alphaType attribute of TGFX.
    */
   static AlphaType ToTGFXAlphaType(int ohAlphaType);
 
   /**
-   * Convert the pixelFormat attribute returned from TGFX to the colorType attribute of HarmonyOS. If the corresponding
+   * Convert the pixelFormat attribute returned from TGFX to the colorType attribute of Openharmony. If the corresponding
    * attribute is not defined in HarmonyOS, it will return PIXEL_FORMAT_UNKNOWN.
    * */
   static int ToOhPixelFormat(ColorType colorType);

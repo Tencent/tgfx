@@ -4,10 +4,7 @@ export const draw: (index: number) => void;
 
 export const updateDensity: (density: number) => void;
 
-export const addImageFromSource: (name: string, image: image.ImageSource) => void;
-
-export const addImageFromPixelMap: (name: string, image: image.PixelMap, orientation: string,
-  alphaType: number) => void;
+export const addImageFromPixelMap: (name: string, image: image.PixelMap) => void;
 
 export const addImageFromPath: (name: string, imagePath: string) => void;
 

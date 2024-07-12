@@ -21,10 +21,15 @@
 #include <cstdint>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
-#include "tgfx/platform/ohos/HarmonyImage.h"
+#include "tgfx/core/Image.h"
+#include "OHOSConverter.h"
 #include "utils/Log.h"
 
 namespace tgfx {
+
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef) {
+  return nullptr;
+}
 
 Orientation GetOrientation(OH_ImageSourceNative* imageSource) {
   char targetData[] = "Orientation";
@@ -36,7 +41,7 @@ Orientation GetOrientation(OH_ImageSourceNative* imageSource) {
 
   auto errorCode = OH_ImageSourceNative_GetImageProperty(imageSource, &target, &response);
   if (errorCode == IMAGE_SUCCESS) {
-    auto result = HarmonyImage::ToTGFXOrientation(response.data, response.size);
+    auto result = OHOSConverter::ToTGFXOrientation(response.data, response.size);
     free(response.data);
     return result;
   }
@@ -73,6 +78,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
 
 bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto image = CreateImageSource();
+  if (!image) {
+    return false;
+  }
   OH_DecodingOptions* options;
   auto errorCode = OH_DecodingOptions_Create(&options);
   if (errorCode != Image_ErrorCode::IMAGE_SUCCESS) {
@@ -80,7 +88,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     OH_ImageSourceNative_Release(image);
     return false;
   }
-  OH_DecodingOptions_SetPixelFormat(options, HarmonyImage::ToOhPixelFormat(dstInfo.colorType()));
+  OH_DecodingOptions_SetPixelFormat(options, OHOSConverter::ToOhPixelFormat(dstInfo.colorType()));
   // decode
   OH_PixelmapNative* pixelmap = nullptr;
   errorCode = OH_ImageSourceNative_CreatePixelmap(image, options, &pixelmap);
@@ -90,13 +98,19 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   auto info = GetPixelmapInfo(pixelmap);
-  uint8_t* pixels = new uint8_t[info.byteSize()];
-  size_t bufferSize = info.byteSize();
-  OH_PixelmapNative_ReadPixels(pixelmap, pixels, &bufferSize);
-  auto result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
+  bool result = true;
+  if (info == dstInfo) {
+    size_t bufferSize = info.byteSize();
+    OH_PixelmapNative_ReadPixels(pixelmap, static_cast<uint8_t*>(dstPixels), &bufferSize);
+  } else {
+    uint8_t* pixels = new uint8_t[info.byteSize()];
+    size_t bufferSize = info.byteSize();
+    OH_PixelmapNative_ReadPixels(pixelmap, pixels, &bufferSize);
+    result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
+    delete[] pixels;
+  }
   OH_ImageSourceNative_Release(image);
   OH_PixelmapNative_Release(pixelmap);
-  delete[] pixels;
   return result;
 }
 
@@ -150,11 +164,11 @@ ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative* pixelmap) {
 
   int32_t pixelFormat = 0;
   OH_PixelmapImageInfo_GetPixelFormat(currentInfo, &pixelFormat);
-  ColorType colorType = HarmonyImage::ToTGFXColorType(pixelFormat);
+  ColorType colorType = OHOSConverter::ToTGFXColorType(pixelFormat);
 
   int32_t alpha = 0;
   OH_PixelmapImageInfo_GetAlphaType(currentInfo, &alpha);
-  AlphaType alphaType = HarmonyImage::ToTGFXAlphaType(alpha);
+  AlphaType alphaType = OHOSConverter::ToTGFXAlphaType(alpha);
   if (alphaType == AlphaType::Unknown) {
     alphaType = AlphaType::Unpremultiplied;
   }
