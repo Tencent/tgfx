@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OHOSConverter.h"
+#include "OHOSImageInfo.h"
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
 
 namespace tgfx {
 
-Orientation OHOSConverter::ToTGFXOrientation(const char* value, size_t size) {
+Orientation OHOSImageInfo::ToTGFXOrientation(const char* value, size_t size) {
   std::string orientationStr = std::string(value, size);
   static const std::unordered_map<std::string, Orientation> OrientationMap = {
       {"Top-left", Orientation::TopLeft},         {"Top-right", Orientation::TopRight},
@@ -35,7 +35,7 @@ Orientation OHOSConverter::ToTGFXOrientation(const char* value, size_t size) {
   return Orientation::TopLeft;
 }
 
-ColorType OHOSConverter::ToTGFXColorType(int ohPixelFormat) {
+ColorType OHOSImageInfo::ToTGFXColorType(int ohPixelFormat) {
   switch (ohPixelFormat) {
     case PIXEL_FORMAT_RGBA_8888:
       return ColorType::RGBA_8888;
@@ -51,7 +51,7 @@ ColorType OHOSConverter::ToTGFXColorType(int ohPixelFormat) {
   return ColorType::Unknown;
 }
 
-AlphaType OHOSConverter::ToTGFXAlphaType(int ohAlphaType) {
+AlphaType OHOSImageInfo::ToTGFXAlphaType(int ohAlphaType) {
   switch (ohAlphaType) {
     case OHOS_PIXEL_MAP_ALPHA_TYPE_UNPREMUL:
       return AlphaType::Unpremultiplied;
@@ -65,7 +65,7 @@ AlphaType OHOSConverter::ToTGFXAlphaType(int ohAlphaType) {
   return AlphaType::Unknown;
 }
 
-int OHOSConverter::ToOhPixelFormat(ColorType colorType) {
+int OHOSImageInfo::ToOHPixelFormat(ColorType colorType) {
   switch (colorType) {
     case ColorType::RGBA_8888:
       return PIXEL_FORMAT_RGBA_8888;

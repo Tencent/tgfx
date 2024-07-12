@@ -35,8 +35,8 @@ class OHOSPixelMap {
   static ImageInfo GetInfo(napi_env env, napi_value value);
 
   /**
-   * Copy PixelMap into an Image. Only AlphaType::Opaque or AlphaType::Premultiplied PixelMap is supported.
+   * Copy PixelMap into a Bitmap. Only AlphaType::Opaque or AlphaType::Premultiplied PixelMap is supported.
    */
-  static std::shared_ptr<Image> CopyImage(napi_env env, napi_value value);
+  static std::shared_ptr<Bitmap> CopyBitmap(napi_env env, napi_value value);
 };
 }  // namespace tgfx

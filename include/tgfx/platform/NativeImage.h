@@ -43,12 +43,6 @@ typedef _jobject* NativeImageRef;
 
 typedef CGImage* NativeImageRef;
 
-#elif defined(__OHOS__)
-
-struct NativeImage {};
-
-typedef NativeImage* NativeImageRef;
-
 #else
 
 struct NativeImage {};

@@ -19,7 +19,7 @@
 #include "NativeCodec.h"
 #include <multimedia/image_framework/image/image_source_native.h>
 #include <cstdint>
-#include "OHOSConverter.h"
+#include "OHOSImageInfo.h"
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Image.h"
@@ -41,7 +41,7 @@ Orientation GetOrientation(OH_ImageSourceNative* imageSource) {
 
   auto errorCode = OH_ImageSourceNative_GetImageProperty(imageSource, &target, &response);
   if (errorCode == IMAGE_SUCCESS) {
-    auto result = OHOSConverter::ToTGFXOrientation(response.data, response.size);
+    auto result = OHOSImageInfo::ToTGFXOrientation(response.data, response.size);
     free(response.data);
     return result;
   }
@@ -88,7 +88,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     OH_ImageSourceNative_Release(image);
     return false;
   }
-  OH_DecodingOptions_SetPixelFormat(options, OHOSConverter::ToOhPixelFormat(dstInfo.colorType()));
+  OH_DecodingOptions_SetPixelFormat(options, OHOSImageInfo::ToOHPixelFormat(dstInfo.colorType()));
   // decode
   OH_PixelmapNative* pixelmap = nullptr;
   errorCode = OH_ImageSourceNative_CreatePixelmap(image, options, &pixelmap);
@@ -98,16 +98,28 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   auto info = GetPixelmapInfo(pixelmap);
-  bool result = true;
+  bool result = false;
   if (info == dstInfo) {
     size_t bufferSize = info.byteSize();
-    OH_PixelmapNative_ReadPixels(pixelmap, static_cast<uint8_t*>(dstPixels), &bufferSize);
+    errorCode =
+        OH_PixelmapNative_ReadPixels(pixelmap, static_cast<uint8_t*>(dstPixels), &bufferSize);
+    if (errorCode != IMAGE_SUCCESS) {
+      LOGE("NativeCodec::readPixels() PixelmapNative Failed to ReadPixels");
+    } else {
+      result = true;
+    }
   } else {
-    uint8_t* pixels = new uint8_t[info.byteSize()];
-    size_t bufferSize = info.byteSize();
-    OH_PixelmapNative_ReadPixels(pixelmap, pixels, &bufferSize);
-    result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
-    delete[] pixels;
+    uint8_t* pixels = new (std::nothrow) uint8_t[info.byteSize()];
+    if (pixels) {
+      size_t bufferSize = info.byteSize();
+      errorCode = OH_PixelmapNative_ReadPixels(pixelmap, pixels, &bufferSize);
+      if (errorCode != IMAGE_SUCCESS) {
+        LOGE("NativeCodec::readPixels() PixelmapNative Failed to ReadPixels");
+      } else {
+        result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
+      }
+      delete[] pixels;
+    }
   }
   OH_ImageSourceNative_Release(image);
   OH_PixelmapNative_Release(pixelmap);
@@ -164,13 +176,14 @@ ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative* pixelmap) {
 
   int32_t pixelFormat = 0;
   OH_PixelmapImageInfo_GetPixelFormat(currentInfo, &pixelFormat);
-  ColorType colorType = OHOSConverter::ToTGFXColorType(pixelFormat);
+  ColorType colorType = OHOSImageInfo::ToTGFXColorType(pixelFormat);
 
   int32_t alpha = 0;
   OH_PixelmapImageInfo_GetAlphaType(currentInfo, &alpha);
-  AlphaType alphaType = OHOSConverter::ToTGFXAlphaType(alpha);
+  AlphaType alphaType = OHOSImageInfo::ToTGFXAlphaType(alpha);
   if (alphaType == AlphaType::Unknown) {
-    alphaType = AlphaType::Unpremultiplied;
+    // Default is Premultiplied
+    alphaType = AlphaType::Premultiplied;
   }
   uint32_t width = 0;
   OH_PixelmapImageInfo_GetWidth(currentInfo, &width);

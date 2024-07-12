@@ -25,7 +25,7 @@
 
 namespace tgfx {
 
-class OHOSConverter {
+class OHOSImageInfo {
  public:
   /**
    * Convert the orientation attribute returned from Openharmony to the orientation of TGFX
@@ -47,6 +47,6 @@ class OHOSConverter {
    * Convert the pixelFormat attribute returned from TGFX to the colorType attribute of Openharmony. If the corresponding
    * attribute is not defined in HarmonyOS, it will return PIXEL_FORMAT_UNKNOWN.
    * */
-  static int ToOhPixelFormat(ColorType colorType);
+  static int ToOHPixelFormat(ColorType colorType);
 };
 }  // namespace tgfx
