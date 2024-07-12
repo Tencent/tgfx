@@ -3,7 +3,6 @@
 #include "tgfx/opengl/egl/EGLWindow.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
-#include "tgfx/platform/ohos/OHOSPixelMap.h"
 
 static float screenDensity = 1.0f;
 static std::shared_ptr<drawers::AppHost> appHost = nullptr;
