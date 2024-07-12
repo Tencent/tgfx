@@ -10,6 +10,13 @@ struct Index {
   aboutToAppear(): void {
     let displayInfo = display.getDefaultDisplaySync();
     hello2d.updateDensity(displayInfo.densityPixels);
+    getContext(this).resourceManager.getRawFileContent("bridge.jpg", async (error, value) => {
+      if (error) {
+        return;
+      }
+      const buffer = value.buffer.slice(0);
+      hello2d.addImageFromEncoded("bridge", buffer);
+    })
   }
 
   build() {
