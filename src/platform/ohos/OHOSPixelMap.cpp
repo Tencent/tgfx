@@ -29,17 +29,17 @@ ImageInfo OHOSPixelMap::GetInfo(napi_env env, napi_value value) {
                          info.rowSize);
 }
 
-std::shared_ptr<Bitmap> OHOSPixelMap::CopyBitmap(napi_env env, napi_value value) {
+Bitmap OHOSPixelMap::CopyBitmap(napi_env env, napi_value value) {
   NativePixelMap* pixelmap = OH_PixelMap_InitNativePixelMap(env, value);
   if (pixelmap == nullptr) {
     LOGE("OHOSBitmap::CopyBitmap() Failed to GetNativePixelMap");
-    return nullptr;
+    return {};
   }
   OhosPixelMapInfos info{};
   auto errorCode = OH_PixelMap_GetImageInfo(pixelmap, &info);
   if (errorCode != IMAGE_RESULT_SUCCESS) {
     LOGE("OHOSBitmap::CopyBitmap() Failed to GetPixelMapInfo");
-    return nullptr;
+    return {};
   }
   auto imageInfo = ImageInfo::Make(static_cast<int>(info.width), static_cast<int>(info.height),
                                    OHOSImageInfo::ToTGFXColorType(info.pixelFormat),
@@ -48,10 +48,10 @@ std::shared_ptr<Bitmap> OHOSPixelMap::CopyBitmap(napi_env env, napi_value value)
   bool alphaOnly =
       imageInfo.colorType() == ColorType::ALPHA_8 || imageInfo.colorType() == ColorType::Gray_8;
 
-  auto bitmap = std::make_shared<Bitmap>();
-  if (!bitmap || !bitmap->allocPixels(imageInfo.width(), imageInfo.height(), alphaOnly)) {
-    LOGE("OHOSBitmap::CopyBitmap() bitmap Failed to allocPixels");
-    return nullptr;
+  Bitmap bitmap = {};
+  if (!bitmap.allocPixels(imageInfo.width(), imageInfo.height(), alphaOnly)) {
+    LOGE("OHOSBitmap::CopyBitmap() Bitmap Failed to allocPixels");
+    return {};
   }
   void* pixel;
   errorCode = OH_PixelMap_AccessPixels(pixelmap, &pixel);
@@ -59,7 +59,7 @@ std::shared_ptr<Bitmap> OHOSPixelMap::CopyBitmap(napi_env env, napi_value value)
     LOGE("OHOSBitmap::CopyBitmap() OH_PixelMap_AccessPixels failed");
     return {};
   }
-  bitmap->writePixels(imageInfo, pixel);
+  bitmap.writePixels(imageInfo, pixel);
   OH_PixelMap_UnAccessPixels(pixelmap);
   return bitmap;
 }

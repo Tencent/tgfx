@@ -37,6 +37,6 @@ class OHOSPixelMap {
   /**
    * Copy PixelMap into a Bitmap. Only Premultiplied PixelMap is supported.
    */
-  static std::shared_ptr<Bitmap> CopyBitmap(napi_env env, napi_value value);
+  static Bitmap CopyBitmap(napi_env env, napi_value value);
 };
 }  // namespace tgfx
