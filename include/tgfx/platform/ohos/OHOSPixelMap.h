@@ -30,12 +30,12 @@ class OHOSPixelMap {
  public:
   /**
    * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
-   * specified OpenHarmony PixelMap object. Only AlphaType::Opaque or AlphaType::Premultiplied PixelMap is supported.
+   * specified OpenHarmony PixelMap object. Only Premultiplied PixelMap is supported.
    */
   static ImageInfo GetInfo(napi_env env, napi_value value);
 
   /**
-   * Copy PixelMap into a Bitmap. Only AlphaType::Opaque or AlphaType::Premultiplied PixelMap is supported.
+   * Copy PixelMap into a Bitmap. Only Premultiplied PixelMap is supported.
    */
   static std::shared_ptr<Bitmap> CopyBitmap(napi_env env, napi_value value);
 };

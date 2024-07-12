@@ -18,21 +18,14 @@ ImageInfo OHOSPixelMap::GetInfo(napi_env env, napi_value value) {
     LOGE("OHOSBitmap::GetInfo() Failed to GetNativePixelMap");
     return {};
   }
-  int32_t hasAlpha = 0;
-  auto errorCode = OH_PixelMap_IsSupportAlpha(pixelmap, &hasAlpha);
-  if (errorCode != IMAGE_RESULT_SUCCESS) {
-    LOGE("OHOSBitmap::GetInfo() Failed to GetAlphaInfo");
-    return {};
-  }
   OhosPixelMapInfos info{};
-  errorCode = OH_PixelMap_GetImageInfo(pixelmap, &info);
+  auto errorCode = OH_PixelMap_GetImageInfo(pixelmap, &info);
   if (errorCode != IMAGE_RESULT_SUCCESS) {
     LOGE("OHOSBitmap::GetInfo() Failed to GetPixelMapInfo");
     return {};
   }
   return ImageInfo::Make(static_cast<int>(info.width), static_cast<int>(info.height),
-                         OHOSImageInfo::ToTGFXColorType(info.pixelFormat),
-                         hasAlpha == 0 ? AlphaType::Opaque : AlphaType::Premultiplied,
+                         OHOSImageInfo::ToTGFXColorType(info.pixelFormat), AlphaType::Premultiplied,
                          info.rowSize);
 }
 
@@ -42,31 +35,30 @@ std::shared_ptr<Bitmap> OHOSPixelMap::CopyBitmap(napi_env env, napi_value value)
     LOGE("OHOSBitmap::CopyBitmap() Failed to GetNativePixelMap");
     return nullptr;
   }
-  int32_t hasAlpha = 0;
-  auto errorCode = OH_PixelMap_IsSupportAlpha(pixelmap, &hasAlpha);
-  if (errorCode != IMAGE_RESULT_SUCCESS) {
-    LOGE("OHOSBitmap::CopyBitmap() Failed to GetAlphaInfo");
-    return nullptr;
-  }
   OhosPixelMapInfos info{};
-  errorCode = OH_PixelMap_GetImageInfo(pixelmap, &info);
+  auto errorCode = OH_PixelMap_GetImageInfo(pixelmap, &info);
   if (errorCode != IMAGE_RESULT_SUCCESS) {
-    LOGE("OHOSBitmap::GetInfo() Failed to GetPixelMapInfo");
+    LOGE("OHOSBitmap::CopyBitmap() Failed to GetPixelMapInfo");
     return nullptr;
   }
-  auto imageInfo =
-      ImageInfo::Make(static_cast<int>(info.width), static_cast<int>(info.height),
-                      OHOSImageInfo::ToTGFXColorType(info.pixelFormat),
-                      hasAlpha == 0 ? AlphaType::Opaque : AlphaType::Premultiplied, info.rowSize);
+  auto imageInfo = ImageInfo::Make(static_cast<int>(info.width), static_cast<int>(info.height),
+                                   OHOSImageInfo::ToTGFXColorType(info.pixelFormat),
+                                   AlphaType::Premultiplied, info.rowSize);
+
+  bool alphaOnly =
+      imageInfo.colorType() == ColorType::ALPHA_8 || imageInfo.colorType() == ColorType::Gray_8;
+
+  auto bitmap = std::make_shared<Bitmap>();
+  if (!bitmap || !bitmap->allocPixels(imageInfo.width(), imageInfo.height(), alphaOnly)) {
+    LOGE("OHOSBitmap::CopyBitmap() bitmap Failed to allocPixels");
+    return nullptr;
+  }
   void* pixel;
   errorCode = OH_PixelMap_AccessPixels(pixelmap, &pixel);
   if (errorCode != IMAGE_RESULT_SUCCESS) {
-    LOGE("Could not create ImageCodec, OH_PixelMap_AccessPixels failed");
+    LOGE("OHOSBitmap::CopyBitmap() OH_PixelMap_AccessPixels failed");
     return {};
   }
-  bool alphaOnly =
-      imageInfo.colorType() == ColorType::ALPHA_8 || imageInfo.colorType() == ColorType::Gray_8;
-  auto bitmap = std::make_shared<Bitmap>(imageInfo.width(), imageInfo.height(), alphaOnly);
   bitmap->writePixels(imageInfo, pixel);
   OH_PixelMap_UnAccessPixels(pixelmap);
   return bitmap;
