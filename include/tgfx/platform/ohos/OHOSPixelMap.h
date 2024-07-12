@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <memory>
 #include <napi/native_api.h>
+#include <memory>
 #include "tgfx/core/Image.h"
 
 namespace tgfx {

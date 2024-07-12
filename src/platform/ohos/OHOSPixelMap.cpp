@@ -5,7 +5,6 @@
 // please include "napi/native_api.h".
 
 #include "tgfx/platform/ohos/OHOSPixelMap.h"
-
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
 #include "OHOSConverter.h"
 #include "utils/Log.h"

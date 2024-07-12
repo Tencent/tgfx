@@ -21,39 +21,6 @@ static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static napi_value AddImageFromPixelMap(napi_env env, napi_callback_info info) {
-  size_t argc = 2;
-  napi_value args[2] = {nullptr};
-  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  size_t strSize;
-  char srcBuf[2048];
-  napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
-  std::string name(srcBuf, strSize);
-
-  if (appHost == nullptr) {
-    appHost = CreateAppHost();
-  }
-  appHost->addImage(name, tgfx::OHOSPixelMap::CopyImage(env, args[1]));
-  return nullptr;
-}
-
-static napi_value AddImageFromPath(napi_env env, napi_callback_info info) {
-  size_t argc = 2;
-  napi_value args[2] = {nullptr};
-  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  size_t strSize;
-  char srcBuf[2048];
-  napi_get_value_string_utf8(env, args[0], srcBuf, sizeof(srcBuf), &strSize);
-  std::string name = srcBuf;
-  napi_get_value_string_utf8(env, args[1], srcBuf, sizeof(srcBuf), &strSize);
-  std::string path = srcBuf;
-  if (appHost == nullptr) {
-    appHost = CreateAppHost();
-  }
-  appHost->addImage(name, tgfx::Image::MakeFromFile(path));
-  return nullptr;
-}
-
 static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value args[2] = {nullptr};
@@ -198,10 +165,6 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"draw", nullptr, OnDraw, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromPixelMap", nullptr, AddImageFromPixelMap, nullptr, nullptr, nullptr,
-       napi_default, nullptr},
-      {"addImageFromPath", nullptr, AddImageFromPath, nullptr, nullptr, nullptr, napi_default,
-       nullptr},
       {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default,
        nullptr}};
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);

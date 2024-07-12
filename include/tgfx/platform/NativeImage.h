@@ -28,7 +28,6 @@ class _jobject;
 
 struct CGImage;
 
-#elif defined(__OHOS__)
 #endif
 
 namespace tgfx {

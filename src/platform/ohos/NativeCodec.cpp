@@ -19,10 +19,10 @@
 #include "NativeCodec.h"
 #include <multimedia/image_framework/image/image_source_native.h>
 #include <cstdint>
+#include "OHOSConverter.h"
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Image.h"
-#include "OHOSConverter.h"
 #include "utils/Log.h"
 
 namespace tgfx {

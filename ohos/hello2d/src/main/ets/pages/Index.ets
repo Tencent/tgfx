@@ -1,6 +1,5 @@
 import hello2d from 'libhello2d.so';
 import display from '@ohos.display';
-import { image } from '@kit.ImageKit';
 
 @Entry
 @Component
@@ -15,17 +14,8 @@ struct Index {
       if (error) {
         return;
       }
-      let name = "bridge";
-      //from pixelmap
       const buffer = value.buffer.slice(0);
-      let img = image.createImageSource(buffer);
-      let pixelmap = img.createPixelMapSync();
-      hello2d.addImageFromPixelMap(name, pixelmap);
-      pixelmap.release();
-
-      // from data
-      // const buffer = value.buffer.slice(0);
-      // hello2d.addImageFromEncoded(name, buffer);
+      hello2d.addImageFromEncoded("bridge", buffer);
     })
   }
 
