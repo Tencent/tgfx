@@ -136,7 +136,7 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
     printf("OnSurfaceCreatedCB() Invalid surface specified.\n");
     return;
   }
-  Draw(0);
+  Draw(1);
 }
 
 static void RegisterCallback(napi_env env, napi_value exports) {

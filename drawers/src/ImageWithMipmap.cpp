@@ -30,7 +30,7 @@ void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host)
   if (image == nullptr) {
     return;
   }
-  image = image->makeMipmapped(true);
+//  image = image->makeMipmapped(true);
   auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
   auto matrix = tgfx::Matrix::MakeScale(imageScale);
   matrix.postTranslate(static_cast<float>(width - size) / 2, static_cast<float>(height - size) / 2);
