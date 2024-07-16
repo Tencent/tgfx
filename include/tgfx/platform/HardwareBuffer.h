@@ -23,6 +23,8 @@
 
 #if defined(__ANDROID__) || defined(ANDROID)
 struct AHardwareBuffer;
+#elif defined(__OHOS__)
+struct OH_NativeBuffer;
 #elif defined(__APPLE__)
 struct __CVBuffer;
 #endif
@@ -30,6 +32,8 @@ struct __CVBuffer;
 namespace tgfx {
 #if defined(__ANDROID__) || defined(ANDROID)
 typedef AHardwareBuffer* HardwareBufferRef;
+#elif defined(__OHOS__)
+typedef OH_NativeBuffer* HardwareBufferRef;
 #elif defined(__APPLE__)
 // __CVBuffer == CVPixelBufferRef
 typedef __CVBuffer* HardwareBufferRef;

@@ -16,41 +16,94 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/HardwareBuffer.h"
-#include "tgfx/core/ImageBuffer.h"
+#include <native_buffer/native_buffer.h>
+#include "core/PixelBuffer.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace) {
+  return PixelBuffer::MakeFrom(hardwareBuffer);
 }
 
-bool HardwareBufferCheck(HardwareBufferRef) {
-  return false;
+bool HardwareBufferCheck(HardwareBufferRef buffer) {
+  if (!HardwareBufferAvailable()) {
+    return false;
+  }
+  return buffer != nullptr;
 }
 
-HardwareBufferRef HardwareBufferAllocate(int, int, bool) {
-  return nullptr;
+HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
+  if (!HardwareBufferAvailable() || alphaOnly) {
+    return nullptr;
+  }
+  OH_NativeBuffer_Config config = {width, height, NATIVEBUFFER_PIXEL_FMT_RGBA_8888,
+                                   NATIVEBUFFER_USAGE_CPU_READ | NATIVEBUFFER_USAGE_CPU_WRITE |
+                                       NATIVEBUFFER_USAGE_HW_RENDER | NATIVEBUFFER_USAGE_HW_TEXTURE,
+                                   0};
+  return OH_NativeBuffer_Alloc(&config);
 }
 
 HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
+  if (buffer != nullptr) {
+    OH_NativeBuffer_Reference(buffer);
+  }
   return buffer;
 }
 
-void HardwareBufferRelease(HardwareBufferRef) {
+void HardwareBufferRelease(HardwareBufferRef buffer) {
+  if (buffer != nullptr) {
+    OH_NativeBuffer_Unreference(buffer);
+  }
 }
 
-void* HardwareBufferLock(HardwareBufferRef) {
-  return nullptr;
+void* HardwareBufferLock(HardwareBufferRef buffer) {
+  if (buffer == nullptr) {
+    return nullptr;
+  }
+  void* pixels = nullptr;
+  auto result = OH_NativeBuffer_Map(buffer, &pixels);
+  if (result != 0) {
+    return nullptr;
+  }
+  return pixels;
 }
 
-void HardwareBufferUnlock(HardwareBufferRef) {
+void HardwareBufferUnlock(HardwareBufferRef buffer) {
+  if (buffer != nullptr) {
+    OH_NativeBuffer_Unmap(buffer);
+  }
 }
 
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
-  return {};
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
+  if (!HardwareBufferAvailable() || buffer == nullptr) {
+    return {};
+  }
+  OH_NativeBuffer_Config config;
+  OH_NativeBuffer_GetConfig(buffer, &config);
+  auto colorType = ColorType::Unknown;
+  auto alphaType = AlphaType::Premultiplied;
+  switch (config.format) {
+    case NATIVEBUFFER_PIXEL_FMT_RGBA_8888:
+      colorType = ColorType::RGBA_8888;
+      break;
+    case NATIVEBUFFER_PIXEL_FMT_RGBX_8888:
+      colorType = ColorType::RGBA_8888;
+      alphaType = AlphaType::Opaque;
+      break;
+    default:
+      break;
+  }
+  auto bytesPerPixel = ImageInfo::GetBytesPerPixel(colorType);
+  return ImageInfo::Make(config.width, config.height, colorType,
+                         alphaType, static_cast<size_t>(config.stride) * bytesPerPixel);
 }
 
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
+PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
+  auto info = HardwareBufferGetInfo(buffer);
+  if (info.isEmpty()) {
+    return PixelFormat::Unknown;
+  }
+  return ColorTypeToPixelFormat(info.colorType());
 }
 }  // namespace tgfx

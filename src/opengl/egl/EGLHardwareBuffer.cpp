@@ -16,13 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
+#include "gpu/Texture.h"
+#include "EGLHardwareTexture.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
-#include "EGLHardwareTexture.h"
 #include "platform/android/AHardwareBufferFunctions.h"
-#include "tgfx/platform/HardwareBuffer.h"
 #endif
 
 namespace tgfx {
@@ -38,6 +37,20 @@ bool HardwareBufferAvailable() {
                                 AHardwareBufferFunctions::Get()->toHardwareBuffer != nullptr &&
                                 AHardwareBufferFunctions::Get()->fromHardwareBuffer != nullptr;
   return available;
+}
+
+std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                           YUVColorSpace) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return nullptr;
+  }
+  return EGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+}
+
+#elif defined(__OHOS__)
+
+bool HardwareBufferAvailable() {
+  return true;
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,

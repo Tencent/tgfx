@@ -21,11 +21,6 @@ set(TGFX_BUILD_DRAWERS ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./tgfx)
 
-find_library(EGL-lib EGL)
-find_library(GLES-lib GLESv3)
-find_library(libace-lib ace_ndk.z)
-find_library(hilog-lib hilog_ndk.z)
-
 file(GLOB_RECURSE HELLO_2D_FILES *.cpp)
 add_library(hello2d SHARED ${HELLO_2D_FILES})
-target_link_libraries(hello2d tgfx-drawers tgfx ${EGL-lib} ${GLES-lib} ${libace-lib} ${hilog-lib} libace_napi.z.so)
+target_link_libraries(hello2d tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
