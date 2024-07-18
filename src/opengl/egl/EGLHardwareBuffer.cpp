@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/HardwareBuffer.h"
-#include "gpu/Texture.h"
 #include "EGLHardwareTexture.h"
+#include "gpu/Texture.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "platform/android/AHardwareBufferFunctions.h"
