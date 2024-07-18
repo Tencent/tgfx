@@ -94,9 +94,8 @@ ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
     default:
       break;
   }
-  auto bytesPerPixel = ImageInfo::GetBytesPerPixel(colorType);
   return ImageInfo::Make(config.width, config.height, colorType,
-                         alphaType, static_cast<size_t>(config.stride) * bytesPerPixel);
+                         alphaType, static_cast<size_t>(config.stride));
 }
 
 PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
