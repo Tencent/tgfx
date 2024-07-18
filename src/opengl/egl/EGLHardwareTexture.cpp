@@ -46,11 +46,11 @@ static PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
 
 static bool InitEGLEXTProc() {
 #if defined(__OHOS__)
-  #define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_OHOS
+#define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_OHOS
   eglext::eglGetNativeClientBuffer =
       (PFNEGLGETNATIVECLIENTBUFFERPROC)OH_NativeWindow_CreateNativeWindowBufferFromNativeBuffer;
 #else
-  #define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_ANDROID
+#define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_ANDROID
   eglext::eglGetNativeClientBuffer =
       (PFNEGLGETNATIVECLIENTBUFFERPROC)eglGetProcAddress("eglGetNativeClientBufferANDROID");
 #endif
