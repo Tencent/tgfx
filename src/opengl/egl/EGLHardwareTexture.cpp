@@ -29,7 +29,7 @@
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
 #include <native_window/external_window.h>
-#elif
+#else
 #include <android/hardware_buffer.h>
 #endif
 
@@ -46,9 +46,11 @@ static PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
 
 static bool InitEGLEXTProc() {
 #if defined(__OHOS__)
+  #define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_OHOS
   eglext::eglGetNativeClientBuffer =
       (PFNEGLGETNATIVECLIENTBUFFERPROC)OH_NativeWindow_CreateNativeWindowBufferFromNativeBuffer;
-#elif
+#else
+  #define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_ANDROID
   eglext::eglGetNativeClientBuffer =
       (PFNEGLGETNATIVECLIENTBUFFERPROC)eglGetProcAddress("eglGetNativeClientBufferANDROID");
 #endif
@@ -82,7 +84,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   EGLint attributes[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
   EGLImageKHR eglImage = eglext::eglCreateImageKHR(
-      display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attributes);
+      display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_TARGET, clientBuffer, attributes);
   if (eglImage == EGL_NO_IMAGE_KHR) {
     return nullptr;
   }
