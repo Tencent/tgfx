@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__ANDROID__) || defined(ANDROID)
+#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
 #pragma once
 
@@ -29,7 +29,7 @@ namespace tgfx {
 class EGLHardwareTexture : public Texture {
  public:
   static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
-                                                      AHardwareBuffer* hardwareBuffer);
+                                                      HardwareBufferRef hardwareBuffer);
 
   size_t memoryUsage() const override;
 
@@ -46,12 +46,12 @@ class EGLHardwareTexture : public Texture {
 
  private:
   std::unique_ptr<TextureSampler> sampler = {};
-  AHardwareBuffer* hardwareBuffer = nullptr;
+  HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
   static ScratchKey ComputeScratchKey(void* hardwareBuffer);
 
-  EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage, int width, int height);
+  EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, int width, int height);
 
   ~EGLHardwareTexture() override;
 };

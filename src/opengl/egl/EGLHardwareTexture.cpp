@@ -16,40 +16,54 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__ANDROID__) || defined(ANDROID)
+#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
 #include "EGLHardwareTexture.h"
-#include <GLES/gl.h>
-#include <GLES/glext.h>
-#include <android/hardware_buffer.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 #include "gpu/Gpu.h"
 #include "opengl/GLSampler.h"
-#include "tgfx/core/Pixmap.h"
 #include "tgfx/opengl/egl/EGLDevice.h"
 #include "utils/PixelFormatUtil.h"
 #include "utils/UniqueID.h"
+#if defined(__OHOS__)
+#include <native_buffer/native_buffer.h>
+#include <native_window/external_window.h>
+#else
+#include <android/hardware_buffer.h>
+#endif
 
 namespace tgfx {
+
+typedef EGLClientBuffer(EGLAPIENTRYP PFNEGLGETNATIVECLIENTBUFFERPROC)(HardwareBufferRef buffer);
+
 namespace eglext {
-static PFNEGLGETNATIVECLIENTBUFFERANDROIDPROC eglGetNativeClientBufferANDROID = nullptr;
+static PFNEGLGETNATIVECLIENTBUFFERPROC eglGetNativeClientBuffer = nullptr;
 static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES = nullptr;
 static PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR = nullptr;
 static PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
 }  // namespace eglext
 
 static bool InitEGLEXTProc() {
-  eglext::eglGetNativeClientBufferANDROID =
-      (PFNEGLGETNATIVECLIENTBUFFERANDROIDPROC)eglGetProcAddress("eglGetNativeClientBufferANDROID");
+#if defined(__OHOS__)
+#define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_OHOS
+  eglext::eglGetNativeClientBuffer =
+      (PFNEGLGETNATIVECLIENTBUFFERPROC)OH_NativeWindow_CreateNativeWindowBufferFromNativeBuffer;
+#else
+#define EGL_NATIVE_BUFFER_TARGET EGL_NATIVE_BUFFER_ANDROID
+  eglext::eglGetNativeClientBuffer =
+      (PFNEGLGETNATIVECLIENTBUFFERPROC)eglGetProcAddress("eglGetNativeClientBufferANDROID");
+#endif
   eglext::glEGLImageTargetTexture2DOES =
       (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
   eglext::eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
   eglext::eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
-  return eglext::eglGetNativeClientBufferANDROID && eglext::glEGLImageTargetTexture2DOES &&
+  return eglext::eglGetNativeClientBuffer && eglext::glEGLImageTargetTexture2DOES &&
          eglext::eglCreateImageKHR && eglext::eglDestroyImageKHR;
 }
 
 std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* context,
-                                                                 AHardwareBuffer* hardwareBuffer) {
+                                                                 HardwareBufferRef hardwareBuffer) {
   static const bool initialized = InitEGLEXTProc();
   if (!initialized) {
     return nullptr;
@@ -63,14 +77,14 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   if (glTexture != nullptr) {
     return glTexture;
   }
-  EGLClientBuffer clientBuffer = eglext::eglGetNativeClientBufferANDROID(hardwareBuffer);
+  auto clientBuffer = eglext::eglGetNativeClientBuffer(hardwareBuffer);
   if (!clientBuffer) {
     return nullptr;
   }
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   EGLint attributes[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
   EGLImageKHR eglImage = eglext::eglCreateImageKHR(
-      display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attributes);
+      display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_TARGET, clientBuffer, attributes);
   if (eglImage == EGL_NO_IMAGE_KHR) {
     return nullptr;
   }
@@ -96,7 +110,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   return glTexture;
 }
 
-EGLHardwareTexture::EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage,
+EGLHardwareTexture::EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
                                        int width, int height)
     : Texture(width, height, ImageOrigin::TopLeft),
       hardwareBuffer(HardwareBufferRetain(hardwareBuffer)), eglImage(eglImage) {
