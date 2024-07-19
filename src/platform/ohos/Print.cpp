@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/Print.h"
-#include <cstdio>
 #include <hilog/log.h>
+#include <cstdio>
 
 namespace tgfx {
 #define LOG_PRINT_TAG "tgfx"
