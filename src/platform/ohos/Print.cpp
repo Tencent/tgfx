@@ -16,28 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if !defined(__ANDROID__) && !defined(ANDROID) && !defined(__OHOS__)
-
 #include "tgfx/platform/Print.h"
-#include <cstdarg>
+#include <hilog/log.h>
 #include <cstdio>
 
 namespace tgfx {
+#define LOG_PRINT_TAG "tgfx"
+#define LOG_PRINT_DOMAIN 0xFF00
+#define MAX_LOG_LENGTH 4096
+
 void PrintLog(const char format[], ...) {
+  char buffer[MAX_LOG_LENGTH];
   va_list args;
   va_start(args, format);
-  vfprintf(stdout, format, args);
+  vsnprintf(buffer, MAX_LOG_LENGTH, format, args);
   va_end(args);
-  fprintf(stdout, "\n");
+  OH_LOG_Print(LOG_APP, LOG_INFO, LOG_PRINT_DOMAIN, LOG_PRINT_TAG, "%{public}s", buffer);
 }
 
 void PrintError(const char format[], ...) {
+  char buffer[MAX_LOG_LENGTH];
   va_list args;
   va_start(args, format);
-  vfprintf(stderr, format, args);
+  vsnprintf(buffer, MAX_LOG_LENGTH, format, args);
   va_end(args);
-  fprintf(stderr, "\n");
+  OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_PRINT_DOMAIN, LOG_PRINT_TAG, "%{public}s", buffer);
 }
 }  // namespace tgfx
-
-#endif
