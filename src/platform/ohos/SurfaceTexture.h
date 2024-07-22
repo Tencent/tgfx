@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES3/gl3.h>
 #include <native_image/native_image.h>
 #include <native_window/external_window.h>
 #include "core/ImageStream.h"
@@ -62,7 +65,7 @@ class SurfaceTexture : public ImageStream {
    * Returns the Surface object used as the input to the SurfaceTexture. The release() method of
    * the returned Surface will be called when the SurfaceTexture is released.
    */
-  OHNativeWindow* getInputSurface() const;
+  NativeWindow* getInputSurface() const;
 
   /**
    * Notifies the previously returned ImageBuffer is available for generating textures. The method
@@ -81,10 +84,10 @@ class SurfaceTexture : public ImageStream {
   int _height = 0;
   std::condition_variable condition = {};
   bool frameAvailable = false;
-  OH_NativeImage* nativeImage = nullptr;
-  OHNativeWindow* nativeWindow = nullptr;  
+  OH_NativeImage* _nativeImage = nullptr;
+  NativeWindow* _nativeWindow = nullptr;  
 
-  SurfaceTexture(int width, int height);
+  SurfaceTexture(int width, int height, OH_NativeImage* nativeImage, NativeWindow* nativeWindow);
 
   std::shared_ptr<Texture> makeTexture(Context* context);
 };
