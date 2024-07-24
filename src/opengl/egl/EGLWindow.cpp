@@ -20,6 +20,8 @@
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include <android/native_window.h>
+#elif defined(__OHOS__)
+#include <native_window/external_window.h>
 #elif defined(_WIN32)
 #include <WinUser.h>
 #endif
@@ -62,6 +64,9 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
 #if defined(__ANDROID__) || defined(ANDROID)
     width = ANativeWindow_getWidth(nativeWindow);
     height = ANativeWindow_getHeight(nativeWindow);
+#elif defined(__OHOS__)
+    OH_NativeWindow_NativeWindowHandleOpt(reinterpret_cast<OHNativeWindow*>(nativeWindow),
+                                          GET_BUFFER_GEOMETRY, &height, &width);
 #elif defined(_WIN32)
     RECT rect;
     GetClientRect(nativeWindow, &rect);
