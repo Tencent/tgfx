@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NV12HardwareBuffer.h"
-#include "gpu/YUVTexture.h"
+#include "gpu/Texture.h"
 #include "utils/USE.h"
 
 namespace tgfx {
@@ -69,6 +69,6 @@ int NV12HardwareBuffer::height() const {
 }
 
 std::shared_ptr<Texture> NV12HardwareBuffer::onMakeTexture(Context* context, bool) const {
-  return YUVTexture::MakeFrom(context, pixelBuffer, colorSpace);
+  return Texture::MakeFrom(context, pixelBuffer, colorSpace);
 }
 }  // namespace tgfx

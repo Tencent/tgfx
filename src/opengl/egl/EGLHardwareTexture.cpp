@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/AlphaType.h"
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
 #include "EGLHardwareTexture.h"
@@ -65,12 +66,25 @@ static bool InitEGLEXTProc() {
 std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* context,
                                                                  HardwareBufferRef hardwareBuffer) {
   static const bool initialized = InitEGLEXTProc();
-  if (!initialized) {
+  if (!initialized || hardwareBuffer == nullptr) {
     return nullptr;
   }
+  unsigned target = GL_TEXTURE_2D;
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.isEmpty()) {
+#if defined(__OHOS__)
+    OH_NativeBuffer_Config config;
+    OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
+    if (config.format < NATIVEBUFFER_PIXEL_FMT_YUV_422_I ||
+        config.format > NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
+      return nullptr;
+    }
+    info = ImageInfo::Make(config.width, config.height, ColorType::RGBA_8888, AlphaType::Opaque,
+                           static_cast<size_t>(config.stride));
+    target = GL_TEXTURE_EXTERNAL_OES;
+#else
     return nullptr;
+#endif
   }
   auto scratchKey = ComputeScratchKey(hardwareBuffer);
   auto glTexture = Resource::Find<EGLHardwareTexture>(context, scratchKey);
@@ -90,7 +104,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   }
 
   auto sampler = std::make_unique<GLSampler>();
-  sampler->target = GL_TEXTURE_2D;
+  sampler->target = target;
   sampler->format = ColorTypeToPixelFormat(info.colorType());
   glGenTextures(1, &sampler->id);
   if (sampler->id == 0) {
