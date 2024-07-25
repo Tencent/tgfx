@@ -70,8 +70,14 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
     return nullptr;
   }
   unsigned target = GL_TEXTURE_2D;
+  auto format = PixelFormat::RGBA_8888;
+  int width, height;
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.isEmpty()) {
+  if (!info.isEmpty()) {
+    format = ColorTypeToPixelFormat(info.colorType());
+    width = info.width();
+    height = info.height();
+  } else {
 #if defined(__OHOS__)
     OH_NativeBuffer_Config config;
     OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
@@ -79,9 +85,9 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
         config.format > NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
       return nullptr;
     }
-    info = ImageInfo::Make(config.width, config.height, ColorType::RGBA_8888, AlphaType::Opaque,
-                           static_cast<size_t>(config.stride));
     target = GL_TEXTURE_EXTERNAL_OES;
+    width = config.width;
+    height = config.height;
 #else
     return nullptr;
 #endif
@@ -105,7 +111,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
 
   auto sampler = std::make_unique<GLSampler>();
   sampler->target = target;
-  sampler->format = ColorTypeToPixelFormat(info.colorType());
+  sampler->format = format;
   glGenTextures(1, &sampler->id);
   if (sampler->id == 0) {
     eglext::eglDestroyImageKHR(display, eglImage);
@@ -117,8 +123,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   glTexParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   eglext::glEGLImageTargetTexture2DOES(sampler->target, (GLeglImageOES)eglImage);
-  auto eglHardwareTexture =
-      new EGLHardwareTexture(hardwareBuffer, eglImage, info.width(), info.height());
+  auto eglHardwareTexture = new EGLHardwareTexture(hardwareBuffer, eglImage, width, height);
   glTexture = Resource::AddToCache(context, eglHardwareTexture, scratchKey);
   glTexture->sampler = std::move(sampler);
   return glTexture;
