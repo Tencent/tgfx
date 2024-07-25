@@ -17,13 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <native_buffer/native_buffer.h>
+#include "ExternalOESBuffer.h"
 #include "core/PixelBuffer.h"
 #include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace) {
-  return PixelBuffer::MakeFrom(hardwareBuffer);
+                                                   YUVColorSpace colorSpace) {
+  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+  if (pixelBuffer) {
+    return pixelBuffer;
+  }
+  return ExternalOESBuffer::MakeFrom(hardwareBuffer, colorSpace);
 }
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {

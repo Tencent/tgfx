@@ -19,9 +19,12 @@
 #include "EGLHardwareTexture.h"
 #include "gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
+#include "utils/USE.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "platform/android/AHardwareBufferFunctions.h"
+#elif defined(__OHOS__)
+#include <native_buffer/native_buffer.h>
 #endif
 
 namespace tgfx {
@@ -54,10 +57,36 @@ bool HardwareBufferAvailable() {
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           YUVColorSpace) {
+                                           YUVColorSpace colorSpace) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return nullptr;
   }
+#if defined(__OHOS__)
+  switch (colorSpace) {
+    case YUVColorSpace::BT601_LIMITED:
+      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_LIMIT);
+      break;
+    case YUVColorSpace::BT601_FULL:
+      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_FULL);
+      break;
+    case YUVColorSpace::BT709_LIMITED:
+      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_LIMIT);
+      break;
+    case YUVColorSpace::BT709_FULL:
+      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_FULL);
+      break;
+    case YUVColorSpace::BT2020_LIMITED:
+      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_LIMIT);
+      break;
+    case YUVColorSpace::BT2020_FULL:
+      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_FULL);
+      break;
+    default:
+      break;
+  }
+#else
+  USE(colorSpace);
+#endif
   return EGLHardwareTexture::MakeFrom(context, hardwareBuffer);
 }
 

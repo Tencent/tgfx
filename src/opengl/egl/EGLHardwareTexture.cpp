@@ -16,11 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/AlphaType.h"
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
-#include "EGLHardwareTexture.h"
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include "EGLHardwareTexture.h"
 #include "gpu/Gpu.h"
 #include "opengl/GLSampler.h"
 #include "tgfx/opengl/egl/EGLDevice.h"
@@ -65,12 +66,31 @@ static bool InitEGLEXTProc() {
 std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* context,
                                                                  HardwareBufferRef hardwareBuffer) {
   static const bool initialized = InitEGLEXTProc();
-  if (!initialized) {
+  if (!initialized || hardwareBuffer == nullptr) {
     return nullptr;
   }
+  unsigned target = GL_TEXTURE_2D;
+  auto format = PixelFormat::RGBA_8888;
+  int width, height;
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.isEmpty()) {
+  if (!info.isEmpty()) {
+    format = ColorTypeToPixelFormat(info.colorType());
+    width = info.width();
+    height = info.height();
+  } else {
+#if defined(__OHOS__)
+    OH_NativeBuffer_Config config;
+    OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
+    if (config.format < NATIVEBUFFER_PIXEL_FMT_YUV_422_I ||
+        config.format > NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
+      return nullptr;
+    }
+    target = GL_TEXTURE_EXTERNAL_OES;
+    width = config.width;
+    height = config.height;
+#else
     return nullptr;
+#endif
   }
   auto scratchKey = ComputeScratchKey(hardwareBuffer);
   auto glTexture = Resource::Find<EGLHardwareTexture>(context, scratchKey);
@@ -90,8 +110,8 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   }
 
   auto sampler = std::make_unique<GLSampler>();
-  sampler->target = GL_TEXTURE_2D;
-  sampler->format = ColorTypeToPixelFormat(info.colorType());
+  sampler->target = target;
+  sampler->format = format;
   glGenTextures(1, &sampler->id);
   if (sampler->id == 0) {
     eglext::eglDestroyImageKHR(display, eglImage);
@@ -103,8 +123,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   glTexParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   eglext::glEGLImageTargetTexture2DOES(sampler->target, (GLeglImageOES)eglImage);
-  auto eglHardwareTexture =
-      new EGLHardwareTexture(hardwareBuffer, eglImage, info.width(), info.height());
+  auto eglHardwareTexture = new EGLHardwareTexture(hardwareBuffer, eglImage, width, height);
   glTexture = Resource::AddToCache(context, eglHardwareTexture, scratchKey);
   glTexture->sampler = std::move(sampler);
   return glTexture;
