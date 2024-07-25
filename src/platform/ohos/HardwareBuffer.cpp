@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <native_buffer/native_buffer.h>
-#include "core/PixelBuffer.h"
 #include "ExternalOESBuffer.h"
+#include "core/PixelBuffer.h"
 #include "utils/PixelFormatUtil.h"
 
 namespace tgfx {

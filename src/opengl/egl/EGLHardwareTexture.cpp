@@ -19,9 +19,9 @@
 #include "tgfx/core/AlphaType.h"
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
-#include "EGLHardwareTexture.h"
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include "EGLHardwareTexture.h"
 #include "gpu/Gpu.h"
 #include "opengl/GLSampler.h"
 #include "tgfx/opengl/egl/EGLDevice.h"
