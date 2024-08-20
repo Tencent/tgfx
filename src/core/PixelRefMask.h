@@ -36,7 +36,7 @@ class PixelRefMask : public Mask {
   }
 
   bool isHardwareBacked() const override {
-    return pixelRef->width();
+    return pixelRef->isHardwareBacked();
   }
 
   void clear() override {
