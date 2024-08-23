@@ -73,6 +73,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   auto format = PixelFormat::RGBA_8888;
   int width, height;
   auto info = HardwareBufferGetInfo(hardwareBuffer);
+  bool enablScratchKey = true;
   if (!info.isEmpty()) {
     format = ColorTypeToPixelFormat(info.colorType());
     width = info.width();
@@ -88,14 +89,19 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
     target = GL_TEXTURE_EXTERNAL_OES;
     width = config.width;
     height = config.height;
+    enablScratchKey = false;
 #else
     return nullptr;
 #endif
   }
-  auto scratchKey = ComputeScratchKey(hardwareBuffer);
-  auto glTexture = Resource::Find<EGLHardwareTexture>(context, scratchKey);
-  if (glTexture != nullptr) {
-    return glTexture;
+  ScratchKey scratchKey = {};
+  std::shared_ptr<EGLHardwareTexture> glTexture = nullptr;
+  if (enablScratchKey) {
+    scratchKey = ComputeScratchKey(hardwareBuffer);
+    glTexture = Resource::Find<EGLHardwareTexture>(context, scratchKey);
+    if (glTexture != nullptr) {
+      return glTexture;
+    }
   }
   auto clientBuffer = eglext::eglGetNativeClientBuffer(hardwareBuffer);
   if (!clientBuffer) {
