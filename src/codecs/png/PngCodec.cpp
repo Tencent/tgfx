@@ -179,6 +179,9 @@ bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (readInfo->rowPtrs == nullptr) {
     return false;
   }
+  if (setjmp(png_jmpbuf(readInfo->p))) {
+    return false;
+  }
   if (dstInfo.colorType() == ColorType::RGBA_8888 &&
       dstInfo.alphaType() == AlphaType::Unpremultiplied) {
     for (size_t i = 0; i < static_cast<size_t>(h); i++) {
