@@ -1,12 +1,12 @@
 # Default owners:
-*       @domchen
+*       @domchen @Hparty @lvpengwei
 
-*.js    @domchen @Hparty
-*.ts    @domchen @Hparty
-*.sh    @kevingpqi123 @domchen @Hparty
-/*      @kevingpqi123 @domchen @Hparty
+*.js    @domchen @Hparty @lvpengwei
+*.ts    @domchen @Hparty @lvpengwei
+*.sh    @kevingpqi123 @domchen @Hparty @lvpengwei
+/*      @kevingpqi123 @domchen @Hparty @lvpengwei
 /web/    @domchen @Hparty
-/.github/  @kevingpqi123 @domchen @Hparty
-/test/   @kevingpqi123 @domchen @Hparty
-/linux/  @kevingpqi123 @domchen @Hparty
-/win/    @kevingpqi123 @domchen @Hparty
+/.github/  @kevingpqi123 @domchen @Hparty @lvpengwei
+/test/   @kevingpqi123 @domchen @Hparty @lvpengwei
+/linux/  @kevingpqi123 @domchen @Hparty @lvpengwei
+/win/    @kevingpqi123 @domchen @Hparty @lvpengwei
