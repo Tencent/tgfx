@@ -412,10 +412,12 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
       }
     }
     OpContext context(renderTarget);
+    // Since the clip may not coverage the entire render target, we need to clear the render target
+    // to transparent. Otherwise, the associated texture will have undefined pixels outside the clip.
+    context.addOp(ClearOp::Make(Color::Transparent(), Rect::MakeWH(width, height)));
     context.addOp(std::move(drawOp));
     clipTexture = renderTarget->getTextureProxy();
   } else {
-    auto uniqueKey = PathRef::GetUniqueKey(clip);
     auto rasterizer = Rasterizer::MakeFrom(clip, ISize::Make(width, height), rasterizeMatrix);
     auto proxyProvider = getContext()->proxyProvider();
     clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
