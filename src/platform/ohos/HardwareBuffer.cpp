@@ -44,7 +44,8 @@ HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) 
   }
   OH_NativeBuffer_Config config = {width, height, NATIVEBUFFER_PIXEL_FMT_RGBA_8888,
                                    NATIVEBUFFER_USAGE_CPU_READ | NATIVEBUFFER_USAGE_CPU_WRITE |
-                                       NATIVEBUFFER_USAGE_HW_RENDER | NATIVEBUFFER_USAGE_HW_TEXTURE,
+                                       1ULL << 5 | NATIVEBUFFER_USAGE_HW_RENDER |
+                                       NATIVEBUFFER_USAGE_HW_TEXTURE,
                                    0};
   return OH_NativeBuffer_Alloc(&config);
 }
