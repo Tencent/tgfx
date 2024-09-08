@@ -102,7 +102,7 @@ ImageOrigin Surface::origin() const {
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
-  flush();
+  getContext()->flush();
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     return {};
@@ -114,7 +114,7 @@ BackendTexture Surface::getBackendTexture() {
   if (!renderTargetProxy->isTextureBacked()) {
     return {};
   }
-  flush();
+  getContext()->flush();
   auto texture = renderTargetProxy->getTexture();
   if (texture == nullptr) {
     return {};
@@ -126,7 +126,7 @@ HardwareBufferRef Surface::getHardwareBuffer() {
   if (!renderTargetProxy->isTextureBacked()) {
     return nullptr;
   }
-  flushAndSubmit(true);
+  getContext()->flushAndSubmit(true);
   auto texture = renderTargetProxy->getTexture();
   if (texture == nullptr) {
     return nullptr;
@@ -150,17 +150,6 @@ Canvas* Surface::getCanvas() {
     canvas = new Canvas(renderContext, GetInitClip(width(), height()));
   }
   return canvas;
-}
-
-bool Surface::flush(BackendSemaphore* signalSemaphore) {
-  auto context = getContext();
-  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
-  return context->flush(signalSemaphore);
-}
-
-void Surface::flushAndSubmit(bool syncCpu) {
-  flush();
-  getContext()->submit(syncCpu);
 }
 
 std::shared_ptr<Image> Surface::makeImageSnapshot() {
@@ -194,11 +183,12 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  flush();
+  auto context = getContext();
+  context->flush();
   auto texture = renderTargetProxy->getTexture();
   auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
   if (hardwareBuffer != nullptr) {
-    getContext()->submit(true);
+    context->submit(true);
     auto pixels = HardwareBufferLock(hardwareBuffer);
     if (pixels != nullptr) {
       auto info = HardwareBufferGetInfo(hardwareBuffer);

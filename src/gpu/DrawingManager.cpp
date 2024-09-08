@@ -37,15 +37,19 @@ std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
   auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy);
   renderTasks.push_back(opsTask);
   activeOpsTask = opsTask.get();
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (textureProxy && (renderTargetProxy->sampleCount() > 1 || textureProxy->hasMipmaps())) {
+    resolveMap.insert(renderTargetProxy);
+  }
   return opsTask;
 }
 
 void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
-  auto textureProxy = renderTargetProxy->getTextureProxy();
-  if (textureProxy == nullptr ||
-      (renderTargetProxy->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
+  auto result = resolveMap.find(renderTargetProxy);
+  if (result == resolveMap.end()) {
     return;
   }
+  resolveMap.erase(result);
   closeActiveOpsTask();
   auto task = std::make_shared<TextureResolveTask>(renderTargetProxy);
   task->makeClosed();
@@ -89,6 +93,11 @@ bool DrawingManager::flush() {
   }
   resourceTaskMap = {};
   resourceTasks = {};
+  for (auto& renderTarget : resolveMap) {
+    auto task = std::make_shared<TextureResolveTask>(renderTarget);
+    renderTasks.push_back(std::move(task));
+  }
+  resolveMap = {};
   for (auto& task : renderTasks) {
     task->makeClosed();
   }

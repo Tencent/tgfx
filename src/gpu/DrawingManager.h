@@ -19,6 +19,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
@@ -50,6 +51,7 @@ class DrawingManager {
 
   Context* context = nullptr;
   UniqueKeyMap<ResourceTask*> resourceTaskMap = {};
+  std::unordered_set<std::shared_ptr<RenderTargetProxy>> resolveMap = {};
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
   OpsRenderTask* activeOpsTask = nullptr;

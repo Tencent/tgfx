@@ -120,7 +120,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rectPaints.size(), drawCallCount);
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
   device->unlock();
 }
@@ -161,7 +161,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRectPaints.size(), drawCallCount);
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
   device->unlock();
 }
@@ -203,7 +203,7 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_clear_op"));
   device->unlock();
 }
@@ -287,7 +287,7 @@ TGFX_TEST(CanvasTest, textShape) {
     canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
                        textRun.font, paint);
   }
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
   device->unlock();
 }
@@ -533,7 +533,7 @@ TGFX_TEST(CanvasTest, image) {
   canvas->drawImage(image);
   auto decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
-  surface->flush();
+  context->flush();
   decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
   auto textureImage = image->makeTextureImage(context);
