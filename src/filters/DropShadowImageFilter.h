@@ -35,9 +35,9 @@ class DropShadowImageFilter : public ImageFilter {
 
   Rect onFilterBounds(const Rect& srcRect) const override;
 
-  std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                   const FPArgs& args,
-                                                   const SamplingOptions& sampling,
-                                                   const Matrix* localMatrix) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                         const FPArgs& args,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* localMatrix) const override;
 };
 }  // namespace tgfx

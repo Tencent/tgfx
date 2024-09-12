@@ -125,34 +125,18 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(
   }
   if (dstBounds.contains(drawBounds) ||
       (tileModeX == TileMode::Decal && tileModeY == TileMode::Decal)) {
-    return filter->onFilterImage(source, args, sampling, AddressOf(fpMatrix));
+    return filter->asFragmentProcessor(source, args, sampling, AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstBounds.width()),
-                                              static_cast<int>(dstBounds.height()),
-                                              PixelFormat::RGBA_8888, 1, mipmapped);
-  if (renderTarget == nullptr) {
+  auto textureProxy =
+      filter->onFilterImage(args.context, source, dstBounds, mipmapped, args.renderFlags);
+  if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto processor = filter->onFilterImage(source, args, {}, AddressOf(fpMatrix));
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  OpContext opContext(renderTarget);
-  auto offsetMatrix = Matrix::MakeTrans(dstBounds.x(), dstBounds.y());
-  if (fpMatrix) {
-    Matrix invert = {};
-    if (!fpMatrix->invert(&invert)) {
-      return nullptr;
-    }
-    offsetMatrix.postConcat(invert);
-  }
-  opContext.fillWithFP(std::move(processor), offsetMatrix, true);
   auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
-                                  &matrix);
+  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, &matrix);
 }
 }  // namespace tgfx

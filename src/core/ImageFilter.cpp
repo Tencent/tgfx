@@ -18,8 +18,9 @@
 
 #include "tgfx/core/ImageFilter.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ops/FillRectOp.h"
+#include "gpu/OpContext.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 Rect ImageFilter::filterBounds(const Rect& rect) const {
@@ -30,6 +31,29 @@ Rect ImageFilter::filterBounds(const Rect& rect) const {
 
 Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
+}
+
+std::shared_ptr<TextureProxy> ImageFilter::onFilterImage(Context* context,
+                                                         std::shared_ptr<Image> source,
+                                                         const Rect& filterBounds, bool mipmapped,
+                                                         uint32_t renderFlags) const {
+  auto renderTarget = RenderTargetProxy::Make(context, static_cast<int>(filterBounds.width()),
+                                              static_cast<int>(filterBounds.height()),
+                                              PixelFormat::RGBA_8888, 1, mipmapped);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto drawRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
+  FPArgs args(context, renderFlags, drawRect, Matrix::I());
+  auto offsetMatrix = Matrix::MakeTrans(filterBounds.x(), filterBounds.y());
+  // There is no scale, so we can use the default sampling options.
+  auto processor = asFragmentProcessor(std::move(source), args, {}, &offsetMatrix);
+  if (!processor) {
+    return nullptr;
+  }
+  OpContext opContext(renderTarget);
+  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
+  return renderTarget->getTextureProxy();
 }
 
 bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds) const {
