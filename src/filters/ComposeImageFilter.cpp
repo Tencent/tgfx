@@ -71,7 +71,7 @@ Rect ComposeImageFilter::onFilterBounds(const Rect& srcRect) const {
   return bounds;
 }
 
-std::unique_ptr<FragmentProcessor> ComposeImageFilter::onFilterImage(
+std::unique_ptr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* localMatrix) const {
   auto bounds = Rect::MakeWH(source->width(), source->height());
@@ -79,33 +79,28 @@ std::unique_ptr<FragmentProcessor> ComposeImageFilter::onFilterImage(
   if (localMatrix) {
     drawBounds = localMatrix->mapRect(drawBounds);
   }
+  bool hasMipmaps = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   auto count = filters.size() - 1;
   auto lastSource = source;
-  Matrix lastLocalMatrix = localMatrix ? *localMatrix : Matrix::I();
+  Point lastOffset = {0, 0};
   for (size_t i = 0; i < count; ++i) {
     auto& filter = filters[i];
     if (!filter->applyCropRect(bounds, &bounds, &drawBounds)) {
       return nullptr;
     }
-    auto processor = filter->onFilterImage(std::move(lastSource), args, {}, &lastLocalMatrix);
-    if (processor == nullptr) {
+    bool mipmapped = (i == count - 1) && hasMipmaps;
+    auto textureProxy =
+        filter->onFilterImage(args.context, lastSource, bounds, mipmapped, args.renderFlags);
+    if (!textureProxy) {
       return nullptr;
     }
-    auto mipmapped =
-        (i == count - 1) && source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-    auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(bounds.width()),
-                                                static_cast<int>(bounds.height()),
-                                                PixelFormat::RGBA_8888, 1, mipmapped);
-    OpContext opContext(renderTarget);
-    Matrix offsetMatrix = Matrix::I();
-    if (!lastLocalMatrix.invert(&offsetMatrix)) {
-      return nullptr;
-    }
-    offsetMatrix.preTranslate(bounds.x(), bounds.y());
-    opContext.fillWithFP(std::move(processor), offsetMatrix, true);
-    lastSource = TextureImage::Wrap(renderTarget->getTextureProxy());
-    lastLocalMatrix.postTranslate(-bounds.x(), -bounds.y());
+    lastSource = TextureImage::Wrap(std::move(textureProxy));
+    lastOffset.offset(bounds.x(), bounds.y());
   }
-  return filters.back()->onFilterImage(std::move(lastSource), args, sampling, &lastLocalMatrix);
+  auto matrix = Matrix::MakeTrans(-lastOffset.x, -lastOffset.y);
+  if (localMatrix) {
+    matrix.preConcat(*localMatrix);
+  }
+  return filters.back()->asFragmentProcessor(std::move(lastSource), args, sampling, &matrix);
 }
 }  // namespace tgfx

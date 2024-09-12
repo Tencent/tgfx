@@ -104,31 +104,22 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
 }
 
-std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(std::shared_ptr<Image> source,
-                                                                  const FPArgs& args,
-                                                                  const SamplingOptions& sampling,
-                                                                  const Matrix* localMatrix) const {
-  auto inputBounds = Rect::MakeWH(source->width(), source->height());
-  auto clipBounds = args.drawRect;
-  if (localMatrix) {
-    clipBounds = localMatrix->mapRect(clipBounds);
-  }
-  Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
-    return nullptr;
-  }
-  inputBounds.intersect(clipBounds);
-  FPArgs newArgs(args.context, args.renderFlags, inputBounds, Matrix::I());
-  auto processor = FragmentProcessor::Make(source, newArgs, tileMode, tileMode, {});
-  auto imageBounds = dstBounds;
-  std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  auto lastRenderTarget = RenderTargetProxy::Make(
-      args.context, static_cast<int>(imageBounds.width()), static_cast<int>(imageBounds.height()),
-      PixelFormat::RGBA_8888, 1, mipmapped);
+std::shared_ptr<TextureProxy> BlurImageFilter::onFilterImage(Context* context,
+                                                             std::shared_ptr<Image> source,
+                                                             const Rect& filterBounds,
+                                                             bool mipmapped,
+                                                             uint32_t renderFlags) const {
+  auto lastRenderTarget = RenderTargetProxy::Make(context, static_cast<int>(filterBounds.width()),
+                                                  static_cast<int>(filterBounds.height()),
+                                                  PixelFormat::RGBA_8888, 1, mipmapped);
   if (lastRenderTarget == nullptr) {
     return nullptr;
   }
+  auto drawRect = Rect::MakeWH(lastRenderTarget->width(), lastRenderTarget->height());
+  FPArgs args(context, renderFlags, drawRect, Matrix::I());
+  auto processor = FragmentProcessor::Make(source, args, tileMode, tileMode, {});
+  auto imageBounds = filterBounds;
+  std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   for (int i = 0; i < iteration; ++i) {
     renderTargets.push_back(lastRenderTarget);
     if (processor == nullptr) {
@@ -151,10 +142,30 @@ std::unique_ptr<FragmentProcessor> BlurImageFilter::onFilterImage(std::shared_pt
     lastRenderTarget = renderTarget;
     imageBounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   }
+  return lastRenderTarget->getTextureProxy();
+}
+
+std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    const Matrix* localMatrix) const {
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  auto clipBounds = args.drawRect;
+  if (localMatrix) {
+    clipBounds = localMatrix->mapRect(clipBounds);
+  }
+  Rect dstBounds = Rect::MakeEmpty();
+  if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
+    return nullptr;
+  }
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto textureProxy = onFilterImage(args.context, source, dstBounds, mipmapped, args.renderFlags);
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
   auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
   if (localMatrix != nullptr) {
     fpMatrix.preConcat(*localMatrix);
   }
-  return TextureEffect::Make(lastRenderTarget->getTextureProxy(), sampling, &fpMatrix);
+  return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix);
 }
 }  // namespace tgfx

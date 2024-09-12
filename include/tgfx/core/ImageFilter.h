@@ -24,6 +24,8 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+class TextureProxy;
+
 /**
  * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
  * drawings occur as usual, but they are as if the drawings happened into an offscreen (before the
@@ -94,12 +96,20 @@ class ImageFilter {
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
   /**
-   * The returned processor is in the coordinate space of the source image.
+   * Returns a TextureProxy that applies this filter to the source image.
    */
-  virtual std::unique_ptr<FragmentProcessor> onFilterImage(std::shared_ptr<Image> source,
-                                                           const FPArgs& args,
-                                                           const SamplingOptions& sampling,
-                                                           const Matrix* localMatrix) const = 0;
+  virtual std::shared_ptr<TextureProxy> onFilterImage(Context* context,
+                                                      std::shared_ptr<Image> source,
+                                                      const Rect& filterBounds, bool mipmapped,
+                                                      uint32_t renderFlags) const;
+
+  /**
+   * Returns a FragmentProcessor that applies this filter to the source image. The returned
+   * processor is in the coordinate space of the source image.
+   */
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+      const Matrix* localMatrix) const = 0;
 
   /**
    * Returns true if this filter is a ComposeImageFilter.
