@@ -20,6 +20,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
@@ -37,9 +38,9 @@ std::shared_ptr<TextureProxy> ImageFilter::onFilterImage(Context* context,
                                                          std::shared_ptr<Image> source,
                                                          const Rect& filterBounds, bool mipmapped,
                                                          uint32_t renderFlags) const {
-  auto renderTarget = RenderTargetProxy::Make(context, static_cast<int>(filterBounds.width()),
-                                              static_cast<int>(filterBounds.height()),
-                                              PixelFormat::RGBA_8888, 1, mipmapped);
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      context, static_cast<int>(filterBounds.width()), static_cast<int>(filterBounds.height()),
+      source->isAlphaOnly(), 1, mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -51,8 +52,8 @@ std::shared_ptr<TextureProxy> ImageFilter::onFilterImage(Context* context,
   if (!processor) {
     return nullptr;
   }
-  OpContext opContext(renderTarget);
-  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
+  OpContext opContext(renderTarget, true);
+  opContext.fillWithFP(std::move(processor), Matrix::I());
   return renderTarget->getTextureProxy();
 }
 
@@ -65,5 +66,29 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   }
   dstRect->roundOut();
   return true;
+}
+
+std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromFilteredImage(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    const Matrix* localMatrix) const {
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  auto clipBounds = args.drawRect;
+  if (localMatrix) {
+    clipBounds = localMatrix->mapRect(clipBounds);
+  }
+  Rect dstBounds = Rect::MakeEmpty();
+  if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
+    return nullptr;
+  }
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto textureProxy = onFilterImage(args.context, source, dstBounds, mipmapped, args.renderFlags);
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  if (localMatrix != nullptr) {
+    fpMatrix.preConcat(*localMatrix);
+  }
+  return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix);
 }
 }  // namespace tgfx

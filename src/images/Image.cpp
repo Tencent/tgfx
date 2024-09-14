@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
+#include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ops/FillRectOp.h"
 #include "images/BufferImage.h"
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
@@ -27,7 +27,6 @@
 #include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
 class PixelDataConverter : public ImageGenerator {
@@ -156,13 +155,7 @@ std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
-  auto surface = Surface::Make(context, width(), height(), isAlphaOnly(), 1, hasMipmaps());
-  if (surface == nullptr) {
-    return nullptr;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->drawImage(weakThis.lock(), 0, 0);
-  return surface->makeImageSnapshot();
+  return TextureImage::Wrap(lockTextureProxy(context));
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
@@ -235,5 +228,23 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 
 std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
   return nullptr;
+}
+
+std::shared_ptr<TextureProxy> Image::lockTextureProxy(Context* context,
+                                                      uint32_t renderFlags) const {
+  auto renderTarget =
+      RenderTargetProxy::MakeFallback(context, width(), height(), isAlphaOnly(), 1, hasMipmaps());
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto drawRect = Rect::MakeWH(width(), height());
+  FPArgs args(context, renderFlags, drawRect, Matrix::I());
+  auto processor = FragmentProcessor::Make(weakThis.lock(), args, {});
+  if (processor == nullptr) {
+    return nullptr;
+  }
+  OpContext opContext(renderTarget, true);
+  opContext.fillWithFP(std::move(processor), Matrix::I());
+  return renderTarget->getTextureProxy();
 }
 }  // namespace tgfx

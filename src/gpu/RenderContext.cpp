@@ -404,12 +404,9 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     auto drawOp =
         TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
     drawOp->setAA(AAType::Coverage);
-    auto renderTarget = RenderTargetProxy::Make(getContext(), width, height, PixelFormat::ALPHA_8);
+    auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true);
     if (renderTarget == nullptr) {
-      renderTarget = RenderTargetProxy::Make(getContext(), width, height, PixelFormat::RGBA_8888);
-      if (renderTarget == nullptr) {
-        return nullptr;
-      }
+      return nullptr;
     }
     OpContext context(renderTarget);
     // Since the clip may not coverage the entire render target, we need to clear the render target

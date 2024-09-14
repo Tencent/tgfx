@@ -95,8 +95,8 @@ void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
-  OpContext opContext(std::move(renderTarget));
-  opContext.fillWithFP(std::move(blurProcessor), localMatrix, true);
+  OpContext opContext(std::move(renderTarget), true);
+  opContext.fillWithFP(std::move(blurProcessor), localMatrix);
 }
 
 Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -109,9 +109,10 @@ std::shared_ptr<TextureProxy> BlurImageFilter::onFilterImage(Context* context,
                                                              const Rect& filterBounds,
                                                              bool mipmapped,
                                                              uint32_t renderFlags) const {
-  auto lastRenderTarget = RenderTargetProxy::Make(context, static_cast<int>(filterBounds.width()),
-                                                  static_cast<int>(filterBounds.height()),
-                                                  PixelFormat::RGBA_8888, 1, mipmapped);
+  auto isAlphaOnly = source->isAlphaOnly();
+  auto lastRenderTarget = RenderTargetProxy::MakeFallback(
+      context, static_cast<int>(filterBounds.width()), static_cast<int>(filterBounds.height()),
+      isAlphaOnly, 1, mipmapped);
   if (lastRenderTarget == nullptr) {
     return nullptr;
   }
@@ -127,7 +128,8 @@ std::shared_ptr<TextureProxy> BlurImageFilter::onFilterImage(Context* context,
     }
     auto downWidth = std::max(static_cast<int>(roundf(imageBounds.width() * downScaling)), 1);
     auto downHeight = std::max(static_cast<int>(roundf(imageBounds.height() * downScaling)), 1);
-    auto renderTarget = RenderTargetProxy::Make(args.context, downWidth, downHeight);
+    auto renderTarget =
+        RenderTargetProxy::MakeFallback(args.context, downWidth, downHeight, isAlphaOnly);
     if (renderTarget == nullptr) {
       return nullptr;
     }
@@ -148,24 +150,6 @@ std::shared_ptr<TextureProxy> BlurImageFilter::onFilterImage(Context* context,
 std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* localMatrix) const {
-  auto inputBounds = Rect::MakeWH(source->width(), source->height());
-  auto clipBounds = args.drawRect;
-  if (localMatrix) {
-    clipBounds = localMatrix->mapRect(clipBounds);
-  }
-  Rect dstBounds = Rect::MakeEmpty();
-  if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
-    return nullptr;
-  }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  auto textureProxy = onFilterImage(args.context, source, dstBounds, mipmapped, args.renderFlags);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
-  if (localMatrix != nullptr) {
-    fpMatrix.preConcat(*localMatrix);
-  }
-  return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix);
+  return makeFPFromFilteredImage(source, args, sampling, localMatrix);
 }
 }  // namespace tgfx

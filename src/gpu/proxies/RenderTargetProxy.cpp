@@ -99,6 +99,16 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* cont
   return nullptr;
 }
 
+std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,
+                                                                   int height, bool isAlphaOnly,
+                                                                   int sampleCount, bool mipmapped,
+                                                                   ImageOrigin origin) {
+  auto formats = isAlphaOnly
+                     ? std::vector<PixelFormat>{PixelFormat::ALPHA_8, PixelFormat::RGBA_8888}
+                     : std::vector<PixelFormat>{PixelFormat::RGBA_8888};
+  return MakeFallback(context, width, height, std::move(formats), sampleCount, mipmapped, origin);
+}
+
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Create(Context* context, int width,
                                                              int height, PixelFormat format,
                                                              int sampleCount, bool mipmapped,

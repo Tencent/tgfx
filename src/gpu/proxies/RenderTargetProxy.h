@@ -73,6 +73,17 @@ class RenderTargetProxy : public ResourceProxy {
                                                          ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
+   * Creates a new RenderTargetProxy instance with the specified context, width, height, sample
+   * count, mipmap state, and origin. If `isAlphaOnly` is true, it will try to use the ALPHA_8
+   * format and fall back to RGBA_8888 if not supported. Otherwise, it will use the RGBA_8888
+   * format.
+   */
+  static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
+                                                         bool isAlphaOnly, int sampleCount = 1,
+                                                         bool mipmapped = false,
+                                                         ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /**
    * Returns the width of the render target.
    */
   int width() const {
