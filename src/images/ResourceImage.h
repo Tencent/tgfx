@@ -33,10 +33,6 @@ class ResourceImage : public Image {
   std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
                                         const SamplingOptions& sampling = {}) const override;
 
-  std::shared_ptr<Image> makeTextureImage(Context* context) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t renderFlags = 0) const;
-
  protected:
   UniqueKey uniqueKey = {};
 
@@ -49,6 +45,9 @@ class ResourceImage : public Image {
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* localMatrix) const override;
+
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
+                                                 uint32_t renderFlags) const override final;
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
                                                            bool mipmapped,

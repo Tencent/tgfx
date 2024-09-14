@@ -120,6 +120,11 @@ class ImageFilter {
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
+  std::unique_ptr<FragmentProcessor> makeFPFromFilteredImage(std::shared_ptr<Image> source,
+                                                             const FPArgs& args,
+                                                             const SamplingOptions& sampling,
+                                                             const Matrix* localMatrix) const;
+
   friend class DropShadowImageFilter;
   friend class ComposeImageFilter;
   friend class FilterImage;

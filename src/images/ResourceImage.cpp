@@ -35,11 +35,7 @@ std::shared_ptr<Image> ResourceImage::makeRasterized(float rasterizationScale,
   return Image::makeRasterized(rasterizationScale, sampling);
 }
 
-std::shared_ptr<Image> ResourceImage::makeTextureImage(Context* context) const {
-  return TextureImage::Wrap(lockTextureProxy(context));
-}
-
-std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(tgfx::Context* context,
+std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(Context* context,
                                                               uint32_t renderFlags) const {
   if (context == nullptr) {
     return nullptr;

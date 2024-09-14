@@ -21,8 +21,14 @@
 #include "gpu/ops/FillRectOp.h"
 
 namespace tgfx {
-void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix,
-                           bool autoResolve) {
+OpContext::~OpContext() {
+  if (autoResolve) {
+    auto drawingManager = renderTargetProxy->getContext()->drawingManager();
+    drawingManager->addTextureResolveTask(renderTargetProxy);
+  }
+}
+
+void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix) {
   fillRectWithFP(Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height()),
                  std::move(fp), localMatrix);
   if (autoResolve) {

@@ -51,8 +51,7 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
 std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
     const FPArgs& args, TileMode, TileMode, const SamplingOptions& sampling,
     const Matrix* localMatrix) const {
-  auto proxy = std::static_pointer_cast<ResourceImage>(source)->lockTextureProxy(args.context,
-                                                                                 args.renderFlags);
+  auto proxy = source->lockTextureProxy(args.context, args.renderFlags);
   auto matrix = concatLocalMatrix(localMatrix);
   return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
 }

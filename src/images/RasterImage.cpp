@@ -113,8 +113,8 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
   if (processor == nullptr) {
     return nullptr;
   }
-  OpContext opContext(renderTarget);
-  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
+  OpContext opContext(renderTarget, true);
+  opContext.fillWithFP(std::move(processor), Matrix::I());
   return textureProxy;
 }
 

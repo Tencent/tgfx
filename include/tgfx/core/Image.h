@@ -35,8 +35,7 @@ class FPArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
-class ImageCodec;
-class DrawOp;
+class TextureProxy;
 
 /**
  * The Image class represents a two-dimensional array of pixels for drawing. These pixels can be
@@ -285,12 +284,16 @@ class Image {
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
                                                   Point* offset, const Rect* clipRect) const;
 
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
+                                                         uint32_t renderFlags = 0) const;
+
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
       const Matrix* localMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class TransformImage;
+  friend class RGBAAAImage;
   friend class RasterImage;
   friend class ImageShader;
 };
