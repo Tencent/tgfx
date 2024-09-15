@@ -17,14 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
+#include "CornerPinEffect.h"
+#include "opengl/GLUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 #include "tgfx/gpu/Surface.h"
+#include "tgfx/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 #include "vectors/freetype/FTMask.h"
 
 namespace tgfx {
-
 TGFX_TEST(FilterTest, ColorMatrixFilter) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -293,6 +296,25 @@ TGFX_TEST(FilterTest, ComposeImageFilter) {
   canvas->translate(200, 200);
   canvas->drawImage(filterImage);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeImageFilter2"));
+  device->unlock();
+}
+
+TGFX_TEST(FilterTest, RuntimeEffect) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 720, 720);
+  auto canvas = surface->getCanvas();
+  image = image->makeRasterized(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
+  image = image->makeMipmapped(true);
+  auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+  auto filter = ImageFilter::Runtime(std::move(effect));
+  image = image->makeWithFilter(std::move(filter));
+  canvas->drawImage(image, 200, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect"));
   device->unlock();
 }
 }  // namespace tgfx

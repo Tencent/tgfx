@@ -292,6 +292,7 @@ class Image {
       const Matrix* localMatrix) const = 0;
 
   friend class FragmentProcessor;
+  friend class RuntimeImageFilter;
   friend class TransformImage;
   friend class RGBAAAImage;
   friend class RasterImage;

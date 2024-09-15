@@ -35,6 +35,7 @@
         "ComposeImageFilter2": "61e5c3b",
         "ImageFilterShader": "0dc7072",
         "LumaColorFilter": "6ae079f",
+        "RuntimeEffect": "6ec728b",
         "blur": "4d6ab20",
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",

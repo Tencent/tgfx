@@ -21,6 +21,7 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
+#include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
 
 namespace tgfx {
@@ -38,6 +39,19 @@ std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
   renderTasks.push_back(opsTask);
   activeOpsTask = opsTask.get();
   return opsTask;
+}
+
+void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
+                                        std::shared_ptr<TextureProxy> source,
+                                        std::shared_ptr<RuntimeEffect> effect,
+                                        const Point& offset) {
+  if (target == nullptr || source == nullptr || effect == nullptr) {
+    return;
+  }
+  closeActiveOpsTask();
+  auto task = std::make_shared<RuntimeDrawTask>(target, source, effect, offset);
+  task->makeClosed();
+  renderTasks.push_back(std::move(task));
 }
 
 void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
