@@ -127,6 +127,18 @@ UniqueKey::UniqueKey(UniqueKey&& key) noexcept
   key.uniqueDomain = nullptr;
 }
 
+UniqueKey::UniqueKey(const UniqueType& type)
+    : ResourceKey(MakeDomainData(type.domain), 1), uniqueDomain(type.domain) {
+  if (uniqueDomain != nullptr) {
+    uniqueDomain->addReference();
+  }
+}
+
+UniqueKey::UniqueKey(tgfx::UniqueType&& type) noexcept
+    : ResourceKey(MakeDomainData(type.domain), 1), uniqueDomain(type.domain) {
+  type.domain = nullptr;
+}
+
 UniqueKey::~UniqueKey() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->releaseReference();

@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cstring>
 #include <memory>
+#include "tgfx/gpu/UniqueType.h"
 #include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
@@ -156,6 +157,10 @@ class UniqueKey : public ResourceKey {
   UniqueKey(const UniqueKey& key);
 
   UniqueKey(UniqueKey&& key) noexcept;
+
+  UniqueKey(const UniqueType& type);
+
+  UniqueKey(UniqueType&& type) noexcept;
 
   virtual ~UniqueKey();
 

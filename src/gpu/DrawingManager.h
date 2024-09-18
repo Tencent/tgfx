@@ -33,6 +33,10 @@ class DrawingManager {
 
   std::shared_ptr<OpsRenderTask> addOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
+  void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
+                          std::shared_ptr<TextureProxy> source,
+                          std::shared_ptr<RuntimeEffect> effect, const Point& offset);
+
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,

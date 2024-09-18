@@ -22,6 +22,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
 class TextureProxy;
@@ -79,6 +80,12 @@ class ImageFilter {
    */
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color);
+
+  /**
+   * Creates a filter that applies the given RuntimeEffect object to the input image.
+   * You can use the shading language of the current GPU backend to create RuntimeEffect objects.
+   */
+  static std::shared_ptr<ImageFilter> Runtime(std::shared_ptr<RuntimeEffect> effect);
 
   virtual ~ImageFilter() = default;
 
