@@ -77,32 +77,7 @@ jobs:
           # Set output variable
           echo "filtered_workflows=$REQUIRED_WORKFLOWS" >> $GITHUB_OUTPUT
 
-      # Step 4: Send initial PR notification
-      - name: Send Initial PR Notification
-        env:
-          EVENT_TITLE: ${{ env.EVENT_TITLE }}
-          PR_NUMBER: ${{ env.PR_NUMBER }}
-          REPO_NAME: ${{ env.REPO_NAME }}
-          REPO_OWNER: ${{ env.REPO_OWNER }}
-
-        run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{
-                \"msgtype\": \"text\",
-                \"text\": {
-                  \"content\": \"Repository ${REPO_NAME} has a new PR that requires review.\nTitle: ${EVENT_TITLE}\nPlease check: https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\"
-                }
-              }" \
-          "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
-        shell: bash
-
-      # Step 5: Wait for 60 seconds
-      - name: Wait Before Starting Polling
-        run: |
-          echo "Waiting for 60 seconds before starting to poll workflow statuses..."
-          sleep 60
-
-      # Step 6: Poll workflow statuses and send notifications
+      # Step 4: Poll workflow statuses and send notifications
       - name: Poll Workflow Status and Send Notifications
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
