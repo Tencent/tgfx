@@ -1,0 +1,220 @@
+name: notifybot
+
+# Listen to PR event trigger types, including opened, synchronize, and reopened PRs
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  poll_workflows:
+    runs-on: ubuntu-latest
+
+    # Define required environment variables
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO_OWNER: ${{ github.repository_owner }}
+      REPO_NAME: ${{ github.event.repository.name }} # Ensure it only contains the repository name
+      EVENT_TITLE: ${{ github.event.pull_request.title }}
+      WECHAT_WEBHOOK_KEY: ${{ secrets.WECHAT_WEBHOOK_KEY }}
+      MAX_ATTEMPTS: 60               # Maximum number of attempts (e.g., 30 attempts ~ 30 minutes)
+      SLEEP_DURATION: 30            # Sleep duration between each polling (seconds)
+      REQUIRED_WORKFLOWS: "build,autotest,Tencent DevOps(OpenSource)" # Required workflows to monitor, separated by commas
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      # Step 1: Set up GitHub CLI and authenticate
+      - name: Set up GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh -y
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      # Step 2: Install necessary dependencies
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      # Step 3: Fetch and print all workflows associated with the PR
+      - name: Fetch and Print Associated Workflows
+        id: fetch_workflows
+        run: |
+          echo "Fetching all workflows associated with PR #$PR_NUMBER on branch $HEAD_REF..."
+
+          # Use GitHub CLI to get all workflow runs on the specified branch
+          workflow_runs=$(gh api "repos/$REPO_OWNER/$REPO_NAME/actions/runs?branch=$HEAD_REF&per_page=100" || echo "{}")
+
+          # Check if the API request was successful
+          if [ "$workflow_runs" = "{}" ]; then
+            echo "Failed to fetch workflow runs. Please check repository name and permissions."
+            exit 1
+          fi
+
+          # Extract workflow names and remove duplicates
+          associated_workflows=$(echo "$workflow_runs" | jq -r '.workflow_runs[].name' | sort | uniq)
+
+          if [ -z "$associated_workflows" ]; then
+            echo "No associated workflows found."
+          else
+            echo "Associated workflows:"
+            echo "$associated_workflows"
+          fi
+          
+          # Remove items from REQUIRED_WORKFLOWS that are not in associated_workflows
+          IFS=',' read -ra REQUIRED_WORKFLOWS_ARRAY <<< "$REQUIRED_WORKFLOWS"
+          filtered_workflows=()
+          for workflow in "${REQUIRED_WORKFLOWS_ARRAY[@]}"; do
+            if echo "$associated_workflows" | grep -q "$workflow"; then
+              filtered_workflows+=("$workflow")
+            fi
+          done
+          REQUIRED_WORKFLOWS=$(IFS=','; echo "${filtered_workflows[*]}")
+          echo "Filtered REQUIRED_WORKFLOWS: $REQUIRED_WORKFLOWS"
+
+          # Set output variable
+          echo "filtered_workflows=$REQUIRED_WORKFLOWS" >> $GITHUB_OUTPUT
+
+      # Step 4: Send initial PR notification
+      - name: Send Initial PR Notification
+        env:
+          EVENT_TITLE: ${{ env.EVENT_TITLE }}
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+          REPO_NAME: ${{ env.REPO_NAME }}
+          REPO_OWNER: ${{ env.REPO_OWNER }}
+
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{
+                \"msgtype\": \"text\",
+                \"text\": {
+                  \"content\": \"Repository ${REPO_NAME} has a new PR that requires review.\nTitle: ${EVENT_TITLE}\nPlease check: https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\"
+                }
+              }" \
+          "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
+        shell: bash
+
+      # Step 5: Wait for 60 seconds
+      - name: Wait Before Starting Polling
+        run: |
+          echo "Waiting for 60 seconds before starting to poll workflow statuses..."
+          sleep 60
+
+      # Step 6: Poll workflow statuses and send notifications
+      - name: Poll Workflow Status and Send Notifications
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ env.PR_NUMBER }}
+          REPO_OWNER: ${{ env.REPO_OWNER }}
+          REPO_NAME: ${{ env.REPO_NAME }}
+          WECHAT_WEBHOOK_KEY: ${{ env.WECHAT_WEBHOOK_KEY }}
+          MAX_ATTEMPTS: ${{ env.MAX_ATTEMPTS }}
+          SLEEP_DURATION: ${{ env.SLEEP_DURATION }}
+          REQUIRED_WORKFLOWS: ${{ steps.fetch_workflows.outputs.filtered_workflows }}
+          EVENT_TITLE: ${{ env.EVENT_TITLE }}
+          HEAD_REF: ${{ env.HEAD_REF }}
+        run: |
+          # Split the required workflow names into an array
+          IFS=',' read -ra WORKFLOWS <<< "$REQUIRED_WORKFLOWS"
+          attempt=0
+          success=true
+          failure=false
+
+          echo "Starting to poll workflow statuses for PR #$PR_NUMBER..."
+
+          while [ $attempt -lt $MAX_ATTEMPTS ]; do
+            echo "Checking workflow statuses, attempt: $((attempt+1))/${MAX_ATTEMPTS}"
+
+            all_success=true
+            any_failure=false
+
+            for workflow in "${WORKFLOWS[@]}"; do
+              echo "Checking the latest run status of workflow \"$workflow\"..."
+
+              # Use GitHub CLI to get the latest run of a specific workflow
+              workflow_run=$(gh api "repos/$REPO_OWNER/$REPO_NAME/actions/workflows/$workflow.yml/runs?branch=$HEAD_REF&per_page=1" --jq '.workflow_runs[0]' || echo "{}")
+
+              if [ "$workflow_run" = "{}" ]; then
+                echo "Workflow \"$workflow\" has not started running yet."
+                all_success=false
+                continue
+              fi
+
+              # Extract conclusion and current status
+              conclusion=$(echo "$workflow_run" | jq -r '.conclusion // "no_run"')
+              status=$(echo "$workflow_run" | jq -r '.status')
+
+              echo "Workflow \"$workflow\" status: $conclusion, progress: $status"
+
+              if [[ "$status" == "completed" && "$conclusion" == "success" ]]; then
+                echo "Workflow \"$workflow\" has successfully completed."
+              elif [[ "$conclusion" == "failure" || "$conclusion" == "cancelled" || "$conclusion" == "timed_out" || "$conclusion" == "action_required" ]]; then
+                echo "Workflow \"$workflow\" failed or requires manual intervention."
+                any_failure=true
+                all_success=false
+              elif [[ "$status" == "queued" || "$status" == "in_progress" ]]; then
+                echo "Workflow \"$workflow\" is still in progress."
+                all_success=false
+              else
+                echo "Workflow \"$workflow\" has an unknown status."
+                all_success=false
+              fi
+            done
+
+            # Decide next steps based on current workflow statuses
+            if [ "$all_success" = true ]; then
+              echo "All monitored workflows have successfully completed."
+              # Send success notification
+              curl -X POST -H "Content-Type: application/json" \
+              -d "{
+                    \"msgtype\": \"text\",
+                    \"text\": {
+                      \"content\": \"The build and tests for repository ${REPO_NAME} have successfully completed.\nTitle: ${EVENT_TITLE}\nPlease merge promptly: https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\"
+                    }
+                  }" \
+              "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
+              break
+            elif [ "$any_failure" = true ]; then
+              echo "At least one workflow has failed or requires manual intervention."
+              # Send failure notification
+              curl -X POST -H "Content-Type: application/json" \
+              -d "{
+                    \"msgtype\": \"text\",
+                    \"text\": {
+                      \"content\": \"The build and tests for repository ${REPO_NAME} have failed.\nTitle: ${EVENT_TITLE}\nPlease check the detailed logs: https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\"
+                    }
+                  }" \
+              "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
+              failure=true
+              break
+            else
+              echo "Some workflows are not yet completed. Waiting $SLEEP_DURATION seconds before retrying."
+              sleep $SLEEP_DURATION
+              attempt=$((attempt+1))
+            fi
+          done
+
+          PR_URL="https://github.com/$REPO_OWNER/$REPO_NAME/pull/$PR_NUMBER"
+
+          if [ "$all_success" = true ]; then
+            # Success notification already sent above
+            exit 0
+          elif [ "$failure" = true ]; then
+            # Failure notification already sent above
+            exit 1
+          else
+            echo "Workflow statuses were not detected within the maximum number of attempts."
+            # Send timeout notification
+            curl -X POST -H "Content-Type: application/json" \
+            -d "{
+                  \"msgtype\": \"text\",
+                  \"text\": {
+                    \"content\": \"The build and test checks for repository ${REPO_NAME} have timed out.\nTitle: ${EVENT_TITLE}\nPlease manually check the related workflows.\"
+                  }
+                }" \
+            "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
+            exit 1
+          fi
+        shell: bash
