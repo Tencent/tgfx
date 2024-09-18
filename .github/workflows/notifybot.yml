@@ -146,7 +146,7 @@ jobs:
               -d "{
                     \"msgtype\": \"text\",
                     \"text\": {
-                      \"content\": \"The build and tests for repository ${REPO_NAME} have successfully completed.\nTitle: ${EVENT_TITLE}\nPlease merge promptly: https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\"
+                      \"content\": \"PR 验证通过\n\n标题：${EVENT_TITLE}\n地址：https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\n作者：${REPO_OWNER}\"   
                     }
                   }" \
               "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
@@ -158,7 +158,7 @@ jobs:
               -d "{
                     \"msgtype\": \"text\",
                     \"text\": {
-                      \"content\": \"The build and tests for repository ${REPO_NAME} have failed.\nTitle: ${EVENT_TITLE}\nPlease check the detailed logs: https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\"
+                      \"content\": \"PR 验证失败，请处理\n\n标题：${EVENT_TITLE}\n地址：https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\n作者：${REPO_OWNER}\"   
                     }
                   }" \
               "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
@@ -186,7 +186,7 @@ jobs:
             -d "{
                   \"msgtype\": \"text\",
                   \"text\": {
-                    \"content\": \"The build and test checks for repository ${REPO_NAME} have timed out.\nTitle: ${EVENT_TITLE}\nPlease manually check the related workflows.\"
+                      \"content\": \"PR 验证超时，请处理\n\n标题：${EVENT_TITLE}\n地址：https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PR_NUMBER}\n作者：${REPO_OWNER}\"   
                   }
                 }" \
             "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${WECHAT_WEBHOOK_KEY}"
