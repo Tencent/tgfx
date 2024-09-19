@@ -55,7 +55,7 @@ class FragmentProcessor : public Processor {
    */
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                                  const SamplingOptions& sampling,
-                                                 const Matrix* localMatrix = nullptr);
+                                                 const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
@@ -63,13 +63,13 @@ class FragmentProcessor : public Processor {
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                                  TileMode tileModeX, TileMode tileModeY,
                                                  const SamplingOptions& sampling,
-                                                 const Matrix* localMatrix = nullptr);
+                                                 const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
-                                                 const Matrix* localMatrix = nullptr);
+                                                 const Matrix* uvMatrix = nullptr);
 
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to

@@ -41,10 +41,10 @@ class OpContext {
     return renderTargetProxy.get();
   }
 
-  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix);
+  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix);
 
   void fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                      const Matrix& localMatrix);
+                      const Matrix& uvMatrix);
 
   void addOp(std::unique_ptr<Op> op);
 

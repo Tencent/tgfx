@@ -30,7 +30,7 @@ class FillRectOp : public DrawOp {
 
   static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
                                           const Matrix& viewMatrix,
-                                          const Matrix* localMatrix = nullptr);
+                                          const Matrix* uvMatrix = nullptr);
 
   void prepare(Context* context) override;
 
@@ -38,7 +38,7 @@ class FillRectOp : public DrawOp {
 
  private:
   FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-             const Matrix* localMatrix = nullptr);
+             const Matrix* uvMatrix = nullptr);
 
   bool onCombineIfPossible(Op* op) override;
 

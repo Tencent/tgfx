@@ -28,8 +28,8 @@ std::shared_ptr<MaskFilter> MaskFilter::MakeShader(std::shared_ptr<Shader> shade
 }
 
 std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
-    const FPArgs& args, const Matrix* localMatrix) const {
-  auto processor = FragmentProcessor::Make(shader, args, localMatrix);
+    const FPArgs& args, const Matrix* uvMatrix) const {
+  auto processor = FragmentProcessor::Make(shader, args, uvMatrix);
   return FragmentProcessor::MulInputByChildAlpha(std::move(processor), inverted);
 }
 }  // namespace tgfx

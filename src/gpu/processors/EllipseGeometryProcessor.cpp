@@ -20,8 +20,8 @@
 
 namespace tgfx {
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
-                                                   bool useScale, const Matrix& localMatrix)
-    : GeometryProcessor(ClassID()), width(width), height(height), localMatrix(localMatrix),
+                                                   bool useScale, const Matrix& uvMatrix)
+    : GeometryProcessor(ClassID()), width(width), height(height), uvMatrix(uvMatrix),
       stroke(stroke), useScale(useScale) {
   inPosition = {"inPosition", SLType::Float2};
   inColor = {"inColor", SLType::Float4};

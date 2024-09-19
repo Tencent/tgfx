@@ -289,7 +289,7 @@ class Image {
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix) const = 0;
+      const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;

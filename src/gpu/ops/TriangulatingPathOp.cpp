@@ -139,16 +139,16 @@ void TriangulatingPathOp::execute(RenderPass* renderPass) {
   if (buffer == nullptr) {
     return;
   }
-  Matrix localMatrix = {};
-  if (!rasterizeMatrix.invert(&localMatrix)) {
+  Matrix uvMatrix = {};
+  if (!rasterizeMatrix.invert(&uvMatrix)) {
     return;
   }
   auto realViewMatrix = viewMatrix;
-  realViewMatrix.preConcat(localMatrix);
+  realViewMatrix.preConcat(uvMatrix);
   auto pipeline = createPipeline(
       renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
                                                  renderPass->renderTarget()->height(), aa,
-                                                 realViewMatrix, localMatrix));
+                                                 realViewMatrix, uvMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(nullptr, buffer);
   auto vertexCount = aa == AAType::Coverage ? PathTriangulator::GetAATriangleCount(buffer->size())

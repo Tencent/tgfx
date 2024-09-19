@@ -26,7 +26,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
  public:
   static std::unique_ptr<DefaultGeometryProcessor> Make(Color color, int width, int height,
                                                         AAType aa, const Matrix& viewMatrix,
-                                                        const Matrix& localMatrix);
+                                                        const Matrix& uvMatrix);
 
   std::string name() const override {
     return "DefaultGeometryProcessor";
@@ -36,7 +36,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   DefaultGeometryProcessor(Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
-                           const Matrix& localMatrix);
+                           const Matrix& uvMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -48,6 +48,6 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   int height = 1;
   AAType aa = AAType::None;
   Matrix viewMatrix = Matrix::I();
-  Matrix localMatrix = Matrix::I();
+  Matrix uvMatrix = Matrix::I();
 };
 }  // namespace tgfx

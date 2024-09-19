@@ -27,31 +27,31 @@ namespace tgfx {
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                            const FPArgs& args,
                                                            const SamplingOptions& sampling,
-                                                           const Matrix* localMatrix) {
+                                                           const Matrix* uvMatrix) {
   if (image == nullptr) {
     return nullptr;
   }
-  return image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, localMatrix);
+  return image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, uvMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                            const tgfx::FPArgs& args,
                                                            TileMode tileModeX, TileMode tileModeY,
                                                            const SamplingOptions& sampling,
-                                                           const Matrix* localMatrix) {
+                                                           const Matrix* uvMatrix) {
   if (image == nullptr) {
     return nullptr;
   }
-  return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, localMatrix);
+  return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
                                                            const FPArgs& args,
-                                                           const Matrix* localMatrix) {
+                                                           const Matrix* uvMatrix) {
   if (shader == nullptr) {
     return nullptr;
   }
-  return shader->asFragmentProcessor(args, localMatrix);
+  return shader->asFragmentProcessor(args, uvMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(

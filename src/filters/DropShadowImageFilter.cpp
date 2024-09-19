@@ -55,13 +55,13 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* localMatrix) const {
+    const Matrix* uvMatrix) const {
   // Request a rasterized image, does nothing if the source is not already rasterized.
   source = source->makeRasterized();
   std::unique_ptr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
-  if (localMatrix != nullptr) {
-    shadowMatrix.preConcat(*localMatrix);
+  if (uvMatrix != nullptr) {
+    shadowMatrix.preConcat(*uvMatrix);
   }
   if (blurFilter != nullptr) {
     shadowProcessor = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
@@ -79,7 +79,7 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return colorShadowProcessor;
   }
   auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                                TileMode::Decal, sampling, localMatrix);
+                                                TileMode::Decal, sampling, uvMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }

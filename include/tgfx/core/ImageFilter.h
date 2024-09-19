@@ -116,7 +116,7 @@ class ImageFilter {
    */
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      const Matrix* localMatrix) const = 0;
+      const Matrix* uvMatrix) const = 0;
 
   /**
    * Returns true if this filter is a ComposeImageFilter.
@@ -130,7 +130,7 @@ class ImageFilter {
   std::unique_ptr<FragmentProcessor> makeFPFromFilteredImage(std::shared_ptr<Image> source,
                                                              const FPArgs& args,
                                                              const SamplingOptions& sampling,
-                                                             const Matrix* localMatrix) const;
+                                                             const Matrix* uvMatrix) const;
 
   friend class DropShadowImageFilter;
   friend class ComposeImageFilter;

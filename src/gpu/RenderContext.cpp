@@ -184,12 +184,12 @@ void RenderContext::drawPath(const Path& path, const MCState& state, const FillS
 }
 
 static std::unique_ptr<FragmentProcessor> CreateMaskFP(std::shared_ptr<TextureProxy> textureProxy,
-                                                       const Matrix* localMatrix = nullptr) {
+                                                       const Matrix* uvMatrix = nullptr) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto isAlphaOnly = textureProxy->isAlphaOnly();
-  auto processor = TextureEffect::Make(std::move(textureProxy), {}, localMatrix);
+  auto processor = TextureEffect::Make(std::move(textureProxy), {}, uvMatrix);
   if (processor == nullptr) {
     return nullptr;
   }
@@ -449,9 +449,9 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
   if (texture == nullptr) {
     return nullptr;
   }
-  auto localMatrix = viewMatrix;
-  localMatrix.postTranslate(-clipBounds.left, -clipBounds.top);
-  auto maskEffect = TextureEffect::Make(texture, {}, &localMatrix);
+  auto uvMatrix = viewMatrix;
+  uvMatrix.postTranslate(-clipBounds.left, -clipBounds.top);
+  auto maskEffect = TextureEffect::Make(texture, {}, &uvMatrix);
   if (!texture->isAlphaOnly()) {
     maskEffect = FragmentProcessor::MulInputByChildAlpha(std::move(maskEffect));
   }

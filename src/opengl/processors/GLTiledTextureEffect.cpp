@@ -24,22 +24,22 @@ namespace tgfx {
 std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                             TileMode tileModeX, TileMode tileModeY,
                                                             const SamplingOptions& options,
-                                                            const Matrix* localMatrix) {
+                                                            const Matrix* uvMatrix) {
   if (proxy == nullptr) {
     return nullptr;
   }
   if (tileModeX == TileMode::Clamp && tileModeY == TileMode::Clamp) {
-    return TextureEffect::Make(std::move(proxy), options, localMatrix);
+    return TextureEffect::Make(std::move(proxy), options, uvMatrix);
   }
-  auto matrix = localMatrix ? *localMatrix : Matrix::I();
+  auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   SamplerState samplerState(tileModeX, tileModeY, options);
   return std::make_unique<GLTiledTextureEffect>(std::move(proxy), samplerState, matrix);
 }
 
 GLTiledTextureEffect::GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
                                            const SamplerState& samplerState,
-                                           const Matrix& localMatrix)
-    : TiledTextureEffect(std::move(proxy), samplerState, localMatrix) {
+                                           const Matrix& uvMatrix)
+    : TiledTextureEffect(std::move(proxy), samplerState, uvMatrix) {
 }
 
 bool GLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {

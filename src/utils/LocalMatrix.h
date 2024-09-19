@@ -24,6 +24,6 @@
 namespace tgfx {
 class LocalMatrix {
  public:
-  static std::optional<Matrix> Concat(const Rect& subset, const Matrix* localMatrix);
+  static std::optional<Matrix> Concat(const Rect& subset, const Matrix* uvMatrix);
 };
 }  // namespace tgfx

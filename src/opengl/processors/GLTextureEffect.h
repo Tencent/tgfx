@@ -25,7 +25,7 @@ namespace tgfx {
 class GLTextureEffect : public TextureEffect {
  public:
   GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
-                  const SamplingOptions& sampling, const Matrix& localMatrix);
+                  const SamplingOptions& sampling, const Matrix& uvMatrix);
 
   void emitCode(EmitArgs& args) const override;
 

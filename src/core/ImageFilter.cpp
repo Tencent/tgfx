@@ -70,11 +70,11 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
 
 std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromFilteredImage(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* localMatrix) const {
+    const Matrix* uvMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
-  if (localMatrix) {
-    clipBounds = localMatrix->mapRect(clipBounds);
+  if (uvMatrix) {
+    clipBounds = uvMatrix->mapRect(clipBounds);
   }
   Rect dstBounds = Rect::MakeEmpty();
   if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
@@ -86,8 +86,8 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromFilteredImage(
     return nullptr;
   }
   auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
-  if (localMatrix != nullptr) {
-    fpMatrix.preConcat(*localMatrix);
+  if (uvMatrix != nullptr) {
+    fpMatrix.preConcat(*uvMatrix);
   }
   return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix);
 }

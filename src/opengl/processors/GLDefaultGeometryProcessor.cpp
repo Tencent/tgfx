@@ -21,15 +21,15 @@
 namespace tgfx {
 std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
     Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
-    const Matrix& localMatrix) {
+    const Matrix& uvMatrix) {
   return std::unique_ptr<DefaultGeometryProcessor>(
-      new GLDefaultGeometryProcessor(color, width, height, aa, viewMatrix, localMatrix));
+      new GLDefaultGeometryProcessor(color, width, height, aa, viewMatrix, uvMatrix));
 }
 
 GLDefaultGeometryProcessor::GLDefaultGeometryProcessor(Color color, int width, int height,
                                                        AAType aa, const Matrix& viewMatrix,
-                                                       const Matrix& localMatrix)
-    : DefaultGeometryProcessor(color, width, height, aa, viewMatrix, localMatrix) {
+                                                       const Matrix& uvMatrix)
+    : DefaultGeometryProcessor(color, width, height, aa, viewMatrix, uvMatrix) {
 }
 
 void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -67,7 +67,7 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
 
 void GLDefaultGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(localMatrix, uniformBuffer, transformIter);
+  setTransformDataHelper(uvMatrix, uniformBuffer, transformIter);
   uniformBuffer->setData("Color", color);
   uniformBuffer->setData("Matrix", viewMatrix);
 }

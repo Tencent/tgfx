@@ -21,8 +21,8 @@
 
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* localMatrix) const {
-  auto fp1 = FragmentProcessor::Make(shader, args, localMatrix);
+    const FPArgs& args, const Matrix* uvMatrix) const {
+  auto fp1 = FragmentProcessor::Make(shader, args, uvMatrix);
   if (fp1 == nullptr) {
     return nullptr;
   }

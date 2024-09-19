@@ -72,13 +72,13 @@ void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCoun
   }
 }
 
-void GeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
+void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix,
                                                UniformBuffer* uniformBuffer,
                                                FPCoordTransformIter* transformIter) const {
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
     Matrix combined = Matrix::I();
-    combined.setConcat(coordTransform->getTotalMatrix(), localMatrix);
+    combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);
     uniformBuffer->setData(uniformName, combined);

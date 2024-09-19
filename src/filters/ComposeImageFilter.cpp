@@ -73,11 +73,11 @@ Rect ComposeImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::unique_ptr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* localMatrix) const {
+    const Matrix* uvMatrix) const {
   auto bounds = Rect::MakeWH(source->width(), source->height());
   auto drawBounds = args.drawRect;
-  if (localMatrix) {
-    drawBounds = localMatrix->mapRect(drawBounds);
+  if (uvMatrix) {
+    drawBounds = uvMatrix->mapRect(drawBounds);
   }
   bool hasMipmaps = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   auto count = filters.size() - 1;
@@ -98,8 +98,8 @@ std::unique_ptr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
     lastOffset.offset(bounds.x(), bounds.y());
   }
   auto matrix = Matrix::MakeTrans(-lastOffset.x, -lastOffset.y);
-  if (localMatrix) {
-    matrix.preConcat(*localMatrix);
+  if (uvMatrix) {
+    matrix.preConcat(*uvMatrix);
   }
   return filters.back()->asFragmentProcessor(std::move(lastSource), args, sampling, &matrix);
 }

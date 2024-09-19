@@ -288,8 +288,8 @@ std::unique_ptr<RRectOp> RRectOp::Make(Color color, const RRect& rRect, const Ma
 }
 
 RRectOp::RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
-                 const Matrix& localMatrix)
-    : DrawOp(ClassID()), localMatrix(localMatrix) {
+                 const Matrix& uvMatrix)
+    : DrawOp(ClassID()), uvMatrix(uvMatrix) {
   setTransformedBounds(rRect.rect, viewMatrix);
   auto rRectPaint = std::make_shared<RRectPaint>(color, 0.f, 0.f, rRect, viewMatrix);
   rRectPaints.push_back(std::move(rRectPaint));
@@ -300,7 +300,7 @@ bool RRectOp::onCombineIfPossible(Op* op) {
     return false;
   }
   auto* that = static_cast<RRectOp*>(op);
-  if (localMatrix != that->localMatrix) {
+  if (uvMatrix != that->uvMatrix) {
     return false;
   }
   rRectPaints.insert(rRectPaints.end(), that->rRectPaints.begin(), that->rRectPaints.end());
@@ -331,7 +331,7 @@ void RRectOp::execute(RenderPass* renderPass) {
   auto pipeline = createPipeline(
       renderPass, EllipseGeometryProcessor::Make(renderPass->renderTarget()->width(),
                                                  renderPass->renderTarget()->height(), false,
-                                                 UseScale(renderPass->getContext()), localMatrix));
+                                                 UseScale(renderPass->getContext()), uvMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer);
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rRectPaints.size() * kIndicesPerFillRRect);

@@ -60,12 +60,12 @@ std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int display
 
 std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
     const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-    const Matrix* localMatrix) const {
+    const Matrix* uvMatrix) const {
   auto proxy = lockTextureProxy(args.context, args.renderFlags);
   if (proxy == nullptr) {
     return nullptr;
   }
-  auto processor = TiledTextureEffect::Make(proxy, tileModeX, tileModeY, sampling, localMatrix);
+  auto processor = TiledTextureEffect::Make(proxy, tileModeX, tileModeY, sampling, uvMatrix);
   if (isAlphaOnly() && !proxy->isAlphaOnly()) {
     return FragmentProcessor::MulInputByChildAlpha(std::move(processor));
   }

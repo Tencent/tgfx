@@ -21,9 +21,9 @@
 namespace tgfx {
 DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height, AAType aa,
                                                    const Matrix& viewMatrix,
-                                                   const Matrix& localMatrix)
+                                                   const Matrix& uvMatrix)
     : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
-      viewMatrix(viewMatrix), localMatrix(localMatrix) {
+      viewMatrix(viewMatrix), uvMatrix(uvMatrix) {
   position = {"aPosition", SLType::Float2};
   int attributeCount = 1;
   if (aa == AAType::Coverage) {

@@ -88,15 +88,15 @@ void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
                            const Rect& imageBounds, bool isDown) const {
   auto dstWidth = static_cast<float>(renderTarget->width());
   auto dstHeight = static_cast<float>(renderTarget->height());
-  auto localMatrix =
+  auto uvMatrix =
       Matrix::MakeScale(imageBounds.width() / dstWidth, imageBounds.height() / dstHeight);
-  localMatrix.postTranslate(imageBounds.x(), imageBounds.y());
+  uvMatrix.postTranslate(imageBounds.x(), imageBounds.y());
   auto texelSize = Size::Make(0.5f / imageBounds.width(), 0.5f / imageBounds.height());
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
   OpContext opContext(std::move(renderTarget), true);
-  opContext.fillWithFP(std::move(blurProcessor), localMatrix);
+  opContext.fillWithFP(std::move(blurProcessor), uvMatrix);
 }
 
 Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -149,7 +149,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::onFilterImage(Context* context,
 
 std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* localMatrix) const {
-  return makeFPFromFilteredImage(source, args, sampling, localMatrix);
+    const Matrix* uvMatrix) const {
+  return makeFPFromFilteredImage(source, args, sampling, uvMatrix);
 }
 }  // namespace tgfx

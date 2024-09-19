@@ -48,9 +48,9 @@ class OrientImage : public TransformImage {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 
-  virtual std::optional<Matrix> concatLocalMatrix(const Matrix* localMatrix) const;
+  virtual std::optional<Matrix> concatLocalMatrix(const Matrix* uvMatrix) const;
 
   Orientation concatOrientation(Orientation newOrientation) const;
 };

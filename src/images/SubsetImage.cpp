@@ -57,8 +57,8 @@ std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) cons
   return SubsetImage::MakeFrom(source, newOrientation, newBounds);
 }
 
-std::optional<Matrix> SubsetImage::concatLocalMatrix(const Matrix* localMatrix) const {
-  auto matrix = LocalMatrix::Concat(bounds, localMatrix);
+std::optional<Matrix> SubsetImage::concatLocalMatrix(const Matrix* uvMatrix) const {
+  auto matrix = LocalMatrix::Concat(bounds, uvMatrix);
   return OrientImage::concatLocalMatrix(AddressOf(matrix));
 }
 }  // namespace tgfx
