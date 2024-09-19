@@ -93,9 +93,11 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
   return OrientImage::MakeFrom(source, newOrientation);
 }
 
-std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(
-    const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
+std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,
+                                                                    TileMode tileModeX,
+                                                                    TileMode tileModeY,
+                                                                    const SamplingOptions& sampling,
+                                                                    const Matrix* uvMatrix) const {
   auto matrix = concatLocalMatrix(uvMatrix);
   return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
 }

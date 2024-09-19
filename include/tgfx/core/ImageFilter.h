@@ -114,9 +114,10 @@ class ImageFilter {
    * Returns a FragmentProcessor that applies this filter to the source image. The returned
    * processor is in the coordinate space of the source image.
    */
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      const Matrix* uvMatrix) const = 0;
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                                 const FPArgs& args,
+                                                                 const SamplingOptions& sampling,
+                                                                 const Matrix* uvMatrix) const = 0;
 
   /**
    * Returns true if this filter is a ComposeImageFilter.

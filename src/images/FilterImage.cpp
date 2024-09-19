@@ -109,9 +109,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   return FilterImage::Wrap(source, std::move(composeFilter), filterBounds);
 }
 
-std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(
-    const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
+std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
+                                                                    TileMode tileModeX,
+                                                                    TileMode tileModeY,
+                                                                    const SamplingOptions& sampling,
+                                                                    const Matrix* uvMatrix) const {
   auto fpMatrix = LocalMatrix::Concat(bounds, uvMatrix);
 
   auto inputBounds = Rect::MakeWH(source->width(), source->height());

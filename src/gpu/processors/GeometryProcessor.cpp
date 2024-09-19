@@ -72,8 +72,7 @@ void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCoun
   }
 }
 
-void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix,
-                                               UniformBuffer* uniformBuffer,
+void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBuffer* uniformBuffer,
                                                FPCoordTransformIter* transformIter) const {
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {

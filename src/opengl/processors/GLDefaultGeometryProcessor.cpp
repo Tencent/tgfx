@@ -19,9 +19,10 @@
 #include "GLDefaultGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
-    Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
-    const Matrix& uvMatrix) {
+std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(Color color, int width,
+                                                                         int height, AAType aa,
+                                                                         const Matrix& viewMatrix,
+                                                                         const Matrix& uvMatrix) {
   return std::unique_ptr<DefaultGeometryProcessor>(
       new GLDefaultGeometryProcessor(color, width, height, aa, viewMatrix, uvMatrix));
 }

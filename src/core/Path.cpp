@@ -27,7 +27,7 @@ static SkPathDirection ToSkDirection(bool reversed) {
   return reversed ? SkPathDirection::kCCW : SkPathDirection::kCW;
 }
 
-#define DistanceToControlPoint(angleStep) (4 * tanf((angleStep)*0.25f) / 3)
+#define DistanceToControlPoint(angleStep) (4 * tanf((angleStep) * 0.25f) / 3)
 
 class PointIterator {
  public:

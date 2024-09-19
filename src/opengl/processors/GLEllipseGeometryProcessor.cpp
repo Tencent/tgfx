@@ -19,8 +19,9 @@
 #include "GLEllipseGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
-    int width, int height, bool stroke, bool useScale, const Matrix& uvMatrix) {
+std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(int width, int height,
+                                                                         bool stroke, bool useScale,
+                                                                         const Matrix& uvMatrix) {
   return std::unique_ptr<EllipseGeometryProcessor>(
       new GLEllipseGeometryProcessor(width, height, stroke, useScale, uvMatrix));
 }

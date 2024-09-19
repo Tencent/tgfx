@@ -37,8 +37,7 @@ std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Text
 }
 
 GLTiledTextureEffect::GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
-                                           const SamplerState& samplerState,
-                                           const Matrix& uvMatrix)
+                                           const SamplerState& samplerState, const Matrix& uvMatrix)
     : TiledTextureEffect(std::move(proxy), samplerState, uvMatrix) {
 }
 
