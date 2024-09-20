@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
-#include "utils/LocalMatrix.h"
+#include "utils/UVMatrix.h"
 
 namespace tgfx {
 std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
@@ -57,8 +57,8 @@ std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) cons
   return SubsetImage::MakeFrom(source, newOrientation, newBounds);
 }
 
-std::optional<Matrix> SubsetImage::concatLocalMatrix(const Matrix* localMatrix) const {
-  auto matrix = LocalMatrix::Concat(bounds, localMatrix);
-  return OrientImage::concatLocalMatrix(AddressOf(matrix));
+std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
+  auto matrix = UVMatrix::Concat(bounds, uvMatrix);
+  return OrientImage::concatUVMatrix(AddressOf(matrix));
 }
 }  // namespace tgfx

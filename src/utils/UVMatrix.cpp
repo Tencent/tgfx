@@ -16,19 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LocalMatrix.h"
+#include "UVMatrix.h"
 
 namespace tgfx {
-std::optional<Matrix> LocalMatrix::Concat(const Rect& subset, const Matrix* localMatrix) {
+std::optional<Matrix> UVMatrix::Concat(const Rect& subset, const Matrix* uvMatrix) {
   std::optional<Matrix> matrix = std::nullopt;
   if (subset.x() != 0 || subset.y() != 0) {
     matrix = Matrix::MakeTrans(subset.x(), subset.y());
   }
-  if (localMatrix != nullptr) {
+  if (uvMatrix != nullptr) {
     if (matrix) {
-      matrix->preConcat(*localMatrix);
+      matrix->preConcat(*uvMatrix);
     } else {
-      matrix = *localMatrix;
+      matrix = *uvMatrix;
     }
   }
   return matrix;

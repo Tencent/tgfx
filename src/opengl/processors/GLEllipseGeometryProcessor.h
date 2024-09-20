@@ -24,7 +24,7 @@ namespace tgfx {
 class GLEllipseGeometryProcessor : public EllipseGeometryProcessor {
  public:
   GLEllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
-                             const Matrix& localMatrix);
+                             const Matrix& uvMatrix);
 
   void emitCode(EmitArgs& args) const override;
 

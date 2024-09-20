@@ -119,9 +119,9 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
 }
 
 TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
-                                       const SamplerState& samplerState, const Matrix& localMatrix)
+                                       const SamplerState& samplerState, const Matrix& uvMatrix)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(samplerState),
-      coordTransform(localMatrix, textureProxy.get()) {
+      coordTransform(uvMatrix, textureProxy.get()) {
   addCoordTransform(&coordTransform);
 }
 

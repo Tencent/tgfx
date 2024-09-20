@@ -33,7 +33,7 @@ class RGBAAAImage : public SubsetImage {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 
  private:
   Point alphaStart = Point::Zero();

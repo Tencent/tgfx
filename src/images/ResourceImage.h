@@ -44,7 +44,7 @@ class ResourceImage : public Image {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
                                                  uint32_t renderFlags) const override final;

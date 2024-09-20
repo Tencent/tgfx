@@ -28,12 +28,12 @@ class TextureEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
                                                  const SamplingOptions& sampling = {},
-                                                 const Matrix* localMatrix = nullptr);
+                                                 const Matrix* uvMatrix = nullptr);
 
   static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
                                                        const Point& alphaStart,
                                                        const SamplingOptions& sampling = {},
-                                                       const Matrix* localMatrix = nullptr);
+                                                       const Matrix* uvMatrix = nullptr);
 
   std::string name() const override {
     return "TextureEffect";
@@ -43,7 +43,7 @@ class TextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                const Point& alphaStart, const Matrix& localMatrix);
+                const Point& alphaStart, const Matrix& uvMatrix);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 

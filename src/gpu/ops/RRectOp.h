@@ -35,12 +35,12 @@ class RRectOp : public DrawOp {
   void execute(RenderPass* renderPass) override;
 
  private:
-  RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
+  RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& uvMatrix);
 
   bool onCombineIfPossible(Op* op) override;
 
   std::vector<std::shared_ptr<RRectPaint>> rRectPaints;
-  Matrix localMatrix = Matrix::I();
+  Matrix uvMatrix = Matrix::I();
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy;
 

@@ -30,7 +30,7 @@ class ShaderMaskFilter : public MaskFilter {
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 
  private:
   std::shared_ptr<Shader> shader;

@@ -23,14 +23,14 @@
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                        const SamplingOptions& sampling,
-                                                       const Matrix* localMatrix) {
-  return MakeRGBAAA(std::move(proxy), Point::Zero(), sampling, localMatrix);
+                                                       const Matrix* uvMatrix) {
+  return MakeRGBAAA(std::move(proxy), Point::Zero(), sampling, uvMatrix);
 }
 
 TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                             const Point& alphaStart, const Matrix& localMatrix)
+                             const Point& alphaStart, const Matrix& uvMatrix)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(sampling),
-      alphaStart(alphaStart), coordTransform(localMatrix, textureProxy.get(), alphaStart) {
+      alphaStart(alphaStart), coordTransform(uvMatrix, textureProxy.get(), alphaStart) {
   addCoordTransform(&coordTransform);
 }
 

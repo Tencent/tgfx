@@ -36,7 +36,7 @@ class RuntimeImageFilter : public ImageFilter {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 
  private:
   std::shared_ptr<RuntimeEffect> effect = nullptr;

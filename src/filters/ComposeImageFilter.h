@@ -33,7 +33,7 @@ class ComposeImageFilter : public ImageFilter {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 
   bool isComposeFilter() const override {
     return true;

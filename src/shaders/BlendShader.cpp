@@ -41,13 +41,13 @@ std::shared_ptr<Shader> Shader::MakeBlend(BlendMode mode, std::shared_ptr<Shader
   return shader;
 }
 
-std::unique_ptr<FragmentProcessor> BlendShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* localMatrix) const {
-  auto fpA = FragmentProcessor::Make(dst, args, localMatrix);
+std::unique_ptr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs& args,
+                                                                    const Matrix* uvMatrix) const {
+  auto fpA = FragmentProcessor::Make(dst, args, uvMatrix);
   if (fpA == nullptr) {
     return nullptr;
   }
-  auto fpB = FragmentProcessor::Make(src, args, localMatrix);
+  auto fpB = FragmentProcessor::Make(src, args, uvMatrix);
   if (fpB == nullptr) {
     return nullptr;
   }

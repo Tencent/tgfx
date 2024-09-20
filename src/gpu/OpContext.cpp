@@ -28,9 +28,9 @@ OpContext::~OpContext() {
   }
 }
 
-void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& localMatrix) {
+void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix) {
   fillRectWithFP(Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height()),
-                 std::move(fp), localMatrix);
+                 std::move(fp), uvMatrix);
   if (autoResolve) {
     auto drawingManager = renderTargetProxy->getContext()->drawingManager();
     drawingManager->addTextureResolveTask(renderTargetProxy);
@@ -38,11 +38,11 @@ void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& 
 }
 
 void OpContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                               const Matrix& localMatrix) {
+                               const Matrix& uvMatrix) {
   if (fp == nullptr) {
     return;
   }
-  auto op = FillRectOp::Make(std::nullopt, dstRect, Matrix::I(), &localMatrix);
+  auto op = FillRectOp::Make(std::nullopt, dstRect, Matrix::I(), &uvMatrix);
   op->addColorFP(std::move(fp));
   op->setBlendMode(BlendMode::Src);
   addOp(std::move(op));

@@ -46,14 +46,14 @@ std::shared_ptr<Shader> MatrixShader::makeWithMatrix(const Matrix& viewMatrix) c
   return MatrixShader::MakeFrom(source, totalMatrix);
 }
 
-std::unique_ptr<FragmentProcessor> MatrixShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* localMatrix) const {
+std::unique_ptr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args,
+                                                                     const Matrix* uvMatrix) const {
   auto totalMatrix = Matrix::I();
   if (!matrix.invert(&totalMatrix)) {
     return nullptr;
   }
-  if (localMatrix) {
-    totalMatrix.preConcat(*localMatrix);
+  if (uvMatrix) {
+    totalMatrix.preConcat(*uvMatrix);
   }
   return FragmentProcessor::Make(source, args, &totalMatrix);
 }

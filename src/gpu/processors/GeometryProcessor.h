@@ -130,7 +130,7 @@ class GeometryProcessor : public Processor {
   /**
    * A helper to upload coord transform matrices in setData().
    */
-  void setTransformDataHelper(const Matrix& localMatrix, UniformBuffer* uniformBuffer,
+  void setTransformDataHelper(const Matrix& uvMatrix, UniformBuffer* uniformBuffer,
                               FPCoordTransformIter* transformIter) const;
 
   /**

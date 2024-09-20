@@ -58,7 +58,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::onFilterImage(Context* context
 
 std::unique_ptr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* localMatrix) const {
-  return makeFPFromFilteredImage(source, args, sampling, localMatrix);
+    const Matrix* uvMatrix) const {
+  return makeFPFromFilteredImage(source, args, sampling, uvMatrix);
 }
 }  // namespace tgfx

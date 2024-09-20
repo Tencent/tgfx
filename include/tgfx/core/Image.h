@@ -287,9 +287,11 @@ class Image {
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
                                                          uint32_t renderFlags = 0) const;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix) const = 0;
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                                 TileMode tileModeX,
+                                                                 TileMode tileModeY,
+                                                                 const SamplingOptions& sampling,
+                                                                 const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;

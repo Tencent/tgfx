@@ -38,8 +38,8 @@ class MaskFilter {
   virtual ~MaskFilter() = default;
 
  private:
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const Matrix* localMatrix) const = 0;
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                                 const Matrix* uvMatrix) const = 0;
 
   friend class RenderContext;
 };

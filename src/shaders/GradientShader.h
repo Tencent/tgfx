@@ -47,7 +47,7 @@ class LinearGradient : public GradientShaderBase {
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 };
 
 class RadialGradient : public GradientShaderBase {
@@ -57,7 +57,7 @@ class RadialGradient : public GradientShaderBase {
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 };
 
 class SweepGradient : public GradientShaderBase {
@@ -67,7 +67,7 @@ class SweepGradient : public GradientShaderBase {
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* localMatrix) const override;
+                                                         const Matrix* uvMatrix) const override;
 
  private:
   float bias;
