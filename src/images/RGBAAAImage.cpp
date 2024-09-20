@@ -53,7 +53,7 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
   auto proxy = source->lockTextureProxy(args.context, args.renderFlags);
-  auto matrix = concatLocalMatrix(uvMatrix);
+  auto matrix = concatUVMatrix(uvMatrix);
   return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
 }
 }  // namespace tgfx

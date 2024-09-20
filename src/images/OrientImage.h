@@ -50,7 +50,7 @@ class OrientImage : public TransformImage {
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
-  virtual std::optional<Matrix> concatLocalMatrix(const Matrix* uvMatrix) const;
+  virtual std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const;
 
   Orientation concatOrientation(Orientation newOrientation) const;
 };

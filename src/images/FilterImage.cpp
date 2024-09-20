@@ -22,7 +22,7 @@
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "utils/LocalMatrix.h"
+#include "utils/UVMatrix.h"
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
@@ -114,7 +114,7 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  auto fpMatrix = LocalMatrix::Concat(bounds, uvMatrix);
+  auto fpMatrix = UVMatrix::Concat(bounds, uvMatrix);
 
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto drawBounds = args.drawRect;

@@ -98,11 +98,11 @@ std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  auto matrix = concatLocalMatrix(uvMatrix);
+  auto matrix = concatUVMatrix(uvMatrix);
   return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
 }
 
-std::optional<Matrix> OrientImage::concatLocalMatrix(const Matrix* uvMatrix) const {
+std::optional<Matrix> OrientImage::concatUVMatrix(const Matrix* uvMatrix) const {
   std::optional<Matrix> matrix = std::nullopt;
   if (orientation != Orientation::TopLeft) {
     matrix = OrientationToMatrix(orientation, source->width(), source->height());

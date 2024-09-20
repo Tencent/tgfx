@@ -22,7 +22,7 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class LocalMatrix {
+class UVMatrix {
  public:
   static std::optional<Matrix> Concat(const Rect& subset, const Matrix* uvMatrix);
 };
