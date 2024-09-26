@@ -30,9 +30,6 @@ class ResourceImage : public Image {
  public:
   explicit ResourceImage(UniqueKey uniqueKey);
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        const SamplingOptions& sampling = {}) const override;
-
  protected:
   UniqueKey uniqueKey = {};
 

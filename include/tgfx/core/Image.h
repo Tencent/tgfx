@@ -196,14 +196,10 @@ class Image {
    * For instance, if you create a subset Image from a rasterized Image, the subset Image does not
    * create its own GPU cache but uses the full resolution cache created by the original Image. If
    * you want the subset Image to create its own GPU cache, you should call makeRasterized() on the
-   * subset Image. The default value of rasterizationScale is 1.0, indicating that the Image should
-   * be rasterized at its current size. Larger values magnify the image content, while smaller
-   * values shrink it. The sampling options will be applied if the rasterizationScale is not 1.0.
-   * If the Image is already rasterized and the rasterizationScale is 1.0, the original Image is
-   * returned. If the rasterizationScale is less than zero, nullptr is returned.
+   * subset Image. The sampling options will be applied if the image is scaled.
+   * If the Image is already rasterized , the original Image is returned.
    */
-  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                                const SamplingOptions& sampling = {}) const;
+  virtual std::shared_ptr<Image> makeRasterized(const SamplingOptions& sampling = {}) const;
 
   /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a
@@ -244,6 +240,13 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
+   * Returns an Image with its origin transformed by the given Orientation. The returned Image
+   * always shares pixels and caches with the original Image. If the scaleX is 1.0 and the scaleY is 1.0,
+   * the original Image is returned. If scaleX or scaleY is less than zero, nullptr is returned.
+   */
+  std::shared_ptr<Image> makeScale(float scaleX, float scaleY) const;
+
+  /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
    * bounds of the source Image. If the clipRect is not nullptr, the filtered Image will be clipped
    * accordingly. The offset stores the translation information for the filtered Image. If the
@@ -277,6 +280,8 @@ class Image {
   virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
 
   virtual std::shared_ptr<Image> onMakeOriented(Orientation orientation) const;
+
+  virtual std::shared_ptr<Image> onMakeScale(float scaleX, float scaleY) const;
 
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;

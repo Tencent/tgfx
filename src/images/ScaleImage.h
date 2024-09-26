@@ -15,44 +15,35 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#pragma once
-
-#include "images/ResourceImage.h"
+#include "TransformImage.h"
 
 namespace tgfx {
-class MipmapImage : public ResourceImage {
+/*
+* RasterImage takes an Image and rasterizes it to a new Image with a different scale and sampling
+* options.
+*/
+class ScaleImage : public TransformImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, float scaleX, float scaleY);
 
-  int width() const override {
-    return source->width();
-  }
+  int width() const override;
 
-  int height() const override {
-    return source->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
-  }
-
-  bool hasMipmaps() const override {
-    return true;
-  }
+  int height() const override;
 
  protected:
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
+  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+  std::shared_ptr<Image> onMakeScale(float scaleX, float scaleY) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
-                                                   bool mipmapped,
-                                                   uint32_t renderFlags) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
 
  private:
-  std::shared_ptr<ResourceImage> source = nullptr;
+  float scaleX = 1.0f;
+  float scaleY = 1.0f;
 
-  MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source);
+  ScaleImage(std::shared_ptr<Image> source, float scaleX, float scaleY);
 };
 }  // namespace tgfx
