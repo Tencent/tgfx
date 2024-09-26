@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
-#include "images/ScaleImage.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "images/BufferImage.h"
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
 #include "images/RasterImage.h"
+#include "images/ScaleImage.h"
 #include "images/SubsetImage.h"
 #include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"
