@@ -41,6 +41,14 @@ std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<ResourceImage> sour
   return image;
 }
 
+std::shared_ptr<Image> MipmapImage::makeRasterized(const SamplingOptions& sampling) const {
+  auto newSource = std::static_pointer_cast<ResourceImage>(source->makeRasterized(sampling));
+  if (newSource != nullptr) {
+    return newSource->makeMipmapped(true);
+  }
+  return newSource;
+}
+
 MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source)
     : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
 }
