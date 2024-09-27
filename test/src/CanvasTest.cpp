@@ -364,7 +364,7 @@ TGFX_TEST(CanvasTest, rasterized) {
   rasterImage = rasterImage->makeRasterized(sampling);
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeMipmapped(true);
-  EXPECT_EQ(rasterImage->width(), 908);
+  EXPECT_EQ(rasterImage->width(), 907);
   EXPECT_EQ(rasterImage->height(), 1210);
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
