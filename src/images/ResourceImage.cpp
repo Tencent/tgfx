@@ -50,7 +50,7 @@ std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int display
                                alphaStartY);
 }
 
-std::shared_ptr<Image> ResourceImage::makeRasterized(const SamplingOptions& sampling) const {
+std::shared_ptr<Image> ResourceImage::makeRasterized(const SamplingOptions&) const {
   return weakThis.lock();
 }
 
