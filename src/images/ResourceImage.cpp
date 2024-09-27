@@ -50,6 +50,10 @@ std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int display
                                alphaStartY);
 }
 
+std::shared_ptr<Image> ResourceImage::makeRasterized(const SamplingOptions& sampling) const {
+  return weakThis.lock();
+}
+
 std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
     const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {

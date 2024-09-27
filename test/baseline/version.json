@@ -18,7 +18,7 @@
         "path": "f1d64c1",
         "rasterized": "e8e31de",
         "rasterized_mipmap": "1f657af",
-        "rasterized_scale_up": "30f45bb",
+        "rasterized_scale_up": "1f657af",
         "text_shape": "74f94c4",
         "tileMode": "3bfc2e8"
     },
@@ -37,10 +37,10 @@
         "LumaColorFilter": "6ae079f",
         "RuntimeEffect": "6ec728b",
         "blur": "4d6ab20",
-        "dropShadow": "30f45bb",
+        "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
-        "shaderMaskFilter": "30f45bb"
+        "shaderMaskFilter": "1f657af"
     },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",

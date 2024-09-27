@@ -25,8 +25,6 @@ class MipmapImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source);
 
-  std::shared_ptr<Image> makeRasterized(const SamplingOptions& sampling) const override;
-
   int width() const override {
     return source->width();
   }
