@@ -35,7 +35,7 @@ std::shared_ptr<Image> ScaleImage::MakeFrom(std::shared_ptr<Image> source, float
 }
 
 static int GetScaledSize(int size, float scale) {
-  return static_cast<int>(ceilf(static_cast<float>(size) * scale));
+  return static_cast<int>(roundf(static_cast<float>(size) * scale));
 }
 
 int ScaleImage::width() const {
