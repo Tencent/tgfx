@@ -44,7 +44,7 @@ enum class LayerType {
    */
   Text,
   /**
-   * A layer displaying the graphics recorded in a Canvas.
+   * A layer displaying custom graphics using the Canvas API.
    */
   Canvas,
 };

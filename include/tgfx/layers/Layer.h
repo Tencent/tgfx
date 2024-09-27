@@ -102,7 +102,7 @@ class Layer {
   /**
    * Returns the transformation matrix applied to the layer.
    */
-  const Matrix& getMatrix() const {
+  const Matrix& matrix() const {
     return _matrix;
   }
 

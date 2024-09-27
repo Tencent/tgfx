@@ -23,7 +23,8 @@
 
 namespace tgfx {
 /**
- * CanvasLayer represents a layer that displays the graphics recorded in a Canvas.
+ * CanvasLayer lets you draw custom graphics using the Canvas API. The graphics you create are saved
+ * in a Picture object that can be replayed later.
  */
 class CanvasLayer : public Layer {
  public:
@@ -37,7 +38,7 @@ class CanvasLayer : public Layer {
   }
 
   /**
-   * Returns the canvas associated with this layer for recording drawing commands.
+   * Returns the canvas used to draw the custom graphics.
    */
   Canvas* getCanvas() const;
 
