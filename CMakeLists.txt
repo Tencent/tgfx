@@ -82,6 +82,7 @@ file(GLOB_RECURSE SRC_FILES
         src/core/*.*
         src/filters/*.*
         src/images/*.*
+        src/layers/*.*
         src/shaders/*.*
         src/utils/*.*
         src/gpu/*.*)
@@ -268,7 +269,7 @@ elseif (OHOS)
     if (TGFX_USE_NATIVE_GL)
         find_library(EGL_LIB EGL)
         find_library(GLES_LIB GLESv3)
-        list(APPEND TGFX_SHARED_LIBS  ${EGL_LIB} ${GLES_LIB})
+        list(APPEND TGFX_SHARED_LIBS ${EGL_LIB} ${GLES_LIB})
         file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
