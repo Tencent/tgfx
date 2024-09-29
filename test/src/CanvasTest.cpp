@@ -320,10 +320,10 @@ TGFX_TEST(CanvasTest, rasterized) {
   auto defaultCacheLimit = context->cacheLimit();
   context->setCacheLimit(0);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto scaleImage = image->makeScale(1.0f, 1.0f);
+  auto scaleImage = image->makeScaled(1.0f, 1.0f);
   EXPECT_TRUE(scaleImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
-  auto rasterImage = image->makeScale(0.15f, 0.15f);
+  auto rasterImage = image->makeScaled(0.15f, 0.15f);
   rasterImage = rasterImage->makeRasterized();
   EXPECT_FALSE(rasterImage->hasMipmaps());
   EXPECT_FALSE(rasterImage == image);
@@ -347,7 +347,7 @@ TGFX_TEST(CanvasTest, rasterized) {
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  image = image->makeScale(0.15f, 0.15f);
+  image = image->makeScaled(0.15f, 0.15f);
   rasterImage = image->makeRasterized(sampling);
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
@@ -360,7 +360,7 @@ TGFX_TEST(CanvasTest, rasterized) {
   canvas->clear();
   rasterImage = image->makeMipmapped(false);
   EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeScale(2.0f, 2.0f);
+  rasterImage = rasterImage->makeScaled(2.0f, 2.0f);
   rasterImage = rasterImage->makeRasterized(sampling);
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeMipmapped(true);
@@ -628,6 +628,38 @@ TGFX_TEST(CanvasTest, image) {
   image = rgbAAA->makeRGBAAA(256, 512, 256, 0);
   EXPECT_TRUE(image == nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
+  device->unlock();
+}
+
+TGFX_TEST(CanvasTest, scaleImage) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  SurfaceOptions options(RenderFlags::DisableCache);
+  auto surface = Surface::Make(context, 1286, 558, false, 1, false, &options);
+  auto canvas = surface->getCanvas();
+  auto image = MakeImage("resources/apitest/rgbaaa.png");
+  EXPECT_EQ(image->width(), 1024);
+  EXPECT_EQ(image->height(), 512);
+  image = image->makeSubset(Rect::MakeXYWH(100, 100, 924, 412));
+  image = image->makeScaled(0.5f, 0.5f);
+  EXPECT_EQ(image->width(), 462);
+  EXPECT_EQ(image->height(), 206);
+  image = image->makeOriented(Orientation::RightTop);
+  EXPECT_EQ(image->width(), 206);
+  EXPECT_EQ(image->height(), 462);
+  image = image->makeScaled(3.0f, 3.0f);
+  EXPECT_EQ(image->width(), 618);
+  EXPECT_EQ(image->height(), 1386);
+  image = image->makeSubset(Rect::MakeXYWH(60, 100, 558, 1286));
+  image = image->makeOriented(Orientation::RightTop);
+  EXPECT_EQ(image->width(), 1286);
+  EXPECT_EQ(image->height(), 558);
+  auto matrix = Matrix::MakeScale(0.5f);
+  matrix.postTranslate(20, 30);
+  canvas->drawImage(image, matrix);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
   device->unlock();
 }
 

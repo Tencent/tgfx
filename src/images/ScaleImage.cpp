@@ -21,15 +21,16 @@
 
 namespace tgfx {
 
-std::shared_ptr<Image> ScaleImage::MakeFrom(std::shared_ptr<Image> source, float scaleX,
-                                            float scaleY) {
-  if (scaleX <= 0 || scaleY <= 0 || source == nullptr) {
+std::shared_ptr<Image> ScaleImage::MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
+                                            const Rect& bounds, const Point& scale) {
+  if (scale.x <= 0 || scale.y <= 0 || source == nullptr) {
     return nullptr;
   }
-  if (scaleX == 1.0f && scaleY == 1.0f) {
+  if (scale.x == 1.0f && scale.y == 1.0f) {
     return source;
   }
-  auto result = std::shared_ptr<ScaleImage>(new ScaleImage(std::move(source), scaleX, scaleY));
+  auto result = std::shared_ptr<ScaleImage>(
+      new ScaleImage(std::move(source), orientation, bounds, scale.x, scale.y));
   result->weakThis = result;
   return result;
 }
@@ -39,36 +40,50 @@ static int GetScaledSize(int size, float scale) {
 }
 
 int ScaleImage::width() const {
-  return GetScaledSize(source->width(), scaleX);
+  return GetScaledSize(SubsetImage::width(), scaleX);
 }
 
 int ScaleImage::height() const {
-  return GetScaledSize(source->height(), scaleY);
+  return GetScaledSize(SubsetImage::height(), scaleY);
 }
 
 std::shared_ptr<Image> ScaleImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return MakeFrom(std::move(newSource), scaleX, scaleY);
+  return MakeFrom(std::move(newSource), orientation, bounds, Point::Make(scaleX, scaleY));
 }
 
-std::shared_ptr<Image> ScaleImage::onMakeScale(float newScaleX, float newScaleY) const {
-  return MakeFrom(source, scaleX * newScaleX, scaleY * newScaleY);
+std::shared_ptr<Image> ScaleImage::onMakeOriented(Orientation orientation) const {
+  auto newOrientation = concatOrientation(orientation);
+  auto orientedWidth = OrientImage::width();
+  auto orientedHeight = OrientImage::height();
+  auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
+  auto newBounds = matrix.mapRect(bounds);
+  return MakeFrom(source, newOrientation, newBounds, Point::Make(scaleX, scaleY));
 }
 
-std::unique_ptr<FragmentProcessor> ScaleImage::asFragmentProcessor(const FPArgs& args,
-                                                                   TileMode tileModeX,
-                                                                   TileMode tileModeY,
-                                                                   const SamplingOptions& sampling,
-                                                                   const Matrix* uvMatrix) const {
+std::shared_ptr<Image> ScaleImage::onMakeSubset(const Rect& subset) const {
+  auto newBounds = subset;
+  newBounds.scale(1 / scaleX, 1 / scaleY);
+  newBounds = newBounds.makeOffset(bounds.x(), bounds.y());
+  return MakeFrom(source, orientation, newBounds, Point::Make(scaleX, scaleY));
+}
+
+std::shared_ptr<Image> ScaleImage::onMakeScaled(float newScaleX, float newScaleY) const {
+  auto newBounds = bounds;
+  newBounds.scale(newScaleX, newScaleY);
+  return MakeFrom(source, orientation, bounds, Point::Make(scaleX * newScaleX, scaleY * newScaleY));
+}
+
+std::optional<Matrix> ScaleImage::concatUVMatrix(const Matrix* uvMatrix) const {
   Matrix matrix = Matrix::MakeScale(1 / scaleX, 1 / scaleY);
-  if (uvMatrix != nullptr) {
+  if (uvMatrix) {
     matrix.preConcat(*uvMatrix);
   }
-  return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling,
-                                 std::addressof(matrix));
+  return SubsetImage::concatUVMatrix(&matrix);
 }
 
-ScaleImage::ScaleImage(std::shared_ptr<Image> source, float scaleX, float scaleY)
-    : TransformImage(std::move(source)), scaleX(scaleX), scaleY(scaleY) {
+ScaleImage::ScaleImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds,
+                       float scaleX, float scaleY)
+    : SubsetImage(std::move(source), orientation, bounds), scaleX(scaleX), scaleY(scaleY) {
 }
 
 }  // namespace tgfx

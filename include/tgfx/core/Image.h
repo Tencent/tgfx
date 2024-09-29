@@ -241,10 +241,10 @@ class Image {
 
   /**
    * Returns an Image with its origin transformed by the given Orientation. The returned Image
-   * always shares pixels and caches with the original Image. If the scaleX is 1.0 and the scaleY is 1.0,
+   * always shares pixels and caches with the original Image. If both scaleX and scaleY are 1.0,,
    * the original Image is returned. If scaleX or scaleY is less than zero, nullptr is returned.
    */
-  std::shared_ptr<Image> makeScale(float scaleX, float scaleY) const;
+  std::shared_ptr<Image> makeScaled(float scaleX, float scaleY) const;
 
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
@@ -281,7 +281,7 @@ class Image {
 
   virtual std::shared_ptr<Image> onMakeOriented(Orientation orientation) const;
 
-  virtual std::shared_ptr<Image> onMakeScale(float scaleX, float scaleY) const;
+  virtual std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const;
 
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;

@@ -47,6 +47,8 @@ class SubsetImage : public OrientImage {
 
   std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
 
+  std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
+
   std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const override;
 
   SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds);

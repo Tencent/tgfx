@@ -18,6 +18,7 @@
 
 #include "OrientImage.h"
 #include "gpu/ops/DrawOp.h"
+#include "images/ScaleImage.h"
 #include "images/SubsetImage.h"
 
 namespace tgfx {
@@ -91,6 +92,11 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
     return source;
   }
   return OrientImage::MakeFrom(source, newOrientation);
+}
+
+std::shared_ptr<Image> OrientImage::onMakeScaled(float scaleX, float scaleY) const {
+  return ScaleImage::MakeFrom(source, orientation, Rect::MakeWH(width(), height()),
+                              Point::Make(scaleX, scaleY));
 }
 
 std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,

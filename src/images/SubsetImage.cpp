@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
+#include "images/ScaleImage.h"
 #include "utils/UVMatrix.h"
 
 namespace tgfx {
@@ -55,6 +56,10 @@ std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) cons
   auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
   auto newBounds = matrix.mapRect(bounds);
   return SubsetImage::MakeFrom(source, newOrientation, newBounds);
+}
+
+std::shared_ptr<Image> SubsetImage::onMakeScaled(float scaleX, float scaleY) const {
+  return ScaleImage::MakeFrom(source, orientation, bounds, Point::Make(scaleX, scaleY));
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
