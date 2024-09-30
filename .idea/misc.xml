@@ -15,10 +15,17 @@
       <file path="$PROJECT_DIR$/ios/TGFX" />
       <file path="$PROJECT_DIR$/linux/cmake-build-debug" />
       <file path="$PROJECT_DIR$/mac/TGFX" />
+      <file path="$PROJECT_DIR$/ohos/.hvigor" />
+      <file path="$PROJECT_DIR$/ohos/hello2d/.cxx" />
+      <file path="$PROJECT_DIR$/ohos/hello2d/build" />
+      <file path="$PROJECT_DIR$/ohos/hello2d/oh_modules" />
+      <file path="$PROJECT_DIR$/ohos/oh_modules" />
       <file path="$PROJECT_DIR$/out" />
       <file path="$PROJECT_DIR$/qt/cmake-build-debug" />
       <file path="$PROJECT_DIR$/resources" />
       <file path="$PROJECT_DIR$/result" />
+      <file path="$PROJECT_DIR$/test/baseline/.cache" />
+      <file path="$PROJECT_DIR$/test/out" />
       <file path="$PROJECT_DIR$/third_party" />
       <file path="$PROJECT_DIR$/vendor" />
       <file path="$PROJECT_DIR$/win/cmake-build-debug" />

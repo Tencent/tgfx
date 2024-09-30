@@ -58,7 +58,8 @@ class Shader {
                                            std::shared_ptr<Shader> src);
 
   /**
-   * Returns a shader that generates a linear gradient between the two specified points.
+   * Returns a shader that generates a linear gradient between the two specified points. The color
+   * gradient is aligned with the line connecting the two points.
    * @param startPoint The start point for the gradient.
    * @param endPoint The end point for the gradient.
    * @param colors The array of colors, to be distributed between the two points.
@@ -72,7 +73,8 @@ class Shader {
                                                     const std::vector<float>& positions);
 
   /**
-   * Returns a shader that generates a radial gradient given the center and radius.
+   * Returns a shader that generates a radial gradient given the center and radius. The color
+   * gradient is drawn from the center point to the edge of the radius.
    * @param center The center of the circle for this gradient
    * @param radius Must be positive. The radius of the circle for this gradient.
    * @param colors The array of colors, to be distributed between the center and edge of the circle.
@@ -86,7 +88,9 @@ class Shader {
                                                     const std::vector<float>& positions);
 
   /**
-   * Returns a shader that generates a sweep gradient given a center.
+   * Returns a shader that generates a conic gradient given a center point and an angular range.
+   * The color gradient is drawn from the start angle to the end angle, wrapping around the center
+   * point.
    * @param center The center of the circle for this gradient
    * @param startAngle Start of the angular range, corresponding to pos == 0.
    * @param endAngle End of the angular range, corresponding to pos == 1.
@@ -97,7 +101,7 @@ class Shader {
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
-  static std::shared_ptr<Shader> MakeSweepGradient(const Point& center, float startAngle,
+  static std::shared_ptr<Shader> MakeConicGradient(const Point& center, float startAngle,
                                                    float endAngle, const std::vector<Color>& colors,
                                                    const std::vector<float>& positions);
 

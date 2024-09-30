@@ -32,7 +32,7 @@ namespace drawers {
   }
 
 DEFINE_DRAWER(GridBackground);
-DEFINE_DRAWER(SweepGradient);
+DEFINE_DRAWER(ConicGradient);
 DEFINE_DRAWER(ImageWithMipmap);
 DEFINE_DRAWER(ImageWithShadow);
 DEFINE_DRAWER(SimpleText);
