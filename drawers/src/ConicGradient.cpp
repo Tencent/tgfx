@@ -19,14 +19,14 @@
 #include "base/Drawers.h"
 
 namespace drawers {
-void SweepGradient::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
+void ConicGradient::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
   auto scale = host->density();
   auto width = host->width();
   auto height = host->height();
   tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
-  auto shader = tgfx::Shader::MakeSweepGradient(tgfx::Point::Make(width / 2, height / 2), 0, 360,
+  auto shader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(width / 2, height / 2), 0, 360,
                                                 {cyan, magenta, yellow, cyan}, {});
   tgfx::Paint paint = {};
   paint.setShader(shader);

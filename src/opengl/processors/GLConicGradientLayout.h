@@ -18,26 +18,17 @@
 
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
+#include <optional>
+#include "gpu/processors/ConicGradientLayout.h"
 
 namespace tgfx {
-class SweepGradientLayout : public FragmentProcessor {
+class GLConicGradientLayout : public ConicGradientLayout {
  public:
-  static std::unique_ptr<SweepGradientLayout> Make(Matrix matrix, float bias, float scale);
+  GLConicGradientLayout(Matrix matrix, float bias, float scale);
 
-  std::string name() const override {
-    return "SweepGradientLayout";
-  }
+  void emitCode(EmitArgs& args) const override;
 
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  SweepGradientLayout(Matrix matrix, float bias, float scale);
-
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
-  CoordTransform coordTransform;
-  float bias;
-  float scale;
+ private:
+  void onSetData(UniformBuffer*) const override;
 };
 }  // namespace tgfx

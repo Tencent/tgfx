@@ -22,7 +22,7 @@
 #include "tgfx/platform/Print.h"
 
 namespace drawers {
-static std::vector<Drawer*> drawers = {new GridBackground(), new SweepGradient(),
+static std::vector<Drawer*> drawers = {new GridBackground(), new ConicGradient(),
                                        new ImageWithMipmap(), new ImageWithShadow(),
                                        new SimpleText()};
 
