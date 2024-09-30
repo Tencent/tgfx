@@ -100,8 +100,7 @@
   drawer->draw(canvas, appHost.get());
   drawer = drawers::Drawer::GetByIndex(index);
   drawer->draw(canvas, appHost.get());
-  surface->flush();
-  context->submit();
+  context->flushAndSubmit();
   window->present(context);
   device->unlock();
 }
