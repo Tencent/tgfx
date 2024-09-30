@@ -16,24 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/layers/SolidColor.h"
 
 namespace tgfx {
-/**
- * GradientType represents the type of gradient.
- */
-enum class GradientType {
-  /**
-   * Linear gradient.
-   */
-  Linear,
-  /**
-   * Radial gradient.
-   */
-  Radial,
-  /**
-   * Sweep gradient.
-   */
-  Sweep,
-};
+std::shared_ptr<SolidColor> SolidColor::Make(const Color& color) {
+  return std::shared_ptr<SolidColor>(new SolidColor(color));
+}
+
+void SolidColor::setColor(const Color& color) {
+  _color = color;
+}
+
+std::shared_ptr<Shader> SolidColor::getShader() const {
+  return Shader::MakeColorShader(_color);
+}
 }  // namespace tgfx

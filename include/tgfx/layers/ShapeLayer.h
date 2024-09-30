@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "tgfx/core/Color.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
 /**
@@ -51,31 +51,32 @@ class ShapeLayer : public Layer {
   void setPath(const Path& path);
 
   /**
-   * Returns the color used to fill the shape's path. If the fill color is set to transparent, the
-   * shape will not be filled. The default color is opaque black.
+   * Returns the style used to fill the shape's path, which can be a solid color, gradient, or image
+   * pattern. If the fill style is set to nullptr, the shape will not be filled. The default fill
+   * style is a SolidColor with an opaque black color.
    */
-  const Color& fillColor() const {
-    return _fillColor;
+  std::shared_ptr<ShapeStyle> fillStyle() const {
+    return _fillStyle;
   }
 
   /**
-   * Returns the color used to stroke the shape’s path. If the stroke color is set to transparent,
-   * the shape will not be stroked. The default color is transparent.
+   * Sets the style used to fill the shape's path.
    */
-  void setFillColor(const Color& color);
+  void setFillStyle(std::shared_ptr<ShapeStyle> style);
 
   /**
-   * Sets the color used to fill the shape's path.
+   * Returns the style used to stroke the shape’s path, which can be a solid color, gradient, or
+   * image pattern. If the stroke style is set to nullptr, the shape will not be stroked. The
+   * default stroke style is nullptr.
    */
-  void setStrokeColor(const Color& color);
-
-  /**
-   *
-   * @return
-   */
-  const Color& strokeColor() const {
-    return _strokeColor;
+  std::shared_ptr<ShapeStyle> strokeStyle() const {
+    return _strokeStyle;
   }
+
+  /**
+   * Sets the style used to fill the shape's path.
+   */
+  void setStrokeStyle(std::shared_ptr<ShapeStyle> style);
 
   /**
    * Returns the line cap style for the shape's path. The default line cap style is Butt.
@@ -201,8 +202,8 @@ class ShapeLayer : public Layer {
 
  private:
   Path _path = {};
-  Color _fillColor = Color::Black();
-  Color _strokeColor = Color::Transparent();
+  std::shared_ptr<ShapeStyle> _fillStyle = nullptr;
+  std::shared_ptr<ShapeStyle> _strokeStyle = nullptr;
   Stroke stroke = {};
   std::vector<float> _lineDashPattern = {};
   float _lineDashPhase = 0.0f;
