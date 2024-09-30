@@ -19,11 +19,11 @@
 #include "GradientShader.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
 #include "gpu/processors/LinearGradientLayout.h"
 #include "gpu/processors/RadialGradientLayout.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
-#include "gpu/processors/SweepGradientLayout.h"
 #include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "utils/MathExtra.h"
@@ -107,9 +107,8 @@ static std::unique_ptr<FragmentProcessor> MakeColorizer(const Context* context, 
       context->resourceProvider()->getGradient(colors + offset, positions + offset, count));
 }
 
-GradientShaderBase::GradientShaderBase(const std::vector<Color>& colors,
-                                       const std::vector<float>& positions,
-                                       const Matrix& pointsToUnit)
+GradientShader::GradientShader(const std::vector<Color>& colors,
+                               const std::vector<float>& positions, const Matrix& pointsToUnit)
     : pointsToUnit(pointsToUnit) {
   colorsAreOpaque = true;
   for (auto& color : colors) {
@@ -157,7 +156,7 @@ GradientShaderBase::GradientShaderBase(const std::vector<Color>& colors,
 // Combines the colorizer and layout with an appropriately configured primary effect based on the
 // gradient's tile mode
 static std::unique_ptr<FragmentProcessor> MakeGradient(const Context* context,
-                                                       const GradientShaderBase& shader,
+                                                       const GradientShader& shader,
                                                        std::unique_ptr<FragmentProcessor> layout) {
   if (layout == nullptr) {
     return nullptr;
@@ -190,13 +189,13 @@ static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint)
   return matrix;
 }
 
-LinearGradient::LinearGradient(const Point& startPoint, const Point& endPoint,
-                               const std::vector<Color>& colors,
-                               const std::vector<float>& positions)
-    : GradientShaderBase(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
+LinearGradientShader::LinearGradientShader(const Point& startPoint, const Point& endPoint,
+                                           const std::vector<Color>& colors,
+                                           const std::vector<float>& positions)
+    : GradientShader(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
 }
 
-std::unique_ptr<FragmentProcessor> LinearGradient::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto totalMatrix = pointsToUnit;
   if (uvMatrix) {
@@ -212,12 +211,13 @@ static Matrix RadialToUnitMatrix(const Point& center, float radius) {
   return matrix;
 }
 
-RadialGradient::RadialGradient(const Point& center, float radius, const std::vector<Color>& colors,
-                               const std::vector<float>& positions)
-    : GradientShaderBase(colors, positions, RadialToUnitMatrix(center, radius)) {
+RadialGradientShader::RadialGradientShader(const Point& center, float radius,
+                                           const std::vector<Color>& colors,
+                                           const std::vector<float>& positions)
+    : GradientShader(colors, positions, RadialToUnitMatrix(center, radius)) {
 }
 
-std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto totalMatrix = pointsToUnit;
   if (uvMatrix != nullptr) {
@@ -226,19 +226,20 @@ std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(
   return MakeGradient(args.context, *this, RadialGradientLayout::Make(totalMatrix));
 }
 
-SweepGradient::SweepGradient(const Point& center, float t0, float t1,
-                             const std::vector<Color>& colors, const std::vector<float>& positions)
-    : GradientShaderBase(colors, positions, Matrix::MakeTrans(-center.x, -center.y)), bias(-t0),
+ConicGradientShader::ConicGradientShader(const Point& center, float t0, float t1,
+                                         const std::vector<Color>& colors,
+                                         const std::vector<float>& positions)
+    : GradientShader(colors, positions, Matrix::MakeTrans(-center.x, -center.y)), bias(-t0),
       scale(1.f / (t1 - t0)) {
 }
 
-std::unique_ptr<FragmentProcessor> SweepGradient::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto totalMatrix = pointsToUnit;
   if (uvMatrix != nullptr) {
     totalMatrix.preConcat(*uvMatrix);
   }
-  return MakeGradient(args.context, *this, SweepGradientLayout::Make(totalMatrix, bias, scale));
+  return MakeGradient(args.context, *this, ConicGradientLayout::Make(totalMatrix, bias, scale));
 }
 
 std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,
@@ -257,7 +258,7 @@ std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, cons
     // once start and end are exactly the same, so just use the end color for a stable solution.
     return Shader::MakeColorShader(colors[0]);
   }
-  auto shader = std::make_shared<LinearGradient>(startPoint, endPoint, colors, positions);
+  auto shader = std::make_shared<LinearGradientShader>(startPoint, endPoint, colors, positions);
   shader->weakThis = shader;
   return shader;
 }
@@ -276,12 +277,12 @@ std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float ra
     // Degenerate gradient optimization, and no special logic needed for clamped radial gradient
     return Shader::MakeColorShader(colors[colors.size() - 1]);
   }
-  auto shader = std::make_shared<RadialGradient>(center, radius, colors, positions);
+  auto shader = std::make_shared<RadialGradientShader>(center, radius, colors, positions);
   shader->weakThis = shader;
   return shader;
 }
 
-std::shared_ptr<Shader> Shader::MakeSweepGradient(const Point& center, float startAngle,
+std::shared_ptr<Shader> Shader::MakeConicGradient(const Point& center, float startAngle,
                                                   float endAngle, const std::vector<Color>& colors,
                                                   const std::vector<float>& positions) {
   if (colors.empty()) {
@@ -290,8 +291,8 @@ std::shared_ptr<Shader> Shader::MakeSweepGradient(const Point& center, float sta
   if (1 == colors.size() || FloatNearlyEqual(startAngle, endAngle, DegenerateThreshold)) {
     return Shader::MakeColorShader(colors[0]);
   }
-  auto shader = std::make_shared<SweepGradient>(center, startAngle / 360.f, endAngle / 360.f,
-                                                colors, positions);
+  auto shader = std::make_shared<ConicGradientShader>(center, startAngle / 360.f, endAngle / 360.f,
+                                                      colors, positions);
   shader->weakThis = shader;
   return shader;
 }
