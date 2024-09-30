@@ -19,16 +19,16 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "images/OrientImage.h"
+#include "images/ScaleImage.h"
 
 namespace tgfx {
 /**
  * An image that is a subset of another image.
  */
-class SubsetImage : public OrientImage {
+class SubsetImage : public ScaleImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                         const Rect& bounds);
+                                         const Point& scale, const Rect& bounds);
 
   int width() const override {
     return static_cast<int>(bounds.width());
@@ -51,6 +51,7 @@ class SubsetImage : public OrientImage {
 
   std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const override;
 
-  SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds);
+  SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
+              const Rect& bounds);
 };
 }  // namespace tgfx

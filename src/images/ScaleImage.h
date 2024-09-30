@@ -15,23 +15,30 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "SubsetImage.h"
+
+#pragma once
+
+#include "OrientImage.h"
 
 namespace tgfx {
 
 /**
  * Scales the source image by the given factors.
  */
-class ScaleImage : public SubsetImage {
+class ScaleImage : public OrientImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                         const Rect& bounds, const Point& scale);
+                                         const Point& scale);
 
   int width() const override;
 
   int height() const override;
 
  protected:
+  Point scale = Point::Make(1.0f, 1.0f);
+
+  ScaleImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale);
+
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
   std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
@@ -41,12 +48,5 @@ class ScaleImage : public SubsetImage {
   std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
 
   std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const override;
-
- private:
-  float scaleX = 1.0f;
-  float scaleY = 1.0f;
-
-  ScaleImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds,
-             float scaleX, float scaleY);
 };
 }  // namespace tgfx

@@ -38,7 +38,8 @@ std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<ResourceImage> sour
 
 RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds,
                          const Point& alphaStart)
-    : SubsetImage(std::move(source), orientation, bounds), alphaStart(alphaStart) {
+    : SubsetImage(std::move(source), orientation, Point::Make(1.0f, 1.0f), bounds),
+      alphaStart(alphaStart) {
 }
 
 std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource) const {

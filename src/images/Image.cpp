@@ -198,7 +198,8 @@ std::shared_ptr<Image> Image::makeScaled(float newScaleX, float newScaleY) const
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  return SubsetImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, subset);
+  return SubsetImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, Point::Make(1.0f, 1.0f),
+                               subset);
 }
 
 std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
@@ -213,8 +214,7 @@ std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
 }
 
 std::shared_ptr<Image> Image::onMakeScaled(float scaleX, float scaleY) const {
-  return ScaleImage::MakeFrom(weakThis.lock(), Orientation::TopLeft,
-                              Rect::MakeWH(width(), height()), Point::Make(scaleX, scaleY));
+  return ScaleImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, Point::Make(scaleX, scaleY));
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
