@@ -67,8 +67,7 @@ static void Draw(int index) {
   drawer = drawers::Drawer::GetByIndex(index);
   drawer->draw(canvas, appHost.get());
   canvas->restore();
-  surface->flush();
-  context->submit();
+  context->flushAndSubmit();
   window->present(context);
   device->unlock();
 }

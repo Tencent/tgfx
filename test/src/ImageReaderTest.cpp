@@ -47,7 +47,7 @@ TGFX_TEST(ImageReaderTest, updateMask) {
   Paint paint = {};
   paint.setColor(Color::Black());
   canvas->drawImage(maskImage, &paint);
-  surface->flush();
+  context->flush();
 
   path.reset();
   path.addRoundRect(Rect::MakeXYWH(22, 22, 10, 10), 3, 3);
@@ -58,7 +58,7 @@ TGFX_TEST(ImageReaderTest, updateMask) {
   canvas->setMatrix(Matrix::MakeTrans(50, 0));
   canvas->drawImage(maskImage, &paint);
   EXPECT_FALSE(buffer->expired());
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(buffer->expired());
 
   EXPECT_TRUE(Baseline::Compare(surface, "ImageReaderTest/update_mask"));
@@ -87,7 +87,7 @@ TGFX_TEST(ImageReaderTest, updateBitmap) {
   auto newBuffer = reader->acquireNextBuffer();
   EXPECT_FALSE(newBuffer != nullptr);
   canvas->drawImage(image);
-  surface->flush();
+  context->flush();
   if (HardwareBufferAvailable()) {
     context->submit(true);
   }
@@ -110,7 +110,7 @@ TGFX_TEST(ImageReaderTest, updateBitmap) {
   if (!HardwareBufferAvailable()) {
     EXPECT_FALSE(buffer->expired());
   }
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(buffer->expired());
 
   EXPECT_TRUE(Baseline::Compare(surface, "ImageReaderTest/update_bitmap"));
