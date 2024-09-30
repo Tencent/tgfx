@@ -28,9 +28,6 @@ std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<ResourceImage> sour
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
   }
-  if (alphaStartX <= 0 && alphaStartY <= 0) {
-    return source->makeSubset(Rect::MakeWH(displayWidth, displayHeight));
-  }
   auto bounds = Rect::MakeWH(displayWidth, displayHeight);
   auto alphaStart = Point::Make(alphaStartX, alphaStartY);
   auto image = std::shared_ptr<RGBAAAImage>(new RGBAAAImage(
