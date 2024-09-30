@@ -227,8 +227,7 @@ void TGFXWindow::draw() {
   drawer = drawers::Drawer::GetByIndex(index);
   drawer->draw(canvas, appHost.get());
   canvas->restore();
-  surface->flush();
-  context->submit();
+  context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 }
