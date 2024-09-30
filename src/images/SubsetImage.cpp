@@ -21,44 +21,60 @@
 
 namespace tgfx {
 std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                             const Rect& bounds) {
+                                             const Point& scale, const Rect& bounds) {
   if (source == nullptr || bounds.isEmpty()) {
     return nullptr;
   }
-  auto sourceBounds = Rect::MakeWH(source->width(), source->height());
+  auto width = static_cast<int>(static_cast<float>(source->width()) * scale.x);
+  auto height = static_cast<int>(static_cast<float>(source->height()) * scale.y);
+  if (OrientationSwapsWidthHeight(orientation)) {
+    std::swap(width, height);
+  }
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto sourceBounds = Rect::MakeWH(width, height);
   if (sourceBounds == bounds) {
-    return source;
+    return ScaleImage::MakeFrom(source, orientation, scale);
   }
   auto image =
-      std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), orientation, bounds));
+      std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), orientation, scale, bounds));
   image->weakThis = image;
   return image;
 }
 
-SubsetImage::SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds)
-    : OrientImage(std::move(source), orientation), bounds(bounds) {
+SubsetImage::SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
+                         const Rect& bounds)
+    : ScaleImage(std::move(source), orientation, scale), bounds(bounds) {
 }
 
 std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return SubsetImage::MakeFrom(std::move(newSource), orientation, bounds);
+  return SubsetImage::MakeFrom(std::move(newSource), orientation, scale, bounds);
 }
 
 std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
-  return SubsetImage::MakeFrom(source, orientation, newBounds);
+  return SubsetImage::MakeFrom(source, orientation, scale, newBounds);
 }
 
 std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) const {
   auto newOrientation = concatOrientation(orientation);
-  auto orientedWidth = OrientImage::width();
-  auto orientedHeight = OrientImage::height();
+  auto orientedWidth = ScaleImage::width();
+  auto orientedHeight = ScaleImage::height();
   auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
   auto newBounds = matrix.mapRect(bounds);
-  return SubsetImage::MakeFrom(source, newOrientation, newBounds);
+  return SubsetImage::MakeFrom(source, newOrientation, scale, newBounds);
+}
+
+std::shared_ptr<Image> SubsetImage::onMakeScaled(float scaleX, float scaleY) const {
+  auto newBounds = bounds;
+  newBounds.scale(scaleX, scaleY);
+  auto newScale = Point::Make(scale.x * scaleX, scale.y * scaleY);
+  return SubsetImage::MakeFrom(source, orientation, newScale, newBounds);
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
   auto matrix = UVMatrix::Concat(bounds, uvMatrix);
-  return OrientImage::concatUVMatrix(AddressOf(matrix));
+  return ScaleImage::concatUVMatrix(AddressOf(matrix));
 }
 }  // namespace tgfx

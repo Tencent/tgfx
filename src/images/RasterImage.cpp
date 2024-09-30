@@ -25,9 +25,8 @@
 
 namespace tgfx {
 std::shared_ptr<RasterImage> RasterImage::MakeFrom(std::shared_ptr<Image> source,
-                                                   float rasterizationScale,
                                                    const SamplingOptions& sampling) {
-  if (source == nullptr || rasterizationScale <= 0) {
+  if (source == nullptr) {
     return nullptr;
   }
   auto hasMipmap = source->hasMipmaps();
@@ -40,36 +39,23 @@ std::shared_ptr<RasterImage> RasterImage::MakeFrom(std::shared_ptr<Image> source
       source = std::move(newSource);
     }
   }
-  auto rasterImage = std::shared_ptr<RasterImage>(
-      new RasterImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
+  auto rasterImage =
+      std::shared_ptr<RasterImage>(new RasterImage(UniqueKey::Make(), std::move(source), sampling));
   rasterImage->weakThis = rasterImage;
   return rasterImage;
 }
 
 RasterImage::RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                         float rasterizationScale, const SamplingOptions& sampling)
-    : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
-      rasterizationScale(rasterizationScale), sampling(sampling) {
-}
-
-static int GetScaledSize(int size, float scale) {
-  return static_cast<int>(ceilf(static_cast<float>(size) * scale));
+                         const SamplingOptions& sampling)
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)), sampling(sampling) {
 }
 
 int RasterImage::width() const {
-  return GetScaledSize(source->width(), rasterizationScale);
+  return source->width();
 }
 
 int RasterImage::height() const {
-  return GetScaledSize(source->height(), rasterizationScale);
-}
-
-std::shared_ptr<Image> RasterImage::makeRasterized(float scaleFactor,
-                                                   const SamplingOptions& options) const {
-  if (scaleFactor == 1.0f) {
-    return weakThis.lock();
-  }
-  return RasterImage::MakeFrom(source, rasterizationScale * scaleFactor, options);
+  return source->height();
 }
 
 std::shared_ptr<Image> RasterImage::onMakeDecoded(Context* context, bool) const {
@@ -79,8 +65,8 @@ std::shared_ptr<Image> RasterImage::onMakeDecoded(Context* context, bool) const 
   if (newSource == nullptr) {
     return nullptr;
   }
-  auto newImage = std::shared_ptr<RasterImage>(
-      new RasterImage(uniqueKey, std::move(newSource), rasterizationScale, sampling));
+  auto newImage =
+      std::shared_ptr<RasterImage>(new RasterImage(uniqueKey, std::move(newSource), sampling));
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -108,8 +94,7 @@ std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
   auto sourceFlags = renderFlags | RenderFlags::DisableCache;
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs args(context, sourceFlags, drawRect, Matrix::I());
-  auto uvMatrix = Matrix::MakeScale(1.0f / rasterizationScale);
-  auto processor = FragmentProcessor::Make(source, args, sampling, &uvMatrix);
+  auto processor = FragmentProcessor::Make(source, args, sampling);
   if (processor == nullptr) {
     return nullptr;
   }

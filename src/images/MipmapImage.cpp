@@ -45,19 +45,6 @@ MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> sou
     : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
 }
 
-std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
-                                                   const SamplingOptions& sampling) const {
-  if (rasterizationScale == 1.0f) {
-    return weakThis.lock();
-  }
-  auto newSource =
-      std::static_pointer_cast<ResourceImage>(source->makeRasterized(rasterizationScale, sampling));
-  if (newSource != nullptr) {
-    return newSource->makeMipmapped(true);
-  }
-  return newSource;
-}
-
 std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const {
   auto newSource = std::static_pointer_cast<ResourceImage>(source->onMakeDecoded(context, false));
   if (newSource == nullptr) {

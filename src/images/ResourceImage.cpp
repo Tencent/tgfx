@@ -27,14 +27,6 @@ namespace tgfx {
 ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
-std::shared_ptr<Image> ResourceImage::makeRasterized(float rasterizationScale,
-                                                     const SamplingOptions& sampling) const {
-  if (rasterizationScale == 1.0f) {
-    return weakThis.lock();
-  }
-  return Image::makeRasterized(rasterizationScale, sampling);
-}
-
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(Context* context,
                                                               uint32_t renderFlags) const {
   if (context == nullptr) {
@@ -56,6 +48,10 @@ std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int display
   auto resourceImage = std::static_pointer_cast<ResourceImage>(weakThis.lock());
   return RGBAAAImage::MakeFrom(std::move(resourceImage), displayWidth, displayHeight, alphaStartX,
                                alphaStartY);
+}
+
+std::shared_ptr<Image> ResourceImage::makeRasterized(const SamplingOptions&) const {
+  return weakThis.lock();
 }
 
 std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(

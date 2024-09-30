@@ -45,6 +45,8 @@ class OrientImage : public TransformImage {
 
   std::shared_ptr<Image> onMakeOriented(Orientation newOrientation) const override;
 
+  std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,

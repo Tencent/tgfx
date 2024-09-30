@@ -41,9 +41,6 @@ class MipmapImage : public ResourceImage {
     return true;
   }
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        const SamplingOptions& sampling = {}) const override;
-
  protected:
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 

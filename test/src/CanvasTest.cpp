@@ -120,7 +120,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rectPaints.size(), drawCallCount);
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
   device->unlock();
 }
@@ -161,7 +161,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRectPaints.size(), drawCallCount);
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
   device->unlock();
 }
@@ -203,7 +203,7 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_clear_op"));
   device->unlock();
 }
@@ -287,7 +287,7 @@ TGFX_TEST(CanvasTest, textShape) {
     canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
                        textRun.font, paint);
   }
-  surface->flush();
+  context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
   device->unlock();
 }
@@ -320,13 +320,13 @@ TGFX_TEST(CanvasTest, rasterized) {
   auto defaultCacheLimit = context->cacheLimit();
   context->setCacheLimit(0);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto rasterImage = image->makeRasterized();
-  EXPECT_TRUE(rasterImage == image);
+  auto scaleImage = image->makeScaled(1.0f, 1.0f);
+  EXPECT_TRUE(scaleImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
-  rasterImage = image->makeRasterized();
+  auto rasterImage = image->makeScaled(0.15f, 0.15f);
+  rasterImage = rasterImage->makeRasterized();
   EXPECT_FALSE(rasterImage->hasMipmaps());
   EXPECT_FALSE(rasterImage == image);
-  rasterImage = image->makeRasterized(0.15f);
   EXPECT_EQ(rasterImage->width(), 454);
   EXPECT_EQ(rasterImage->height(), 605);
   ASSERT_TRUE(image != nullptr);
@@ -347,7 +347,8 @@ TGFX_TEST(CanvasTest, rasterized) {
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  rasterImage = image->makeRasterized(0.15f, sampling);
+  image = image->makeScaled(0.15f, 0.15f);
+  rasterImage = image->makeRasterized(sampling);
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
@@ -357,12 +358,13 @@ TGFX_TEST(CanvasTest, rasterized) {
   texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();
-  rasterImage = rasterImage->makeMipmapped(false);
+  rasterImage = image->makeMipmapped(false);
   EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeRasterized(2.0f, sampling);
+  rasterImage = rasterImage->makeScaled(2.0f, 2.0f);
+  rasterImage = rasterImage->makeRasterized(sampling);
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeMipmapped(true);
-  EXPECT_EQ(rasterImage->width(), 908);
+  EXPECT_EQ(rasterImage->width(), 907);
   EXPECT_EQ(rasterImage->height(), 1210);
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
@@ -533,7 +535,7 @@ TGFX_TEST(CanvasTest, image) {
   canvas->drawImage(image);
   auto decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
-  surface->flush();
+  context->flush();
   decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
   auto textureImage = image->makeTextureImage(context);
@@ -626,6 +628,39 @@ TGFX_TEST(CanvasTest, image) {
   image = rgbAAA->makeRGBAAA(256, 512, 256, 0);
   EXPECT_TRUE(image == nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
+  device->unlock();
+}
+
+TGFX_TEST(CanvasTest, scaleImage) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  SurfaceOptions options(RenderFlags::DisableCache);
+  auto surface = Surface::Make(context, 1286, 558, false, 1, false, &options);
+  auto canvas = surface->getCanvas();
+  auto image = MakeImage("resources/apitest/rgbaaa.png");
+  EXPECT_EQ(image->width(), 1024);
+  EXPECT_EQ(image->height(), 512);
+  image = image->makeScaled(0.5f, 0.5f);
+  image = image->makeOriented(Orientation::RightTop);
+  EXPECT_EQ(image->width(), 256);
+  EXPECT_EQ(image->height(), 512);
+  image = image->makeSubset(Rect::MakeXYWH(50, 50, 206, 462));
+  EXPECT_EQ(image->width(), 206);
+  EXPECT_EQ(image->height(), 462);
+  image = image->makeScaled(3.0f, 3.0f);
+  EXPECT_EQ(image->width(), 618);
+  EXPECT_EQ(image->height(), 1386);
+  image = image->makeSubset(Rect::MakeXYWH(60, 100, 558, 1286));
+  image = image->makeOriented(Orientation::RightTop);
+  image = image->makeScaled(0.25f, 0.25f);
+  EXPECT_EQ(image->width(), 1286 / 4);
+  EXPECT_EQ(image->height(), 558 / 4);
+  auto matrix = Matrix::MakeScale(2.f);
+  matrix.postTranslate(20, 30);
+  canvas->drawImage(image, matrix);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
   device->unlock();
 }
 

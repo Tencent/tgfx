@@ -23,6 +23,7 @@
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
 #include "images/RasterImage.h"
+#include "images/ScaleImage.h"
 #include "images/SubsetImage.h"
 #include "images/TextureImage.h"
 #include "tgfx/core/ImageCodec.h"
@@ -145,9 +146,8 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
 }
 
-std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
-                                             const SamplingOptions& sampling) const {
-  auto rasterImage = RasterImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
+std::shared_ptr<Image> Image::makeRasterized(const SamplingOptions& sampling) const {
+  auto rasterImage = RasterImage::MakeFrom(weakThis.lock(), sampling);
   if (rasterImage != nullptr && hasMipmaps()) {
     return rasterImage->makeMipmapped(true);
   }
@@ -193,8 +193,13 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
+std::shared_ptr<Image> Image::makeScaled(float newScaleX, float newScaleY) const {
+  return onMakeScaled(newScaleX, newScaleY);
+}
+
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  return SubsetImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, subset);
+  return SubsetImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, Point::Make(1.0f, 1.0f),
+                               subset);
 }
 
 std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
@@ -206,6 +211,10 @@ std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
 
 std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
   return OrientImage::MakeFrom(weakThis.lock(), orientation);
+}
+
+std::shared_ptr<Image> Image::onMakeScaled(float scaleX, float scaleY) const {
+  return ScaleImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, Point::Make(scaleX, scaleY));
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,

@@ -35,10 +35,16 @@ class RGBAAAImage : public SubsetImage {
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
+  std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
+
+  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
+
+  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
+
  private:
   Point alphaStart = Point::Zero();
 
-  RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds,
-              const Point& alphaStart);
+  RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
+              const Rect& bounds, const Point& alphaStart);
 };
 }  // namespace tgfx
