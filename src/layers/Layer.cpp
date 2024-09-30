@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/ContainerLayer.h"
 
 namespace tgfx {
 std::shared_ptr<Layer> Layer::Make() {

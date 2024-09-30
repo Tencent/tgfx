@@ -50,6 +50,6 @@ std::shared_ptr<Shader> RadialGradient::getShader() const {
 }
 
 std::shared_ptr<Shader> ConicGradient::getShader() const {
-  return Shader::MakeSweepGradient(_center, _startAngle, _endAngle, _colors, _positions);
+  return Shader::MakeConicGradient(_center, _startAngle, _endAngle, _colors, _positions);
 }
 }  // namespace tgfx
