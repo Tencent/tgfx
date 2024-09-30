@@ -28,23 +28,25 @@ std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<ResourceImage> sour
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
   }
+  if (alphaStartX <= 0 && alphaStartY <= 0) {
+    return source->makeSubset(Rect::MakeWH(displayWidth, displayHeight));
+  }
   auto bounds = Rect::MakeWH(displayWidth, displayHeight);
   auto alphaStart = Point::Make(alphaStartX, alphaStartY);
-  auto image = std::shared_ptr<RGBAAAImage>(
-      new RGBAAAImage(std::move(source), Orientation::TopLeft, bounds, alphaStart));
+  auto image = std::shared_ptr<RGBAAAImage>(new RGBAAAImage(
+      std::move(source), Orientation::TopLeft, Point::Make(1.0f, 1.0f), bounds, alphaStart));
   image->weakThis = image;
   return image;
 }
 
-RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Rect& bounds,
-                         const Point& alphaStart)
-    : SubsetImage(std::move(source), orientation, Point::Make(1.0f, 1.0f), bounds),
-      alphaStart(alphaStart) {
+RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
+                         const Rect& bounds, const Point& alphaStart)
+    : SubsetImage(std::move(source), orientation, scale, bounds), alphaStart(alphaStart) {
 }
 
 std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource) const {
   auto image = std::shared_ptr<RGBAAAImage>(
-      new RGBAAAImage(std::move(newSource), orientation, bounds, alphaStart));
+      new RGBAAAImage(std::move(newSource), orientation, scale, bounds, alphaStart));
   image->weakThis = image;
   return image;
 }
@@ -57,4 +59,28 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
   auto matrix = concatUVMatrix(uvMatrix);
   return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
 }
+
+std::shared_ptr<Image> RGBAAAImage::onMakeOriented(Orientation orientation) const {
+  auto newOrientation = concatOrientation(orientation);
+  auto orientedWidth = ScaleImage::width();
+  auto orientedHeight = ScaleImage::height();
+  auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
+  auto newBounds = matrix.mapRect(bounds);
+  return std::shared_ptr<Image>(
+      new RGBAAAImage(source, newOrientation, scale, newBounds, alphaStart));
+}
+
+std::shared_ptr<Image> RGBAAAImage::onMakeScaled(float scaleX, float scaleY) const {
+  auto newBounds = bounds;
+  newBounds.scale(scaleX, scaleY);
+  auto newScale = Point::Make(scale.x * scaleX, scale.y * scaleY);
+  return std::shared_ptr<Image>(
+      new RGBAAAImage(source, orientation, newScale, newBounds, alphaStart));
+}
+
+std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
+  auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
+  return std::shared_ptr<Image>(new RGBAAAImage(source, orientation, scale, newBounds, alphaStart));
+}
+
 }  // namespace tgfx

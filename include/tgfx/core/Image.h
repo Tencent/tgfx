@@ -240,9 +240,9 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
-   * Returns an Image with its origin transformed by the given Orientation. The returned Image
-   * always shares pixels and caches with the original Image. If both scaleX and scaleY are 1.0,,
-   * the original Image is returned. If scaleX or scaleY is less than zero, nullptr is returned.
+   * Returns an Image with the specified scale. The returned Image always shares pixels and caches
+   * with the original Image. If both scaleX and scaleY are 1.0, the original Image is returned.
+   * If scaleX or scaleY is less than zero, nullptr is returned.
    */
   std::shared_ptr<Image> makeScaled(float scaleX, float scaleY) const;
 

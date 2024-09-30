@@ -69,7 +69,8 @@ std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) cons
 std::shared_ptr<Image> SubsetImage::onMakeScaled(float scaleX, float scaleY) const {
   auto newBounds = bounds;
   newBounds.scale(scaleX, scaleY);
-  return SubsetImage::MakeFrom(source, orientation, Point::Make(scaleX, scaleY), newBounds);
+  auto newScale = Point::Make(scale.x * scaleX, scale.y * scaleY);
+  return SubsetImage::MakeFrom(source, orientation, newScale, newBounds);
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {

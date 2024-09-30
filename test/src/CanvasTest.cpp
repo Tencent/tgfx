@@ -642,11 +642,11 @@ TGFX_TEST(CanvasTest, scaleImage) {
   auto image = MakeImage("resources/apitest/rgbaaa.png");
   EXPECT_EQ(image->width(), 1024);
   EXPECT_EQ(image->height(), 512);
-  image = image->makeSubset(Rect::MakeXYWH(100, 100, 924, 412));
   image = image->makeScaled(0.5f, 0.5f);
-  EXPECT_EQ(image->width(), 462);
-  EXPECT_EQ(image->height(), 206);
   image = image->makeOriented(Orientation::RightTop);
+  EXPECT_EQ(image->width(), 256);
+  EXPECT_EQ(image->height(), 512);
+  image = image->makeSubset(Rect::MakeXYWH(50, 50, 206, 462));
   EXPECT_EQ(image->width(), 206);
   EXPECT_EQ(image->height(), 462);
   image = image->makeScaled(3.0f, 3.0f);
@@ -654,9 +654,10 @@ TGFX_TEST(CanvasTest, scaleImage) {
   EXPECT_EQ(image->height(), 1386);
   image = image->makeSubset(Rect::MakeXYWH(60, 100, 558, 1286));
   image = image->makeOriented(Orientation::RightTop);
-  EXPECT_EQ(image->width(), 1286);
-  EXPECT_EQ(image->height(), 558);
-  auto matrix = Matrix::MakeScale(0.5f);
+  image = image->makeScaled(0.25f, 0.25f);
+  EXPECT_EQ(image->width(), 1286 / 4);
+  EXPECT_EQ(image->height(), 558 / 4);
+  auto matrix = Matrix::MakeScale(2.f);
   matrix.postTranslate(20, 30);
   canvas->drawImage(image, matrix);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
