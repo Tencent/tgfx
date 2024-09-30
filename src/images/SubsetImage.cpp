@@ -25,7 +25,15 @@ std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orie
   if (source == nullptr || bounds.isEmpty()) {
     return nullptr;
   }
-  auto sourceBounds = Rect::MakeWH(source->width(), source->height());
+  auto width = static_cast<int>(static_cast<float>(source->width()) * scale.x);
+  auto height = static_cast<int>(static_cast<float>(source->height()) * scale.y);
+  if (OrientationSwapsWidthHeight(orientation)) {
+    std::swap(width, height);
+  }
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto sourceBounds = Rect::MakeWH(width, height);
   if (sourceBounds == bounds) {
     return ScaleImage::MakeFrom(source, orientation, scale);
   }
