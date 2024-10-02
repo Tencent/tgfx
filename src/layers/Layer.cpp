@@ -66,11 +66,19 @@ void Layer::setVisible(bool value) {
   invalidate();
 }
 
-void Layer::setCacheAsBitmap(bool value) {
-  if (_cacheAsBitmap == value) {
+void Layer::setShouldRasterize(bool value) {
+  if (_shouldRasterize == value) {
     return;
   }
-  _cacheAsBitmap = value;
+  _shouldRasterize = value;
+  invalidate();
+}
+
+void Layer::setRasterizationScale(float value) {
+  if (_rasterizationScale == value) {
+    return;
+  }
+  _rasterizationScale = value;
   invalidate();
 }
 

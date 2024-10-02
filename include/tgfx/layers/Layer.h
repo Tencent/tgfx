@@ -124,23 +124,37 @@ class Layer {
   void setVisible(bool value);
 
   /**
-   * If set to true, the runtime caches an internal bitmap representation of the layer, including
-   * its child layers. This caching can improve performance for layers with complex vector content.
-   * The cacheAsBitmap is automatically set to true when you apply a filter to a layer. If a layer
-   * has a filter applied, cacheAsBitmap is reported as true, even if you set it to false. When you
-   * clear all filters for a layer, the cacheAsBitmap setting reverts to its last set value. A layer
-   * might not create the bitmap cache if the memory exceeds the upper limit, even if you set it to
-   * true. The cacheAsBitmap is best used with layers that have mostly static content and do not
-   * scale frequently.
+   * Indicates whether the layer is rendered as a bitmap before compositing. If true, the layer is
+   * rendered as a bitmap in its local coordinate space and then composited with other content. Any
+   * filters in the filters property are rasterized and included in the bitmap, but the current
+   * alpha of the layer is not. If false, the layer is composited directly into the destination
+   * whenever possible. The layer may still be rasterized before compositing if certain features
+   * (like filters) require it. The default value is false.
    */
-  bool cacheAsBitmap() const {
-    return _cacheAsBitmap || !_filters.empty();
+  bool shouldRasterize() {
+    return _shouldRasterize || !_filters.empty();
   }
 
   /**
-   * Sets whether the layer should be cached as a bitmap.
+   * Sets whether the layer should be rasterized.
    */
-  void setCacheAsBitmap(bool value);
+  void setShouldRasterize(bool value);
+
+  /**
+   * The scale at which to rasterize content, relative to the coordinate space of the layer. When
+   * the value in the shouldRasterize property is true, the layer uses this property to determine
+   * whether to scale the rasterized content (and by how much). The default value of this property
+   * is 1.0, which indicates that the layer should be rasterized at its current size. Larger values
+   * magnify the content and smaller values shrink it.
+   */
+  float rasterizationScale() const {
+    return _rasterizationScale;
+  }
+
+  /**
+   * Sets the scale at which to rasterize content.
+   */
+  void setRasterizationScale(float value);
 
   /**
    * Returns the list of filters applied to the layer.
@@ -366,7 +380,8 @@ class Layer {
   BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = Matrix::I();
   bool _visible = true;
-  bool _cacheAsBitmap = false;
+  bool _shouldRasterize = false;
+  float _rasterizationScale = 1.0f;
   std::vector<std::shared_ptr<ImageFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;

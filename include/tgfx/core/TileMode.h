@@ -19,9 +19,12 @@
 #pragma once
 
 namespace tgfx {
+/**
+ * TileMode determines how a shader should draw outside its original bounds.
+ */
 enum class TileMode {
   /**
-   * Replicate the edge color if the shader draws outside of its original bounds.
+   * Replicate the edge color if the shader draws outside its original bounds.
    */
   Clamp,
 
