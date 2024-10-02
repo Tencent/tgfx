@@ -126,4 +126,10 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 void Layer::invalidate() {
   dirty = true;
 }
+
+void Layer::invalidateContent() {
+}
+
+void Layer::onDraw(Canvas* canvas) {
+}
 }  // namespace tgfx

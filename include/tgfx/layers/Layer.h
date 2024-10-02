@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerType.h"
@@ -43,7 +44,7 @@ class Layer {
    * Returns the type of the layer.
    */
   virtual LayerType type() const {
-    return LayerType::Generic;
+    return LayerType::Layer;
   }
 
   /**
@@ -369,9 +370,22 @@ class Layer {
   Layer() = default;
 
   /**
-   * Called when the layer needs to be redrawn.
+   * Marks the layer as needing to be redrawn. Different from invalidateContent(), this method only
+   * marks the layer as dirty and does not update the cached content bounds or rasterized bitmap.
    */
   void invalidate();
+
+  /**
+   * Marks the layer's content has changed and needs to be redrawn. The cached content bounds will
+   * be updated, and if the layer is rasterized, the rasterized bitmap will be recreated.
+   */
+  void invalidateContent();
+
+  /**
+   * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
+   * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
+   */
+  virtual void onDraw(Canvas* canvas);
 
  private:
   bool dirty = true;

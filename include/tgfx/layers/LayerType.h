@@ -26,7 +26,7 @@ enum class LayerType {
   /**
    * The type for a generic layer. May be used as a container for other child layers.
    */
-  Generic,
+  Layer,
   /**
    * A layer displaying an image.
    */
@@ -43,9 +43,5 @@ enum class LayerType {
    * A layer displaying a simple text.
    */
   Text,
-  /**
-   * A layer displaying custom graphics using the Canvas API.
-   */
-  Canvas,
 };
 }  // namespace tgfx
