@@ -21,14 +21,27 @@
 #include "images/SubsetImage.h"
 
 namespace tgfx {
+static int GetScaledSize(int size, float scale) {
+  return static_cast<int>(roundf(static_cast<float>(size) * scale));
+}
 
 std::shared_ptr<Image> ScaleImage::MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
                                             const Point& scale) {
-  if (scale.x <= 0 || scale.y <= 0 || source == nullptr) {
+  if (source == nullptr) {
     return nullptr;
   }
   if (scale.x == 1.0f && scale.y == 1.0f) {
     return OrientImage::MakeFrom(std::move(source), orientation);
+  }
+  auto w = source->width();
+  auto h = source->height();
+  if (OrientationSwapsWidthHeight(orientation)) {
+    std::swap(w, h);
+  }
+  w = GetScaledSize(w, scale.x);
+  h = GetScaledSize(h, scale.y);
+  if (w <= 0 || h <= 0) {
+    return nullptr;
   }
   auto result = std::shared_ptr<ScaleImage>(new ScaleImage(std::move(source), orientation, scale));
   result->weakThis = result;
@@ -37,10 +50,6 @@ std::shared_ptr<Image> ScaleImage::MakeFrom(std::shared_ptr<Image> source, Orien
 
 ScaleImage::ScaleImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale)
     : OrientImage(std::move(source), orientation), scale(scale) {
-}
-
-static int GetScaledSize(int size, float scale) {
-  return static_cast<int>(roundf(static_cast<float>(size) * scale));
 }
 
 int ScaleImage::width() const {
@@ -69,7 +78,13 @@ std::shared_ptr<Image> ScaleImage::onMakeScaled(float newScaleX, float newScaleY
 }
 
 std::optional<Matrix> ScaleImage::concatUVMatrix(const Matrix* uvMatrix) const {
-  Matrix matrix = Matrix::MakeScale(1 / scale.x, 1 / scale.y);
+  auto orgWidth = OrientImage::width();
+  auto orgHeight = OrientImage::height();
+  auto w = GetScaledSize(orgWidth, scale.x);
+  auto h = GetScaledSize(orgHeight, scale.y);
+  auto uvScaleX = static_cast<float>(orgWidth) / static_cast<float>(w);
+  auto uvScaleY = static_cast<float>(orgHeight) / static_cast<float>(h);
+  Matrix matrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   if (uvMatrix) {
     matrix.preConcat(*uvMatrix);
   }
