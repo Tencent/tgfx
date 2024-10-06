@@ -24,11 +24,11 @@
         "tileMode": "3bfc2e8"
     },
     "DrawersTest": {
+        "ConicGradient": "5a1fb11",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
-        "SimpleText": "74f94c4",
-        "ConicGradient": "5a1fb11"
+        "SimpleText": "74f94c4"
     },
     "FilterTest": {
         "ComposeColorFilter": "6ae079f",
