@@ -22,6 +22,7 @@
 #include "images/BufferImage.h"
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
+#include "images/RGBAAAImage.h"
 #include "images/RasterImage.h"
 #include "images/ScaleImage.h"
 #include "images/SubsetImage.h"
@@ -232,11 +233,8 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
   if (alphaStartX == 0 && alphaStartY == 0) {
     return makeSubset(Rect::MakeWH(displayWidth, displayHeight));
   }
-  return onMakeRGBAAA(displayWidth, displayHeight, alphaStartX, alphaStartY);
-}
-
-std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
-  return nullptr;
+  return RGBAAAImage::MakeFrom(weakThis.lock(), displayWidth, displayHeight, alphaStartX,
+                               alphaStartY);
 }
 
 std::shared_ptr<TextureProxy> Image::lockTextureProxy(Context* context,

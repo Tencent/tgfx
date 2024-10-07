@@ -21,10 +21,9 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<ResourceImage> source,
-                                             int displayWidth, int displayHeight, int alphaStartX,
-                                             int alphaStartY) {
-  if (source == nullptr || alphaStartX + displayWidth > source->width() ||
+std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
+                                             int displayHeight, int alphaStartX, int alphaStartY) {
+  if (source == nullptr || source->isAlphaOnly() || alphaStartX + displayWidth > source->width() ||
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
   }
