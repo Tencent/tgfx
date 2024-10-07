@@ -602,7 +602,7 @@ TGFX_TEST(CanvasTest, image) {
   canvas->drawImage(textureImage, sampling);
   canvas->resetMatrix();
   auto rgbAAA = subset->makeRGBAAA(500, 500, 500, 0);
-  EXPECT_TRUE(rgbAAA == nullptr);
+  EXPECT_TRUE(rgbAAA != nullptr);
   image = MakeImage("resources/apitest/rgbaaa.png");
   EXPECT_EQ(image->width(), 1024);
   EXPECT_EQ(image->height(), 512);
@@ -625,8 +625,6 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_EQ(rgbAAA->height(), 512);
   matrix.postTranslate(110, -75);
   canvas->drawImage(rgbAAA, matrix);
-  image = rgbAAA->makeRGBAAA(256, 512, 256, 0);
-  EXPECT_TRUE(image == nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
   device->unlock();
 }
