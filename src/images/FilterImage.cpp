@@ -19,10 +19,8 @@
 #include "FilterImage.h"
 #include "SubsetImage.h"
 #include "gpu/OpContext.h"
-#include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "utils/AddressOf.h"
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,

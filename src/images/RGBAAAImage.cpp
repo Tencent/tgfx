@@ -19,7 +19,6 @@
 #include "RGBAAAImage.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TextureEffect.h"
-#include "utils/AddressOf.h"
 
 namespace tgfx {
 std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,

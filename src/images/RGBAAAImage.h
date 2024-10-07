@@ -19,7 +19,6 @@
 #pragma once
 
 #include "SubsetImage.h"
-#include "images/ResourceImage.h"
 
 namespace tgfx {
 class RGBAAAImage : public SubsetImage {

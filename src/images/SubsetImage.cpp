@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "utils/AddressOf.h"
 
 namespace tgfx {
 std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, const Rect& bounds) {

@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/processors/FragmentProcessor.h"
 #include "images/TransformImage.h"
+#include "utils/AddressOf.h"
 
 namespace tgfx {
 /**
