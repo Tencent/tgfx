@@ -19,16 +19,15 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "images/ScaleImage.h"
+#include "images/TransformImage.h"
 
 namespace tgfx {
 /**
  * An image that is a subset of another image.
  */
-class SubsetImage : public ScaleImage {
+class SubsetImage : public TransformImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                         const Point& scale, const Rect& bounds);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, const Rect& bounds);
 
   int width() const override {
     return static_cast<int>(bounds.width());
@@ -45,13 +44,13 @@ class SubsetImage : public ScaleImage {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
 
-  std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
+  std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const;
 
-  std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const override;
-
-  SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
-              const Rect& bounds);
+  SubsetImage(std::shared_ptr<Image> source, const Rect& bounds);
 };
 }  // namespace tgfx

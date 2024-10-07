@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "images/TransformImage.h"
+#include "images/SubsetImage.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 /**
- * FilterImage wraps an existing image and applies a Filter to it.
+ * FilterImage wraps an existing image and applies an ImageFilter to it.
  */
-class FilterImage : public TransformImage {
+class FilterImage : public SubsetImage {
  public:
   /**
    * Creates a new FilterImage from the given source image, filter, and clipRect.
@@ -43,8 +43,8 @@ class FilterImage : public TransformImage {
   }
 
  protected:
-  FilterImage(std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter,
-              const Rect& bounds);
+  FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
+              std::shared_ptr<ImageFilter> filter);
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
@@ -60,9 +60,8 @@ class FilterImage : public TransformImage {
 
  private:
   std::shared_ptr<ImageFilter> filter = nullptr;
-  Rect bounds = Rect::MakeEmpty();
 
-  static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source,
-                                     std::shared_ptr<ImageFilter> filter, const Rect& bounds);
+  static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source, const Rect& bounds,
+                                     std::shared_ptr<ImageFilter> filter);
 };
 }  // namespace tgfx

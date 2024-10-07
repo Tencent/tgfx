@@ -18,17 +18,18 @@
 
 #pragma once
 
-#include "OrientImage.h"
+#include "images/TransformImage.h"
 
 namespace tgfx {
 
 /**
  * Scales the source image by the given factors.
  */
-class ScaleImage : public OrientImage {
+class ScaleImage : public TransformImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                         const Point& scale);
+  static int GetSize(int size, float scale);
+
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, const Point& scale);
 
   int width() const override;
 
@@ -37,16 +38,15 @@ class ScaleImage : public OrientImage {
  protected:
   Point scale = Point::Make(1.0f, 1.0f);
 
-  ScaleImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale);
+  ScaleImage(std::shared_ptr<Image> source, const Point& scale);
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
-
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
-
   std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
 
-  std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

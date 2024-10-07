@@ -17,64 +17,53 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
-#include "utils/UVMatrix.h"
+#include "gpu/processors/FragmentProcessor.h"
+#include "utils/AddressOf.h"
 
 namespace tgfx {
-std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, Orientation orientation,
-                                             const Point& scale, const Rect& bounds) {
+std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, const Rect& bounds) {
   if (source == nullptr || bounds.isEmpty()) {
     return nullptr;
   }
-  auto width = static_cast<int>(static_cast<float>(source->width()) * scale.x);
-  auto height = static_cast<int>(static_cast<float>(source->height()) * scale.y);
-  if (OrientationSwapsWidthHeight(orientation)) {
-    std::swap(width, height);
-  }
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto sourceBounds = Rect::MakeWH(width, height);
-  if (sourceBounds == bounds) {
-    return ScaleImage::MakeFrom(source, orientation, scale);
-  }
-  auto image =
-      std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), orientation, scale, bounds));
+  auto image = std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), bounds));
   image->weakThis = image;
   return image;
 }
 
-SubsetImage::SubsetImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
-                         const Rect& bounds)
-    : ScaleImage(std::move(source), orientation, scale), bounds(bounds) {
+SubsetImage::SubsetImage(std::shared_ptr<Image> source, const Rect& bounds)
+    : TransformImage(std::move(source)), bounds(bounds) {
 }
 
 std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return SubsetImage::MakeFrom(std::move(newSource), orientation, scale, bounds);
+  return SubsetImage::MakeFrom(std::move(newSource), bounds);
 }
 
 std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
-  return SubsetImage::MakeFrom(source, orientation, scale, newBounds);
+  return SubsetImage::MakeFrom(source, newBounds);
 }
 
-std::shared_ptr<Image> SubsetImage::onMakeOriented(Orientation orientation) const {
-  auto newOrientation = concatOrientation(orientation);
-  auto orientedWidth = ScaleImage::width();
-  auto orientedHeight = ScaleImage::height();
-  auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
-  auto newBounds = matrix.mapRect(bounds);
-  return SubsetImage::MakeFrom(source, newOrientation, scale, newBounds);
-}
-
-std::shared_ptr<Image> SubsetImage::onMakeScaled(float scaleX, float scaleY) const {
-  auto newBounds = bounds;
-  newBounds.scale(scaleX, scaleY);
-  auto newScale = Point::Make(scale.x * scaleX, scale.y * scaleY);
-  return SubsetImage::MakeFrom(source, orientation, newScale, newBounds);
+std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
+                                                                    TileMode tileModeX,
+                                                                    TileMode tileModeY,
+                                                                    const SamplingOptions& sampling,
+                                                                    const Matrix* uvMatrix) const {
+  auto matrix = concatUVMatrix(uvMatrix);
+  return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
-  auto matrix = UVMatrix::Concat(bounds, uvMatrix);
-  return ScaleImage::concatUVMatrix(AddressOf(matrix));
+  std::optional<Matrix> matrix = std::nullopt;
+  if (bounds.x() != 0 || bounds.y() != 0) {
+    matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  }
+  if (uvMatrix != nullptr) {
+    if (matrix) {
+      matrix->preConcat(*uvMatrix);
+    } else {
+      matrix = *uvMatrix;
+    }
+  }
+  return matrix;
 }
 }  // namespace tgfx
