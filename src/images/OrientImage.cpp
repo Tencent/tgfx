@@ -82,10 +82,6 @@ std::shared_ptr<Image> OrientImage::onCloneWith(std::shared_ptr<Image> newSource
   return OrientImage::MakeFrom(std::move(newSource), orientation);
 }
 
-std::shared_ptr<Image> OrientImage::onMakeSubset(const Rect& subset) const {
-  return SubsetImage::MakeFrom(source, orientation, Point::Make(1.0f, 1.0f), subset);
-}
-
 std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) const {
   newOrientation = concatOrientation(newOrientation);
   if (newOrientation == Orientation::TopLeft) {
@@ -94,33 +90,24 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
   return OrientImage::MakeFrom(source, newOrientation);
 }
 
-std::shared_ptr<Image> OrientImage::onMakeScaled(float scaleX, float scaleY) const {
-  return ScaleImage::MakeFrom(source, orientation, Point::Make(scaleX, scaleY));
-}
-
 std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,
                                                                     TileMode tileModeX,
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  auto matrix = concatUVMatrix(uvMatrix);
-  return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
-}
-
-std::optional<Matrix> OrientImage::concatUVMatrix(const Matrix* uvMatrix) const {
   std::optional<Matrix> matrix = std::nullopt;
   if (orientation != Orientation::TopLeft) {
     matrix = OrientationToMatrix(orientation, source->width(), source->height());
     matrix->invert(AddressOf(matrix));
   }
-  if (uvMatrix != nullptr) {
+  if (uvMatrix) {
     if (matrix) {
       matrix->preConcat(*uvMatrix);
     } else {
       matrix = *uvMatrix;
     }
   }
-  return matrix;
+  return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
 }
 
 Orientation OrientImage::concatOrientation(Orientation newOrientation) const {

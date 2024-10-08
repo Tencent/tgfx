@@ -653,8 +653,8 @@ TGFX_TEST(CanvasTest, scaleImage) {
   image = image->makeSubset(Rect::MakeXYWH(60, 100, 558, 1286));
   image = image->makeOriented(Orientation::RightTop);
   image = image->makeScaled(0.25f, 0.25f);
-  EXPECT_EQ(image->width(), 1286 / 4);
-  EXPECT_EQ(image->height(), 558 / 4);
+  EXPECT_EQ(image->width(), 322);
+  EXPECT_EQ(image->height(), 140);
   auto matrix = Matrix::MakeScale(2.f);
   matrix.postTranslate(20, 30);
   canvas->drawImage(image, matrix);

@@ -19,10 +19,8 @@
 #include "FilterImage.h"
 #include "SubsetImage.h"
 #include "gpu/OpContext.h"
-#include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "utils/UVMatrix.h"
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
@@ -49,30 +47,30 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
     offset->x = bounds.left;
     offset->y = bounds.top;
   }
-  return Wrap(std::move(source), std::move(filter), bounds);
+  return Wrap(std::move(source), bounds, std::move(filter));
 }
 
-std::shared_ptr<Image> FilterImage::Wrap(std::shared_ptr<Image> source,
-                                         std::shared_ptr<ImageFilter> filter, const Rect& bounds) {
+std::shared_ptr<Image> FilterImage::Wrap(std::shared_ptr<Image> source, const Rect& bounds,
+                                         std::shared_ptr<ImageFilter> filter) {
   auto image =
-      std::shared_ptr<FilterImage>(new FilterImage(std::move(source), std::move(filter), bounds));
+      std::shared_ptr<FilterImage>(new FilterImage(std::move(source), bounds, std::move(filter)));
   image->weakThis = image;
   return image;
 }
 
-FilterImage::FilterImage(std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter,
-                         const Rect& bounds)
-    : TransformImage(std::move(source)), filter(std::move(filter)), bounds(bounds) {
+FilterImage::FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
+                         std::shared_ptr<ImageFilter> filter)
+    : SubsetImage(std::move(source), bounds), filter(std::move(filter)) {
 }
 
 std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return FilterImage::Wrap(std::move(newSource), filter, bounds);
+  return FilterImage::Wrap(std::move(newSource), bounds, filter);
 }
 
 std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset;
   newBounds.offset(bounds.x(), bounds.y());
-  return FilterImage::Wrap(source, filter, newBounds);
+  return FilterImage::Wrap(source, newBounds, filter);
 }
 
 std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter> imageFilter,
@@ -102,11 +100,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
     offset->y = filterBounds.top;
   }
   if (hasClip) {
-    return FilterImage::Wrap(weakThis.lock(), std::move(imageFilter), filterBounds);
+    return FilterImage::Wrap(weakThis.lock(), filterBounds, std::move(imageFilter));
   }
   filterBounds.offset(bounds.x(), bounds.y());
   auto composeFilter = ImageFilter::Compose(filter, std::move(imageFilter));
-  return FilterImage::Wrap(source, std::move(composeFilter), filterBounds);
+  return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
 }
 
 std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
@@ -114,8 +112,7 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  auto fpMatrix = UVMatrix::Concat(bounds, uvMatrix);
-
+  auto fpMatrix = concatUVMatrix(uvMatrix);
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto drawBounds = args.drawRect;
   if (fpMatrix) {
