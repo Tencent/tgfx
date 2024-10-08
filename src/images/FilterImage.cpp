@@ -107,6 +107,14 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
 }
 
+std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(Context* context,
+                                                            uint32_t renderFlags) const {
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  auto filterBounds = filter->filterBounds(inputBounds);
+  auto mipmapped = source->hasMipmaps();
+  return filter->lockTextureProxy(context, source, filterBounds, mipmapped, renderFlags);
+}
+
 std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
                                                                     TileMode tileModeX,
                                                                     TileMode tileModeY,
@@ -128,7 +136,7 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   auto textureProxy =
-      filter->onFilterImage(args.context, source, dstBounds, mipmapped, args.renderFlags);
+      filter->lockTextureProxy(args.context, source, dstBounds, mipmapped, args.renderFlags);
   if (textureProxy == nullptr) {
     return nullptr;
   }

@@ -53,6 +53,9 @@ class FilterImage : public SubsetImage {
   std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                           const Rect* clipRect) const override;
 
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
+                                                 uint32_t renderFlags) const override;
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
