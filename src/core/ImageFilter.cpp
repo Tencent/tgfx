@@ -34,10 +34,11 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
 }
 
-std::shared_ptr<TextureProxy> ImageFilter::onFilterImage(Context* context,
-                                                         std::shared_ptr<Image> source,
-                                                         const Rect& filterBounds, bool mipmapped,
-                                                         uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(Context* context,
+                                                            std::shared_ptr<Image> source,
+                                                            const Rect& filterBounds,
+                                                            bool mipmapped,
+                                                            uint32_t renderFlags) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
       context, static_cast<int>(filterBounds.width()), static_cast<int>(filterBounds.height()),
       source->isAlphaOnly(), 1, mipmapped);
@@ -68,7 +69,7 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   return true;
 }
 
-std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromFilteredImage(
+std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
@@ -81,7 +82,8 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromFilteredImage(
     return nullptr;
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  auto textureProxy = onFilterImage(args.context, source, dstBounds, mipmapped, args.renderFlags);
+  auto textureProxy =
+      lockTextureProxy(args.context, source, dstBounds, mipmapped, args.renderFlags);
   if (textureProxy == nullptr) {
     return nullptr;
   }

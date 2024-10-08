@@ -104,11 +104,11 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
 }
 
-std::shared_ptr<TextureProxy> BlurImageFilter::onFilterImage(Context* context,
-                                                             std::shared_ptr<Image> source,
-                                                             const Rect& filterBounds,
-                                                             bool mipmapped,
-                                                             uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(Context* context,
+                                                                std::shared_ptr<Image> source,
+                                                                const Rect& filterBounds,
+                                                                bool mipmapped,
+                                                                uint32_t renderFlags) const {
   auto isAlphaOnly = source->isAlphaOnly();
   auto lastRenderTarget = RenderTargetProxy::MakeFallback(
       context, static_cast<int>(filterBounds.width()), static_cast<int>(filterBounds.height()),
@@ -150,6 +150,6 @@ std::shared_ptr<TextureProxy> BlurImageFilter::onFilterImage(Context* context,
 std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  return makeFPFromFilteredImage(source, args, sampling, uvMatrix);
+  return makeFPFromTextureProxy(source, args, sampling, uvMatrix);
 }
 }  // namespace tgfx
