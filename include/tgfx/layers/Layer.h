@@ -30,7 +30,8 @@ namespace tgfx {
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
  * features for positioning, visibility, and alpha support, as well as methods for adding and
- * removing child layers.
+ * removing child layers. Note: All layers are not thread-safe and should be accessed from a single
+ * thread.
  */
 class Layer {
  public:

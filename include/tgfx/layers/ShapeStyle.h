@@ -23,7 +23,8 @@
 namespace tgfx {
 /**
  * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
- * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern.
+ * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
+ * are not thread-safe and should only be accessed from a single thread.
  */
 class ShapeStyle {
  public:

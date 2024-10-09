@@ -22,7 +22,8 @@
 
 namespace tgfx {
 /**
- * DisplayList represents a collection of layers can be drawn to a Surface.
+ * DisplayList represents a collection of layers can be drawn to a Surface. Note: All layers in the
+ * display list are not thread-safe and should only be accessed from a single thread.
  */
 class DisplayList {
  public:

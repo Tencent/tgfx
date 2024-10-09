@@ -24,7 +24,7 @@ namespace tgfx {
 /**
  * PathProvider is an interface for classes that generates a Path. It defers the acquisition of the
  * Path until it is actually required, allowing the Path to be invalidated and regenerate if
- * necessary.
+ * necessary. Note: PathProvider is not thread-safe and should be accessed from a single thread.
  */
 class PathProvider {
  public:
