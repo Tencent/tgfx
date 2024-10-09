@@ -54,9 +54,8 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   return nullptr;
 }
 
-std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(Context* context, const UniqueKey&,
-                                                               bool, uint32_t) const {
-  if (textureProxy->getContext() != context) {
+std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(const TPArgs& args) const {
+  if (textureProxy->getContext() != args.context) {
     return nullptr;
   }
   return textureProxy;

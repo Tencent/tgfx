@@ -18,27 +18,13 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
-class RuntimeImageFilter : public ImageFilter {
- public:
-  explicit RuntimeImageFilter(std::shared_ptr<RuntimeEffect> effect) : effect(std::move(effect)) {
-  }
-
- protected:
-  Rect onFilterBounds(const Rect& srcRect) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                 const Rect& clipBounds, const TPArgs& args,
-                                                 const SamplingOptions& sampling) const override;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
-
- private:
-  std::shared_ptr<RuntimeEffect> effect = nullptr;
-};
+/**
+   * Returns true if mipmaps are needed for the specified sampling options, view matrix, and UV
+   * matrix.
+   */
+bool NeedMipmaps(const SamplingOptions& sampling, const Matrix& viewMatrix, const Matrix* uvMatrix);
 }  // namespace tgfx

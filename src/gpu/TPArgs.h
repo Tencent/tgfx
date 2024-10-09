@@ -18,27 +18,42 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
+#include "gpu/ResourceKey.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class RuntimeImageFilter : public ImageFilter {
+/**
+ * Arguments passed to create a TextureProxy.
+ */
+class TPArgs {
  public:
-  explicit RuntimeImageFilter(std::shared_ptr<RuntimeEffect> effect) : effect(std::move(effect)) {
+  TPArgs() = default;
+
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, UniqueKey uniqueKey = {})
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped),
+        uniqueKey(std::move(uniqueKey)) {
   }
 
- protected:
-  Rect onFilterBounds(const Rect& srcRect) const override;
+  /**
+   * The context to create the texture proxy.
+   */
+  Context* context = nullptr;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                 const Rect& clipBounds, const TPArgs& args,
-                                                 const SamplingOptions& sampling) const override;
+  /**
+   * The render flags to create the texture proxy.
+   */
+  uint32_t renderFlags = 0;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
+  /**
+   * Specifies whether the texture proxy should be mipmapped. This may be ignored if the associated
+   * image already has preset mipmaps.
+   */
+  bool mipmapped = false;
 
- private:
-  std::shared_ptr<RuntimeEffect> effect = nullptr;
+  /**
+   * The unique key assigned to the texture proxy. This may be ignored if the associated image
+   * already has a unique key.
+   */
+  UniqueKey uniqueKey = {};
 };
 }  // namespace tgfx
