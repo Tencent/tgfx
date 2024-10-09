@@ -39,6 +39,12 @@ class ProxyProvider {
   std::shared_ptr<ResourceProxy> findProxy(const UniqueKey& uniqueKey);
 
   /**
+   * Returns the texture proxy for the given UniqueKey. If the proxy doesn't exist but a texture
+   * with the same UniqueKey does, it wraps the texture in a TextureProxy and returns it.
+   */
+  std::shared_ptr<TextureProxy> findOrWrapTextureProxy(const UniqueKey& uniqueKey);
+
+  /**
    * Creates a GpuBufferProxy for the given Data. The data will be released after being uploaded to
    * the GPU.
    */
@@ -110,6 +116,12 @@ class ProxyProvider {
   std::shared_ptr<RenderTargetProxy> wrapBackendRenderTarget(
       const BackendRenderTarget& backendRenderTarget, ImageOrigin origin = ImageOrigin::TopLeft);
 
+  /**
+   * Changes the key of the given proxy to the new key. So that the proxy can be found with the new
+   * key. This does not change the key of the resource that the proxy wraps.
+   */
+  void changeProxyKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey);
+
   /*
    * Purges all unreferenced proxies.
    */
@@ -121,9 +133,7 @@ class ProxyProvider {
 
   static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
-  std::shared_ptr<GpuBufferProxy> findGpuBufferProxy(const UniqueKey& uniqueKey);
-
-  std::shared_ptr<TextureProxy> findTextureProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<GpuBufferProxy> findOrWrapGpuBufferProxy(const UniqueKey& uniqueKey);
 
   std::shared_ptr<TextureProxy> doCreateTextureProxy(const UniqueKey& uniqueKey,
                                                      std::shared_ptr<ImageDecoder> decoder,

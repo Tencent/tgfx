@@ -41,18 +41,12 @@ class OrientImage : public TransformImage {
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
-
   std::shared_ptr<Image> onMakeOriented(Orientation newOrientation) const override;
-
-  std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
-
-  virtual std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const;
 
   Orientation concatOrientation(Orientation newOrientation) const;
 };

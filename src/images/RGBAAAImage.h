@@ -19,12 +19,11 @@
 #pragma once
 
 #include "SubsetImage.h"
-#include "images/ResourceImage.h"
 
 namespace tgfx {
 class RGBAAAImage : public SubsetImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source, int displayWidth,
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, int displayWidth,
                                          int displayHeight, int alphaStartX, int alphaStartY);
 
  protected:
@@ -35,16 +34,11 @@ class RGBAAAImage : public SubsetImage {
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
-  std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
-
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
-
-  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override;
 
  private:
   Point alphaStart = Point::Zero();
 
-  RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
-              const Rect& bounds, const Point& alphaStart);
+  RGBAAAImage(std::shared_ptr<Image> source, const Rect& bounds, const Point& alphaStart);
 };
 }  // namespace tgfx

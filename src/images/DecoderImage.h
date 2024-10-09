@@ -43,9 +43,7 @@ class DecoderImage : public ResourceImage {
   }
 
  protected:
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
-                                                   bool mipmapped,
-                                                   uint32_t renderFlags) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
 
  private:
   std::shared_ptr<ImageDecoder> decoder = nullptr;

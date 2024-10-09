@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,12 +18,13 @@
 
 #pragma once
 
-#include <optional>
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
-class UVMatrix {
- public:
-  static std::optional<Matrix> Concat(const Rect& subset, const Matrix* uvMatrix);
-};
+/**
+   * Returns true if mipmaps are needed for the specified sampling options, view matrix, and UV
+   * matrix.
+   */
+bool NeedMipmaps(const SamplingOptions& sampling, const Matrix& viewMatrix, const Matrix* uvMatrix);
 }  // namespace tgfx

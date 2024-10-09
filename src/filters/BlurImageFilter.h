@@ -29,9 +29,9 @@ class BlurImageFilter : public ImageFilter {
  protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
 
-  std::shared_ptr<TextureProxy> onFilterImage(Context* context, std::shared_ptr<Image> source,
-                                              const Rect& filterBounds, bool mipmapped,
-                                              uint32_t renderFlags) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
+                                                 const Rect& clipBounds, const TPArgs& args,
+                                                 const SamplingOptions& sampling) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const FPArgs& args,

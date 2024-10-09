@@ -56,7 +56,7 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const Unique
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
     const UniqueKey& uniqueKey, std::shared_ptr<DataProvider> provider, BufferType bufferType,
     uint32_t renderFlags) {
-  auto proxy = findGpuBufferProxy(uniqueKey);
+  auto proxy = findOrWrapGpuBufferProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
@@ -82,7 +82,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     const UniqueKey& uniqueKey, std::shared_ptr<ImageGenerator> generator, bool mipmapped,
     uint32_t renderFlags) {
-  auto proxy = findTextureProxy(uniqueKey);
+  auto proxy = findOrWrapTextureProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
@@ -94,7 +94,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     const UniqueKey& uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped,
     uint32_t renderFlags) {
-  auto proxy = findTextureProxy(uniqueKey);
+  auto proxy = findOrWrapTextureProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
@@ -121,7 +121,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey&
                                                                 PixelFormat format, bool mipmapped,
                                                                 ImageOrigin origin,
                                                                 uint32_t renderFlags) {
-  auto proxy = findTextureProxy(uniqueKey);
+  auto proxy = findOrWrapTextureProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
@@ -199,6 +199,12 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::wrapBackendRenderTarget(
   return proxy;
 }
 
+void ProxyProvider::changeProxyKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey) {
+  if (proxy != nullptr && !newKey.empty()) {
+    proxyMap[newKey] = proxy;
+  }
+}
+
 void ProxyProvider::purgeExpiredProxies() {
   std::vector<const UniqueKey*> keys = {};
   for (auto& pair : proxyMap) {
@@ -219,7 +225,8 @@ UniqueKey ProxyProvider::GetProxyKey(const UniqueKey& uniqueKey, uint32_t render
   return uniqueKey;
 }
 
-std::shared_ptr<GpuBufferProxy> ProxyProvider::findGpuBufferProxy(const UniqueKey& uniqueKey) {
+std::shared_ptr<GpuBufferProxy> ProxyProvider::findOrWrapGpuBufferProxy(
+    const UniqueKey& uniqueKey) {
   auto proxy = std::static_pointer_cast<GpuBufferProxy>(findProxy(uniqueKey));
   if (proxy != nullptr) {
     return proxy;
@@ -233,7 +240,7 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::findGpuBufferProxy(const UniqueKe
   return proxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::findTextureProxy(const UniqueKey& uniqueKey) {
+std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const UniqueKey& uniqueKey) {
   auto proxy = std::static_pointer_cast<TextureProxy>(findProxy(uniqueKey));
   if (proxy != nullptr) {
     return proxy;

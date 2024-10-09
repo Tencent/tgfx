@@ -17,33 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAAImage.h"
+#include "gpu/TPArgs.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TextureEffect.h"
+#include "utils/NeedMipmaps.h"
 
 namespace tgfx {
-std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<ResourceImage> source,
-                                             int displayWidth, int displayHeight, int alphaStartX,
-                                             int alphaStartY) {
-  if (source == nullptr || alphaStartX + displayWidth > source->width() ||
+std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
+                                             int displayHeight, int alphaStartX, int alphaStartY) {
+  if (source == nullptr || source->isAlphaOnly() || alphaStartX + displayWidth > source->width() ||
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
   }
   auto bounds = Rect::MakeWH(displayWidth, displayHeight);
   auto alphaStart = Point::Make(alphaStartX, alphaStartY);
-  auto image = std::shared_ptr<RGBAAAImage>(new RGBAAAImage(
-      std::move(source), Orientation::TopLeft, Point::Make(1.0f, 1.0f), bounds, alphaStart));
+  auto image = std::shared_ptr<RGBAAAImage>(new RGBAAAImage(std::move(source), bounds, alphaStart));
   image->weakThis = image;
   return image;
 }
 
-RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, Orientation orientation, const Point& scale,
-                         const Rect& bounds, const Point& alphaStart)
-    : SubsetImage(std::move(source), orientation, scale, bounds), alphaStart(alphaStart) {
+RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, const Rect& bounds, const Point& alphaStart)
+    : SubsetImage(std::move(source), bounds), alphaStart(alphaStart) {
 }
 
 std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  auto image = std::shared_ptr<RGBAAAImage>(
-      new RGBAAAImage(std::move(newSource), orientation, scale, bounds, alphaStart));
+  auto image =
+      std::shared_ptr<RGBAAAImage>(new RGBAAAImage(std::move(newSource), bounds, alphaStart));
   image->weakThis = image;
   return image;
 }
@@ -52,32 +51,18 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  auto proxy = source->lockTextureProxy(args.context, args.renderFlags);
+  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  auto proxy = source->lockTextureProxy(tpArgs, sampling);
   auto matrix = concatUVMatrix(uvMatrix);
   return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
 }
 
-std::shared_ptr<Image> RGBAAAImage::onMakeOriented(Orientation orientation) const {
-  auto newOrientation = concatOrientation(orientation);
-  auto orientedWidth = ScaleImage::width();
-  auto orientedHeight = ScaleImage::height();
-  auto matrix = OrientationToMatrix(orientation, orientedWidth, orientedHeight);
-  auto newBounds = matrix.mapRect(bounds);
-  return std::shared_ptr<Image>(
-      new RGBAAAImage(source, newOrientation, scale, newBounds, alphaStart));
-}
-
-std::shared_ptr<Image> RGBAAAImage::onMakeScaled(float scaleX, float scaleY) const {
-  auto newBounds = bounds;
-  newBounds.scale(scaleX, scaleY);
-  auto newScale = Point::Make(scale.x * scaleX, scale.y * scaleY);
-  return std::shared_ptr<Image>(
-      new RGBAAAImage(source, orientation, newScale, newBounds, alphaStart));
-}
-
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
-  return std::shared_ptr<Image>(new RGBAAAImage(source, orientation, scale, newBounds, alphaStart));
+  auto image = std::shared_ptr<Image>(new RGBAAAImage(source, newBounds, alphaStart));
+  image->weakThis = image;
+  return image;
 }
 
 }  // namespace tgfx

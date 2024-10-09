@@ -49,10 +49,8 @@ std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryH
   return DecoderImage::MakeFrom(uniqueKey, std::move(decoder));
 }
 
-std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(Context* context,
-                                                                 const UniqueKey& key,
-                                                                 bool mipmapped,
-                                                                 uint32_t renderFlags) const {
-  return context->proxyProvider()->createTextureProxy(key, generator, mipmapped, renderFlags);
+std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(const TPArgs& args) const {
+  return args.context->proxyProvider()->createTextureProxy(args.uniqueKey, generator,
+                                                           args.mipmapped, args.renderFlags);
 }
 }  // namespace tgfx

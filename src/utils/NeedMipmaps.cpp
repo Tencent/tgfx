@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "UVMatrix.h"
+#include "NeedMipmaps.h"
 
 namespace tgfx {
-std::optional<Matrix> UVMatrix::Concat(const Rect& subset, const Matrix* uvMatrix) {
-  std::optional<Matrix> matrix = std::nullopt;
-  if (subset.x() != 0 || subset.y() != 0) {
-    matrix = Matrix::MakeTrans(subset.x(), subset.y());
+bool NeedMipmaps(const SamplingOptions& sampling, const Matrix& viewMatrix,
+                 const Matrix* uvMatrix) {
+  if (sampling.mipmapMode == MipmapMode::None) {
+    return false;
   }
-  if (uvMatrix != nullptr) {
-    if (matrix) {
-      matrix->preConcat(*uvMatrix);
-    } else {
-      matrix = *uvMatrix;
-    }
-  }
-  return matrix;
+  return viewMatrix.hasNonIdentityScale() || (uvMatrix && uvMatrix->hasNonIdentityScale());
 }
 }  // namespace tgfx

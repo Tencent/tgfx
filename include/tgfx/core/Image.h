@@ -32,6 +32,7 @@
 
 namespace tgfx {
 class FPArgs;
+class TPArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
@@ -196,8 +197,8 @@ class Image {
    * For instance, if you create a subset Image from a rasterized Image, the subset Image does not
    * create its own GPU cache but uses the full resolution cache created by the original Image. If
    * you want the subset Image to create its own GPU cache, you should call makeRasterized() on the
-   * subset Image. The sampling options will be applied if the image is scaled.
-   * If the Image is already rasterized , the original Image is returned.
+   * subset Image. The sampling options will be applied if the image is scaled. If the Image is
+   * already rasterized, the original Image is returned.
    */
   virtual std::shared_ptr<Image> makeRasterized(const SamplingOptions& sampling = {}) const;
 
@@ -259,9 +260,8 @@ class Image {
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
    * channels and the other half as its alpha channel. If both alphaStartX and alphaStartY are zero,
-   * a subset Image is returned. If the original Image cannot directly generate a texture, nullptr
-   * is returned. For example, an Image with orientation or subset cannot generate a texture
-   * directly.
+   * a subset Image is returned. Returns nullptr if the original Image is alpha only, or the alpha
+   * area is not fully contained by the original Image.
    * @param displayWidth The display width of the RGBAAA image.
    * @param displayHeight The display height of the RGBAAA image.
    * @param alphaStartX The x position of where alpha area begins in the original image.
@@ -283,15 +283,26 @@ class Image {
 
   virtual std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const;
 
-  virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
-                                              int alphaStartY) const;
-
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
                                                   Point* offset, const Rect* clipRect) const;
 
-  virtual std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
-                                                         uint32_t renderFlags = 0) const;
+  /**
+   * Returns a rasterized texture proxy for the entire Image.
+   * @param args The TPArgs used to create the texture proxy.
+   * @param sampling The sampling options applied when rasterizing the Image. This option
+   * may be ignored if the Image or its nested Images are already rasterized.
+   */
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
+                                                         const SamplingOptions& sampling) const;
 
+  /**
+   * Returns a fragment processor for the entire Image.
+   * @param args The FPArgs used to create the fragment processor.
+   * @param tileModeX The tile mode applied in the x direction.
+   * @param tileModeY The tile mode applied in the y direction.
+   * @param sampling The sampling options used when sampling the Image.
+   * @param uvMatrix The matrix used to transform the uv coordinates.
+   */
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                                  TileMode tileModeX,
                                                                  TileMode tileModeY,

@@ -19,9 +19,12 @@
 #include "tgfx/core/Image.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
 #include "images/BufferImage.h"
 #include "images/FilterImage.h"
 #include "images/GeneratorImage.h"
+#include "images/OrientImage.h"
+#include "images/RGBAAAImage.h"
 #include "images/RasterImage.h"
 #include "images/ScaleImage.h"
 #include "images/SubsetImage.h"
@@ -155,7 +158,10 @@ std::shared_ptr<Image> Image::makeRasterized(const SamplingOptions& sampling) co
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
-  return TextureImage::Wrap(lockTextureProxy(context));
+  TPArgs args(context, 0, hasMipmaps());
+  auto mipmapMode = args.mipmapped ? MipmapMode::Linear : MipmapMode::None;
+  SamplingOptions sampling(FilterMode::Linear, mipmapMode);
+  return TextureImage::Wrap(lockTextureProxy(args, sampling));
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
@@ -193,13 +199,19 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeScaled(float newScaleX, float newScaleY) const {
-  return onMakeScaled(newScaleX, newScaleY);
+std::shared_ptr<Image> Image::makeScaled(float scaleX, float scaleY) const {
+  auto w = width();
+  auto h = height();
+  auto scaledWidth = ScaleImage::GetSize(w, scaleX);
+  auto scaledHeight = ScaleImage::GetSize(h, scaleY);
+  if (scaledWidth == w && scaledHeight == h) {
+    return weakThis.lock();
+  }
+  return onMakeScaled(scaleX, scaleY);
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  return SubsetImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, Point::Make(1.0f, 1.0f),
-                               subset);
+  return SubsetImage::MakeFrom(weakThis.lock(), subset);
 }
 
 std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
@@ -214,7 +226,7 @@ std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
 }
 
 std::shared_ptr<Image> Image::onMakeScaled(float scaleX, float scaleY) const {
-  return ScaleImage::MakeFrom(weakThis.lock(), Orientation::TopLeft, Point::Make(scaleX, scaleY));
+  return ScaleImage::MakeFrom(weakThis.lock(), Point::Make(scaleX, scaleY));
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
@@ -232,28 +244,32 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
   if (alphaStartX == 0 && alphaStartY == 0) {
     return makeSubset(Rect::MakeWH(displayWidth, displayHeight));
   }
-  return onMakeRGBAAA(displayWidth, displayHeight, alphaStartX, alphaStartY);
+  return RGBAAAImage::MakeFrom(weakThis.lock(), displayWidth, displayHeight, alphaStartX,
+                               alphaStartY);
 }
 
-std::shared_ptr<Image> Image::onMakeRGBAAA(int, int, int, int) const {
-  return nullptr;
-}
-
-std::shared_ptr<TextureProxy> Image::lockTextureProxy(Context* context,
-                                                      uint32_t renderFlags) const {
-  auto renderTarget =
-      RenderTargetProxy::MakeFallback(context, width(), height(), isAlphaOnly(), 1, hasMipmaps());
+std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
+                                                      const SamplingOptions& sampling) const {
+  auto context = args.context;
+  auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  auto proxyProvider = context->proxyProvider();
+  // Don't pass args.renderFlags to this method. It's meant for creating the fragment processor.
+  // The caller should decide whether to disable the cache by setting args.uniqueKey.
+  auto textureProxy =
+      proxyProvider->createTextureProxy(args.uniqueKey, width(), height(), format, args.mipmapped);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs args(context, renderFlags, drawRect, Matrix::I());
-  auto processor = FragmentProcessor::Make(weakThis.lock(), args, {});
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
+  auto processor = FragmentProcessor::Make(weakThis.lock(), fpArgs, sampling);
   if (processor == nullptr) {
     return nullptr;
   }
   OpContext opContext(renderTarget, true);
   opContext.fillWithFP(std::move(processor), Matrix::I());
-  return renderTarget->getTextureProxy();
+  return textureProxy;
 }
 }  // namespace tgfx

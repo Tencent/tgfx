@@ -20,34 +20,25 @@
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "images/MipmapImage.h"
-#include "images/RGBAAAImage.h"
-#include "images/TextureImage.h"
 
 namespace tgfx {
 ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
-std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(Context* context,
-                                                              uint32_t renderFlags) const {
-  if (context == nullptr) {
+std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args,
+                                                              const SamplingOptions&) const {
+  if (args.context == nullptr) {
     return nullptr;
   }
-  return onLockTextureProxy(context, uniqueKey, hasMipmaps(), renderFlags);
+  // The passed-in TPArgs and sampling options are ignored because all resource images are already
+  // rasterized and have a preset mipmap state.
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), uniqueKey);
+  return onLockTextureProxy(tpArgs);
 }
 
 std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
   auto source = std::static_pointer_cast<ResourceImage>(weakThis.lock());
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
-}
-
-std::shared_ptr<Image> ResourceImage::onMakeRGBAAA(int displayWidth, int displayHeight,
-                                                   int alphaStartX, int alphaStartY) const {
-  if (isAlphaOnly()) {
-    return nullptr;
-  }
-  auto resourceImage = std::static_pointer_cast<ResourceImage>(weakThis.lock());
-  return RGBAAAImage::MakeFrom(std::move(resourceImage), displayWidth, displayHeight, alphaStartX,
-                               alphaStartY);
 }
 
 std::shared_ptr<Image> ResourceImage::makeRasterized(const SamplingOptions&) const {
@@ -57,7 +48,8 @@ std::shared_ptr<Image> ResourceImage::makeRasterized(const SamplingOptions&) con
 std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
     const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  auto proxy = lockTextureProxy(args.context, args.renderFlags);
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), uniqueKey);
+  auto proxy = onLockTextureProxy(tpArgs);
   if (proxy == nullptr) {
     return nullptr;
   }

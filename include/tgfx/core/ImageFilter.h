@@ -103,12 +103,15 @@ class ImageFilter {
   virtual Rect onFilterBounds(const Rect& srcRect) const;
 
   /**
-   * Returns a TextureProxy that applies this filter to the source image.
+   * Returns a texture proxy that applies this filter to the source image.
+   * @param source The source image.
+   * @param clipBounds The clip bounds of the filtered image, relative to the source image.
+   * @param args The arguments for creating the texture proxy.
+   * @param sampling The sampling options used for sampling the source image.
    */
-  virtual std::shared_ptr<TextureProxy> onFilterImage(Context* context,
-                                                      std::shared_ptr<Image> source,
-                                                      const Rect& filterBounds, bool mipmapped,
-                                                      uint32_t renderFlags) const;
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
+                                                         const Rect& clipBounds, const TPArgs& args,
+                                                         const SamplingOptions& sampling) const;
 
   /**
    * Returns a FragmentProcessor that applies this filter to the source image. The returned
@@ -128,10 +131,10 @@ class ImageFilter {
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
-  std::unique_ptr<FragmentProcessor> makeFPFromFilteredImage(std::shared_ptr<Image> source,
-                                                             const FPArgs& args,
-                                                             const SamplingOptions& sampling,
-                                                             const Matrix* uvMatrix) const;
+  std::unique_ptr<FragmentProcessor> makeFPFromTextureProxy(std::shared_ptr<Image> source,
+                                                            const FPArgs& args,
+                                                            const SamplingOptions& sampling,
+                                                            const Matrix* uvMatrix) const;
 
   friend class DropShadowImageFilter;
   friend class ComposeImageFilter;

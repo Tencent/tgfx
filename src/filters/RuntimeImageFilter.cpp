@@ -18,6 +18,7 @@
 
 #include "RuntimeImageFilter.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "images/ResourceImage.h"
@@ -34,23 +35,24 @@ Rect RuntimeImageFilter::onFilterBounds(const Rect& srcRect) const {
   return effect->filterBounds(srcRect);
 }
 
-std::shared_ptr<TextureProxy> RuntimeImageFilter::onFilterImage(Context* context,
-                                                                std::shared_ptr<Image> source,
-                                                                const Rect& filterBounds,
-                                                                bool mipmapped,
-                                                                uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(
+    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args,
+    const SamplingOptions& sampling) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      context, static_cast<int>(filterBounds.width()), static_cast<int>(filterBounds.height()),
-      source->isAlphaOnly(), effect->sampleCount(), mipmapped);
+      args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
+      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto textureProxy = source->lockTextureProxy(context, renderFlags);
+  // Request a texture proxy from the source image without mipmaps to save memory.
+  // It may be ignored if the source image has preset mipmaps.
+  TPArgs tpArgs(args.context, args.renderFlags, false);
+  auto textureProxy = source->lockTextureProxy(tpArgs, sampling);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto offset = Point::Make(-filterBounds.x(), -filterBounds.y());
-  auto drawingManager = context->drawingManager();
+  auto offset = Point::Make(-clipBounds.x(), -clipBounds.y());
+  auto drawingManager = args.context->drawingManager();
   drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxy), effect, offset);
   drawingManager->addTextureResolveTask(renderTarget);
   return renderTarget->getTextureProxy();
@@ -59,6 +61,6 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::onFilterImage(Context* context
 std::unique_ptr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  return makeFPFromFilteredImage(source, args, sampling, uvMatrix);
+  return makeFPFromTextureProxy(source, args, sampling, uvMatrix);
 }
 }  // namespace tgfx

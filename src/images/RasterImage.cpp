@@ -71,35 +71,21 @@ std::shared_ptr<Image> RasterImage::onMakeDecoded(Context* context, bool) const 
   return newImage;
 }
 
-std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(Context* context,
-                                                              const UniqueKey& key, bool mipmapped,
-                                                              uint32_t renderFlags) const {
-  auto proxyProvider = context->proxyProvider();
-  auto textureProxy = std::static_pointer_cast<TextureProxy>(proxyProvider->findProxy(key));
+std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(const TPArgs& args) const {
+  auto proxyProvider = args.context->proxyProvider();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(args.uniqueKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
-  auto hasResourceCache = context->resourceCache()->hasUniqueResource(key);
-  auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, mipmapped,
-                                                   ImageOrigin::TopLeft, renderFlags);
-  if (hasResourceCache) {
-    return textureProxy;
+  auto sourceArgs = args;
+  sourceArgs.renderFlags |= RenderFlags::DisableCache;
+  if (args.renderFlags & RenderFlags::DisableCache) {
+    sourceArgs.uniqueKey = {};
   }
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
-  if (renderTarget == nullptr) {
-    return nullptr;
+  textureProxy = source->lockTextureProxy(sourceArgs, sampling);
+  if (args.renderFlags & RenderFlags::DisableCache) {
+    proxyProvider->changeProxyKey(textureProxy, args.uniqueKey);
   }
-  auto sourceFlags = renderFlags | RenderFlags::DisableCache;
-  auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs args(context, sourceFlags, drawRect, Matrix::I());
-  auto processor = FragmentProcessor::Make(source, args, sampling);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  OpContext opContext(renderTarget, true);
-  opContext.fillWithFP(std::move(processor), Matrix::I());
   return textureProxy;
 }
 

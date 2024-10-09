@@ -19,9 +19,11 @@
 #include "tgfx/core/ImageFilter.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "utils/NeedMipmaps.h"
 
 namespace tgfx {
 Rect ImageFilter::filterBounds(const Rect& rect) const {
@@ -34,21 +36,20 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
 }
 
-std::shared_ptr<TextureProxy> ImageFilter::onFilterImage(Context* context,
-                                                         std::shared_ptr<Image> source,
-                                                         const Rect& filterBounds, bool mipmapped,
-                                                         uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
+                                                            const Rect& clipBounds,
+                                                            const TPArgs& args,
+                                                            const SamplingOptions& sampling) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      context, static_cast<int>(filterBounds.width()), static_cast<int>(filterBounds.height()),
-      source->isAlphaOnly(), 1, mipmapped);
+      args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
+      source->isAlphaOnly(), 1, args.mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  FPArgs args(context, renderFlags, drawRect, Matrix::I());
-  auto offsetMatrix = Matrix::MakeTrans(filterBounds.x(), filterBounds.y());
-  // There is no scale, so we can use the default sampling options.
-  auto processor = asFragmentProcessor(std::move(source), args, {}, &offsetMatrix);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
+  auto offsetMatrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
+  auto processor = asFragmentProcessor(std::move(source), fpArgs, sampling, &offsetMatrix);
   if (!processor) {
     return nullptr;
   }
@@ -68,7 +69,7 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   return true;
 }
 
-std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromFilteredImage(
+std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
@@ -80,8 +81,9 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromFilteredImage(
   if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  auto textureProxy = onFilterImage(args.context, source, dstBounds, mipmapped, args.renderFlags);
+  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs, sampling);
   if (textureProxy == nullptr) {
     return nullptr;
   }
