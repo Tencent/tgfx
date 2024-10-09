@@ -60,8 +60,7 @@ class TextureImage : public ResourceImage {
     return nullptr;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey&, bool,
-                                                   uint32_t) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;

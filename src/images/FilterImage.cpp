@@ -21,6 +21,7 @@
 #include "gpu/OpContext.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "utils/NeedMipmaps.h"
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
@@ -107,12 +108,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
 }
 
-std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(Context* context,
-                                                            uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args,
+                                                            const SamplingOptions& sampling) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto filterBounds = filter->filterBounds(inputBounds);
-  auto mipmapped = source->hasMipmaps();
-  return filter->lockTextureProxy(context, source, filterBounds, mipmapped, renderFlags);
+  return filter->lockTextureProxy(source, filterBounds, args, sampling);
 }
 
 std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
@@ -134,9 +134,10 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
       (tileModeX == TileMode::Decal && tileModeY == TileMode::Decal)) {
     return filter->asFragmentProcessor(source, args, sampling, AddressOf(fpMatrix));
   }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  auto textureProxy =
-      filter->lockTextureProxy(args.context, source, dstBounds, mipmapped, args.renderFlags);
+  auto mipmapped =
+      source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, AddressOf(fpMatrix));
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs, sampling);
   if (textureProxy == nullptr) {
     return nullptr;
   }

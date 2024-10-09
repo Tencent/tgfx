@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAAImage.h"
+#include "gpu/TPArgs.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TextureEffect.h"
+#include "utils/NeedMipmaps.h"
 
 namespace tgfx {
 std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
@@ -49,7 +51,9 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  auto proxy = source->lockTextureProxy(args.context, args.renderFlags);
+  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  auto proxy = source->lockTextureProxy(tpArgs, sampling);
   auto matrix = concatUVMatrix(uvMatrix);
   return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
 }

@@ -728,6 +728,11 @@ class Matrix {
   float getMaxScale() const;
 
   /**
+   * Returns true if the Matrix contains a non-identity scale component.
+   */
+  bool hasNonIdentityScale() const;
+
+  /**
    * Returns the scale components of the Matrix along the x and y axes. Both components are
    * absolute values.
    */

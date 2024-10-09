@@ -395,6 +395,20 @@ float Matrix::getMaxScale() const {
   return -1.0f;
 }
 
+bool Matrix::hasNonIdentityScale() const {
+  double a = values[SCALE_X];
+  double b = values[SKEW_Y];
+  if (sqrt(a * a + b * b) != 1.0) {
+    return true;
+  }
+  double c = values[SKEW_X];
+  double d = values[SCALE_Y];
+  if (sqrt(c * c + d * d) != 1.0) {
+    return true;
+  }
+  return false;
+}
+
 Point Matrix::getAxisScales() const {
   Point scale = {};
   double a = values[SCALE_X];

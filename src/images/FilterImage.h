@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/TPArgs.h"
 #include "images/SubsetImage.h"
 #include "tgfx/core/ImageFilter.h"
 
@@ -53,8 +54,8 @@ class FilterImage : public SubsetImage {
   std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                           const Rect* clipRect) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
-                                                 uint32_t renderFlags) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
+                                                 const SamplingOptions& sampling) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,

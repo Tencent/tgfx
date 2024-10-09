@@ -16,29 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ImageFilter.h"
+#include "NeedMipmaps.h"
 
 namespace tgfx {
-class RuntimeImageFilter : public ImageFilter {
- public:
-  explicit RuntimeImageFilter(std::shared_ptr<RuntimeEffect> effect) : effect(std::move(effect)) {
+bool NeedMipmaps(const SamplingOptions& sampling, const Matrix& viewMatrix,
+                 const Matrix* uvMatrix) {
+  if (sampling.mipmapMode == MipmapMode::None) {
+    return false;
   }
-
- protected:
-  Rect onFilterBounds(const Rect& srcRect) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                 const Rect& clipBounds, const TPArgs& args,
-                                                 const SamplingOptions& sampling) const override;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
-
- private:
-  std::shared_ptr<RuntimeEffect> effect = nullptr;
-};
+  return viewMatrix.hasNonIdentityScale() || (uvMatrix && uvMatrix->hasNonIdentityScale());
+}
 }  // namespace tgfx

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/Resource.h"
+#include "gpu/TPArgs.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Image.h"
 
@@ -37,17 +38,15 @@ class ResourceImage : public Image {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
+  std::shared_ptr<TextureProxy> lockTextureProxy(
+      const TPArgs& args, const SamplingOptions& sampling) const override final;
+
+  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const = 0;
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
-                                                 uint32_t renderFlags) const override final;
-
-  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
-                                                           bool mipmapped,
-                                                           uint32_t renderFlags) const = 0;
 
   friend class MipmapImage;
 };

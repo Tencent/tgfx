@@ -32,8 +32,8 @@
     },
     "FilterTest": {
         "ComposeColorFilter": "6ae079f",
-        "ComposeImageFilter": "36ce1ca",
-        "ComposeImageFilter2": "61e5c3b",
+        "ComposeImageFilter": "73046fc",
+        "ComposeImageFilter2": "73046fc",
         "ImageFilterShader": "0dc7072",
         "LumaColorFilter": "6ae079f",
         "RuntimeEffect": "6ec728b",

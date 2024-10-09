@@ -46,9 +46,7 @@ class MipmapImage : public ResourceImage {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(Context* context, const UniqueKey& key,
-                                                   bool mipmapped,
-                                                   uint32_t renderFlags) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
 
  private:
   std::shared_ptr<ResourceImage> source = nullptr;
