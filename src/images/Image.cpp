@@ -262,9 +262,6 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
   auto processor = FragmentProcessor::Make(weakThis.lock(), fpArgs, sampling);
