@@ -16,21 +16,47 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ShapeLayer.h"
+#pragma once
+
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
-  layer->weakThis = layer;
-  return layer;
-}
+/**
+ * PathProvider is an interface for classes that generates a Path. It defers the acquisition of the
+ * Path until it is actually required, allowing the Path to be invalidated and regenerate if
+ * necessary.
+ */
+class PathProvider {
+ public:
+  /**
+   * Creates a new PathProvider that wraps the given Path.
+   */
+  static std::shared_ptr<PathProvider> Wrap(const Path& path);
 
-void ShapeLayer::setPath(const Path& path) {
-  _pathProvider = PathProvider::Wrap(path);
-}
+  virtual ~PathProvider() = default;
 
-ShapeLayer::ShapeLayer() {
-  _pathProvider = PathProvider::Wrap(Path());
-}
+  /**
+   * Returns the Path provided by this object.
+   */
+  Path getPath();
 
+ protected:
+  PathProvider() = default;
+
+  /**
+   * Creates a new PathProvider with an initial path.
+   */
+  explicit PathProvider(Path path);
+
+  /**
+   * Invalidates the path, causing it to be re-computed the next time it is requested.
+   */
+  void invalidate();
+
+  virtual Path onGeneratePath();
+
+ private:
+  bool dirty = true;
+  Path path = {};
+};
 }  // namespace tgfx

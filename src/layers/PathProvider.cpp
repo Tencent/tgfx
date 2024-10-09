@@ -16,21 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/PathProvider.h"
 
 namespace tgfx {
-std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
-  layer->weakThis = layer;
-  return layer;
+std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
+  if (path.isEmpty()) {
+    return nullptr;
+  }
+  return std::shared_ptr<PathProvider>(new PathProvider(path));
 }
 
-void ShapeLayer::setPath(const Path& path) {
-  _pathProvider = PathProvider::Wrap(path);
+Path PathProvider::getPath() {
+  if (dirty) {
+    path = onGeneratePath();
+    dirty = false;
+  }
+  return path;
 }
 
-ShapeLayer::ShapeLayer() {
-  _pathProvider = PathProvider::Wrap(Path());
+void PathProvider::invalidate() {
+  dirty = true;
 }
 
+Path PathProvider::onGeneratePath() {
+  return path;
+}
 }  // namespace tgfx

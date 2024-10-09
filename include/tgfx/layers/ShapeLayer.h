@@ -21,6 +21,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/PathProvider.h"
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
@@ -46,9 +47,23 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Sets the path defining the shape to be rendered.
+   * Sets the path defining the shape to be rendered. If the path provider is set, the path will be
+   * set to an empty Path.
    */
   void setPath(const Path& path);
+
+  /**
+   * Returns the path provider that generates the shape's path.
+   */
+  std::shared_ptr<PathProvider> pathProvider() const {
+    return _pathProvider;
+  }
+
+  /**
+   * Sets the path provider that generates the shape's path. If the path is set directly using
+   * setPath(), the path provider will be set to nullptr.
+   */
+  void setPathProvider(std::shared_ptr<PathProvider> provider);
 
   /**
    * Returns the style used to fill the shape's path, which can be a solid color, gradient, or image
@@ -202,6 +217,7 @@ class ShapeLayer : public Layer {
 
  private:
   Path _path = {};
+  std::shared_ptr<PathProvider> _pathProvider = nullptr;
   std::shared_ptr<ShapeStyle> _fillStyle = nullptr;
   std::shared_ptr<ShapeStyle> _strokeStyle = nullptr;
   Stroke stroke = {};

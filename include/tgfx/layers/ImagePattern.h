@@ -45,7 +45,7 @@ class ImagePattern : public ShapeStyle {
   std::shared_ptr<Shader> getShader() const override {
     return shader;
   }
- 
+
  private:
   std::shared_ptr<Shader> shader = nullptr;
 
