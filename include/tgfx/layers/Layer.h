@@ -23,6 +23,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/layers/LayerFilter.h"
 #include "tgfx/layers/LayerType.h"
 
 namespace tgfx {
@@ -160,14 +161,14 @@ class Layer {
   /**
    * Returns the list of filters applied to the layer.
    */
-  const std::vector<std::shared_ptr<ImageFilter>>& filters() const {
+  const std::vector<std::shared_ptr<LayerFilter>>& filters() const {
     return _filters;
   }
 
   /**
    * Sets the list of filters applied to the layer.
    */
-  void setFilters(std::vector<std::shared_ptr<ImageFilter>> value);
+  void setFilters(std::vector<std::shared_ptr<LayerFilter>> value);
 
   /**
    * Returns the layer used as a mask for the calling layer. For masking to work (allowing scaling
@@ -396,7 +397,7 @@ class Layer {
   bool _visible = true;
   bool _shouldRasterize = false;
   float _rasterizationScale = 1.0f;
-  std::vector<std::shared_ptr<ImageFilter>> _filters = {};
+  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
   Layer* _root = nullptr;
