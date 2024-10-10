@@ -265,6 +265,8 @@ class FragmentProcessor : public Processor {
   void emitChild(size_t childIndex, const std::string& inputColor, EmitArgs& parentArgs) const;
 
  protected:
+  std::vector<std::unique_ptr<FragmentProcessor>> childProcessors;
+
   explicit FragmentProcessor(uint32_t classID) : Processor(classID) {
   }
 
@@ -323,6 +325,5 @@ class FragmentProcessor : public Processor {
                          std::function<std::string(std::string_view)> = {}) const;
 
   std::vector<const CoordTransform*> coordTransforms;
-  std::vector<std::unique_ptr<FragmentProcessor>> childProcessors;
 };
 }  // namespace tgfx
