@@ -100,7 +100,27 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
   Paint paint;
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
-  paint.setColorFilter(ColorFilter::Luma());
+  auto lumaColorFilter = ColorFilter::Matrix({0,
+                                              0,
+                                              0,
+                                              0,
+                                              0,  // red
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              0,  // green
+                                              0,
+                                              0,
+                                              0,
+                                              0,
+                                              0,  // blue
+                                              0.21260000000000001f,
+                                              0.71519999999999995f,
+                                              0.0722f,
+                                              0,
+                                              0});
+  paint.setColorFilter(lumaColorFilter);
   int tileSize = 8;
   size_t drawCallCount = 0;
   for (int y = 0; y < height; y += tileSize) {
