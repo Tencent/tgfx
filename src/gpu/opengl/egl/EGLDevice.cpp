@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
-#include <tgfx/opengl/egl/EGLGlobals.h>
 #include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLProcGetter.h"
+#include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 
 namespace tgfx {
 static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
