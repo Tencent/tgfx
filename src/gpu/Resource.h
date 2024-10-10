@@ -98,7 +98,7 @@ class Resource {
   std::list<Resource*>::iterator cachedPosition;
   std::chrono::steady_clock::time_point lastUsedTime = {};
 
-  bool isPurgeable() const {
+  virtual bool isPurgeable() const {
     return reference.use_count() <= 1 && uniqueKey.strongCount() == 0;
   }
 
