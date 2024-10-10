@@ -18,11 +18,14 @@
 
 #include "DropShadowImageFilter.h"
 #include "gpu/OpContext.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "images/TextureImage.h"
 #include "tgfx/core/ColorFilter.h"
+#include "utils/NeedMipmaps.h"
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
@@ -56,8 +59,10 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  // Request a rasterized image, does nothing if the source is not already rasterized.
-  source = source->makeRasterized();
+  if (source->isComplex()) {
+    auto needMipmaps = NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+    source = source->makeRasterized(needMipmaps, sampling);
+  }
   std::unique_ptr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix != nullptr) {

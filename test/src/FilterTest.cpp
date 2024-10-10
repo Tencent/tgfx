@@ -333,9 +333,9 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
-  image = image->makeScaled(0.5f, 0.5f);
-  image = image->makeRasterized(SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   image = image->makeMipmapped(true);
+  image = image->makeScaled(0.5f, 0.5f);
+  image = image->makeRasterized(true, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter = ImageFilter::Runtime(std::move(effect));
   image = image->makeWithFilter(std::move(filter));

@@ -28,11 +28,8 @@ namespace tgfx {
  */
 class RasterImage : public ResourceImage {
  public:
-  /**
-   * Note that the returned Image is always non-mipmapped.
-   */
-  static std::shared_ptr<RasterImage> MakeFrom(std::shared_ptr<Image> source,
-                                               const SamplingOptions& sampling = {});
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, bool mipmapped = false,
+                                         const SamplingOptions& sampling = {});
 
   int width() const override;
 

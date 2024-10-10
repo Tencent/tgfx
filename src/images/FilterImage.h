@@ -43,6 +43,10 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
+  bool isComplex() const override {
+    return true;
+  }
+
  protected:
   FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
               std::shared_ptr<ImageFilter> filter);

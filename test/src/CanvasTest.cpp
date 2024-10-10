@@ -368,7 +368,7 @@ TGFX_TEST(CanvasTest, rasterized) {
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
   image = image->makeScaled(0.15f, 0.15f);
-  rasterImage = image->makeRasterized(sampling);
+  rasterImage = image->makeRasterized(true, sampling);
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
@@ -381,7 +381,7 @@ TGFX_TEST(CanvasTest, rasterized) {
   rasterImage = image->makeMipmapped(false);
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeScaled(2.0f, 2.0f);
-  rasterImage = rasterImage->makeRasterized(sampling);
+  rasterImage = rasterImage->makeRasterized(false, sampling);
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeMipmapped(true);
   EXPECT_EQ(rasterImage->width(), 907);

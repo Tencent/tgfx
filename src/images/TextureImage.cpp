@@ -47,7 +47,8 @@ BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* or
   return texture->getBackendTexture();
 }
 
-std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
+std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context,
+                                                      const SamplingOptions&) const {
   if (textureProxy->getContext() == context) {
     return std::static_pointer_cast<Image>(weakThis.lock());
   }

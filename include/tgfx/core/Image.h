@@ -183,6 +183,13 @@ class Image {
   }
 
   /**
+   * Returns true if the Image has complex transforms that can't be drawn as a single texture with a
+   * UV matrix. Complex transforms may include subsets, filters, and RGBAAA layouts. Returns false
+   * if the Image is rasterized or only has orientation and scale transforms.
+   */
+  virtual bool isComplex() const = 0;
+
+  /**
    * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
    * not backed by a Texture. If the origin is not nullptr, the origin of the backend texture is
    * returned.
@@ -190,27 +197,36 @@ class Image {
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
 
   /**
-   * Returns a rasterized Image that is scaled by the specified rasterizationScale. A rasterized
-   * Image has a fixed resolution and can be cached as a GPU resource for repeated drawing. By
-   * default, an Image directly backed by an ImageBuffer, an ImageGenerator, or a GPU texture is
-   * rasterized. Other images are not rasterized unless they are implicitly created by this method.
-   * For instance, if you create a subset Image from a rasterized Image, the subset Image does not
-   * create its own GPU cache but uses the full resolution cache created by the original Image. If
-   * you want the subset Image to create its own GPU cache, you should call makeRasterized() on the
-   * subset Image. The sampling options will be applied if the image is scaled. If the Image is
-   * already rasterized, the original Image is returned.
+   * Returns a rasterized Image with the same content as this Image, as if this Image were drawn to
+   * the returned Image. Unlike the makeTextureImage() method, this method does not perform a draw
+   * operation immediately. Instead, it defers the draw operation until it is actually required.
+   * A rasterized Image can be represented as a single GPU texture without any transforms and can be
+   * cached for repeated drawing. By default, an Image directly backed by an ImageBuffer, an
+   * ImageGenerator, or a GPU texture is rasterized. Other images are not rasterized unless this
+   * method explicitly creates them.
+   * For example, if you create a subset Image from a rasterized Image, the subset Image does not
+   * create its own GPU cache but uses the full resolution cache created by the original Image.
+   * If you want the subset Image to create its own GPU cache, you should call makeRasterized() on
+   * the subset Image.
+   * @param mipmapped Specifies whether the rasterized Image should have mipmaps. Ignored if the
+   * Image is already rasterized.
+   * @param sampling The sampling options may be applied if the image has scaling transforms.
+   * Ignored if the Image is already rasterized.
+   * @return If the Image is already rasterized, the original Image is returned.
    */
-  virtual std::shared_ptr<Image> makeRasterized(const SamplingOptions& sampling = {}) const;
+  virtual std::shared_ptr<Image> makeRasterized(bool mipmapped = false,
+                                                const SamplingOptions& sampling = {}) const;
 
   /**
-   * Returns an Image backed by GPU texture associated with the specified context. If there is a
-   * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
-   * creates one immediately. Returns the original Image if the Image is texture backed and the
-   * context is compatible with the backing GPU texture. Otherwise, returns nullptr. It's safe to
-   * release the original Image to reduce CPU memory usage afterward, as the returned Image holds
-   * a strong reference to the texture cache.
+   * Returns an Image backed by a GPU texture associated with the given context. If a corresponding
+   * texture cache exists in the context, it returns an Image that wraps that texture. Otherwise, it
+   * creates one immediately, applying the sampling options if the image is scaled. If the Image is
+   * already texture-backed and the context is compatible with the GPU texture, it returns the
+   * original Image. Otherwise, it returns nullptr. It's safe to release the original Image to
+   * reduce CPU memory usage, as the returned Image holds a strong reference to the texture cache.
    */
-  virtual std::shared_ptr<Image> makeTextureImage(Context* context) const;
+  virtual std::shared_ptr<Image> makeTextureImage(Context* context,
+                                                  const SamplingOptions& sampling = {}) const;
 
   /**
    * Returns a fully decoded Image from this Image. The returned Image shares the same GPU cache

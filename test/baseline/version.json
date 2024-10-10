@@ -3,7 +3,7 @@
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
         "Picture": "72edd24",
-        "drawImage": "6f4a968",
+        "drawImage": "ded3c91",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "d010fb8",
@@ -18,7 +18,7 @@
         "path": "f1d64c1",
         "rasterized": "f55f586",
         "rasterized_mipmap": "f55f586",
-        "rasterized_scale_up": "f55f586",
+        "rasterized_scale_up": "721c9e0",
         "scaleImage": "d038aa6",
         "text_shape": "74f94c4",
         "tileMode": "3bfc2e8"
@@ -32,8 +32,8 @@
     },
     "FilterTest": {
         "ComposeColorFilter": "f710e29",
-        "ComposeImageFilter": "73046fc",
-        "ComposeImageFilter2": "73046fc",
+        "ComposeImageFilter": "ded3c91",
+        "ComposeImageFilter2": "ded3c91",
         "ImageFilterShader": "6f4a968",
         "ModeColorFilter": "c2b0b18",
         "RuntimeEffect": "6f4a968",
@@ -41,7 +41,7 @@
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
-        "shaderMaskFilter": "c2b0b18"
+        "shaderMaskFilter": "ded3c91"
     },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
