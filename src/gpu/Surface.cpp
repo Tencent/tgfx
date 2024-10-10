@@ -152,6 +152,17 @@ Canvas* Surface::getCanvas() {
   return canvas;
 }
 
+bool Surface::flush(BackendSemaphore* signalSemaphore) {
+  auto context = getContext();
+  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
+  return context->flush(signalSemaphore);
+}
+
+void Surface::flushAndSubmit(bool syncCpu) {
+  flush();
+  getContext()->submit(syncCpu);
+}
+
 std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (cachedImage != nullptr) {
     return cachedImage;
