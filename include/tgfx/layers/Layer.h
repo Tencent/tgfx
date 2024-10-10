@@ -236,8 +236,9 @@ class Layer {
    * child at a specific position, use the addChildAt() method. If the child layer already has a
    * different parent, it will be removed from that parent first.
    * @param child The layer to add as a child of the calling layer.
+   * @return true, if the child layer is added as a child of the calling layer, otherwise false.
    */
-  void addChild(std::shared_ptr<Layer> child);
+  bool addChild(std::shared_ptr<Layer> child);
 
   /**
    * Adds a child layer to the calling layer at the specified index position. An index of 0 places
@@ -247,8 +248,9 @@ class Layer {
    * @param index The index position to which the child is added. If you specify a currently
    * occupied index position, the child layer that exists at that position and all higher positions
    * are moved up one position in the child list.
+   * @return true, if the child layer is added as a child of the calling layer, otherwise false.
    */
-  void addChildAt(std::shared_ptr<Layer> child, int index);
+  bool addChildAt(std::shared_ptr<Layer> child, int index);
 
   /**
    * Checks if the specified layer is a child of the calling layer or the calling layer itself. The
@@ -319,15 +321,17 @@ class Layer {
    * all children between the old and new positions will have their index decreased by 1.
    * @param child The child layer to reposition.
    * @param index The new index position for the child layer.
+   * @return true, if the child layer is repositioned, otherwise false.
    */
-  void setChildIndex(std::shared_ptr<Layer> child, int index);
+  bool setChildIndex(std::shared_ptr<Layer> child, int index);
 
   /**
    * Replaces the specified child layer of the calling layer with a different layer.
    * @param oldChild The layer to be replaced.
    * @param newChild The layer with which to replace oldLayer.
+   * @return true, if the child layer is replaced, otherwise false.
    */
-  void replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer> newChild);
+  bool replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer> newChild);
 
   /**
    * Returns a rectangle that defines the area of the layer relative to the coordinates of the
@@ -390,6 +394,10 @@ class Layer {
   virtual void onDraw(Canvas* canvas);
 
  private:
+  void onAttachToRoot(Layer* root);
+
+  void onDetachFromRoot();
+
   bool dirty = true;
   std::string _name;
   float _alpha = 1.0f;
@@ -404,5 +412,7 @@ class Layer {
   Layer* _root = nullptr;
   Layer* _parent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+
+  friend class DisplayList;
 };
 }  // namespace tgfx

@@ -16,27 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace tgfx {
-/**
- * DisplayList represents a collection of layers can be drawn to a Surface. Note: All layers in the
- * display list are not thread-safe and should only be accessed from a single thread.
- */
-class DisplayList {
- public:
-  DisplayList();
 
-  virtual ~DisplayList() = default;
+DisplayList::DisplayList() : _root(Layer::Make()) {
+  _root->_root = _root.get();
+}
 
-  /**
-   * Returns the root layer of the display list.
-   */
-  Layer* root() const;
+Layer* DisplayList::root() const {
+  return _root.get();
+}
 
- private:
-  std::shared_ptr<Layer> _root = nullptr;
-};
 }  // namespace tgfx

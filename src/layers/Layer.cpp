@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<Layer> Layer::Make() {
@@ -111,6 +112,143 @@ void Layer::setScrollRect(const Rect* rect) {
   invalidate();
 }
 
+bool Layer::addChild(std::shared_ptr<Layer> child) {
+  if (!child) {
+    return false;
+  }
+  auto index = _children.size();
+  if (child->parent().get() == this) {
+    index--;
+  }
+  return addChildAt(child, static_cast<int>(index));
+}
+
+bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
+  if (!child) {
+    return false;
+  }
+  if (child.get() == this) {
+    LOGE("addChildAt() The child is the same as the parent.");
+    return false;
+  } else if (child->contains(weakThis.lock())) {
+    LOGE("addChildAt() The child is already a parent of the parent.");
+    return false;
+  } else if (child->root() == child.get()) {
+    LOGE("A root cannot be added as a child to a layer.");
+    return false;
+  }
+  if (child->parent().get() == this) {
+    return setChildIndex(child, index);
+  }
+  child->removeFromParent();
+  _children.insert(_children.begin() + index, child);
+  child->_parent = this;
+  child->onAttachToRoot(_root);
+  invalidateContent();
+  return true;
+}
+
+bool Layer::contains(std::shared_ptr<Layer> child) const {
+  auto target = child.get();
+  while (target) {
+    if (target == this) {
+      return true;
+    }
+    target = target->_parent;
+  }
+  return false;
+}
+
+std::shared_ptr<Layer> Layer::getChildByName(const std::string& name) {
+  for (const auto& c : _children) {
+    if (c->name() == name) {
+      return c;
+    }
+  }
+  return nullptr;
+}
+
+int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
+  auto it = std::find(_children.begin(), _children.end(), child);
+  if (it != _children.end()) {
+    return static_cast<int>(it - _children.begin());
+  }
+  return -1;
+}
+
+std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float, float) {
+  return {};
+}
+
+void Layer::removeFromParent() {
+  if (!_parent) {
+    return;
+  }
+  _parent->removeChildAt(_parent->getChildIndex(weakThis.lock()));
+}
+
+std::shared_ptr<Layer> Layer::removeChildAt(int index) {
+  if (index < 0 || static_cast<size_t>(index) >= _children.size()) {
+    LOGE("The supplied index is out of bounds.");
+    return nullptr;
+  }
+  auto child = _children[static_cast<size_t>(index)];
+  child->_parent = nullptr;
+  child->onDetachFromRoot();
+  _children.erase(_children.begin() + index);
+  invalidateContent();
+  return child;
+}
+
+void Layer::removeChildren(int beginIndex, int endIndex) {
+  if (beginIndex < 0 || static_cast<size_t>(beginIndex) >= _children.size()) {
+    LOGE("The supplied beginIndex is out of bounds.");
+    return;
+  }
+  if (endIndex < 0 || static_cast<size_t>(endIndex) >= _children.size()) {
+    endIndex = static_cast<int>(_children.size()) - 1;
+  }
+  for (int i = endIndex; i >= beginIndex; --i) {
+    removeChildAt(i);
+  }
+}
+
+bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
+  if (index < 0 || static_cast<size_t>(index) >= _children.size()) {
+    index = static_cast<int>(_children.size()) - 1;
+  }
+  auto oldIndex = getChildIndex(child);
+  if (oldIndex < 0) {
+    LOGE("The supplied layer must be a child layer of the caller.");
+    return false;
+  }
+  if (oldIndex == index) {
+    return true;
+  }
+  _children.erase(_children.begin() + oldIndex);
+  _children.insert(_children.begin() + index, child);
+  invalidateContent();
+  return true;
+}
+
+bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer> newChild) {
+  auto index = getChildIndex(oldChild);
+  if (index < 0) {
+    LOGE("The supplied layer must be a child layer of the caller.");
+    return false;
+  }
+  if (!addChildAt(newChild, index)) {
+    return false;
+  }
+  oldChild->removeFromParent();
+  invalidateContent();
+  return true;
+}
+
+Rect Layer::getBounds(const Layer*) const {
+  return Rect::MakeEmpty();
+}
+
 Point Layer::globalToLocal(const Point& globalPoint) const {
   return globalPoint;
 }
@@ -119,7 +257,32 @@ Point Layer::localToGlobal(const Point& localPoint) const {
   return localPoint;
 }
 
+bool Layer::hitTestPoint(float, float, bool) {
+  return false;
+}
+
 void Layer::invalidate() {
   dirty = true;
+}
+
+void Layer::invalidateContent() {
+  invalidate();
+}
+
+void Layer::onAttachToRoot(Layer* root) {
+  _root = root;
+  for (auto child : _children) {
+    child->onAttachToRoot(root);
+  }
+}
+
+void Layer::onDetachFromRoot() {
+  _root = nullptr;
+  for (auto child : _children) {
+    child->onDetachFromRoot();
+  }
+}
+
+void Layer::onDraw(Canvas*) {
 }
 }  // namespace tgfx
