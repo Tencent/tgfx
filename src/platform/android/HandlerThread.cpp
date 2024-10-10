@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HandlerThread.h"
-#include "utils/Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 static Global<jclass> HandlerThreadClass;

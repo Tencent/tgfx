@@ -20,6 +20,8 @@
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
 #include "core/SimpleTextBlob.h"
+#include "core/images/TextureImage.h"
+#include "core/utils/StrokeKey.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
@@ -29,8 +31,6 @@
 #include "gpu/ops/TriangulatingPathOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/TextureEffect.h"
-#include "images/TextureImage.h"
-#include "utils/StrokeKey.h"
 
 namespace tgfx {
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/

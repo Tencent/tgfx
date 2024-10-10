@@ -20,7 +20,7 @@
 
 #include <emscripten/bind.h>
 #include "drawers/Drawer.h"
-#include "tgfx/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 namespace hello2d {
 class TGFXView {

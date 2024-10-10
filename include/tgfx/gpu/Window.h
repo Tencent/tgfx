@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
 /**

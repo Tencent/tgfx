@@ -18,24 +18,24 @@
 
 #include "tgfx/core/ImageCodec.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/USE.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/Stream.h"
-#include "utils/USE.h"
+#include "tgfx/core/Stream.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
-#include "codecs/webp/WebpCodec.h"
+#include "core/codecs/webp/WebpCodec.h"
 #endif
 
 #if defined(TGFX_USE_PNG_DECODE) || defined(TGFX_USE_PNG_ENCODE)
 
-#include "codecs/png/PngCodec.h"
+#include "core/codecs/png/PngCodec.h"
 
 #endif
 
 #if defined(TGFX_USE_JPEG_DECODE) || defined(TGFX_USE_JPEG_ENCODE)
-#include "codecs/jpeg/JpegCodec.h"
+#include "core/codecs/jpeg/JpegCodec.h"
 #endif
 
 namespace tgfx {

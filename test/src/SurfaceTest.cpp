@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "opengl/GLCaps.h"
-#include "opengl/GLUtil.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "gpu/opengl/GLCaps.h"
+#include "gpu/opengl/GLUtil.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {

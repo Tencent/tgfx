@@ -21,7 +21,7 @@
 #include <QOpenGLContext>
 #include <QQuickItem>
 #include "drawers/AppHost.h"
-#include "tgfx/opengl/qt/QGLWindow.h"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 namespace hello2d {
 class TGFXView : public QQuickItem {

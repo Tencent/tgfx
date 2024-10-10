@@ -19,7 +19,7 @@
 #include "tgfx/core/TextBlob.h"
 #include "core/GlyphRun.h"
 #include "core/SimpleTextBlob.h"
-#include "utils/SimpleTextShaper.h"
+#include "core/utils/SimpleTextShaper.h"
 
 namespace tgfx {
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const tgfx::Font& font) {

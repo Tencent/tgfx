@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UniformBuffer.h"
-#include "utils/Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 size_t Uniform::size() const {

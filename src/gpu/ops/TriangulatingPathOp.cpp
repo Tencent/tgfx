@@ -19,11 +19,11 @@
 #include "TriangulatingPathOp.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/StrokeKey.h"
 #include "gpu/Gpu.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "tgfx/core/PathEffect.h"
-#include "utils/StrokeKey.h"
 
 namespace tgfx {
 class PathTriangles : public DataProvider {

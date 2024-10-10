@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/apple/CTTypeface.h"
-#include "utils/USE.h"
+#include "core/utils/USE.h"
 
 #ifndef TGFX_USE_FREETYPE
 #include "vectors/coregraphics/CGTypeface.h"

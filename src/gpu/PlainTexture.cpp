@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PlainTexture.h"
+#include "core/utils/PixelFormatUtil.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/Gpu.h"
-#include "utils/PixelFormatUtil.h"
-#include "utils/UniqueID.h"
 
 namespace tgfx {
 static ScratchKey ComputeScratchKey(int width, int height, PixelFormat format, bool mipmapped) {

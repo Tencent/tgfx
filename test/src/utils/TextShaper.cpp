@@ -20,8 +20,8 @@
 #include <list>
 #include <map>
 #include <mutex>
+#include "core/utils/Log.h"
 #include "hb.h"
-#include "utils/Log.h"
 #include "utils/ProjectPath.h"
 
 namespace tgfx {

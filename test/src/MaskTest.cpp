@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
-#include "images/BufferImage.h"
+#include "core/images/BufferImage.h"
+#include "core/vectors/freetype/FTMask.h"
 #include "tgfx/core/Mask.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
-#include "vectors/freetype/FTMask.h"
 
 namespace tgfx {
 TGFX_TEST(MaskTest, Rasterize) {

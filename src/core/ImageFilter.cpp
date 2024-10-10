@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageFilter.h"
+#include "core/utils/NeedMipmaps.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "utils/NeedMipmaps.h"
 
 namespace tgfx {
 Rect ImageFilter::filterBounds(const Rect& rect) const {
