@@ -20,7 +20,7 @@
 
 #include "gpu/ops/Op.h"
 #include "gpu/tasks/RenderTask.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 class OpsRenderTask : public RenderTask {

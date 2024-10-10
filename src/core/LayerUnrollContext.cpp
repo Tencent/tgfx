@@ -18,7 +18,7 @@
 
 #include "LayerUnrollContext.h"
 #include "core/PathRef.h"
-#include "utils/Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 using namespace pk;

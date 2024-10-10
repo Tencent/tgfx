@@ -19,8 +19,8 @@
 #include "tgfx/core/ImageReader.h"
 #include "core/ImageStream.h"
 #include "core/PixelRef.h"
+#include "core/utils/Log.h"
 #include "gpu/Texture.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 class ImageReaderBuffer : public ImageBuffer {

@@ -21,8 +21,8 @@
 #include <emscripten/val.h>
 #include <optional>
 #include "tgfx/core/Data.h"
+#include "tgfx/core/DataView.h"
 #include "tgfx/core/Size.h"
-#include "tgfx/utils/DataView.h"
 
 namespace tgfx {
 class WebImageInfo {

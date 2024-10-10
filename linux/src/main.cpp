@@ -19,8 +19,8 @@
 #include <filesystem>
 #include <fstream>
 #include "drawers/Drawer.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/platform/Print.h"
 
 static std::string GetRootPath() {

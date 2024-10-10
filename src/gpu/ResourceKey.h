@@ -21,8 +21,8 @@
 #include <atomic>
 #include <cstring>
 #include <memory>
+#include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/UniqueType.h"
-#include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
 /**

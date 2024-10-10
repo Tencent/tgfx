@@ -18,10 +18,10 @@
 
 #include "tgfx/platform/web/VideoElementReader.h"
 #include "GLVideoTexture.h"
-#include "opengl/GLSampler.h"
+#include "core/utils/Log.h"
+#include "gpu/opengl/GLSampler.h"
 #include "platform/web/VideoElement.h"
 #include "tgfx/platform/web/WebCodec.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 using namespace emscripten;

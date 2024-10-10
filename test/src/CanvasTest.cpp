@@ -16,22 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/images/ResourceImage.h"
+#include "core/images/TransformImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Texture.h"
+#include "gpu/opengl/GLCaps.h"
+#include "gpu/opengl/GLSampler.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
-#include "images/ResourceImage.h"
-#include "images/TransformImage.h"
-#include "opengl/GLCaps.h"
-#include "opengl/GLSampler.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Recorder.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
 

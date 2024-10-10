@@ -20,9 +20,9 @@
 #include <dirent.h>
 #include <fstream>
 #include "ProjectPath.h"
-#include "tgfx/opengl/GLFunctions.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/Stream.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Stream.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");

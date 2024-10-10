@@ -26,8 +26,8 @@
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 

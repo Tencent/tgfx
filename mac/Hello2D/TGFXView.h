@@ -20,9 +20,9 @@
 
 #import <Cocoa/Cocoa.h>
 #include "tgfx/core/Canvas.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
-#include "tgfx/opengl/cgl/CGLWindow.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 
 @interface TGFXView : NSView
 

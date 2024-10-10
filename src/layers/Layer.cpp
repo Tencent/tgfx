@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
-#include "utils/Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<Layer> Layer::Make() {

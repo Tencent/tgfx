@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "YUVTexture.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/Gpu.h"
-#include "utils/UniqueID.h"
 
 namespace tgfx {
 static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};

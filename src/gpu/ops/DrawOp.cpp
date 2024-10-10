@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
+#include "core/utils/Log.h"
 #include "gpu/Gpu.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 static DstTextureInfo CreateDstTextureInfo(RenderPass* renderPass, Rect dstRect) {

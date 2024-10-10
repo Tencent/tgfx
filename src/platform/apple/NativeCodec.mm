@@ -18,7 +18,7 @@
 
 #include "NativeCodec.h"
 #include "BitmapContextUtil.h"
-#include "tgfx/utils/Buffer.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef imageProperties) {

@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/ResourceKey.h"
+#include "core/utils/HashRange.h"
+#include "core/utils/Log.h"
 #include "gpu/UniqueDomain.h"
-#include "utils/HashRange.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 static uint32_t* CopyData(const uint32_t* data, size_t count, size_t offset = 0) {

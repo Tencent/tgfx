@@ -20,9 +20,9 @@
 #include <atomic>
 #include "WebImageBuffer.h"
 #include "WebImageInfo.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/platform/web/WebCodec.h"
-#include "tgfx/utils/Buffer.h"
-#include "tgfx/utils/Stream.h"
 
 using namespace emscripten;
 

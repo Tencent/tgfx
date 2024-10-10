@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/Drawers.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace drawers {
 void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {

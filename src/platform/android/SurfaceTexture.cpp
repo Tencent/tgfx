@@ -21,8 +21,8 @@
 #include "GLExternalOESTexture.h"
 #include "HandlerThread.h"
 #include "JNIUtil.h"
-#include "opengl/GLSampler.h"
-#include "utils/Log.h"
+#include "core/utils/Log.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;

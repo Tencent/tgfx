@@ -18,8 +18,8 @@
 
 #include "AHardwareBufferFunctions.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "tgfx/platform/android/HardwareBufferJNI.h"
-#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,

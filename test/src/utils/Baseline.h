@@ -20,7 +20,7 @@
 
 #include "core/PixelBuffer.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 class Baseline {

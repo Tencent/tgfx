@@ -19,7 +19,7 @@
 #pragma once
 
 #include <atomic>
-#include "utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 class UniqueDomain {

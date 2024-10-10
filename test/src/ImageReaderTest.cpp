@@ -21,8 +21,8 @@
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {

@@ -79,17 +79,21 @@ endif ()
 
 # collects tgfx common files.
 file(GLOB_RECURSE SRC_FILES
-        src/core/*.*
-        src/filters/*.*
-        src/images/*.*
-        src/layers/*.*
-        src/shaders/*.*
-        src/utils/*.*
-        src/gpu/*.*)
+        src/core/filters/*.*
+        src/core/images/*.*
+        src/core/shaders/*.*
+        src/core/utils/*.*
+        src/gpu/ops/*.*
+        src/gpu/processors/*.*
+        src/gpu/proxies/*.*
+        src/gpu/tasks/*.*
+        src/layers/*.*)
 list(APPEND TGFX_FILES ${SRC_FILES})
 file(GLOB PLATFORM_COMMON_FILES
-        src/codecs/*.*
-        src/vectors/*.*
+        src/core/*.*
+        src/gpu/*.*
+        src/core/codecs/*.*
+        src/core/vectors/*.*
         src/platform/*.*)
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
@@ -154,14 +158,14 @@ endif ()
 
 if (TGFX_USE_JPEG)
     list(APPEND TGFX_STATIC_VENDORS libjpeg-turbo)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/codecs/jpeg/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/jpeg/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
 endif ()
 
 if (TGFX_USE_WEBP)
     list(APPEND TGFX_STATIC_VENDORS libwebp)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/codecs/webp/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/webp/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES third_party/libwebp/src)
 endif ()
@@ -169,7 +173,7 @@ endif ()
 if (TGFX_USE_PNG)
     set(TGFX_USE_ZLIB ON)
     list(APPEND TGFX_STATIC_VENDORS libpng)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/codecs/png/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/png/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()
@@ -181,36 +185,36 @@ endif ()
 if (TGFX_USE_FREETYPE)
     list(APPEND TGFX_DEFINES TGFX_USE_FREETYPE)
     list(APPEND TGFX_STATIC_VENDORS freetype)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vectors/freetype/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/freetype/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES third_party/freetype/include)
 elseif (WEB)
     list(APPEND TGFX_DEFINES TGFX_BUILD_FOR_WEB)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vectors/web/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/web/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
 elseif (APPLE)
     # Uses CoreGraphics instead.
     list(APPEND TGFX_DEFINES TGFX_USE_CORE_GRAPHICS)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vectors/coregraphics/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/coregraphics/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
 endif ()
 
 if (TGFX_USE_OPENGL)
-    file(GLOB GFX_PLATFORM_FILES src/opengl/*.*)
+    file(GLOB GFX_PLATFORM_FILES src/gpu/opengl/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
-    file(GLOB_RECURSE GFX_PROCESSOR_FILES src/opengl/processors/*.*)
+    file(GLOB_RECURSE GFX_PROCESSOR_FILES src/gpu/opengl/processors/*.*)
     list(APPEND TGFX_FILES ${GFX_PROCESSOR_FILES})
 elseif (ANDROID)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vulkan/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/gpu/vulkan/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
 elseif (APPLE)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/metal/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/gpu/metal/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     find_library(Metal_LIBS Metal REQUIRED)
     list(APPEND TGFX_SHARED_LIBS ${Metal_LIBS})
 endif ()
 
-file(GLOB_RECURSE EGL_PLATFORM_FILES src/opengl/egl/*.*)
+file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 
 if (TGFX_USE_QT)
     set(CMAKE_AUTOMOC ON)
@@ -221,10 +225,10 @@ if (TGFX_USE_QT)
     list(APPEND TGFX_SHARED_LIBS Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::OpenGL
             Qt${QT_VERSION_MAJOR}::Quick)
 
-    file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/qt/*.*)
+    file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/qt/*.*)
     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     if (MACOS)
-        file(GLOB CGL_PLATFORM_FILES src/opengl/cgl/CGLHardwareTexture.mm)
+        file(GLOB CGL_PLATFORM_FILES src/gpu/opengl/cgl/CGLHardwareTexture.mm)
         list(APPEND TGFX_FILES ${CGL_PLATFORM_FILES})
         list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
         find_library(OpenGL_LIBS OpenGL REQUIRED)
@@ -248,7 +252,7 @@ if (WEB)
     file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
     if (TGFX_USE_NATIVE_GL)
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/webgl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/webgl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
 elseif (OHOS)
@@ -270,7 +274,7 @@ elseif (OHOS)
         find_library(EGL_LIB EGL)
         find_library(GLES_LIB GLESv3)
         list(APPEND TGFX_SHARED_LIBS ${EGL_LIB} ${GLES_LIB})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
 elseif (IOS)
@@ -303,7 +307,7 @@ elseif (IOS)
         list(APPEND TGFX_DEFINES GLES_SILENCE_DEPRECATION)
         find_library(OpenGLES_LIBS OpenGLES REQUIRED)
         list(APPEND TGFX_SHARED_LIBS ${OpenGLES_LIBS})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/eagl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/eagl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
 elseif (MACOS)
@@ -328,7 +332,7 @@ elseif (MACOS)
         list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
         find_library(OpenGL_LIBS OpenGL REQUIRED)
         list(APPEND TGFX_SHARED_LIBS ${OpenGL_LIBS})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/cgl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/cgl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
 
@@ -349,7 +353,7 @@ elseif (ANDROID)
         list(APPEND TGFX_SHARED_LIBS ${GLESV2_LIB})
         find_library(EGL_LIB EGL)
         list(APPEND TGFX_SHARED_LIBS ${EGL_LIB})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
 
@@ -371,7 +375,7 @@ elseif (WIN32)
         file(GLOB ANGLE_LIBS vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
         list(APPEND GPU_PLATFORM_STATIC_LIBS ${ANGLE_LIBS})
         list(APPEND TGFX_INCLUDES vendor/angle/include)
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
 elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
@@ -388,7 +392,7 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
         list(APPEND TGFX_SHARED_LIBS ${GLESV2_LIB})
         find_library(EGL_LIB EGL)
         list(APPEND TGFX_SHARED_LIBS ${EGL_LIB})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
 endif ()

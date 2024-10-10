@@ -19,8 +19,8 @@
 #include "TiledTextureEffect.h"
 #include "ConstColorProcessor.h"
 #include "TextureEffect.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/ProxyProvider.h"
-#include "utils/MathExtra.h"
 
 namespace tgfx {
 using Wrap = SamplerState::WrapMode;

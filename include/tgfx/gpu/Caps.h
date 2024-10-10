@@ -23,6 +23,9 @@
 namespace tgfx {
 class Swizzle;
 
+/**
+ * Caps describes the capabilities of the GPU.
+ */
 class Caps {
  public:
   virtual ~Caps() = default;

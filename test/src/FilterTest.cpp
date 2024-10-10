@@ -18,14 +18,14 @@
 
 #include <vector>
 #include "CornerPinEffect.h"
-#include "opengl/GLUtil.h"
+#include "core/vectors/freetype/FTMask.h"
+#include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/RuntimeEffect.h"
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
-#include "vectors/freetype/FTMask.h"
 
 namespace tgfx {
 std::array<float, 20> lumaColorMatrix = {0,

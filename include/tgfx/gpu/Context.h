@@ -32,6 +32,10 @@ class Gpu;
 class ResourceProvider;
 class ProxyProvider;
 
+/**
+ * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
+ * issue drawing commands. Contexts are created by Devices.
+ */
 class Context {
  public:
   virtual ~Context();
