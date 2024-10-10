@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,13 +18,20 @@
 
 #pragma once
 
-#include "gpu/processors/ComposeFragmentProcessor.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class GLComposeFragmentProcessor : public ComposeFragmentProcessor {
+class ColorImageFilter : public ImageFilter {
  public:
-  explicit GLComposeFragmentProcessor(std::vector<std::unique_ptr<FragmentProcessor>> processors);
+  explicit ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter);
 
-  void emitCode(EmitArgs& args) const override;
+ protected:
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                         const FPArgs& args,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
+
+ private:
+  std::shared_ptr<tgfx::ColorFilter> filter;
 };
 }  // namespace tgfx

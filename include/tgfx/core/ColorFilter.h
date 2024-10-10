@@ -80,5 +80,6 @@ class ColorFilter {
   friend class RenderContext;
   friend class ColorFilterShader;
   friend class ComposeColorFilter;
+  friend class ColorImageFilter;
 };
 }  // namespace tgfx

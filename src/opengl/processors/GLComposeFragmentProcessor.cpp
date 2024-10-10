@@ -20,23 +20,16 @@
 
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> ComposeFragmentProcessor::Make(
-    std::unique_ptr<FragmentProcessor> f, std::unique_ptr<FragmentProcessor> g) {
-  if (f == nullptr && g == nullptr) {
+    std::vector<std::unique_ptr<FragmentProcessor>> processors) {
+  if (processors.empty()) {
     return nullptr;
   }
-  if (f == nullptr) {
-    return g;
-  }
-  if (g == nullptr) {
-    return f;
-  }
-  return std::unique_ptr<FragmentProcessor>(
-      new GLComposeFragmentProcessor(std::move(f), std::move(g)));
+  return std::unique_ptr<FragmentProcessor>(new GLComposeFragmentProcessor(std::move(processors)));
 }
 
-GLComposeFragmentProcessor::GLComposeFragmentProcessor(std::unique_ptr<FragmentProcessor> f,
-                                                       std::unique_ptr<FragmentProcessor> g)
-    : ComposeFragmentProcessor(std::move(f), std::move(g)) {
+GLComposeFragmentProcessor::GLComposeFragmentProcessor(
+    std::vector<std::unique_ptr<FragmentProcessor>> processors)
+    : ComposeFragmentProcessor(std::move(processors)) {
 }
 
 void GLComposeFragmentProcessor::emitCode(EmitArgs& args) const {

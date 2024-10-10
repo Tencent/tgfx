@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/TileMode.h"
@@ -80,6 +81,11 @@ class ImageFilter {
    */
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color);
+
+  /**
+   * Create a filter that applies the given color filter to the input image.
+   */
+  static std::shared_ptr<ImageFilter> ColorFilter(std::shared_ptr<ColorFilter> colorFilter);
 
   /**
    * Creates a filter that applies the given RuntimeEffect object to the input image.

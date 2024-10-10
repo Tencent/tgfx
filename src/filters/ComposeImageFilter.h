@@ -25,9 +25,7 @@ class ComposeImageFilter : public ImageFilter {
  public:
   explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
 
- private:
-  std::vector<std::shared_ptr<ImageFilter>> filters = {};
-
+ protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
@@ -38,6 +36,9 @@ class ComposeImageFilter : public ImageFilter {
   bool isComposeFilter() const override {
     return true;
   }
+
+ private:
+  std::vector<std::shared_ptr<ImageFilter>> filters = {};
 
   friend class ImageFilter;
 };
