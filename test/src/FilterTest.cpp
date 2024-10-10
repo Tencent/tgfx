@@ -28,6 +28,27 @@
 #include "vectors/freetype/FTMask.h"
 
 namespace tgfx {
+std::array<float, 20> lumaColorMatrix = {0,
+                                         0,
+                                         0,
+                                         0,
+                                         0,  // red
+                                         0,
+                                         0,
+                                         0,
+                                         0,
+                                         0,  // green
+                                         0,
+                                         0,
+                                         0,
+                                         0,
+                                         0,  // blue
+                                         0.21260000000000001f,
+                                         0.71519999999999995f,
+                                         0.0722f,
+                                         0,
+                                         0};
+
 TGFX_TEST(FilterTest, ColorMatrixFilter) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -53,7 +74,7 @@ TGFX_TEST(FilterTest, ColorMatrixFilter) {
   device->unlock();
 }
 
-TGFX_TEST(FilterTest, LumaColorFilter) {
+TGFX_TEST(FilterTest, ModeColorFilter) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
@@ -64,9 +85,10 @@ TGFX_TEST(FilterTest, LumaColorFilter) {
   auto canvas = surface->getCanvas();
   canvas->scale(0.25f, 0.25f);
   Paint paint;
-  paint.setColorFilter(ColorFilter::Luma());
+  auto modeColorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
+  paint.setColorFilter(modeColorFilter);
   canvas->drawImage(image, &paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/LumaColorFilter"));
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ModeColorFilter"));
   device->unlock();
 }
 
@@ -85,7 +107,8 @@ TGFX_TEST(FilterTest, ComposeColorFilter) {
                                            0,    0.2f, 0, 0, 0,  // green
                                            0,    0,    2, 0, 0,  // blue
                                            0,    0,    0, 1, 0});
-  auto composeFilter = ColorFilter::Compose(matrixFilter, ColorFilter::Luma());
+  auto lumaFilter = ColorFilter::Matrix(lumaColorMatrix);
+  auto composeFilter = ColorFilter::Compose(matrixFilter, lumaFilter);
   paint.setColorFilter(std::move(composeFilter));
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeColorFilter"));
@@ -101,7 +124,8 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   ASSERT_TRUE(mask != nullptr);
   auto shader = Shader::MakeImageShader(mask);
   ASSERT_TRUE(shader != nullptr);
-  shader = shader->makeWithColorFilter(ColorFilter::Luma());
+  auto lumaFilter = ColorFilter::Matrix(lumaColorMatrix);
+  shader = shader->makeWithColorFilter(lumaFilter);
   ASSERT_TRUE(shader != nullptr);
   auto maskFilter = MaskFilter::MakeShader(shader);
   auto image = MakeImage("resources/apitest/rotation.jpg");

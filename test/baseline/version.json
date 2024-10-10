@@ -31,17 +31,17 @@
         "SimpleText": "74f94c4"
     },
     "FilterTest": {
-        "ComposeColorFilter": "6ae079f",
+        "ComposeColorFilter": "f710e29",
         "ComposeImageFilter": "73046fc",
         "ComposeImageFilter2": "73046fc",
         "ImageFilterShader": "6f4a968",
-        "LumaColorFilter": "6ae079f",
+        "ModeColorFilter": "c2b0b18",
         "RuntimeEffect": "6f4a968",
         "blur": "4d6ab20",
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
-        "shaderMaskFilter": "1f657af"
+        "shaderMaskFilter": "c2b0b18"
     },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
