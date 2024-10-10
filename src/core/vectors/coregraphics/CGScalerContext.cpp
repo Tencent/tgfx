@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "vectors/coregraphics/CGScalerContext.h"
+#include "core/vectors/coregraphics/CGScalerContext.h"
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"

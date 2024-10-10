@@ -20,7 +20,7 @@
 #include "core/utils/USE.h"
 
 #ifndef TGFX_USE_FREETYPE
-#include "vectors/coregraphics/CGTypeface.h"
+#include "core/vectors/coregraphics/CGTypeface.h"
 #endif
 
 namespace tgfx {
