@@ -82,7 +82,7 @@ void Layer::setRasterizationScale(float value) {
   invalidate();
 }
 
-void Layer::setFilters(std::vector<std::shared_ptr<ImageFilter>> value) {
+void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   if (_filters.size() == value.size() &&
       std::equal(_filters.begin(), _filters.end(), value.begin())) {
     return;
@@ -111,10 +111,6 @@ void Layer::setScrollRect(const Rect* rect) {
   invalidate();
 }
 
-Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
-  return Rect::MakeEmpty();
-}
-
 Point Layer::globalToLocal(const Point& globalPoint) const {
   return globalPoint;
 }
@@ -125,11 +121,5 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 
 void Layer::invalidate() {
   dirty = true;
-}
-
-void Layer::invalidateContent() {
-}
-
-void Layer::onDraw(Canvas* canvas) {
 }
 }  // namespace tgfx

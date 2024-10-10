@@ -24,13 +24,4 @@ std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
   layer->weakThis = layer;
   return layer;
 }
-
-void ShapeLayer::setPath(const Path& path) {
-  _pathProvider = PathProvider::Wrap(path);
-}
-
-ShapeLayer::ShapeLayer() {
-  _pathProvider = PathProvider::Wrap(Path());
-}
-
 }  // namespace tgfx
