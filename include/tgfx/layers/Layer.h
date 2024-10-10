@@ -398,6 +398,10 @@ class Layer {
 
   void onDetachFromRoot();
 
+  int doGetChildIndex(Layer* child) const;
+
+  bool doContains(Layer* child) const;
+
   bool dirty = true;
   std::string _name;
   float _alpha = 1.0f;

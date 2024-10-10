@@ -130,7 +130,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   if (child.get() == this) {
     LOGE("addChildAt() The child is the same as the parent.");
     return false;
-  } else if (child->contains(weakThis.lock())) {
+  } else if (child->doContains(this)) {
     LOGE("addChildAt() The child is already a parent of the parent.");
     return false;
   } else if (child->root() == child.get()) {
@@ -149,31 +149,20 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
 }
 
 bool Layer::contains(std::shared_ptr<Layer> child) const {
-  auto target = child.get();
-  while (target) {
-    if (target == this) {
-      return true;
-    }
-    target = target->_parent;
-  }
-  return false;
+  return doContains(child.get());
 }
 
 std::shared_ptr<Layer> Layer::getChildByName(const std::string& name) {
-  for (const auto& c : _children) {
-    if (c->name() == name) {
-      return c;
+  for (const auto& child : _children) {
+    if (child->name() == name) {
+      return child;
     }
   }
   return nullptr;
 }
 
 int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
-  auto it = std::find(_children.begin(), _children.end(), child);
-  if (it != _children.end()) {
-    return static_cast<int>(it - _children.begin());
-  }
-  return -1;
+  return doGetChildIndex(child.get());
 }
 
 std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float, float) {
@@ -184,7 +173,7 @@ void Layer::removeFromParent() {
   if (!_parent) {
     return;
   }
-  _parent->removeChildAt(_parent->getChildIndex(weakThis.lock()));
+  _parent->removeChildAt(_parent->doGetChildIndex(this));
 }
 
 std::shared_ptr<Layer> Layer::removeChildAt(int index) {
@@ -281,6 +270,26 @@ void Layer::onDetachFromRoot() {
   for (auto child : _children) {
     child->onDetachFromRoot();
   }
+}
+
+int Layer::doGetChildIndex(Layer* child) const {
+  for (size_t i = 0; i < _children.size(); ++i) {
+    if (_children[i].get() == child) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
+bool Layer::doContains(Layer* child) const {
+  auto target = child;
+  while (target) {
+    if (target == this) {
+      return true;
+    }
+    target = target->_parent;
+  }
+  return false;
 }
 
 void Layer::onDraw(Canvas*) {
