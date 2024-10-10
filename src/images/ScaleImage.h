@@ -35,6 +35,10 @@ class ScaleImage : public TransformImage {
 
   int height() const override;
 
+  bool isComplex() const override {
+    return source->isComplex();
+  }
+
  protected:
   Point scale = Point::Make(1.0f, 1.0f);
 

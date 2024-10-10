@@ -41,7 +41,7 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
 }
 
-std::shared_ptr<Image> ResourceImage::makeRasterized(const SamplingOptions&) const {
+std::shared_ptr<Image> ResourceImage::makeRasterized(bool, const SamplingOptions&) const {
   return weakThis.lock();
 }
 

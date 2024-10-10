@@ -149,18 +149,14 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
 }
 
-std::shared_ptr<Image> Image::makeRasterized(const SamplingOptions& sampling) const {
-  auto rasterImage = RasterImage::MakeFrom(weakThis.lock(), sampling);
-  if (rasterImage != nullptr && hasMipmaps()) {
-    return rasterImage->makeMipmapped(true);
-  }
-  return rasterImage;
+std::shared_ptr<Image> Image::makeRasterized(bool mipmapped,
+                                             const SamplingOptions& sampling) const {
+  return RasterImage::MakeFrom(weakThis.lock(), mipmapped, sampling);
 }
 
-std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
+std::shared_ptr<Image> Image::makeTextureImage(Context* context,
+                                               const SamplingOptions& sampling) const {
   TPArgs args(context, 0, hasMipmaps());
-  auto mipmapMode = args.mipmapped ? MipmapMode::Linear : MipmapMode::None;
-  SamplingOptions sampling(FilterMode::Linear, mipmapMode);
   return TextureImage::Wrap(lockTextureProxy(args, sampling));
 }
 

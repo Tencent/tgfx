@@ -34,6 +34,10 @@ class OrientImage : public TransformImage {
 
   int height() const override;
 
+  bool isComplex() const override {
+    return source->isComplex();
+  }
+
  protected:
   Orientation orientation = Orientation::TopLeft;
 

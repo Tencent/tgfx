@@ -39,6 +39,10 @@ class SubsetImage : public TransformImage {
     return static_cast<int>(bounds.height());
   }
 
+  bool isComplex() const override {
+    return true;
+  }
+
  protected:
   Rect bounds = Rect::MakeEmpty();
 

@@ -130,8 +130,7 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
   if (!filter->applyCropRect(inputBounds, &dstBounds, &drawBounds)) {
     return nullptr;
   }
-  if (dstBounds.contains(drawBounds) ||
-      (tileModeX == TileMode::Decal && tileModeY == TileMode::Decal)) {
+  if (dstBounds.contains(drawBounds)) {
     return filter->asFragmentProcessor(source, args, sampling, AddressOf(fpMatrix));
   }
   auto mipmapped =
