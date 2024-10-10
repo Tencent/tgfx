@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,20 @@
 
 #pragma once
 
+#include "tgfx/layers/Layer.h"
+
 namespace tgfx {
 /**
- * TileMode determines how a shader should draw outside its original bounds.
+ * DisplayList represents a collection of layers can be drawn to a Surface. Note: All layers in the
+ * display list are not thread-safe and should only be accessed from a single thread.
  */
-enum class TileMode {
-  /**
-   * Replicate the edge color if the shader draws outside its original bounds.
-   */
-  Clamp,
+class DisplayList {
+ public:
+  virtual ~DisplayList() = default;
 
   /**
-   * Repeat the shader's image horizontally and vertically.
+   * Returns the root layer of the display list.
    */
-  Repeat,
-
-  /**
-   * Repeat the shader's image horizontally and vertically, alternating mirror images so that
-   * adjacent images always seam.
-   */
-  Mirror,
-
-  /**
-   * Only draw within the original domain, return transparent-black everywhere else.
-   */
-  Decal
+  Layer* root() const;
 };
 }  // namespace tgfx

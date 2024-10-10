@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,32 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/layers/PathProvider.h"
 
 namespace tgfx {
-/**
- * TileMode determines how a shader should draw outside its original bounds.
- */
-enum class TileMode {
-  /**
-   * Replicate the edge color if the shader draws outside its original bounds.
-   */
-  Clamp,
+std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
+  if (path.isEmpty()) {
+    return nullptr;
+  }
+  return std::shared_ptr<PathProvider>(new PathProvider(path));
+}
 
-  /**
-   * Repeat the shader's image horizontally and vertically.
-   */
-  Repeat,
+Path PathProvider::getPath() {
+  if (dirty) {
+    path = onGeneratePath();
+    dirty = false;
+  }
+  return path;
+}
 
-  /**
-   * Repeat the shader's image horizontally and vertically, alternating mirror images so that
-   * adjacent images always seam.
-   */
-  Mirror,
+void PathProvider::invalidate() {
+  dirty = true;
+}
 
-  /**
-   * Only draw within the original domain, return transparent-black everywhere else.
-   */
-  Decal
-};
+Path PathProvider::onGeneratePath() {
+  return path;
+}
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,53 @@
 
 #pragma once
 
+#include "tgfx/core/Image.h"
+#include "tgfx/layers/Layer.h"
+
 namespace tgfx {
 /**
- * TileMode determines how a shader should draw outside its original bounds.
+ * ImageLayer represents a layer that displays an image.
  */
-enum class TileMode {
+class ImageLayer : public Layer {
+ public:
   /**
-   * Replicate the edge color if the shader draws outside its original bounds.
+   * Creates a new image layer.
    */
-  Clamp,
+  static std::shared_ptr<ImageLayer> Make();
+
+  LayerType type() const override {
+    return LayerType::Image;
+  }
 
   /**
-   * Repeat the shader's image horizontally and vertically.
+   * Returns true if the image is smoothed when scaled.
    */
-  Repeat,
+  bool smoothing() const {
+    return _smoothing;
+  }
 
   /**
-   * Repeat the shader's image horizontally and vertically, alternating mirror images so that
-   * adjacent images always seam.
+   * Sets whether the image is smoothed when scaled.
    */
-  Mirror,
+  void setSmoothing(bool value);
 
   /**
-   * Only draw within the original domain, return transparent-black everywhere else.
+   * Returns the image displayed by this layer.
    */
-  Decal
+  std::shared_ptr<Image> image() const {
+    return _image;
+  }
+
+  /**
+   * Sets the image displayed by this layer.
+   */
+  void setImage(std::shared_ptr<Image> value);
+
+ protected:
+  ImageLayer() = default;
+
+ private:
+  bool _smoothing = true;
+  std::shared_ptr<Image> _image;
 };
 }  // namespace tgfx

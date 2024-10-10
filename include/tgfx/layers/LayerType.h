@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,28 +20,28 @@
 
 namespace tgfx {
 /**
- * TileMode determines how a shader should draw outside its original bounds.
+ * Defines the types of a layer.
  */
-enum class TileMode {
+enum class LayerType {
   /**
-   * Replicate the edge color if the shader draws outside its original bounds.
+   * The type for a generic layer. May be used as a container for other child layers.
    */
-  Clamp,
-
+  Layer,
   /**
-   * Repeat the shader's image horizontally and vertically.
+   * A layer displaying an image.
    */
-  Repeat,
-
+  Image,
   /**
-   * Repeat the shader's image horizontally and vertically, alternating mirror images so that
-   * adjacent images always seam.
+   * A layer displaying a shape.
    */
-  Mirror,
-
+  Shape,
   /**
-   * Only draw within the original domain, return transparent-black everywhere else.
+   * A layer displaying a color gradient.
    */
-  Decal
+  Gradient,
+  /**
+   * A layer displaying a simple text.
+   */
+  Text,
 };
 }  // namespace tgfx

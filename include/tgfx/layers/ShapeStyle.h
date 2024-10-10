@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,24 @@
 
 #pragma once
 
+#include "tgfx/core/Shader.h"
+
 namespace tgfx {
 /**
- * TileMode determines how a shader should draw outside its original bounds.
+ * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
+ * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
+ * are not thread-safe and should only be accessed from a single thread.
  */
-enum class TileMode {
-  /**
-   * Replicate the edge color if the shader draws outside its original bounds.
-   */
-  Clamp,
+class ShapeStyle {
+ public:
+  virtual ~ShapeStyle() = default;
 
+ protected:
   /**
-   * Repeat the shader's image horizontally and vertically.
+   * Returns the current shader that will be used to draw the shape.
    */
-  Repeat,
+  virtual std::shared_ptr<Shader> getShader() const = 0;
 
-  /**
-   * Repeat the shader's image horizontally and vertically, alternating mirror images so that
-   * adjacent images always seam.
-   */
-  Mirror,
-
-  /**
-   * Only draw within the original domain, return transparent-black everywhere else.
-   */
-  Decal
+  friend class ShapeLayer;
 };
 }  // namespace tgfx

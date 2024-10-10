@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,31 @@
 
 #pragma once
 
+#include "tgfx/core/ImageFilter.h"
+
 namespace tgfx {
 /**
- * TileMode determines how a shader should draw outside its original bounds.
+ * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
+ * adjustments. LayerFilters are mutable and can be changed at any time.
  */
-enum class TileMode {
+class LayerFilter {
+ public:
   /**
-   * Replicate the edge color if the shader draws outside its original bounds.
+   * Wraps an ImageFilter in a LayerFilter.
    */
-  Clamp,
+  static std::shared_ptr<LayerFilter> Wrap(const std::shared_ptr<ImageFilter>& filter);
+
+  virtual ~LayerFilter() = default;
 
   /**
-   * Repeat the shader's image horizontally and vertically.
+   * Returns the ImageFilter that represents the current state of this LayerFilter.
    */
-  Repeat,
+  virtual std::shared_ptr<ImageFilter> getImageFilter() const = 0;
 
+ protected:
   /**
-   * Repeat the shader's image horizontally and vertically, alternating mirror images so that
-   * adjacent images always seam.
+   * Invalidates the filter, causing it to be re-computed the next time it is requested.
    */
-  Mirror,
-
-  /**
-   * Only draw within the original domain, return transparent-black everywhere else.
-   */
-  Decal
+  void invalidate();
 };
 }  // namespace tgfx
