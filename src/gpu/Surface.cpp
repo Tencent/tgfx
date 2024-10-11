@@ -102,7 +102,9 @@ ImageOrigin Surface::origin() const {
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
-  getContext()->flush();
+  auto context = getContext();
+  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
+  context->flush();
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     return {};
@@ -114,7 +116,9 @@ BackendTexture Surface::getBackendTexture() {
   if (!renderTargetProxy->isTextureBacked()) {
     return {};
   }
-  getContext()->flush();
+  auto context = getContext();
+  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
+  context->flush();
   auto texture = renderTargetProxy->getTexture();
   if (texture == nullptr) {
     return {};
@@ -126,7 +130,9 @@ HardwareBufferRef Surface::getHardwareBuffer() {
   if (!renderTargetProxy->isTextureBacked()) {
     return nullptr;
   }
-  getContext()->flushAndSubmit(true);
+  auto context = getContext();
+  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
+  context->flushAndSubmit(true);
   auto texture = renderTargetProxy->getTexture();
   if (texture == nullptr) {
     return nullptr;
@@ -195,6 +201,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   auto context = getContext();
+  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
   context->flush();
   auto texture = renderTargetProxy->getTexture();
   auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
