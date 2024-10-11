@@ -25,16 +25,10 @@
 #include "gpu/tasks/TextureResolveTask.h"
 
 namespace tgfx {
-void DrawingManager::closeActiveOpsTask() {
-  if (activeOpsTask) {
-    activeOpsTask->makeClosed();
-    activeOpsTask = nullptr;
-  }
-}
-
 std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
     std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   closeActiveOpsTask();
+  checkIfResolveNeeded(renderTargetProxy);
   auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy);
   renderTasks.push_back(opsTask);
   activeOpsTask = opsTask.get();
@@ -49,6 +43,7 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> targe
     return;
   }
   closeActiveOpsTask();
+  checkIfResolveNeeded(target);
   auto task = std::make_shared<RuntimeDrawTask>(target, source, effect, offset);
   task->makeClosed();
   renderTasks.push_back(std::move(task));
@@ -60,6 +55,8 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> re
       (renderTargetProxy->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
+  // TODO(domchen): Skip resolving if the render target is not in the needResolveTargets set.
+  needResolveTargets.erase(renderTargetProxy);
   closeActiveOpsTask();
   auto task = std::make_shared<TextureResolveTask>(renderTargetProxy);
   task->makeClosed();
@@ -95,6 +92,12 @@ bool DrawingManager::flush() {
   if (resourceTasks.empty() && renderTasks.empty()) {
     return false;
   }
+  for (auto& renderTarget : needResolveTargets) {
+    auto task = std::make_shared<TextureResolveTask>(renderTarget);
+    task->makeClosed();
+    renderTasks.push_back(std::move(task));
+  }
+  needResolveTargets = {};
   for (auto& task : renderTasks) {
     task->prepare(context);
   }
@@ -112,5 +115,21 @@ bool DrawingManager::flush() {
   }
   renderTasks = {};
   return true;
+}
+
+void DrawingManager::closeActiveOpsTask() {
+  if (activeOpsTask) {
+    activeOpsTask->makeClosed();
+    activeOpsTask = nullptr;
+  }
+}
+
+void DrawingManager::checkIfResolveNeeded(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (textureProxy == nullptr ||
+      (renderTargetProxy->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
+    return;
+  }
+  needResolveTargets.insert(std::move(renderTargetProxy));
 }
 }  // namespace tgfx
