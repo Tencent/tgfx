@@ -258,6 +258,25 @@ void Layer::invalidateContent() {
   invalidate();
 }
 
+void Layer::draw(Canvas* canvas, const Paint* paint) {
+  if (!_visible || _alpha <= 0) {
+    return;
+  }
+  canvas->save();
+  canvas->concat(_matrix);
+  Paint currentPaint;
+  if (paint) {
+    currentPaint = *paint;
+    currentPaint.setAlpha(paint->getAlpha() * _alpha);
+  }
+  currentPaint.setBlendMode(_blendMode);
+  onDraw(canvas, currentPaint);
+  for (auto child : _children) {
+    child->draw(canvas, &currentPaint);
+  }
+  canvas->restore();
+}
+
 void Layer::onAttachToRoot(Layer* root) {
   _root = root;
   for (auto child : _children) {
@@ -292,6 +311,6 @@ bool Layer::doContains(Layer* child) const {
   return false;
 }
 
-void Layer::onDraw(Canvas*) {
+void Layer::onDraw(Canvas*, const Paint&) {
 }
 }  // namespace tgfx

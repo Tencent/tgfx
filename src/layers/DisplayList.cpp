@@ -28,4 +28,8 @@ Layer* DisplayList::root() const {
   return _root.get();
 }
 
+void DisplayList::draw(Canvas* canvas) {
+  _root->draw(canvas, nullptr);
+}
+
 }  // namespace tgfx

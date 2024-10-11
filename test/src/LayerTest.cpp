@@ -18,7 +18,9 @@
 
 #include <vector>
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/TextLayer.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -163,5 +165,58 @@ TGFX_TEST(LayerTest, LayerTreeCircle) {
   EXPECT_TRUE(child->contains(grandChild));
 
   EXPECT_TRUE(parent->contains(child));
+}
+
+TGFX_TEST(LayerTest, textLayer) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 200, 100);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto textLayer = TextLayer::Make();
+  auto textLayer2 = TextLayer::Make();
+  layer->addChild(textLayer);
+  layer->addChild(textLayer2);
+  layer->setMatrix(Matrix::MakeTrans(10, 10));
+  textLayer->setText("Hello, World!");
+  textLayer2->setText("Hello, World!");
+  auto color = Color::Red();
+  color.alpha = 0.5;
+  textLayer->setTextColor(color);
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 20);
+  textLayer->setFont(font);
+  textLayer->setAlpha(0.5f);
+  textLayer2->setFont(font);
+  textLayer2->setBlendMode(BlendMode::DstOut);
+  textLayer->setMatrix(Matrix::MakeRotate(30));
+  displayList->draw(canvas);
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, imageLayer) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  auto surface = Surface::Make(context, image->width() * 5, image->height() * 5);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto imageLayer = ImageLayer::Make();
+  layer->addChild(imageLayer);
+  imageLayer->setImage(image);
+  imageLayer->setSmoothing(false);
+  imageLayer->setMatrix(Matrix::MakeScale(5.0f));
+  displayList->draw(canvas);
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
+  device->unlock();
 }
 }  // namespace tgfx

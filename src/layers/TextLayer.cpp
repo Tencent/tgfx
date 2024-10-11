@@ -16,42 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ImageLayer.h"
+#include "tgfx/layers/TextLayer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
+std::shared_ptr<TextLayer> TextLayer::Make() {
+  auto layer = std::shared_ptr<TextLayer>(new TextLayer());
   layer->weakThis = layer;
   return layer;
 }
 
-void ImageLayer::setSampling(const SamplingOptions& value) {
-  if (_sampling == value) {
-    return;
-  }
-  _sampling = value;
-  invalidate();
+void TextLayer::setText(const std::string& text) {
+  _text = text;
+  invalidateContent();
 }
 
-void ImageLayer::setImage(std::shared_ptr<Image> value) {
-  if (_image == value) {
-    return;
-  }
-  _image = value;
-  invalidate();
+void TextLayer::setTextColor(const Color& color) {
+  _textColor = color;
+  invalidateContent();
 }
 
-void ImageLayer::onDraw(Canvas* canvas, const Paint& paint) {
-  if (!_image) {
+void TextLayer::setFont(const Font& font) {
+  _font = font;
+  invalidateContent();
+}
+
+void TextLayer::onDraw(Canvas* canvas, const Paint& paint) {
+  if (_text.empty()) {
     return;
   }
-  SamplingOptions samplingOptions;
-  if (_smoothing && _image->hasMipmaps()) {
-    samplingOptions.mipmapMode = MipmapMode::Linear;
-  } else {
-    samplingOptions.mipmapMode = MipmapMode::None;
-  }
-  canvas->drawImage(_image, samplingOptions, &paint);
+  auto textPaint = paint;
+  auto currentColor = _textColor;
+  currentColor.alpha *= textPaint.getAlpha();
+  textPaint.setColor(currentColor);
+  textPaint.setStyle(tgfx::PaintStyle::Fill);
+  canvas->drawSimpleText(_text, 0, _font.getSize(), _font, textPaint);
 }
 
 }  // namespace tgfx

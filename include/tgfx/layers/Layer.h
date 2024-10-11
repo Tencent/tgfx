@@ -388,11 +388,13 @@ class Layer {
    */
   void invalidateContent();
 
+  void draw(Canvas* canvas, const Paint* paint);
+
   /**
    * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
    * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
    */
-  virtual void onDraw(Canvas* canvas);
+  virtual void onDraw(Canvas* canvas, const Paint& paint);
 
  private:
   void onAttachToRoot(Layer* root);
