@@ -35,7 +35,16 @@ class OpsRenderTask : public RenderTask {
 
   bool execute(Gpu* gpu) override;
 
+  void makeClosed() {
+    closed = true;
+  }
+
+  bool isClosed() const {
+    return closed;
+  }
+
  private:
+  bool closed = false;
   std::shared_ptr<RenderPass> renderPass = nullptr;
   std::vector<std::unique_ptr<Op>> ops = {};
 };
