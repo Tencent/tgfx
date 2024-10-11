@@ -51,7 +51,7 @@ class Paint {
   void reset();
 
   /**
-   * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
+   * Returns true if the edges of paths or images may be drawn with partial transparency. The
    * default value is true.
    */
   bool isAntiAlias() const {
