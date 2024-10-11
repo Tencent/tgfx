@@ -18,8 +18,8 @@
 
 #include "NativeImageBuffer.h"
 #include <android/bitmap.h>
+#include "core/utils/Log.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> NativeImageBuffer::MakeFrom(JNIEnv* env, jobject bitmap) {

@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "opengl/GLUtil.h"
+#include "gpu/opengl/GLUtil.h"
 #include "tgfx/gpu/RuntimeProgram.h"
-#include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 class Uniforms {

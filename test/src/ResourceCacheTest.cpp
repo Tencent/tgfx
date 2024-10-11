@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
+#include "core/utils/UniqueID.h"
 #include "gpu/Resource.h"
-#include "tgfx/utils/Task.h"
+#include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
-#include "utils/UniqueID.h"
 
 namespace tgfx {
 class TestResource : public Resource {

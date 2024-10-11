@@ -21,7 +21,7 @@
 #include <atomic>
 #include <mutex>
 #include "JNIInit.h"
-#include "utils/Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 // https://android.googlesource.com/platform/art/+/refs/tags/android-5.0.2_r1/runtime/jni_internal.cc#63

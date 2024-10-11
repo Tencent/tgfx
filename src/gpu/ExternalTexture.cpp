@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExternalTexture.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "gpu/Gpu.h"
-#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, const BackendTexture& backendTexture,

@@ -7,8 +7,8 @@
 #include "tgfx/platform/ohos/OHOSPixelMap.h"
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
 #include "OHOSImageInfo.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/ColorType.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 

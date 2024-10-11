@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/utils/Log.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
 #include "gpu/ResourceProvider.h"
-#include "tgfx/utils/Clock.h"
-#include "utils/Log.h"
+#include "tgfx/core/Clock.h"
 
 namespace tgfx {
 Context::Context(Device* device) : _device(device) {

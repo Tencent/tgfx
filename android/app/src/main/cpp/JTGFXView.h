@@ -23,7 +23,7 @@
 #include <string>
 #include "drawers/Drawer.h"
 #include "tgfx/gpu/Window.h"
-#include "tgfx/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 
 namespace hello2d {
 class JTGFXView {

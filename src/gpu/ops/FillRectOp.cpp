@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FillRectOp.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/Gpu.h"
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "tgfx/utils/Buffer.h"
-#include "utils/UniqueID.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 class RectPaint {

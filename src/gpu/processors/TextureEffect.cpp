@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureEffect.h"
+#include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,

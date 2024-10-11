@@ -18,8 +18,8 @@
 
 #include "ResourceProvider.h"
 #include "GradientCache.h"
-#include "tgfx/utils/Buffer.h"
-#include "utils/Log.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 class PatternedIndexBufferProvider : public DataProvider {

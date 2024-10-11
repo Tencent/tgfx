@@ -20,10 +20,10 @@
 #include "core/DrawContext.h"
 #include "core/LayerUnrollContext.h"
 #include "core/Records.h"
+#include "core/utils/Log.h"
+#include "core/utils/SimpleTextShaper.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/gpu/Surface.h"
-#include "utils/Log.h"
-#include "utils/SimpleTextShaper.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {

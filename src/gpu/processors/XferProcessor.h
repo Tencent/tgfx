@@ -24,7 +24,7 @@
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
-#include "tgfx/utils/BytesKey.h"
+#include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
 class XferProcessor : public Processor {

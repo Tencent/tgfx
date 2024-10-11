@@ -1,6 +1,6 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
-#include "tgfx/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
 

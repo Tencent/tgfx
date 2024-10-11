@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/utils/Log.h"
 #include "drawers/Drawer.h"
-#include "utils/Log.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {

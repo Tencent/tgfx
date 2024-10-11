@@ -19,7 +19,7 @@
 #include "platform/web/WebImageStream.h"
 #include "gpu/Gpu.h"
 #include "gpu/Texture.h"
-#include "opengl/GLSampler.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 using namespace emscripten;

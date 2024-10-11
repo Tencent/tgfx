@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GpuBufferCreateTask.h"
-#include "tgfx/utils/Task.h"
+#include "tgfx/core/Task.h"
 
 namespace tgfx {
 class GpuBufferCreator : public GpuBufferCreateTask {
