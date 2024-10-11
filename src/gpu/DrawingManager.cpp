@@ -27,10 +27,9 @@
 namespace tgfx {
 std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
     std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
-  closeActiveOpsTask();
   checkIfResolveNeeded(renderTargetProxy);
   auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy);
-  renderTasks.push_back(opsTask);
+  addRenderTask(opsTask);
   activeOpsTask = opsTask.get();
   return opsTask;
 }
@@ -42,11 +41,9 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> targe
   if (target == nullptr || source == nullptr || effect == nullptr) {
     return;
   }
-  closeActiveOpsTask();
   checkIfResolveNeeded(target);
   auto task = std::make_shared<RuntimeDrawTask>(target, source, effect, offset);
-  task->makeClosed();
-  renderTasks.push_back(std::move(task));
+  addRenderTask(std::move(task));
 }
 
 void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
@@ -57,10 +54,8 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> re
   }
   // TODO(domchen): Skip resolving if the render target is not in the needResolveTargets set.
   needResolveTargets.erase(renderTargetProxy);
-  closeActiveOpsTask();
   auto task = std::make_shared<TextureResolveTask>(renderTargetProxy);
-  task->makeClosed();
-  renderTasks.push_back(std::move(task));
+  addRenderTask(std::move(task));
 }
 
 void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
@@ -69,10 +64,8 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  closeActiveOpsTask();
   auto task = std::make_shared<RenderTargetCopyTask>(source, dest, srcRect, dstPoint);
-  task->makeClosed();
-  renderTasks.push_back(std::move(task));
+  addRenderTask(std::move(task));
 }
 
 void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask) {
@@ -92,9 +85,12 @@ bool DrawingManager::flush() {
   if (resourceTasks.empty() && renderTasks.empty()) {
     return false;
   }
+  if (activeOpsTask) {
+    activeOpsTask->makeClosed();
+    activeOpsTask = nullptr;
+  }
   for (auto& renderTarget : needResolveTargets) {
     auto task = std::make_shared<TextureResolveTask>(renderTarget);
-    task->makeClosed();
     renderTasks.push_back(std::move(task));
   }
   needResolveTargets = {};
@@ -107,21 +103,18 @@ bool DrawingManager::flush() {
   resourceTaskMap = {};
   resourceTasks = {};
   for (auto& task : renderTasks) {
-    task->makeClosed();
-  }
-  activeOpsTask = nullptr;
-  for (auto& task : renderTasks) {
     task->execute(context->gpu());
   }
   renderTasks = {};
   return true;
 }
 
-void DrawingManager::closeActiveOpsTask() {
+void DrawingManager::addRenderTask(std::shared_ptr<RenderTask> renderTask) {
   if (activeOpsTask) {
     activeOpsTask->makeClosed();
     activeOpsTask = nullptr;
   }
+  renderTasks.push_back(std::move(renderTask));
 }
 
 void DrawingManager::checkIfResolveNeeded(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {

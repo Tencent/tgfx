@@ -58,7 +58,7 @@ class DrawingManager {
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
   OpsRenderTask* activeOpsTask = nullptr;
 
-  void closeActiveOpsTask();
+  void addRenderTask(std::shared_ptr<RenderTask> renderTask);
   void checkIfResolveNeeded(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 };
 }  // namespace tgfx

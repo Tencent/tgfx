@@ -140,10 +140,6 @@ HardwareBufferRef Surface::getHardwareBuffer() {
   return texture->getHardwareBuffer();
 }
 
-bool Surface::wait(const BackendSemaphore& waitSemaphore) {
-  return renderTargetProxy->getContext()->wait(waitSemaphore);
-}
-
 static Path GetInitClip(int width, int height) {
   Path path = {};
   path.addRect(Rect::MakeWH(width, height));
@@ -156,17 +152,6 @@ Canvas* Surface::getCanvas() {
     canvas = new Canvas(renderContext, GetInitClip(width(), height()));
   }
   return canvas;
-}
-
-bool Surface::flush(BackendSemaphore* signalSemaphore) {
-  auto context = getContext();
-  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
-  return context->flush(signalSemaphore);
-}
-
-void Surface::flushAndSubmit(bool syncCpu) {
-  flush();
-  getContext()->submit(syncCpu);
 }
 
 std::shared_ptr<Image> Surface::makeImageSnapshot() {

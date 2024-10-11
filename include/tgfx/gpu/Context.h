@@ -114,10 +114,10 @@ class Context {
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
-   * commands on the GPU for this surface. Surface will take ownership of the underlying semaphore
-   * and delete it once it has been signaled and waited on. If this call returns false, then the
-   * GPU back-end will not wait on the passed semaphore, and the client will still own the
-   * semaphore. Returns true if GPU is waiting on the semaphore.
+   * commands on the GPU. The context will take ownership of the underlying semaphore and delete it
+   * once it has been signaled and waited on. If this call returns false, then the GPU back-end will
+   * not wait on the passed semaphore, and the client will still own the semaphore. Returns true if
+   * GPU is waiting on the semaphore.
    */
   bool wait(const BackendSemaphore& waitSemaphore);
 
