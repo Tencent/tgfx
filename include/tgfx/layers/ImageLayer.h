@@ -37,16 +37,17 @@ class ImageLayer : public Layer {
   }
 
   /**
-   * Returns true if the image is smoothed when scaled.
+   * Returns the sampling options used to draw the image. The default value is
+   * SamplingOptions(FilterMode::Linear, MipmapMode::Linear).
    */
-  bool smoothing() const {
-    return _smoothing;
+  SamplingOptions sampling() const {
+    return _sampling;
   }
 
   /**
-   * Sets whether the image is smoothed when scaled.
+   * Sets the sampling options used to display the image.
    */
-  void setSmoothing(bool value);
+  void setSampling(const SamplingOptions& value);
 
   /**
    * Returns the image displayed by this layer.
@@ -61,10 +62,11 @@ class ImageLayer : public Layer {
   void setImage(std::shared_ptr<Image> value);
 
  protected:
-  ImageLayer() = default;
+  ImageLayer() : _sampling(FilterMode::Linear, MipmapMode::Linear) {
+  }
 
  private:
-  bool _smoothing = true;
-  std::shared_ptr<Image> _image;
+  SamplingOptions _sampling;
+  std::shared_ptr<Image> _image = nullptr;
 };
 }  // namespace tgfx
