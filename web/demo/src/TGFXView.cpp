@@ -31,15 +31,15 @@ std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   auto buffer = new (std::nothrow) uint8_t[length];
   if (buffer) {
     auto memory = val::module_property("HEAPU8")["buffer"];
-    auto memoryView = emscriptenData["constructor"].new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
+    auto memoryView =
+        emscriptenData["constructor"].new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
     memoryView.call<void>("set", emscriptenData);
     return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
   }
   return nullptr;
 }
 
-TGFXView::TGFXView(std::string canvasID, const val& nativeImage)
-    : canvasID(std::move(canvasID)) {
+TGFXView::TGFXView(std::string canvasID, const val& nativeImage) : canvasID(std::move(canvasID)) {
   appHost = std::make_shared<drawers::AppHost>();
 #ifdef __EMSCRIPTEN_PTHREADS__
   auto data = GetDataFromEmscripten(nativeImage);
@@ -124,7 +124,7 @@ void TGFXView::draw(int drawIndex) {
 }
 }  // namespace hello2d
 
-int main(int, const char * []) {
+int main(int, const char*[]) {
   return 0;
 }
 
@@ -133,13 +133,13 @@ using namespace hello2d;
 EMSCRIPTEN_BINDINGS(TGFXDemo) {
   class_<TGFXView>("TGFXView")
       .smart_ptr<std::shared_ptr<TGFXView>>("TGFXView")
-      .class_function("MakeFrom", optional_override(
-                                      [](const std::string& canvasID, const val& nativeImage) {
-                                        if (canvasID.empty()) {
-                                          return std::shared_ptr<TGFXView>(nullptr);
-                                        }
-                                        return std::make_shared<TGFXView>(canvasID, nativeImage);
-                                      }))
+      .class_function("MakeFrom",
+                      optional_override([](const std::string& canvasID, const val& nativeImage) {
+                        if (canvasID.empty()) {
+                          return std::shared_ptr<TGFXView>(nullptr);
+                        }
+                        return std::make_shared<TGFXView>(canvasID, nativeImage);
+                      }))
       .function("updateSize", &TGFXView::updateSize)
       .function("registerFont", &TGFXView::registerFont)
       .function("draw", &TGFXView::draw);
