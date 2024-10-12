@@ -32,17 +32,17 @@ class DisplayList {
   virtual ~DisplayList() = default;
 
   /**
-   * Returns true if the edges of paths or images may be drawn with partial transparency. The
-   * default value is true.
+   * Returns true if the display list allows layers to perform edge antialiasing. This means the
+   * edges of shapes and images can be drawn with partial transparency. The default value is true.
    */
-  bool antiAlias() const {
-    return _antiAlias;
+  bool allowsEdgeAntialiasing() const {
+    return _allowsEdgeAntialiasing;
   }
 
   /**
-   * Requests, but does not require, that edge pixels draw opaque or with partial transparency.
+   * Sets whether the display list allows layers to perform edge antialiasing.
    */
-  void setAntiAlias(bool edgeAntiAlias);
+  void setAllowsEdgeAntialiasing(bool edgeAntiAlias);
 
   /**
    * Returns true if the display list allows layers to be composited as a separate group from their
@@ -50,15 +50,15 @@ class DisplayList {
    * separately from its parent. This ensures correct rendering for layers with multiple opaque
    * components but may reduce performance. The default value is false.
    */
-  bool allowGroupAlpha() const {
-    return _allowGroupAlpha;
+  bool allowsGroupOpacity() const {
+    return _allowsGroupOpacity;
   }
 
   /**
    * Sets whether the display list allows layers to be composited as a separate group from their
    * parent.
    */
-  void setAllowGroupAlpha(bool allowGroupAlpha);
+  void setAllowsGroupOpacity(bool value);
 
   /**
    * Returns the root layer of the display list.
@@ -66,8 +66,8 @@ class DisplayList {
   Layer* root() const;
 
  private:
-  bool _antiAlias = true;
-  bool _allowGroupAlpha = false;
+  bool _allowsEdgeAntialiasing = true;
+  bool _allowsGroupOpacity = false;
   std::shared_ptr<Layer> _root = nullptr;
 };
 }  // namespace tgfx

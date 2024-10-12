@@ -25,11 +25,11 @@ std::shared_ptr<ImageLayer> ImageLayer::Make() {
   return layer;
 }
 
-void ImageLayer::setSmoothing(bool value) {
-  if (_smoothing == value) {
+void ImageLayer::setSampling(const SamplingOptions& value) {
+  if (_sampling == value) {
     return;
   }
-  _smoothing = value;
+  _sampling = value;
   invalidate();
 }
 
