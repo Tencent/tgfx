@@ -19,34 +19,9 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm/hello2d';
+import {ShareData, updateSize, onresizeEvent, onclickEvent} from "./common";
 
-declare class TGFXView {
-    public static MakeFrom: (selector: string) => TGFXView;
-    public updateSize: (devicePixelRatio: number) => void;
-    public draw: (drawIndex: number) => void;
-}
-
-let Hello2DModule: types.TGFX = null;
-let tgfxView: TGFXView = null;
-let drawIndex: number = 0;
-let resized: boolean = false;
-
-function updateSize() {
-    if (!tgfxView) {
-        return;
-    }
-    resized = false;
-    let canvas = document.getElementById('hello2d') as HTMLCanvasElement;
-    let container = document.getElementById('container') as HTMLDivElement;
-    let screenRect = container.getBoundingClientRect();
-    let scaleFactor = window.devicePixelRatio;
-    canvas.width = screenRect.width * scaleFactor;
-    canvas.height = screenRect.height * scaleFactor;
-    canvas.style.width = screenRect.width + "px";
-    canvas.style.height = screenRect.height + "px";
-    tgfxView.updateSize(scaleFactor);
-    tgfxView.draw(drawIndex);
-}
+let shareData: ShareData = new ShareData();
 
 const loadImage = (src) => {
     return new Promise((resolve, reject) => {
@@ -57,33 +32,28 @@ const loadImage = (src) => {
     })
 }
 
-window.onload = async () => {
-    Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm/' + file})
-        .then((module: types.TGFX) => {
-            TGFXBind(module);
-            return module;
-        })
-        .catch((error: any) => {
-            console.error(error);
-            throw new Error("Hello2D init failed. Please check the .wasm file path!.");
-        });
-    let image = await loadImage('../../resources/assets/bridge.jpg');
-    tgfxView = Hello2DModule.TGFXView.MakeFrom('#hello2d', image);
-    updateSize();
-};
+if (typeof window !== 'undefined') {
+    window.onload = async () => {
+        shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm/' + file})
+            .then((module: types.TGFX) => {
+                TGFXBind(module);
+                return module;
+            })
+            .catch((error: any) => {
+                console.error(error);
+                throw new Error("Hello2D init failed. Please check the .wasm file path!.");
+            });
+        let image = await loadImage('../../resources/assets/bridge.jpg');
+        shareData.tgfxBaseView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d', image);
+        updateSize(shareData);
+    };
 
-window.onresize = () => {
-    if (resized) {
-        return;
-    }
-    resized = true;
-    window.setTimeout(updateSize, 300);
-};
+    window.onresize = () => {
+        onresizeEvent(shareData);
+    };
 
-window.onclick = () => {
-    if (!tgfxView) {
-        return;
-    }
-    drawIndex++;
-    tgfxView.draw(drawIndex);
-};
+    window.onclick = () => {
+        onclickEvent(shareData);
+    };
+}
+

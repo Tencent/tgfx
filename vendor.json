@@ -79,7 +79,10 @@
         "platforms": [
           "win",
           "linux",
-          "mac"
+          "mac",
+          "android",
+          "ios",
+          "ohos"
         ]
       }
     },

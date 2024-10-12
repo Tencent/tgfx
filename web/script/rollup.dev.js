@@ -41,7 +41,7 @@ export default [
         plugins: plugins,
     },
     {
-        input: 'demo/index-mt.ts',
+        input: 'demo/index.ts',
         output: {
             banner,
             format: 'umd',
