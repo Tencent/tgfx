@@ -127,16 +127,15 @@ class Layer {
   void setVisible(bool value);
 
   /**
-   * Indicates whether the layer is cached as a bitmap before compositing. If true, the layer is
+   * Indicates whether the layer is rendered as a bitmap before compositing. If true, the layer is
    * rendered as a bitmap in its local coordinate space and then composited with other content. Any
    * filters in the filters property are rasterized and included in the bitmap, but the current
    * alpha of the layer is not. If false, the layer is composited directly into the destination
    * whenever possible. The layer may still be rasterized before compositing if certain features
-   * (like filters) require it. This caching can improve performance for layers with complex
-   * content. The default value is false.
+   * (like filters) require it. The default value is false.
    */
   bool shouldRasterize() {
-    return _shouldRasterize;
+    return _shouldRasterize || !_filters.empty();
   }
 
   /**
