@@ -10,16 +10,16 @@ cmake_policy(SET CMP0063 NEW)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building tgfx
-option(TGFX_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
+option(TGFX_USE_OPENGL "Allow the use of OpenGL as GPU backend" ON)
 option(TGFX_USE_QT "Allow build with QT frameworks." OFF)
 option(TGFX_USE_SWIFTSHADER "Allow build with SwiftShader library" OFF)
 option(TGFX_BUILD_DRAWERS "Build the tgfx-drawers library" OFF)
-option(EMSCRIPTEN_PTHREADS "Allow use threads on the web platform" OFF)
+option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
-    option(TGFX_USE_FREETYPE "Allow use of embedded freetype library" OFF)
+    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)
 else ()
-    option(TGFX_USE_FREETYPE "Allow use of embedded freetype library" ON)
+    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" ON)
 endif ()
 
 if (IOS)
