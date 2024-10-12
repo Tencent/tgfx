@@ -21,7 +21,7 @@
 namespace tgfx {
 
 DisplayList::DisplayList() : _root(Layer::Make()) {
-  _root->_root = _root.get();
+  _root->_root = this;
 }
 
 Layer* DisplayList::root() const {
@@ -29,7 +29,7 @@ Layer* DisplayList::root() const {
 }
 
 void DisplayList::draw(Canvas* canvas) {
-  _root->draw(canvas, nullptr);
+  _root->draw(canvas);
 }
 
 }  // namespace tgfx

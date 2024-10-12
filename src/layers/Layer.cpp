@@ -18,6 +18,8 @@
 
 #include "tgfx/layers/Layer.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace tgfx {
 std::shared_ptr<Layer> Layer::Make() {
@@ -133,7 +135,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   } else if (child->doContains(this)) {
     LOGE("addChildAt() The child is already a parent of the parent.");
     return false;
-  } else if (child->root() == child.get()) {
+  } else if (child->root() && child->root()->root() == child.get()) {
     LOGE("A root cannot be added as a child to a layer.");
     return false;
   }
@@ -256,28 +258,57 @@ void Layer::invalidate() {
 
 void Layer::invalidateContent() {
   invalidate();
+  contentSurface = nullptr;
 }
 
-void Layer::draw(Canvas* canvas, const Paint* paint) {
+void Layer::draw(Canvas* canvas, float globalAlpha) {
   if (!_visible || _alpha <= 0) {
     return;
   }
   canvas->save();
   canvas->concat(_matrix);
   Paint currentPaint;
-  if (paint) {
-    currentPaint = *paint;
-    currentPaint.setAlpha(paint->getAlpha() * _alpha);
-  }
+  currentPaint.setAlpha(_alpha * globalAlpha);
   currentPaint.setBlendMode(_blendMode);
-  onDraw(canvas, currentPaint);
-  for (auto child : _children) {
-    child->draw(canvas, &currentPaint);
+  auto contentCanvas = canvas;
+  if (contentSurface) {
+    canvas->drawImage(contentSurface->makeImageSnapshot(), &currentPaint);
+  } else if (!drawContentOffScreen()) {
+    // draw contents directly to the canvas.
+    onDraw(contentCanvas, currentPaint);
+    for (const auto& child : _children) {
+      child->draw(canvas, currentPaint.getAlpha());
+    }
+  } else {
+    // draw contents to an offscreen surface.
+    auto bounds = getBounds();
+    auto currentOptions = canvas->getSurface()->options();
+    auto contentOptions = *currentOptions;
+    if (shouldRasterize()) {
+      contentOptions = currentOptions->renderFlags() | RenderFlags::DisableCache;
+    }
+    contentSurface =
+        Surface::Make(canvas->getSurface()->getContext(), static_cast<int>(bounds.width()),
+                      static_cast<int>(bounds.height()), false, 1, true, &contentOptions);
+    if (!contentSurface) {
+      canvas->restore();
+      return;
+    }
+    contentCanvas = contentSurface->getCanvas();
+    onDraw(contentCanvas, {});
+
+    for (const auto& child : _children) {
+      child->draw(contentCanvas);
+    }
+    canvas->drawImage(contentSurface->makeImageSnapshot(), &currentPaint);
+    if (!shouldRasterize() || currentOptions->cacheDisabled()) {
+      contentSurface = nullptr;
+    }
   }
   canvas->restore();
 }
 
-void Layer::onAttachToRoot(Layer* root) {
+void Layer::onAttachToRoot(DisplayList* root) {
   _root = root;
   for (auto child : _children) {
     child->onAttachToRoot(root);
@@ -309,6 +340,15 @@ bool Layer::doContains(Layer* child) const {
     target = target->_parent;
   }
   return false;
+}
+
+bool Layer::drawContentOffScreen() const {
+  auto offscreen = shouldRasterize() || !_filters.empty();
+  if (!_children.empty()) {
+    offscreen = offscreen || _blendMode != BlendMode::SrcOver ||
+                (_root->allowsGroupOpacity() && _alpha < 1);
+  }
+  return offscreen;
 }
 
 void Layer::onDraw(Canvas*, const Paint&) {

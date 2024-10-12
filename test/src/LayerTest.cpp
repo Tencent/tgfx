@@ -53,10 +53,10 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(child2->root(), nullptr);
   EXPECT_EQ(child3->root(), nullptr);
   displayList->root()->addChild(parent);
-  EXPECT_EQ(parent->root(), displayList->root());
-  EXPECT_EQ(child1->root(), displayList->root());
-  EXPECT_EQ(child2->root(), displayList->root());
-  EXPECT_EQ(child3->root(), displayList->root());
+  EXPECT_EQ(parent->root(), displayList.get());
+  EXPECT_EQ(child1->root(), displayList.get());
+  EXPECT_EQ(child2->root(), displayList.get());
+  EXPECT_EQ(child3->root(), displayList.get());
 
   parent->removeFromParent();
   EXPECT_EQ(parent->root(), nullptr);
@@ -74,7 +74,7 @@ TGFX_TEST(LayerTest, LayerTree) {
 
   parent->replaceChild(child1, replacedChild);
   EXPECT_EQ(replacedChild->parent(), parent);
-  EXPECT_EQ(replacedChild->root(), displayList->root());
+  EXPECT_EQ(replacedChild->root(), displayList.get());
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_FALSE(parent->contains(child2));
   EXPECT_TRUE(parent->contains(replacedChild));
@@ -82,7 +82,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(parent->getChildIndex(replacedChild), 1);
   parent->replaceChild(replacedChild, child2);
   EXPECT_EQ(child2->parent(), parent);
-  EXPECT_EQ(child2->root(), displayList->root());
+  EXPECT_EQ(child2->root(), displayList.get());
   EXPECT_FALSE(parent->contains(replacedChild));
   EXPECT_TRUE(parent->contains(child2));
   EXPECT_TRUE(child1->children().size() == 0);
@@ -212,7 +212,8 @@ TGFX_TEST(LayerTest, imageLayer) {
   auto imageLayer = ImageLayer::Make();
   layer->addChild(imageLayer);
   imageLayer->setImage(image);
-  imageLayer->setSmoothing(false);
+  SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
+  imageLayer->setSampling(options);
   imageLayer->setMatrix(Matrix::MakeScale(5.0f));
   displayList->draw(canvas);
   context->submit();

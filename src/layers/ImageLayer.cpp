@@ -45,13 +45,7 @@ void ImageLayer::onDraw(Canvas* canvas, const Paint& paint) {
   if (!_image) {
     return;
   }
-  SamplingOptions samplingOptions;
-  if (_smoothing && _image->hasMipmaps()) {
-    samplingOptions.mipmapMode = MipmapMode::Linear;
-  } else {
-    samplingOptions.mipmapMode = MipmapMode::None;
-  }
-  canvas->drawImage(_image, samplingOptions, &paint);
+  canvas->drawImage(_image, _sampling, &paint);
 }
 
 }  // namespace tgfx
