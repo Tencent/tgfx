@@ -31,10 +31,10 @@ const plugins = [
 
 export default [
     {
-        input: 'demo/index.ts',
+        input: 'demo/index-mt.ts',
         output: {
             banner,
-            file: 'demo/index.js',
+            file: 'demo/index-mt.js',
             format: 'esm',
             sourcemap: true
         },

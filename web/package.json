@@ -10,10 +10,14 @@
     "clean:tgfx": "rimraf lib/ types/",
     "clean": "npm run clean:tgfx && rimraf demo/build demo/wasm demo/*.md5 demo/*.js demo/*.map demo/cmake-build-*",
     "build:tgfx": "npm run clean:tgfx && tsc -p ./tsconfig.type.json && rollup -c ./script/rollup.tgfx.js",
-    "build": "node script/cmake.demo.js && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
-    "build:debug": "node script/cmake.demo.js --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
+    "build": "node script/cmake.demo.js -a wasm-mt && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
+    "build:debug": "node script/cmake.demo.js -a wasm-mt --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
     "dev": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w",
-    "server": "http-server -p 8081 ../ -g -c-1 --cors -o web/demo"
+    "install:express": "npm install express && npm install -g pm2",
+    "start:server": "pm2 start server.js",
+    "stop:server": "pm2 stop server.js",
+    "server:mac": "open http://localhost:8081/web/demo/index.html",
+    "server:windows": "start http://localhost:8081/web/demo/index.html"
   },
   "repository": {
     "type": "git",
@@ -44,5 +48,8 @@
     "src"
   ],
   "license": "BSD-3-Clause",
-  "author": "Tencent"
+  "author": "Tencent",
+  "dependencies": {
+    "express": "^4.21.1"
+  }
 }

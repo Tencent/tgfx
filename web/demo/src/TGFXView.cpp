@@ -18,10 +18,36 @@
 
 #include "TGFXView.h"
 
+using namespace emscripten;
 namespace hello2d {
-TGFXView::TGFXView(std::string canvasID, emscripten::val nativeImage)
+std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
+  if (emscriptenData.isUndefined()) {
+    return nullptr;
+  }
+  unsigned int length = emscriptenData["length"].as<unsigned int>();
+  if (length == 0) {
+    return nullptr;
+  }
+  auto buffer = new (std::nothrow) uint8_t[length];
+  if (buffer) {
+    auto memory = val::module_property("HEAPU8")["buffer"];
+    auto memoryView = emscriptenData["constructor"].new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
+    memoryView.call<void>("set", emscriptenData);
+    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+  }
+  return nullptr;
+}
+
+TGFXView::TGFXView(std::string canvasID, const val& nativeImage)
     : canvasID(std::move(canvasID)) {
   appHost = std::make_shared<drawers::AppHost>();
+#ifdef __EMSCRIPTEN_PTHREADS__
+  auto data = GetDataFromEmscripten(nativeImage);
+  if (data) {
+    auto image = tgfx::Image::MakeFromEncoded(data);
+    appHost->addImage("bridge", std::move(image));
+  }
+#else
   auto image = tgfx::Image::MakeFrom(nativeImage);
   appHost->addImage("bridge", std::move(image));
   // To utilize a custom typeface, you can load it directly into the browser and access it using
@@ -30,6 +56,7 @@ TGFXView::TGFXView(std::string canvasID, emscripten::val nativeImage)
   appHost->addTypeface("default", std::move(typeface));
   typeface = tgfx::Typeface::MakeFromName("Noto Color Emoji", "Regular");
   appHost->addTypeface("emoji", std::move(typeface));
+#endif
 }
 
 void TGFXView::updateSize(float devicePixelRatio) {
@@ -39,7 +66,26 @@ void TGFXView::updateSize(float devicePixelRatio) {
     emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
     auto sizeChanged = appHost->updateScreen(width, height, devicePixelRatio);
     if (sizeChanged) {
-      window->invalidSize();
+      if (window) {
+        window->invalidSize();
+      }
+    }
+  }
+}
+
+void TGFXView::registerFont(const val& fontVal, const val& emojiFontVal) {
+  auto fontData = GetDataFromEmscripten(fontVal);
+  if (fontData) {
+    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
+    if (typeface) {
+      appHost->addTypeface("default", std::move(typeface));
+    }
+  }
+  auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
+  if (emojiFontData) {
+    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
+    if (typeface) {
+      appHost->addTypeface("emoji", std::move(typeface));
     }
   }
 }
@@ -78,19 +124,23 @@ void TGFXView::draw(int drawIndex) {
 }
 }  // namespace hello2d
 
+int main(int, const char * []) {
+  return 0;
+}
+
 using namespace hello2d;
-using namespace emscripten;
 
 EMSCRIPTEN_BINDINGS(TGFXDemo) {
   class_<TGFXView>("TGFXView")
       .smart_ptr<std::shared_ptr<TGFXView>>("TGFXView")
       .class_function("MakeFrom", optional_override(
-                                      [](const std::string& canvasID, emscripten::val nativeImage) {
+                                      [](const std::string& canvasID, const val& nativeImage) {
                                         if (canvasID.empty()) {
                                           return std::shared_ptr<TGFXView>(nullptr);
                                         }
                                         return std::make_shared<TGFXView>(canvasID, nativeImage);
                                       }))
       .function("updateSize", &TGFXView::updateSize)
+      .function("registerFont", &TGFXView::registerFont)
       .function("draw", &TGFXView::draw);
 }

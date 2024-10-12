@@ -25,9 +25,11 @@
 namespace hello2d {
 class TGFXView {
  public:
-  TGFXView(std::string canvasID, emscripten::val nativeImage);
+  TGFXView(std::string canvasID, const emscripten::val& nativeImage);
 
   void updateSize(float devicePixelRatio);
+
+  void registerFont(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
 
   void draw(int drawIndex);
 

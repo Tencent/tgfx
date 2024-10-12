@@ -34,14 +34,14 @@ export default [
         input: 'src/binding.ts',
         output: {
             banner,
-            file: 'demo/index.js',
+            file: 'demo/index-mt.js',
             format: 'esm',
             sourcemap: true
         },
         plugins: plugins,
     },
     {
-        input: 'demo/index.ts',
+        input: 'demo/index-mt.ts',
         output: {
             banner,
             format: 'umd',
