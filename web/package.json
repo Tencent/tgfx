@@ -13,11 +13,7 @@
     "build": "node script/cmake.demo.js -a wasm-mt && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
     "build:debug": "node script/cmake.demo.js -a wasm-mt --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
     "dev": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w",
-    "install:express": "npm install express && npm install -g pm2",
-    "start:server": "pm2 start server.js",
-    "stop:server": "pm2 stop server.js",
-    "server:mac": "open http://localhost:8081/web/demo/index.html",
-    "server:windows": "start http://localhost:8081/web/demo/index.html"
+    "server": "node server.js"
   },
   "repository": {
     "type": "git",
@@ -33,7 +29,6 @@
     "esbuild": "~0.15.14",
     "eslint": "~8.27.0",
     "eslint-config-alloy": "~4.7.0",
-    "http-server": "^14.1.1",
     "rimraf": "~3.0.2",
     "rollup": "~2.79.1",
     "rollup-plugin-esbuild": "~4.10.3",

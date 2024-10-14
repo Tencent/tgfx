@@ -52,7 +52,6 @@ export function onresizeEvent(shareData: ShareData) {
         return;
     }
     shareData.resized = true;
-    shareData.tgfxBaseView.updateSize(window.devicePixelRatio);
 }
 
 export function onclickEvent(shareData: ShareData) {
