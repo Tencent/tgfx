@@ -30,7 +30,7 @@ void ImageLayer::setSampling(const SamplingOptions& value) {
     return;
   }
   _sampling = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ImageLayer::setImage(std::shared_ptr<Image> value) {
@@ -38,14 +38,21 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
     return;
   }
   _image = value;
-  invalidate();
+  invalidateContent();
 }
 
-void ImageLayer::onDraw(Canvas* canvas, const Paint& paint) {
+void ImageLayer::onDraw(Canvas* canvas, Paint paint) {
   if (!_image) {
     return;
   }
   canvas->drawImage(_image, _sampling, &paint);
+}
+
+Rect ImageLayer::measureContentBounds() const {
+  if (!_image) {
+    return Rect::MakeEmpty();
+  }
+  return Rect::MakeWH(_image->width(), _image->height());
 }
 
 }  // namespace tgfx

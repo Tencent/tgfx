@@ -75,7 +75,9 @@ class TextLayer : public Layer {
  protected:
   TextLayer() = default;
 
-  void onDraw(Canvas* canvas, const Paint& paint) override;
+  void onDraw(Canvas* canvas, Paint paint) override;
+
+  Rect measureContentBounds() const override;
 
  private:
   std::string _text;

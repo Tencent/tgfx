@@ -29,6 +29,7 @@
 namespace tgfx {
 
 class DisplayList;
+class SurfaceOptions;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -391,24 +392,31 @@ class Layer {
    */
   void invalidateContent();
 
-  void draw(Canvas* canvas, float globalAlpha = 1.0f);
-
   /**
    * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
    * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
    */
-  virtual void onDraw(Canvas* canvas, const Paint& paint);
+  virtual void onDraw(Canvas* canvas, Paint paint);
+
+  /**
+    * Measure the rectangle area occupied by itself, note: this measurement does not include the area occupied by the sub-items
+    */
+  virtual Rect measureContentBounds() const;
 
  private:
   void onAttachToRoot(DisplayList* root);
 
   void onDetachFromRoot();
 
-  int doGetChildIndex(Layer* child) const;
+  int doGetChildIndex(const Layer* child) const;
 
-  bool doContains(Layer* child) const;
+  bool doContains(const Layer* child) const;
 
   bool drawContentOffScreen() const;
+
+  Matrix getTotalMatrix() const;
+
+  void draw(Canvas* canvas, float parentAlpha = 1.0f);
 
   bool dirty = true;
   std::string _name;
@@ -425,6 +433,7 @@ class Layer {
   Layer* _parent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
 
+  bool contentChange = true;
   std::shared_ptr<Surface> contentSurface = nullptr;
 
   friend class DisplayList;

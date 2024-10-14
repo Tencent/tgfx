@@ -74,7 +74,7 @@ void Layer::setShouldRasterize(bool value) {
     return;
   }
   _shouldRasterize = value;
-  invalidate();
+  invalidateContent();
 }
 
 void Layer::setRasterizationScale(float value) {
@@ -82,7 +82,7 @@ void Layer::setRasterizationScale(float value) {
     return;
   }
   _rasterizationScale = value;
-  invalidate();
+  invalidateContent();
 }
 
 void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
@@ -91,7 +91,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
     return;
   }
   _filters = std::move(value);
-  invalidate();
+  invalidateContent();
 }
 
 void Layer::setMask(std::shared_ptr<Layer> value) {
@@ -99,7 +99,7 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
     return;
   }
   _mask = std::move(value);
-  invalidate();
+  invalidateContent();
 }
 
 void Layer::setScrollRect(const Rect* rect) {
@@ -236,16 +236,50 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
   return true;
 }
 
-Rect Layer::getBounds(const Layer*) const {
-  return Rect::MakeEmpty();
+Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
+  auto totalMatrix = Matrix::I();
+  if (targetCoordinateSpace) {
+    auto rootLayer = this;
+    while (rootLayer->_parent != nullptr && targetCoordinateSpace != rootLayer) {
+      rootLayer = rootLayer->_parent;
+      totalMatrix.preConcat(rootLayer->_matrix);
+    }
+    if (!rootLayer->doContains(targetCoordinateSpace)) {
+      return Rect::MakeEmpty();
+    }
+    auto coordinateMatrix = Matrix::I();
+    while (rootLayer != targetCoordinateSpace) {
+      coordinateMatrix.preConcat(targetCoordinateSpace->_matrix);
+      targetCoordinateSpace = targetCoordinateSpace->_parent;
+    }
+    if (!coordinateMatrix.invert(&coordinateMatrix)) {
+      return Rect::MakeEmpty();
+    }
+    totalMatrix.postConcat(coordinateMatrix);
+  }
+
+  auto contentBounds = measureContentBounds();
+  for (const auto& child : _children) {
+    auto childBounds = child->getBounds();
+    child->_matrix.mapRect(&childBounds);
+    contentBounds.join(childBounds);
+  }
+  totalMatrix.mapRect(&contentBounds);
+
+  return contentBounds;
 }
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
-  return globalPoint;
+  auto globalMatrix = getTotalMatrix();
+  if (!globalMatrix.invert(&globalMatrix)) {
+    return Point::Make(0, 0);
+  }
+  return globalMatrix.mapXY(globalPoint.x, globalPoint.y);
 }
 
 Point Layer::localToGlobal(const Point& localPoint) const {
-  return localPoint;
+  auto globalMatrix = getTotalMatrix();
+  return globalMatrix.mapXY(localPoint.x, localPoint.y);
 }
 
 bool Layer::hitTestPoint(float, float, bool) {
@@ -253,59 +287,75 @@ bool Layer::hitTestPoint(float, float, bool) {
 }
 
 void Layer::invalidate() {
+  if (_parent) {
+    _parent->invalidateContent();
+  }
   dirty = true;
 }
 
 void Layer::invalidateContent() {
   invalidate();
-  contentSurface = nullptr;
+  contentChange = true;
 }
 
-void Layer::draw(Canvas* canvas, float globalAlpha) {
+void Layer::draw(Canvas* canvas, float parentAlpha) {
   if (!_visible || _alpha <= 0) {
     return;
   }
   canvas->save();
   canvas->concat(_matrix);
   Paint currentPaint;
-  currentPaint.setAlpha(_alpha * globalAlpha);
+  currentPaint.setAlpha(_alpha * parentAlpha);
   currentPaint.setBlendMode(_blendMode);
   auto contentCanvas = canvas;
-  if (contentSurface) {
+  if (!contentChange && contentSurface) {
+    canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
     canvas->drawImage(contentSurface->makeImageSnapshot(), &currentPaint);
   } else if (!drawContentOffScreen()) {
     // draw contents directly to the canvas.
-    onDraw(contentCanvas, currentPaint);
+    onDraw(contentCanvas, std::move(currentPaint));
     for (const auto& child : _children) {
       child->draw(canvas, currentPaint.getAlpha());
     }
   } else {
     // draw contents to an offscreen surface.
     auto bounds = getBounds();
-    auto currentOptions = canvas->getSurface()->options();
-    auto contentOptions = *currentOptions;
+    auto parentOptions = canvas->getSurface()->options();
+    auto contentOptions = *parentOptions;
     if (shouldRasterize()) {
-      contentOptions = currentOptions->renderFlags() | RenderFlags::DisableCache;
+      contentOptions = parentOptions->renderFlags() | RenderFlags::DisableCache;
     }
-    contentSurface =
-        Surface::Make(canvas->getSurface()->getContext(), static_cast<int>(bounds.width()),
-                      static_cast<int>(bounds.height()), false, 1, true, &contentOptions);
+    bounds.scale(_rasterizationScale, _rasterizationScale);
+    auto surfaceWidth = static_cast<int>(bounds.width());
+    auto surfaceHeight = static_cast<int>(bounds.height());
+    if (contentSurface == nullptr || contentSurface->width() != surfaceWidth ||
+        contentSurface->height() != surfaceHeight ||
+        contentOptions.renderFlags() != contentSurface->options()->renderFlags()) {
+      auto context = canvas->getSurface()->getContext();
+      contentSurface =
+          Surface::Make(context, surfaceWidth, surfaceHeight, false, 1, true, &contentOptions);
+    }
     if (!contentSurface) {
       canvas->restore();
       return;
     }
     contentCanvas = contentSurface->getCanvas();
+    contentCanvas->clear();
     onDraw(contentCanvas, {});
 
     for (const auto& child : _children) {
       child->draw(contentCanvas);
     }
+
+    canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
     canvas->drawImage(contentSurface->makeImageSnapshot(), &currentPaint);
-    if (!shouldRasterize() || currentOptions->cacheDisabled()) {
+    if (!shouldRasterize() || parentOptions->cacheDisabled()) {
       contentSurface = nullptr;
     }
   }
   canvas->restore();
+  contentChange = false;
+  dirty = false;
 }
 
 void Layer::onAttachToRoot(DisplayList* root) {
@@ -322,7 +372,7 @@ void Layer::onDetachFromRoot() {
   }
 }
 
-int Layer::doGetChildIndex(Layer* child) const {
+int Layer::doGetChildIndex(const Layer* child) const {
   for (size_t i = 0; i < _children.size(); ++i) {
     if (_children[i].get() == child) {
       return static_cast<int>(i);
@@ -331,7 +381,7 @@ int Layer::doGetChildIndex(Layer* child) const {
   return -1;
 }
 
-bool Layer::doContains(Layer* child) const {
+bool Layer::doContains(const Layer* child) const {
   auto target = child;
   while (target) {
     if (target == this) {
@@ -351,6 +401,20 @@ bool Layer::drawContentOffScreen() const {
   return offscreen;
 }
 
-void Layer::onDraw(Canvas*, const Paint&) {
+void Layer::onDraw(Canvas*, Paint) {
+}
+
+Rect Layer::measureContentBounds() const {
+  return Rect::MakeEmpty();
+}
+
+Matrix Layer::getTotalMatrix() const {
+  auto totalMatrix = Matrix::I();
+  auto layer = this;
+  while (layer) {
+    totalMatrix.preConcat(layer->_matrix);
+    layer = layer->_parent;
+  }
+  return totalMatrix;
 }
 }  // namespace tgfx

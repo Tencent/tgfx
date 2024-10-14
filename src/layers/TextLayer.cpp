@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
+#include "core/utils/SimpleTextShaper.h"
 
 namespace tgfx {
 std::shared_ptr<TextLayer> TextLayer::Make() {
@@ -40,16 +41,23 @@ void TextLayer::setFont(const Font& font) {
   invalidateContent();
 }
 
-void TextLayer::onDraw(Canvas* canvas, const Paint& paint) {
+void TextLayer::onDraw(Canvas* canvas, Paint paint) {
   if (_text.empty()) {
     return;
   }
-  auto textPaint = paint;
   auto currentColor = _textColor;
-  currentColor.alpha *= textPaint.getAlpha();
-  textPaint.setColor(currentColor);
-  textPaint.setStyle(tgfx::PaintStyle::Fill);
-  canvas->drawSimpleText(_text, 0, _font.getSize(), _font, textPaint);
+  currentColor.alpha *= paint.getAlpha();
+  paint.setColor(currentColor);
+  paint.setStyle(tgfx::PaintStyle::Fill);
+  canvas->drawSimpleText(_text, 0, _font.getSize(), _font, paint);
+}
+
+Rect TextLayer::measureContentBounds() const {
+  if (_text.empty()) {
+    return Rect::MakeEmpty();
+  }
+  auto glyphRun = SimpleTextShaper::Shape(_text, _font);
+  return glyphRun.getBounds(Matrix::MakeTrans(0, _font.getSize()));
 }
 
 }  // namespace tgfx

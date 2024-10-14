@@ -65,7 +65,9 @@ class ImageLayer : public Layer {
   ImageLayer() : _sampling(FilterMode::Linear, MipmapMode::Linear) {
   }
 
-  void onDraw(Canvas* canvas, const Paint& paint) override;
+  void onDraw(Canvas* canvas, Paint paint) override;
+
+  Rect measureContentBounds() const override;
 
  private:
   SamplingOptions _sampling;
