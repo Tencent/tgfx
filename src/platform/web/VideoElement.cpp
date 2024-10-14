@@ -37,7 +37,7 @@ VideoElement::VideoElement(emscripten::val video, int width, int height)
 void VideoElement::markFrameChanged(emscripten::val promise) {
   currentPromise = promise;
   markContentDirty(Rect::MakeWH(width(), height()));
-  if (currentPromise != val::null() && !WebCodec::AllowsAsyncDecoding()) {
+  if (currentPromise != val::null() && !WebCodec::AsyncSupport()) {
     currentPromise.await();
   }
 }
@@ -51,7 +51,7 @@ std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipm
 }
 
 bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
-  if (currentPromise != val::null() && WebCodec::AllowsAsyncDecoding()) {
+  if (currentPromise != val::null() && WebCodec::AsyncSupport()) {
     currentPromise.await();
   }
   return WebImageStream::onUpdateTexture(texture, bounds);

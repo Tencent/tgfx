@@ -120,7 +120,7 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
     auto bytes =
         val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
     image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
-    usePromise = WebCodec::AllowsAsyncDecoding();
+    usePromise = WebCodec::AsyncSupport();
     if (!usePromise) {
       image = image.await();
     }

@@ -33,11 +33,11 @@ class WebCodec {
    * process requires multiple flush() calls to the screen in a single frame, as it may cause screen
    * tearing, where parts of the screen update while others don’t. The default value is false.
    */
-  static bool AllowsAsyncDecoding();
+  static bool AsyncSupport();
 
   /**
    * Sets whether async decoding support for web native codecs is enabled.
    */
-  static void SetAllowsAsyncDecoding(bool enabled);
+  static void SetAsyncSupport(bool enabled);
 };
 }  // namespace tgfx
