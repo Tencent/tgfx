@@ -22,11 +22,7 @@ using namespace emscripten;
 namespace hello2d {
 
 TGFXView::TGFXView(std::string canvasID, const val& nativeImage)
-    : TGFXBaseView(std::move(canvasID)) {
-  auto image = tgfx::Image::MakeFrom(nativeImage);
-  if (image) {
-    appHost->addImage("bridge", std::move(image));
-  }
+    : TGFXBaseView(std::move(canvasID), nativeImage) {
   // To utilize a custom typeface, you can load it directly into the browser and access it using
   // tgfx::Typeface::MakeFromName().
   auto typeface = tgfx::Typeface::MakeFromName("Arial", "Regular");

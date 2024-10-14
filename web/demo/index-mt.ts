@@ -19,7 +19,7 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm-mt/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent} from "./common";
+import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
 
 let shareData: ShareData = new ShareData();
 
@@ -34,10 +34,9 @@ if (typeof window !== 'undefined') {
                 console.error(error);
                 throw new Error("Hello2D init failed. Please check the .wasm file path!.");
             });
-        var imagePath = "../../resources/assets/bridge.jpg";
-        const buffer = await fetch(imagePath).then((response) => response.arrayBuffer());
-        const intArray = new Uint8Array(buffer);
-        let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d', intArray);
+
+        let image = await loadImage('../../resources/assets/bridge.jpg');
+        let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d', image);
 
         var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
         const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());

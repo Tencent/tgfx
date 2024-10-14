@@ -21,8 +21,13 @@
 using namespace emscripten;
 namespace hello2d {
 
-TGFXBaseView::TGFXBaseView(std::string canvasID) : canvasID(std::move(canvasID)) {
+TGFXBaseView::TGFXBaseView(std::string canvasID, const val& nativeImage)
+    : canvasID(std::move(canvasID)) {
   appHost = std::make_shared<drawers::AppHost>();
+  auto image = tgfx::Image::MakeFrom(nativeImage);
+  if (image) {
+    appHost->addImage("bridge", std::move(image));
+  }
 }
 
 void TGFXBaseView::updateSize(float devicePixelRatio) {

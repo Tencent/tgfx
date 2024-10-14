@@ -19,18 +19,9 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent} from "./common";
+import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
 
 let shareData: ShareData = new ShareData();
-
-const loadImage = (src) => {
-    return new Promise((resolve, reject) => {
-        let img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
-    })
-}
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {

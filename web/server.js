@@ -1,7 +1,6 @@
 const express = require('express');
 const app = express();
 const path = require('path');
-const {exec} = require("child_process");
 
 // Enable SharedArrayBuffer
 app.use((req, res, next) => {
@@ -11,20 +10,19 @@ app.use((req, res, next) => {
 });
 
 app.use('', express.static(path.join('../')));
+app.use('', express.static(path.join('demo/')));
 
 app.get('/', (req, res) => {
   res.send('Hello, tgfx!');
 });
 
 const port = 8081;
+const args = process.argv.slice(2);
+var fileName = args.includes('wasm-mt') ? 'index-mt': 'index';
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
-  
-  const url = `http://localhost:${port}/web/demo/index.html`;
-  const command = process.platform === 'win32' ? `start ${url}` : `open ${url}`;
-  exec(command, (error, stdout, stderr) => {
-    if (error) {
-      return;
-    }
-  });
+
+  var url = `http://localhost:${port}/${fileName}.html`;
+  var start = (process.platform == 'darwin'? 'open': 'start');
+  require('child_process').exec(start + ' ' + url);
 });

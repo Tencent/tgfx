@@ -26,7 +26,7 @@ namespace hello2d {
 
 class TGFXBaseView {
  public:
-  TGFXBaseView(std::string canvasID);
+  TGFXBaseView(std::string canvasID, const emscripten::val& nativeImage);
 
   void updateSize(float devicePixelRatio);
 

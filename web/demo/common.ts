@@ -61,3 +61,12 @@ export function onclickEvent(shareData: ShareData) {
     shareData.drawIndex++;
     shareData.tgfxBaseView.draw(shareData.drawIndex);
 }
+
+export function loadImage(src: string) {
+    return new Promise((resolve, reject) => {
+        let img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+    })
+}

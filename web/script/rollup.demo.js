@@ -22,6 +22,9 @@ const banner = `////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
 `;
 
+const arch = process.env.ARCH;
+var fileName = (arch === 'wasm-mt'? 'index-mt': 'index');
+
 const plugins = [
     esbuild({tsconfig: "tsconfig.json", minify: false}),
     json(),
@@ -31,10 +34,10 @@ const plugins = [
 
 export default [
     {
-        input: 'demo/index-mt.ts',
+        input: `demo/${fileName}.ts`,
         output: {
             banner,
-            file: 'demo/index-mt.js',
+            file: `demo/${fileName}.js`,
             format: 'esm',
             sourcemap: true
         },
