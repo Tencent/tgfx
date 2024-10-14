@@ -78,6 +78,14 @@ Rasterizer::~Rasterizer() {
   delete stroke;
 }
 
+bool Rasterizer::asyncSupport() const {
+#if defined(TGFX_BUILD_FOR_WEB) && !defined(TGFX_USE_FREETYPE)
+  return false;
+#else
+  return true;
+#endif
+}
+
 std::shared_ptr<ImageBuffer> Rasterizer::onMakeBuffer(bool tryHardware) const {
   auto mask = Mask::Make(width(), height(), tryHardware);
   if (!mask) {

@@ -85,7 +85,8 @@ NativeCodec::NativeCodec(int width, int height, emscripten::val nativeImage)
 }
 
 bool NativeCodec::asyncSupport() const {
-  return WebCodec::AsyncSupport();
+  // The native codec can be only used in the main thread.
+  return false;
 }
 
 bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
