@@ -65,6 +65,8 @@ class ImageLayer : public Layer {
   ImageLayer() : _sampling(FilterMode::Linear, MipmapMode::Linear) {
   }
 
+  void onDraw(Canvas* canvas, const Paint& paint) override;
+
  private:
   SamplingOptions _sampling;
   std::shared_ptr<Image> _image = nullptr;

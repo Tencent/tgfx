@@ -21,11 +21,15 @@
 namespace tgfx {
 
 DisplayList::DisplayList() : _root(Layer::Make()) {
-  _root->_root = _root.get();
+  _root->_root = this;
 }
 
 Layer* DisplayList::root() const {
   return _root.get();
+}
+
+void DisplayList::draw(Canvas* canvas) {
+  _root->draw(canvas);
 }
 
 }  // namespace tgfx

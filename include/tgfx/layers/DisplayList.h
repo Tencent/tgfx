@@ -65,6 +65,11 @@ class DisplayList {
    */
   Layer* root() const;
 
+  /**
+   * Draws the display list to the given canvas.
+   */
+  void draw(Canvas* canvas);
+
  private:
   bool _allowsEdgeAntialiasing = true;
   bool _allowsGroupOpacity = false;

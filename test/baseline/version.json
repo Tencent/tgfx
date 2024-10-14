@@ -47,6 +47,10 @@
         "update_bitmap": "d010fb8",
         "update_mask": "d010fb8"
     },
+    "LayerTest": {
+        "draw_text": "99a5cd9",
+        "imageLayer": "99a5cd9"
+    },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
         "rasterize_path": "d010fb8",

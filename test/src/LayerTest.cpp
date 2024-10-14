@@ -18,7 +18,9 @@
 
 #include <vector>
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/TextLayer.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -51,10 +53,10 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(child2->root(), nullptr);
   EXPECT_EQ(child3->root(), nullptr);
   displayList->root()->addChild(parent);
-  EXPECT_EQ(parent->root(), displayList->root());
-  EXPECT_EQ(child1->root(), displayList->root());
-  EXPECT_EQ(child2->root(), displayList->root());
-  EXPECT_EQ(child3->root(), displayList->root());
+  EXPECT_EQ(parent->root(), displayList.get());
+  EXPECT_EQ(child1->root(), displayList.get());
+  EXPECT_EQ(child2->root(), displayList.get());
+  EXPECT_EQ(child3->root(), displayList.get());
 
   parent->removeFromParent();
   EXPECT_EQ(parent->root(), nullptr);
@@ -72,7 +74,7 @@ TGFX_TEST(LayerTest, LayerTree) {
 
   parent->replaceChild(child1, replacedChild);
   EXPECT_EQ(replacedChild->parent(), parent);
-  EXPECT_EQ(replacedChild->root(), displayList->root());
+  EXPECT_EQ(replacedChild->root(), displayList.get());
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_FALSE(parent->contains(child2));
   EXPECT_TRUE(parent->contains(replacedChild));
@@ -80,7 +82,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(parent->getChildIndex(replacedChild), 1);
   parent->replaceChild(replacedChild, child2);
   EXPECT_EQ(child2->parent(), parent);
-  EXPECT_EQ(child2->root(), displayList->root());
+  EXPECT_EQ(child2->root(), displayList.get());
   EXPECT_FALSE(parent->contains(replacedChild));
   EXPECT_TRUE(parent->contains(child2));
   EXPECT_TRUE(child1->children().size() == 0);
@@ -163,5 +165,59 @@ TGFX_TEST(LayerTest, LayerTreeCircle) {
   EXPECT_TRUE(child->contains(grandChild));
 
   EXPECT_TRUE(parent->contains(child));
+}
+
+TGFX_TEST(LayerTest, textLayer) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 200, 100);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto textLayer = TextLayer::Make();
+  auto textLayer2 = TextLayer::Make();
+  layer->addChild(textLayer);
+  layer->addChild(textLayer2);
+  layer->setMatrix(Matrix::MakeTrans(10, 10));
+  textLayer->setText("Hello, World!");
+  textLayer2->setText("Hello, World!");
+  auto color = Color::Red();
+  color.alpha = 0.5;
+  textLayer->setTextColor(color);
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 20);
+  textLayer->setFont(font);
+  textLayer->setAlpha(0.5f);
+  textLayer2->setFont(font);
+  textLayer2->setBlendMode(BlendMode::DstOut);
+  textLayer->setMatrix(Matrix::MakeRotate(30));
+  displayList->draw(canvas);
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, imageLayer) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  auto surface = Surface::Make(context, image->width() * 5, image->height() * 5);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto imageLayer = ImageLayer::Make();
+  layer->addChild(imageLayer);
+  imageLayer->setImage(image);
+  SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
+  imageLayer->setSampling(options);
+  imageLayer->setMatrix(Matrix::MakeScale(5.0f));
+  displayList->draw(canvas);
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
+  device->unlock();
 }
 }  // namespace tgfx

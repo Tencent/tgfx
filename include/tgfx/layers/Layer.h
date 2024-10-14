@@ -27,6 +27,9 @@
 #include "tgfx/layers/LayerType.h"
 
 namespace tgfx {
+
+class DisplayList;
+
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
  * features for positioning, visibility, and alpha support, as well as methods for adding and
@@ -135,7 +138,7 @@ class Layer {
    * (like filters) require it. This caching can improve performance for layers with complex
    * content. The default value is false.
    */
-  bool shouldRasterize() {
+  bool shouldRasterize() const {
     return _shouldRasterize;
   }
 
@@ -209,10 +212,10 @@ class Layer {
   void setScrollRect(const Rect* rect);
 
   /**
-   * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
-   * is not added to a display list, its root property is set to nullptr.
+   * Returns the binding displayList of the calling layer. If a layer is not added to a display
+   * list, its root property is set to nullptr.
    */
-  Layer* root() const {
+  DisplayList* root() const {
     return _root;
   }
 
@@ -388,20 +391,24 @@ class Layer {
    */
   void invalidateContent();
 
+  void draw(Canvas* canvas, float globalAlpha = 1.0f);
+
   /**
    * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
    * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
    */
-  virtual void onDraw(Canvas* canvas);
+  virtual void onDraw(Canvas* canvas, const Paint& paint);
 
  private:
-  void onAttachToRoot(Layer* root);
+  void onAttachToRoot(DisplayList* root);
 
   void onDetachFromRoot();
 
   int doGetChildIndex(Layer* child) const;
 
   bool doContains(Layer* child) const;
+
+  bool drawContentOffScreen() const;
 
   bool dirty = true;
   std::string _name;
@@ -414,9 +421,11 @@ class Layer {
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
-  Layer* _root = nullptr;
+  DisplayList* _root = nullptr;
   Layer* _parent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+
+  std::shared_ptr<Surface> contentSurface = nullptr;
 
   friend class DisplayList;
 };

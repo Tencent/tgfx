@@ -30,7 +30,7 @@ class TextLayer : public Layer {
   /**
    * Creates a new text layer.
    */
-  std::shared_ptr<TextLayer> Make();
+  static std::shared_ptr<TextLayer> Make();
 
   LayerType type() const override {
     return LayerType::Text;
@@ -74,6 +74,8 @@ class TextLayer : public Layer {
 
  protected:
   TextLayer() = default;
+
+  void onDraw(Canvas* canvas, const Paint& paint) override;
 
  private:
   std::string _text;
