@@ -47,6 +47,8 @@ class Rasterizer : public ImageGenerator {
     return true;
   }
 
+  bool asyncSupport() const override;
+
  protected:
   Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* stroke);
 

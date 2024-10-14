@@ -128,10 +128,6 @@ std::shared_ptr<ImageDecoder> ImageDecoder::MakeFrom(std::shared_ptr<ImageGenera
     return nullptr;
   }
   if (asyncDecoding && generator->asyncSupport()) {
-    auto imageBuffer = generator->makeBuffer(tryHardware);
-    return Wrap(std::move(imageBuffer));
-  }
-  if (asyncDecoding) {
     return std::make_shared<AsyncImageDecoder>(std::move(generator), tryHardware);
   }
   return std::make_shared<ImageGeneratorWrapper>(std::move(generator), tryHardware);
