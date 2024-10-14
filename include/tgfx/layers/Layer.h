@@ -212,11 +212,11 @@ class Layer {
   void setScrollRect(const Rect* rect);
 
   /**
-   * Returns the binding displayList of the calling layer. If a layer is not added to a display
-   * list, its root property is set to nullptr.
+   * Returns the display list owner of the calling layer. If a layer is not added to a display list,
+   * its owner property is set to nullptr.
    */
-  DisplayList* root() const {
-    return _root;
+  DisplayList* owner() const {
+    return _owner;
   }
 
   /**
@@ -391,8 +391,6 @@ class Layer {
    */
   void invalidateContent();
 
-  void draw(Canvas* canvas, float globalAlpha = 1.0f);
-
   /**
    * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
    * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
@@ -400,15 +398,17 @@ class Layer {
   virtual void onDraw(Canvas* canvas, const Paint& paint);
 
  private:
-  void onAttachToRoot(DisplayList* root);
+  void onAttachToDisplayList(DisplayList* owner);
 
-  void onDetachFromRoot();
+  void onDetachFromDisplayList();
 
   int doGetChildIndex(Layer* child) const;
 
   bool doContains(Layer* child) const;
 
   bool drawContentOffScreen() const;
+
+  void draw(Canvas* canvas, float globalAlpha = 1.0f);
 
   bool dirty = true;
   std::string _name;
@@ -421,7 +421,7 @@ class Layer {
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
-  DisplayList* _root = nullptr;
+  DisplayList* _owner = nullptr;
   Layer* _parent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
 
