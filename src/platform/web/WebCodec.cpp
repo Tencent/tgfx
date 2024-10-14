@@ -22,11 +22,11 @@
 namespace tgfx {
 static std::atomic_bool AsyncSupportEnabled = false;
 
-bool WebCodec::AsyncSupport() {
+bool WebCodec::AllowsAsyncDecoding() {
   return AsyncSupportEnabled;
 }
 
-void WebCodec::SetAsyncSupport(bool enabled) {
+void WebCodec::SetAllowsAsyncDecoding(bool enabled) {
   AsyncSupportEnabled = enabled;
 }
 }  // namespace tgfx

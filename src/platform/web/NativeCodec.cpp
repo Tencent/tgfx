@@ -85,7 +85,8 @@ NativeCodec::NativeCodec(int width, int height, emscripten::val nativeImage)
 }
 
 bool NativeCodec::asyncSupport() const {
-  return WebCodec::AsyncSupport();
+  // The native codec can be only used in the main thread.
+  return false;
 }
 
 bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
@@ -119,7 +120,7 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
     auto bytes =
         val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
     image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
-    usePromise = WebCodec::AsyncSupport();
+    usePromise = WebCodec::AllowsAsyncDecoding();
     if (!usePromise) {
       image = image.await();
     }
