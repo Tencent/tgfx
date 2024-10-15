@@ -21,6 +21,7 @@
 #include "gpu/TPArgs.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
@@ -47,15 +48,28 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
   return image;
 }
 
-std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args, TileMode,
-                                                                    TileMode,
+std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
+                                                                    TileMode tileModeX,
+                                                                    TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto proxy = source->lockTextureProxy(tpArgs, sampling);
   auto matrix = concatUVMatrix(uvMatrix);
-  return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
+  auto drawBounds = args.drawRect;
+  if (matrix) {
+    matrix->mapRect(&drawBounds);
+  }
+  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  if (bounds.contains(drawBounds)) {
+    TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+    auto proxy = source->lockTextureProxy(tpArgs, sampling);
+    return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
+  }
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  auto textureProxy = lockTextureProxy(tpArgs, sampling);
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix);
 }
 
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
