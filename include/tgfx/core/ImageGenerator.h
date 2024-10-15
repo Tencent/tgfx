@@ -50,11 +50,12 @@ class ImageGenerator {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the ImageGenerator has built-in support for asynchronous decoding. If true, the
-   * makeBuffer() method will not block the calling thread.
+   * Returns true if the ImageGenerator supports asynchronous decoding. If so, the makeBuffer()
+   * method can be called from an arbitrary thread. Otherwise, the makeBuffer() method must be
+   * called from the main thread.
    */
   virtual bool asyncSupport() const {
-    return false;
+    return true;
   }
 
   /**

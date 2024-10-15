@@ -20,24 +20,23 @@
 
 namespace tgfx {
 /**
- * WebImageCodec provides convenience functions to enable/disable the async support for decoding web
- * images.
+ * WebCodec provides functions to enable or disable async decoding support for native codecs using
+ * web platform APIs. This setting does not affect embedded third-party codecs.
  */
 class WebCodec {
  public:
   /**
-   * Returns true if the async support for decoding web images is enabled. The default value is
-   * false.
+   * Returns true if async decoding support for web native codecs web images is enabled. When
+   * enabled, ImageBuffers generated from web native codecs won't be fully decoded immediately.
+   * Instead, they will trigger promise-awaiting calls before generating textures, speeding up the
+   * process of decoding multiple images simultaneously. Avoid enabling this if your rendering
+   * process requires multiple flush() calls to the screen in a single frame, as it may cause screen
+   * tearing, where parts of the screen update while others don’t. The default value is false.
    */
   static bool AsyncSupport();
 
   /**
-   * Enables or disables the async support for decoding web images. If set to true, the ImageBuffers
-   * generated from the web platform will not be fully decoded buffers. Instead, they will trigger
-   * promise-awaiting calls before generating textures, which can speed up the process of decoding
-   * multiple images simultaneously. Do not set it to true if your rendering process may require
-   * multiple flush() calls to the screen Surface during one single frame. Otherwise, it may result
-   * in screen tearing.
+   * Sets whether async decoding support for web native codecs is enabled.
    */
   static void SetAsyncSupport(bool enabled);
 };

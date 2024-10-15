@@ -41,7 +41,7 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
   invalidateContent();
 }
 
-void ImageLayer::onDraw(Canvas* canvas, Paint paint) {
+void ImageLayer::onDraw(Canvas* canvas, const Paint& paint) {
   if (!_image) {
     return;
   }

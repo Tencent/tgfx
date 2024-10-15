@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,14 +18,14 @@
 
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
-import Hello2D from './wasm/hello2d';
+import Hello2D from './wasm-mt/hello2d';
 import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
 
 let shareData: ShareData = new ShareData();
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
-        shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm/' + file})
+        shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm-mt/' + file})
             .then((module: types.TGFX) => {
                 TGFXBind(module);
                 return module;
@@ -34,8 +34,19 @@ if (typeof window !== 'undefined') {
                 console.error(error);
                 throw new Error("Hello2D init failed. Please check the .wasm file path!.");
             });
+
         let image = await loadImage('../../resources/assets/bridge.jpg');
-        shareData.tgfxBaseView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d', image);
+        let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d', image);
+
+        var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+        const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
+        const fontUIntArray = new Uint8Array(fontBuffer);
+        var emojiFontPath = "../../resources/font/NotoColorEmoji.ttf";
+        const emojiFontBuffer = await fetch(emojiFontPath).then((response) => response.arrayBuffer());
+        const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
+        tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
+
+        shareData.tgfxBaseView = tgfxView;
         updateSize(shareData);
     };
 

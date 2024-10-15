@@ -21,7 +21,7 @@
 namespace tgfx {
 
 DisplayList::DisplayList() : _root(Layer::Make()) {
-  _root->_root = this;
+  _root->_owner = this;
 }
 
 Layer* DisplayList::root() const {

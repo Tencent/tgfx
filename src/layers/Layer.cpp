@@ -135,8 +135,8 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   } else if (child->doContains(this)) {
     LOGE("addChildAt() The child is already a parent of the parent.");
     return false;
-  } else if (child->root() && child->root()->root() == child.get()) {
-    LOGE("A root cannot be added as a child to a layer.");
+  } else if (child->_owner && child->_owner->root() == child.get()) {
+    LOGE("A root layer cannot be added as a child to another layer.");
     return false;
   }
   if (child->parent().get() == this) {
@@ -145,7 +145,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   child->removeFromParent();
   _children.insert(_children.begin() + index, child);
   child->_parent = this;
-  child->onAttachToRoot(_root);
+  child->onAttachToDisplayList(_owner);
   invalidateContent();
   return true;
 }
@@ -185,7 +185,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   }
   auto child = _children[static_cast<size_t>(index)];
   child->_parent = nullptr;
-  child->onDetachFromRoot();
+  child->onDetachFromDisplayList();
   _children.erase(_children.begin() + index);
   invalidateContent();
   return child;
@@ -314,17 +314,17 @@ void Layer::draw(Canvas* canvas, const Paint& paint) {
   contentChange = false;
 }
 
-void Layer::onAttachToRoot(DisplayList* root) {
-  _root = root;
+void Layer::onAttachToDisplayList(DisplayList* owner) {
+  _owner = owner;
   for (auto child : _children) {
-    child->onAttachToRoot(root);
+    child->onAttachToDisplayList(owner);
   }
 }
 
-void Layer::onDetachFromRoot() {
-  _root = nullptr;
+void Layer::onDetachFromDisplayList() {
+  _owner = nullptr;
   for (auto child : _children) {
-    child->onDetachFromRoot();
+    child->onDetachFromDisplayList();
   }
 }
 
@@ -436,12 +436,12 @@ bool Layer::shouldDrawOffScreen() const {
   auto offscreen = shouldRasterize() || !_filters.empty();
   if (!_children.empty()) {
     offscreen = offscreen || _blendMode != BlendMode::SrcOver ||
-                (_alpha < 1 && _root && _root->allowsGroupOpacity());
+                (_alpha < 1 && _owner && _owner->allowsGroupOpacity());
   }
   return offscreen;
 }
 
-void Layer::onDraw(Canvas*, Paint) {
+void Layer::onDraw(Canvas*, const Paint&) {
 }
 
 Rect Layer::measureContentBounds() const {

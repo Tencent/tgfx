@@ -213,11 +213,11 @@ class Layer {
   void setScrollRect(const Rect* rect);
 
   /**
-   * Returns the binding displayList of the calling layer. If a layer is not added to a display
-   * list, its root property is set to nullptr.
+   * Returns the display list owner of the calling layer. If a layer is not added to a display list,
+   * its owner property is set to nullptr.
    */
-  DisplayList* root() const {
-    return _root;
+  DisplayList* owner() const {
+    return _owner;
   }
 
   /**
@@ -281,18 +281,6 @@ class Layer {
    * @return The index position of the child layer to identify.
    */
   int getChildIndex(std::shared_ptr<Layer> child) const;
-
-  /**
-   * Returns an array of layers that lie under the specified point and are children (or grandchildren,
-   * and so on) of the calling layer. The point parameter is in the root layer's coordinate space,
-   * not the parent layer's (unless the parent layer is the root). You can use the globalToLocal()
-   * and the localToGlobal() methods to convert points between these coordinate spaces.
-   * @param x The x coordinate under which to look.
-   * @param y The y coordinate under which to look.
-   * @return An array of layers that lie under the specified point and are children (or
-   * grandchildren, and so on) of the calling layer.
-   */
-  std::vector<std::shared_ptr<Layer>> getLayersUnderPoint(float x, float y);
 
   /**
    * Removes the layer from its parent layer. If the layer is not a child of any layer, this method
@@ -363,14 +351,29 @@ class Layer {
   Point localToGlobal(const Point& localPoint) const;
 
   /**
+   * Returns an array of layers under the specified point that are children (or descendants) of the
+   * calling layer. The layers are checked against their bounding boxes for quick selection. The
+   * first layer in the array is the top-most layer under the point, and the last layer is the
+   * bottom-most. The point parameter is in the root layer's coordinate space, not the parent
+   * layer's (unless the parent layer is the root). You can use the globalToLocal() and the
+   * localToGlobal() methods to convert points between these coordinate spaces.
+   * @param x The x coordinate under which to look.
+   * @param y The y coordinate under which to look.
+   * @return An array of layers that lie under the specified point and are children (or
+   * grandchildren, and so on) of the calling layer.
+   */
+  std::vector<std::shared_ptr<Layer>> getLayersUnderPoint(float x, float y);
+
+  /**
    * Checks if the layer overlaps or intersects with the specified point (x, y).
    * The x and y coordinates are in the root layer's coordinate space, not the parent layer's
    * (unless the parent layer is the root). You can use the globalToLocal() and the localToGlobal()
    * methods to convert points between these coordinate spaces.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
-   * @param shapeFlag Whether to check against the actual pixels of the layer (true) or just the
-   * bounding box (false).
+   * @param shapeFlag Whether to check the actual pixels of the layer (true) or just the bounding
+   * box (false). Note that Image layers are always checked against their bounding box. You can draw
+   * image layers to a Surface and use the Surface::getColor() method to check the actual pixels.
    * @return true if the layer overlaps or intersects with the specified point, false otherwise.
    */
   bool hitTestPoint(float x, float y, bool shapeFlag = false);
@@ -396,7 +399,7 @@ class Layer {
    * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
    * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
    */
-  virtual void onDraw(Canvas* canvas, Paint paint);
+  virtual void onDraw(Canvas* canvas, const Paint& paint);
 
   /**
     * Measure the rectangle area occupied by itself, note: this measurement does not include the area occupied by the sub-items
@@ -404,9 +407,9 @@ class Layer {
   virtual Rect measureContentBounds() const;
 
  private:
-  void onAttachToRoot(DisplayList* root);
+  void onAttachToDisplayList(DisplayList* owner);
 
-  void onDetachFromRoot();
+  void onDetachFromDisplayList();
 
   int doGetChildIndex(const Layer* child) const;
 
@@ -423,7 +426,7 @@ class Layer {
   void drawChild(Canvas* canvas, const Paint& paint, Layer* child);
 
   std::shared_ptr<Surface> getOffscreenSurface(Context* context, uint32_t options,
-                                             const Rect* clipRect);
+                                               const Rect* clipRect);
 
   bool dirty = true;
   std::string _name;
@@ -436,7 +439,7 @@ class Layer {
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
-  DisplayList* _root = nullptr;
+  DisplayList* _owner = nullptr;
   Layer* _parent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
 

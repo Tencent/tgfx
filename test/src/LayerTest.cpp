@@ -47,22 +47,22 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_TRUE(parent->getChildIndex(child3) == 0);
   EXPECT_EQ(parent->getChildIndex(child1), 1);
 
-  // Test setting root
-  EXPECT_EQ(parent->root(), nullptr);
-  EXPECT_EQ(child1->root(), nullptr);
-  EXPECT_EQ(child2->root(), nullptr);
-  EXPECT_EQ(child3->root(), nullptr);
+  // Tests for setting the display list owner.
+  EXPECT_EQ(parent->owner(), nullptr);
+  EXPECT_EQ(child1->owner(), nullptr);
+  EXPECT_EQ(child2->owner(), nullptr);
+  EXPECT_EQ(child3->owner(), nullptr);
   displayList->root()->addChild(parent);
-  EXPECT_EQ(parent->root(), displayList.get());
-  EXPECT_EQ(child1->root(), displayList.get());
-  EXPECT_EQ(child2->root(), displayList.get());
-  EXPECT_EQ(child3->root(), displayList.get());
+  EXPECT_EQ(parent->owner(), displayList.get());
+  EXPECT_EQ(child1->owner(), displayList.get());
+  EXPECT_EQ(child2->owner(), displayList.get());
+  EXPECT_EQ(child3->owner(), displayList.get());
 
   parent->removeFromParent();
-  EXPECT_EQ(parent->root(), nullptr);
-  EXPECT_EQ(child1->root(), nullptr);
-  EXPECT_EQ(child2->root(), nullptr);
-  EXPECT_EQ(child3->root(), nullptr);
+  EXPECT_EQ(parent->owner(), nullptr);
+  EXPECT_EQ(child1->owner(), nullptr);
+  EXPECT_EQ(child2->owner(), nullptr);
+  EXPECT_EQ(child3->owner(), nullptr);
   displayList->root()->addChild(parent);
 
   // Test replacing a child
@@ -70,11 +70,11 @@ TGFX_TEST(LayerTest, LayerTree) {
   auto replacedChild2 = Layer::Make();
   parent->replaceChild(replacedChild, replacedChild2);
   EXPECT_EQ(replacedChild2->parent(), nullptr);
-  EXPECT_EQ(replacedChild2->root(), nullptr);
+  EXPECT_EQ(replacedChild2->owner(), nullptr);
 
   parent->replaceChild(child1, replacedChild);
   EXPECT_EQ(replacedChild->parent(), parent);
-  EXPECT_EQ(replacedChild->root(), displayList.get());
+  EXPECT_EQ(replacedChild->owner(), displayList.get());
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_FALSE(parent->contains(child2));
   EXPECT_TRUE(parent->contains(replacedChild));
@@ -82,7 +82,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(parent->getChildIndex(replacedChild), 1);
   parent->replaceChild(replacedChild, child2);
   EXPECT_EQ(child2->parent(), parent);
-  EXPECT_EQ(child2->root(), displayList.get());
+  EXPECT_EQ(child2->owner(), displayList.get());
   EXPECT_FALSE(parent->contains(replacedChild));
   EXPECT_TRUE(parent->contains(child2));
   EXPECT_TRUE(child1->children().size() == 0);
@@ -92,7 +92,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   auto removedChild = parent->removeChildAt(0);
   EXPECT_EQ(removedChild, child3);
   EXPECT_EQ(child3->parent(), nullptr);
-  EXPECT_EQ(child3->root(), nullptr);
+  EXPECT_EQ(child3->owner(), nullptr);
   EXPECT_FALSE(parent->contains(child3));
   EXPECT_TRUE(parent->children().size() == 2);
   EXPECT_EQ(parent->getChildIndex(child1), 0);
@@ -101,13 +101,13 @@ TGFX_TEST(LayerTest, LayerTree) {
   // Test removing all children
   parent->removeChildren();
   EXPECT_EQ(child2->parent(), nullptr);
-  EXPECT_EQ(child2->root(), nullptr);
+  EXPECT_EQ(child2->owner(), nullptr);
   EXPECT_FALSE(parent->contains(child2));
   EXPECT_EQ(child2->parent(), nullptr);
-  EXPECT_EQ(child2->root(), nullptr);
+  EXPECT_EQ(child2->owner(), nullptr);
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_EQ(child1->parent(), nullptr);
-  EXPECT_EQ(child1->root(), nullptr);
+  EXPECT_EQ(child1->owner(), nullptr);
   EXPECT_TRUE(parent->children().empty());
 }
 
