@@ -412,11 +412,18 @@ class Layer {
 
   bool doContains(const Layer* child) const;
 
-  bool drawContentOffScreen() const;
+  bool shouldUseCache() const;
+
+  bool shouldDrawOffScreen() const;
 
   Matrix getTotalMatrix() const;
 
-  void draw(Canvas* canvas, float parentAlpha = 1.0f);
+  void draw(Canvas* canvas, const Paint& paint);
+
+  void drawChild(Canvas* canvas, const Paint& paint, Layer* child);
+
+  std::shared_ptr<Surface> getOffscreenSurface(Context* context, uint32_t options,
+                                             const Rect* clipRect);
 
   bool dirty = true;
   std::string _name;

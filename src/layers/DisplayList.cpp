@@ -29,7 +29,7 @@ Layer* DisplayList::root() const {
 }
 
 void DisplayList::draw(Canvas* canvas) {
-  _root->draw(canvas);
+  _root->draw(canvas, Paint());
 }
 
 }  // namespace tgfx

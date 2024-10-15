@@ -298,64 +298,20 @@ void Layer::invalidateContent() {
   contentChange = true;
 }
 
-void Layer::draw(Canvas* canvas, float parentAlpha) {
-  if (!_visible || _alpha <= 0) {
-    return;
-  }
+void Layer::draw(Canvas* canvas, const Paint& paint) {
   canvas->save();
-  canvas->concat(_matrix);
-  Paint currentPaint;
-  currentPaint.setAlpha(_alpha * parentAlpha);
-  currentPaint.setBlendMode(_blendMode);
-  auto contentCanvas = canvas;
-  if (!contentChange && contentSurface) {
+  if (shouldUseCache()) {
     canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
-    canvas->drawImage(contentSurface->makeImageSnapshot(), &currentPaint);
-  } else if (!drawContentOffScreen()) {
-    // draw contents directly to the canvas.
-    onDraw(contentCanvas, std::move(currentPaint));
-    for (const auto& child : _children) {
-      child->draw(canvas, currentPaint.getAlpha());
-    }
+    canvas->drawImage(contentSurface->makeImageSnapshot(), &paint);
   } else {
-    // draw contents to an offscreen surface.
-    auto bounds = getBounds();
-    auto parentOptions = canvas->getSurface()->options();
-    auto contentOptions = *parentOptions;
-    if (shouldRasterize()) {
-      contentOptions = parentOptions->renderFlags() | RenderFlags::DisableCache;
-    }
-    bounds.scale(_rasterizationScale, _rasterizationScale);
-    auto surfaceWidth = static_cast<int>(bounds.width());
-    auto surfaceHeight = static_cast<int>(bounds.height());
-    if (contentSurface == nullptr || contentSurface->width() != surfaceWidth ||
-        contentSurface->height() != surfaceHeight ||
-        contentOptions.renderFlags() != contentSurface->options()->renderFlags()) {
-      auto context = canvas->getSurface()->getContext();
-      contentSurface =
-          Surface::Make(context, surfaceWidth, surfaceHeight, false, 1, true, &contentOptions);
-    }
-    if (!contentSurface) {
-      canvas->restore();
-      return;
-    }
-    contentCanvas = contentSurface->getCanvas();
-    contentCanvas->clear();
-    onDraw(contentCanvas, {});
-
+    onDraw(canvas, paint);
     for (const auto& child : _children) {
-      child->draw(contentCanvas);
-    }
-
-    canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
-    canvas->drawImage(contentSurface->makeImageSnapshot(), &currentPaint);
-    if (!shouldRasterize() || parentOptions->cacheDisabled()) {
-      contentSurface = nullptr;
+      drawChild(canvas, paint, child.get());
     }
   }
   canvas->restore();
-  contentChange = false;
   dirty = false;
+  contentChange = false;
 }
 
 void Layer::onAttachToRoot(DisplayList* root) {
@@ -370,6 +326,83 @@ void Layer::onDetachFromRoot() {
   for (auto child : _children) {
     child->onDetachFromRoot();
   }
+}
+
+void Layer::drawChild(Canvas* canvas, const Paint& paint, Layer* child) {
+  if (!child->_visible || child->_alpha <= 0) {
+    return;
+  }
+  canvas->save();
+  canvas->concat(child->_matrix);
+  auto childPaint = paint;
+  childPaint.setAlpha(child->_alpha * paint.getAlpha());
+  childPaint.setBlendMode(child->_blendMode);
+  if (child->_scrollRect) {
+    canvas->clipRect(*child->_scrollRect);
+  }
+
+  if (!child->shouldDrawOffScreen()) {
+    // draw contents directly to the canvas.
+    child->draw(canvas, childPaint);
+  } else {
+    // draw contents to an offscreen surface.
+    auto options = canvas->getSurface()->options();
+    auto context = canvas->getSurface()->getContext();
+    auto surface =
+        child->getOffscreenSurface(context, options->renderFlags(), child->_scrollRect.get());
+    if (!surface) {
+      canvas->restore();
+      return;
+    }
+
+    auto offscreenCanvas = surface->getCanvas();
+    offscreenCanvas->clear();
+    bool rasterize = child->shouldRasterize();
+    if (rasterize) {
+      offscreenCanvas->concat(Matrix::MakeScale(_rasterizationScale));
+    }
+    child->draw(offscreenCanvas, {});
+
+    if (rasterize) {
+      canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
+    }
+    canvas->drawImage(surface->makeImageSnapshot(), &childPaint);
+  }
+  canvas->restore();
+}
+
+std::shared_ptr<Surface> Layer::getOffscreenSurface(Context* context, uint32_t options,
+                                                    const Rect* clipRect) {
+  Rect bounds = getBounds();
+  bool rasterize = shouldRasterize();
+  uint32_t currentOptions = options;
+  if (rasterize) {
+    bounds.scale(_rasterizationScale, _rasterizationScale);
+    currentOptions = currentOptions | RenderFlags::DisableCache;
+  } else if (clipRect) {
+    bounds.intersect(*clipRect);
+  }
+
+  auto surfaceWidth = static_cast<int>(bounds.width());
+  auto surfaceHeight = static_cast<int>(bounds.height());
+
+  std::shared_ptr<Surface> offscreenSurface = nullptr;
+  if (contentSurface == nullptr || contentSurface->width() != surfaceWidth ||
+      contentSurface->height() != surfaceHeight ||
+      contentSurface->options()->renderFlags() != currentOptions) {
+    SurfaceOptions surfaceOptions = currentOptions;
+    offscreenSurface =
+        Surface::Make(context, surfaceWidth, surfaceHeight, false, 1, true, &surfaceOptions);
+  } else {
+    offscreenSurface = contentSurface;
+  }
+
+  if (rasterize && !(options & RenderFlags::DisableCache)) {
+    contentSurface = offscreenSurface;
+  } else {
+    contentSurface = nullptr;
+  }
+  return offscreenSurface;
 }
 
 int Layer::doGetChildIndex(const Layer* child) const {
@@ -392,11 +425,18 @@ bool Layer::doContains(const Layer* child) const {
   return false;
 }
 
-bool Layer::drawContentOffScreen() const {
+bool Layer::shouldUseCache() const {
+  return !contentChange && contentSurface;
+}
+
+bool Layer::shouldDrawOffScreen() const {
+  if (shouldUseCache()) {
+    return false;
+  }
   auto offscreen = shouldRasterize() || !_filters.empty();
   if (!_children.empty()) {
     offscreen = offscreen || _blendMode != BlendMode::SrcOver ||
-                (_root->allowsGroupOpacity() && _alpha < 1);
+                (_alpha < 1 && _root && _root->allowsGroupOpacity());
   }
   return offscreen;
 }
