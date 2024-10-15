@@ -261,6 +261,9 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
   auto contentBounds = measureContentBounds();
   for (const auto& child : _children) {
     auto childBounds = child->getBounds();
+    if (child->_scrollRect) {
+      childBounds.intersect(*child->_scrollRect);
+    }
     child->_matrix.mapRect(&childBounds);
     contentBounds.join(childBounds);
   }
