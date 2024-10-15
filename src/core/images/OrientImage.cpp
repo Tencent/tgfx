@@ -107,6 +107,9 @@ std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs
       matrix = *uvMatrix;
     }
   }
+  if (OrientationSwapsWidthHeight(orientation)) {
+    std::swap(tileModeX, tileModeY);
+  }
   return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
 }
 
