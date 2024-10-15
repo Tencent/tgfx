@@ -302,7 +302,7 @@ void Layer::draw(Canvas* canvas, const Paint& paint) {
   canvas->save();
   if (shouldUseCache()) {
     canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
-    canvas->drawImage(contentSurface->makeImageSnapshot(), &paint);
+    canvas->drawImage(_owner->getCacheSurface(this)->makeImageSnapshot(), &paint);
   } else {
     onDraw(canvas, paint);
     for (const auto& child : _children) {
@@ -322,6 +322,9 @@ void Layer::onAttachToDisplayList(DisplayList* owner) {
 }
 
 void Layer::onDetachFromDisplayList() {
+  if (_owner) {
+    _owner->setCacheSurface(this, nullptr);
+  }
   _owner = nullptr;
   for (auto child : _children) {
     child->onDetachFromDisplayList();
@@ -387,6 +390,7 @@ std::shared_ptr<Surface> Layer::getOffscreenSurface(Context* context, uint32_t o
   auto surfaceHeight = static_cast<int>(bounds.height());
 
   std::shared_ptr<Surface> offscreenSurface = nullptr;
+  auto contentSurface = _owner ? _owner->getCacheSurface(this) : nullptr;
   if (contentSurface == nullptr || contentSurface->width() != surfaceWidth ||
       contentSurface->height() != surfaceHeight ||
       contentSurface->options()->renderFlags() != currentOptions) {
@@ -397,10 +401,12 @@ std::shared_ptr<Surface> Layer::getOffscreenSurface(Context* context, uint32_t o
     offscreenSurface = contentSurface;
   }
 
-  if (rasterize && !(options & RenderFlags::DisableCache)) {
-    contentSurface = offscreenSurface;
-  } else {
-    contentSurface = nullptr;
+  if (_owner) {
+    if (rasterize && !(options & RenderFlags::DisableCache)) {
+      _owner->setCacheSurface(this, offscreenSurface);
+    } else {
+      _owner->setCacheSurface(this, nullptr);
+    }
   }
   return offscreenSurface;
 }
@@ -426,7 +432,7 @@ bool Layer::doContains(const Layer* child) const {
 }
 
 bool Layer::shouldUseCache() const {
-  return !contentChange && contentSurface;
+  return !contentChange && _owner->hasCache(this);
 }
 
 bool Layer::shouldDrawOffScreen() const {

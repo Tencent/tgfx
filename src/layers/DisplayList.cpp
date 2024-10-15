@@ -32,4 +32,25 @@ void DisplayList::draw(Canvas* canvas) {
   _root->draw(canvas, Paint());
 }
 
+bool DisplayList::hasCache(const Layer* layer) const {
+  return cacheSurfaces.find(layer) != cacheSurfaces.end();
+}
+
+std::shared_ptr<Surface> DisplayList::getCacheSurface(const Layer* layer) {
+  if (hasCache(layer)) {
+    return cacheSurfaces[layer];
+  }
+  return nullptr;
+}
+
+void DisplayList::setCacheSurface(const Layer* layer, std::shared_ptr<Surface> surface) {
+  if (surface == nullptr) {
+    if (hasCache(layer)) {
+      cacheSurfaces.erase(layer);
+    }
+  } else {
+    cacheSurfaces[layer] = surface;
+  }
+}
+
 }  // namespace tgfx

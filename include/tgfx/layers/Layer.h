@@ -444,7 +444,6 @@ class Layer {
   std::vector<std::shared_ptr<Layer>> _children = {};
 
   bool contentChange = true;
-  std::shared_ptr<Surface> contentSurface = nullptr;
 
   friend class DisplayList;
 };

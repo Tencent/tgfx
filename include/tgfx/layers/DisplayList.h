@@ -71,8 +71,18 @@ class DisplayList {
   void draw(Canvas* canvas);
 
  private:
+  bool hasCache(const Layer* layer) const;
+
+  std::shared_ptr<Surface> getCacheSurface(const Layer* layer);
+
+  void setCacheSurface(const Layer* layer, std::shared_ptr<Surface> surface);
+
   bool _allowsEdgeAntialiasing = true;
   bool _allowsGroupOpacity = false;
   std::shared_ptr<Layer> _root = nullptr;
+
+  std::unordered_map<const Layer*, std::shared_ptr<Surface>> cacheSurfaces;
+
+  friend class Layer;
 };
 }  // namespace tgfx
