@@ -241,8 +241,8 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
   if (targetCoordinateSpace) {
     auto rootLayer = this;
     while (rootLayer->_parent != nullptr && targetCoordinateSpace != rootLayer) {
-      rootLayer = rootLayer->_parent;
       totalMatrix.preConcat(rootLayer->_matrix);
+      rootLayer = rootLayer->_parent;
     }
     if (!rootLayer->doContains(targetCoordinateSpace)) {
       return Rect::MakeEmpty();
