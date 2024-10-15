@@ -282,18 +282,6 @@ class Layer {
   int getChildIndex(std::shared_ptr<Layer> child) const;
 
   /**
-   * Returns an array of layers that lie under the specified point and are children (or grandchildren,
-   * and so on) of the calling layer. The point parameter is in the root layer's coordinate space,
-   * not the parent layer's (unless the parent layer is the root). You can use the globalToLocal()
-   * and the localToGlobal() methods to convert points between these coordinate spaces.
-   * @param x The x coordinate under which to look.
-   * @param y The y coordinate under which to look.
-   * @return An array of layers that lie under the specified point and are children (or
-   * grandchildren, and so on) of the calling layer.
-   */
-  std::vector<std::shared_ptr<Layer>> getLayersUnderPoint(float x, float y);
-
-  /**
    * Removes the layer from its parent layer. If the layer is not a child of any layer, this method
    * has no effect.
    */
@@ -362,14 +350,29 @@ class Layer {
   Point localToGlobal(const Point& localPoint) const;
 
   /**
+   * Returns an array of layers under the specified point that are children (or descendants) of the
+   * calling layer. The layers are checked against their bounding boxes for quick selection. The
+   * first layer in the array is the top-most layer under the point, and the last layer is the
+   * bottom-most. The point parameter is in the root layer's coordinate space, not the parent
+   * layer's (unless the parent layer is the root). You can use the globalToLocal() and the
+   * localToGlobal() methods to convert points between these coordinate spaces.
+   * @param x The x coordinate under which to look.
+   * @param y The y coordinate under which to look.
+   * @return An array of layers that lie under the specified point and are children (or
+   * grandchildren, and so on) of the calling layer.
+   */
+  std::vector<std::shared_ptr<Layer>> getLayersUnderPoint(float x, float y);
+
+  /**
    * Checks if the layer overlaps or intersects with the specified point (x, y).
    * The x and y coordinates are in the root layer's coordinate space, not the parent layer's
    * (unless the parent layer is the root). You can use the globalToLocal() and the localToGlobal()
    * methods to convert points between these coordinate spaces.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
-   * @param shapeFlag Whether to check against the actual pixels of the layer (true) or just the
-   * bounding box (false).
+   * @param shapeFlag Whether to check the actual pixels of the layer (true) or just the bounding
+   * box (false). Note that Image layers are always checked against their bounding box. You can draw
+   * image layers to a Surface and use the Surface::getColor() method to check the actual pixels.
    * @return true if the layer overlaps or intersects with the specified point, false otherwise.
    */
   bool hitTestPoint(float x, float y, bool shapeFlag = false);
