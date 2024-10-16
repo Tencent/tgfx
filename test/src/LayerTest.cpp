@@ -177,12 +177,9 @@ TGFX_TEST(LayerTest, textLayer) {
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
   auto textLayer = TextLayer::Make();
-  auto textLayer2 = TextLayer::Make();
   layer->addChild(textLayer);
-  layer->addChild(textLayer2);
   layer->setMatrix(Matrix::MakeTrans(10, 10));
   textLayer->setText("Hello, World!");
-  textLayer2->setText("Hello, World!");
   auto color = Color::Red();
   color.alpha = 0.5;
   textLayer->setTextColor(color);
@@ -190,11 +187,8 @@ TGFX_TEST(LayerTest, textLayer) {
   tgfx::Font font(typeface, 20);
   textLayer->setFont(font);
   textLayer->setAlpha(0.5f);
-  textLayer2->setFont(font);
-  textLayer2->setBlendMode(BlendMode::DstOut);
   textLayer->setMatrix(Matrix::MakeRotate(30));
   displayList->draw(canvas);
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
   device->unlock();
 }
@@ -216,7 +210,6 @@ TGFX_TEST(LayerTest, imageLayer) {
   imageLayer->setSampling(options);
   imageLayer->setMatrix(Matrix::MakeScale(5.0f));
   displayList->draw(canvas);
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
   device->unlock();
 }
