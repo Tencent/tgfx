@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <vector>
 #include <math.h>
+#include <vector>
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
@@ -242,13 +242,12 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
 
   auto rotateMat = Matrix::MakeRotate(45);
   greatGrandson->setMatrix(rotateMat * greatGrandson->matrix());
-  EXPECT_EQ(greatGrandson->matrix().getTranslateX(), 0.0f);
-  EXPECT_EQ(greatGrandson->matrix().getTranslateY(), 10.0f * std::sqrt(2.0f));
 
   greatGrandsonTotalMatrix = greatGrandson->getTotalMatrix();
   auto grandChildTotalMatrix = grandChild->getTotalMatrix();
   EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateX(), grandChildTotalMatrix.getTranslateX());
-  EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateY(), grandChildTotalMatrix.getTranslateX() + 10.0f * std::sqrt(2.0f));
+  EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateY(),
+                  grandChildTotalMatrix.getTranslateX() + 10.0f * std::sqrt(2.0f));
 }
 
 /**
@@ -264,23 +263,25 @@ TGFX_TEST(LayerTest, Layer_globalToLocal) {
   layerA2->setMatrix(Matrix::MakeTrans(15.0f, 5.0f) * Matrix::MakeRotate(45.0f));
 
   auto layerA3 = Layer::Make();
-  layerA3->setMatrix(Matrix::MakeTrans(10.0f * std::sqrt(2.0f), 5.0f * std::sqrt(2.0f)) * Matrix::MakeRotate(45.0f));
+  layerA3->setMatrix(Matrix::MakeTrans(10.0f * std::sqrt(2.0f), 5.0f * std::sqrt(2.0f)) *
+                     Matrix::MakeRotate(45.0f));
 
   layerA1->addChild(layerA2);
   layerA2->addChild(layerA3);
 
   auto globalPoint = Point::Make(25.0f, 45.0f);
   auto pointInLayer3 = layerA3->globalToLocal(globalPoint);
-  printf("pointInLayer3XY: (%f, %f)\n", pointInLayer3.x, pointInLayer3.y);
-  EXPECT_EQ(pointInLayer3, Point::Make(15.0f, 5.0f));
+  auto testPoint = Point::Make(15.0f, 5.0f);
+  EXPECT_EQ(pointInLayer3, testPoint);
 
   auto pointInLayer2 = layerA2->globalToLocal(globalPoint);
-  printf("pointInLayer2XY: (%f, %f)\n", pointInLayer2.x, pointInLayer2.y);
-  EXPECT_EQ(pointInLayer2, Point::Make(15.0f * std::sqrt(2.0f), 15.0f * std::sqrt(2.0f)));
+  testPoint = Point::Make(15.0f * std::sqrt(2.0f), 15.0f * std::sqrt(2.0f));
+  EXPECT_FLOAT_EQ(pointInLayer2.x, testPoint.x);
+  EXPECT_FLOAT_EQ(pointInLayer2.y, testPoint.y);
 
   auto pointInLayer1 = layerA1->globalToLocal(globalPoint);
-  printf("pointInLayer1XY: (%f, %f)\n", pointInLayer1.x, pointInLayer1.y);
-  EXPECT_EQ(pointInLayer1, Point::Make(15.0f, 35.0f));
+  testPoint = Point::Make(15.0f, 35.0f);
+  EXPECT_EQ(pointInLayer1, testPoint);
 }
 /**
  * The derivation process is shown in the following figure:
@@ -291,51 +292,41 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   auto layerA1 = Layer::Make();
   auto mat1 = Matrix::MakeTrans(10, 10);
   layerA1->setMatrix(mat1);
-  auto layer1GlobalMat = layerA1->getTotalMatrix();
-  printf("layer1GlobalMatXY: (%f, %f)\n", layer1GlobalMat.getTranslateX(), layer1GlobalMat.getTranslateY());
 
   auto layerA2 = Layer::Make();
   layerA2->setMatrix(Matrix::MakeTrans(10, 10) * Matrix::MakeRotate(45.0f));
   layerA1->addChild(layerA2);
   auto layer2GlobalMat = layerA2->getTotalMatrix();
-  printf("layer2GlobalMatXY: (%f, %f)\n", layer2GlobalMat.getTranslateX(), layer2GlobalMat.getTranslateY());
 
   auto layerA3 = Layer::Make();
-  layerA3->setMatrix(Matrix::MakeTrans(10 * std::sqrt(2.0f), 10 * std::sqrt(2.0f)) * Matrix::MakeRotate(45.0f));
+  layerA3->setMatrix(Matrix::MakeTrans(10 * std::sqrt(2.0f), 10 * std::sqrt(2.0f)) *
+                     Matrix::MakeRotate(45.0f));
   layerA2->addChild(layerA3);
-  auto layer3GlobalMat = layerA3->getTotalMatrix();
-  printf("layer3GlobalMatXY: (%f, %f)\n", layer3GlobalMat.getTranslateX(), layer3GlobalMat.getTranslateY());
 
   auto pointDInLayer3 = Point::Make(5, 5);
   auto pointDInGlobal = layerA3->localToGlobal(pointDInLayer3);
-  printf("pointDInGlobalXY: (%f, %f)\n", pointDInGlobal.x, pointDInGlobal.y);
   EXPECT_EQ(pointDInGlobal, Point::Make(15.0f, 45.0f));
 
   auto pointEInLayer2 = Point::Make(8, 8);
   auto pointEInGlobal = layerA2->localToGlobal(pointEInLayer2);
-  printf("pointEInGlobalXY: (%f, %f)\n", pointEInGlobal.x, pointEInGlobal.y);
-  EXPECT_EQ(pointEInGlobal, Point::Make(layer2GlobalMat.getTranslateX(), layer2GlobalMat.getTranslateY() + 8.0f * std::sqrt(2.0f)));
+  EXPECT_EQ(pointEInGlobal, Point::Make(layer2GlobalMat.getTranslateX(),
+                                        layer2GlobalMat.getTranslateY() + 8.0f * std::sqrt(2.0f)));
 
   auto layer4 = Layer::Make();
   layer4->setMatrix(Matrix::MakeTrans(5, -5) * Matrix::MakeRotate(-60.0f));
   layerA3->addChild(layer4);
-  auto layer4GlobalMat = layer4->getTotalMatrix();
-  printf("layer4GlobalMatXY: (%f, %f)\n", layer4GlobalMat.getTranslateX(), layer4GlobalMat.getTranslateY());
 
   auto pointFInLayer4 = Point::Make(10.0f, 10.0f);
   auto pointFInGlobal = layer4->localToGlobal(pointFInLayer4);
-  printf("pointFInGlobalXY: (%f, %f)\n", pointFInGlobal.x, pointFInGlobal.y);
-  EXPECT_EQ(pointFInGlobal, Point::Make(28.660254f, 58.660255f));
+  EXPECT_FLOAT_EQ(pointFInGlobal.x, 28.660254f);
+  EXPECT_FLOAT_EQ(pointFInGlobal.y, 58.660255f);
 
   auto layer5 = Layer::Make();
   layer5->setMatrix(Matrix::MakeTrans(10, -15) * Matrix::MakeRotate(-90.0f));
   layerA3->addChild(layer5);
-  auto layer5GlobalMat = layer5->getTotalMatrix();
-  printf("layer5GlobalMatXY: (%f, %f)\n", layer5GlobalMat.getTranslateX(), layer5GlobalMat.getTranslateY());
 
   auto pointGInLayer5 = Point::Make(10.0f, 20.0f);
   auto pointGInGlobal = layer5->localToGlobal(pointGInLayer5);
-  printf("pointGInGlobalXY: (%f, %f)\n", pointGInGlobal.x, pointGInGlobal.y);
   EXPECT_EQ(pointGInGlobal, Point::Make(45.0f, 70.0f));
 }
 

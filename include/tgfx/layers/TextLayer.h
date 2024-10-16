@@ -79,6 +79,8 @@ class TextLayer : public Layer {
 
   Rect measureContentBounds() const override;
 
+  GlyphRun createGlyphRun() const;
+
  private:
   std::string _text;
   Color _textColor = Color::White();

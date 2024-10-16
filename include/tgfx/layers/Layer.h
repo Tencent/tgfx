@@ -162,7 +162,7 @@ class Layer {
    * content. The default value is false.
    */
   bool shouldRasterize() const {
-    return bitFields.shouldRasterize;
+    return bitFields.shouldRasterize && _rasterizationScale > 0.0f;
   }
 
   /**
@@ -480,16 +480,13 @@ class Layer {
 
   bool shouldUseCache() const;
 
-  bool shouldDrawOffScreen() const;
-
   Matrix getTotalMatrix() const;
+
+  void rasterizeContent(Context* context);
 
   void drawContent(Canvas* canvas, float alpha);
 
-  void drawChild(Canvas* canvas, const Paint& paint, Layer* child);
-
-  std::shared_ptr<Surface> getOffscreenSurface(Context* context, uint32_t options,
-                                               const Rect* clipRect);
+  void drawChild(Canvas* canvas, float alpha, Layer* child);
 
   bool dirty = true;
   std::string _name;

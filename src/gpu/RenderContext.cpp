@@ -397,6 +397,9 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     return clipTexture;
   }
   auto bounds = clip.getBounds();
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
