@@ -17,15 +17,45 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
+#include <atomic>
 #include "core/utils/Log.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace tgfx {
+static std::atomic_bool AllowsEdgeAntialiasing = true;
+static std::atomic_bool AllowsGroupOpacity = false;
+
+bool Layer::DefaultAllowsEdgeAntialiasing() {
+  return AllowsEdgeAntialiasing;
+}
+
+void Layer::SetDefaultAllowsEdgeAntialiasing(bool value) {
+  AllowsEdgeAntialiasing = value;
+}
+
+bool Layer::DefaultAllowsGroupOpacity() {
+  return AllowsGroupOpacity;
+}
+
+void Layer::SetDefaultAllowsGroupOpacity(bool value) {
+  AllowsGroupOpacity = value;
+}
+
 std::shared_ptr<Layer> Layer::Make() {
   auto layer = std::shared_ptr<Layer>(new Layer());
   layer->weakThis = layer;
   return layer;
+}
+
+Layer::Layer()
+    : bitFields({
+          true,                    //dirty
+          true,                    //visible
+          false,                   //shouldRasterize
+          AllowsEdgeAntialiasing,  //allowsEdgeAntialiasing
+          AllowsGroupOpacity,      //allowsGroupOpacity
+      }) {
 }
 
 void Layer::setAlpha(float value) {
@@ -62,19 +92,19 @@ void Layer::setMatrix(const Matrix& value) {
 }
 
 void Layer::setVisible(bool value) {
-  if (_visible == value) {
+  if (bitFields.visible == value) {
     return;
   }
-  _visible = value;
+  bitFields.visible = value;
   invalidate();
 }
 
 void Layer::setShouldRasterize(bool value) {
-  if (_shouldRasterize == value) {
+  if (bitFields.shouldRasterize == value) {
     return;
   }
-  _shouldRasterize = value;
-  invalidateContent();
+  bitFields.shouldRasterize = value;
+  invalidate();
 }
 
 void Layer::setRasterizationScale(float value) {
@@ -83,6 +113,22 @@ void Layer::setRasterizationScale(float value) {
   }
   _rasterizationScale = value;
   invalidateContent();
+}
+
+void Layer::setAllowsEdgeAntialiasing(bool value) {
+  if (bitFields.allowsEdgeAntialiasing == value) {
+    return;
+  }
+  bitFields.allowsEdgeAntialiasing = value;
+  invalidate();
+}
+
+void Layer::setAllowsGroupOpacity(bool value) {
+  if (bitFields.allowsGroupOpacity == value) {
+    return;
+  }
+  bitFields.allowsGroupOpacity = value;
+  invalidate();
 }
 
 void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
@@ -291,10 +337,7 @@ bool Layer::hitTestPoint(float, float, bool) {
 }
 
 void Layer::invalidate() {
-  if (_parent) {
-    _parent->invalidateContent();
-  }
-  dirty = true;
+  bitFields.dirty = true;
 }
 
 void Layer::invalidateContent() {
@@ -302,16 +345,47 @@ void Layer::invalidateContent() {
   contentChange = true;
 }
 
-void Layer::draw(Canvas* canvas, const Paint& paint) {
-  canvas->save();
-  if (shouldUseCache()) {
-    canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
-    canvas->drawImage(_owner->getCacheSurface(this)->makeImageSnapshot(), &paint);
-  } else {
-    onDraw(canvas, paint);
-    for (const auto& child : _children) {
-      drawChild(canvas, paint, child.get());
+void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
+  if (alpha <= 0) {
+    return;
+  }
+  auto needOffscreen =
+      shouldRasterize() || blendMode != BlendMode::SrcOver || (allowsGroupOpacity() && alpha < 1);
+  if (needOffscreen) {
+    if (contentSurface == nullptr) {
+      auto bounds = getBounds();
+      contentSurface =
+          Surface::Make(canvas->getSurface()->getContext(), static_cast<int>(bounds.width()),
+                        static_cast<int>(bounds.height()), false, 1, true);
+      if (contentSurface == nullptr) {
+        return;
+      }
+      drawContent(contentSurface->getCanvas(), 1.0f);
     }
+    Paint paint;
+    paint.setAlpha(alpha);
+    paint.setBlendMode(blendMode);
+    canvas->drawImage(contentSurface->makeImageSnapshot(), &paint);
+    if (!shouldRasterize()) {
+      contentSurface = nullptr;
+    }
+  } else {
+    // draw contents directly to the canvas.
+    drawContent(canvas, alpha);
+  }
+}
+
+
+void Layer::drawContent(Canvas* canvas, float alpha) {
+  onDraw(canvas, alpha);
+  for (const auto& child : _children) {
+    if (!child->visible()) {
+      continue;
+    }
+    canvas->save();
+    canvas->concat(child->_matrix);
+    child->draw(canvas, alpha * child->_alpha, child->_blendMode);
+    canvas->restore();
   }
   canvas->restore();
   dirty = false;
@@ -451,7 +525,7 @@ bool Layer::shouldDrawOffScreen() const {
   return offscreen;
 }
 
-void Layer::onDraw(Canvas*, const Paint&) {
+void Layer::onDraw(Canvas*, float) {
 }
 
 Rect Layer::measureContentBounds() const {

@@ -260,7 +260,7 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
   }
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
-  auto processor = FragmentProcessor::Make(weakThis.lock(), fpArgs, sampling);
+  auto processor = asFragmentProcessor(fpArgs, TileMode::Clamp, TileMode::Clamp, sampling, nullptr);
   if (processor == nullptr) {
     return nullptr;
   }

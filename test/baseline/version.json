@@ -3,7 +3,7 @@
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
         "Picture": "72edd24",
-        "drawImage": "ded3c91",
+        "drawImage": "8cb853c",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "d010fb8",
@@ -19,9 +19,11 @@
         "rasterized": "f55f586",
         "rasterized_mipmap": "f55f586",
         "rasterized_scale_up": "721c9e0",
-        "scaleImage": "d038aa6",
+        "scaleImage": "8cb853c",
         "text_shape": "74f94c4",
-        "tileMode": "3bfc2e8"
+        "tile_mode_normal": "8cb853c",
+        "tile_mode_rgbaaa": "8cb853c",
+        "tile_mode_subset": "8cb853c"
     },
     "DrawersTest": {
         "ConicGradient": "5a1fb11",
@@ -48,7 +50,7 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
-        "draw_text": "99a5cd9",
+        "draw_text": "01e2f1d",
         "imageLayer": "99a5cd9"
     },
     "MaskTest": {

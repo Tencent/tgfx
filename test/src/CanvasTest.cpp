@@ -73,18 +73,35 @@ TGFX_TEST(CanvasTest, TileMode) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(codec != nullptr);
-  auto image = Image::MakeFrom(codec);
-  auto surface = Surface::Make(context, codec->width() / 2, codec->height() / 2);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  image = image->makeMipmapped(true);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
   auto canvas = surface->getCanvas();
   Paint paint;
-  paint.setShader(Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror)
-                      ->makeWithMatrix(Matrix::MakeScale(0.125f)));
-  canvas->drawRect(Rect::MakeWH(static_cast<float>(surface->width()),
-                                static_cast<float>(surface->height()) * 0.9f),
-                   paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tileMode"));
+  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror)
+                    ->makeWithMatrix(Matrix::MakeScale(0.125f));
+  paint.setShader(shader);
+  canvas->translate(100, 100);
+  auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
+  canvas->drawRect(drawRect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_normal"));
+  canvas->clear();
+  image = image->makeSubset(Rect::MakeXYWH(300, 1000, 2400, 2000));
+  shader = Shader::MakeImageShader(image, TileMode::Mirror, TileMode::Repeat)
+               ->makeWithMatrix(Matrix::MakeScale(0.125f));
+  paint.setShader(shader);
+  canvas->drawRect(drawRect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_subset"));
+  canvas->clear();
+  image = MakeImage("resources/apitest/rgbaaa.png");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeRGBAAA(512, 512, 512, 0);
+  ASSERT_TRUE(image != nullptr);
+  shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror);
+  paint.setShader(shader);
+  canvas->drawRect(drawRect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_rgbaaa"));
   device->unlock();
 }
 
