@@ -274,10 +274,11 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
   auto globalMatrix = getTotalMatrix();
-  if (!globalMatrix.invert(&globalMatrix)) {
+  auto inverseMatrix = Matrix::I();
+  if (!globalMatrix.invert(&inverseMatrix)) {
     return Point::Make(0, 0);
   }
-  return globalMatrix.mapXY(globalPoint.x, globalPoint.y);
+  return inverseMatrix.mapXY(globalPoint.x, globalPoint.y);
 }
 
 Point Layer::localToGlobal(const Point& localPoint) const {
@@ -461,7 +462,7 @@ Matrix Layer::getTotalMatrix() const {
   auto totalMatrix = Matrix::I();
   auto layer = this;
   while (layer) {
-    totalMatrix.preConcat(layer->_matrix);
+    totalMatrix = layer->_matrix * totalMatrix;
     layer = layer->_parent;
   }
   return totalMatrix;
