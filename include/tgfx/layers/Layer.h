@@ -39,6 +39,28 @@ class DisplayList;
 class Layer {
  public:
   /**
+   * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
+   * default value is true.
+   */
+  static bool DefaultAllowsEdgeAntialiasing();
+
+  /**
+   * Sets the default value for the allowsEdgeAntialiasing property for new Layer instances.
+   */
+  static void SetDefaultAllowsEdgeAntialiasing(bool value);
+
+  /**
+   * Returns the default value for the allowsGroupOpacity property for new Layer instances. The
+   * default value is false.
+   */
+  static bool DefaultAllowsGroupOpacity();
+
+  /**
+   * Sets the default value for the allowsGroupOpacity property for new Layer instances.
+   */
+  static void SetDefaultAllowsGroupOpacity(bool value);
+
+  /**
    * Creates a new Layer instance.
    */
   static std::shared_ptr<Layer> Make();
@@ -121,7 +143,7 @@ class Layer {
    * Returns whether the layer is visible. The default value is true.
    */
   bool visible() const {
-    return _visible;
+    return bitFields.visible;
   }
 
   /**
@@ -139,7 +161,7 @@ class Layer {
    * content. The default value is false.
    */
   bool shouldRasterize() const {
-    return _shouldRasterize;
+    return bitFields.shouldRasterize;
   }
 
   /**
@@ -162,6 +184,36 @@ class Layer {
    * Sets the scale at which to rasterize content.
    */
   void setRasterizationScale(float value);
+
+  /**
+   * Returns true if the layer is allowed to perform edge antialiasing. This means the edges of
+   * shapes and images can be drawn with partial transparency. The default value is read from the
+   * Layer::DefaultAllowsEdgeAntialiasing() method.
+   */
+  bool allowsEdgeAntialiasing() const {
+    return bitFields.allowsEdgeAntialiasing;
+  }
+
+  /**
+   * Sets whether the layer is allowed to perform edge antialiasing.
+   */
+  void setAllowsEdgeAntialiasing(bool value);
+
+  /**
+   * Returns true if the layer is allowed to be composited as a separate group from their parent.
+   * When true and the layer’s alpha value is less than 1.0, the layer can composite itself
+   * separately from its parent. This ensures correct rendering for layers with multiple opaque
+   * components but may reduce performance. The default value is read from the
+   * Layer::DefaultAllowsGroupOpacity() method.
+   */
+  bool allowsGroupOpacity() const {
+    return bitFields.allowsGroupOpacity;
+  }
+
+  /**
+   * Sets whether the layer is allowed to be composited as a separate group from their parent.
+   */
+  void setAllowsGroupOpacity(bool value);
 
   /**
    * Returns the list of filters applied to the layer.
@@ -377,10 +429,21 @@ class Layer {
    */
   bool hitTestPoint(float x, float y, bool shapeFlag = false);
 
+  /**
+   * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
+   * mode to control how the layer is drawn. Note: The layer is drawn in its local space without
+   * applying its own matrix, alpha, blend mode, scrollRect, or visibility.
+   * @param canvas The canvas to draw the layer on.
+   * @param alpha The alpha transparency value used for drawing the layer and its children.
+   * @param blendMode The blend mode used to composite the layer with the existing content on the
+   * canvas.
+   */
+  void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
+
  protected:
   std::weak_ptr<Layer> weakThis;
 
-  Layer() = default;
+  Layer();
 
   /**
    * Marks the layer as needing to be redrawn. Different from invalidateContent(), this method only
@@ -398,7 +461,7 @@ class Layer {
    * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
    * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
    */
-  virtual void onDraw(Canvas* canvas, const Paint& paint);
+  virtual void onDraw(Canvas* canvas, float alpha);
 
  private:
   void onAttachToDisplayList(DisplayList* owner);
@@ -409,17 +472,12 @@ class Layer {
 
   bool doContains(Layer* child) const;
 
-  bool drawContentOffScreen() const;
+  void drawContent(Canvas* canvas, float alpha);
 
-  void draw(Canvas* canvas, float globalAlpha = 1.0f);
-
-  bool dirty = true;
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = Matrix::I();
-  bool _visible = true;
-  bool _shouldRasterize = false;
   float _rasterizationScale = 1.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
@@ -427,6 +485,13 @@ class Layer {
   DisplayList* _owner = nullptr;
   Layer* _parent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+  struct {
+    bool dirty : 1;
+    bool visible : 1;
+    bool shouldRasterize : 1;
+    bool allowsEdgeAntialiasing : 1;
+    bool allowsGroupOpacity : 1;
+  } bitFields;
 
   std::shared_ptr<Surface> contentSurface = nullptr;
 

@@ -41,10 +41,13 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
   invalidate();
 }
 
-void ImageLayer::onDraw(Canvas* canvas, const Paint& paint) {
+void ImageLayer::onDraw(Canvas* canvas, float alpha) {
   if (!_image) {
     return;
   }
+  Paint paint;
+  paint.setAntiAlias(allowsEdgeAntialiasing());
+  paint.setAlpha(alpha);
   canvas->drawImage(_image, _sampling, &paint);
 }
 
