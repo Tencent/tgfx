@@ -29,7 +29,6 @@
 namespace tgfx {
 
 class DisplayList;
-class SurfaceOptions;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -488,7 +487,6 @@ class Layer {
 
   void drawContent(Canvas* canvas, float alpha);
 
-  bool dirty = true;
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
@@ -506,9 +504,8 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
+    bool contentChange : 1;
   } bitFields;
-
-  bool contentChange = true;
 
   friend class DisplayList;
 };

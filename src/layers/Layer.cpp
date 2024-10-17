@@ -56,6 +56,7 @@ Layer::Layer()
           false,                   //shouldRasterize
           AllowsEdgeAntialiasing,  //allowsEdgeAntialiasing
           AllowsGroupOpacity,      //allowsGroupOpacity
+          true,                    //contentChange
       }) {
 }
 
@@ -344,7 +345,7 @@ void Layer::invalidate() {
 
 void Layer::invalidateContent() {
   invalidate();
-  contentChange = true;
+  bitFields.contentChange = true;
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
@@ -418,8 +419,8 @@ void Layer::drawContent(Canvas* canvas, float alpha) {
     child->draw(canvas, child->_alpha * alpha, child->_blendMode);
     canvas->restore();
   }
-  dirty = false;
-  contentChange = false;
+  bitFields.dirty = false;
+  bitFields.contentChange = false;
 }
 
 void Layer::onAttachToDisplayList(DisplayList* owner) {
@@ -460,7 +461,7 @@ bool Layer::doContains(const Layer* child) const {
 }
 
 bool Layer::shouldUseCache() const {
-  return !contentChange && _owner->hasCache(this);
+  return !bitFields.contentChange && _owner->hasCache(this);
 }
 
 void Layer::onDraw(Canvas*, float) {
