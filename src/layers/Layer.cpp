@@ -350,21 +350,17 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (alpha < 0 || canvas == nullptr) {
     return;
   }
-
-  if (shouldRasterize() && !shouldUseCache()) {
-    rasterizeContent(canvas->getSurface()->getContext());
-  }
-
+  auto cacheImage = getCacheContent(canvas->getSurface()->getContext());
   Paint paint;
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  if (shouldUseCache()) {
+  if (cacheImage) {
     // draw the cached image
     canvas->save();
     canvas->concat(Matrix::MakeScale(1.0f / _rasterizationScale));
-    canvas->drawImage(_owner->getCacheSurface(this)->makeImageSnapshot(), &paint);
+    canvas->drawImage(cacheImage, &paint);
     canvas->restore();
-  } else if (blendMode != BlendMode::SrcOver || (alpha < 1 && bitFields.allowsGroupOpacity)) {
+  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity)) {
     // draw with recoder
     Recorder recorder;
     auto contentCanvas = recorder.beginRecording();
@@ -376,7 +372,12 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
 }
 
-void Layer::rasterizeContent(Context* context) {
+std::shared_ptr<Image> Layer::getCacheContent(Context* context) {
+  if (!shouldRasterize()) {
+    return nullptr;
+  } else if (shouldUseCache()) {
+    return _owner->getCacheSurface(this)->makeImageSnapshot();
+  }
   Rect bounds = getBounds();
   bounds.scale(_rasterizationScale, _rasterizationScale);
 
@@ -391,20 +392,30 @@ void Layer::rasterizeContent(Context* context) {
 
   auto cacheCanvas = cacheSurface->getCanvas();
   if (!cacheCanvas) {
-    return;
+    return nullptr;
   }
   cacheCanvas->concat(Matrix::MakeScale(_rasterizationScale));
-  drawContent(cacheCanvas, 1);
+  drawContent(cacheCanvas, 1.0f);
 
   if (_owner) {
     _owner->setCacheSurface(this, cacheSurface);
   }
+  return cacheSurface->makeImageSnapshot();
 }
 
 void Layer::drawContent(Canvas* canvas, float alpha) {
   onDraw(canvas, alpha);
   for (const auto& child : _children) {
-    drawChild(canvas, alpha, child.get());
+    if (!child->visible() || child->_alpha <= 0) {
+      return;
+    }
+    canvas->save();
+    canvas->concat(child->_matrix);
+    if (child->_scrollRect) {
+      canvas->clipRect(*child->_scrollRect);
+    }
+    child->draw(canvas, child->_alpha * alpha, child->_blendMode);
+    canvas->restore();
   }
   dirty = false;
   contentChange = false;
@@ -425,19 +436,6 @@ void Layer::onDetachFromDisplayList() {
   for (auto child : _children) {
     child->onDetachFromDisplayList();
   }
-}
-
-void Layer::drawChild(Canvas* canvas, float alpha, Layer* child) {
-  if (!child->visible() || child->_alpha <= 0) {
-    return;
-  }
-  canvas->save();
-  canvas->concat(child->_matrix);
-  if (child->_scrollRect) {
-    canvas->clipRect(*child->_scrollRect);
-  }
-  child->draw(canvas, child->_alpha * alpha, child->_blendMode);
-  canvas->restore();
 }
 
 int Layer::doGetChildIndex(const Layer* child) const {

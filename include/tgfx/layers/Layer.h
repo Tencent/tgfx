@@ -482,11 +482,9 @@ class Layer {
 
   Matrix getTotalMatrix() const;
 
-  void rasterizeContent(Context* context);
+  std::shared_ptr<Image> getCacheContent(Context* context);
 
   void drawContent(Canvas* canvas, float alpha);
-
-  void drawChild(Canvas* canvas, float alpha, Layer* child);
 
   bool dirty = true;
   std::string _name;

@@ -189,6 +189,12 @@ TGFX_TEST(LayerTest, textLayer) {
   textLayer->setFont(font);
   textLayer->setAlpha(0.5f);
   textLayer->setMatrix(Matrix::MakeRotate(30));
+  auto textLayer2 = TextLayer::Make();
+  layer->addChild(textLayer2);
+  textLayer2->setText("Hello, World!");
+  color.alpha = 0.5;
+  textLayer2->setFont(font);
+  textLayer2->setBlendMode(BlendMode::Difference);
   displayList->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
   device->unlock();
