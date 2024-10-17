@@ -69,4 +69,44 @@ void Picture::playback(DrawContext* drawContext, const MCState& state) const {
   }
 }
 
+std::shared_ptr<Image> Picture::asImage(int width, int height, const Matrix* matrix) const {
+  if (records.size() != 1) {
+    return nullptr;
+  }
+  auto record = records[0];
+  if (record->type() != RecordType::DrawImage) {
+    return nullptr;
+  }
+  auto imageRecord = static_cast<DrawImage*>(record);
+  auto image = imageRecord->image;
+  if (image->width() != width || image->height() != height) {
+    return nullptr;
+  }
+  auto& style = imageRecord->style;
+  if (style.colorFilter || style.maskFilter) {
+    return nullptr;
+  }
+  auto imageMatrix = imageRecord->state.matrix;
+  if (matrix) {
+    imageMatrix.postConcat(*matrix);
+  }
+  if (!imageMatrix.isIdentity()) {
+    return nullptr;
+  }
+  auto clip = imageRecord->state.clip;
+  if (clip.isEmpty() && clip.isInverseFillType()) {
+    return image;
+  }
+  Rect rect = {};
+  if (!clip.isRect(&rect)) {
+    return nullptr;
+  }
+  if (matrix) {
+    matrix->mapRect(&rect);
+  }
+  if (rect != Rect::MakeWH(width, height)) {
+    return nullptr;
+  }
+  return image;
+}
 }  // namespace tgfx

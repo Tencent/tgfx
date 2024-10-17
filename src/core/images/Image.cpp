@@ -21,6 +21,7 @@
 #include "core/images/FilterImage.h"
 #include "core/images/GeneratorImage.h"
 #include "core/images/OrientImage.h"
+#include "core/images/PictureImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/RasterImage.h"
 #include "core/images/ScaleImage.h"
@@ -111,6 +112,11 @@ std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {
 std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
   return MakeFrom(std::move(buffer));
+}
+
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
+                                       const Matrix* matrix, const Paint* paint) {
+  return PictureImage::MakeFrom(std::move(picture), width, height, matrix, paint);
 }
 
 std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
