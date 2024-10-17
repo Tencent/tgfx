@@ -50,7 +50,7 @@ class DisplayList {
 
   std::shared_ptr<Layer> _root = nullptr;
 
-  std::unordered_map<const Layer*, std::shared_ptr<Surface>> cacheSurfaces;
+  std::unordered_map<uint32_t, std::shared_ptr<Surface>> cacheSurfaces;
 
   friend class Layer;
 };

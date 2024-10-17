@@ -51,11 +51,12 @@ void ImageLayer::onDraw(Canvas* canvas, float alpha) {
   canvas->drawImage(_image, _sampling, &paint);
 }
 
-Rect ImageLayer::measureContentBounds() const {
-  if (!_image) {
-    return Rect::MakeEmpty();
+void ImageLayer::measureContentBounds(Rect* rect) const {
+  if (_image) {
+    rect->setWH(static_cast<float>(_image->width()), static_cast<float>(_image->height()));
+  } else {
+    rect->setEmpty();
   }
-  return Rect::MakeWH(_image->width(), _image->height());
 }
 
 }  // namespace tgfx

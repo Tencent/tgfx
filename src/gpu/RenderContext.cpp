@@ -433,6 +433,10 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
   if (!clip.isEmpty() && clip.contains(deviceBounds)) {
     return nullptr;
   }
+  auto clipBounds = clip.getBounds();
+  if (clipBounds.isEmpty() && clip.isInverseFillType()) {
+    return nullptr;
+  }
   auto [rect, useScissor] = getClipRect(clip);
   if (rect.has_value()) {
     if (!rect->isEmpty()) {
@@ -444,7 +448,6 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
     }
     return nullptr;
   }
-  auto clipBounds = clip.getBounds();
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, opContext->renderTarget());
   scissorRect->roundOut();

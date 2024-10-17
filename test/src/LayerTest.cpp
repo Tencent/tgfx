@@ -350,7 +350,7 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.left, 0);
   EXPECT_FLOAT_EQ(bounds.top, 0);
   EXPECT_FLOAT_EQ(bounds.right, 47);
-  EXPECT_FLOAT_EQ(bounds.bottom, 17.5);
+  EXPECT_FLOAT_EQ(bounds.bottom, 17.43f);
 
   auto grandChild = ImageLayer::Make();
   grandChild->setMatrix(Matrix::MakeRotate(40, 55, 55));

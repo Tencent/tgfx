@@ -77,7 +77,7 @@ class TextLayer : public Layer {
 
   void onDraw(Canvas* canvas, float alpha) override;
 
-  Rect measureContentBounds() const override;
+  void measureContentBounds(Rect* rect) const override;
 
   GlyphRun createGlyphRun() const;
 

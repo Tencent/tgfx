@@ -56,7 +56,7 @@ Layer::Layer()
           false,                   //shouldRasterize
           AllowsEdgeAntialiasing,  //allowsEdgeAntialiasing
           AllowsGroupOpacity,      //allowsGroupOpacity
-          true,                    //contentChange
+          true,                    //contentDirty
       }) {
 }
 
@@ -285,38 +285,27 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
-  auto totalMatrix = Matrix::I();
-  if (targetCoordinateSpace) {
-    auto rootLayer = this;
-    while (rootLayer->_parent != nullptr && targetCoordinateSpace != rootLayer) {
-      totalMatrix.postConcat(rootLayer->matrixWithScrollRect());
-      rootLayer = rootLayer->_parent;
-    }
-    if (!rootLayer->doContains(targetCoordinateSpace)) {
-      return Rect::MakeEmpty();
-    }
-    auto coordinateMatrix = Matrix::I();
-    while (rootLayer != targetCoordinateSpace) {
-      coordinateMatrix.postConcat(targetCoordinateSpace->matrixWithScrollRect());
-      targetCoordinateSpace = targetCoordinateSpace->_parent;
-    }
-    if (!coordinateMatrix.invert(&coordinateMatrix)) {
-      return Rect::MakeEmpty();
-    }
-    totalMatrix.postConcat(coordinateMatrix);
-  }
-
-  auto contentBounds = measureContentBounds();
+  Rect contentBounds = Rect::MakeEmpty();
+  measureContentBounds(&contentBounds);
   for (const auto& child : _children) {
     auto childBounds = child->getBounds();
-    child->matrixWithScrollRect().mapRect(&childBounds);
+    child->getMatrixWithScrollRect().mapRect(&childBounds);
     if (child->_scrollRect) {
       childBounds.intersect(
           Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
     }
     contentBounds.join(childBounds);
   }
-  totalMatrix.mapRect(&contentBounds);
+
+  if (targetCoordinateSpace && targetCoordinateSpace != this) {
+    auto totalMatrix = getGlobalMatrix();
+    auto coordinateMatrix = targetCoordinateSpace->getGlobalMatrix();
+    if (!coordinateMatrix.invert(&coordinateMatrix)) {
+      return Rect::MakeEmpty();
+    }
+    totalMatrix.postConcat(coordinateMatrix);
+    totalMatrix.mapRect(&contentBounds);
+  }
 
   return contentBounds;
 }
@@ -345,14 +334,14 @@ void Layer::invalidate() {
 
 void Layer::invalidateContent() {
   invalidate();
-  bitFields.contentChange = true;
+  bitFields.contentDirty = true;
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (alpha < 0 || canvas == nullptr) {
     return;
   }
-  auto cacheImage = getCacheContent(canvas->getSurface()->getContext());
+  auto cacheImage = getContentCache(canvas->getSurface()->getContext());
   Paint paint;
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
@@ -374,8 +363,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
 }
 
-std::shared_ptr<Image> Layer::getCacheContent(Context* context) {
-  if (!shouldRasterize()) {
+std::shared_ptr<Image> Layer::getContentCache(Context* context) {
+  if (!bitFields.shouldRasterize || _rasterizationScale <= 0.0f) {
     return nullptr;
   } else if (shouldUseCache()) {
     return _owner->getCacheSurface(this)->makeImageSnapshot();
@@ -415,12 +404,12 @@ void Layer::drawContent(Canvas* canvas, float alpha) {
     if (child->_scrollRect) {
       canvas->clipRect(Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
     }
-    canvas->concat(child->matrixWithScrollRect());
+    canvas->concat(child->getMatrixWithScrollRect());
     child->draw(canvas, child->_alpha * alpha, child->_blendMode);
     canvas->restore();
   }
   bitFields.dirty = false;
-  bitFields.contentChange = false;
+  bitFields.contentDirty = false;
 }
 
 void Layer::onAttachToDisplayList(DisplayList* owner) {
@@ -461,27 +450,29 @@ bool Layer::doContains(const Layer* child) const {
 }
 
 bool Layer::shouldUseCache() const {
-  return !bitFields.contentChange && _owner->hasCache(this);
+  return !bitFields.contentDirty && _owner->hasCache(this);
 }
 
 void Layer::onDraw(Canvas*, float) {
 }
 
-Rect Layer::measureContentBounds() const {
-  return Rect::MakeEmpty();
+void Layer::measureContentBounds(Rect* rect) const {
+  rect->setEmpty();
 }
 
 Matrix Layer::getGlobalMatrix() const {
-  auto totalMatrix = Matrix::I();
+  // The root layer is the root of the display list, so we don't need to include it in the matrix.
+  auto root = owner() ? owner()->root() : nullptr;
+  auto matrix = Matrix::I();
   auto layer = this;
-  while (layer) {
-    totalMatrix.postConcat(layer->matrixWithScrollRect());
+  while (layer != root) {
+    matrix.postConcat(layer->getMatrixWithScrollRect());
     layer = layer->_parent;
   }
-  return totalMatrix;
+  return matrix;
 }
 
-Matrix Layer::matrixWithScrollRect() const {
+Matrix Layer::getMatrixWithScrollRect() const {
   auto matrix = _matrix;
   if (_scrollRect) {
     matrix.postTranslate(-_scrollRect->left, -_scrollRect->top);

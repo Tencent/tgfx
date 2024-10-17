@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "core/utils/UniqueID.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
@@ -161,7 +162,7 @@ class Layer {
    * content. The default value is false.
    */
   bool shouldRasterize() const {
-    return bitFields.shouldRasterize && _rasterizationScale > 0.0f;
+    return bitFields.shouldRasterize;
   }
 
   /**
@@ -466,7 +467,7 @@ class Layer {
   /**
     * Measure the rectangle area occupied by itself, note: this measurement does not include the area occupied by the sub-items
     */
-  virtual Rect measureContentBounds() const;
+  virtual void measureContentBounds(Rect* bounds) const;
 
  private:
   void onAttachToDisplayList(DisplayList* owner);
@@ -481,12 +482,15 @@ class Layer {
 
   Matrix getGlobalMatrix() const;
 
-  Matrix matrixWithScrollRect() const;
+  Matrix getMatrixToAncestor(const Layer* ancestor) const;
 
-  std::shared_ptr<Image> getCacheContent(Context* context);
+  Matrix getMatrixWithScrollRect() const;
+
+  std::shared_ptr<Image> getContentCache(Context* context);
 
   void drawContent(Canvas* canvas, float alpha);
 
+  uint32_t id = UniqueID::Next();
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
@@ -504,7 +508,7 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
-    bool contentChange : 1;
+    bool contentDirty : 1;
   } bitFields;
 
   friend class DisplayList;

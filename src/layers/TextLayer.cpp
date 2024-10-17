@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-#define TGFX_DEFAULT_TEXT_LAYER_LINE_HEIGHT 1.2f
+static constexpr float DefaultLineHeight = 1.2f;
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
@@ -60,13 +60,14 @@ void TextLayer::onDraw(Canvas* canvas, float alpha) {
                      glyphRun.font(), paint);
 }
 
-Rect TextLayer::measureContentBounds() const {
+void TextLayer::measureContentBounds(Rect* rect) const {
   if (_text.empty()) {
-    return Rect::MakeEmpty();
+    rect->setEmpty();
+  } else {
+    auto glyphRun = createGlyphRun();
+    auto bounds = glyphRun.getBounds(Matrix::I());
+    rect->setWH(bounds.right, bounds.bottom);
   }
-  auto glyphRun = createGlyphRun();
-  auto bounds = glyphRun.getBounds(Matrix::I());
-  return Rect::MakeWH(bounds.right, bounds.bottom);
 }
 
 GlyphRun TextLayer::createGlyphRun() const {
@@ -75,17 +76,16 @@ GlyphRun TextLayer::createGlyphRun() const {
   }
   std::vector<GlyphID> glyphs = {};
   std::vector<Point> positions = {};
-  const char* textStart = _text.data();
-  const char* textStop = textStart + _text.size();
+
+  // use middle alignment, refer to the document: https://paddywang.github.io/demo/list/css/baseline_line-height.html
+  auto metrics = _font.getMetrics();
+  auto lineHeight = ceil(_font.getSize() * DefaultLineHeight);
+  auto baseLine = (lineHeight + metrics.xHeight) / 2;
+
   auto emptyGlyphID = _font.getGlyphID(" ");
   auto emptyAdvance = _font.getAdvance(emptyGlyphID);
-  auto xGlyphID = _font.getGlyphID("x");
-  auto xHeight = 0.f;
-  if (xGlyphID > 0) {
-    xHeight = _font.getBounds(xGlyphID).y();
-  }
-  auto lineHeight = ceil(_font.getSize() * TGFX_DEFAULT_TEXT_LAYER_LINE_HEIGHT);
-  auto baseLine = lineHeight / 2 - xHeight / 2;
+  const char* textStart = _text.data();
+  const char* textStop = textStart + _text.size();
   float xOffset = 0;
   float yOffset = baseLine;
   while (textStart < textStop) {
