@@ -368,7 +368,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 std::shared_ptr<Image> Layer::getContentCache(Context* context) {
   if (!bitFields.shouldRasterize || _rasterizationScale <= 0.0f) {
     return nullptr;
-  } else if (shouldUseCache()) {
+  } else if (!bitFields.contentDirty && _owner->hasCache(this)) {
     return _owner->getSurfaceCache(this)->makeImageSnapshot();
   }
   Rect bounds = getBounds();
@@ -449,10 +449,6 @@ bool Layer::doContains(const Layer* child) const {
     target = target->_parent;
   }
   return false;
-}
-
-bool Layer::shouldUseCache() const {
-  return !bitFields.contentDirty && _owner->hasCache(this);
 }
 
 void Layer::onDraw(Canvas*, float) {

@@ -478,8 +478,6 @@ class Layer {
 
   bool doContains(const Layer* child) const;
 
-  bool shouldUseCache() const;
-
   Matrix getGlobalMatrix() const;
 
   Matrix getMatrixWithScrollRect() const;
