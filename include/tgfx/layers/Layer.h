@@ -465,7 +465,8 @@ class Layer {
   virtual void onDraw(Canvas* canvas, float alpha);
 
   /**
-    * Measure the rectangle area occupied by itself, note: this measurement does not include the area occupied by the sub-items
+    * Measure the bounding box of the layer's content. Note: This measurement does 
+    not include the bounding boxes of child layers.
     */
   virtual void measureContentBounds(Rect* bounds) const;
 
