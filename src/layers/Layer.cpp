@@ -288,7 +288,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
   if (targetCoordinateSpace) {
     auto rootLayer = this;
     while (rootLayer->_parent != nullptr && targetCoordinateSpace != rootLayer) {
-      totalMatrix.preConcat(rootLayer->_matrix);
+      totalMatrix.postConcat(rootLayer->matrixWithScrollRect());
       rootLayer = rootLayer->_parent;
     }
     if (!rootLayer->doContains(targetCoordinateSpace)) {
@@ -296,7 +296,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
     }
     auto coordinateMatrix = Matrix::I();
     while (rootLayer != targetCoordinateSpace) {
-      coordinateMatrix.preConcat(targetCoordinateSpace->_matrix);
+      coordinateMatrix.postConcat(targetCoordinateSpace->matrixWithScrollRect());
       targetCoordinateSpace = targetCoordinateSpace->_parent;
     }
     if (!coordinateMatrix.invert(&coordinateMatrix)) {
@@ -308,10 +308,11 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
   auto contentBounds = measureContentBounds();
   for (const auto& child : _children) {
     auto childBounds = child->getBounds();
+    child->matrixWithScrollRect().mapRect(&childBounds);
     if (child->_scrollRect) {
-      childBounds.intersect(*child->_scrollRect);
+      childBounds.intersect(
+          Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
     }
-    child->_matrix.mapRect(&childBounds);
     contentBounds.join(childBounds);
   }
   totalMatrix.mapRect(&contentBounds);
@@ -320,7 +321,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
 }
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
-  auto globalMatrix = getTotalMatrix();
+  auto globalMatrix = getGlobalMatrix();
   auto inverseMatrix = Matrix::I();
   if (!globalMatrix.invert(&inverseMatrix)) {
     return Point::Make(0, 0);
@@ -329,7 +330,7 @@ Point Layer::globalToLocal(const Point& globalPoint) const {
 }
 
 Point Layer::localToGlobal(const Point& localPoint) const {
-  auto globalMatrix = getTotalMatrix();
+  auto globalMatrix = getGlobalMatrix();
   return globalMatrix.mapXY(localPoint.x, localPoint.y);
 }
 
@@ -410,10 +411,10 @@ void Layer::drawContent(Canvas* canvas, float alpha) {
       return;
     }
     canvas->save();
-    canvas->concat(child->_matrix);
     if (child->_scrollRect) {
-      canvas->clipRect(*child->_scrollRect);
+      canvas->clipRect(Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
     }
+    canvas->concat(child->matrixWithScrollRect());
     child->draw(canvas, child->_alpha * alpha, child->_blendMode);
     canvas->restore();
   }
@@ -469,13 +470,21 @@ Rect Layer::measureContentBounds() const {
   return Rect::MakeEmpty();
 }
 
-Matrix Layer::getTotalMatrix() const {
+Matrix Layer::getGlobalMatrix() const {
   auto totalMatrix = Matrix::I();
   auto layer = this;
   while (layer) {
-    totalMatrix = layer->_matrix * totalMatrix;
+    totalMatrix.postConcat(layer->matrixWithScrollRect());
     layer = layer->_parent;
   }
   return totalMatrix;
+}
+
+Matrix Layer::matrixWithScrollRect() const {
+  auto matrix = _matrix;
+  if (_scrollRect) {
+    matrix.postTranslate(-_scrollRect->left, -_scrollRect->top);
+  }
+  return matrix;
 }
 }  // namespace tgfx

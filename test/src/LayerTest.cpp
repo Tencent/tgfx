@@ -238,7 +238,7 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   child->addChild(grandChild);
   grandChild->addChild(greatGrandson);
 
-  auto greatGrandsonTotalMatrix = greatGrandson->getTotalMatrix();
+  auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
   EXPECT_EQ(greatGrandsonTotalMatrix, Matrix::MakeTrans(40, 40));
 
   EXPECT_EQ(greatGrandson->matrix(), Matrix::MakeTrans(10, 10));
@@ -249,8 +249,8 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   auto rotateMat = Matrix::MakeRotate(45);
   greatGrandson->setMatrix(rotateMat * greatGrandson->matrix());
 
-  greatGrandsonTotalMatrix = greatGrandson->getTotalMatrix();
-  auto grandChildTotalMatrix = grandChild->getTotalMatrix();
+  greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
+  auto grandChildTotalMatrix = grandChild->getGlobalMatrix();
   EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateX(), grandChildTotalMatrix.getTranslateX());
   EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateY(),
                   grandChildTotalMatrix.getTranslateX() + 10.0f * std::sqrt(2.0f));
@@ -302,7 +302,7 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   auto layerA2 = Layer::Make();
   layerA2->setMatrix(Matrix::MakeTrans(10, 10) * Matrix::MakeRotate(45.0f));
   layerA1->addChild(layerA2);
-  auto layer2GlobalMat = layerA2->getTotalMatrix();
+  auto layer2GlobalMat = layerA2->getGlobalMatrix();
 
   auto layerA3 = Layer::Make();
   layerA3->setMatrix(Matrix::MakeTrans(10 * std::sqrt(2.0f), 10 * std::sqrt(2.0f)) *
@@ -336,4 +336,74 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   EXPECT_EQ(pointGInGlobal, Point::Make(45.0f, 70.0f));
 }
 
+TGFX_TEST(LayerTest, getbounds) {
+  auto root = Layer::Make();
+  root->setMatrix(Matrix::MakeTrans(30, 30));
+
+  auto child = TextLayer::Make();
+  child->setMatrix(Matrix::MakeRotate(20));
+  child->setText("hello");
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 20);
+  child->setFont(font);
+  auto bounds = child->getBounds();
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 47);
+  EXPECT_FLOAT_EQ(bounds.bottom, 17.5);
+
+  auto grandChild = ImageLayer::Make();
+  grandChild->setMatrix(Matrix::MakeRotate(40, 55, 55));
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  grandChild->setImage(image);
+  bounds = grandChild->getBounds();
+  auto clip = Rect::MakeLTRB(10, 10, 70, 70);
+  grandChild->setScrollRect(&clip);
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_EQ(static_cast<int>(bounds.right), image->width());
+  EXPECT_EQ(static_cast<int>(bounds.bottom), image->height());
+
+  auto cousin = Layer::Make();
+  cousin->setMatrix(Matrix::MakeTrans(10, 10));
+
+  root->addChild(child);
+  child->addChild(grandChild);
+  root->addChild(cousin);
+
+  bounds = child->getBounds();
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 60);
+  EXPECT_FLOAT_EQ(bounds.bottom, 60);
+  bounds = child->getBounds(root.get());
+  EXPECT_FLOAT_EQ(bounds.left, -20.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 56.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 76.902763f);
+  bounds = child->getBounds(cousin.get());
+  EXPECT_FLOAT_EQ(bounds.left, -30.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, -10);
+  EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(root);
+  bounds = child->getBounds();
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 60);
+  EXPECT_FLOAT_EQ(bounds.bottom, 60);
+  bounds = child->getBounds(root.get());
+  EXPECT_FLOAT_EQ(bounds.left, -20.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 56.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 76.902763f);
+  bounds = child->getBounds(cousin.get());
+  EXPECT_FLOAT_EQ(bounds.left, -30.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, -10);
+  EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
+
+}
 }  // namespace tgfx

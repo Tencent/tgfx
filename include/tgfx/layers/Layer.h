@@ -480,7 +480,9 @@ class Layer {
 
   bool shouldUseCache() const;
 
-  Matrix getTotalMatrix() const;
+  Matrix getGlobalMatrix() const;
+
+  Matrix matrixWithScrollRect() const;
 
   std::shared_ptr<Image> getCacheContent(Context* context);
 
