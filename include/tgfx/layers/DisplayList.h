@@ -44,13 +44,13 @@ class DisplayList {
  private:
   bool hasCache(const Layer* layer) const;
 
-  std::shared_ptr<Surface> getCacheSurface(const Layer* layer);
+  std::shared_ptr<Surface> getSurfaceCache(const Layer* layer);
 
-  void setCacheSurface(const Layer* layer, std::shared_ptr<Surface> surface);
+  void setSurfaceCache(const Layer* layer, std::shared_ptr<Surface> surface);
 
   std::shared_ptr<Layer> _root = nullptr;
 
-  std::unordered_map<uint32_t, std::shared_ptr<Surface>> cacheSurfaces;
+  std::unordered_map<uint32_t, std::shared_ptr<Surface>> surfaceCaches;
 
   friend class Layer;
 };

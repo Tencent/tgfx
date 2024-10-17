@@ -33,23 +33,23 @@ void DisplayList::draw(Canvas* canvas) {
 }
 
 bool DisplayList::hasCache(const Layer* layer) const {
-  return cacheSurfaces.find(layer->id) != cacheSurfaces.end();
+  return surfaceCaches.find(layer->id) != surfaceCaches.end();
 }
 
-std::shared_ptr<Surface> DisplayList::getCacheSurface(const Layer* layer) {
+std::shared_ptr<Surface> DisplayList::getSurfaceCache(const Layer* layer) {
   if (hasCache(layer)) {
-    return cacheSurfaces[layer->id];
+    return surfaceCaches[layer->id];
   }
   return nullptr;
 }
 
-void DisplayList::setCacheSurface(const Layer* layer, std::shared_ptr<Surface> surface) {
+void DisplayList::setSurfaceCache(const Layer* layer, std::shared_ptr<Surface> surface) {
   if (surface == nullptr) {
     if (hasCache(layer)) {
-      cacheSurfaces.erase(layer->id);
+      surfaceCaches.erase(layer->id);
     }
   } else {
-    cacheSurfaces[layer->id] = surface;
+    surfaceCaches[layer->id] = surface;
   }
 }
 

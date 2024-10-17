@@ -367,7 +367,7 @@ std::shared_ptr<Image> Layer::getContentCache(Context* context) {
   if (!bitFields.shouldRasterize || _rasterizationScale <= 0.0f) {
     return nullptr;
   } else if (shouldUseCache()) {
-    return _owner->getCacheSurface(this)->makeImageSnapshot();
+    return _owner->getSurfaceCache(this)->makeImageSnapshot();
   }
   Rect bounds = getBounds();
   bounds.scale(_rasterizationScale, _rasterizationScale);
@@ -375,23 +375,23 @@ std::shared_ptr<Image> Layer::getContentCache(Context* context) {
   auto surfaceWidth = static_cast<int>(bounds.width());
   auto surfaceHeight = static_cast<int>(bounds.height());
 
-  auto cacheSurface = _owner ? _owner->getCacheSurface(this) : nullptr;
-  if (cacheSurface == nullptr || cacheSurface->width() != surfaceWidth ||
-      cacheSurface->height() != surfaceHeight) {
-    cacheSurface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto surface = _owner ? _owner->getSurfaceCache(this) : nullptr;
+  if (surface == nullptr || surface->width() != surfaceWidth ||
+      surface->height() != surfaceHeight) {
+    surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   }
 
-  auto cacheCanvas = cacheSurface->getCanvas();
-  if (!cacheCanvas) {
+  auto canvas = surface->getCanvas();
+  if (!canvas) {
     return nullptr;
   }
-  cacheCanvas->concat(Matrix::MakeScale(_rasterizationScale));
-  drawContent(cacheCanvas, 1.0f);
+  canvas->concat(Matrix::MakeScale(_rasterizationScale));
+  drawContent(canvas, 1.0f);
 
   if (_owner) {
-    _owner->setCacheSurface(this, cacheSurface);
+    _owner->setSurfaceCache(this, surface);
   }
-  return cacheSurface->makeImageSnapshot();
+  return surface->makeImageSnapshot();
 }
 
 void Layer::drawContent(Canvas* canvas, float alpha) {
@@ -421,7 +421,7 @@ void Layer::onAttachToDisplayList(DisplayList* owner) {
 
 void Layer::onDetachFromDisplayList() {
   if (_owner) {
-    _owner->setCacheSurface(this, nullptr);
+    _owner->setSurfaceCache(this, nullptr);
   }
   _owner = nullptr;
   for (auto child : _children) {
