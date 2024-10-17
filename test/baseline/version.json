@@ -2,7 +2,8 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
-        "Picture": "72edd24",
+        "Picture": "fa90eb0",
+        "PictureImage": "fa90eb0",
         "drawImage": "8cb853c",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",

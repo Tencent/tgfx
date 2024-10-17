@@ -777,9 +777,34 @@ TGFX_TEST(CanvasTest, Picture) {
   ASSERT_TRUE(singleRecordPicture != nullptr);
   EXPECT_TRUE(recorder.getRecordingCanvas() == nullptr);
 
-  canvas = recorder.beginRecording();
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
+  canvas = recorder.beginRecording();
+  canvas->drawImage(image);
+  auto singleImageRecord = recorder.finishRecordingAsPicture();
+  auto pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height());
+  EXPECT_TRUE(pictureImage == image);
+  pictureImage = Image::MakeFrom(singleRecordPicture, 200, 150);
+  EXPECT_TRUE(pictureImage != nullptr);
+  EXPECT_FALSE(pictureImage == image);
+
+  canvas = recorder.beginRecording();
+  canvas->clipRect(Rect::MakeXYWH(100, 100, image->width(), image->height()));
+  canvas->drawImage(image, 100, 100);
+  singleImageRecord = recorder.finishRecordingAsPicture();
+  Matrix matrix = Matrix::MakeTrans(-100, -100);
+  pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix);
+  EXPECT_TRUE(pictureImage == image);
+  pictureImage =
+      Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, &paint);
+  EXPECT_TRUE(pictureImage == image);
+  paint.setAlpha(0.8f);
+  pictureImage =
+      Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, &paint);
+  EXPECT_TRUE(pictureImage != nullptr);
+  EXPECT_FALSE(pictureImage == image);
+
+  canvas = recorder.beginRecording();
   image = image->makeMipmapped(true);
   auto imageScale = 200.f / static_cast<float>(image->width());
   canvas->scale(imageScale, imageScale);
@@ -795,7 +820,7 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas->drawPath(path, paint);
   path.reset();
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
-  auto matrix = Matrix::I();
+  matrix = Matrix::I();
   matrix.postRotate(30, 50, 50);
   path.transform(matrix);
   canvas->resetMatrix();
@@ -822,9 +847,15 @@ TGFX_TEST(CanvasTest, Picture) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, pictureImage->width(), pictureImage->height());
+  canvas = surface->getCanvas();
+  canvas->drawImage(pictureImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
+
   auto bounds = picture->getBounds();
-  auto surface = Surface::Make(context, static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height() + 20));
+  surface = Surface::Make(context, static_cast<int>(bounds.width()),
+                          static_cast<int>(bounds.height() + 20));
   canvas = surface->getCanvas();
   path.reset();
   path.addOval(Rect::MakeWH(bounds.width(), bounds.height() + 100));

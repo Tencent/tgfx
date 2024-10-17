@@ -29,6 +29,7 @@ class MatrixDrawContext : public TransformContext {
   MCState transform(const MCState& state) override {
     auto newState = state;
     newState.matrix.postConcat(initMatrix);
+    newState.clip.transform(initMatrix);
     return newState;
   }
 
@@ -68,9 +69,10 @@ class MCStateDrawContext : public ClipDrawContext {
 
  protected:
   MCState transform(const MCState& state) override {
-    auto newState = ClipDrawContext::transform(state);
+    auto newState = state;
     newState.matrix.postConcat(initMatrix);
-    return newState;
+    newState.clip.transform(initMatrix);
+    return ClipDrawContext::transform(newState);
   }
 
  private:

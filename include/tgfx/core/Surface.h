@@ -186,5 +186,6 @@ class Surface {
   bool aboutToDraw(const std::function<bool()>& willDiscardContent);
 
   friend class RenderContext;
+  friend class PictureImage;
 };
 }  // namespace tgfx
