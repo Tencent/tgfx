@@ -408,7 +408,7 @@ void Layer::drawContent(Canvas* canvas, float alpha) {
   onDraw(canvas, alpha);
   for (const auto& child : _children) {
     if (!child->visible() || child->_alpha <= 0) {
-      return;
+      continue;
     }
     canvas->save();
     if (child->_scrollRect) {

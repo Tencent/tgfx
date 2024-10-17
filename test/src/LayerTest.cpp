@@ -404,6 +404,5 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.top, -10);
   EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
   EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
-
 }
 }  // namespace tgfx
