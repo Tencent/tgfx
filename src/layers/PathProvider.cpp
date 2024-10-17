@@ -26,6 +26,9 @@ std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
   return std::shared_ptr<PathProvider>(new PathProvider(path));
 }
 
+PathProvider::PathProvider(const Path& path) : path(path) {
+}
+
 Path PathProvider::getPath() {
   if (dirty) {
     path = onGeneratePath();

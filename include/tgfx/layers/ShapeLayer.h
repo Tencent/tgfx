@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "SolidColor.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/Layer.h"
@@ -63,7 +64,7 @@ class ShapeLayer : public Layer {
    * Sets the path provider that generates the shape's path. If the path is set directly using
    * setPath(), the path provider will be set to nullptr.
    */
-  void setPathProvider(std::shared_ptr<PathProvider> provider);
+  void setPathProvider(const std::shared_ptr<PathProvider>& provider);
 
   /**
    * Returns the style used to fill the shape's path, which can be a solid color, gradient, or image
@@ -77,7 +78,7 @@ class ShapeLayer : public Layer {
   /**
    * Sets the style used to fill the shape's path.
    */
-  void setFillStyle(std::shared_ptr<ShapeStyle> style);
+  void setFillStyle(const std::shared_ptr<ShapeStyle>& style);
 
   /**
    * Returns the style used to stroke the shape’s path, which can be a solid color, gradient, or
@@ -91,7 +92,7 @@ class ShapeLayer : public Layer {
   /**
    * Sets the style used to fill the shape's path.
    */
-  void setStrokeStyle(std::shared_ptr<ShapeStyle> style);
+  void setStrokeStyle(const std::shared_ptr<ShapeStyle>& style);
 
   /**
    * Returns the line cap style for the shape's path. The default line cap style is Butt.
@@ -215,10 +216,15 @@ class ShapeLayer : public Layer {
  protected:
   ShapeLayer() = default;
 
+  void onDraw(Canvas* canvas, float alpha) override;
+
+  void measureContentBounds(tgfx::Rect* bounds) const override;
+
  private:
   Path _path = {};
+  Path renderPath = {};
   std::shared_ptr<PathProvider> _pathProvider = nullptr;
-  std::shared_ptr<ShapeStyle> _fillStyle = nullptr;
+  std::shared_ptr<ShapeStyle> _fillStyle = SolidColor::Make();
   std::shared_ptr<ShapeStyle> _strokeStyle = nullptr;
   Stroke stroke = {};
   std::vector<float> _lineDashPattern = {};
