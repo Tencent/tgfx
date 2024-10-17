@@ -50,6 +50,11 @@ bool Paint::nothingToDraw() const {
     default:
       break;
   }
+
+  if ((PaintStyle::Stroke == style) && (stroke.width <= 0.0f)) {
+    return true;
+  }
+
   return false;
 }
 }  // namespace tgfx

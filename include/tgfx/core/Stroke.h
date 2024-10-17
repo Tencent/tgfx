@@ -76,7 +76,7 @@ class Stroke {
   /**
    * The thickness of the pen used to outline the paths or glyphs.
    */
-  float width = 0.0f;
+  float width = 1.0f;
 
   /**
    *  The geometry drawn at the beginning and end of strokes.
