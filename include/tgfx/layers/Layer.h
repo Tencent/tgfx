@@ -465,8 +465,8 @@ class Layer {
   virtual void onDraw(Canvas* canvas, float alpha);
 
   /**
-    * Measure the bounding box of the layer's content. Note: This measurement does 
-    not include the bounding boxes of child layers.
+    * Measure the bounding box of the layer's content. Note: This measurement does not include the
+    * bounding boxes of child layers.
     */
   virtual void measureContentBounds(Rect* bounds) const;
 
