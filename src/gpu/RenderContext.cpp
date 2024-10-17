@@ -397,6 +397,9 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     return clipTexture;
   }
   auto bounds = clip.getBounds();
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
@@ -427,7 +430,8 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
                                                               const Rect& deviceBounds,
                                                               const Matrix& viewMatrix,
                                                               Rect* scissorRect) {
-  if (!clip.isEmpty() && clip.contains(deviceBounds)) {
+  if ((!clip.isEmpty() && clip.contains(deviceBounds)) ||
+      (clip.isEmpty() && clip.isInverseFillType())) {
     return nullptr;
   }
   auto [rect, useScissor] = getClipRect(clip);

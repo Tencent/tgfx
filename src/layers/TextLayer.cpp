@@ -17,8 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
+#include "core/utils/SimpleTextShaper.h"
+#include "tgfx/core/UTF.h"
 
 namespace tgfx {
+
+static constexpr float DefaultLineHeight = 1.2f;
+
 std::shared_ptr<TextLayer> TextLayer::Make() {
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
   layer->weakThis = layer;
@@ -46,12 +51,66 @@ void TextLayer::onDraw(Canvas* canvas, float alpha) {
   }
   Paint paint;
   paint.setAntiAlias(allowsEdgeAntialiasing());
-  paint.setAlpha(alpha);
   auto currentColor = _textColor;
-  currentColor.alpha *= paint.getAlpha();
+  currentColor.alpha *= alpha;
   paint.setColor(currentColor);
   paint.setStyle(tgfx::PaintStyle::Fill);
-  canvas->drawSimpleText(_text, 0, _font.getSize(), _font, paint);
+  auto glyphRun = createGlyphRun();
+  canvas->drawGlyphs(glyphRun.glyphIDs().data(), glyphRun.positions().data(), glyphRun.runSize(),
+                     glyphRun.font(), paint);
+}
+
+void TextLayer::measureContentBounds(Rect* rect) const {
+  if (_text.empty()) {
+    rect->setEmpty();
+  } else {
+    auto glyphRun = createGlyphRun();
+    auto bounds = glyphRun.getBounds(Matrix::I());
+    rect->setWH(bounds.right, bounds.bottom);
+  }
+}
+
+GlyphRun TextLayer::createGlyphRun() const {
+  if (_text.empty()) {
+    return {};
+  }
+  std::vector<GlyphID> glyphs = {};
+  std::vector<Point> positions = {};
+
+  // use middle alignment, refer to the document: https://paddywang.github.io/demo/list/css/baseline_line-height.html
+  auto metrics = _font.getMetrics();
+  auto lineHeight = ceil(_font.getSize() * DefaultLineHeight);
+  auto baseLine = (lineHeight + metrics.xHeight) / 2;
+
+  auto emptyGlyphID = _font.getGlyphID(" ");
+  auto emptyAdvance = _font.getAdvance(emptyGlyphID);
+  const char* textStart = _text.data();
+  const char* textStop = textStart + _text.size();
+  float xOffset = 0;
+  float yOffset = baseLine;
+  while (textStart < textStop) {
+    if (*textStart == '\n') {
+      xOffset = -emptyAdvance;
+      yOffset += lineHeight;
+      glyphs.push_back(emptyGlyphID);
+      positions.push_back(Point::Make(xOffset, yOffset));
+      textStart++;
+      continue;
+    }
+    auto unichar = UTF::NextUTF8(&textStart, textStop);
+    auto glyphID = _font.getGlyphID(unichar);
+    if (glyphID > 0) {
+      glyphs.push_back(glyphID);
+      positions.push_back(Point::Make(xOffset, yOffset));
+      auto advance = _font.getAdvance(glyphID);
+      xOffset += advance;
+    } else {
+      glyphs.push_back(emptyGlyphID);
+      positions.push_back(Point::Make(xOffset, yOffset));
+      xOffset += emptyAdvance;
+    }
+  }
+  return GlyphRun(_font, glyphs, positions);
 }
 
 }  // namespace tgfx

@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <math.h>
 #include <vector>
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -188,6 +189,12 @@ TGFX_TEST(LayerTest, textLayer) {
   textLayer->setFont(font);
   textLayer->setAlpha(0.5f);
   textLayer->setMatrix(Matrix::MakeRotate(30));
+  auto textLayer2 = TextLayer::Make();
+  layer->addChild(textLayer2);
+  textLayer2->setText("Hello, World!");
+  color.alpha = 0.5;
+  textLayer2->setFont(font);
+  textLayer2->setBlendMode(BlendMode::Difference);
   displayList->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
   device->unlock();
@@ -212,5 +219,190 @@ TGFX_TEST(LayerTest, imageLayer) {
   displayList->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
   device->unlock();
+}
+
+TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto child = Layer::Make();
+  child->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto grandChild = Layer::Make();
+  grandChild->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto greatGrandson = Layer::Make();
+  greatGrandson->setMatrix(Matrix::MakeTrans(10, 10));
+
+  parent->addChild(child);
+  child->addChild(grandChild);
+  grandChild->addChild(greatGrandson);
+
+  auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
+  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix::MakeTrans(40, 40));
+
+  EXPECT_EQ(greatGrandson->matrix(), Matrix::MakeTrans(10, 10));
+  EXPECT_EQ(grandChild->matrix(), Matrix::MakeTrans(10, 10));
+  EXPECT_EQ(child->matrix(), Matrix::MakeTrans(10, 10));
+  EXPECT_EQ(parent->matrix(), Matrix::MakeTrans(10, 10));
+
+  auto rotateMat = Matrix::MakeRotate(45);
+  greatGrandson->setMatrix(rotateMat * greatGrandson->matrix());
+
+  greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
+  auto grandChildTotalMatrix = grandChild->getGlobalMatrix();
+  EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateX(), grandChildTotalMatrix.getTranslateX());
+  EXPECT_FLOAT_EQ(greatGrandsonTotalMatrix.getTranslateY(),
+                  grandChildTotalMatrix.getTranslateX() + 10.0f * std::sqrt(2.0f));
+}
+
+/**
+ * The derivation process is shown in the following figure:
+ * https://www.geogebra.org/graphing/vtcatfdf
+ * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/%E5%9D%90%E6%A0%87%E8%BD%AC%E6%8D%A2_%E5%85%A8%E5%B1%80%E5%88%B0%E5%B1%80%E9%83%A8.png
+ */
+TGFX_TEST(LayerTest, Layer_globalToLocal) {
+  auto layerA1 = Layer::Make();
+  layerA1->setMatrix(Matrix::MakeTrans(10.0f, 10.0f));
+
+  auto layerA2 = Layer::Make();
+  layerA2->setMatrix(Matrix::MakeTrans(15.0f, 5.0f) * Matrix::MakeRotate(45.0f));
+
+  auto layerA3 = Layer::Make();
+  layerA3->setMatrix(Matrix::MakeTrans(10.0f * std::sqrt(2.0f), 5.0f * std::sqrt(2.0f)) *
+                     Matrix::MakeRotate(45.0f));
+
+  layerA1->addChild(layerA2);
+  layerA2->addChild(layerA3);
+
+  auto globalPoint = Point::Make(25.0f, 45.0f);
+  auto pointInLayer3 = layerA3->globalToLocal(globalPoint);
+  auto testPoint = Point::Make(15.0f, 5.0f);
+  EXPECT_EQ(pointInLayer3, testPoint);
+
+  auto pointInLayer2 = layerA2->globalToLocal(globalPoint);
+  testPoint = Point::Make(15.0f * std::sqrt(2.0f), 15.0f * std::sqrt(2.0f));
+  EXPECT_FLOAT_EQ(pointInLayer2.x, testPoint.x);
+  EXPECT_FLOAT_EQ(pointInLayer2.y, testPoint.y);
+
+  auto pointInLayer1 = layerA1->globalToLocal(globalPoint);
+  testPoint = Point::Make(15.0f, 35.0f);
+  EXPECT_EQ(pointInLayer1, testPoint);
+}
+/**
+ * The derivation process is shown in the following figure:
+ * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/%E5%9D%90%E6%A0%87%E8%BD%AC%E6%8D%A2.png
+ * https://www.geogebra.org/graphing/kvrqtdqk
+ */
+TGFX_TEST(LayerTest, Layer_localToGlobal) {
+  auto layerA1 = Layer::Make();
+  auto mat1 = Matrix::MakeTrans(10, 10);
+  layerA1->setMatrix(mat1);
+
+  auto layerA2 = Layer::Make();
+  layerA2->setMatrix(Matrix::MakeTrans(10, 10) * Matrix::MakeRotate(45.0f));
+  layerA1->addChild(layerA2);
+  auto layer2GlobalMat = layerA2->getGlobalMatrix();
+
+  auto layerA3 = Layer::Make();
+  layerA3->setMatrix(Matrix::MakeTrans(10 * std::sqrt(2.0f), 10 * std::sqrt(2.0f)) *
+                     Matrix::MakeRotate(45.0f));
+  layerA2->addChild(layerA3);
+
+  auto pointDInLayer3 = Point::Make(5, 5);
+  auto pointDInGlobal = layerA3->localToGlobal(pointDInLayer3);
+  EXPECT_EQ(pointDInGlobal, Point::Make(15.0f, 45.0f));
+
+  auto pointEInLayer2 = Point::Make(8, 8);
+  auto pointEInGlobal = layerA2->localToGlobal(pointEInLayer2);
+  EXPECT_EQ(pointEInGlobal, Point::Make(layer2GlobalMat.getTranslateX(),
+                                        layer2GlobalMat.getTranslateY() + 8.0f * std::sqrt(2.0f)));
+
+  auto layer4 = Layer::Make();
+  layer4->setMatrix(Matrix::MakeTrans(5, -5) * Matrix::MakeRotate(-60.0f));
+  layerA3->addChild(layer4);
+
+  auto pointFInLayer4 = Point::Make(10.0f, 10.0f);
+  auto pointFInGlobal = layer4->localToGlobal(pointFInLayer4);
+  EXPECT_FLOAT_EQ(pointFInGlobal.x, 28.660254f);
+  EXPECT_FLOAT_EQ(pointFInGlobal.y, 58.660255f);
+
+  auto layer5 = Layer::Make();
+  layer5->setMatrix(Matrix::MakeTrans(10, -15) * Matrix::MakeRotate(-90.0f));
+  layerA3->addChild(layer5);
+
+  auto pointGInLayer5 = Point::Make(10.0f, 20.0f);
+  auto pointGInGlobal = layer5->localToGlobal(pointGInLayer5);
+  EXPECT_EQ(pointGInGlobal, Point::Make(45.0f, 70.0f));
+}
+
+TGFX_TEST(LayerTest, getbounds) {
+  auto root = Layer::Make();
+  root->setMatrix(Matrix::MakeTrans(30, 30));
+
+  auto child = TextLayer::Make();
+  child->setMatrix(Matrix::MakeRotate(20));
+  child->setText("hello");
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 20);
+  child->setFont(font);
+  auto bounds = child->getBounds();
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 47);
+  EXPECT_FLOAT_EQ(bounds.bottom, 17.43f);
+
+  auto grandChild = ImageLayer::Make();
+  grandChild->setMatrix(Matrix::MakeRotate(40, 55, 55));
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  grandChild->setImage(image);
+  bounds = grandChild->getBounds();
+  auto clip = Rect::MakeLTRB(10, 10, 70, 70);
+  grandChild->setScrollRect(&clip);
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_EQ(static_cast<int>(bounds.right), image->width());
+  EXPECT_EQ(static_cast<int>(bounds.bottom), image->height());
+
+  auto cousin = Layer::Make();
+  cousin->setMatrix(Matrix::MakeTrans(10, 10));
+
+  root->addChild(child);
+  child->addChild(grandChild);
+  root->addChild(cousin);
+
+  bounds = child->getBounds();
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 60);
+  EXPECT_FLOAT_EQ(bounds.bottom, 60);
+  bounds = child->getBounds(root.get());
+  EXPECT_FLOAT_EQ(bounds.left, -20.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 56.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 76.902763f);
+  bounds = child->getBounds(cousin.get());
+  EXPECT_FLOAT_EQ(bounds.left, -30.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, -10);
+  EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(root);
+  bounds = child->getBounds();
+  EXPECT_FLOAT_EQ(bounds.left, 0);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 60);
+  EXPECT_FLOAT_EQ(bounds.bottom, 60);
+  bounds = child->getBounds(root.get());
+  EXPECT_FLOAT_EQ(bounds.left, -20.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.right, 56.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 76.902763f);
+  bounds = child->getBounds(cousin.get());
+  EXPECT_FLOAT_EQ(bounds.left, -30.521208f);
+  EXPECT_FLOAT_EQ(bounds.top, -10);
+  EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
 }
 }  // namespace tgfx

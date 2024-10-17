@@ -77,6 +77,10 @@ class TextLayer : public Layer {
 
   void onDraw(Canvas* canvas, float alpha) override;
 
+  void measureContentBounds(Rect* rect) const override;
+
+  GlyphRun createGlyphRun() const;
+
  private:
   std::string _text;
   Color _textColor = Color::White();

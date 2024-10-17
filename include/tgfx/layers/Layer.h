@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "core/utils/UniqueID.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
@@ -463,17 +464,30 @@ class Layer {
    */
   virtual void onDraw(Canvas* canvas, float alpha);
 
+  /**
+    * Measure the bounding box of the layer's content. Note: This measurement does not include the
+    * bounding boxes of child layers.
+    */
+  virtual void measureContentBounds(Rect* bounds) const;
+
  private:
   void onAttachToDisplayList(DisplayList* owner);
 
   void onDetachFromDisplayList();
 
-  int doGetChildIndex(Layer* child) const;
+  int doGetChildIndex(const Layer* child) const;
 
-  bool doContains(Layer* child) const;
+  bool doContains(const Layer* child) const;
+
+  Matrix getGlobalMatrix() const;
+
+  Matrix getMatrixWithScrollRect() const;
+
+  std::shared_ptr<Image> getContentCache(Context* context);
 
   void drawContent(Canvas* canvas, float alpha);
 
+  uint32_t uniqueID = UniqueID::Next();
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
@@ -491,9 +505,8 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
+    bool contentDirty : 1;
   } bitFields;
-
-  std::shared_ptr<Surface> contentSurface = nullptr;
 
   friend class DisplayList;
 };

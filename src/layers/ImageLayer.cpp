@@ -30,7 +30,7 @@ void ImageLayer::setSampling(const SamplingOptions& value) {
     return;
   }
   _sampling = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ImageLayer::setImage(std::shared_ptr<Image> value) {
@@ -38,7 +38,7 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
     return;
   }
   _image = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ImageLayer::onDraw(Canvas* canvas, float alpha) {
@@ -49,6 +49,14 @@ void ImageLayer::onDraw(Canvas* canvas, float alpha) {
   paint.setAntiAlias(allowsEdgeAntialiasing());
   paint.setAlpha(alpha);
   canvas->drawImage(_image, _sampling, &paint);
+}
+
+void ImageLayer::measureContentBounds(Rect* rect) const {
+  if (_image) {
+    rect->setWH(static_cast<float>(_image->width()), static_cast<float>(_image->height()));
+  } else {
+    rect->setEmpty();
+  }
 }
 
 }  // namespace tgfx

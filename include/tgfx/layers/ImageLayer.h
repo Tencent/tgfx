@@ -67,6 +67,8 @@ class ImageLayer : public Layer {
 
   void onDraw(Canvas* canvas, float alpha) override;
 
+  void measureContentBounds(Rect* rect) const override;
+
  private:
   SamplingOptions _sampling;
   std::shared_ptr<Image> _image = nullptr;
