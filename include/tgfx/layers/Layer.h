@@ -482,8 +482,6 @@ class Layer {
 
   Matrix getGlobalMatrix() const;
 
-  Matrix getMatrixToAncestor(const Layer* ancestor) const;
-
   Matrix getMatrixWithScrollRect() const;
 
   std::shared_ptr<Image> getContentCache(Context* context);

@@ -338,7 +338,7 @@ void Layer::invalidateContent() {
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
-  if (alpha < 0 || canvas == nullptr) {
+  if (canvas == nullptr || alpha <= 0) {
     return;
   }
   auto cacheImage = getContentCache(canvas->getSurface()->getContext());
