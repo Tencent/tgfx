@@ -488,7 +488,7 @@ class Layer {
 
   void drawContent(Canvas* canvas, float alpha);
 
-  uint32_t id = UniqueID::Next();
+  uint32_t uniqueID = UniqueID::Next();
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;

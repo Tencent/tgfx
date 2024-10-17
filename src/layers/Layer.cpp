@@ -291,8 +291,10 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
     auto childBounds = child->getBounds();
     child->getMatrixWithScrollRect().mapRect(&childBounds);
     if (child->_scrollRect) {
-      childBounds.intersect(
-          Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
+      auto displayRect = Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height());
+      if (!childBounds.intersect(displayRect)) {
+        continue;
+      }
     }
     contentBounds.join(childBounds);
   }
