@@ -438,8 +438,6 @@ Paint Layer::getPaint(float alpha, BlendMode blendMode) {
 
 void Layer::doDraw(Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
-  if (shouldRasterize()) {
-  }
   auto rasterizedCache = getRasterizedCache(canvas->getSurface()->getContext());
   Paint paint;
   paint.setAlpha(alpha);
