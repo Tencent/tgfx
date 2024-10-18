@@ -21,6 +21,7 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/TextLayer.h"
 #include "utils/TestUtils.h"
 
@@ -404,5 +405,42 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.top, -10);
   EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
   EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
+}
+
+TGFX_TEST(LayerTest, shapeLayer) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 200, 100);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto shaperLayer = ShapeLayer::Make();
+  auto rect = Rect::MakeXYWH(10, 10, 150, 80);
+  Path path = {};
+  path.addRect(rect);
+  shaperLayer->setPath(path);
+  auto filleStyle = SolidColor::Make(Color::Blue());
+  shaperLayer->setFillStyle(filleStyle);
+  // stroke style
+  shaperLayer->setLineWidth(10.0f);
+  shaperLayer->setLineCap(LineCap::Butt);
+  shaperLayer->setLineJoin(LineJoin::Miter);
+  shaperLayer->setMiterLimit(2.0f);
+  auto strokeStyle = SolidColor::Make(Color::Red());
+  shaperLayer->setStrokeStyle(strokeStyle);
+  std::vector<float> dashPattern = {10.0f, 10.0f};
+  shaperLayer->setLineDashPattern(dashPattern);
+  shaperLayer->setLineDashPhase(0.0f);
+
+  layer->addChild(shaperLayer);
+  displayList->draw(canvas);
+  context->submit();
+  auto shapeLayerRect = shaperLayer->getBounds();
+  auto bounds = Rect::MakeXYWH(5, 5, 160, 90);
+  ASSERT_TRUE(shapeLayerRect == bounds);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_shape"));
+  device->unlock();
 }
 }  // namespace tgfx
