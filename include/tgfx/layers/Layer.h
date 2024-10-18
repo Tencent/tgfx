@@ -24,6 +24,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/layers/LayerContent.h"
 #include "tgfx/layers/LayerFilter.h"
 #include "tgfx/layers/LayerType.h"
 
@@ -447,28 +448,29 @@ class Layer {
   Layer();
 
   /**
-   * Marks the layer as needing to be redrawn. Different from invalidateContent(), this method only
-   * marks the layer as dirty and does not update the cached content bounds or rasterized bitmap.
+   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
+   * the layer as dirty and does not update the cached content.
    */
   void invalidate();
 
   /**
-   * Marks the layer's content has changed and needs to be redrawn. The cached content bounds will
-   * be updated, and if the layer is rasterized, the rasterized bitmap will be recreated.
+   * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
+   * be called to update the cached content.
    */
   void invalidateContent();
 
   /**
-   * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
-   * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
+   * Called when the layer's content needs to be updated. Subclasses should override this method to
+   * create the layer content used for measuring the bounding box and drawing the layer itself
+   * (children not included).
    */
-  virtual void onDraw(Canvas* canvas, float alpha);
+  virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
-    * Measure the bounding box of the layer's content. Note: This measurement does not include the
-    * bounding boxes of child layers.
-    */
-  virtual void measureContentBounds(Rect* bounds);
+   * Called when the layer needs to be redrawn. Subclasses should override this method to set the
+   * paint properties for drawing the layer content.
+   */
+  virtual void onUpdatePaint(Paint* paint);
 
  private:
   void onAttachToDisplayList(DisplayList* owner);
@@ -483,11 +485,16 @@ class Layer {
 
   Matrix getMatrixWithScrollRect() const;
 
-  std::shared_ptr<Image> getContentCache(Context* context);
+  LayerContent* getContent();
 
-  void drawContent(Canvas* canvas, float alpha);
+  Paint getPaint(float alpha, BlendMode blendMode);
 
-  uint32_t uniqueID = UniqueID::Next();
+  void doDraw(Canvas* canvas, float alpha, BlendMode blendMode);
+
+  LayerContent* getRasterizedCache(Context* context);
+
+  void drawContentAndChildren(Canvas* canvas, float alpha);
+
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
@@ -498,14 +505,16 @@ class Layer {
   std::unique_ptr<Rect> _scrollRect = nullptr;
   DisplayList* _owner = nullptr;
   Layer* _parent = nullptr;
+  std::unique_ptr<LayerContent> layerContent = nullptr;
+  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
   struct {
-    bool dirty : 1;
+    bool dirty : 1;         // need to redraw
+    bool contentDirty : 1;  // need to update content
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
-    bool contentDirty : 1;
   } bitFields;
 
   friend class DisplayList;

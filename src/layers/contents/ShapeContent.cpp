@@ -16,32 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ImageLayer.h"
+#include "ShapeContent.h"
 
 namespace tgfx {
-std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
-  layer->weakThis = layer;
-  return layer;
+ShapeContent::ShapeContent(Path path, std::shared_ptr<Shader> shader)
+    : path(std::move(path)), shader(std::move(shader)) {
 }
 
-void ImageLayer::setSampling(const SamplingOptions& value) {
-  if (_sampling == value) {
-    return;
-  }
-  _sampling = value;
-  invalidateContent();
-}
-
-void ImageLayer::setImage(std::shared_ptr<Image> value) {
-  if (_image == value) {
-    return;
-  }
-  _image = value;
-  invalidateContent();
-}
-
-std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
-  return std::make_unique<ImageContent>(_image, _sampling);
+void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
+  auto shapePaint = paint;
+  shapePaint.setShader(shader);
+  canvas->drawPath(path, shapePaint);
 }
 }  // namespace tgfx

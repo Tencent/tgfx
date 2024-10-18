@@ -16,32 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ImageLayer.h"
+#include "ComposeContent.h"
 
 namespace tgfx {
-std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
-  layer->weakThis = layer;
-  return layer;
-}
-
-void ImageLayer::setSampling(const SamplingOptions& value) {
-  if (_sampling == value) {
-    return;
+std::unique_ptr<LayerContent> LayerContent::Compose(
+    std::vector<std::unique_ptr<LayerContent>> contents) {
+  if (contents.empty()) {
+    return nullptr;
   }
-  _sampling = value;
-  invalidateContent();
-}
-
-void ImageLayer::setImage(std::shared_ptr<Image> value) {
-  if (_image == value) {
-    return;
+  if (contents.size() == 1) {
+    return std::move(contents[0]);
   }
-  _image = value;
-  invalidateContent();
+  return std::make_unique<ComposeContent>(std::move(contents));
 }
 
-std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
-  return std::make_unique<ImageContent>(_image, _sampling);
+Rect ComposeContent::getBounds() const {
+  auto bounds = Rect::MakeEmpty();
+  for (const auto& content : contents) {
+    bounds.join(content->getBounds());
+  }
+  return bounds;
+}
+
+void ComposeContent::draw(Canvas* canvas, const Paint& paint) const {
+  for (const auto& content : contents) {
+    content->draw(canvas, paint);
+  }
 }
 }  // namespace tgfx

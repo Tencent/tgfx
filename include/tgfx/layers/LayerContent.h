@@ -16,32 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ImageLayer.h"
+#pragma once
+
+#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
-std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
-  layer->weakThis = layer;
-  return layer;
-}
+/**
+ * LayerContent represents the content of a layer, such as a shape, image, or text. LayerContent is
+ * immutable and cannot be changed after it is created.
+ */
+class LayerContent {
+ public:
+  /**
+   * Composes the given contents into a single content.
+   */
+  static std::unique_ptr<LayerContent> Compose(std::vector<std::unique_ptr<LayerContent>> contents);
 
-void ImageLayer::setSampling(const SamplingOptions& value) {
-  if (_sampling == value) {
-    return;
-  }
-  _sampling = value;
-  invalidateContent();
-}
+  virtual ~LayerContent() = default;
 
-void ImageLayer::setImage(std::shared_ptr<Image> value) {
-  if (_image == value) {
-    return;
-  }
-  _image = value;
-  invalidateContent();
-}
+  /**
+   * Returns the bounds of the content.
+   */
+  virtual Rect getBounds() const = 0;
 
-std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
-  return std::make_unique<ImageContent>(_image, _sampling);
-}
+  /**
+   * Draws the content to the given canvas with the given paint.
+   */
+  virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
+};
 }  // namespace tgfx
