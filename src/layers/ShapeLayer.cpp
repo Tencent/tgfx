@@ -156,6 +156,7 @@ void ShapeLayer::onDraw(Canvas* canvas, float alpha) {
     strokeEffect->applyTo(&renderPath);
 
     Paint strokePaint = {};
+    strokePaint.setAlpha(alpha);
     if (_strokeStyle) {
       strokePaint.setShader(_strokeStyle->getShader());
     }
