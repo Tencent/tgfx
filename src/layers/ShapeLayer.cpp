@@ -141,10 +141,12 @@ void ShapeLayer::updateRenderPath() {
     if (!_lineDashPattern.empty()) {
       auto renderLineDashPattern = _lineDashPattern;
       if (_lineDashPattern.size() % 2 != 0) {
-        renderLineDashPattern.insert(renderLineDashPattern.end(), _lineDashPattern.begin(), _lineDashPattern.end());
+        renderLineDashPattern.insert(renderLineDashPattern.end(), _lineDashPattern.begin(),
+                                     _lineDashPattern.end());
       }
-      auto pathEffect = PathEffect::MakeDash(
-          renderLineDashPattern.data(), static_cast<int>(renderLineDashPattern.size()), _lineDashPhase);
+      auto pathEffect =
+          PathEffect::MakeDash(renderLineDashPattern.data(),
+                               static_cast<int>(renderLineDashPattern.size()), _lineDashPhase);
       pathEffect->applyTo(&renderPath);
     }
     auto strokeEffect = PathEffect::MakeStroke(&stroke);
@@ -159,7 +161,7 @@ void ShapeLayer::onDraw(Canvas* canvas, float alpha) {
     updateRenderPath();
   }
   if (renderPath.isEmpty()) {
-    return ;
+    return;
   }
   Paint shapePaint = {};
   if (_fillStyle) {
