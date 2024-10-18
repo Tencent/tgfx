@@ -326,7 +326,7 @@ Point Layer::localToGlobal(const Point& localPoint) const {
   return globalMatrix.mapXY(localPoint.x, localPoint.y);
 }
 
-bool Layer::hitTestPoint(float, float, bool) {
+bool Layer::hitTestPoint(float x, float y, bool accuratePixelDetection) {
   return false;
 }
 
