@@ -51,7 +51,7 @@ void ImageLayer::onDraw(Canvas* canvas, float alpha) {
   canvas->drawImage(_image, _sampling, &paint);
 }
 
-void ImageLayer::measureContentBounds(Rect* rect) const {
+void ImageLayer::measureContentBounds(Rect* rect) {
   if (_image) {
     rect->setWH(static_cast<float>(_image->width()), static_cast<float>(_image->height()));
   } else {

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "SolidColor.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/Layer.h"
@@ -50,7 +51,7 @@ class ShapeLayer : public Layer {
    * Sets the path defining the shape to be rendered. If the path provider is set, the path will be
    * set to an empty Path.
    */
-  void setPath(const Path& path);
+  void setPath(Path path);
 
   /**
    * Returns the path provider that generates the shape's path.
@@ -215,15 +216,23 @@ class ShapeLayer : public Layer {
  protected:
   ShapeLayer() = default;
 
+  void onDraw(Canvas* canvas, float alpha) override;
+
+  void measureContentBounds(Rect* bounds) override;
+
  private:
+  void updateRenderPath();
+
   Path _path = {};
+  Path renderPath = {};
   std::shared_ptr<PathProvider> _pathProvider = nullptr;
-  std::shared_ptr<ShapeStyle> _fillStyle = nullptr;
+  std::shared_ptr<ShapeStyle> _fillStyle = SolidColor::Make();
   std::shared_ptr<ShapeStyle> _strokeStyle = nullptr;
   Stroke stroke = {};
   std::vector<float> _lineDashPattern = {};
   float _lineDashPhase = 0.0f;
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
+  bool invalidateRenderPath = true;
 };
 }  // namespace tgfx

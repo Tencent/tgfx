@@ -284,7 +284,7 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
   return true;
 }
 
-Rect Layer::getBounds(const Layer* targetCoordinateSpace) const {
+Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
   Rect contentBounds = Rect::MakeEmpty();
   measureContentBounds(&contentBounds);
   for (const auto& child : _children) {
@@ -454,7 +454,7 @@ bool Layer::doContains(const Layer* child) const {
 void Layer::onDraw(Canvas*, float) {
 }
 
-void Layer::measureContentBounds(Rect* rect) const {
+void Layer::measureContentBounds(Rect* rect) {
   rect->setEmpty();
 }
 

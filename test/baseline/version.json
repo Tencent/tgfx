@@ -52,7 +52,8 @@
     },
     "LayerTest": {
         "draw_text": "fa90eb0",
-        "imageLayer": "99a5cd9"
+        "imageLayer": "99a5cd9",
+        "draw_shape": "8378211"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
