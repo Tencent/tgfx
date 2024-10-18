@@ -16,32 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ImageLayer.h"
+#pragma once
+
+#include "core/GlyphRun.h"
+#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
-  layer->weakThis = layer;
-  return layer;
-}
-
-void ImageLayer::setSampling(const SamplingOptions& value) {
-  if (_sampling == value) {
-    return;
+class TextContent : public LayerContent {
+ public:
+  explicit TextContent(GlyphRun glyphRun) : glyphRun(std::move(glyphRun)) {
   }
-  _sampling = value;
-  invalidateContent();
-}
 
-void ImageLayer::setImage(std::shared_ptr<Image> value) {
-  if (_image == value) {
-    return;
-  }
-  _image = value;
-  invalidateContent();
-}
+  Rect getBounds() const override;
 
-std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
-  return std::make_unique<ImageContent>(_image, _sampling);
-}
+  void draw(Canvas* canvas, const Paint& paint) const override;
+
+ private:
+  GlyphRun glyphRun = {};
+};
 }  // namespace tgfx

@@ -348,8 +348,8 @@ TGFX_TEST(LayerTest, getbounds) {
   tgfx::Font font(typeface, 20);
   child->setFont(font);
   auto bounds = child->getBounds();
-  EXPECT_FLOAT_EQ(bounds.left, 0);
-  EXPECT_FLOAT_EQ(bounds.top, 0);
+  EXPECT_FLOAT_EQ(bounds.left, 1);
+  EXPECT_FLOAT_EQ(bounds.top, 0.43000031f);
   EXPECT_FLOAT_EQ(bounds.right, 47);
   EXPECT_FLOAT_EQ(bounds.bottom, 17.43f);
 
@@ -373,38 +373,51 @@ TGFX_TEST(LayerTest, getbounds) {
   root->addChild(cousin);
 
   bounds = child->getBounds();
-  EXPECT_FLOAT_EQ(bounds.left, 0);
-  EXPECT_FLOAT_EQ(bounds.top, 0);
-  EXPECT_FLOAT_EQ(bounds.right, 60);
-  EXPECT_FLOAT_EQ(bounds.bottom, 60);
+  EXPECT_FLOAT_EQ(bounds.left, 1);
+  EXPECT_FLOAT_EQ(bounds.top, -22.485762f);
+  EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.521208f);
-  EXPECT_FLOAT_EQ(bounds.top, 0);
-  EXPECT_FLOAT_EQ(bounds.right, 56.381557f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 76.902763f);
+  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
+  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
+  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.521208f);
-  EXPECT_FLOAT_EQ(bounds.top, -10);
-  EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
+  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
+  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
+  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
 
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
   bounds = child->getBounds();
-  EXPECT_FLOAT_EQ(bounds.left, 0);
-  EXPECT_FLOAT_EQ(bounds.top, 0);
-  EXPECT_FLOAT_EQ(bounds.right, 60);
-  EXPECT_FLOAT_EQ(bounds.bottom, 60);
+  EXPECT_FLOAT_EQ(bounds.left, 1);
+  EXPECT_FLOAT_EQ(bounds.top, -22.485762f);
+  EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.521208f);
-  EXPECT_FLOAT_EQ(bounds.top, 0);
-  EXPECT_FLOAT_EQ(bounds.right, 56.381557f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 76.902763f);
+  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
+  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
+  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.521208f);
-  EXPECT_FLOAT_EQ(bounds.top, -10);
-  EXPECT_FLOAT_EQ(bounds.right, 46.381557f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 66.902763f);
+  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
+  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
+  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
+
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto rootBounds = root->getBounds();
+  auto width = static_cast<int>(rootBounds.width());
+  auto height = static_cast<int>(rootBounds.height());
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  displayList->draw(canvas);
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getBounds"));
+  device->unlock();
 }
 
 TGFX_TEST(LayerTest, shapeLayer) {

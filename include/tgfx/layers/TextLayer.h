@@ -75,11 +75,9 @@ class TextLayer : public Layer {
  protected:
   TextLayer() = default;
 
-  void onDraw(Canvas* canvas, float alpha) override;
+  std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  void measureContentBounds(Rect* rect) override;
-
-  GlyphRun createGlyphRun() const;
+  void onUpdatePaint(tgfx::Paint* paint) override;
 
  private:
   std::string _text;
