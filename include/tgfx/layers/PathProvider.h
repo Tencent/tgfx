@@ -46,7 +46,7 @@ class PathProvider {
   /**
    * Creates a new PathProvider with an initial path.
    */
-  explicit PathProvider(const Path& path);
+  explicit PathProvider(Path path);
 
   /**
    * Invalidates the path, causing it to be re-computed the next time it is requested.

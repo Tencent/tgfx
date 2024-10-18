@@ -60,7 +60,7 @@ void TextLayer::onDraw(Canvas* canvas, float alpha) {
                      glyphRun.font(), paint);
 }
 
-void TextLayer::measureContentBounds(Rect* rect) const {
+void TextLayer::measureContentBounds(Rect* rect) {
   if (_text.empty()) {
     rect->setEmpty();
   } else {

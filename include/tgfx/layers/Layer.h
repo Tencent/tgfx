@@ -386,7 +386,7 @@ class Layer {
    * @return The rectangle that defines the area of the layer relative to the targetCoordinateSpace
    * layer's coordinate system.
    */
-  Rect getBounds(const Layer* targetCoordinateSpace = nullptr) const;
+  Rect getBounds(const Layer* targetCoordinateSpace = nullptr);
 
   /**
    * Converts the point from the root's (global) coordinates to the layer's (local) coordinates.
@@ -468,7 +468,7 @@ class Layer {
     * Measure the bounding box of the layer's content. Note: This measurement does not include the
     * bounding boxes of child layers.
     */
-  virtual void measureContentBounds(Rect* bounds) const;
+  virtual void measureContentBounds(Rect* bounds);
 
  private:
   void onAttachToDisplayList(DisplayList* owner);

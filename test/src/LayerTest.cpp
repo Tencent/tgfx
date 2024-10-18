@@ -435,11 +435,12 @@ TGFX_TEST(LayerTest, shapeLayer) {
   shaperLayer->setLineDashPhase(0.0f);
 
   layer->addChild(shaperLayer);
-  displayList->draw(canvas);
-  context->submit();
   auto shapeLayerRect = shaperLayer->getBounds();
   auto bounds = Rect::MakeXYWH(5, 5, 160, 90);
   ASSERT_TRUE(shapeLayerRect == bounds);
+
+  displayList->draw(canvas);
+  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_shape"));
   device->unlock();
 }
