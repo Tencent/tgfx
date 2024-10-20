@@ -18,19 +18,25 @@
 
 #pragma once
 
-#include <cinttypes>
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class LayerDrawFlags {
+/**
+ * DrawArgs represents the arguments passed to the draw method of a Layer.
+ */
+class DrawArgs {
  public:
-  /**
-   * Cleans the dirty flags of the associated Layer during the drawing process.
-   */
-  static constexpr uint32_t CleanDirtyFlags = 1 << 0;
+  DrawArgs() = default;
 
-  /**
-   * Skips generating rasterized caches for the associated Layer during the drawing process.
-   */
-  static constexpr uint32_t DisableRasterizedCache = 1 << 1;
+  DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false)
+      : context(context), renderFlags(renderFlags), cleanDirtyFlags(cleanDirtyFlags) {
+  }
+
+  // The GPU context to be used during the drawing process. Note: this could be nullptr.
+  Context* context = nullptr;
+  // Render flags to be used during the drawing process.
+  uint32_t renderFlags = 0;
+  // Whether to clean the dirty flags of the associated Layer during the drawing process.
+  bool cleanDirtyFlags = false;
 };
 }  // namespace tgfx

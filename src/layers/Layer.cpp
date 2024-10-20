@@ -18,8 +18,8 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
-#include "LayerDrawFlags.h"
 #include "core/utils/Log.h"
+#include "layers/DrawArgs.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
@@ -337,16 +337,16 @@ bool Layer::hitTestPoint(float, float, bool) {
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
-  if (canvas == nullptr) {
+  if (canvas == nullptr || alpha <= 0) {
     return;
   }
-  Paint paint = {};
-  paint.setAlpha(alpha);
-  paint.setBlendMode(blendMode);
-  if (paint.nothingToDraw()) {
-    return;
+  auto surface = canvas->getSurface();
+  DrawArgs args = {};
+  if (surface) {
+    args.context = surface->getContext();
+    args.renderFlags = surface->renderFlags();
   }
-  drawLayer(canvas, alpha, blendMode, 0);
+  drawLayer(args, canvas, alpha, blendMode);
 }
 
 void Layer::invalidate() {
@@ -453,14 +453,16 @@ Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
   return paint;
 }
 
-LayerContent* Layer::getRasterizedCache(Context* context, uint32_t drawFlags) {
-  if (!bitFields.shouldRasterize) {
+LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
+  if (!bitFields.shouldRasterize || args.context == nullptr) {
     return nullptr;
   }
-  if (rasterizedContent) {
-    return rasterizedContent.get();
+  auto deviceID = args.context->device()->uniqueID();
+  auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
+  if (content && content->deviceID() == deviceID) {
+    return content;
   }
-  if (drawFlags & LayerDrawFlags::DisableRasterizedCache) {
+  if (args.renderFlags & RenderFlags::DisableCache) {
     return nullptr;
   }
   Rect bounds = getBounds();
@@ -472,23 +474,24 @@ LayerContent* Layer::getRasterizedCache(Context* context, uint32_t drawFlags) {
   if (!matrix.invert(&drawingMatrix)) {
     return nullptr;
   }
-  auto surface = Surface::Make(context, static_cast<int>(width), static_cast<int>(height));
+  auto renderFlags = args.renderFlags | RenderFlags::DisableCache;
+  auto surface = Surface::Make(args.context, static_cast<int>(width), static_cast<int>(height),
+                               false, 1, false, renderFlags);
   if (surface == nullptr) {
     return nullptr;
   }
   auto canvas = surface->getCanvas();
   canvas->concat(matrix);
-  drawFlags |= LayerDrawFlags::CleanDirtyFlags;
-  drawFlags |= LayerDrawFlags::DisableRasterizedCache;
-  drawContents(canvas, 1.0f, drawFlags);
+  DrawArgs drawArgs(args.context, renderFlags, true);
+  drawContents(drawArgs, canvas, 1.0f);
   auto image = surface->makeImageSnapshot();
-  rasterizedContent = std::make_unique<RasterizedContent>(image, drawingMatrix);
+  rasterizedContent = std::make_unique<RasterizedContent>(deviceID, image, drawingMatrix);
   return rasterizedContent.get();
 }
 
-void Layer::drawLayer(Canvas* canvas, float alpha, BlendMode blendMode, uint32_t drawFlags) {
+void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
-  auto rasterizedCache = getRasterizedCache(canvas->getSurface()->getContext(), drawFlags);
+  auto rasterizedCache = getRasterizedCache(args);
   Paint paint;
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
@@ -497,18 +500,18 @@ void Layer::drawLayer(Canvas* canvas, float alpha, BlendMode blendMode, uint32_t
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity)) {
     Recorder recorder;
     auto contentCanvas = recorder.beginRecording();
-    drawContents(contentCanvas, 1.0f, drawFlags);
+    drawContents(args, contentCanvas, 1.0f);
     canvas->drawPicture(recorder.finishRecordingAsPicture(), nullptr, &paint);
   } else {
     // draw directly
-    drawContents(canvas, alpha, drawFlags);
+    drawContents(args, canvas, alpha);
   }
-  if (drawFlags & LayerDrawFlags::CleanDirtyFlags) {
+  if (args.cleanDirtyFlags) {
     bitFields.dirty = false;
   }
 }
 
-void Layer::drawContents(Canvas* canvas, float alpha, uint32_t drawFlags) {
+void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   auto content = getContent();
   if (content) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
@@ -522,10 +525,10 @@ void Layer::drawContents(Canvas* canvas, float alpha, uint32_t drawFlags) {
     if (child->_scrollRect) {
       canvas->clipRect(Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
     }
-    child->drawLayer(canvas, child->_alpha * alpha, child->_blendMode, drawFlags);
+    child->drawLayer(args, canvas, child->_alpha * alpha, child->_blendMode);
     canvas->restore();
   }
-  if (drawFlags & LayerDrawFlags::CleanDirtyFlags) {
+  if (args.cleanDirtyFlags) {
     bitFields.childrenDirty = false;
   }
 }

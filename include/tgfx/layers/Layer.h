@@ -31,6 +31,7 @@
 namespace tgfx {
 
 class DisplayList;
+class DrawArgs;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -496,11 +497,11 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
-  LayerContent* getRasterizedCache(Context* context, uint32_t drawFlags);
+  LayerContent* getRasterizedCache(const DrawArgs& args);
 
-  void drawLayer(Canvas* canvas, float alpha, BlendMode blendMode, uint32_t drawFlags);
+  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
-  void drawContents(Canvas* canvas, float alpha, uint32_t drawFlags);
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
 
   std::string _name;
   float _alpha = 1.0f;
