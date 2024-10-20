@@ -85,13 +85,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       xOffset += emptyAdvance;
     }
   }
-  return std::make_unique<TextContent>(GlyphRun{_font, std::move(glyphs), std::move(positions)});
+  GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
+  return std::make_unique<TextContent>(std::move(glyphRun), _textColor);
 }
-
-void TextLayer::onUpdatePaint(Paint* paint) {
-  auto color = _textColor;
-  color.alpha *= paint->getAlpha();
-  paint->setColor(color);
-}
-
 }  // namespace tgfx

@@ -151,14 +151,14 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   invalidate();
 }
 
-void Layer::setScrollRect(const Rect* rect) {
-  if (_scrollRect.get() == rect || (_scrollRect && rect && *_scrollRect == *rect)) {
+void Layer::setScrollRect(const Rect& rect) {
+  if ((_scrollRect && *_scrollRect == rect) || (!_scrollRect && rect.isEmpty())) {
     return;
   }
-  if (rect) {
-    _scrollRect = std::make_unique<Rect>(*rect);
-  } else {
+  if (rect.isEmpty()) {
     _scrollRect = nullptr;
+  } else {
+    _scrollRect = std::make_unique<Rect>(rect);
   }
   invalidate();
 }
@@ -343,7 +343,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (paint.nothingToDraw()) {
     return;
   }
-  doDraw(canvas, alpha, blendMode);
+  drawLayer(canvas, alpha, blendMode);
 }
 
 void Layer::invalidate() {
@@ -358,9 +358,6 @@ void Layer::invalidateContent() {
 
 std::unique_ptr<LayerContent> Layer::onUpdateContent() {
   return nullptr;
-}
-
-void Layer::onUpdatePaint(Paint*) {
 }
 
 void Layer::onAttachToDisplayList(DisplayList* owner) {
@@ -427,16 +424,15 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-Paint Layer::getPaint(float alpha, BlendMode blendMode) {
+Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
   Paint paint;
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  onUpdatePaint(&paint);
   return paint;
 }
 
-void Layer::doDraw(Canvas* canvas, float alpha, BlendMode blendMode) {
+void Layer::drawLayer(Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   auto rasterizedCache = getRasterizedCache(canvas->getSurface()->getContext());
   Paint paint;
@@ -447,11 +443,11 @@ void Layer::doDraw(Canvas* canvas, float alpha, BlendMode blendMode) {
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity)) {
     Recorder recorder;
     auto contentCanvas = recorder.beginRecording();
-    drawContentAndChildren(contentCanvas, 1.0f);
+    drawContents(contentCanvas, 1.0f);
     canvas->drawPicture(recorder.finishRecordingAsPicture(), nullptr, &paint);
   } else {
     // draw directly
-    drawContentAndChildren(canvas, alpha);
+    drawContents(canvas, alpha);
   }
 }
 
@@ -477,17 +473,16 @@ LayerContent* Layer::getRasterizedCache(Context* context) {
   }
   auto canvas = surface->getCanvas();
   canvas->concat(matrix);
-  drawContentAndChildren(canvas, 1.0f);
+  drawContents(canvas, 1.0f);
   auto image = surface->makeImageSnapshot();
   rasterizedContent = std::make_unique<RasterizedContent>(image, drawingMatrix);
   return rasterizedContent.get();
 }
 
-void Layer::drawContentAndChildren(Canvas* canvas, float alpha) {
+void Layer::drawContents(Canvas* canvas, float alpha) {
   auto content = getContent();
   if (content) {
-    auto paint = getPaint(alpha, BlendMode::SrcOver);
-    content->draw(canvas, paint);
+    content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
   }
   for (const auto& child : _children) {
     if (!child->visible() || child->_alpha <= 0) {
@@ -498,7 +493,7 @@ void Layer::drawContentAndChildren(Canvas* canvas, float alpha) {
     if (child->_scrollRect) {
       canvas->clipRect(Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
     }
-    child->doDraw(canvas, child->_alpha * alpha, child->_blendMode);
+    child->drawLayer(canvas, child->_alpha * alpha, child->_blendMode);
     canvas->restore();
   }
 }

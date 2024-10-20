@@ -359,7 +359,7 @@ TGFX_TEST(LayerTest, getbounds) {
   grandChild->setImage(image);
   bounds = grandChild->getBounds();
   auto clip = Rect::MakeLTRB(10, 10, 70, 70);
-  grandChild->setScrollRect(&clip);
+  grandChild->setScrollRect(clip);
   EXPECT_FLOAT_EQ(bounds.left, 0);
   EXPECT_FLOAT_EQ(bounds.top, 0);
   EXPECT_EQ(static_cast<int>(bounds.right), image->width());
