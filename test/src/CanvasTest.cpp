@@ -557,8 +557,7 @@ TGFX_TEST(CanvasTest, image) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  SurfaceOptions options(RenderFlags::DisableCache);
-  auto surface = Surface::Make(context, 400, 500, false, 1, false, &options);
+  auto surface = Surface::Make(context, 400, 500, false, 1, false, RenderFlags::DisableCache);
   auto canvas = surface->getCanvas();
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -671,8 +670,7 @@ TGFX_TEST(CanvasTest, scaleImage) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  SurfaceOptions options(RenderFlags::DisableCache);
-  auto surface = Surface::Make(context, 1286, 558, false, 1, false, &options);
+  auto surface = Surface::Make(context, 1286, 558, false, 1, false, RenderFlags::DisableCache);
   auto canvas = surface->getCanvas();
   auto image = MakeImage("resources/apitest/rgbaaa.png");
   EXPECT_EQ(image->width(), 1024);
