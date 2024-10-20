@@ -92,8 +92,8 @@ std::shared_ptr<TextureProxy> PictureImage::onLockTextureProxy(const TPArgs& arg
     return nullptr;
   }
   auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
-  SurfaceOptions surfaceOptions(args.renderFlags | RenderFlags::DisableCache);
-  auto surface = Surface::MakeFrom(renderTarget, &surfaceOptions);
+  auto renderFlags = args.renderFlags | RenderFlags::DisableCache;
+  auto surface = Surface::MakeFrom(renderTarget, renderFlags);
   if (surface == nullptr) {
     return nullptr;
   }

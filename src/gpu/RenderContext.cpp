@@ -53,7 +53,7 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProx
 }
 
 RenderContext::RenderContext(Surface* surface) : surface(surface) {
-  renderFlags = surface->surfaceOptions.renderFlags();
+  renderFlags = surface->renderFlags();
   opContext = new OpContext(surface->renderTargetProxy);
 }
 
