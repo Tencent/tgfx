@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
+#include "LayerDrawFlags.h"
 #include "core/utils/Log.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Recorder.h"
@@ -54,6 +55,7 @@ Layer::Layer()
     : bitFields({
           true,                    //dirty
           false,                   //contentDirty
+          false,                   //childrenDirty
           true,                    //visible
           false,                   //shouldRasterize
           AllowsEdgeAntialiasing,  //allowsEdgeAntialiasing
@@ -140,7 +142,8 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
     return;
   }
   _filters = std::move(value);
-  invalidateContent();
+  rasterizedContent = nullptr;
+  invalidate();
 }
 
 void Layer::setMask(std::shared_ptr<Layer> value) {
@@ -195,7 +198,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   _children.insert(_children.begin() + index, child);
   child->_parent = this;
   child->onAttachToDisplayList(_owner);
-  invalidateContent();
+  invalidateChildren();
   return true;
 }
 
@@ -236,7 +239,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   child->_parent = nullptr;
   child->onDetachFromDisplayList();
   _children.erase(_children.begin() + index);
-  invalidateContent();
+  invalidateChildren();
   return child;
 }
 
@@ -267,7 +270,7 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   }
   _children.erase(_children.begin() + oldIndex);
   _children.insert(_children.begin() + index, child);
-  invalidateContent();
+  invalidateChildren();
   return true;
 }
 
@@ -281,7 +284,7 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
     return false;
   }
   oldChild->removeFromParent();
-  invalidateContent();
+  invalidateChildren();
   return true;
 }
 
@@ -343,17 +346,35 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (paint.nothingToDraw()) {
     return;
   }
-  drawLayer(canvas, alpha, blendMode);
+  drawLayer(canvas, alpha, blendMode, 0);
 }
 
 void Layer::invalidate() {
+  if (bitFields.dirty) {
+    return;
+  }
   bitFields.dirty = true;
+  if (_parent) {
+    _parent->invalidateChildren();
+  }
 }
 
 void Layer::invalidateContent() {
-  invalidate();
+  if (bitFields.contentDirty) {
+    return;
+  }
   bitFields.contentDirty = true;
   rasterizedContent = nullptr;
+  invalidate();
+}
+
+void Layer::invalidateChildren() {
+  if (bitFields.childrenDirty) {
+    return;
+  }
+  bitFields.childrenDirty = true;
+  rasterizedContent = nullptr;
+  invalidate();
 }
 
 std::unique_ptr<LayerContent> Layer::onUpdateContent() {
@@ -432,31 +453,15 @@ Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
   return paint;
 }
 
-void Layer::drawLayer(Canvas* canvas, float alpha, BlendMode blendMode) {
-  DEBUG_ASSERT(canvas != nullptr);
-  auto rasterizedCache = getRasterizedCache(canvas->getSurface()->getContext());
-  Paint paint;
-  paint.setAlpha(alpha);
-  paint.setBlendMode(blendMode);
-  if (rasterizedCache) {
-    rasterizedCache->draw(canvas, paint);
-  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity)) {
-    Recorder recorder;
-    auto contentCanvas = recorder.beginRecording();
-    drawContents(contentCanvas, 1.0f);
-    canvas->drawPicture(recorder.finishRecordingAsPicture(), nullptr, &paint);
-  } else {
-    // draw directly
-    drawContents(canvas, alpha);
-  }
-}
-
-LayerContent* Layer::getRasterizedCache(Context* context) {
+LayerContent* Layer::getRasterizedCache(Context* context, uint32_t drawFlags) {
   if (!bitFields.shouldRasterize) {
     return nullptr;
   }
   if (rasterizedContent) {
     return rasterizedContent.get();
+  }
+  if (drawFlags & LayerDrawFlags::DisableRasterizedCache) {
+    return nullptr;
   }
   Rect bounds = getBounds();
   auto width = roundf(bounds.width() * _rasterizationScale);
@@ -473,13 +478,37 @@ LayerContent* Layer::getRasterizedCache(Context* context) {
   }
   auto canvas = surface->getCanvas();
   canvas->concat(matrix);
-  drawContents(canvas, 1.0f);
+  drawFlags |= LayerDrawFlags::CleanDirtyFlags;
+  drawFlags |= LayerDrawFlags::DisableRasterizedCache;
+  drawContents(canvas, 1.0f, drawFlags);
   auto image = surface->makeImageSnapshot();
   rasterizedContent = std::make_unique<RasterizedContent>(image, drawingMatrix);
   return rasterizedContent.get();
 }
 
-void Layer::drawContents(Canvas* canvas, float alpha) {
+void Layer::drawLayer(Canvas* canvas, float alpha, BlendMode blendMode, uint32_t drawFlags) {
+  DEBUG_ASSERT(canvas != nullptr);
+  auto rasterizedCache = getRasterizedCache(canvas->getSurface()->getContext(), drawFlags);
+  Paint paint;
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  if (rasterizedCache) {
+    rasterizedCache->draw(canvas, paint);
+  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity)) {
+    Recorder recorder;
+    auto contentCanvas = recorder.beginRecording();
+    drawContents(contentCanvas, 1.0f, drawFlags);
+    canvas->drawPicture(recorder.finishRecordingAsPicture(), nullptr, &paint);
+  } else {
+    // draw directly
+    drawContents(canvas, alpha, drawFlags);
+  }
+  if (drawFlags & LayerDrawFlags::CleanDirtyFlags) {
+    bitFields.dirty = false;
+  }
+}
+
+void Layer::drawContents(Canvas* canvas, float alpha, uint32_t drawFlags) {
   auto content = getContent();
   if (content) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
@@ -493,8 +522,11 @@ void Layer::drawContents(Canvas* canvas, float alpha) {
     if (child->_scrollRect) {
       canvas->clipRect(Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
     }
-    child->drawLayer(canvas, child->_alpha * alpha, child->_blendMode);
+    child->drawLayer(canvas, child->_alpha * alpha, child->_blendMode, drawFlags);
     canvas->restore();
+  }
+  if (drawFlags & LayerDrawFlags::CleanDirtyFlags) {
+    bitFields.childrenDirty = false;
   }
 }
 
