@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/TextLayer.h"
 #include "core/utils/SimpleTextShaper.h"
+#include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -45,34 +46,9 @@ void TextLayer::setFont(const Font& font) {
   invalidateContent();
 }
 
-void TextLayer::onDraw(Canvas* canvas, float alpha) {
+std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   if (_text.empty()) {
-    return;
-  }
-  Paint paint;
-  paint.setAntiAlias(allowsEdgeAntialiasing());
-  auto currentColor = _textColor;
-  currentColor.alpha *= alpha;
-  paint.setColor(currentColor);
-  paint.setStyle(tgfx::PaintStyle::Fill);
-  auto glyphRun = createGlyphRun();
-  canvas->drawGlyphs(glyphRun.glyphIDs().data(), glyphRun.positions().data(), glyphRun.runSize(),
-                     glyphRun.font(), paint);
-}
-
-void TextLayer::measureContentBounds(Rect* rect) {
-  if (_text.empty()) {
-    rect->setEmpty();
-  } else {
-    auto glyphRun = createGlyphRun();
-    auto bounds = glyphRun.getBounds(Matrix::I());
-    rect->setWH(bounds.right, bounds.bottom);
-  }
-}
-
-GlyphRun TextLayer::createGlyphRun() const {
-  if (_text.empty()) {
-    return {};
+    return nullptr;
   }
   std::vector<GlyphID> glyphs = {};
   std::vector<Point> positions = {};
@@ -81,7 +57,6 @@ GlyphRun TextLayer::createGlyphRun() const {
   auto metrics = _font.getMetrics();
   auto lineHeight = ceil(_font.getSize() * DefaultLineHeight);
   auto baseLine = (lineHeight + metrics.xHeight) / 2;
-
   auto emptyGlyphID = _font.getGlyphID(" ");
   auto emptyAdvance = _font.getAdvance(emptyGlyphID);
   const char* textStart = _text.data();
@@ -110,7 +85,13 @@ GlyphRun TextLayer::createGlyphRun() const {
       xOffset += emptyAdvance;
     }
   }
-  return GlyphRun(_font, glyphs, positions);
+  return std::make_unique<TextContent>(GlyphRun{_font, std::move(glyphs), std::move(positions)});
+}
+
+void TextLayer::onUpdatePaint(Paint* paint) {
+  auto color = _textColor;
+  color.alpha *= paint->getAlpha();
+  paint->setColor(color);
 }
 
 }  // namespace tgfx

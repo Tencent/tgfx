@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -32,8 +34,7 @@ void ShapeLayer::setPath(Path path) {
   }
   _path = std::move(path);
   _pathProvider = nullptr;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setPathProvider(std::shared_ptr<PathProvider> value) {
@@ -42,8 +43,7 @@ void ShapeLayer::setPathProvider(std::shared_ptr<PathProvider> value) {
   }
   _pathProvider = std::move(value);
   _path.reset();
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> style) {
@@ -51,7 +51,7 @@ void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> style) {
     return;
   }
   _fillStyle = std::move(style);
-  invalidate();
+  invalidateContent();
 }
 
 void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> style) {
@@ -59,7 +59,7 @@ void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> style) {
     return;
   }
   _strokeStyle = std::move(style);
-  invalidate();
+  invalidateContent();
 }
 
 void ShapeLayer::setLineCap(LineCap cap) {
@@ -67,8 +67,7 @@ void ShapeLayer::setLineCap(LineCap cap) {
     return;
   }
   stroke.cap = cap;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setLineJoin(LineJoin join) {
@@ -76,8 +75,7 @@ void ShapeLayer::setLineJoin(LineJoin join) {
     return;
   }
   stroke.join = join;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setMiterLimit(float limit) {
@@ -85,8 +83,7 @@ void ShapeLayer::setMiterLimit(float limit) {
     return;
   }
   stroke.miterLimit = limit;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setLineWidth(float width) {
@@ -94,8 +91,7 @@ void ShapeLayer::setLineWidth(float width) {
     return;
   }
   stroke.width = width;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setLineDashPattern(const std::vector<float>& pattern) {
@@ -104,8 +100,7 @@ void ShapeLayer::setLineDashPattern(const std::vector<float>& pattern) {
     return;
   }
   _lineDashPattern = pattern;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setLineDashPhase(float phase) {
@@ -113,82 +108,70 @@ void ShapeLayer::setLineDashPhase(float phase) {
     return;
   }
   _lineDashPhase = phase;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setStrokeStart(float start) {
+  if (start < 0) {
+    start = 0;
+  }
+  if (start > 1.0f) {
+    start = 1.0f;
+  }
   if (_strokeStart == start) {
     return;
   }
   _strokeStart = start;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
 void ShapeLayer::setStrokeEnd(float end) {
+  if (end < 0) {
+    end = 0;
+  }
+  if (end > 1.0f) {
+    end = 1.0f;
+  }
   if (_strokeEnd == end) {
     return;
   }
   _strokeEnd = end;
-  invalidate();
-  invalidateRenderPath = true;
+  invalidateContent();
 }
 
-void ShapeLayer::updateRenderPath() {
-  if (invalidateRenderPath) {
-    renderPath = _path.isEmpty() ? _pathProvider->getPath() : _path;
+std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
+  std::vector<std::unique_ptr<LayerContent>> contents = {};
+  auto path = _path.isEmpty() ? _pathProvider->getPath() : _path;
+  if (_fillStyle) {
+    auto content = std::make_unique<ShapeContent>(path, _fillStyle->getShader());
+    contents.push_back(std::move(content));
+  }
+  if (stroke.width > 0 && _strokeStyle) {
+    auto strokedPath = path;
+    if ((_strokeStart != 0 || _strokeEnd != 1)) {
+      auto pathMeasure = PathMeasure::MakeFrom(path);
+      auto length = pathMeasure->getLength();
+      auto start = _strokeStart * length;
+      auto end = _strokeEnd * length;
+      Path tempPath = {};
+      if (pathMeasure->getSegment(start, end, &tempPath)) {
+        strokedPath = tempPath;
+      }
+    }
     if (!_lineDashPattern.empty()) {
-      auto renderLineDashPattern = _lineDashPattern;
+      auto dashes = _lineDashPattern;
       if (_lineDashPattern.size() % 2 != 0) {
-        renderLineDashPattern.insert(renderLineDashPattern.end(), _lineDashPattern.begin(),
-                                     _lineDashPattern.end());
+        dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
       }
       auto pathEffect =
-          PathEffect::MakeDash(renderLineDashPattern.data(),
-                               static_cast<int>(renderLineDashPattern.size()), _lineDashPhase);
-      pathEffect->applyTo(&renderPath);
+          PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
+      pathEffect->applyTo(&strokedPath);
     }
     auto strokeEffect = PathEffect::MakeStroke(&stroke);
-    strokeEffect->applyTo(&renderPath);
-
-    invalidateRenderPath = false;
+    strokeEffect->applyTo(&strokedPath);
+    auto content = std::make_unique<ShapeContent>(strokedPath, _strokeStyle->getShader());
+    contents.push_back(std::move(content));
   }
-}
-
-void ShapeLayer::onDraw(Canvas* canvas, float alpha) {
-  if (invalidateRenderPath) {
-    updateRenderPath();
-  }
-  if (renderPath.isEmpty()) {
-    return;
-  }
-  Paint shapePaint = {};
-  if (_fillStyle) {
-    shapePaint.setShader(_fillStyle->getShader());
-  }
-  shapePaint.setAlpha(alpha);
-  auto shapePath = _path.isEmpty() ? _pathProvider->getPath() : _path;
-  canvas->drawPath(shapePath, shapePaint);
-
-  if (stroke.width > 0) {
-    Paint strokePaint = {};
-    strokePaint.setAlpha(alpha);
-    if (_strokeStyle) {
-      strokePaint.setShader(_strokeStyle->getShader());
-    }
-    canvas->drawPath(renderPath, strokePaint);
-  }
-}
-
-void ShapeLayer::measureContentBounds(Rect* bounds) {
-  if (invalidateRenderPath) {
-    updateRenderPath();
-  }
-  if (renderPath.isEmpty()) {
-    bounds->setEmpty();
-  } else {
-    *bounds = renderPath.getBounds();
-  }
+  return LayerContent::Compose(std::move(contents));
 }
 }  // namespace tgfx

@@ -216,15 +216,10 @@ class ShapeLayer : public Layer {
  protected:
   ShapeLayer() = default;
 
-  void onDraw(Canvas* canvas, float alpha) override;
-
-  void measureContentBounds(Rect* bounds) override;
+  std::unique_ptr<LayerContent> onUpdateContent() override;
 
  private:
-  void updateRenderPath();
-
   Path _path = {};
-  Path renderPath = {};
   std::shared_ptr<PathProvider> _pathProvider = nullptr;
   std::shared_ptr<ShapeStyle> _fillStyle = SolidColor::Make();
   std::shared_ptr<ShapeStyle> _strokeStyle = nullptr;
@@ -233,6 +228,5 @@ class ShapeLayer : public Layer {
   float _lineDashPhase = 0.0f;
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
-  bool invalidateRenderPath = true;
 };
 }  // namespace tgfx
