@@ -253,17 +253,25 @@ class Layer {
   /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
    * the rectangle, and it scrolls within the rectangle when you change the x and y properties of
-   * the scrollRect. The default value is nullptr, meaning the layer is displayed in its entirety.
+   * the scrollRect. The properties of the scrollRect Rectangle object use the layer's coordinate
+   * space and are scaled just like the overall layer. The corner bounds of the cropped viewport on
+   * the scrolling layer are the origin of the layer (0,0) and the point defined by the width and
+   * height of the rectangle. They are not centered around the origin, but use the origin to define
+   * the upper-left corner of the area. You can scroll a layer left and right by setting the x
+   * property of the scrollRect. You can scroll a layer up and down by setting the y property of the
+   * scrollRect. If the layer is rotated 90° and if you scroll it left and right, the layer actually
+   * scrolls up and down. The default value is an empty Rect, meaning the layer is displayed in its
+   * entirety and no scrolling is applied.
    */
-  const Rect* scrollRect() const {
-    return _scrollRect.get();
+  Rect scrollRect() const {
+    return _scrollRect ? *_scrollRect : Rect::MakeEmpty();
   }
 
   /**
    * Sets the scroll rectangle bounds of the layer. The scrollRect value is copied internally, so
    * changes to it after calling this function have no effect.
    */
-  void setScrollRect(const Rect* rect);
+  void setScrollRect(const Rect& rect);
 
   /**
    * Returns the display list owner of the calling layer. If a layer is not added to a display list,
@@ -466,12 +474,6 @@ class Layer {
    */
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
-  /**
-   * Called when the layer needs to be redrawn. Subclasses should override this method to set the
-   * paint properties for drawing the layer content.
-   */
-  virtual void onUpdatePaint(Paint* paint);
-
  private:
   void onAttachToDisplayList(DisplayList* owner);
 
@@ -487,13 +489,13 @@ class Layer {
 
   LayerContent* getContent();
 
-  Paint getPaint(float alpha, BlendMode blendMode);
+  Paint getLayerPaint(float alpha, BlendMode blendMode);
 
-  void doDraw(Canvas* canvas, float alpha, BlendMode blendMode);
+  void drawLayer(Canvas* canvas, float alpha, BlendMode blendMode);
 
   LayerContent* getRasterizedCache(Context* context);
 
-  void drawContentAndChildren(Canvas* canvas, float alpha);
+  void drawContents(Canvas* canvas, float alpha);
 
   std::string _name;
   float _alpha = 1.0f;

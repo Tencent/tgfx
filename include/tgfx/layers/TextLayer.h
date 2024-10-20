@@ -77,8 +77,6 @@ class TextLayer : public Layer {
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  void onUpdatePaint(tgfx::Paint* paint) override;
-
  private:
   std::string _text;
   Color _textColor = Color::White();

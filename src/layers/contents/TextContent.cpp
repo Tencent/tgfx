@@ -24,7 +24,11 @@ Rect TextContent::getBounds() const {
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {
+  auto textPaint = paint;
+  auto color = textColor;
+  color.alpha *= paint.getAlpha();
+  textPaint.setColor(color);
   canvas->drawGlyphs(glyphRun.glyphIDs().data(), glyphRun.positions().data(), glyphRun.runSize(),
-                     glyphRun.font(), paint);
+                     glyphRun.font(), textPaint);
 }
 }  // namespace tgfx

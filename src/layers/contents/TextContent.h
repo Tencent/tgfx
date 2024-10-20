@@ -24,7 +24,8 @@
 namespace tgfx {
 class TextContent : public LayerContent {
  public:
-  explicit TextContent(GlyphRun glyphRun) : glyphRun(std::move(glyphRun)) {
+  TextContent(GlyphRun glyphRun, Color textColor)
+      : glyphRun(std::move(glyphRun)), textColor(textColor) {
   }
 
   Rect getBounds() const override;
@@ -33,5 +34,6 @@ class TextContent : public LayerContent {
 
  private:
   GlyphRun glyphRun = {};
+  Color textColor = Color::White();
 };
 }  // namespace tgfx
