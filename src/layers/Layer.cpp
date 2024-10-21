@@ -187,7 +187,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   } else if (child->doContains(this)) {
     LOGE("addChildAt() The child is already a parent of the parent.");
     return false;
-  } else if (child->_owner && child->_owner->root() == child.get()) {
+  } else if (child->_root == child.get()) {
     LOGE("A root layer cannot be added as a child to another layer.");
     return false;
   }
@@ -197,7 +197,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   child->removeFromParent();
   _children.insert(_children.begin() + index, child);
   child->_parent = this;
-  child->onAttachToDisplayList(_owner);
+  child->onAttachToRoot(_root);
   invalidateChildren();
   return true;
 }
@@ -237,7 +237,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   }
   auto child = _children[static_cast<size_t>(index)];
   child->_parent = nullptr;
-  child->onDetachFromDisplayList();
+  child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
   invalidateChildren();
   return child;
@@ -381,17 +381,17 @@ std::unique_ptr<LayerContent> Layer::onUpdateContent() {
   return nullptr;
 }
 
-void Layer::onAttachToDisplayList(DisplayList* owner) {
-  _owner = owner;
+void Layer::onAttachToRoot(Layer* owner) {
+  _root = owner;
   for (auto& child : _children) {
-    child->onAttachToDisplayList(owner);
+    child->onAttachToRoot(owner);
   }
 }
 
-void Layer::onDetachFromDisplayList() {
-  _owner = nullptr;
+void Layer::onDetachFromRoot() {
+  _root = nullptr;
   for (auto& child : _children) {
-    child->onDetachFromDisplayList();
+    child->onDetachFromRoot();
   }
 }
 
@@ -418,11 +418,12 @@ bool Layer::doContains(const Layer* child) const {
 }
 
 Matrix Layer::getGlobalMatrix() const {
-  // The root layer is the root of the display list, so we don't need to include it in the matrix.
-  auto root = owner() ? owner()->root() : nullptr;
+  // The global matrix transforms the layer's local coordinate space to the coordinate space of its
+  // top-level parent layer. This means the top-level parent layer's own matrix is not included in
+  // the global matrix.
   auto matrix = Matrix::I();
   auto layer = this;
-  while (layer != root) {
+  while (layer->_parent) {
     matrix.postConcat(layer->getMatrixWithScrollRect());
     layer = layer->_parent;
   }

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -32,14 +33,19 @@ class DisplayList {
   virtual ~DisplayList() = default;
 
   /**
-   * Returns the root layer of the display list.
+   * Returns the root layer of the display list. Note: The root layer cannot be added to another
+   * layer. Therefore, properties like alpha, blendMode, position, matrix, visibility, scrollRect,
+   * and mask have no effect on the root layer since it will never have a parent.
    */
   Layer* root() const;
 
   /**
-   * Draws the display list to the given canvas.
+   * Draws the display list to the given surface.
+   * @param surface The surface to draw the display list to.
+   * @param replaceAll If true, the surface will be cleared before drawing the display list.
+   * Otherwise, the display list will be drawn on top of the existing content.
    */
-  void draw(Canvas* canvas);
+  void render(Surface* surface, bool replaceAll = true);
 
  private:
   std::shared_ptr<Layer> _root = nullptr;
