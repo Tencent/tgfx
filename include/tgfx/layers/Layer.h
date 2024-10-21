@@ -525,7 +525,7 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
-  } bitFields;
+  } bitFields = {};
 
   friend class DisplayList;
 };
