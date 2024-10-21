@@ -487,6 +487,11 @@ class Layer {
 
   void drawContent(Canvas* canvas, float alpha);
 
+  bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
+
+  bool getChildLayerAtPoint(Layer* childLayer, float x, float y,
+                            std::vector<std::shared_ptr<Layer>>* results);
+
   uint32_t uniqueID = UniqueID::Next();
   std::string _name;
   float _alpha = 1.0f;

@@ -215,8 +215,10 @@ int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
   return doGetChildIndex(child.get());
 }
 
-std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float, float) {
-  return {};
+std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float x, float y) {
+  std::vector<std::shared_ptr<Layer>> results;
+  getLayersUnderPointInternal(x, y, &results);
+  return results;
 }
 
 void Layer::removeFromParent() {
@@ -476,5 +478,38 @@ Matrix Layer::getMatrixWithScrollRect() const {
     matrix.postTranslate(-_scrollRect->left, -_scrollRect->top);
   }
   return matrix;
+}
+
+bool Layer::getLayersUnderPointInternal(float x, float y,
+                                        std::vector<std::shared_ptr<Layer>>* results) {
+  if (!visible()) {
+    return false;
+  }
+
+  if (!getBounds().contains(x, y)) {
+    return false;
+  }
+
+  bool isHit = false;
+  for (auto iter = _children.rbegin(); iter != _children.rend(); ++iter) {
+    const auto& childLayer = *iter;
+    if (!childLayer->visible()) {
+      continue;
+    }
+
+    auto success = getChildLayerAtPoint(childLayer.get(), x, y, results);
+    if (success) {
+      results->push_back(childLayer);
+      isHit = true;
+    }
+  }
+
+  return isHit;
+}
+
+bool Layer::getChildLayerAtPoint(Layer* layer, float x, float y,
+                                 std::vector<std::shared_ptr<Layer>>* results) {
+
+  return true;
 }
 }  // namespace tgfx
