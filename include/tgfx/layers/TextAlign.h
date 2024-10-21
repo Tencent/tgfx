@@ -22,7 +22,7 @@ namespace tgfx {
 /**
  * Defines the horizontal alignment of a text.
  */
-enum class HorizontalAlign {
+enum class TextAlign {
   /**
    * Text is visually left aligned.
    */

@@ -19,8 +19,8 @@
 #pragma once
 
 #include "tgfx/core/Font.h"
-#include "tgfx/layers/HorizontalAlign.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/TextAlign.h"
 #include "tgfx/layers/VerticalAlign.h"
 
 namespace tgfx {
@@ -104,14 +104,14 @@ class TextLayer : public Layer {
    * Specifies how the text should be horizontally aligned within the layout width. The default is
    * HorizontalAlign::Left. This setting is ignored if the layout width is 0.
    */
-  HorizontalAlign horizontalAlign() const {
-    return _horizontalAlign;
+  TextAlign textAlign() const {
+    return _textAlign;
   }
 
   /**
    * Sets how the text should be horizontally aligned within the layout width.
    */
-  void setHorizontalAlign(HorizontalAlign align);
+  void setTextAlign(TextAlign align);
 
   /**
    * Specifies how the text should be vertically aligned within the layout height. The default is
@@ -150,7 +150,7 @@ class TextLayer : public Layer {
   Font _font = {};
   float _width = 0;
   float _height = 0;
-  HorizontalAlign _horizontalAlign = HorizontalAlign::Left;
+  TextAlign _textAlign = TextAlign::Left;
   VerticalAlign _verticalAlign = VerticalAlign::Top;
   bool _autoWrap = false;
 };

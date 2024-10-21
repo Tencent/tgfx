@@ -77,11 +77,11 @@ void TextLayer::setHeight(float height) {
   invalidateContent();
 }
 
-void TextLayer::setHorizontalAlign(HorizontalAlign value) {
-  if (_horizontalAlign == value) {
+void TextLayer::setTextAlign(TextAlign align) {
+  if (_textAlign == align) {
     return;
   }
-  _horizontalAlign = value;
+  _textAlign = align;
   invalidateContent();
 }
 
