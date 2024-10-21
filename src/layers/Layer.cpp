@@ -51,16 +51,11 @@ std::shared_ptr<Layer> Layer::Make() {
   return layer;
 }
 
-Layer::Layer()
-    : bitFields({
-          true,                    //dirty
-          false,                   //contentDirty
-          false,                   //childrenDirty
-          true,                    //visible
-          false,                   //shouldRasterize
-          AllowsEdgeAntialiasing,  //allowsEdgeAntialiasing
-          AllowsGroupOpacity,      //allowsGroupOpacity
-      }) {
+Layer::Layer() {
+  memset(&bitFields, 0, sizeof(bitFields));
+  bitFields.visible = true;
+  bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
+  bitFields.allowsGroupOpacity = AllowsGroupOpacity;
 }
 
 void Layer::setAlpha(float value) {
