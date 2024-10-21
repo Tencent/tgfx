@@ -147,6 +147,18 @@ class Font {
    */
   std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const;
 
+  /**
+   * Compares two fonts for equality.
+   */
+  bool operator==(const Font& font) const;
+
+  /**
+   * Compares two fonts for inequality.
+   */
+  bool operator!=(const Font& font) const {
+    return !(*this == font);
+  }
+
  private:
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   bool fauxBold = false;

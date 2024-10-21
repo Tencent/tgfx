@@ -143,4 +143,9 @@ std::shared_ptr<Image> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
   auto generator = std::make_shared<GlyphImageGenerator>(width, height, scalerContext, glyphID);
   return Image::MakeFrom(std::move(generator));
 }
+
+bool Font::operator==(const Font& font) const {
+  return scalerContext == font.scalerContext && fauxBold == font.fauxBold &&
+         fauxItalic == font.fauxItalic;
+}
 }  // namespace tgfx
