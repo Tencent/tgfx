@@ -23,15 +23,15 @@
 namespace tgfx {
 class RasterizedContent : public LayerContent {
  public:
-  RasterizedContent(uint32_t deviceID, std::shared_ptr<Image> image, const Matrix& matrix)
-      : _deviceID(deviceID), image(std::move(image)), matrix(matrix) {
+  RasterizedContent(uint32_t contextID, std::shared_ptr<Image> image, const Matrix& matrix)
+      : _contextID(contextID), image(std::move(image)), matrix(matrix) {
   }
 
   /**
    * Returns the unique ID of the associated GPU device.
    */
-  uint32_t deviceID() const {
-    return _deviceID;
+  uint32_t contextID() const {
+    return _contextID;
   }
 
   Rect getBounds() const override;
@@ -39,7 +39,7 @@ class RasterizedContent : public LayerContent {
   void draw(Canvas* canvas, const Paint& paint) const override;
 
  private:
-  uint32_t _deviceID = 0;
+  uint32_t _contextID = 0;
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = Matrix::I();
 };

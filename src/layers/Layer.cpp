@@ -457,9 +457,9 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   if (!bitFields.shouldRasterize || args.context == nullptr) {
     return nullptr;
   }
-  auto deviceID = args.context->device()->uniqueID();
+  auto contextID = args.context->uniqueID();
   auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
-  if (content && content->deviceID() == deviceID) {
+  if (content && content->contextID() == contextID) {
     return content;
   }
   if (args.renderFlags & RenderFlags::DisableCache) {
@@ -485,7 +485,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   DrawArgs drawArgs(args.context, renderFlags, true);
   drawContents(drawArgs, canvas, 1.0f);
   auto image = surface->makeImageSnapshot();
-  rasterizedContent = std::make_unique<RasterizedContent>(deviceID, image, drawingMatrix);
+  rasterizedContent = std::make_unique<RasterizedContent>(contextID, image, drawingMatrix);
   return rasterizedContent.get();
 }
 
