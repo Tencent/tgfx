@@ -31,6 +31,7 @@
 namespace tgfx {
 
 class DisplayList;
+class DrawArgs;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -457,13 +458,13 @@ class Layer {
 
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
-   * the layer as dirty and does not update the cached content.
+   * the layer as dirty and does not update the layer content.
    */
   void invalidate();
 
   /**
    * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
-   * be called to update the cached content.
+   * be called to create the new layer content.
    */
   void invalidateContent();
 
@@ -475,6 +476,11 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
  private:
+  /**
+   * Marks the layer's children as changed and needing to be redrawn.
+   */
+  void invalidateChildren();
+
   void onAttachToDisplayList(DisplayList* owner);
 
   void onDetachFromDisplayList();
@@ -491,11 +497,11 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
-  void drawLayer(Canvas* canvas, float alpha, BlendMode blendMode);
+  LayerContent* getRasterizedCache(const DrawArgs& args);
 
-  LayerContent* getRasterizedCache(Context* context);
+  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
-  void drawContents(Canvas* canvas, float alpha);
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
 
   std::string _name;
   float _alpha = 1.0f;
@@ -511,8 +517,9 @@ class Layer {
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
   struct {
-    bool dirty : 1;         // need to redraw
-    bool contentDirty : 1;  // need to update content
+    bool dirty : 1;          // need to redraw the layer
+    bool contentDirty : 1;   // need to update content
+    bool childrenDirty : 1;  // need to redraw child layers
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;

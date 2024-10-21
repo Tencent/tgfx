@@ -18,29 +18,25 @@
 
 #pragma once
 
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class RasterizedContent : public LayerContent {
+/**
+ * DrawArgs represents the arguments passed to the draw method of a Layer.
+ */
+class DrawArgs {
  public:
-  RasterizedContent(uint32_t contextID, std::shared_ptr<Image> image, const Matrix& matrix)
-      : _contextID(contextID), image(std::move(image)), matrix(matrix) {
+  DrawArgs() = default;
+
+  DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false)
+      : context(context), renderFlags(renderFlags), cleanDirtyFlags(cleanDirtyFlags) {
   }
 
-  /**
-   * Returns the unique ID of the associated GPU device.
-   */
-  uint32_t contextID() const {
-    return _contextID;
-  }
-
-  Rect getBounds() const override;
-
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
- private:
-  uint32_t _contextID = 0;
-  std::shared_ptr<Image> image = nullptr;
-  Matrix matrix = Matrix::I();
+  // The GPU context to be used during the drawing process. Note: this could be nullptr.
+  Context* context = nullptr;
+  // Render flags to be used during the drawing process.
+  uint32_t renderFlags = 0;
+  // Whether to clean the dirty flags of the associated Layer during the drawing process.
+  bool cleanDirtyFlags = false;
 };
 }  // namespace tgfx

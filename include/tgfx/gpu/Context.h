@@ -48,6 +48,13 @@ class Context {
   }
 
   /**
+   * Returns the unique ID of the Context.
+   */
+  uint32_t uniqueID() const {
+    return _device->uniqueID();
+  }
+
+  /**
    * Returns the associated cache that manages the lifetime of all Program instances.
    */
   ProgramCache* programCache() const {

@@ -65,7 +65,8 @@ class TextureImage : public ResourceImage {
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  uint32_t contextID = 0;
 
-  explicit TextureImage(std::shared_ptr<TextureProxy> textureProxy);
+  TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID);
 };
 }  // namespace tgfx
