@@ -20,26 +20,26 @@
 
 namespace tgfx {
 /**
- * Text alignment options.
+ * Defines the vertical alignment of a text.
  */
-enum class TextAlign {
+enum class VerticalAlign {
   /**
-   * Align text to the left.
+   * Text is visually top aligned.
    */
-  Left,
+  Top,
 
   /**
-   * Align text to the center.
+   * Text is visually bottom aligned.
+   */
+  Bottom,
+
+  /**
+   * Text is visually center aligned.
    */
   Center,
 
   /**
-   * Align text to the right.
-   */
-  Right,
-
-  /**
-   * Justify text.
+   * Text is justified.
    */
   Justify
 };

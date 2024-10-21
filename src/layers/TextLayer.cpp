@@ -55,27 +55,49 @@ void TextLayer::setFont(const Font& font) {
   invalidateContent();
 }
 
-void TextLayer::setTextWidth(float width) {
-  if (_textWidth == width) {
+void TextLayer::setWidth(float width) {
+  if (width < 0) {
+    width = 0;
+  }
+  if (_width == width) {
     return;
   }
-  _textWidth = width;
+  _width = width;
   invalidateContent();
 }
 
-void TextLayer::setTextAlign(TextAlign align) {
-  if (_textAlign == align) {
+void TextLayer::setHeight(float height) {
+  if (height < 0) {
+    height = 0;
+  }
+  if (_height == height) {
     return;
   }
-  _textAlign = align;
+  _height = height;
   invalidateContent();
 }
 
-void TextLayer::setWrapped(bool value) {
-  if (_wrapped == value) {
+void TextLayer::setHorizontalAlign(HorizontalAlign value) {
+  if (_horizontalAlign == value) {
     return;
   }
-  _wrapped = value;
+  _horizontalAlign = value;
+  invalidateContent();
+}
+
+void TextLayer::setVerticalAlign(VerticalAlign value) {
+  if (_verticalAlign == value) {
+    return;
+  }
+  _verticalAlign = value;
+  invalidateContent();
+}
+
+void TextLayer::setAutoWrap(bool value) {
+  if (_autoWrap == value) {
+    return;
+  }
+  _autoWrap = value;
   invalidateContent();
 }
 
