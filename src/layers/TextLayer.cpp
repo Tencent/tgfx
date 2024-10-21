@@ -32,17 +32,50 @@ std::shared_ptr<TextLayer> TextLayer::Make() {
 }
 
 void TextLayer::setText(const std::string& text) {
+  if (_text == text) {
+    return;
+  }
   _text = text;
   invalidateContent();
 }
 
 void TextLayer::setTextColor(const Color& color) {
+  if (_textColor == color) {
+    return;
+  }
   _textColor = color;
   invalidateContent();
 }
 
 void TextLayer::setFont(const Font& font) {
+  if (_font == font) {
+    return;
+  }
   _font = font;
+  invalidateContent();
+}
+
+void TextLayer::setTextWidth(float width) {
+  if (_textWidth == width) {
+    return;
+  }
+  _textWidth = width;
+  invalidateContent();
+}
+
+void TextLayer::setTextAlign(TextAlign align) {
+  if (_textAlign == align) {
+    return;
+  }
+  _textAlign = align;
+  invalidateContent();
+}
+
+void TextLayer::setWrapped(bool value) {
+  if (_wrapped == value) {
+    return;
+  }
+  _wrapped = value;
   invalidateContent();
 }
 

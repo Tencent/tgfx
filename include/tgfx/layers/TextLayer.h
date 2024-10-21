@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Font.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/TextAlign.h"
 
 namespace tgfx {
 /**
@@ -72,6 +73,45 @@ class TextLayer : public Layer {
    */
   void setFont(const Font& font);
 
+  /**
+   * Returns the layout width of the text, used for alignment or wrapping. The default value is 100.
+   * If set to 0 or less, the text will be rendered without alignment or wrapping.
+   */
+  float textWidth() const {
+    return _textWidth;
+  }
+
+  /**
+   * Sets the layout width of the text.
+   */
+  void setTextWidth(float width);
+
+  /**
+   * Determines how the text should be horizontally aligned within the text width. The default value
+   * is TextAlign::Left.
+   */
+  TextAlign textAlign() const {
+    return _textAlign;
+  }
+
+  /**
+   * Sets how the text should be horizontally aligned within the text width.
+   */
+  void setTextAlign(TextAlign align);
+
+  /**
+   * Returns whether the text should be wrapped to fit within the text width. The default value is
+   * false.
+   */
+  bool wrapped() const {
+    return _wrapped;
+  }
+
+  /**
+   * Sets whether the text should be wrapped to fit within the text width.
+   */
+  void setWrapped(bool value);
+
  protected:
   TextLayer() = default;
 
@@ -81,5 +121,8 @@ class TextLayer : public Layer {
   std::string _text;
   Color _textColor = Color::White();
   Font _font = {};
+  float _textWidth = 100;
+  TextAlign _textAlign = TextAlign::Left;
+  bool _wrapped = false;
 };
 }  // namespace tgfx
