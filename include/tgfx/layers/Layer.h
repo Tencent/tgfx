@@ -36,8 +36,9 @@ class DrawArgs;
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
  * features for positioning, visibility, and alpha support, as well as methods for adding and
- * removing child layers. Note: All layers are not thread-safe and should be accessed from a single
- * thread.
+ * removing child layers. Note that all layers are not thread-safe and should be accessed from a
+ * single thread. Some properties only take effect if the layer has a parent, such as alpha,
+ * blendMode, position, matrix, visible, scrollRect, and mask.
  */
 class Layer {
  public:
@@ -275,11 +276,11 @@ class Layer {
   void setScrollRect(const Rect& rect);
 
   /**
-   * Returns the display list owner of the calling layer. If a layer is not added to a display list,
-   * its owner property is set to nullptr.
+   * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
+   * is not added to a display list, its root property is set to nullptr.
    */
-  DisplayList* owner() const {
-    return _owner;
+  Layer* root() const {
+    return _root;
   }
 
   /**
@@ -481,9 +482,9 @@ class Layer {
    */
   void invalidateChildren();
 
-  void onAttachToDisplayList(DisplayList* owner);
+  void onAttachToRoot(Layer* owner);
 
-  void onDetachFromDisplayList();
+  void onDetachFromRoot();
 
   int doGetChildIndex(const Layer* child) const;
 
@@ -511,7 +512,7 @@ class Layer {
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
-  DisplayList* _owner = nullptr;
+  Layer* _root = nullptr;
   Layer* _parent = nullptr;
   std::unique_ptr<LayerContent> layerContent = nullptr;
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;

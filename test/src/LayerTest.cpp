@@ -50,21 +50,21 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(parent->getChildIndex(child1), 1);
 
   // Tests for setting the display list owner.
-  EXPECT_EQ(parent->owner(), nullptr);
-  EXPECT_EQ(child1->owner(), nullptr);
-  EXPECT_EQ(child2->owner(), nullptr);
-  EXPECT_EQ(child3->owner(), nullptr);
+  EXPECT_EQ(parent->root(), nullptr);
+  EXPECT_EQ(child1->root(), nullptr);
+  EXPECT_EQ(child2->root(), nullptr);
+  EXPECT_EQ(child3->root(), nullptr);
   displayList->root()->addChild(parent);
-  EXPECT_EQ(parent->owner(), displayList.get());
-  EXPECT_EQ(child1->owner(), displayList.get());
-  EXPECT_EQ(child2->owner(), displayList.get());
-  EXPECT_EQ(child3->owner(), displayList.get());
+  EXPECT_EQ(parent->root(), displayList->root());
+  EXPECT_EQ(child1->root(), displayList->root());
+  EXPECT_EQ(child2->root(), displayList->root());
+  EXPECT_EQ(child3->root(), displayList->root());
 
   parent->removeFromParent();
-  EXPECT_EQ(parent->owner(), nullptr);
-  EXPECT_EQ(child1->owner(), nullptr);
-  EXPECT_EQ(child2->owner(), nullptr);
-  EXPECT_EQ(child3->owner(), nullptr);
+  EXPECT_EQ(parent->root(), nullptr);
+  EXPECT_EQ(child1->root(), nullptr);
+  EXPECT_EQ(child2->root(), nullptr);
+  EXPECT_EQ(child3->root(), nullptr);
   displayList->root()->addChild(parent);
 
   // Test replacing a child
@@ -72,11 +72,11 @@ TGFX_TEST(LayerTest, LayerTree) {
   auto replacedChild2 = Layer::Make();
   parent->replaceChild(replacedChild, replacedChild2);
   EXPECT_EQ(replacedChild2->parent(), nullptr);
-  EXPECT_EQ(replacedChild2->owner(), nullptr);
+  EXPECT_EQ(replacedChild2->root(), nullptr);
 
   parent->replaceChild(child1, replacedChild);
   EXPECT_EQ(replacedChild->parent(), parent);
-  EXPECT_EQ(replacedChild->owner(), displayList.get());
+  EXPECT_EQ(replacedChild->root(), displayList->root());
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_FALSE(parent->contains(child2));
   EXPECT_TRUE(parent->contains(replacedChild));
@@ -84,17 +84,17 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(parent->getChildIndex(replacedChild), 1);
   parent->replaceChild(replacedChild, child2);
   EXPECT_EQ(child2->parent(), parent);
-  EXPECT_EQ(child2->owner(), displayList.get());
+  EXPECT_EQ(child2->root(), displayList->root());
   EXPECT_FALSE(parent->contains(replacedChild));
   EXPECT_TRUE(parent->contains(child2));
-  EXPECT_TRUE(child1->children().size() == 0);
+  EXPECT_TRUE(child1->children().empty());
   parent->addChildAt(child1, 1);
 
   // Test removing a child
   auto removedChild = parent->removeChildAt(0);
   EXPECT_EQ(removedChild, child3);
   EXPECT_EQ(child3->parent(), nullptr);
-  EXPECT_EQ(child3->owner(), nullptr);
+  EXPECT_EQ(child3->root(), nullptr);
   EXPECT_FALSE(parent->contains(child3));
   EXPECT_TRUE(parent->children().size() == 2);
   EXPECT_EQ(parent->getChildIndex(child1), 0);
@@ -103,13 +103,13 @@ TGFX_TEST(LayerTest, LayerTree) {
   // Test removing all children
   parent->removeChildren();
   EXPECT_EQ(child2->parent(), nullptr);
-  EXPECT_EQ(child2->owner(), nullptr);
+  EXPECT_EQ(child2->root(), nullptr);
   EXPECT_FALSE(parent->contains(child2));
   EXPECT_EQ(child2->parent(), nullptr);
-  EXPECT_EQ(child2->owner(), nullptr);
+  EXPECT_EQ(child2->root(), nullptr);
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_EQ(child1->parent(), nullptr);
-  EXPECT_EQ(child1->owner(), nullptr);
+  EXPECT_EQ(child1->root(), nullptr);
   EXPECT_TRUE(parent->children().empty());
 }
 
@@ -174,7 +174,6 @@ TGFX_TEST(LayerTest, textLayer) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   auto surface = Surface::Make(context, 200, 100);
-  auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
@@ -196,7 +195,7 @@ TGFX_TEST(LayerTest, textLayer) {
   color.alpha = 0.5;
   textLayer2->setFont(font);
   textLayer2->setBlendMode(BlendMode::Difference);
-  displayList->draw(canvas);
+  displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
   device->unlock();
 }
@@ -207,7 +206,6 @@ TGFX_TEST(LayerTest, imageLayer) {
   auto context = device->lockContext();
   auto image = MakeImage("resources/apitest/image_as_mask.png");
   auto surface = Surface::Make(context, image->width() * 5, image->height() * 5);
-  auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
@@ -217,13 +215,14 @@ TGFX_TEST(LayerTest, imageLayer) {
   SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
   imageLayer->setSampling(options);
   imageLayer->setMatrix(Matrix::MakeScale(5.0f));
-  displayList->draw(canvas);
+  displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
   device->unlock();
 }
 
 TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   auto parent = Layer::Make();
+  // Should have no effect on the total matrix since it has no parent.
   parent->setMatrix(Matrix::MakeTrans(10, 10));
 
   auto child = Layer::Make();
@@ -240,7 +239,7 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   grandChild->addChild(greatGrandson);
 
   auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
-  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix::MakeTrans(40, 40));
+  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix::MakeTrans(30, 30));
 
   EXPECT_EQ(greatGrandson->matrix(), Matrix::MakeTrans(10, 10));
   EXPECT_EQ(grandChild->matrix(), Matrix::MakeTrans(10, 10));
@@ -276,7 +275,7 @@ TGFX_TEST(LayerTest, Layer_globalToLocal) {
   layerA1->addChild(layerA2);
   layerA2->addChild(layerA3);
 
-  auto globalPoint = Point::Make(25.0f, 45.0f);
+  auto globalPoint = Point::Make(15.0f, 35.0f);
   auto pointInLayer3 = layerA3->globalToLocal(globalPoint);
   auto testPoint = Point::Make(15.0f, 5.0f);
   EXPECT_EQ(pointInLayer3, testPoint);
@@ -312,7 +311,8 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
 
   auto pointDInLayer3 = Point::Make(5, 5);
   auto pointDInGlobal = layerA3->localToGlobal(pointDInLayer3);
-  EXPECT_EQ(pointDInGlobal, Point::Make(15.0f, 45.0f));
+  EXPECT_FLOAT_EQ(pointDInGlobal.x, 5.0f);
+  EXPECT_FLOAT_EQ(pointDInGlobal.y, 35.0f);
 
   auto pointEInLayer2 = Point::Make(8, 8);
   auto pointEInGlobal = layerA2->localToGlobal(pointEInLayer2);
@@ -325,8 +325,8 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
 
   auto pointFInLayer4 = Point::Make(10.0f, 10.0f);
   auto pointFInGlobal = layer4->localToGlobal(pointFInLayer4);
-  EXPECT_FLOAT_EQ(pointFInGlobal.x, 28.660254f);
-  EXPECT_FLOAT_EQ(pointFInGlobal.y, 58.660255f);
+  EXPECT_FLOAT_EQ(pointFInGlobal.x, 18.6602554f);
+  EXPECT_FLOAT_EQ(pointFInGlobal.y, 48.6602516f);
 
   auto layer5 = Layer::Make();
   layer5->setMatrix(Matrix::MakeTrans(10, -15) * Matrix::MakeRotate(-90.0f));
@@ -334,7 +334,7 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
 
   auto pointGInLayer5 = Point::Make(10.0f, 20.0f);
   auto pointGInGlobal = layer5->localToGlobal(pointGInLayer5);
-  EXPECT_EQ(pointGInGlobal, Point::Make(45.0f, 70.0f));
+  EXPECT_EQ(pointGInGlobal, Point::Make(35.0f, 60.0f));
 }
 
 TGFX_TEST(LayerTest, getbounds) {
@@ -413,8 +413,7 @@ TGFX_TEST(LayerTest, getbounds) {
   auto width = static_cast<int>(rootBounds.width());
   auto height = static_cast<int>(rootBounds.height());
   auto surface = Surface::Make(context, width, height);
-  auto canvas = surface->getCanvas();
-  displayList->draw(canvas);
+  displayList->render(surface.get());
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getBounds"));
   device->unlock();
@@ -425,7 +424,6 @@ TGFX_TEST(LayerTest, shapeLayer) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   auto surface = Surface::Make(context, 200, 100);
-  auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
@@ -452,7 +450,7 @@ TGFX_TEST(LayerTest, shapeLayer) {
   auto bounds = Rect::MakeXYWH(5, 5, 160, 90);
   ASSERT_TRUE(shapeLayerRect == bounds);
 
-  displayList->draw(canvas);
+  displayList->render(surface.get());
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_shape"));
   device->unlock();

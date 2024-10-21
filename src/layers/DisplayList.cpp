@@ -17,18 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "layers/DrawArgs.h"
 
 namespace tgfx {
 
 DisplayList::DisplayList() : _root(Layer::Make()) {
-  _root->_owner = this;
+  _root->_root = _root.get();
 }
 
 Layer* DisplayList::root() const {
   return _root.get();
 }
 
-void DisplayList::draw(Canvas* canvas) {
-  _root->draw(canvas);
+void DisplayList::render(Surface* surface, bool replaceAll) {
+  if (surface == nullptr) {
+    return;
+  }
+  auto canvas = surface->getCanvas();
+  if (replaceAll) {
+    canvas->clear();
+  }
+  DrawArgs args(surface->getContext(), surface->renderFlags(), true);
+  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 }  // namespace tgfx
