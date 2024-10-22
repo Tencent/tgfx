@@ -30,6 +30,11 @@ namespace tgfx {
 class TextLayer : public Layer {
  public:
   /**
+   * Sets the typefaces to be used as fallbacks when the requested typeface is not available.
+   */
+  static void SetFallbackTypefaces(std::vector<std::shared_ptr<Typeface>> typefaces);
+
+  /**
    * Creates a new text layer with the specified layout width and height.
    */
   static std::shared_ptr<TextLayer> Make();

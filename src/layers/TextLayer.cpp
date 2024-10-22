@@ -24,6 +24,18 @@
 namespace tgfx {
 
 static constexpr float DefaultLineHeight = 1.2f;
+static std::mutex locker = {};
+static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
+
+void TextLayer::SetFallbackTypefaces(std::vector<std::shared_ptr<Typeface>> typefaces) {
+  std::lock_guard<std::mutex> lock(locker);
+  FallbackTypefaces = std::move(typefaces);
+}
+
+std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
+  std::lock_guard<std::mutex> lock(locker);
+  return FallbackTypefaces;
+}
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
