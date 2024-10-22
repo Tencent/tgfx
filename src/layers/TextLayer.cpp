@@ -24,6 +24,18 @@
 namespace tgfx {
 
 static constexpr float DefaultLineHeight = 1.2f;
+static std::mutex& TypefaceMutex = *new std::mutex;
+static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
+
+void TextLayer::SetFallbackTypefaces(std::vector<std::shared_ptr<Typeface>> typefaces) {
+  std::lock_guard<std::mutex> lock(TypefaceMutex);
+  FallbackTypefaces = std::move(typefaces);
+}
+
+std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
+  std::lock_guard<std::mutex> lock(TypefaceMutex);
+  return FallbackTypefaces;
+}
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
@@ -32,17 +44,72 @@ std::shared_ptr<TextLayer> TextLayer::Make() {
 }
 
 void TextLayer::setText(const std::string& text) {
+  if (_text == text) {
+    return;
+  }
   _text = text;
   invalidateContent();
 }
 
 void TextLayer::setTextColor(const Color& color) {
+  if (_textColor == color) {
+    return;
+  }
   _textColor = color;
   invalidateContent();
 }
 
 void TextLayer::setFont(const Font& font) {
+  if (_font == font) {
+    return;
+  }
   _font = font;
+  invalidateContent();
+}
+
+void TextLayer::setWidth(float width) {
+  if (width < 0) {
+    width = 0;
+  }
+  if (_width == width) {
+    return;
+  }
+  _width = width;
+  invalidateContent();
+}
+
+void TextLayer::setHeight(float height) {
+  if (height < 0) {
+    height = 0;
+  }
+  if (_height == height) {
+    return;
+  }
+  _height = height;
+  invalidateContent();
+}
+
+void TextLayer::setTextAlign(TextAlign align) {
+  if (_textAlign == align) {
+    return;
+  }
+  _textAlign = align;
+  invalidateContent();
+}
+
+void TextLayer::setVerticalAlign(VerticalAlign value) {
+  if (_verticalAlign == value) {
+    return;
+  }
+  _verticalAlign = value;
+  invalidateContent();
+}
+
+void TextLayer::setAutoWrap(bool value) {
+  if (_autoWrap == value) {
+    return;
+  }
+  _autoWrap = value;
   invalidateContent();
 }
 
