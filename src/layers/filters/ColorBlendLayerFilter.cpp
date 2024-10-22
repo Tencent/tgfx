@@ -16,29 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorImageFilter.h"
-#include "gpu/processors/ComposeFragmentProcessor.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "tgfx/core/ColorFilter.h"
+#include "tgfx/layers/filters/ColorBlendLayerFilter.h"
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> ImageFilter::ColorFilter(
-    std::shared_ptr<class ColorFilter> colorFilter) {
-  return std::make_shared<ColorImageFilter>(std::move(colorFilter));
+std::shared_ptr<ColorBlendLayerFilter> ColorBlendLayerFilter::Make() {
+  return std::make_shared<ColorBlendLayerFilter>();
 }
 
-ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
-    : filter(std::move(filter)) {
-}
-
-std::unique_ptr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
-  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, sampling, uvMatrix);
-  if (imageProcessor == nullptr) {
-    return nullptr;
+void ColorBlendLayerFilter::setBlendMode(BlendMode mode) {
+  if (_blendMode == mode) {
+    return;
   }
-  return ComposeFragmentProcessor::Make(std::move(imageProcessor), filter->asFragmentProcessor());
+  _blendMode = mode;
+  invalidate();
 }
+
+void ColorBlendLayerFilter::setColor(const Color& color) {
+  if (_color == color) {
+    return;
+  }
+  _color = color;
+  invalidate();
+}
+
+std::shared_ptr<ImageFilter> ColorBlendLayerFilter::onCreateImageFilter(float) {
+  return ImageFilter::ColorFilter(ColorFilter::Blend(_color, _blendMode));
+}
+
 }  // namespace tgfx

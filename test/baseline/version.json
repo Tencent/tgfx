@@ -51,9 +51,15 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
+        "ModeColorFilter": "a1605b2",
         "draw_shape": "8378211",
         "draw_text": "fa90eb0",
+        "dropShadow": "a1605b2",
+        "filterClip": "a1605b2",
+        "filterTest": "a1605b2",
         "getBounds": "dec1b56",
+        "greyColorMatrix": "a1605b2",
+        "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9"
     },
     "MaskTest": {

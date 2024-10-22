@@ -16,33 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ImageFilter.h"
+#include "tgfx/layers/filters/BlurLayerFilter.h"
 
 namespace tgfx {
-/**
- * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
- * adjustments. LayerFilters are mutable and can be changed at any time.
- */
-class LayerFilter {
- public:
-  /**
-   * Wraps an ImageFilter in a LayerFilter.
-   */
-  static std::shared_ptr<LayerFilter> Wrap(const std::shared_ptr<ImageFilter>& filter);
 
-  virtual ~LayerFilter() = default;
+std::shared_ptr<BlurLayerFilter> BlurLayerFilter::Make() {
+  return std::shared_ptr<BlurLayerFilter>(new BlurLayerFilter());
+}
 
-  /**
-   * Returns the ImageFilter that represents the current state of this LayerFilter.
-   */
-  virtual std::shared_ptr<ImageFilter> getImageFilter() const = 0;
+void BlurLayerFilter::setBlurrinessX(float blurrinessX) {
+  if (_blurrinessX == blurrinessX) {
+    return;
+  }
+  _blurrinessX = blurrinessX;
+  invalidate();
+}
 
- protected:
-  /**
-   * Invalidates the filter, causing it to be re-computed the next time it is requested.
-   */
-  void invalidate();
-};
+void BlurLayerFilter::setBlurrinessY(float blurrinessY) {
+  if (_blurrinessY == blurrinessY) {
+    return;
+  }
+  _blurrinessY = blurrinessY;
+  invalidate();
+}
+
+void BlurLayerFilter::setTileMode(TileMode tileMode) {
+  if (_tileMode == tileMode) {
+    return;
+  }
+  _tileMode = tileMode;
+  invalidate();
+}
+
+std::shared_ptr<ImageFilter> BlurLayerFilter::onCreateImageFilter(float scale) {
+  return ImageFilter::Blur(_blurrinessX * scale, _blurrinessY * scale, _tileMode);
+}
+
 }  // namespace tgfx
