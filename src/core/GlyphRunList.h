@@ -18,62 +18,39 @@
 
 #pragma once
 
-#include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 /**
- * A GlyphRun represents a sequence of glyphs from a single font, along with their positions.
+ * GlyphRunList contains a list of glyph runs that can be drawn together. All glyph runs in a list
+ * share the same font type, whether they have color or not.
  */
-class GlyphRun {
+class GlyphRunList {
  public:
   /**
-   * Constructs an empty GlyphRun.
+   * Constructs a GlyphRunList using a single glyph run.
    */
-  GlyphRun() = default;
+  explicit GlyphRunList(GlyphRun glyphRun);
 
   /**
-   * Constructs a GlyphRun from a font, a sequence of glyph IDs, and a sequence of positions.
+   * Constructs a GlyphRunList using a list of glyph runs. All glyph runs in the list must share the
+   * same font type, whether they have color or not.
    */
-  GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions);
-
-  bool empty() const {
-    return _glyphIDs.empty();
-  }
+  explicit GlyphRunList(std::vector<GlyphRun> glyphRuns);
 
   /**
-   * Returns the font used to render the glyphs in this run.
-   */
-  const Font& font() const {
-    return _font;
-  }
-
-  /**
-   * Returns true if the font has color.
+   * Returns true if the GlyphRunList has color.
    */
   bool hasColor() const {
-    return _font.hasColor();
+    return _glyphRuns[0].font.hasColor();
   }
 
   /**
-   * Returns the sequence of glyph IDs in this run.
+   * Returns the glyph runs in the text blob.
    */
-  const std::vector<GlyphID>& glyphIDs() const {
-    return _glyphIDs;
-  }
-
-  /**
-   * Returns the number of glyphs in this run.
-   */
-  size_t runSize() const {
-    return _glyphIDs.size();
-  }
-
-  /**
-   * Returns the sequence of positions for the glyphs in this run.
-   */
-  const std::vector<Point>& positions() const {
-    return _positions;
+  const std::vector<GlyphRun>& glyphRuns() const {
+    return _glyphRuns;
   }
 
   /**
@@ -88,8 +65,6 @@ class GlyphRun {
   bool getPath(Path* path, const Matrix& matrix, const Stroke* stroke = nullptr) const;
 
  private:
-  Font _font = {};
-  std::vector<GlyphID> _glyphIDs = {};
-  std::vector<Point> _positions = {};
+  std::vector<GlyphRun> _glyphRuns = {};
 };
 }  // namespace tgfx

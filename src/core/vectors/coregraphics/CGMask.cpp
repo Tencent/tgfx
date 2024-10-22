@@ -18,8 +18,8 @@
 
 #include "CGMask.h"
 #include "CGTypeface.h"
+#include "core/GlyphRunList.h"
 #include "core/ScalerContext.h"
-#include "core/SimpleTextBlob.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
@@ -178,17 +178,16 @@ static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
       static_cast<CGFloat>(matrix.getTranslateX()), static_cast<CGFloat>(matrix.getTranslateY()));
 }
 
-bool CGMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix) {
-  if (glyphRun == nullptr || stroke) {
+bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
+                        const Matrix& matrix) {
+  if (glyphRunList == nullptr || stroke) {
     return false;
   }
-  const auto& font = glyphRun->font();
-  if (font.isFauxBold()) {
-    return false;
-  }
-  auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
-  if (typeface == nullptr) {
-    return false;
+  for (auto& glyphRun : glyphRunList->glyphRuns()) {
+    auto& font = glyphRun.font;
+    if (font.isFauxBold() || font.getTypeface() == nullptr) {
+      return false;
+    }
   }
   auto pixels = pixelRef->lockWritablePixels();
   auto cgContext = CreateBitmapContext(pixelRef->info(), pixels);
@@ -206,28 +205,34 @@ bool CGMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Ma
   CGContextSetAllowsFontSubpixelPositioning(cgContext, true);
   CGContextSetShouldSubpixelPositionFonts(cgContext, true);
 
-  CTFontRef ctFont = typeface->getCTFont();
-  ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
-                                          nullptr);
-  if (font.isFauxItalic()) {
-    CGContextSetTextMatrix(cgContext, CGAffineTransformMake(1, 0, -ITALIC_SKEW, 1, 0, 0));
-  }
-  CGContextTranslateCTM(cgContext, 0.f, static_cast<CGFloat>(height()));
-  CGContextScaleCTM(cgContext, 1.f, -1.f);
-  CGContextConcatCTM(cgContext, MatrixToCGAffineTransform(matrix));
-  auto& glyphIDs = glyphRun->glyphIDs();
-  auto& positions = glyphRun->positions();
-  auto glyphCount = glyphRun->runSize();
-  auto point = CGPointZero;
-  for (size_t i = 0; i < glyphCount; ++i) {
-    auto position = positions[i];
+  for (auto& glyphRun : glyphRunList->glyphRuns()) {
     CGContextSaveGState(cgContext);
-    CGContextTranslateCTM(cgContext, position.x, position.y);
+    auto& font = glyphRun.font;
+    auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
+    CTFontRef ctFont = typeface->getCTFont();
+    ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
+                                            nullptr);
+    if (font.isFauxItalic()) {
+      CGContextSetTextMatrix(cgContext, CGAffineTransformMake(1, 0, -ITALIC_SKEW, 1, 0, 0));
+    }
+    CGContextTranslateCTM(cgContext, 0.f, static_cast<CGFloat>(height()));
     CGContextScaleCTM(cgContext, 1.f, -1.f);
-    CTFontDrawGlyphs(ctFont, static_cast<const CGGlyph*>(&glyphIDs[i]), &point, 1, cgContext);
+    CGContextConcatCTM(cgContext, MatrixToCGAffineTransform(matrix));
+    auto& glyphIDs = glyphRun.glyphs;
+    auto& positions = glyphRun.positions;
+    auto glyphCount = glyphIDs.size();
+    auto point = CGPointZero;
+    for (size_t i = 0; i < glyphCount; ++i) {
+      auto position = positions[i];
+      CGContextSaveGState(cgContext);
+      CGContextTranslateCTM(cgContext, position.x, position.y);
+      CGContextScaleCTM(cgContext, 1.f, -1.f);
+      CTFontDrawGlyphs(ctFont, static_cast<const CGGlyph*>(&glyphIDs[i]), &point, 1, cgContext);
+      CGContextRestoreGState(cgContext);
+    }
+    CFRelease(ctFont);
     CGContextRestoreGState(cgContext);
   }
-  CFRelease(ctFont);
   CGContextRelease(cgContext);
   pixelRef->unlockPixels();
   return true;

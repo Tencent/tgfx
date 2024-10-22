@@ -20,7 +20,7 @@
 
 namespace tgfx {
 Rect TextContent::getBounds() const {
-  return glyphRun.getBounds(Matrix::I());
+  return textBlob->getBounds(Matrix::I());
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {
@@ -28,7 +28,6 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
   auto color = textColor;
   color.alpha *= paint.getAlpha();
   textPaint.setColor(color);
-  canvas->drawGlyphs(glyphRun.glyphIDs().data(), glyphRun.positions().data(), glyphRun.runSize(),
-                     glyphRun.font(), textPaint);
+  canvas->drawTextBlob(textBlob, 0, 0, textPaint);
 }
 }  // namespace tgfx

@@ -45,9 +45,10 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const SamplingOptions
   addLocalBounds(rect, state);
 }
 
-void MeasureContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle&,
-                                  const Stroke* stroke) {
-  auto deviceBounds = glyphRun.getBounds(state.matrix, stroke);
+void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                      const MCState& state, const FillStyle&,
+                                      const Stroke* stroke) {
+  auto deviceBounds = glyphRunList->getBounds(state.matrix, stroke);
   addDeviceBounds(deviceBounds, state.clip);
 }
 
