@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,30 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SimpleTextShaper.h"
-#include "tgfx/core/UTF.h"
+#pragma once
+
+#include "tgfx/core/Font.h"
 
 namespace tgfx {
-GlyphRun SimpleTextShaper::Shape(const std::string& text, const tgfx::Font& font) {
-  const char* textStart = text.data();
-  const char* textStop = textStart + text.size();
-  std::vector<GlyphID> glyphs = {};
-  std::vector<Point> positions = {};
-  auto emptyGlyphID = font.getGlyphID(" ");
-  auto emptyAdvance = font.getAdvance(emptyGlyphID);
-  float xOffset = 0;
-  while (textStart < textStop) {
-    auto unichar = UTF::NextUTF8(&textStart, textStop);
-    auto glyphID = font.getGlyphID(unichar);
-    if (glyphID > 0) {
-      glyphs.push_back(glyphID);
-      positions.push_back(Point::Make(xOffset, 0.0f));
-      auto advance = font.getAdvance(glyphID);
-      xOffset += advance;
-    } else {
-      xOffset += emptyAdvance;
-    }
+/**
+ * GlyphRun represents a sequence of glyphs from a single font, along with their positions.
+ */
+struct GlyphRun {
+  /**
+   * Constructs an empty GlyphRun.
+   */
+  GlyphRun() = default;
+
+  /**
+   * Constructs a GlyphRun using a font, a list of glyph IDs, and their positions.
+   */
+  GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
+      : font(font), glyphs(glyphIDs), positions(positions) {
   }
-  return {font, std::move(glyphs), std::move(positions)};
-}
+
+  /**
+   * Returns the font used to render the glyphs in this run.
+   */
+  Font font = {};
+
+  /**
+   * Returns the sequence of glyph IDs in this run.
+   */
+  std::vector<GlyphID> glyphs = {};
+
+  /**
+   * Returns the sequence of positions for each glyph in this run.
+   */
+  std::vector<Point> positions = {};
+};
 }  // namespace tgfx

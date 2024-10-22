@@ -21,7 +21,6 @@
 #include "core/LayerUnrollContext.h"
 #include "core/Records.h"
 #include "core/utils/Log.h"
-#include "core/utils/SimpleTextShaper.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Surface.h"
 
@@ -319,14 +318,11 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
                             const Paint& paint) {
-  if (text.empty() || paint.nothingToDraw()) {
+  if (text.empty()) {
     return;
   }
-  auto glyphRun = SimpleTextShaper::Shape(text, font);
-  auto state = *mcState;
-  state.matrix.preTranslate(x, y);
-  auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), state, style, paint.getStroke());
+  auto textBlob = TextBlob::MakeFrom(text, font);
+  drawTextBlob(std::move(textBlob), x, y, paint);
 }
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
@@ -335,8 +331,22 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
     return;
   }
   GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), *mcState, style, paint.getStroke());
+  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
+}
+
+void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
+                          const Paint& paint) {
+  if (textBlob == nullptr || paint.nothingToDraw()) {
+    return;
+  }
+  auto state = *mcState;
+  state.matrix.preTranslate(x, y);
+  auto style = CreateFillStyle(paint);
+  for (auto& glyphRunList : textBlob->glyphRunLists) {
+    drawContext->drawGlyphRunList(glyphRunList, state, style, paint.getStroke());
+  }
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {

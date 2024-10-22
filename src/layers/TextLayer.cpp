@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
-#include "core/utils/SimpleTextShaper.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
 
@@ -153,6 +152,10 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     }
   }
   GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
-  return std::make_unique<TextContent>(std::move(glyphRun), _textColor);
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRun));
+  if (textBlob == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<TextContent>(std::move(textBlob), _textColor);
 }
 }  // namespace tgfx

@@ -18,7 +18,7 @@
 
 #include "WebMask.h"
 #include "WebTypeface.h"
-#include "core/SimpleTextBlob.h"
+#include "core/GlyphRunList.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 #include "platform/web/WebImageStream.h"
@@ -99,44 +99,47 @@ void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool) {
 
 static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::string>* texts,
                                  std::vector<Point>* points) {
-  auto& font = glyphRun->font();
+  auto& font = glyphRun->font;
   auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
   if (typeface == nullptr) {
     return;
   }
-  auto& glyphIDs = glyphRun->glyphIDs();
-  auto& positions = glyphRun->positions();
+  auto& glyphIDs = glyphRun->glyphs;
+  auto& positions = glyphRun->positions;
   for (size_t i = 0; i < glyphIDs.size(); ++i) {
     texts->push_back(typeface->getText(glyphIDs[i]));
     points->push_back(positions[i]);
   }
 }
 
-bool WebMask::onFillText(const GlyphRun* glyphRun, const Stroke* stroke, const Matrix& matrix) {
+bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
+                         const Matrix& matrix) {
   aboutToFill();
-  auto bounds = glyphRun->getBounds(matrix, stroke);
+  auto bounds = glyphRunList->getBounds(matrix, stroke);
   if (bounds.isEmpty()) {
     return false;
   }
   stream->markContentDirty(bounds);
-  std::vector<std::string> texts = {};
-  std::vector<Point> points = {};
-  GetTextsAndPositions(glyphRun, &texts, &points);
-  const auto& font = glyphRun->font();
-  const auto typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
-  if (typeFace == nullptr) {
-    return false;
-  }
-  auto webFont = val::object();
-  webFont.set("name", typeFace->fontFamily());
-  webFont.set("style", typeFace->fontStyle());
-  webFont.set("size", font.getSize());
-  webFont.set("bold", font.isFauxBold());
-  webFont.set("italic", font.isFauxItalic());
-  if (stroke) {
-    webMask.call<void>("strokeText", webFont, *stroke, texts, points, matrix);
-  } else {
-    webMask.call<void>("fillText", webFont, texts, points, matrix);
+  for (auto& glyphRun : glyphRunList->glyphRuns()) {
+    std::vector<std::string> texts = {};
+    std::vector<Point> points = {};
+    GetTextsAndPositions(&glyphRun, &texts, &points);
+    const auto& font = glyphRun.font;
+    const auto typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
+    if (typeFace == nullptr) {
+      return false;
+    }
+    auto webFont = val::object();
+    webFont.set("name", typeFace->fontFamily());
+    webFont.set("style", typeFace->fontStyle());
+    webFont.set("size", font.getSize());
+    webFont.set("bold", font.isFauxBold());
+    webFont.set("italic", font.isFauxItalic());
+    if (stroke) {
+      webMask.call<void>("strokeText", webFont, *stroke, texts, points, matrix);
+    } else {
+      webMask.call<void>("fillText", webFont, texts, points, matrix);
+    }
   }
   return true;
 }

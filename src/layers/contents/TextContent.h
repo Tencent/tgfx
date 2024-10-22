@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "core/GlyphRun.h"
 #include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
 class TextContent : public LayerContent {
  public:
-  TextContent(GlyphRun glyphRun, Color textColor)
-      : glyphRun(std::move(glyphRun)), textColor(textColor) {
+  TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor)
+      : textBlob(std::move(textBlob)), textColor(textColor) {
   }
 
   Rect getBounds() const override;
@@ -33,7 +32,7 @@ class TextContent : public LayerContent {
   void draw(Canvas* canvas, const Paint& paint) const override;
 
  private:
-  GlyphRun glyphRun = {};
+  std::shared_ptr<TextBlob> textBlob = nullptr;
   Color textColor = Color::White();
 };
 }  // namespace tgfx
