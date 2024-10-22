@@ -496,7 +496,7 @@ TGFX_TEST(LayerTest, filterClip) {
   auto filter = DropShadowLayerFilter::Make();
   filter->setDx(-10);
   filter->setDy(-10);
-  filter->setClipRect(Rect::MakeLTRB(-20, -20, 200, 200));
+  filter->setClipBounds(Rect::MakeLTRB(-20, -20, 200, 200));
   filter->setColor(Color::Black());
   filter->setDropsShadowOnly(false);
 
@@ -647,8 +647,8 @@ TGFX_TEST(LayerTest, blurLayerFilter) {
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
   auto clipRect = Rect::MakeLTRB(0, 0, 100, 100);
-  blur->setClipRect(clipRect);
-  EXPECT_EQ(blur->clipRect(), Rect::MakeLTRB(0, 0, 100, 100));
+  blur->setClipBounds(clipRect);
+  EXPECT_EQ(blur->clipBounds(), Rect::MakeLTRB(0, 0, 100, 100));
   auto imageFilter = std::static_pointer_cast<BlurImageFilter>(blur->getImageFilter(0.5f));
   auto imageFilter2 =
       std::static_pointer_cast<BlurImageFilter>(ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
