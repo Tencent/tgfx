@@ -35,8 +35,7 @@ class LayerFilter {
    * @param image The image to apply the filter to.
    * @param filterScale The scale factor to apply to the filter. This is used to adjust the filter
    * to the resolution of the image.
-   * @param offset An optional offset to apply to the image. This is used to adjust the filter to
-   * the resolution of the image.
+   * @param offset The offset stores the translation information for the filtered Image.
    * @return A new image with the filter applied.
    */
   std::shared_ptr<Image> applyFilter(const std::shared_ptr<Image>& image, float filterScale,
