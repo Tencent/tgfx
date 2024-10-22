@@ -145,7 +145,8 @@ std::shared_ptr<Image> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
 }
 
 bool Font::operator==(const Font& font) const {
-  return scalerContext == font.scalerContext && fauxBold == font.fauxBold &&
+  return scalerContext->typeface == font.scalerContext->typeface &&
+         scalerContext->textSize == font.scalerContext->textSize && fauxBold == font.fauxBold &&
          fauxItalic == font.fauxItalic;
 }
 }  // namespace tgfx
