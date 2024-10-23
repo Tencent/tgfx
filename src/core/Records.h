@@ -95,7 +95,6 @@ class DrawPath : public Record {
     context->drawPath(path, state, style, nullptr);
   }
 
- protected:
   Path path;
   MCState state;
   FillStyle style;

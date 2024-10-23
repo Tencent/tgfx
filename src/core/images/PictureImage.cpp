@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
+#include "core/Rasterizer.h"
 #include "core/Records.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -78,6 +79,87 @@ static std::shared_ptr<Image> GetEquivalentImage(const Record* record, int width
   return image->makeSubset(subset);
 }
 
+static bool CheckStyleAndClip(const FillStyle& style, const Path& clip, int width, int height,
+                              const Matrix* matrix) {
+  if (style.colorFilter || style.maskFilter) {
+    return false;
+  }
+  switch (style.blendMode) {
+    case BlendMode::Clear:
+    case BlendMode::Dst:
+    case BlendMode::SrcIn:
+    case BlendMode::SrcATop:
+    case BlendMode::DstOver:
+    case BlendMode::DstIn:
+    case BlendMode::DstOut:
+    case BlendMode::DstATop:
+      return false;
+    default:
+      break;
+  }
+  if (clip.isEmpty() && clip.isInverseFillType()) {
+    return true;
+  }
+  Rect clipRect = {};
+  if (!clip.isRect(&clipRect)) {
+    return false;
+  }
+  if (matrix) {
+    if (!matrix->rectStaysRect()) {
+      return false;
+    }
+    matrix->mapRect(&clipRect);
+  }
+  return clipRect.contains(Rect::MakeWH(width, height));
+}
+
+static Matrix GetMaskMatrix(const MCState& state, const Matrix* matrix) {
+  auto m = state.matrix;
+  if (matrix) {
+    m.postConcat(*matrix);
+  }
+  return m;
+}
+
+static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record, int width,
+                                                           int height, const Matrix* matrix) {
+  if (record->type() == RecordType::DrawPath) {
+    auto pathRecord = static_cast<const DrawPath*>(record);
+    if (!CheckStyleAndClip(pathRecord->style, pathRecord->state.clip, width, height, matrix)) {
+      return nullptr;
+    }
+    return Rasterizer::MakeFrom(pathRecord->path, ISize::Make(width, height),
+                                GetMaskMatrix(pathRecord->state, matrix));
+  }
+  if (record->type() == RecordType::StrokePath) {
+    auto strokeRecord = static_cast<const StrokePath*>(record);
+    if (!CheckStyleAndClip(strokeRecord->style, strokeRecord->state.clip, width, height, matrix)) {
+      return nullptr;
+    }
+    return Rasterizer::MakeFrom(strokeRecord->path, ISize::Make(width, height),
+                                GetMaskMatrix(strokeRecord->state, matrix), &strokeRecord->stroke);
+  }
+  if (record->type() == RecordType::DrawGlyphRunList) {
+    auto glyphRecord = static_cast<const DrawGlyphRunList*>(record);
+    if (!CheckStyleAndClip(glyphRecord->style, glyphRecord->state.clip, width, height, matrix)) {
+      return nullptr;
+    }
+    return Rasterizer::MakeFrom(glyphRecord->glyphRunList, ISize::Make(width, height),
+                                GetMaskMatrix(glyphRecord->state, matrix));
+  }
+  if (record->type() == RecordType::StrokeGlyphRunList) {
+    auto strokeGlyphRecord = static_cast<const StrokeGlyphRunList*>(record);
+    if (!CheckStyleAndClip(strokeGlyphRecord->style, strokeGlyphRecord->state.clip, width, height,
+                           matrix)) {
+      return nullptr;
+    }
+    return Rasterizer::MakeFrom(strokeGlyphRecord->glyphRunList, ISize::Make(width, height),
+                                GetMaskMatrix(strokeGlyphRecord->state, matrix),
+                                &strokeGlyphRecord->stroke);
+  }
+  return nullptr;
+}
+
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
                                        const Matrix* matrix, bool alphaOnly) {
   if (picture == nullptr || width <= 0 || height <= 0) {
@@ -90,6 +172,13 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
     auto image = GetEquivalentImage(picture->records[0], width, height, alphaOnly, matrix);
     if (image) {
       return image;
+    }
+    if (alphaOnly) {
+      auto rasterizer = GetEquivalentRasterizer(picture->records[0], width, height, matrix);
+      image = Image::MakeFrom(std::move(rasterizer));
+      if (image) {
+        return image;
+      }
     }
   }
   auto image = std::make_shared<PictureImage>(UniqueKey::Make(), std::move(picture), width, height,
