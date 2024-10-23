@@ -530,10 +530,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
   drawContents(args, contentCanvas, 1.0f);
-  auto contentPicture = recorder.finishRecordingAsPicture();
-  auto contentBounds = contentPicture->getBounds();
-  contentBounds.width();
-  contentBounds.height();
 
   Paint paint;
   paint.setAlpha(alpha);
