@@ -535,7 +535,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   contentBounds.width();
   contentBounds.height();
 
-
   Paint paint;
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);

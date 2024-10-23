@@ -52,7 +52,6 @@ class LayerFilter {
   virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
  private:
-
   bool dirty = true;
 
   float lastScale = 1.0f;

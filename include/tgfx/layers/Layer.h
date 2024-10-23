@@ -507,8 +507,8 @@ class Layer {
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  std::shared_ptr<ImageFilter> composeFilter(const std::vector<std::shared_ptr<LayerFilter>>& filters,
-                                             float scale);
+  std::shared_ptr<ImageFilter> composeFilter(
+      const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale);
 
   std::string _name;
   float _alpha = 1.0f;
