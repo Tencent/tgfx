@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
+#include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "layers/DrawArgs.h"
 #include "layers/contents/RasterizedContent.h"
@@ -300,6 +301,11 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
     bounds.join(childBounds);
   }
 
+  auto imageFilter = composeFilter(_filters, 1.0f);
+  if (imageFilter) {
+    bounds = imageFilter->filterBounds(bounds);
+  }
+
   if (targetCoordinateSpace && targetCoordinateSpace != this) {
     auto totalMatrix = getGlobalMatrix();
     auto coordinateMatrix = targetCoordinateSpace->getGlobalMatrix();
@@ -479,7 +485,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   auto canvas = surface->getCanvas();
   canvas->concat(matrix);
   DrawArgs drawArgs(args.context, renderFlags, true);
-  drawContents(drawArgs, canvas, 1.0f);
+  drawOffscreen(drawArgs, canvas, 1.0, BlendMode::SrcOver, _filters);
   auto image = surface->makeImageSnapshot();
   rasterizedContent = std::make_unique<RasterizedContent>(contextID, image, drawingMatrix);
   return rasterizedContent.get();
@@ -488,16 +494,14 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   auto rasterizedCache = getRasterizedCache(args);
-  Paint paint;
-  paint.setAlpha(alpha);
-  paint.setBlendMode(blendMode);
   if (rasterizedCache) {
+    Paint paint;
+    paint.setAlpha(alpha);
+    paint.setBlendMode(blendMode);
     rasterizedCache->draw(canvas, paint);
-  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity)) {
-    Recorder recorder;
-    auto contentCanvas = recorder.beginRecording();
-    drawContents(args, contentCanvas, 1.0f);
-    canvas->drawPicture(recorder.finishRecordingAsPicture(), nullptr, &paint);
+  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+             !_filters.empty()) {
+    drawOffscreen(args, canvas, alpha, blendMode, _filters);
   } else {
     // draw directly
     drawContents(args, canvas, alpha);
@@ -505,6 +509,30 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (args.cleanDirtyFlags) {
     bitFields.dirty = false;
   }
+}
+
+void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                          const std::vector<std::shared_ptr<LayerFilter>>& filters) {
+  if (filters.empty() && alpha == 1.0f && blendMode == BlendMode::SrcOver) {
+    drawContents(args, canvas, alpha);
+    return;
+  }
+
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto filter = composeFilter(filters, contentScale);
+  Recorder recorder;
+  auto contentCanvas = recorder.beginRecording();
+  contentCanvas->scale(contentScale, contentScale);
+  drawContents(args, contentCanvas, 1.0f);
+
+  Paint paint;
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  paint.setImageFilter(filter);
+  canvas->save();
+  canvas->scale(1.0f / contentScale, 1.0f / contentScale);
+  canvas->drawPicture(recorder.finishRecordingAsPicture(), nullptr, &paint);
+  canvas->restore();
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
@@ -527,6 +555,22 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   if (args.cleanDirtyFlags) {
     bitFields.childrenDirty = false;
   }
+}
+
+std::shared_ptr<ImageFilter> Layer::composeFilter(
+    const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale) {
+  if (filters.empty()) {
+    return nullptr;
+  }
+  std::vector<std::shared_ptr<ImageFilter>> imageFilters;
+  for (const auto& filter : filters) {
+    auto imageFilter = filter->getImageFilter(scale);
+    if (!imageFilter) {
+      continue;
+    }
+    imageFilters.push_back(imageFilter);
+  }
+  return ImageFilter::Compose(imageFilters);
 }
 
 }  // namespace tgfx

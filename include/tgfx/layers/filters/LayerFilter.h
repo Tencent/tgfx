@@ -27,22 +27,37 @@ namespace tgfx {
  */
 class LayerFilter {
  public:
-  /**
-   * Wraps an ImageFilter in a LayerFilter.
-   */
-  static std::shared_ptr<LayerFilter> Wrap(const std::shared_ptr<ImageFilter>& filter);
-
   virtual ~LayerFilter() = default;
 
   /**
-   * Returns the ImageFilter that represents the current state of this LayerFilter.
+   * Returns the current image filter for the given scale factor. If the filter has not been
+   * created yet, it will be created and cached.
+   * @param scale The scale factor to apply to the filter.
+   * @return The current image filter.
    */
-  virtual std::shared_ptr<ImageFilter> getImageFilter() const = 0;
+  std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
  protected:
   /**
    * Invalidates the filter, causing it to be re-computed the next time it is requested.
    */
   void invalidate();
+
+  /**
+   * Creates a new image filter for the given scale factor. When it is necessary to recreate the
+   * ImageFilter, the onCreateImageFilter method will be called.
+   * @param scale The scale factor to apply to the filter.
+   * @return A new image filter.
+   */
+  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
+
+ private:
+  bool dirty = true;
+
+  float lastScale = 1.0f;
+
+  std::unique_ptr<Rect> _clipBounds = nullptr;
+
+  std::shared_ptr<ImageFilter> lastFilter;
 };
 }  // namespace tgfx

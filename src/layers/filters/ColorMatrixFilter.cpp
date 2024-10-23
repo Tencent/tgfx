@@ -16,29 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorImageFilter.h"
-#include "gpu/processors/ComposeFragmentProcessor.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "tgfx/core/ColorFilter.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> ImageFilter::ColorFilter(
-    std::shared_ptr<class ColorFilter> colorFilter) {
-  return std::make_shared<ColorImageFilter>(std::move(colorFilter));
+std::shared_ptr<ColorMatrixFilter> ColorMatrixFilter::Make(const std::array<float, 20>& matrix) {
+  return std::shared_ptr<ColorMatrixFilter>(new ColorMatrixFilter(matrix));
 }
 
-ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
-    : filter(std::move(filter)) {
-}
-
-std::unique_ptr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
-  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, sampling, uvMatrix);
-  if (imageProcessor == nullptr) {
-    return nullptr;
+void ColorMatrixFilter::setMatrix(const std::array<float, 20>& matrix) {
+  if (_matrix == matrix) {
+    return;
   }
-  return ComposeFragmentProcessor::Make(std::move(imageProcessor), filter->asFragmentProcessor());
+  _matrix = std::move(matrix);
+  invalidate();
 }
+
+std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {
+  return ImageFilter::ColorFilter(ColorFilter::Matrix(_matrix));
+}
+
+ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix)
+    : LayerFilter(), _matrix(std::move(matrix)) {
+}
+
 }  // namespace tgfx

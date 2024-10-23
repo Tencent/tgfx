@@ -21,9 +21,9 @@
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
-class ColorMatrixFilter : public ColorFilter {
+class MatrixColorFilter : public ColorFilter {
  public:
-  explicit ColorMatrixFilter(const std::array<float, 20>& matrix);
+  explicit MatrixColorFilter(const std::array<float, 20>& matrix);
 
   bool isAlphaUnchanged() const override {
     return alphaIsUnchanged;
