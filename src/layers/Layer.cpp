@@ -301,11 +301,8 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
     bounds.join(childBounds);
   }
 
-  if (!_filters.empty()) {
-    auto imageFilter = composeFilter(_filters, 1.0f);
-    if (!imageFilter) {
-      return Rect::MakeEmpty();
-    }
+  auto imageFilter = composeFilter(_filters, 1.0f);
+  if (imageFilter) {
     bounds = imageFilter->filterBounds(bounds);
   }
 
@@ -523,9 +520,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto filter = composeFilter(filters, contentScale);
-  if (!filters.empty() && filter == nullptr) {
-    return;
-  }
   Recorder recorder;
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
@@ -568,17 +562,13 @@ std::shared_ptr<ImageFilter> Layer::composeFilter(
   if (filters.empty()) {
     return nullptr;
   }
-  auto contentScale = scale;
   std::vector<std::shared_ptr<ImageFilter>> imageFilters;
   for (const auto& filter : filters) {
-    auto imageFilter = filter->getImageFilter(contentScale);
+    auto imageFilter = filter->getImageFilter(scale);
     if (!imageFilter) {
-      return nullptr;
+      continue;
     }
     imageFilters.push_back(imageFilter);
-  }
-  if (imageFilters.empty()) {
-    return nullptr;
   }
   return ImageFilter::Compose(imageFilters);
 }
