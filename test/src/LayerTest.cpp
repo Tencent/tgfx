@@ -597,6 +597,7 @@ TGFX_TEST(LayerTest, colorMatrixLayerFilter) {
   auto layer = ImageLayer::Make();
   layer->setImage(image);
   auto filter = ColorMatrixFilter::Make(matrix);
+  layer->setFilters({filter});
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/identityMatrix"));
