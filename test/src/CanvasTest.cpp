@@ -885,6 +885,28 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas->drawImage(pictureImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
 
+  canvas = recorder.beginRecording();
+  canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
+  auto textRecord = recorder.finishRecordingAsPicture();
+  bounds = textRecord->getBounds();
+  matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
+  ASSERT_TRUE(textImage != nullptr);
+  EXPECT_FALSE(textImage->isComplex());
+
+  canvas = recorder.beginRecording();
+  canvas->drawPath(path, paint);
+  auto patRecord = recorder.finishRecordingAsPicture();
+  bounds = patRecord->getBounds();
+  matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  width = static_cast<int>(bounds.width());
+  height = static_cast<int>(bounds.height());
+  auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
+  ASSERT_TRUE(pathImage != nullptr);
+  EXPECT_FALSE(pathImage->isComplex());
+
   device->unlock();
 }
 }  // namespace tgfx
