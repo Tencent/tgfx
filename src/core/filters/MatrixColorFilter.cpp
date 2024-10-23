@@ -16,23 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ColorFilter.h"
+#include "MatrixColorFilter.h"
+#include "core/utils/MathExtra.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
-class ColorMatrixFilter : public ColorFilter {
- public:
-  explicit ColorMatrixFilter(const std::array<float, 20>& matrix);
+std::shared_ptr<ColorFilter> ColorFilter::Matrix(const std::array<float, 20>& rowMajor) {
+  return std::make_shared<MatrixColorFilter>(rowMajor);
+}
 
-  bool isAlphaUnchanged() const override {
-    return alphaIsUnchanged;
-  }
+static bool IsAlphaUnchanged(const float matrix[20]) {
+  const float* srcA = matrix + 15;
+  return FloatNearlyZero(srcA[0]) && FloatNearlyZero(srcA[1]) && FloatNearlyZero(srcA[2]) &&
+         FloatNearlyEqual(srcA[3], 1) && FloatNearlyZero(srcA[4]);
+}
 
- private:
-  std::array<float, 20> matrix;
-  bool alphaIsUnchanged;
+MatrixColorFilter::MatrixColorFilter(const std::array<float, 20>& matrix)
+    : matrix(matrix), alphaIsUnchanged(IsAlphaUnchanged(matrix.data())) {
+}
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
-};
+std::unique_ptr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor() const {
+  return ColorMatrixFragmentProcessor::Make(matrix);
+}
 }  // namespace tgfx

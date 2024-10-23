@@ -502,11 +502,13 @@ class Layer {
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
-  void drawFilteredContents(const DrawArgs& args, Canvas* canvas, float alpha);
+  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const std::vector<std::shared_ptr<LayerFilter>>& filters);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  std::shared_ptr<Image> getOffscreenContents(const DrawArgs& args);
+  std::shared_ptr<ImageFilter> composeFilter(const std::vector<std::shared_ptr<LayerFilter>>& filters,
+                                             float scale);
 
   std::string _name;
   float _alpha = 1.0f;

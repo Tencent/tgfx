@@ -16,40 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/BlurLayerFilter.h"
+#include "tgfx/layers/filters/BlendFilter.h"
 
 namespace tgfx {
 
-std::shared_ptr<BlurLayerFilter> BlurLayerFilter::Make() {
-  return std::shared_ptr<BlurLayerFilter>(new BlurLayerFilter());
+std::shared_ptr<BlendFilter> BlendFilter::Make(const Color& color, BlendMode mode) {
+  return std::shared_ptr<BlendFilter>(new BlendFilter(color, mode));
 }
 
-void BlurLayerFilter::setBlurrinessX(float blurrinessX) {
-  if (_blurrinessX == blurrinessX) {
+void BlendFilter::setBlendMode(BlendMode mode) {
+  if (_blendMode == mode) {
     return;
   }
-  _blurrinessX = blurrinessX;
+  _blendMode = mode;
   invalidate();
 }
 
-void BlurLayerFilter::setBlurrinessY(float blurrinessY) {
-  if (_blurrinessY == blurrinessY) {
+void BlendFilter::setColor(const Color& color) {
+  if (_color == color) {
     return;
   }
-  _blurrinessY = blurrinessY;
+  _color = color;
   invalidate();
 }
 
-void BlurLayerFilter::setTileMode(TileMode tileMode) {
-  if (_tileMode == tileMode) {
-    return;
-  }
-  _tileMode = tileMode;
-  invalidate();
+std::shared_ptr<ImageFilter> BlendFilter::onCreateImageFilter(float) {
+  return ImageFilter::ColorFilter(ColorFilter::Blend(_color, _blendMode));
 }
 
-std::shared_ptr<ImageFilter> BlurLayerFilter::onCreateImageFilter(float scale) {
-  return ImageFilter::Blur(_blurrinessX * scale, _blurrinessY * scale, _tileMode);
+BlendFilter::BlendFilter(const Color& color, BlendMode blendMode)
+    : LayerFilter(), _color(std::move(color)), _blendMode(blendMode) {
 }
 
 }  // namespace tgfx

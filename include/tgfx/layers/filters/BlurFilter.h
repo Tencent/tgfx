@@ -22,20 +22,16 @@
 
 namespace tgfx {
 
-class BlurLayerFilter : public LayerFilter {
+class BlurFilter : public LayerFilter {
  public:
-  virtual ~BlurLayerFilter() = default;
+  virtual ~BlurFilter() = default;
 
   /**
    * Create a filter that blurs its input by the separate X and Y blurriness. The provided tile mode
    * is used when the blur kernel goes outside the input image.
    */
-  static std::shared_ptr<BlurLayerFilter> Make();
-
-  /**
-   * Set the Gaussian sigma value for blurring along the X axis.
-   */
-  void setBlurrinessX(float blurrinessX);
+  static std::shared_ptr<BlurFilter> Make(float blurrinessX, float blurrinessY,
+                                          TileMode tileMode = TileMode::Decal);
 
   /**
    * The Gaussian sigma value for blurring along the Y axis.
@@ -45,10 +41,9 @@ class BlurLayerFilter : public LayerFilter {
   }
 
   /**
-   * Set the Gaussian sigma value for blurring along the Y axis.
-   * @param blurrinessY
+   * Set the Gaussian sigma value for blurring along the X axis.
    */
-  void setBlurrinessY(float blurrinessY);
+  void setBlurrinessX(float blurrinessX);
 
   /**
    * The Gaussian sigma value for blurring along the Y axis.
@@ -58,10 +53,10 @@ class BlurLayerFilter : public LayerFilter {
   }
 
   /**
-   * Set the tile mode applied at edges.
-   * @param tileMode
+   * Set the Gaussian sigma value for blurring along the Y axis.
+   * @param blurrinessY
    */
-  void setTileMode(TileMode tileMode);
+  void setBlurrinessY(float blurrinessY);
 
   /**
    * The tile mode applied at edges.
@@ -70,11 +65,17 @@ class BlurLayerFilter : public LayerFilter {
     return _tileMode;
   }
 
+  /**
+   * Set the tile mode applied at edges.
+   * @param tileMode
+   */
+  void setTileMode(TileMode tileMode);
+
  protected:
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
-  BlurLayerFilter() = default;
+  BlurFilter(float blurrinessX, float blurrinessY, TileMode tileMode);
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   TileMode _tileMode = TileMode::Decal;

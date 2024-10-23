@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/ColorMatrixLayerFilter.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
 
 namespace tgfx {
 
-std::shared_ptr<ColorMatrixLayerFilter> ColorMatrixLayerFilter::Make() {
-  return std::shared_ptr<ColorMatrixLayerFilter>(new ColorMatrixLayerFilter());
+std::shared_ptr<ColorMatrixFilter> ColorMatrixFilter::Make(const std::array<float, 20>& matrix) {
+  return std::shared_ptr<ColorMatrixFilter>(new ColorMatrixFilter(matrix));
 }
 
-void ColorMatrixLayerFilter::setMatrix(const std::array<float, 20>& matrix) {
+void ColorMatrixFilter::setMatrix(const std::array<float, 20>& matrix) {
   if (_matrix == matrix) {
     return;
   }
@@ -32,8 +32,12 @@ void ColorMatrixLayerFilter::setMatrix(const std::array<float, 20>& matrix) {
   invalidate();
 }
 
-std::shared_ptr<ImageFilter> ColorMatrixLayerFilter::onCreateImageFilter(float) {
+std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {
   return ImageFilter::ColorFilter(ColorFilter::Matrix(_matrix));
+}
+
+ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix)
+    : LayerFilter(), _matrix(std::move(matrix)) {
 }
 
 }  // namespace tgfx

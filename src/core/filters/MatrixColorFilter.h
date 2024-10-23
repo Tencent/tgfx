@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,32 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/ColorBlendLayerFilter.h"
+#pragma once
+
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
+class MatrixColorFilter : public ColorFilter {
+ public:
+  explicit MatrixColorFilter(const std::array<float, 20>& matrix);
 
-std::shared_ptr<ColorBlendLayerFilter> ColorBlendLayerFilter::Make() {
-  return std::make_shared<ColorBlendLayerFilter>();
-}
-
-void ColorBlendLayerFilter::setBlendMode(BlendMode mode) {
-  if (_blendMode == mode) {
-    return;
+  bool isAlphaUnchanged() const override {
+    return alphaIsUnchanged;
   }
-  _blendMode = mode;
-  invalidate();
-}
 
-void ColorBlendLayerFilter::setColor(const Color& color) {
-  if (_color == color) {
-    return;
-  }
-  _color = color;
-  invalidate();
-}
+ private:
+  std::array<float, 20> matrix;
+  bool alphaIsUnchanged;
 
-std::shared_ptr<ImageFilter> ColorBlendLayerFilter::onCreateImageFilter(float) {
-  return ImageFilter::ColorFilter(ColorFilter::Blend(_color, _blendMode));
-}
-
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+};
 }  // namespace tgfx

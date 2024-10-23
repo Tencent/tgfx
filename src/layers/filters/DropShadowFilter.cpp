@@ -16,30 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/DropShadowLayerFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
 
 namespace tgfx {
-std::shared_ptr<DropShadowLayerFilter> DropShadowLayerFilter::Make() {
-  return std::make_shared<DropShadowLayerFilter>();
+std::shared_ptr<DropShadowFilter> DropShadowFilter::Make(float offsetX, float offsetY,
+                                                         float blurrinessX, float blurrinessY,
+                                                         const Color& color, bool dropsShadowOnly) {
+  return std::shared_ptr<DropShadowFilter>(
+      new DropShadowFilter(offsetX, offsetY, blurrinessX, blurrinessY, color, dropsShadowOnly));
 }
 
-void DropShadowLayerFilter::setDx(float dx) {
-  if (_dx == dx) {
+void DropShadowFilter::setOffsetX(float offsetX) {
+  if (_offsetX == offsetX) {
     return;
   }
-  _dx = dx;
+  _offsetX = offsetX;
   invalidate();
 }
 
-void DropShadowLayerFilter::setDy(float dy) {
-  if (_dy == dy) {
+void DropShadowFilter::setOffsetY(float offsetY) {
+  if (_offsetY == offsetY) {
     return;
   }
-  _dy = dy;
+  _offsetY = offsetY;
   invalidate();
 }
 
-void DropShadowLayerFilter::setBlurrinessX(float blurrinessX) {
+void DropShadowFilter::setBlurrinessX(float blurrinessX) {
   if (_blurrinessX == blurrinessX) {
     return;
   }
@@ -47,7 +50,7 @@ void DropShadowLayerFilter::setBlurrinessX(float blurrinessX) {
   invalidate();
 }
 
-void DropShadowLayerFilter::setBlurrinessY(float blurrinessY) {
+void DropShadowFilter::setBlurrinessY(float blurrinessY) {
   if (_blurrinessY == blurrinessY) {
     return;
   }
@@ -55,7 +58,7 @@ void DropShadowLayerFilter::setBlurrinessY(float blurrinessY) {
   invalidate();
 }
 
-void DropShadowLayerFilter::setColor(const Color& color) {
+void DropShadowFilter::setColor(const Color& color) {
   if (_color == color) {
     return;
   }
@@ -63,7 +66,7 @@ void DropShadowLayerFilter::setColor(const Color& color) {
   invalidate();
 }
 
-void DropShadowLayerFilter::setDropsShadowOnly(bool value) {
+void DropShadowFilter::setDropsShadowOnly(bool value) {
   if (_dropsShadowOnly == value) {
     return;
   }
@@ -71,14 +74,20 @@ void DropShadowLayerFilter::setDropsShadowOnly(bool value) {
   invalidate();
 }
 
-std::shared_ptr<ImageFilter> DropShadowLayerFilter::onCreateImageFilter(float scale) {
+std::shared_ptr<ImageFilter> DropShadowFilter::onCreateImageFilter(float scale) {
   if (_dropsShadowOnly) {
-    return ImageFilter::DropShadowOnly(_dx * scale, _dy * scale, _blurrinessX * scale,
+    return ImageFilter::DropShadowOnly(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
                                        _blurrinessY * scale, _color);
   } else {
-    return ImageFilter::DropShadow(_dx * scale, _dy * scale, _blurrinessX * scale,
+    return ImageFilter::DropShadow(_offsetX * scale, _offsetY * scale, _blurrinessX * scale,
                                    _blurrinessY * scale, _color);
   }
+}
+
+DropShadowFilter::DropShadowFilter(float offsetX, float offsetY, float blurrinessX,
+                                   float blurrinessY, const Color& color, bool dropsShadowOnly)
+    : LayerFilter(), _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX),
+      _blurrinessY(blurrinessY), _color(std::move(color)), _dropsShadowOnly(dropsShadowOnly) {
 }
 
 }  // namespace tgfx

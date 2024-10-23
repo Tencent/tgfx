@@ -25,10 +25,10 @@
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/TextLayer.h"
-#include "tgfx/layers/filters/BlurLayerFilter.h"
-#include "tgfx/layers/filters/ColorBlendLayerFilter.h"
-#include "tgfx/layers/filters/ColorMatrixLayerFilter.h"
-#include "tgfx/layers/filters/DropShadowLayerFilter.h"
+#include "tgfx/layers/filters/BlendFilter.h"
+#include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/ColorMatrixFilter.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -463,16 +463,9 @@ TGFX_TEST(LayerTest, shapeLayer) {
 }
 
 TGFX_TEST(LayerTest, FilterTest) {
-  auto filter = DropShadowLayerFilter::Make();
-  filter->setDx(-80);
-  filter->setDy(-80);
-  auto filter2 = DropShadowLayerFilter::Make();
-  filter2->setDx(-40);
-  filter2->setDy(-40);
-  filter2->setColor(Color::Green());
-  auto filter3 = BlurLayerFilter::Make();
-  filter3->setBlurrinessX(40);
-  filter3->setBlurrinessY(40);
+  auto filter = DropShadowFilter::Make(-80, -80, 0, 0, Color::Black());
+  auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
+  auto filter3 = BlurFilter::Make(40, 40);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   auto device = DevicePool::Make();
   auto context = device->lockContext();
@@ -487,18 +480,13 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(186.5f, 186.5f, 1725.5f, 2229.5f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(126.5f, 126.5f, 1725.5f, 2229.5f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
   device->unlock();
 }
 
 TGFX_TEST(LayerTest, filterClip) {
-  auto filter = DropShadowLayerFilter::Make();
-  filter->setDx(-10);
-  filter->setDy(-10);
-  filter->setClipBounds(Rect::MakeLTRB(-20, -20, 200, 200));
-  filter->setColor(Color::Black());
-  filter->setDropsShadowOnly(false);
+  auto filter = DropShadowFilter::Make(-10, -10, 0, 0, Color::Black());
 
   auto image = MakeImage("resources/apitest/rotation.jpg");
   auto device = DevicePool::Make();
@@ -514,7 +502,7 @@ TGFX_TEST(LayerTest, filterClip) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(45.f, 45.f, 150.f, 150.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(45.f, 45.f, 1562.f, 2066.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterClip"));
   device->unlock();
 }
@@ -532,9 +520,7 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   Paint paint;
   auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
                                static_cast<int>(imageHeight * 2.f + padding * 3.f));
-  auto filter = BlurLayerFilter::Make();
-  filter->setBlurrinessX(15);
-  filter->setBlurrinessY(15);
+  auto filter = BlurFilter::Make(15, 15);
   auto layer = ImageLayer::Make();
   layer->setImage(image);
   layer->setMatrix(Matrix::MakeTrans(padding, padding));
@@ -545,31 +531,21 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   auto layer2 = ImageLayer::Make();
   layer2->setImage(image);
   layer2->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, padding));
-  auto filter2 = DropShadowLayerFilter::Make();
-  filter2->setBlurrinessX(15);
-  filter2->setBlurrinessY(15);
-  filter2->setColor(Color::White());
-  filter2->setDropsShadowOnly(true);
+  auto filter2 = DropShadowFilter::Make(0, 0, 15, 15, Color::White(), true);
   layer2->setFilters({filter2});
   displayList->root()->addChild(layer2);
 
   auto layer3 = ImageLayer::Make();
   layer3->setImage(image);
   layer3->setMatrix(Matrix::MakeTrans(padding, imageWidth + padding * 2));
-  auto filter3 = DropShadowLayerFilter::Make();
-  filter3->setBlurrinessX(15);
-  filter3->setBlurrinessY(15);
-  filter3->setColor(Color::White());
+  auto filter3 = DropShadowFilter::Make(0, 0, 15, 15, Color::White());
   layer3->setFilters({filter3});
   displayList->root()->addChild(layer3);
 
   auto layer4 = ImageLayer::Make();
   layer4->setImage(image);
   layer4->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, imageWidth + padding * 2));
-  auto filter4 = DropShadowLayerFilter::Make();
-  filter4->setDx(3);
-  filter4->setDy(3);
-  filter4->setColor(Color::White());
+  auto filter4 = DropShadowFilter::Make(3, 3, 0, 0, Color::White());
   layer4->setFilters({filter4});
   displayList->root()->addChild(layer4);
 
@@ -579,7 +555,7 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   device->unlock();
 
   auto src = Rect::MakeXYWH(10, 10, 10, 10);
-  auto bounds = filter4->filterBounds(src);
+  auto bounds = filter4->getImageFilter(1.0f)->filterBounds(src);
   EXPECT_EQ(bounds, Rect::MakeXYWH(10, 10, 13, 13));
   bounds = ImageFilter::DropShadowOnly(3, 3, 0, 0, Color::White())->filterBounds(src);
   EXPECT_EQ(bounds, Rect::MakeXYWH(13, 13, 10, 10));
@@ -593,10 +569,8 @@ TGFX_TEST(LayerTest, colorBlendLayerFilter) {
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width() / 4, image->height() / 4);
 
-  auto filter = ColorBlendLayerFilter::Make();
+  auto filter = BlendFilter::Make(Color::Red(), BlendMode::Multiply);
 
-  filter->setColor(Color::Red());
-  filter->setBlendMode(BlendMode::Multiply);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = ImageLayer::Make();
   layer->setImage(image);
@@ -609,7 +583,7 @@ TGFX_TEST(LayerTest, colorBlendLayerFilter) {
 }
 
 TGFX_TEST(LayerTest, colorMatrixLayerFilter) {
-  auto filter = ColorMatrixLayerFilter::Make();
+
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
@@ -622,8 +596,7 @@ TGFX_TEST(LayerTest, colorMatrixLayerFilter) {
   auto displayList = std::make_unique<DisplayList>();
   auto layer = ImageLayer::Make();
   layer->setImage(image);
-  layer->setFilters({filter});
-  filter->setMatrix(matrix);
+  auto filter = ColorMatrixFilter::Make(matrix);
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/identityMatrix"));
@@ -639,16 +612,11 @@ TGFX_TEST(LayerTest, colorMatrixLayerFilter) {
 }
 
 TGFX_TEST(LayerTest, blurLayerFilter) {
-  auto blur = BlurLayerFilter::Make();
-  blur->setBlurrinessY(130.f);
+  auto blur = BlurFilter::Make(130.f, 130.f);
   EXPECT_EQ(blur->blurrinessY(), 130.f);
-  blur->setBlurrinessX(130.f);
   EXPECT_EQ(blur->blurrinessX(), 130.f);
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
-  auto clipRect = Rect::MakeLTRB(0, 0, 100, 100);
-  blur->setClipBounds(clipRect);
-  EXPECT_EQ(blur->clipBounds(), Rect::MakeLTRB(0, 0, 100, 100));
   auto imageFilter = std::static_pointer_cast<BlurImageFilter>(blur->getImageFilter(0.5f));
   auto imageFilter2 =
       std::static_pointer_cast<BlurImageFilter>(ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
@@ -657,9 +625,7 @@ TGFX_TEST(LayerTest, blurLayerFilter) {
   EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);
   EXPECT_EQ(imageFilter->iteration, imageFilter2->iteration);
 
-  Rect rect;
-  clipRect.scale(0.5, 0.5);
-  imageFilter2->applyCropRect(Rect::MakeWH(200, 200), &rect, &clipRect);
-  EXPECT_EQ(blur->filterBounds(Rect::MakeWH(200, 200), 0.5f), rect);
+  EXPECT_EQ(blur->getImageFilter(0.5f)->filterBounds(Rect::MakeWH(200, 200)),
+            imageFilter2->filterBounds(Rect::MakeWH(200, 200)));
 }
 }  // namespace tgfx

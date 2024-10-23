@@ -21,47 +21,42 @@
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
-class DropShadowLayerFilter : public LayerFilter {
+class DropShadowFilter : public LayerFilter {
  public:
-  DropShadowLayerFilter() = default;
-  virtual ~DropShadowLayerFilter() = default;
+  virtual ~DropShadowFilter() = default;
 
   /**
    * Create a filter that draws a drop shadow under the input content.
    */
-  static std::shared_ptr<DropShadowLayerFilter> Make();
-
-  /**
-   * Set x offset of the shadow.
-   * @param dx
-   */
-  void setDx(float dx);
+  static std::shared_ptr<DropShadowFilter> Make(float offsetX, float offsetY, float blurrinessX,
+                                                float blurrinessY, const Color& color,
+                                                bool dropsShadowOnly = false);
 
   /**
    * The x offset of the shadow.
    */
-  float dx() const {
-    return _dx;
+  float offsetX() const {
+    return _offsetX;
+  }
+
+  /**
+   * Set x offset of the shadow.
+   * @param offsetX
+   */
+  void setOffsetX(float offsetX);
+
+  /**
+     * The y offset of the shadow.
+     */
+  float offsetY() const {
+    return _offsetY;
   }
 
   /**
    * Set y offset of the shadow.
-   * @param dy
+   * @param offsetY
    */
-  void setDy(float dy);
-
-  /**
-   * The y offset of the shadow.
-   */
-  float dy() const {
-    return _dy;
-  }
-
-  /**
-   * Set blur radius for the shadow, along the X axis.
-   * @param blurrinessX
-   */
-  void setBlurrinessX(float blurrinessX);
+  void setOffsetY(float offsetY);
 
   /**
    * The blur radius for the shadow, along the X axis.
@@ -71,10 +66,10 @@ class DropShadowLayerFilter : public LayerFilter {
   }
 
   /**
-   * Set blur radius for the shadow, along the Y axis.
-   * @param blurrinessY
+   * Set blur radius for the shadow, along the X axis.
+   * @param blurrinessX
    */
-  void setBlurrinessY(float blurrinessY);
+  void setBlurrinessX(float blurrinessX);
 
   /**
    * The blur radius for the shadow, along the Y axis.
@@ -84,10 +79,10 @@ class DropShadowLayerFilter : public LayerFilter {
   }
 
   /**
-   * Set the color of the shadow.
-   * @param color
+   * Set blur radius for the shadow, along the Y axis.
+   * @param blurrinessY
    */
-  void setColor(const Color& color);
+  void setBlurrinessY(float blurrinessY);
 
   /**
    * The color of the shadow.
@@ -97,9 +92,10 @@ class DropShadowLayerFilter : public LayerFilter {
   }
 
   /**
-   * Set whether the resulting image does not include the input content.
+   * Set the color of the shadow.
+   * @param color
    */
-  void setDropsShadowOnly(bool value);
+  void setColor(const Color& color);
 
   /**
    * Whether the resulting image does not include the input content.
@@ -108,12 +104,19 @@ class DropShadowLayerFilter : public LayerFilter {
     return _dropsShadowOnly;
   }
 
+  /**
+   * Set whether the resulting image does not include the input content.
+   */
+  void setDropsShadowOnly(bool value);
+
  protected:
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
-  float _dx = 0.0f;
-  float _dy = 0.0f;
+  DropShadowFilter(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
+                   const Color& color, bool dropsShadowOnly);
+  float _offsetX = 0.0f;
+  float _offsetY = 0.0f;
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
