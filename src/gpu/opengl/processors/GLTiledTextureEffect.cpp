@@ -24,16 +24,23 @@ namespace tgfx {
 std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                             TileMode tileModeX, TileMode tileModeY,
                                                             const SamplingOptions& options,
-                                                            const Matrix* uvMatrix) {
+                                                            const Matrix* uvMatrix,
+                                                            bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
   if (tileModeX == TileMode::Clamp && tileModeY == TileMode::Clamp) {
-    return TextureEffect::Make(std::move(proxy), options, uvMatrix);
+    return TextureEffect::Make(std::move(proxy), options, uvMatrix, forceAsMask);
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   SamplerState samplerState(tileModeX, tileModeY, options);
-  return std::make_unique<GLTiledTextureEffect>(std::move(proxy), samplerState, matrix);
+  auto isAlphaOnly = proxy->isAlphaOnly();
+  std::unique_ptr<FragmentProcessor> processor =
+      std::make_unique<GLTiledTextureEffect>(std::move(proxy), samplerState, matrix);
+  if (forceAsMask && !isAlphaOnly) {
+    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
+  }
+  return processor;
 }
 
 GLTiledTextureEffect::GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,

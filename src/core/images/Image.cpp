@@ -89,10 +89,6 @@ std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   return image->makeOriented(codec->orientation());
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
-  return GeneratorImage::MakeFrom(std::move(generator));
-}
-
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
   if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
     return nullptr;
@@ -114,11 +110,6 @@ std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColo
   return MakeFrom(std::move(buffer));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                       const Matrix* matrix) {
-  return PictureImage::MakeFrom(std::move(picture), width, height, matrix);
-}
-
 std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));
@@ -127,10 +118,6 @@ std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColo
 std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));
-}
-
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
-  return BufferImage::MakeFrom(std::move(imageBuffer));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,

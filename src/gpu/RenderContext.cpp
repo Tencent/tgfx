@@ -182,22 +182,6 @@ void RenderContext::drawPath(const Path& path, const MCState& state, const FillS
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
-static std::unique_ptr<FragmentProcessor> CreateMaskFP(std::shared_ptr<TextureProxy> textureProxy,
-                                                       const Matrix* uvMatrix = nullptr) {
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  auto isAlphaOnly = textureProxy->isAlphaOnly();
-  auto processor = TextureEffect::Make(std::move(textureProxy), {}, uvMatrix);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  if (!isAlphaOnly) {
-    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
-  }
-  return processor;
-}
-
 std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& path,
                                                                   const Matrix& viewMatrix,
                                                                   const Stroke* stroke) {
@@ -220,7 +204,7 @@ std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& pa
   auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy(uniqueKey, rasterizer, false, renderFlags);
-  return CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
+  return TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
 }
 
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -290,7 +274,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                          rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
-  auto processor = CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
+  auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
   if (processor == nullptr) {
     return;
   }
@@ -312,7 +296,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& s
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
+  auto alphaOnly = opContext->renderTarget()->format() == PixelFormat::ALPHA_8;
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, alphaOnly);
   Matrix invertMatrix = {};
   if (!viewMatrix.invert(&invertMatrix)) {
     return;
@@ -456,17 +441,13 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, opContext->renderTarget());
   scissorRect->roundOut();
-  auto texture = getClipTexture(clip);
-  if (texture == nullptr) {
+  auto textureProxy = getClipTexture(clip);
+  if (textureProxy == nullptr) {
     return nullptr;
   }
   auto uvMatrix = viewMatrix;
   uvMatrix.postTranslate(-clipBounds.left, -clipBounds.top);
-  auto maskEffect = TextureEffect::Make(texture, {}, &uvMatrix);
-  if (!texture->isAlphaOnly()) {
-    maskEffect = FragmentProcessor::MulInputByChildAlpha(std::move(maskEffect));
-  }
-  return maskEffect;
+  return TextureEffect::Make(std::move(textureProxy), {}, &uvMatrix, true);
 }
 
 void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds,

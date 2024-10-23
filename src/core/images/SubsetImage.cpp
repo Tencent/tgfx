@@ -63,7 +63,8 @@ std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix);
+  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix,
+                                  source->isAlphaOnly());
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {

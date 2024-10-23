@@ -56,11 +56,10 @@ class Picture {
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 
-  std::shared_ptr<Image> asImage(int width, int height, const Matrix* matrix) const;
-
   friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
+  friend class Image;
   friend class PictureImage;
   friend class Canvas;
 };

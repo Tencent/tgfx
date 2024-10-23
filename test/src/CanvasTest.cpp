@@ -862,8 +862,10 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(subsetImage->source == image);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100, &matrix);
+  EXPECT_FALSE(pictureImage->isComplex());
   EXPECT_FALSE(pictureImage == image);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100);
+  EXPECT_FALSE(pictureImage->isComplex());
   EXPECT_FALSE(pictureImage == image);
 
   canvas = recorder.beginRecording();
@@ -875,6 +877,8 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix.postTranslate(-100, -100);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix);
   EXPECT_TRUE(pictureImage == image);
+  pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, true);
+  EXPECT_FALSE(pictureImage == image);
 
   surface = Surface::Make(context, pictureImage->width(), pictureImage->height());
   canvas = surface->getCanvas();

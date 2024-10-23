@@ -28,7 +28,8 @@ class TextureEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
                                                  const SamplingOptions& sampling = {},
-                                                 const Matrix* uvMatrix = nullptr);
+                                                 const Matrix* uvMatrix = nullptr,
+                                                 bool forceAsMask = false);
 
   static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
                                                        const Point& alphaStart,

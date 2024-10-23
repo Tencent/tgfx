@@ -24,28 +24,84 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-std::shared_ptr<Image> PictureImage::MakeFrom(std::shared_ptr<Picture> picture, int width,
-                                              int height, const Matrix* matrix) {
+static std::shared_ptr<Image> GetEquivalentImage(const Record* record, int width, int height,
+                                                 bool alphaOnly, const Matrix* matrix) {
+  if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
+    return nullptr;
+  }
+  auto imageRecord = static_cast<const DrawImage*>(record);
+  auto image = imageRecord->image;
+  if (image->isAlphaOnly() != alphaOnly) {
+    return nullptr;
+  }
+  auto& style = imageRecord->style;
+  if (style.colorFilter || style.maskFilter) {
+    return nullptr;
+  }
+  auto imageMatrix = imageRecord->state.matrix;
+  if (matrix) {
+    imageMatrix.postConcat(*matrix);
+  }
+  if (!imageMatrix.isTranslate()) {
+    return nullptr;
+  }
+  auto offsetX = imageMatrix.getTranslateX();
+  auto offsetY = imageMatrix.getTranslateY();
+  if (roundf(offsetX) != offsetX || roundf(offsetY) != offsetY) {
+    return nullptr;
+  }
+  auto subset =
+      Rect::MakeXYWH(-offsetX, -offsetY, static_cast<float>(width), static_cast<float>(height));
+  auto imageBounds = record->type() == RecordType::DrawImageRect
+                         ? static_cast<const DrawImageRect*>(imageRecord)->rect
+                         : Rect::MakeWH(image->width(), image->height());
+  if (!imageBounds.contains(subset)) {
+    return nullptr;
+  }
+  auto clip = imageRecord->state.clip;
+  if (clip.isEmpty() && clip.isInverseFillType()) {
+    return image->makeSubset(subset);
+  }
+  Rect clipRect = {};
+  if (!clip.isRect(&clipRect)) {
+    return nullptr;
+  }
+  if (matrix) {
+    if (!matrix->rectStaysRect()) {
+      return nullptr;
+    }
+    matrix->mapRect(&clipRect);
+  }
+  if (!clipRect.contains(Rect::MakeWH(width, height))) {
+    return nullptr;
+  }
+  return image->makeSubset(subset);
+}
+
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
+                                       const Matrix* matrix, bool alphaOnly) {
   if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
   if (matrix && !matrix->invertible()) {
     return nullptr;
   }
-  auto pictureImage = picture->asImage(width, height, matrix);
-  if (pictureImage) {
-    return pictureImage;
+  if (picture->records.size() == 1) {
+    auto image = GetEquivalentImage(picture->records[0], width, height, alphaOnly, matrix);
+    if (image) {
+      return image;
+    }
   }
-  auto image = std::shared_ptr<PictureImage>(
-      new PictureImage(UniqueKey::Make(), std::move(picture), width, height, matrix));
+  auto image = std::make_shared<PictureImage>(UniqueKey::Make(), std::move(picture), width, height,
+                                              matrix, alphaOnly);
   image->weakThis = image;
   return image;
 }
 
 PictureImage::PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width,
-                           int height, const Matrix* matrix)
+                           int height, const Matrix* matrix, bool alphaOnly)
     : ResourceImage(std::move(uniqueKey)), picture(std::move(picture)), _width(width),
-      _height(height) {
+      _height(height), alphaOnly(alphaOnly) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -61,7 +117,8 @@ std::shared_ptr<TextureProxy> PictureImage::onLockTextureProxy(const TPArgs& arg
   if (textureProxy != nullptr) {
     return textureProxy;
   }
-  auto format = PixelFormat::RGBA_8888;
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   textureProxy =
       proxyProvider->createTextureProxy(args.uniqueKey, _width, _height, format, args.mipmapped,
                                         ImageOrigin::TopLeft, args.renderFlags);

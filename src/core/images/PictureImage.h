@@ -26,8 +26,8 @@ namespace tgfx {
  */
 class PictureImage : public ResourceImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                         const Matrix* matrix = nullptr);
+  PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width, int height,
+               const Matrix* matrix = nullptr, bool alphaOnly = false);
 
   ~PictureImage() override;
 
@@ -40,7 +40,7 @@ class PictureImage : public ResourceImage {
   }
 
   bool isAlphaOnly() const override {
-    return false;
+    return alphaOnly;
   }
 
  protected:
@@ -51,8 +51,6 @@ class PictureImage : public ResourceImage {
   int _width = 0;
   int _height = 0;
   Matrix* matrix = nullptr;
-
-  PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width, int height,
-               const Matrix* matrix = nullptr);
+  bool alphaOnly = false;
 };
 }  // namespace tgfx

@@ -26,7 +26,7 @@ namespace tgfx {
  */
 class BufferImage : public ResourceImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> buffer);
+  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
 
   int width() const override {
     return imageBuffer->width();
@@ -45,7 +45,5 @@ class BufferImage : public ResourceImage {
 
  private:
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-
-  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
 };
 }  // namespace tgfx
