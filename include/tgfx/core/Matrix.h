@@ -728,15 +728,20 @@ class Matrix {
   float getMaxScale() const;
 
   /**
+   * Returns the scale components of the Matrix along the x and y axes. Both components are
+   * absolute values.
+   */
+  Point getAxisScales() const;
+
+  /**
    * Returns true if the Matrix contains a non-identity scale component.
    */
   bool hasNonIdentityScale() const;
 
   /**
-   * Returns the scale components of the Matrix along the x and y axes. Both components are
-   * absolute values.
+   * Returns true if the Matrix is identity or contains only translation.
    */
-  Point getAxisScales() const;
+  bool isTranslate() const;
 
   /**
    * Returns true if all elements of the matrix are finite. Returns false if any element is

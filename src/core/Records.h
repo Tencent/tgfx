@@ -131,8 +131,7 @@ class DrawImage : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawImageRect(image, sampling, Rect::MakeWH(image->width(), image->height()), state,
-                           style);
+    context->drawImage(image, sampling, state, style);
   }
 
   std::shared_ptr<Image> image;
@@ -143,7 +142,7 @@ class DrawImage : public Record {
 
 class DrawImageRect : public DrawImage {
  public:
-  DrawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Rect& rect,
+  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
                 MCState state, FillStyle style)
       : DrawImage(std::move(image), sampling, std::move(state), std::move(style)), rect(rect) {
   }
@@ -153,7 +152,7 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawImageRect(image, sampling, rect, state, style);
+    context->drawImageRect(image, rect, sampling, state, style);
   }
 
   Rect rect;

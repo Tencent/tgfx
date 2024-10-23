@@ -24,58 +24,35 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-static bool IsEmptyPaint(const Paint* paint) {
-  if (!paint) {
-    return true;
-  }
-  if (paint->getAlpha() != 1.0f) {
-    return false;
-  }
-  if (paint->getImageFilter() != nullptr) {
-    return false;
-  }
-  if (paint->getColorFilter() != nullptr) {
-    return false;
-  }
-  if (paint->getMaskFilter() != nullptr) {
-    return false;
-  }
-  return true;
-}
 std::shared_ptr<Image> PictureImage::MakeFrom(std::shared_ptr<Picture> picture, int width,
-                                              int height, const Matrix* matrix,
-                                              const Paint* paint) {
-  if (picture == nullptr || width <= 0 || height <= 0 || (paint && paint->nothingToDraw())) {
+                                              int height, const Matrix* matrix) {
+  if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-
-  if (IsEmptyPaint(paint)) {
-    auto image = picture->asImage(width, height, matrix);
-    if (image) {
-      return image;
-    }
+  if (matrix && !matrix->invertible()) {
+    return nullptr;
+  }
+  auto pictureImage = picture->asImage(width, height, matrix);
+  if (pictureImage) {
+    return pictureImage;
   }
   auto image = std::shared_ptr<PictureImage>(
-      new PictureImage(UniqueKey::Make(), std::move(picture), width, height, matrix, paint));
+      new PictureImage(UniqueKey::Make(), std::move(picture), width, height, matrix));
   image->weakThis = image;
   return image;
 }
 
 PictureImage::PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width,
-                           int height, const Matrix* matrix, const Paint* paint)
+                           int height, const Matrix* matrix)
     : ResourceImage(std::move(uniqueKey)), picture(std::move(picture)), _width(width),
       _height(height) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
-  if (paint) {
-    this->paint = new Paint(*paint);
-  }
 }
 
 PictureImage::~PictureImage() {
   delete matrix;
-  delete paint;
 }
 
 std::shared_ptr<TextureProxy> PictureImage::onLockTextureProxy(const TPArgs& args) const {
@@ -88,17 +65,14 @@ std::shared_ptr<TextureProxy> PictureImage::onLockTextureProxy(const TPArgs& arg
   textureProxy =
       proxyProvider->createTextureProxy(args.uniqueKey, _width, _height, format, args.mipmapped,
                                         ImageOrigin::TopLeft, args.renderFlags);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
   auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
-  auto renderFlags = args.renderFlags | RenderFlags::DisableCache;
-  auto surface = Surface::MakeFrom(renderTarget, renderFlags);
-  if (surface == nullptr) {
+  if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto canvas = surface->getCanvas();
-  canvas->drawPicture(picture, matrix, paint);
+  auto renderFlags = args.renderFlags | RenderFlags::DisableCache;
+  RenderContext renderContext(renderTarget, renderFlags);
+  MCState replayState(matrix ? *matrix : Matrix::I());
+  picture->playback(&renderContext, replayState);
   auto drawingManager = args.context->drawingManager();
   drawingManager->addTextureResolveTask(renderTarget);
   return textureProxy;

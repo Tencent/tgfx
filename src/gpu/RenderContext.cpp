@@ -223,8 +223,18 @@ std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& pa
   return CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
 }
 
-void RenderContext::drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                  const Rect& rect, const MCState& state, const FillStyle& style) {
+void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                              const MCState& state, const FillStyle& style) {
+  if (image == nullptr) {
+    return;
+  }
+  auto rect = Rect::MakeWH(image->width(), image->height());
+  return drawImageRect(std::move(image), rect, sampling, state, style);
+}
+
+void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+                                  const SamplingOptions& sampling, const MCState& state,
+                                  const FillStyle& style) {
   if (image == nullptr) {
     return;
   }
@@ -289,30 +299,26 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
+void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+  if (picture != nullptr) {
+    picture->playback(this, state);
+  }
+}
+
 void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                               const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  auto bounds = picture->getBounds(state.matrix);
+  auto viewMatrix = filter ? Matrix::I() : state.matrix;
+  auto bounds = picture->getBounds(viewMatrix);
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto renderTarget = opContext->renderTarget()->makeRenderTargetProxy(width, height);
-  if (renderTarget == nullptr) {
-    return;
-  }
-  RenderContext renderContext(renderTarget, renderFlags);
-  auto viewMatrix = state.matrix;
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  MCState replayState(viewMatrix);
-  picture->playback(&renderContext, replayState);
-  if (renderTarget->sampleCount() > 1) {
-    auto drawingManager = getContext()->drawingManager();
-    drawingManager->addTextureResolveTask(renderTarget);
-  }
-  auto image = TextureImage::Wrap(renderTarget->getTextureProxy());
-  if (image == nullptr) {
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
+  Matrix invertMatrix = {};
+  if (!viewMatrix.invert(&invertMatrix)) {
     return;
   }
   MCState drawState = state;
-  drawState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  drawState.matrix.preConcat(invertMatrix);
   if (filter) {
     auto offset = Point::Zero();
     image = image->makeWithFilter(std::move(filter), &offset);
@@ -321,7 +327,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& s
     }
     drawState.matrix.preTranslate(offset.x, offset.y);
   }
-  drawImageRect(std::move(image), {}, bounds, drawState, style);
+  drawImage(std::move(image), {}, drawState, style);
 }
 
 void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -346,7 +352,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), {}, rect, glyphState, style);
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
     }
   }
 }

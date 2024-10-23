@@ -325,7 +325,7 @@ class Canvas {
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
-                 std::shared_ptr<ImageFilter> filter = nullptr);
+                 std::shared_ptr<ImageFilter> imageFilter = nullptr);
   void resetMCState();
 
   friend class Surface;

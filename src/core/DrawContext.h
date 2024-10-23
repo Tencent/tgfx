@@ -50,32 +50,44 @@ class DrawContext {
   virtual void clear() = 0;
 
   /**
-   * Draws a rectangle with the specified FillStyle.
+   * Draws a rectangle with the specified MCState and FillStyle.
    */
   virtual void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) = 0;
 
   /**
-   * Draws a rounded rectangle with the specified FillStyle.
+   * Draws a rounded rectangle with the specified MCState and FillStyle.
    */
   virtual void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) = 0;
 
   /**
-   * Draws a complex Path with the specified FillStyle and optional Stroke.
+   * Draws a complex Path with the specified MCState, FillStyle and optional Stroke.
    */
   virtual void drawPath(const Path& path, const MCState& state, const FillStyle& style,
                         const Stroke* stroke) = 0;
 
   /**
-   * Draws a rectangle filled with the specified Image, sampling options, and FillStyle.
+   * Draws an Image with the specified SamplingOptions, MCState, and FillStyle.
    */
-  virtual void drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                             const Rect& rect, const MCState& state, const FillStyle& style) = 0;
+  virtual void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                         const MCState& state, const FillStyle& style) = 0;
 
   /**
-   * Draws a GlyphRunList with the specified FillStyle and optional Stroke.
+   * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and FillStyle.
+   */
+  virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+                             const SamplingOptions& sampling, const MCState& state,
+                             const FillStyle& style) = 0;
+
+  /**
+   * Draws a GlyphRunList with the specified MCState, FillStyle, and optional Stroke.
    */
   virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                                 const FillStyle& style, const Stroke* stroke) = 0;
+
+  /**
+   * Draws a Picture with the specified MCState.
+   */
+  virtual void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) = 0;
 
   /**
    * Draws a Picture into an offscreen layer. This offscreen layer is then passed to the image
@@ -84,10 +96,5 @@ class DrawContext {
    */
   virtual void drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                          const FillStyle& style, std::shared_ptr<ImageFilter> filter) = 0;
-
-  /**
-   * Draws a Picture.
-   */
-  virtual void drawPicture(std::shared_ptr<Picture> picture, const MCState& state);
 };
 }  // namespace tgfx

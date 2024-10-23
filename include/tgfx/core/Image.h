@@ -105,20 +105,18 @@ class Image {
 
   /**
    * Creates an Image from the given picture with the specified width and height. The picture will
-   * be drawn onto the Image using the provided matrix and paint. The picture is not immediately
-   * turned into raster pixels; instead, the Image holds a reference to the picture and defers
-   * rasterization until it is actually required. If the picture contains a single Image and the
-   * drawing result matches its content, the Image will be returned directly.
+   * be drawn onto the Image using the provided matrix. The picture is not immediately turned into
+   * raster pixels; instead, the returned Image holds a reference to the picture and defers
+   * rasterization until it is actually required. Note: This method may return a different type of
+   * Image other than PictureImage if the picture is simple enough.
    * @param picture A stream of drawing commands.
    * @param width The width of the Image.
    * @param height The height of the Image.
    * @param matrix A Matrix to apply transformations to the picture.
-   * @param paint A Paint to apply transparency, filtering, etc.
-   * @return An Image that draws the picture with the specified dimensions, matrix, and paint.
+   * @return An Image that draws the picture with the specified dimensions and matrix.
    */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                         const Matrix* matrix = nullptr,
-                                         const Paint* paint = nullptr);
+                                         const Matrix* matrix = nullptr);
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns

@@ -79,7 +79,7 @@ std::shared_ptr<Image> Picture::asImage(int width, int height, const Matrix* mat
   }
   auto imageRecord = static_cast<DrawImage*>(record);
   auto image = imageRecord->image;
-  if (image->width() != width || image->height() != height) {
+  if (image->isAlphaOnly()) {
     return nullptr;
   }
   auto& style = imageRecord->style;
@@ -90,23 +90,33 @@ std::shared_ptr<Image> Picture::asImage(int width, int height, const Matrix* mat
   if (matrix) {
     imageMatrix.postConcat(*matrix);
   }
-  if (!imageMatrix.isIdentity()) {
+  if (!imageMatrix.isTranslate()) {
     return nullptr;
   }
+  auto offsetX = imageMatrix.getTranslateX();
+  auto offsetY = imageMatrix.getTranslateY();
+  if (roundf(offsetX) != offsetX || roundf(offsetY) != offsetY) {
+    return nullptr;
+  }
+  auto subset =
+      Rect::MakeXYWH(-offsetX, -offsetY, static_cast<float>(width), static_cast<float>(height));
   auto clip = imageRecord->state.clip;
   if (clip.isEmpty() && clip.isInverseFillType()) {
-    return image;
+    return image->makeSubset(subset);
   }
-  Rect rect = {};
-  if (!clip.isRect(&rect)) {
+  Rect clipRect = {};
+  if (!clip.isRect(&clipRect)) {
     return nullptr;
   }
   if (matrix) {
-    matrix->mapRect(&rect);
+    if (!matrix->rectStaysRect()) {
+      return nullptr;
+    }
+    matrix->mapRect(&clipRect);
   }
-  if (rect != Rect::MakeWH(width, height)) {
+  if (clipRect != Rect::MakeWH(width, height)) {
     return nullptr;
   }
-  return image;
+  return image->makeSubset(subset);
 }
 }  // namespace tgfx

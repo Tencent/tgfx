@@ -115,8 +115,8 @@ std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColo
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                       const Matrix* matrix, const Paint* paint) {
-  return PictureImage::MakeFrom(std::move(picture), width, height, matrix, paint);
+                                       const Matrix* matrix) {
+  return PictureImage::MakeFrom(std::move(picture), width, height, matrix);
 }
 
 std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {

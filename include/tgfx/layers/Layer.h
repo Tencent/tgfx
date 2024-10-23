@@ -234,14 +234,9 @@ class Layer {
   /**
    * Returns the layer used as a mask for the calling layer. For masking to work (allowing scaling
    * or moving), the mask must be in an active part of the display list. However, the mask layer
-   * itself will not be drawn. When layers are cached by setting the cacheAsBitmap property to true,
-   * both the mask and the layer being masked must be part of the same cached bitmap. If the layer
-   * is cached, the mask must be a child of the layer. If an ancestor of the display object on the
-   * display list is cached, the mask must be a child of that ancestor or one of its descendants.
-   * If more than one ancestor of the masked layer is cached, the mask must be a descendant of the
-   * cached container closest to the masked layer in the display list. Note: A single mask object
-   * cannot be used to mask more than one layer. When the mask is assigned to a second layer, it is
-   * removed as the mask of the first object, and that object's mask property becomes nullptr.
+   * itself will not be drawn. Note: A single mask object cannot be used to mask more than one
+   * layer. When the mask is assigned to a second layer, it is removed as the mask of the first
+   * object, and that object's mask property becomes nullptr.
    */
   std::shared_ptr<Layer> mask() const {
     return _mask;

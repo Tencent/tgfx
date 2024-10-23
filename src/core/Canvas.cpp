@@ -311,9 +311,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
     }
     state.matrix.preTranslate(offset.x, offset.y);
   }
-  auto rect = Rect::MakeWH(image->width(), image->height());
   auto style = CreateFillStyle(paint);
-  drawContext->drawImageRect(std::move(image), sampling, rect, state, style);
+  drawContext->drawImage(std::move(image), sampling, state, style);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
@@ -371,15 +370,15 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 }
 
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
-                       const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  if (picture->records.size() == 1) {
-    LayerUnrollContext layerContext(drawContext, style, filter);
+                       const FillStyle& style, std::shared_ptr<ImageFilter> imageFilter) {
+  if (imageFilter == nullptr && picture->records.size() == 1) {
+    LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
     if (layerContext.hasUnrolled()) {
       return;
     }
   }
-  drawContext->drawLayer(std::move(picture), state, style, std::move(filter));
+  drawContext->drawLayer(std::move(picture), state, style, std::move(imageFilter));
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
@@ -403,7 +402,11 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     if (colors) {
       glyphStyle.color = colors[i].premultiply();
     }
-    drawContext->drawImageRect(atlas, sampling, rect, state, glyphStyle);
+    if (rect == atlasRect) {
+      drawContext->drawImage(atlas, sampling, state, glyphStyle);
+    } else {
+      drawContext->drawImageRect(atlas, rect, sampling, state, glyphStyle);
+    }
   }
 }
 }  // namespace tgfx

@@ -58,10 +58,10 @@ class Picture {
 
   std::shared_ptr<Image> asImage(int width, int height, const Matrix* matrix) const;
 
-  friend class DrawContext;
+  friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
-  friend class Canvas;
   friend class PictureImage;
+  friend class Canvas;
 };
 }  // namespace tgfx

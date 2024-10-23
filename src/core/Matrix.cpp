@@ -395,20 +395,6 @@ float Matrix::getMaxScale() const {
   return -1.0f;
 }
 
-bool Matrix::hasNonIdentityScale() const {
-  double a = values[SCALE_X];
-  double b = values[SKEW_Y];
-  if (sqrt(a * a + b * b) != 1.0) {
-    return true;
-  }
-  double c = values[SKEW_X];
-  double d = values[SCALE_Y];
-  if (sqrt(c * c + d * d) != 1.0) {
-    return true;
-  }
-  return false;
-}
-
 Point Matrix::getAxisScales() const {
   Point scale = {};
   double a = values[SCALE_X];
@@ -456,6 +442,24 @@ bool Matrix::getMinMaxScaleFactors(float* results) const {
   }
   results[1] = sqrtf(results[1]);
   return true;
+}
+
+bool Matrix::hasNonIdentityScale() const {
+  double a = values[SCALE_X];
+  double b = values[SKEW_Y];
+  if (sqrt(a * a + b * b) != 1.0) {
+    return true;
+  }
+  double c = values[SKEW_X];
+  double d = values[SCALE_Y];
+  if (sqrt(c * c + d * d) != 1.0) {
+    return true;
+  }
+  return false;
+}
+
+bool Matrix::isTranslate() const {
+  return values[SCALE_X] == 1 && values[SCALE_Y] == 1 && values[SKEW_X] == 0 && values[SKEW_Y] == 0;
 }
 
 bool Matrix::isFinite() const {
