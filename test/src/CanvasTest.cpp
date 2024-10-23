@@ -860,13 +860,16 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(pictureImage->isComplex());
   auto subsetImage = std::static_pointer_cast<SubsetImage>(pictureImage);
   EXPECT_TRUE(subsetImage->source == image);
+  EXPECT_EQ(singleImageRecord.use_count(), 1);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100, &matrix);
   EXPECT_FALSE(pictureImage->isComplex());
+  EXPECT_EQ(singleImageRecord.use_count(), 2);
   EXPECT_FALSE(pictureImage == image);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100);
   EXPECT_FALSE(pictureImage->isComplex());
   EXPECT_FALSE(pictureImage == image);
+  EXPECT_EQ(singleImageRecord.use_count(), 2);
 
   canvas = recorder.beginRecording();
   canvas->scale(0.5f, 0.5f);
@@ -893,8 +896,14 @@ TGFX_TEST(CanvasTest, Picture) {
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
+  EXPECT_EQ(textRecord.use_count(), 1);
   ASSERT_TRUE(textImage != nullptr);
   EXPECT_FALSE(textImage->isComplex());
+
+  surface = Surface::Make(context, textImage->width(), textImage->height());
+  canvas = surface->getCanvas();
+  canvas->drawImage(textImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Text"));
 
   canvas = recorder.beginRecording();
   canvas->drawPath(path, paint);
@@ -904,8 +913,14 @@ TGFX_TEST(CanvasTest, Picture) {
   width = static_cast<int>(bounds.width());
   height = static_cast<int>(bounds.height());
   auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
+  EXPECT_EQ(patRecord.use_count(), 1);
   ASSERT_TRUE(pathImage != nullptr);
   EXPECT_FALSE(pathImage->isComplex());
+
+  surface = Surface::Make(context, pathImage->width(), pathImage->height());
+  canvas = surface->getCanvas();
+  canvas->drawImage(pathImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
 
   device->unlock();
 }
