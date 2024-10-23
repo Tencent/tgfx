@@ -72,12 +72,13 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Samplin
   }
 }
 
-void RecordingContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle& style,
-                                    const Stroke* stroke) {
+void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                        const MCState& state, const FillStyle& style,
+                                        const Stroke* stroke) {
   if (stroke && stroke->width > 0) {
-    records.push_back(new StrokeGlyphRun(std::move(glyphRun), state, style, *stroke));
+    records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), state, style, *stroke));
   } else {
-    records.push_back(new DrawGlyphRun(std::move(glyphRun), state, style));
+    records.push_back(new DrawGlyphRunList(std::move(glyphRunList), state, style));
   }
 }
 

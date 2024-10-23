@@ -2,7 +2,7 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
-        "Picture": "fa90eb0",
+        "Picture": "7fd9cd9",
         "PictureImage": "fa90eb0",
         "drawImage": "8cb853c",
         "filter_mode_linear": "d010fb8",
@@ -31,7 +31,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
-        "SimpleText": "74f94c4"
+        "SimpleText": "7fd9cd9"
     },
     "FilterTest": {
         "ComposeColorFilter": "f710e29",
@@ -57,7 +57,7 @@
         "dropShadow": "a1605b2",
         "filterClip": "a1605b2",
         "filterTest": "a1605b2",
-        "getBounds": "dec1b56",
+        "getBounds": "8a26de7",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9"

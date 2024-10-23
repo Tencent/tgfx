@@ -20,7 +20,7 @@
 
 #include <stack>
 #include "core/FillStyle.h"
-#include "core/GlyphRun.h"
+#include "core/GlyphRunList.h"
 #include "core/MCState.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
@@ -72,10 +72,10 @@ class DrawContext {
                              const Rect& rect, const MCState& state, const FillStyle& style) = 0;
 
   /**
-   * Draws a GlyphRun with the specified FillStyle and optional Stroke.
+   * Draws a GlyphRunList with the specified FillStyle and optional Stroke.
    */
-  virtual void drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle& style,
-                            const Stroke* stroke) = 0;
+  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                                const FillStyle& style, const Stroke* stroke) = 0;
 
   /**
    * Draws a Picture into an offscreen layer. This offscreen layer is then passed to the image

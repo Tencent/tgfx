@@ -19,7 +19,6 @@
 #include "RenderContext.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
-#include "core/SimpleTextBlob.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/StrokeKey.h"
 #include "gpu/DrawingManager.h"
@@ -250,13 +249,14 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const SamplingOp
   }
 }
 
-void RenderContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle& style,
-                                 const Stroke* stroke) {
-  if (glyphRun.empty()) {
+void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                     const MCState& state, const FillStyle& style,
+                                     const Stroke* stroke) {
+  if (glyphRunList == nullptr) {
     return;
   }
-  if (glyphRun.hasColor()) {
-    drawColorGlyphs(glyphRun, state, style);
+  if (glyphRunList->hasColor()) {
+    drawColorGlyphs(std::move(glyphRunList), state, style);
     return;
   }
   auto maxScale = state.matrix.getMaxScale();
@@ -265,7 +265,7 @@ void RenderContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const 
   }
   auto scaleMatrix = Matrix::MakeScale(maxScale);
   // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-  auto bounds = glyphRun.getBounds(scaleMatrix, stroke);
+  auto bounds = glyphRunList->getBounds(scaleMatrix, stroke);
   auto localBounds = bounds;
   localBounds.scale(1.0f / maxScale, 1.0f / maxScale);
   localBounds = clipLocalBounds(localBounds, state);
@@ -276,8 +276,7 @@ void RenderContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const 
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto textBlob = std::make_shared<SimpleTextBlob>(std::move(glyphRun));
-  auto rasterizer = Rasterizer::MakeFrom(std::move(textBlob), ISize::Make(width, height),
+  auto rasterizer = Rasterizer::MakeFrom(std::move(glyphRunList), ISize::Make(width, height),
                                          rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
@@ -325,28 +324,30 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& s
   drawImageRect(std::move(image), {}, bounds, drawState, style);
 }
 
-void RenderContext::drawColorGlyphs(const GlyphRun& glyphRun, const MCState& state,
-                                    const FillStyle& style) {
+void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
+                                    const MCState& state, const FillStyle& style) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
-  auto font = glyphRun.font();
-  font = font.makeWithSize(font.getSize() * scale);
-  auto glyphCount = glyphRun.runSize();
-  auto& glyphIDs = glyphRun.glyphIDs();
-  auto& positions = glyphRun.positions();
-  auto glyphState = state;
-  for (size_t i = 0; i < glyphCount; ++i) {
-    const auto& glyphID = glyphIDs[i];
-    const auto& position = positions[i];
-    auto glyphImage = font.getImage(glyphID, &glyphState.matrix);
-    if (glyphImage == nullptr) {
-      continue;
+  for (auto& glyphRun : glyphRunList->glyphRuns()) {
+    auto font = glyphRun.font;
+    font = font.makeWithSize(font.getSize() * scale);
+    auto& glyphIDs = glyphRun.glyphs;
+    auto glyphCount = glyphIDs.size();
+    auto& positions = glyphRun.positions;
+    auto glyphState = state;
+    for (size_t i = 0; i < glyphCount; ++i) {
+      const auto& glyphID = glyphIDs[i];
+      const auto& position = positions[i];
+      auto glyphImage = font.getImage(glyphID, &glyphState.matrix);
+      if (glyphImage == nullptr) {
+        continue;
+      }
+      glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
+      glyphState.matrix.postConcat(viewMatrix);
+      auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
+      drawImageRect(std::move(glyphImage), {}, rect, glyphState, style);
     }
-    glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
-    glyphState.matrix.postConcat(viewMatrix);
-    auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-    drawImageRect(std::move(glyphImage), {}, rect, glyphState, style);
   }
 }
 
