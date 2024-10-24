@@ -668,6 +668,11 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
 }
 
 
+/**
+ * The schematic diagram is as follows:
+ * https://www.geogebra.org/graphing/et36u73x
+ * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/getLayersUnderPoint.png
+ */
 TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -701,8 +706,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   path.lineTo(50, 125);
   path.close();
   shaperLayer->setPath(path);
-  auto filleStyle = SolidColor::Make(Color::FromRGBA(255, 0, 0, 127));
-  shaperLayer->setFillStyle(filleStyle);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(255, 0, 0, 127));
+  shaperLayer->setFillStyle(fillStyle);
   shaperLayer->setMatrix(Matrix::MakeTrans(100.0f, 0.0f) * Matrix::MakeScale(2.0f, 2.0f));
   rootLayer->addChild(shaperLayer);
   auto shaperLayerBounds = shaperLayer->getBounds();
@@ -723,6 +728,21 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top, textLayerBounds.right,
          textLayerBounds.bottom);
 
+  auto shaperLayer2 = ShapeLayer::Make();
+  shaperLayer2->setName("shaper_layer2");
+  shaperLayer2->setMatrix(Matrix::MakeTrans(550.0f, 150.0f) * Matrix::MakeRotate(45.0f));
+  auto rect2 = Rect::MakeXYWH(0, 0, 80, 80);
+  Path path2 = {};
+  path2.addRect(rect2);
+  shaperLayer2->setPath(path2);
+  auto fillStyle2 = SolidColor::Make(Color::FromRGBA(175, 27, 193, 255));
+  shaperLayer2->setFillStyle(fillStyle2);
+  rootLayer->addChild(shaperLayer2);
+  auto shaperLayer2Bounds = shaperLayer2->getBounds();
+  shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);
+  printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
+         shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
+
   auto rootLayerBounds = rootLayer->getBounds();
   printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top, rootLayerBounds.right,
          rootLayerBounds.bottom);
@@ -736,6 +756,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   canvas->drawRect(imageLayerBounds, paint);
   canvas->drawRect(shaperLayerBounds, paint);
   canvas->drawRect(textLayerBounds, paint);
+  canvas->drawRect(shaperLayer2Bounds, paint);
   paint.setColor(Color::Red());
   canvas->drawRect(rootLayerBounds, paint);
 
@@ -857,6 +878,32 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   printf("\n");
   EXPECT_EQ(static_cast<int>(layers.size()), 2);
   EXPECT_EQ(layerNameJoin, "image_layer|root_layer|");
+
+  // P10(511.6931040682015, 171.034333482391) is in the shaper_layer2, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(511.6931040682015f, 171.034333482391f);
+  canvas->drawCircle(511.6931040682015f, 171.034333482391f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 2);
+  EXPECT_EQ(layerNameJoin, "shaper_layer2|root_layer|");
+
+  // P11(540, 200) is in the shaper_layer2, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(540.0f, 200.0f);
+  canvas->drawCircle(540.0f, 200.0f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 2);
+  EXPECT_EQ(layerNameJoin, "shaper_layer2|root_layer|");
 
   context->submit();
   Baseline::Compare(surface, "LayerTest/getLayersUnderPoint");
