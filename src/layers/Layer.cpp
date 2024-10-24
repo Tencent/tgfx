@@ -214,8 +214,10 @@ int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
   return doGetChildIndex(child.get());
 }
 
-std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float, float) {
-  return {};
+std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float x, float y) {
+  std::vector<std::shared_ptr<Layer>> results;
+  getLayersUnderPointInternal(x, y, &results);
+  return results;
 }
 
 void Layer::removeFromParent() {
@@ -527,6 +529,59 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   if (args.cleanDirtyFlags) {
     bitFields.childrenDirty = false;
   }
+}
+
+bool Layer::getLayersUnderPointInternal(float x, float y,
+                                        std::vector<std::shared_ptr<Layer>>* results) {
+  if (!visible()) {
+    return false;
+  }
+
+  bool hasLayerUnderPoint = false;
+  for (auto iter = _children.rbegin(); iter != _children.rend(); iter++) {
+    const auto& childLayer = *iter;
+    if (!childLayer->visible()) {
+      continue;
+    }
+
+    auto success = getChildLayerAtPoint(childLayer.get(), x, y, results);
+    if (success) {
+      results->push_back(childLayer);
+      hasLayerUnderPoint = true;
+    }
+  }
+
+  if (hasLayerUnderPoint) {
+    results->push_back(weakThis.lock());
+  } else {
+    Rect layerBoundsRect = getBounds();
+    this->getGlobalMatrix().mapRect(&layerBoundsRect);
+    if (layerBoundsRect.contains(x, y)) {
+      results->push_back(weakThis.lock());
+      hasLayerUnderPoint = true;
+    }
+  }
+
+  return hasLayerUnderPoint;
+}
+
+bool Layer::getChildLayerAtPoint(Layer* layer, float x, float y,
+                                 std::vector<std::shared_ptr<Layer>>* results) {
+  if (nullptr == layer) {
+    return false;
+  }
+
+  if (layer->_children.empty()) {
+    Rect layerBoundsRect = layer->getBounds();
+    layer->getGlobalMatrix().mapRect(&layerBoundsRect);
+    if (layerBoundsRect.contains(x, y)) {
+      return true;
+    }
+  } else {
+    return layer->getLayersUnderPointInternal(x, y, results);
+  }
+
+  return false;
 }
 
 }  // namespace tgfx

@@ -455,4 +455,199 @@ TGFX_TEST(LayerTest, shapeLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_shape"));
   device->unlock();
 }
+
+TGFX_TEST(LayerTest, getLayersUnderPoint) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 800, 800);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setName("root_layer");
+  displayList->root()->addChild(rootLayer);
+
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setName("image_layer");
+  imageLayer->setMatrix(Matrix::MakeScale(3.0f, 3.0f));
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  imageLayer->setImage(image);
+  SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
+  imageLayer->setSampling(options);
+  rootLayer->addChild(imageLayer);
+  auto imageLayerBounds = imageLayer->getBounds();
+  imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
+  printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top, imageLayerBounds.right,
+         imageLayerBounds.bottom);
+
+  auto shaperLayer = ShapeLayer::Make();
+  shaperLayer->setName("shaper_layer");
+  Path path = {};
+  path.moveTo(100, 50);
+  path.lineTo(150, 125);
+  path.lineTo(50, 125);
+  path.close();
+  shaperLayer->setPath(path);
+  auto filleStyle = SolidColor::Make(Color::FromRGBA(255, 0, 0, 127));
+  shaperLayer->setFillStyle(filleStyle);
+  shaperLayer->setMatrix(Matrix::MakeTrans(100.0f, 0.0f) * Matrix::MakeScale(2.0f, 2.0f));
+  rootLayer->addChild(shaperLayer);
+  auto shaperLayerBounds = shaperLayer->getBounds();
+  shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
+  printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top, shaperLayerBounds.right,
+         shaperLayerBounds.bottom);
+
+  auto textLayer = TextLayer::Make();
+  textLayer->setName("text_layer");
+  textLayer->setText("Hello World!");
+  textLayer->setMatrix(Matrix::MakeTrans(50.0f, 50.0f) * Matrix::MakeScale(5.0f, 5.0f));
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 20);
+  textLayer->setFont(font);
+  rootLayer->addChild(textLayer);
+  auto textLayerBounds = textLayer->getBounds();
+  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top, textLayerBounds.right,
+         textLayerBounds.bottom);
+
+  auto rootLayerBounds = rootLayer->getBounds();
+  printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top, rootLayerBounds.right,
+         rootLayerBounds.bottom);
+
+  displayList->render(surface.get());
+
+  auto paint = Paint();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1.0f);
+  paint.setColor(Color::Green());
+  canvas->drawRect(imageLayerBounds, paint);
+  canvas->drawRect(shaperLayerBounds, paint);
+  canvas->drawRect(textLayerBounds, paint);
+  paint.setColor(Color::Red());
+  canvas->drawRect(rootLayerBounds, paint);
+
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  // P1(200, 100) is in the text_layer, shaper_layer, image_layer, root_layer
+  auto layers = rootLayer->getLayersUnderPoint(200.0f, 100.0f);
+  canvas->drawCircle(200.0f, 100.0f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  std::string layerNameJoin = "";
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 4);
+  EXPECT_EQ(layerNameJoin, "text_layer|shaper_layer|image_layer|root_layer|");
+
+  // P2(330, 130) is in the text_layer, shaper_layer, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(330.0f, 130.0f);
+  canvas->drawCircle(330.0f, 130.0f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 3);
+  EXPECT_EQ(layerNameJoin, "text_layer|shaper_layer|root_layer|");
+
+  // P3(369.4903917863642, 119.382137866799) is in the text_layer, shaper_layer, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(369.4903917863642f, 119.382137866799f);
+  canvas->drawCircle(369.4903917863642f, 119.382137866799f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 3);
+  EXPECT_EQ(layerNameJoin, "text_layer|shaper_layer|root_layer|");
+
+  // P4(376.3366070606341, 226.8150544784194) is in the shaper_layer, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(376.3366070606341f, 226.8150544784194f);
+  canvas->drawCircle(376.3366070606341f, 226.8150544784194f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 2);
+  EXPECT_EQ(layerNameJoin, "shaper_layer|root_layer|");
+
+  // P5(538.0126139222378, 91.4706448255447) is in the text_layer, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(538.0126139222378f, 91.4706448255447f);
+  canvas->drawCircle(538.0126139222378f, 91.4706448255447f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 2);
+  EXPECT_EQ(layerNameJoin, "text_layer|root_layer|");
+
+  // P6(526.4267111503966, 279.4782488958804) is in the root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(526.4267111503966f, 279.4782488958804f);
+  canvas->drawCircle(526.4267111503966f, 279.4782488958804f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 1);
+  EXPECT_EQ(layerNameJoin, "root_layer|");
+
+  // P7(686.0488534297194, 375.2199363468245) is out of the root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(686.0488534297194f, 375.2199363468245f);
+  canvas->drawCircle(686.0488534297194f, 375.2199363468245f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 0);
+  EXPECT_EQ(layerNameJoin, "");
+
+  // P8(-64.7176461855979, 83.8344816350128) is out of the root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(-64.7176461855979f, 83.8344816350128f);
+  canvas->drawCircle(-64.7176461855979f, 83.8344816350128f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 0);
+  EXPECT_EQ(layerNameJoin, "");
+
+  // P9(50, 300) is in the image_layer, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(50.0f, 300.0f);
+  canvas->drawCircle(50.0f, 300.0f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 2);
+  EXPECT_EQ(layerNameJoin, "image_layer|root_layer|");
+
+  context->submit();
+  Baseline::Compare(surface, "LayerTest/getLayersUnderPoint");
+  device->unlock();
+}
 }  // namespace tgfx
