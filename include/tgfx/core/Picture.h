@@ -56,12 +56,11 @@ class Picture {
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 
-  std::shared_ptr<Image> asImage(int width, int height, const Matrix* matrix) const;
-
-  friend class DrawContext;
+  friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
-  friend class Canvas;
+  friend class Image;
   friend class PictureImage;
+  friend class Canvas;
 };
 }  // namespace tgfx

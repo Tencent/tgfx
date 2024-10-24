@@ -148,6 +148,7 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, &matrix);
+  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, &matrix,
+                                  source->isAlphaOnly());
 }
 }  // namespace tgfx

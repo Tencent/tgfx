@@ -50,13 +50,7 @@ std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
     const Matrix* uvMatrix) const {
   TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), uniqueKey);
   auto proxy = onLockTextureProxy(tpArgs);
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  auto processor = TiledTextureEffect::Make(proxy, tileModeX, tileModeY, sampling, uvMatrix);
-  if (isAlphaOnly() && !proxy->isAlphaOnly()) {
-    return FragmentProcessor::MulInputByChildAlpha(std::move(processor));
-  }
-  return processor;
+  return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,
+                                  isAlphaOnly());
 }
 }  // namespace tgfx

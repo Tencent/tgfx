@@ -23,34 +23,26 @@
 namespace tgfx {
 using namespace pk;
 
-LayerUnrollContext::LayerUnrollContext(DrawContext* drawContext, FillStyle fillStyle,
-                                       std::shared_ptr<ImageFilter> filter)
-    : drawContext(drawContext), fillStyle(std::move(fillStyle)), imageFilter(std::move(filter)) {
+LayerUnrollContext::LayerUnrollContext(DrawContext* drawContext, FillStyle fillStyle)
+    : drawContext(drawContext), fillStyle(std::move(fillStyle)) {
 }
 
 void LayerUnrollContext::clear() {
 }
 
 void LayerUnrollContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (!imageFilter) {
-    drawContext->drawRect(rect, state, merge(style));
-    unrolled = true;
-  }
+  drawContext->drawRect(rect, state, merge(style));
+  unrolled = true;
 }
 
 void LayerUnrollContext::drawRRect(const RRect& rRect, const MCState& state,
                                    const FillStyle& style) {
-  if (!imageFilter) {
-    drawContext->drawRRect(rRect, state, merge(style));
-    unrolled = true;
-  }
+  drawContext->drawRRect(rRect, state, merge(style));
+  unrolled = true;
 }
 
 void LayerUnrollContext::drawPath(const Path& path, const MCState& state, const FillStyle& style,
                                   const Stroke* stroke) {
-  if (imageFilter) {
-    return;
-  }
   auto& skPath = PathRef::ReadAccess(path);
   if (skPath.hasMultipleContours()) {
     // If the path has multiple contours, they may overlap, so we can't unroll it.
@@ -60,41 +52,34 @@ void LayerUnrollContext::drawPath(const Path& path, const MCState& state, const 
   unrolled = true;
 }
 
-void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image,
-                                       const SamplingOptions& sampling, const Rect& rect,
-                                       const MCState& mcState, const FillStyle& style) {
-  auto state = mcState;
-  if (imageFilter) {
-    image = image->makeSubset(rect);
-    // the rect should always be contained in the image bounds.
-    DEBUG_ASSERT(image != nullptr);
-    Point offset = Point::Zero();
-    image = image->makeWithFilter(imageFilter, &offset);
-    if (image == nullptr) {
-      LOGE("LayerUnrollContext::drawImageRect() Failed to apply filter to image!");
-      return;
-    }
-    state.matrix.preTranslate(offset.x, offset.y);
-  }
-  drawContext->drawImageRect(std::move(image), sampling, rect, state, merge(style));
+void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                                   const MCState& state, const FillStyle& style) {
+  drawContext->drawImage(std::move(image), sampling, state, merge(style));
+  unrolled = true;
+}
+
+void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+                                       const SamplingOptions& sampling, const MCState& state,
+                                       const FillStyle& style) {
+  drawContext->drawImageRect(std::move(image), rect, sampling, state, merge(style));
   unrolled = true;
 }
 
 void LayerUnrollContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                           const MCState& state, const FillStyle& style,
                                           const Stroke* stroke) {
-  if (!imageFilter) {
-    // We presume that within a single GlyphRunList, glyphs usually do not overlap.
-    drawContext->drawGlyphRunList(std::move(glyphRunList), state, merge(style), stroke);
-    unrolled = true;
-  }
+  // We presume that within a single GlyphRunList, glyphs usually do not overlap.
+  drawContext->drawGlyphRunList(std::move(glyphRunList), state, merge(style), stroke);
+  unrolled = true;
 }
 
 void LayerUnrollContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                                    const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  filter = ImageFilter::Compose(filter, imageFilter);
   drawContext->drawLayer(std::move(picture), state, merge(style), std::move(filter));
   unrolled = true;
+}
+
+void LayerUnrollContext::drawPicture(std::shared_ptr<Picture>, const MCState&) {
 }
 
 FillStyle LayerUnrollContext::merge(const FillStyle& style) {

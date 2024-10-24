@@ -28,7 +28,8 @@ class TiledTextureEffect : public FragmentProcessor {
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
                                                  TileMode tileModeX, TileMode tileModeY,
                                                  const SamplingOptions& sampling = {},
-                                                 const Matrix* uvMatrix = nullptr);
+                                                 const Matrix* uvMatrix = nullptr,
+                                                 bool forceAsMask = false);
 
   std::string name() const override {
     return "TiledTextureEffect";

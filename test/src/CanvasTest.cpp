@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/images/ResourceImage.h"
+#include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Texture.h"
@@ -759,6 +760,11 @@ TGFX_TEST(CanvasTest, NothingToDraw) {
 }
 
 TGFX_TEST(CanvasTest, Picture) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
   Recorder recorder = {};
   auto canvas = recorder.beginRecording();
   EXPECT_TRUE(recorder.getRecordingCanvas() != nullptr);
@@ -778,31 +784,6 @@ TGFX_TEST(CanvasTest, Picture) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   canvas = recorder.beginRecording();
-  canvas->drawImage(image);
-  auto singleImageRecord = recorder.finishRecordingAsPicture();
-  auto pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height());
-  EXPECT_TRUE(pictureImage == image);
-  pictureImage = Image::MakeFrom(singleRecordPicture, 200, 150);
-  EXPECT_TRUE(pictureImage != nullptr);
-  EXPECT_FALSE(pictureImage == image);
-
-  canvas = recorder.beginRecording();
-  canvas->clipRect(Rect::MakeXYWH(100, 100, image->width(), image->height()));
-  canvas->drawImage(image, 100, 100);
-  singleImageRecord = recorder.finishRecordingAsPicture();
-  Matrix matrix = Matrix::MakeTrans(-100, -100);
-  pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix);
-  EXPECT_TRUE(pictureImage == image);
-  pictureImage =
-      Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, &paint);
-  EXPECT_TRUE(pictureImage == image);
-  paint.setAlpha(0.8f);
-  pictureImage =
-      Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, &paint);
-  EXPECT_TRUE(pictureImage != nullptr);
-  EXPECT_FALSE(pictureImage == image);
-
-  canvas = recorder.beginRecording();
   image = image->makeMipmapped(true);
   auto imageScale = 200.f / static_cast<float>(image->width());
   canvas->scale(imageScale, imageScale);
@@ -818,7 +799,7 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas->drawPath(path, paint);
   path.reset();
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
-  matrix = Matrix::I();
+  auto matrix = Matrix::I();
   matrix.postRotate(30, 50, 50);
   path.transform(matrix);
   canvas->resetMatrix();
@@ -841,19 +822,9 @@ TGFX_TEST(CanvasTest, Picture) {
   auto picture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(picture != nullptr);
 
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto surface = Surface::Make(context, pictureImage->width(), pictureImage->height());
-  canvas = surface->getCanvas();
-  canvas->drawImage(pictureImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
-
   auto bounds = picture->getBounds();
-  surface = Surface::Make(context, static_cast<int>(bounds.width()),
-                          static_cast<int>(bounds.height() + 20));
+  auto surface = Surface::Make(context, static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height() + 20));
   canvas = surface->getCanvas();
   path.reset();
   path.addOval(Rect::MakeWH(bounds.width(), bounds.height() + 100));
@@ -866,6 +837,91 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix = Matrix::MakeTrans(0, -180);
   canvas->drawPicture(singleRecordPicture, &matrix, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Picture"));
+
+  image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  canvas = recorder.beginRecording();
+  canvas->drawImage(image);
+  auto singleImageRecord = recorder.finishRecordingAsPicture();
+  auto pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height());
+  EXPECT_TRUE(pictureImage == image);
+  pictureImage = Image::MakeFrom(singleImageRecord, 200, 150);
+  ASSERT_TRUE(pictureImage != nullptr);
+  EXPECT_FALSE(pictureImage == image);
+
+  canvas = recorder.beginRecording();
+  canvas->clipRect(Rect::MakeXYWH(100, 100, image->width() - 200, image->height() - 200));
+  canvas->drawImage(image);
+  singleImageRecord = recorder.finishRecordingAsPicture();
+  matrix = Matrix::MakeTrans(-100, -100);
+  pictureImage =
+      Image::MakeFrom(singleImageRecord, image->width() - 200, image->height() - 200, &matrix);
+  ASSERT_TRUE(pictureImage != nullptr);
+  EXPECT_TRUE(pictureImage->isComplex());
+  auto subsetImage = std::static_pointer_cast<SubsetImage>(pictureImage);
+  EXPECT_TRUE(subsetImage->source == image);
+  EXPECT_EQ(singleImageRecord.use_count(), 1);
+  pictureImage =
+      Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100, &matrix);
+  EXPECT_FALSE(pictureImage->isComplex());
+  EXPECT_EQ(singleImageRecord.use_count(), 2);
+  EXPECT_FALSE(pictureImage == image);
+  pictureImage = Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100);
+  EXPECT_FALSE(pictureImage->isComplex());
+  EXPECT_FALSE(pictureImage == image);
+  EXPECT_EQ(singleImageRecord.use_count(), 2);
+
+  canvas = recorder.beginRecording();
+  canvas->scale(0.5f, 0.5f);
+  canvas->clipRect(Rect::MakeXYWH(100, 100, image->width(), image->height()));
+  canvas->drawImage(image, 100, 100);
+  singleImageRecord = recorder.finishRecordingAsPicture();
+  matrix = Matrix::MakeScale(2.0f);
+  matrix.postTranslate(-100, -100);
+  pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix);
+  EXPECT_TRUE(pictureImage == image);
+  pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, true);
+  EXPECT_FALSE(pictureImage == image);
+
+  surface = Surface::Make(context, pictureImage->width(), pictureImage->height());
+  canvas = surface->getCanvas();
+  canvas->drawImage(pictureImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
+
+  canvas = recorder.beginRecording();
+  canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
+  auto textRecord = recorder.finishRecordingAsPicture();
+  bounds = textRecord->getBounds();
+  matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
+  EXPECT_EQ(textRecord.use_count(), 1);
+  ASSERT_TRUE(textImage != nullptr);
+  EXPECT_FALSE(textImage->isComplex());
+
+  surface = Surface::Make(context, textImage->width(), textImage->height());
+  canvas = surface->getCanvas();
+  canvas->drawImage(textImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Text"));
+
+  canvas = recorder.beginRecording();
+  canvas->drawPath(path, paint);
+  auto patRecord = recorder.finishRecordingAsPicture();
+  bounds = patRecord->getBounds();
+  matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  width = static_cast<int>(bounds.width());
+  height = static_cast<int>(bounds.height());
+  auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
+  EXPECT_EQ(patRecord.use_count(), 1);
+  ASSERT_TRUE(pathImage != nullptr);
+  EXPECT_FALSE(pathImage->isComplex());
+
+  surface = Surface::Make(context, pathImage->width(), pathImage->height());
+  canvas = surface->getCanvas();
+  canvas->drawImage(pathImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
+
   device->unlock();
 }
 }  // namespace tgfx

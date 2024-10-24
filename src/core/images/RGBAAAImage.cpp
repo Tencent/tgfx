@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAAImage.h"
+#include "core/utils/Log.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/TPArgs.h"
 #include "gpu/ops/FillRectOp.h"
@@ -53,6 +54,7 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
+  DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {

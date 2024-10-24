@@ -23,8 +23,16 @@
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                        const SamplingOptions& sampling,
-                                                       const Matrix* uvMatrix) {
-  return MakeRGBAAA(std::move(proxy), Point::Zero(), sampling, uvMatrix);
+                                                       const Matrix* uvMatrix, bool forceAsMask) {
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  auto isAlphaOnly = proxy->isAlphaOnly();
+  auto processor = MakeRGBAAA(std::move(proxy), Point::Zero(), sampling, uvMatrix);
+  if (forceAsMask && !isAlphaOnly) {
+    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
+  }
+  return processor;
 }
 
 TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
