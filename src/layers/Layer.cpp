@@ -335,8 +335,14 @@ Point Layer::localToGlobal(const Point& localPoint) const {
   return globalMatrix.mapXY(localPoint.x, localPoint.y);
 }
 
-bool Layer::hitTestPoint(float, float, bool) {
-  return false;
+bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
+  if (pixelHitTest) {
+    // TODO: Implement accurate pixel detection.
+    return false;
+  } else {
+    const auto& layers = getLayersUnderPoint(x, y);
+    return !layers.empty();
+  }
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
@@ -588,9 +594,8 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
       continue;
     }
 
-    auto success = getChildLayerAtPoint(childLayer.get(), x, y, results);
+    const auto success = childLayer->getLayersUnderPointInternal(x, y, results);
     if (success) {
-      results->push_back(childLayer);
       hasLayerUnderPoint = true;
     }
   }
@@ -607,25 +612,6 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   }
 
   return hasLayerUnderPoint;
-}
-
-bool Layer::getChildLayerAtPoint(Layer* layer, float x, float y,
-                                 std::vector<std::shared_ptr<Layer>>* results) {
-  if (nullptr == layer) {
-    return false;
-  }
-
-  if (layer->_children.empty()) {
-    Rect layerBoundsRect = layer->getBounds();
-    layer->getGlobalMatrix().mapRect(&layerBoundsRect);
-    if (layerBoundsRect.contains(x, y)) {
-      return true;
-    }
-  } else {
-    return layer->getLayersUnderPointInternal(x, y, results);
-  }
-
-  return false;
 }
 
 }  // namespace tgfx
