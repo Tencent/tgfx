@@ -54,34 +54,26 @@ class RenderTargetProxy : public ResourceProxy {
 
   /**
    * Creates a new RenderTargetProxy instance with specified context, with, height, format, sample
-   * count, mipmap state and origin.
+   * count, mipmap state and origin. If clearAll is true, the entire render target will be cleared
+   * to transparent black.
    */
   static std::shared_ptr<RenderTargetProxy> Make(Context* context, int width, int height,
                                                  PixelFormat format = PixelFormat::RGBA_8888,
                                                  int sampleCount = 1, bool mipmapped = false,
-                                                 ImageOrigin origin = ImageOrigin::TopLeft);
-
-  /**
-   * Creates a new RenderTargetProxy instance with specified context, with, height, formats, sample
-   * count, mipmap state and origin. If the first format is not supported, it will try the next one
-   * in the format list.
-   */
-  static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
-                                                         std::vector<PixelFormat> formats,
-                                                         int sampleCount = 1,
-                                                         bool mipmapped = false,
-                                                         ImageOrigin origin = ImageOrigin::TopLeft);
+                                                 ImageOrigin origin = ImageOrigin::TopLeft,
+                                                 bool clearAll = false);
 
   /**
    * Creates a new RenderTargetProxy instance with the specified context, width, height, sample
    * count, mipmap state, and origin. If `isAlphaOnly` is true, it will try to use the ALPHA_8
    * format and fall back to RGBA_8888 if not supported. Otherwise, it will use the RGBA_8888
-   * format.
+   * format. If clearAll is true, the entire render target will be cleared to transparent black.
    */
   static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
                                                          bool isAlphaOnly, int sampleCount = 1,
                                                          bool mipmapped = false,
-                                                         ImageOrigin origin = ImageOrigin::TopLeft);
+                                                         ImageOrigin origin = ImageOrigin::TopLeft,
+                                                         bool clearAll = false);
 
   /**
    * Returns the width of the render target.
@@ -158,17 +150,20 @@ class RenderTargetProxy : public ResourceProxy {
   std::shared_ptr<TextureProxy> makeTextureProxy(int width, int height) const;
 
   /**
-   * Creates a compatible RenderTargetProxy instance matches the properties of this one.
+   * Creates a compatible RenderTargetProxy instance matches the properties of this one. If clearAll
+   * is true, the returned render target will be cleared to transparent black.
    */
-  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy() const {
-    return makeRenderTargetProxy(width(), height());
+  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(bool clearAll = false) const {
+    return makeRenderTargetProxy(width(), height(), clearAll);
   }
 
   /**
    * Creates a compatible RenderTargetProxy instance of the specified size that matches the
-   * properties of this one.
+   * properties of this one. If clearAll is true, the returned render target will be cleared to
+   * transparent black.
    */
-  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(int width, int height) const;
+  std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(int width, int height,
+                                                           bool clearAll = false) const;
 
  protected:
   RenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format, int sampleCount,
@@ -183,7 +178,8 @@ class RenderTargetProxy : public ResourceProxy {
 
   static std::shared_ptr<RenderTargetProxy> Create(Context* context, int width, int height,
                                                    PixelFormat format, int sampleCount,
-                                                   bool mipmapped, ImageOrigin origin);
+                                                   bool mipmapped, ImageOrigin origin,
+                                                   bool clearAll);
 
   friend class ProxyProvider;
 };

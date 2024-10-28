@@ -114,6 +114,8 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   int width = 72;
   int height = 72;
   auto surface = Surface::Make(context, width, height);
+  // clear the pending ClearOp.
+  context->flush();
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
   Paint paint;
@@ -156,7 +158,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
-  EXPECT_TRUE(task->ops.size() == 2);
+  ASSERT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rectPaints.size(), drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
@@ -171,6 +173,8 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   int width = 72;
   int height = 72;
   auto surface = Surface::Make(context, width, height);
+  // clear the pending ClearOp.
+  context->flush();
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(width, height), Color::White());
   Paint paint;
@@ -197,7 +201,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
-  EXPECT_TRUE(task->ops.size() == 2);
+  ASSERT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRectPaints.size(), drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
@@ -212,6 +216,8 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   int width = 72;
   int height = 72;
   auto surface = Surface::Make(context, width, height);
+  // clear the pending ClearOp.
+  context->flush();
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(width, height), Color::White());
   canvas->save();

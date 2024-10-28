@@ -211,7 +211,7 @@ std::shared_ptr<TextureProxy> PictureImage::onLockTextureProxy(const TPArgs& arg
   textureProxy =
       proxyProvider->createTextureProxy(args.uniqueKey, _width, _height, format, args.mipmapped,
                                         ImageOrigin::TopLeft, args.renderFlags);
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format, 1, true);
   if (renderTarget == nullptr) {
     return nullptr;
   }
