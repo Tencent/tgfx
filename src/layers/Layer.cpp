@@ -340,14 +340,16 @@ bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
   if (pixelHitTest) {
     for (auto& layer : layers) {
       switch (layer->type()) {
-        case LayerType::Layer: // Layer, Image, and Text Layer only check if the bounding box is hit.
+        // Layer, Image, and Text Layer only check if the bounding box is hit.
+        case LayerType::Layer:
         case LayerType::Image:
         case LayerType::Text:
           if (layer->hitTestByBounds(x, y)) {
             return true;
           }
           break;
-        case LayerType::Shape: // ShapeLayer needs to perform pixel-level hit testing to determine if the layer is hit.
+        // ShapeLayer needs to perform pixel-level hit testing to determine if the layer is hit.
+        case LayerType::Shape:
           if (layer->hitTestByPixel(x, y)) {
             return true;
           }

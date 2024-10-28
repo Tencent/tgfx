@@ -657,8 +657,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   rootLayer->addChild(imageLayer);
   auto imageLayerBounds = imageLayer->getBounds();
   imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
-  printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top, imageLayerBounds.right,
-         imageLayerBounds.bottom);
+  printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
+         imageLayerBounds.right, imageLayerBounds.bottom);
 
   auto shaperLayer = ShapeLayer::Make();
   shaperLayer->setName("shaper_layer");
@@ -674,8 +674,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   rootLayer->addChild(shaperLayer);
   auto shaperLayerBounds = shaperLayer->getBounds();
   shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
-  printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top, shaperLayerBounds.right,
-         shaperLayerBounds.bottom);
+  printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
+         shaperLayerBounds.right, shaperLayerBounds.bottom);
 
   auto textLayer = TextLayer::Make();
   textLayer->setName("text_layer");
@@ -687,8 +687,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   rootLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds();
   textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
-  printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top, textLayerBounds.right,
-         textLayerBounds.bottom);
+  printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
+         textLayerBounds.right, textLayerBounds.bottom);
 
   auto shaperLayer2 = ShapeLayer::Make();
   shaperLayer2->setName("shaper_layer2");
@@ -706,8 +706,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
   auto rootLayerBounds = rootLayer->getBounds();
-  printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top, rootLayerBounds.right,
-         rootLayerBounds.bottom);
+  printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
+         rootLayerBounds.right, rootLayerBounds.bottom);
 
   displayList->render(surface.get());
 
