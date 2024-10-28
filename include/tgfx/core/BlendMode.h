@@ -141,7 +141,7 @@ enum class BlendMode {
    */
   Luminosity,
   /**
-   * Darker than darken
+   * A variant subtracts 1 from all end values, with values below 0 becoming black.
    * Reference:https://developer.apple.com/documentation/coregraphics/cgblendmode/kcgblendmodeplusdarker
    */
   PlusDarker
