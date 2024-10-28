@@ -108,7 +108,7 @@ class ImageInfo {
   }
 
   /**
-   * Returns the byte size of the pixels, computed from the rowBytes and height.
+   * Returns the byte size of the pixels, computed from the rowBytes and width.
    */
   size_t byteSize() const {
     return _rowBytes * static_cast<size_t>(_height);
