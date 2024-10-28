@@ -298,6 +298,140 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
   path->close();
 }
 
+// This converts the SVG arc to conics based on the SVG standard.
+// Code source:
+// 1. kdelibs/kdecore/svgicons Niko's code
+// 2. webkit/chrome SVGPathNormalizer::decomposeArcToCubic()
+// See also SVG implementation notes:
+// http://www.w3.org/TR/SVG/implnote.html#ArcConversionEndpointToCenter
+// Note that arcSweep bool value is flipped from the original implementation.
+void Path::addArc(float rx, float ry, float xAxisRotate, ArcSize largeArc, PathDirection sweep,
+                  Point endPt) {
+  // path->injectMoveToIfNeeded();
+  std::array<Point, 2> srcPts;
+  this->getLastPt(&srcPts[0]);
+  // If rx = 0 or ry = 0 then this arc is treated as a straight line segment (a "lineto")
+  // joining the endpoints.
+  // http://www.w3.org/TR/SVG/implnote.html#ArcOutOfRangeParameters
+  if (FloatNearlyZero(rx) && FloatNearlyZero(ry)) {
+    return this->lineTo(endPt);
+  }
+  // If the current point and target point for the arc are identical, it should be treated as a
+  // zero length path. This ensures continuity in animations.
+  srcPts[1] = endPt;
+  if (srcPts[0] == srcPts[1]) {
+    return this->lineTo(endPt);
+  }
+  rx = std::abs(rx);
+  ry = std::abs(ry);
+  Point midPointDistance = (srcPts[0] - srcPts[1]) * 0.5f;
+
+  Matrix pointTransform;
+  pointTransform.setRotate(-xAxisRotate);
+
+  Point transformedMidPoint;
+  pointTransform.mapPoints(&transformedMidPoint, &midPointDistance, 1);
+  float squareRx = rx * rx;
+  float squareRy = ry * ry;
+  float squareX = transformedMidPoint.x * transformedMidPoint.x;
+  float squareY = transformedMidPoint.y * transformedMidPoint.y;
+
+  // Check if the radii are big enough to draw the arc, scale radii if not.
+  // http://www.w3.org/TR/SVG/implnote.html#ArcCorrectionOutOfRangeRadii
+  float radiiScale = squareX / squareRx + squareY / squareRy;
+  if (radiiScale > 1) {
+    radiiScale = std::sqrt(radiiScale);
+    rx *= radiiScale;
+    ry *= radiiScale;
+  }
+
+  pointTransform.setScale(1.0f / rx, 1.0f / ry);
+  pointTransform.preRotate(-xAxisRotate);
+
+  std::array<Point, 2> unitPts;
+  pointTransform.mapPoints(unitPts.data(), srcPts.data(), unitPts.size());
+  Point delta = unitPts[1] - unitPts[0];
+
+  float d = delta.x * delta.x + delta.y * delta.y;
+  float scaleFactorSquared = std::max(1 / d - 0.25f, 0.f);
+
+  float scaleFactor = std::sqrt(scaleFactorSquared);
+  if ((sweep == PathDirection::CCW) !=
+      static_cast<bool>(largeArc)) {  // flipped from the original implementation
+    scaleFactor = -scaleFactor;
+  }
+  delta *= scaleFactor;
+  Point centerPoint = unitPts[0] + unitPts[1];
+  centerPoint *= 0.5f;
+  centerPoint.offset(-delta.y, delta.x);
+  unitPts[0] -= centerPoint;
+  unitPts[1] -= centerPoint;
+  float theta1 = std::atan2(unitPts[0].y, unitPts[0].x);
+  float theta2 = std::atan2(unitPts[1].y, unitPts[1].x);
+  float thetaArc = theta2 - theta1;
+  if (thetaArc < 0 &&
+      (sweep == PathDirection::CW)) {  // arcSweep flipped from the original implementation
+    thetaArc += M_PI_F * 2.0f;
+  } else if (thetaArc > 0 &&
+             (sweep != PathDirection::CW)) {  // arcSweep flipped from the original implementation
+    thetaArc -= M_PI_F * 2.0f;
+  }
+
+  // Very tiny angles cause our subsequent math to go wonky
+  // but a larger value is probably ok too.
+  if (std::abs(thetaArc) < (M_PI_F / (1000 * 1000))) {
+    return this->lineTo(endPt);
+  }
+
+  pointTransform.setRotate(xAxisRotate);
+  pointTransform.preScale(rx, ry);
+
+  // the arc may be slightly bigger than 1/4 circle, so allow up to 1/3rd
+  float segments = std::ceil(std::abs(thetaArc / (2 * M_PI_F / 3)));
+  float thetaWidth = thetaArc / segments;
+  float t = std::tan(0.5f * thetaWidth);
+  if (!FloatsAreFinite(&t, 1)) {
+    return;
+  }
+  float startTheta = theta1;
+  float w = std::sqrt(0.5f + std::cos(thetaWidth) * 0.5f);
+  auto float_is_integer = [](float scalar) -> bool { return scalar == std::floor(scalar); };
+  bool expectIntegers = FloatNearlyZero(M_PI_F * 0.5f - std::abs(thetaWidth)) &&
+                        float_is_integer(rx) && float_is_integer(ry) && float_is_integer(endPt.x) &&
+                        float_is_integer(endPt.y);
+
+  auto path = &(writableRef()->path);
+  for (int i = 0; i < static_cast<int>(segments); ++i) {
+    float endTheta = startTheta + thetaWidth;
+    float sinEndTheta = SkScalarSinSnapToZero(endTheta);
+    float cosEndTheta = SkScalarCosSnapToZero(endTheta);
+
+    unitPts[1].set(cosEndTheta, sinEndTheta);
+    unitPts[1] += centerPoint;
+    unitPts[0] = unitPts[1];
+    unitPts[0].offset(t * sinEndTheta, -t * cosEndTheta);
+    std::array<Point, 2> mapped;
+    pointTransform.mapPoints(mapped.data(), unitPts.data(), unitPts.size());
+    /*
+        Computing the arc width introduces rounding errors that cause arcs to start
+        outside their marks. A round rect may lose convexity as a result. If the input
+        values are on integers, place the conic on integers as well.
+         */
+    if (expectIntegers) {
+      for (Point& point : mapped) {
+        point.x = std::round(point.x);
+        point.y = std::round(point.y);
+      }
+    }
+    path->conicTo(mapped[0].x, mapped[0].y, mapped[1].x, mapped[1].y, w);
+    startTheta = endTheta;
+  }
+
+  // The final point should match the input point (by definition); replace it to
+  // ensure that rounding errors in the above math don't cause any problems.
+  path->setLastPt(endPt.x, endPt.y);
+}
+
 void Path::addRoundRect(const Rect& rect, float radiusX, float radiusY, bool reversed,
                         unsigned startIndex) {
   writableRef()->path.addRRect(SkRRect::MakeRectXY(ToSkRect(rect), radiusX, radiusY),
@@ -415,4 +549,14 @@ int Path::countPoints() const {
 int Path::countVerbs() const {
   return pathRef->path.countVerbs();
 }
+
+bool Path::getLastPt(Point* lastPt) const {
+  SkPoint skPoint;
+  if (pathRef->path.getLastPt(&skPoint)) {
+    lastPt->set(skPoint.fX, skPoint.fY);
+    return true;
+  }
+  return false;
+};
+
 }  // namespace tgfx

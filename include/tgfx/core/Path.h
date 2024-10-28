@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
@@ -222,6 +223,44 @@ class Path {
    */
   void addArc(const Rect& oval, float startAngle, float sweepAngle);
 
+  enum class PathDirection : uint8_t {
+    /** clockwise direction for adding closed contours */
+    CW,
+    /** counter-clockwise direction for adding closed contours */
+    CCW,
+  };
+
+  enum ArcSize : uint8_t {
+    Small_ArcSize,  //!< smaller of arc pair
+    Large_ArcSize,  //!< larger of arc pair
+  };
+
+  /** Appends arc to SkPath. Arc is implemented by one or more conics weighted to
+    * describe part of oval with radii (rx, ry) rotated by xAxisRotate degrees. Arc
+    * curves from last SkPath SkPoint to (x, y), choosing one of four possible routes:
+    * clockwise or counterclockwise, and smaller or larger.
+    *
+    * Arc sweep is always less than 360 degrees. arcTo() appends line to (x, y) if
+    * either radii are zero, or if last SkPath SkPoint equals (x, y). arcTo() scales radii
+    * (rx, ry) to fit last SkPath SkPoint and (x, y) if both are greater than zero but
+    * too small.
+
+    * arcTo() appends up to four conic curves.
+    * arcTo() implements the functionality of SVG arc, although SVG sweep-flag value
+    * is opposite the integer value of sweep; SVG sweep-flag uses 1 for clockwise,
+    * while CW_Direction cast to int is zero.
+
+    * @param rx           x radii on axes before x-axis rotation
+    * @param ry           y radii on axes before x-axis rotation
+    * @param xAxisRotate  x-axis rotation in degrees; positive values are clockwise
+    * @param largeArc     chooses smaller or larger arc
+    * @param sweep        chooses clockwise or counterclockwise arc
+    * @param x            end of arc
+    * @return             reference to SkPath
+    */
+  void addArc(float rx, float ry, float xAxisRotate, ArcSize largeArc, PathDirection sweep,
+              Point endPt);
+
   /**
    * Adds a round rect to path. creating a new closed contour, each corner is 90 degrees of an
    * ellipse with radius (radiusX, radiusY). The round rect begins at startIndex point and continues
@@ -286,6 +325,11 @@ class Path {
    * Returns the number of verbs in Path.
    */
   int countVerbs() const;
+
+  /**
+   * Returns last point on Path in lastPt. Returns false if SkPoint array is empty.
+   */
+  bool getLastPt(Point* lastPt) const;
 
  private:
   std::shared_ptr<PathRef> pathRef = nullptr;
