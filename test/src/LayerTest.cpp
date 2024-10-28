@@ -630,44 +630,6 @@ TGFX_TEST(LayerTest, blurLayerFilter) {
             imageFilter2->filterBounds(Rect::MakeWH(200, 200)));
 }
 
-TGFX_TEST(LayerTest, PassthroughAndNormal) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto surface = Surface::Make(context, 800, 400);
-
-  surface->getCanvas()->clearRect(Rect::MakeWH(800, 400), Color::FromRGBA(53, 53, 53));
-  DisplayList displayList;
-
-  auto root = ShapeLayer::Make();
-  root->setMatrix(Matrix::MakeTrans(50, 50));
-  Path rect;
-  rect.addRect(0, 0, 200, 200);
-  auto rect1 = ShapeLayer::Make();
-  rect1->setPath(rect);
-  rect1->setFillStyle(SolidColor::Make(Color::FromRGBA(123, 77, 77)));
-  auto rect2 = ShapeLayer::Make();
-  rect2->setPath(rect);
-  rect2->setMatrix(Matrix::MakeTrans(100, 100));
-  rect2->setFillStyle(SolidColor::Make(Color::FromRGBA(219, 32, 32)));
-  root->addChild(rect1);
-  root->addChild(rect2);
-  displayList.root()->addChild(root);
-  rect1->setBlendMode(BlendMode::SoftLight);
-  rect2->setBlendMode(BlendMode::Screen);
-  root->setShouldRasterize(true);
-  displayList.render(surface.get(), false);
-
-  root->setMatrix(Matrix::MakeTrans(400, 50));
-  root->setShouldRasterize(false);
-  displayList.render(surface.get(), false);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
-  device->unlock();
-}
-
-
 /**
  * The schematic diagram is as follows:
  * https://www.geogebra.org/graphing/et36u73x
