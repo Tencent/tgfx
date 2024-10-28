@@ -217,7 +217,7 @@ class ShapeLayer : public Layer {
   ShapeLayer() = default;
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
-··
+
   bool hitTestByPixel(float x, float y) override;
 
  private:

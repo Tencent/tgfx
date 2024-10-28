@@ -871,4 +871,170 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   Baseline::Compare(surface, "LayerTest/getLayersUnderPoint");
   device->unlock();
 }
+
+/**
+ * The schematic diagram is as follows(Visit geogebra online vector map to view pixel details):
+ * https://www.geogebra.org/classic/krbzbz6m
+ * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/hitTestPoint.png
+ * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/Layer_hitTestPoint.png
+ */
+TGFX_TEST(LayerTest, hitTestPoint) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 800, 800);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setName("root_layer");
+  displayList->root()->addChild(rootLayer);
+
+  auto shaperLayer1 = ShapeLayer::Make();
+  shaperLayer1->setName("shaper_layer1");
+  Path path1 = {};
+  path1.moveTo(100, 50);
+  path1.lineTo(150, 125);
+  path1.lineTo(50, 125);
+  path1.close();
+  shaperLayer1->setPath(path1);
+  auto fillStyle1 = SolidColor::Make(Color::FromRGBA(255, 0, 0, 127));
+  shaperLayer1->setFillStyle(fillStyle1);
+  shaperLayer1->setMatrix(Matrix::MakeTrans(100.0f, 50.0f));
+  rootLayer->addChild(shaperLayer1);
+  auto shaperLayer1Bounds = shaperLayer1->getBounds();
+  shaperLayer1->getGlobalMatrix().mapRect(&shaperLayer1Bounds);
+  printf("shaperLayer1Bounds: (%f, %f, %f, %f)\n", shaperLayer1Bounds.left, shaperLayer1Bounds.top,
+         shaperLayer1Bounds.right, shaperLayer1Bounds.bottom);
+
+  auto shaperLayer2 = ShapeLayer::Make();
+  shaperLayer2->setName("shaper_layer2");
+  Rect rect = Rect::MakeLTRB(220, 100, 370, 250);
+  Path path2 = {};
+  path2.addOval(rect);
+  path2.close();
+  shaperLayer2->setPath(path2);
+  auto fillStyle2 = SolidColor::Make(Color::FromRGBA(127, 255, 0, 127));
+  shaperLayer2->setFillStyle(fillStyle2);
+  rootLayer->addChild(shaperLayer2);
+  auto shaperLayer2Bounds = shaperLayer2->getBounds();
+  shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);
+  printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
+         shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
+
+  auto rootLayerBounds = rootLayer->getBounds();
+  rootLayerBounds.roundOut();
+  printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top, rootLayerBounds.right,
+         rootLayerBounds.bottom);
+
+  displayList->render(surface.get());
+
+  auto paint = Paint();
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1.0f);
+  canvas->drawRect(rootLayerBounds, paint);
+
+  // P1(160, 120)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p1 = {160.0f, 120.0f};
+  canvas->drawCircle(p1.x, p1.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(p1.x, p1.y, true));
+
+  // P2(186.66668f, 120.0f)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p2 = {186.66668f, 120.0f};
+  canvas->drawCircle(p2.x, p2.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(p2.x, p2.y, true));
+
+  // P3(172.0774145878251, 140)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p3 = {172.0774145878251f, 140.0f};
+  canvas->drawCircle(p3.x, p3.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(p3.x, p3.y, true));
+
+  // P4(200, 150)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p4 = {200.0f, 150.0f};
+  canvas->drawCircle(p4.x, p4.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(p4.x, p4.y, true));
+
+  // P5(225, 120)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p5 = {225.0f, 120.0f};
+  canvas->drawCircle(p5.x, p5.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(p5.x, p5.y));
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(p5.x, p5.y, true));
+
+  // P6(200, 180)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p6 = {200.0f, 180.0f};
+  canvas->drawCircle(p6.x, p6.y, 1.0f, paint);
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(p6.x, p6.y));
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(p6.x, p6.y, true));
+
+  // Q1(227.79885, -141.69835)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point q1 = {227.79885f, 141.69835f};
+  canvas->drawCircle(q1.x, q1.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(q1.x, q1.y));
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(q1.x, q1.y, true));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q1.x, q1.y));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q1.x, q1.y, true));
+
+  // Q2(230.0, 160.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point q2 = {230.0f, 160.0f};
+  canvas->drawCircle(q2.x, q2.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(q2.x, q2.y));
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(q2.x, q2.y, true));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q2.x, q2.y));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q2.x, q2.y, true));
+
+  // Q3(270.0, 190.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point q3 = {270.0f, 190.0f};
+  canvas->drawCircle(q3.x, q3.y, 1.0f, paint);
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(q3.x, q3.y));
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(q3.x, q3.y, true));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q3.x, q3.y));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q3.x, q3.y, true));
+
+  // Q4(336.0, 239.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point q4 = {336.0f, 239.0f};
+  canvas->drawCircle(q4.x, q4.y, 1.0f, paint);
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(q4.x, q4.y));
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(q4.x, q4.y, true));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q4.x, q4.y));
+  EXPECT_EQ(false, shaperLayer2->hitTestPoint(q4.x, q4.y, true));
+
+  // Q5(240.0, 150.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point q5 = {240.0f, 150.0f};
+  canvas->drawCircle(q5.x, q5.y, 1.0f, paint);
+  EXPECT_EQ(true, shaperLayer1->hitTestPoint(q5.x, q5.y));
+  EXPECT_EQ(false, shaperLayer1->hitTestPoint(q5.x, q5.y, true));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q5.x, q5.y));
+  EXPECT_EQ(true, shaperLayer2->hitTestPoint(q5.x, q5.y, true));
+
+  context->submit();
+  Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint");
+  device->unlock();
+}
 }  // namespace tgfx
