@@ -72,8 +72,7 @@ enum class BlendMode {
    */
   Xor,
   /**
-   * Sum of colors.
-   * Reference:https://developer.apple.com/documentation/coregraphics/cgblendmode/kcgblendmodepluslighter
+   * Adds the colors together. If the result exceeds 1 (for RGB), it displays white.
    */
   PlusLighter,
   /**
@@ -141,8 +140,8 @@ enum class BlendMode {
    */
   Luminosity,
   /**
-   * A variant subtracts 1 from all end values, with values below 0 becoming black.
-   * Reference:https://developer.apple.com/documentation/coregraphics/cgblendmode/kcgblendmodeplusdarker
+   * A variation of PlusLighter. It adds the colors together but subtracts 1 from the final values,
+   * making any values below 0 black.
    */
   PlusDarker
 };
