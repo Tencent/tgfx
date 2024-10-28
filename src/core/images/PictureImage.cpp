@@ -81,21 +81,8 @@ static std::shared_ptr<Image> GetEquivalentImage(const Record* record, int width
 
 static bool CheckStyleAndClip(const FillStyle& style, const Path& clip, int width, int height,
                               const Matrix* matrix) {
-  if (style.colorFilter || style.maskFilter) {
+  if (!style.isOpaque()) {
     return false;
-  }
-  switch (style.blendMode) {
-    case BlendMode::Clear:
-    case BlendMode::Dst:
-    case BlendMode::SrcIn:
-    case BlendMode::SrcATop:
-    case BlendMode::DstOver:
-    case BlendMode::DstIn:
-    case BlendMode::DstOut:
-    case BlendMode::DstATop:
-      return false;
-    default:
-      break;
   }
   if (clip.isEmpty() && clip.isInverseFillType()) {
     return true;
