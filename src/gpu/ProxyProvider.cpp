@@ -19,6 +19,7 @@
 #include "ProxyProvider.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
+#include "gpu/ops/ClearOp.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GpuBufferCreateTask.h"
 #include "gpu/tasks/RenderTargetCreateTask.h"
@@ -162,7 +163,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
-    std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount) {
+    std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount,
+    bool clearAll) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -177,9 +179,15 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   if (task == nullptr) {
     return nullptr;
   }
-  context->drawingManager()->addResourceTask(std::move(task));
+  auto drawingManager = context->drawingManager();
+  drawingManager->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<RenderTargetProxy>(
       new TextureRenderTargetProxy(uniqueKey, std::move(textureProxy), format, sampleCount));
+  if (clearAll) {
+    auto opsTask = drawingManager->addOpsTask(proxy);
+    auto rect = Rect::MakeWH(proxy->width(), proxy->height());
+    opsTask->addOp(ClearOp::Make(Color::Transparent(), rect));
+  }
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }

@@ -56,7 +56,7 @@ class DrawingManager {
   std::unordered_set<std::shared_ptr<RenderTargetProxy>> needResolveTargets = {};
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
-  OpsRenderTask* activeOpsTask = nullptr;
+  std::shared_ptr<OpsRenderTask> activeOpsTask = nullptr;
 
   void addRenderTask(std::shared_ptr<RenderTask> renderTask);
   void checkIfResolveNeeded(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
