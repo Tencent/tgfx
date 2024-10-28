@@ -73,8 +73,9 @@ enum class BlendMode {
   Xor,
   /**
    * Sum of colors.
+   * Reference:https://developer.apple.com/documentation/coregraphics/cgblendmode/kcgblendmodepluslighter
    */
-  Plus,
+  PlusLighter,
   /**
    * Product of premultiplied colors; darkens destination.
    */
@@ -138,6 +139,11 @@ enum class BlendMode {
   /**
    * Luminosity of source with hue and saturation of destination.
    */
-  Luminosity
+  Luminosity,
+  /**
+   * Darker than darken
+   * Reference:https://developer.apple.com/documentation/coregraphics/cgblendmode/kcgblendmodeplusdarker
+   */
+  PlusDarker
 };
 }  // namespace tgfx
