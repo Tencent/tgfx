@@ -45,6 +45,60 @@ static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
+enum class SrcColorOpacity {
+  Unknown,
+  // The src color is known to be opaque (alpha == 255)
+  Opaque,
+  // The src color is known to be fully transparent (color == 0)
+  TransparentBlack,
+  // The src alpha is known to be fully transparent (alpha == 0)
+  TransparentAlpha,
+};
+
+static SrcColorOpacity GetFillColorOpacity(const FillStyle& style) {
+  auto alpha = style.color.alpha;
+  const auto& color = style.color;
+  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
+    return SrcColorOpacity::Opaque;
+  } else if (alpha == 0.0f) {
+    if (style.shader || color.red != 0.0f || color.green != 0.0f || color.blue != 0.0f) {
+      return SrcColorOpacity::TransparentAlpha;
+    } else {
+      return SrcColorOpacity::TransparentBlack;
+    }
+  }
+  return SrcColorOpacity::Unknown;
+}
+
+static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
+  BlendInfo blendInfo = {};
+  if (!BlendModeAsCoeff(mode, &blendInfo)) {
+    return false;
+  }
+  switch (blendInfo.srcBlend) {
+    case BlendModeCoeff::DA:
+    case BlendModeCoeff::DC:
+    case BlendModeCoeff::IDA:
+    case BlendModeCoeff::IDC:
+      return false;
+    default:
+      break;
+  }
+  switch (blendInfo.dstBlend) {
+    case BlendModeCoeff::Zero:
+      return true;
+    case BlendModeCoeff::ISA:
+      return opacityType == SrcColorOpacity::Opaque;
+    case BlendModeCoeff::SA:
+      return opacityType == SrcColorOpacity::TransparentBlack ||
+             opacityType == SrcColorOpacity::TransparentAlpha;
+    case BlendModeCoeff::SC:
+      return opacityType == SrcColorOpacity::TransparentBlack;
+    default:
+      return false;
+  }
+}
+
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                              uint32_t renderFlags)
     : renderFlags(renderFlags) {
@@ -109,12 +163,8 @@ bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const Fi
     return false;
   }
   auto color = style.color;
-  if (style.blendMode == BlendMode::Clear) {
-    color = Color::Transparent();
-  } else if (style.blendMode != BlendMode::Src) {
-    if (!color.isOpaque()) {
-      return false;
-    }
+  if (!BlendModeIsOpaque(style.blendMode, GetFillColorOpacity(style))) {
+    return false;
   }
   auto bounds = rect;
   state.matrix.mapRect(&bounds);
@@ -496,45 +546,6 @@ void RenderContext::addOp(std::unique_ptr<Op> op, const std::function<bool()>& w
   opContext->addOp(std::move(op));
 }
 
-enum class SrcColorOpacity {
-  Unknown,
-  // The src color is known to be opaque (alpha == 255)
-  Opaque,
-  // The src color is known to be fully transparent (color == 0)
-  TransparentBlack,
-  // The src alpha is known to be fully transparent (alpha == 0)
-  TransparentAlpha,
-};
-
-static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
-  BlendInfo blendInfo = {};
-  if (!BlendModeAsCoeff(mode, &blendInfo)) {
-    return false;
-  }
-  switch (blendInfo.srcBlend) {
-    case BlendModeCoeff::DA:
-    case BlendModeCoeff::DC:
-    case BlendModeCoeff::IDA:
-    case BlendModeCoeff::IDC:
-      return false;
-    default:
-      break;
-  }
-  switch (blendInfo.dstBlend) {
-    case BlendModeCoeff::Zero:
-      return true;
-    case BlendModeCoeff::ISA:
-      return opacityType == SrcColorOpacity::Opaque;
-    case BlendModeCoeff::SA:
-      return opacityType == SrcColorOpacity::TransparentBlack ||
-             opacityType == SrcColorOpacity::TransparentAlpha;
-    case BlendModeCoeff::SC:
-      return opacityType == SrcColorOpacity::TransparentBlack;
-    default:
-      return false;
-  }
-}
-
 bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state,
                                            const FillStyle& style, bool isRectOp) const {
   if (!isRectOp) {
@@ -561,18 +572,7 @@ bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCStat
   if (style.colorFilter && style.colorFilter->isAlphaUnchanged()) {
     return false;
   }
-  auto opacityType = SrcColorOpacity::Unknown;
-  auto alpha = style.color.alpha;
-  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
-    opacityType = SrcColorOpacity::Opaque;
-  } else if (alpha == 0) {
-    if (style.shader) {
-      opacityType = SrcColorOpacity::TransparentAlpha;
-    } else {
-      opacityType = SrcColorOpacity::TransparentBlack;
-    }
-  }
-  return BlendModeIsOpaque(style.blendMode, opacityType);
+  return BlendModeIsOpaque(style.blendMode, GetFillColorOpacity(style));
 }
 
 void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {

@@ -54,6 +54,7 @@
     },
     "LayerTest": {
         "ModeColorFilter": "43cd416",
+        "PassThoughAndNormal": "43cd416",
         "draw_shape": "8378211",
         "draw_text": "fa90eb0",
         "dropShadow": "43cd416",
