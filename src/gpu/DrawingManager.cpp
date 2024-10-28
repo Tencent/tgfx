@@ -30,7 +30,7 @@ std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
   checkIfResolveNeeded(renderTargetProxy);
   auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy);
   addRenderTask(opsTask);
-  activeOpsTask = opsTask.get();
+  activeOpsTask = opsTask;
   return opsTask;
 }
 
