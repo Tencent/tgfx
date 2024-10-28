@@ -276,7 +276,7 @@ TGFX_TEST(CanvasTest, textShape) {
   auto newline = [&]() {
     x = 0;
     height += lineHeight;
-    path.moveTo(0, height);
+    path.moveTo(Point{0, height});
   };
   newline();
   for (size_t i = 0; i < count; ++i) {
@@ -296,7 +296,7 @@ TGFX_TEST(CanvasTest, textShape) {
     run->ids.emplace_back(glyphID);
     run->positions.push_back(Point{x, height});
     x += run->font.getAdvance(glyphID);
-    path.lineTo(x, height);
+    path.lineTo(Point{x, height});
     if (width < x) {
       width = x;
     }
@@ -495,7 +495,7 @@ TGFX_TEST(CanvasTest, path) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 500, 500);
+  auto surface = Surface::Make(context, 700, 500);
   auto canvas = surface->getCanvas();
   Path path;
   path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
@@ -549,7 +549,46 @@ TGFX_TEST(CanvasTest, path) {
   canvas->drawLine(200, 50, 400, 50, paint);
   paint.setLineCap(LineCap::Round);
   canvas->drawLine(200, 320, 400, 320, paint);
+  path.reset();
+  path.quadTo(Point{100, 150}, Point{150, 150});
+  paint.setColor(Color::White());
+  matrix.reset();
+  matrix.postTranslate(500, 10);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
+  device->unlock();
+}
+
+TGFX_TEST(CanvasTest, shape) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 400;
+  auto height = 500;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(0));
+  EXPECT_TRUE(paint.nothingToDraw());
+  paint.setStrokeWidth(2);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  auto point = Point::Make(width / 2, height / 2);
+  auto radius = image->width() / 2;
+  auto rect = Rect::MakeWH(radius * 2, radius * 2);
+  canvas->drawCircle(point, radius + 30, paint);
+  canvas->setMatrix(Matrix::MakeTrans(point.x - radius, point.y - radius));
+  canvas->drawRoundRect(rect, 10, 10, paint);
+
+  canvas->setMatrix(Matrix::MakeTrans(point.x - radius, point.y - radius));
+  canvas->rotate(45, radius, radius);
+  canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
   device->unlock();
 }
 
