@@ -934,6 +934,7 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
 
   canvas = recorder.beginRecording();
+  paint.reset();
   canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
   auto textRecord = recorder.finishRecordingAsPicture();
   bounds = textRecord->getBounds();
@@ -951,6 +952,11 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Text"));
 
   canvas = recorder.beginRecording();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  matrix.reset();
+  matrix.postRotate(30, 50, 50);
+  path.transform(matrix);
   canvas->drawPath(path, paint);
   auto patRecord = recorder.finishRecordingAsPicture();
   bounds = patRecord->getBounds();
