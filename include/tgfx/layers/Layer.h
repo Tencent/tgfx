@@ -471,6 +471,10 @@ class Layer {
    */
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
+  virtual bool hitTestByBounds(float x, float y);
+
+  virtual bool hitTestByPixel(float x, float y);
+
  private:
   /**
    * Marks the layer's children as changed and needing to be redrawn.

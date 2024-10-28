@@ -336,11 +336,28 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
+  const auto& layers = getLayersUnderPoint(x, y);
   if (pixelHitTest) {
-    // TODO: Implement accurate pixel detection.
+    for (auto& layer : layers) {
+      switch (layer->type()) {
+        case LayerType::Layer: // Layer, Image, and Text Layer only check if the bounding box is hit.
+        case LayerType::Image:
+        case LayerType::Text:
+          if (layer->hitTestByBounds(x, y)) {
+            return true;
+          }
+          break;
+        case LayerType::Shape: // ShapeLayer needs to perform pixel-level hit testing to determine if the layer is hit.
+          if (layer->hitTestByPixel(x, y)) {
+            return true;
+          }
+          break;
+        default:
+          break;
+      }
+    }
     return false;
   } else {
-    const auto& layers = getLayersUnderPoint(x, y);
     return !layers.empty();
   }
 }
@@ -612,6 +629,22 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   }
 
   return hasLayerUnderPoint;
+}
+
+bool Layer::hitTestByBounds(float x, float y) {
+  const auto content = getContent();
+  if (nullptr == content) {
+    return false;
+  }
+
+  Rect bounds = Rect::MakeEmpty();
+  bounds.join(content->getBounds());
+  getGlobalMatrix().mapRect(&bounds);
+  return bounds.contains(x, y);
+}
+
+bool Layer::hitTestByPixel(float, float) {
+  return false;
 }
 
 }  // namespace tgfx
