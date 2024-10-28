@@ -55,6 +55,21 @@ enum class SrcColorOpacity {
   TransparentAlpha,
 };
 
+static SrcColorOpacity GetFillColorOpacity(const FillStyle& style) {
+  auto alpha = style.color.alpha;
+  const auto& color = style.color;
+  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
+    return SrcColorOpacity::Opaque;
+  } else if (alpha == 0.0f) {
+    if (style.shader || color.red != 0.0f || color.green != 0.0f || color.blue != 0.0f) {
+      return SrcColorOpacity::TransparentAlpha;
+    } else {
+      return SrcColorOpacity::TransparentBlack;
+    }
+  }
+  return SrcColorOpacity::Unknown;
+}
+
 static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
   BlendInfo blendInfo = {};
   if (!BlendModeAsCoeff(mode, &blendInfo)) {
@@ -148,13 +163,7 @@ bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const Fi
     return false;
   }
   auto color = style.color;
-  SrcColorOpacity opacity = SrcColorOpacity::Unknown;
-  if (color.isOpaque()) {
-    opacity = SrcColorOpacity::Opaque;
-  } else if (color.alpha == 0.0f) {
-    opacity = SrcColorOpacity::TransparentBlack;
-  }
-  if (!BlendModeIsOpaque(style.blendMode, opacity)) {
+  if (!BlendModeIsOpaque(style.blendMode, GetFillColorOpacity(style))) {
     return false;
   }
   auto bounds = rect;
@@ -563,18 +572,7 @@ bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCStat
   if (style.colorFilter && style.colorFilter->isAlphaUnchanged()) {
     return false;
   }
-  auto opacityType = SrcColorOpacity::Unknown;
-  auto alpha = style.color.alpha;
-  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
-    opacityType = SrcColorOpacity::Opaque;
-  } else if (alpha == 0) {
-    if (style.shader) {
-      opacityType = SrcColorOpacity::TransparentAlpha;
-    } else {
-      opacityType = SrcColorOpacity::TransparentBlack;
-    }
-  }
-  return BlendModeIsOpaque(style.blendMode, opacityType);
+  return BlendModeIsOpaque(style.blendMode, GetFillColorOpacity(style));
 }
 
 void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {
