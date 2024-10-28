@@ -924,8 +924,8 @@ TGFX_TEST(LayerTest, hitTestPoint) {
 
   auto rootLayerBounds = rootLayer->getBounds();
   rootLayerBounds.roundOut();
-  printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top, rootLayerBounds.right,
-         rootLayerBounds.bottom);
+  printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
+         rootLayerBounds.right, rootLayerBounds.bottom);
 
   displayList->render(surface.get());
 
