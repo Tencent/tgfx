@@ -122,13 +122,9 @@ Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& stat
 }
 
 void RenderContext::clear() {
-  FillStyle style = {};
-  style.color = Color::Transparent();
-  style.blendMode = BlendMode::Src;
   auto renderTarget = opContext->renderTarget();
   auto rect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  MCState state = {};
-  drawAsClear(rect, state, style);
+  addOp(ClearOp::Make(Color::Transparent(), rect), [] { return true; });
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -440,14 +436,12 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     auto drawOp =
         TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
     drawOp->setAA(AAType::Coverage);
-    auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true);
+    auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true, 1, false,
+                                                        ImageOrigin::TopLeft, true);
     if (renderTarget == nullptr) {
       return nullptr;
     }
     OpContext context(renderTarget);
-    // Since the clip may not coverage the entire render target, we need to clear the render target
-    // to transparent. Otherwise, the associated texture will have undefined pixels outside the clip.
-    context.addOp(ClearOp::Make(Color::Transparent(), Rect::MakeWH(width, height)));
     context.addOp(std::move(drawOp));
     clipTexture = renderTarget->getTextureProxy();
   } else {
