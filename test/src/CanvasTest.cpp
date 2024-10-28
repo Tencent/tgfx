@@ -276,7 +276,7 @@ TGFX_TEST(CanvasTest, textShape) {
   auto newline = [&]() {
     x = 0;
     height += lineHeight;
-    path.moveTo(Point{0, height});
+    path.moveTo({0, height});
   };
   newline();
   for (size_t i = 0; i < count; ++i) {
@@ -296,7 +296,7 @@ TGFX_TEST(CanvasTest, textShape) {
     run->ids.emplace_back(glyphID);
     run->positions.push_back(Point{x, height});
     x += run->font.getAdvance(glyphID);
-    path.lineTo(Point{x, height});
+    path.lineTo({x, height});
     if (width < x) {
       width = x;
     }
