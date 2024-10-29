@@ -25,59 +25,50 @@
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
-                                       int sampleCount, bool mipmapped,
-                                       const SurfaceOptions* options) {
+                                       int sampleCount, bool mipmapped, uint32_t renderFlags) {
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
-              sampleCount, mipmapped, options);
+              sampleCount, mipmapped, renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, ColorType colorType,
-                                       int sampleCount, bool mipmapped,
-                                       const SurfaceOptions* options) {
+                                       int sampleCount, bool mipmapped, uint32_t renderFlags) {
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
-  auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipmapped);
-  auto surface = MakeFrom(std::move(proxy), options);
-  if (surface != nullptr) {
-    // Clear the surface by default for internally created RenderTarget.
-    surface->getCanvas()->clear();
-  }
-  return surface;
+  auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipmapped,
+                                       ImageOrigin::TopLeft, true);
+  return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin, const SurfaceOptions* options) {
+                                           ImageOrigin origin, uint32_t renderFlags) {
   auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, origin);
-  return MakeFrom(std::move(proxy), options);
+  return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount,
-                                           const SurfaceOptions* options) {
+                                           uint32_t renderFlags) {
   auto proxy = RenderTargetProxy::MakeFrom(context, backendTexture, sampleCount, origin);
-  return MakeFrom(std::move(proxy), options);
+  return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           int sampleCount, const SurfaceOptions* options) {
+                                           int sampleCount, uint32_t renderFlags) {
   auto proxy = RenderTargetProxy::MakeFrom(context, hardwareBuffer, sampleCount);
-  return MakeFrom(std::move(proxy), options);
+  return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           const SurfaceOptions* options) {
+                                           uint32_t renderFlags) {
   if (renderTargetProxy == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), options));
+  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), renderFlags));
 }
 
-Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options)
-    : renderTargetProxy(std::move(proxy)) {
+Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
+    : renderTargetProxy(std::move(proxy)), _renderFlags(renderFlags) {
   DEBUG_ASSERT(this->renderTargetProxy != nullptr);
-  if (options != nullptr) {
-    surfaceOptions = *options;
-  }
 }
 
 Surface::~Surface() {

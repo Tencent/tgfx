@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorMatrixFilter.h"
-#include "core/utils/MathExtra.h"
-#include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "tgfx/layers/filters/BlendFilter.h"
 
 namespace tgfx {
-std::shared_ptr<ColorFilter> ColorFilter::Matrix(const std::array<float, 20>& rowMajor) {
-  return std::make_shared<ColorMatrixFilter>(rowMajor);
+
+std::shared_ptr<BlendFilter> BlendFilter::Make(const Color& color, BlendMode mode) {
+  return std::shared_ptr<BlendFilter>(new BlendFilter(color, mode));
 }
 
-static bool IsAlphaUnchanged(const float matrix[20]) {
-  const float* srcA = matrix + 15;
-  return FloatNearlyZero(srcA[0]) && FloatNearlyZero(srcA[1]) && FloatNearlyZero(srcA[2]) &&
-         FloatNearlyEqual(srcA[3], 1) && FloatNearlyZero(srcA[4]);
+void BlendFilter::setBlendMode(BlendMode mode) {
+  if (_blendMode == mode) {
+    return;
+  }
+  _blendMode = mode;
+  invalidate();
 }
 
-ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix)
-    : matrix(matrix), alphaIsUnchanged(IsAlphaUnchanged(matrix.data())) {
+void BlendFilter::setColor(const Color& color) {
+  if (_color == color) {
+    return;
+  }
+  _color = color;
+  invalidate();
 }
 
-std::unique_ptr<FragmentProcessor> ColorMatrixFilter::asFragmentProcessor() const {
-  return ColorMatrixFragmentProcessor::Make(matrix);
+std::shared_ptr<ImageFilter> BlendFilter::onCreateImageFilter(float) {
+  return ImageFilter::ColorFilter(ColorFilter::Blend(_color, _blendMode));
 }
+
+BlendFilter::BlendFilter(const Color& color, BlendMode blendMode)
+    : LayerFilter(), _color(std::move(color)), _blendMode(blendMode) {
+}
+
 }  // namespace tgfx

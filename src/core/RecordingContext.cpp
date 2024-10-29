@@ -58,26 +58,30 @@ void RecordingContext::drawPath(const Path& path, const MCState& state, const Fi
   }
 }
 
-void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                     const Rect& rect, const MCState& state,
+void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                                 const MCState& state, const FillStyle& style) {
+  if (image == nullptr) {
+    return;
+  }
+  records.push_back(new DrawImage(std::move(image), sampling, state, style));
+}
+
+void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+                                     const SamplingOptions& sampling, const MCState& state,
                                      const FillStyle& style) {
   if (image == nullptr) {
     return;
   }
-  auto imageRect = Rect::MakeWH(image->width(), image->height());
-  if (rect == imageRect) {
-    records.push_back(new DrawImage(std::move(image), sampling, state, style));
-  } else {
-    records.push_back(new DrawImageRect(std::move(image), sampling, rect, state, style));
-  }
+  records.push_back(new DrawImageRect(std::move(image), rect, sampling, state, style));
 }
 
-void RecordingContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle& style,
-                                    const Stroke* stroke) {
+void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                        const MCState& state, const FillStyle& style,
+                                        const Stroke* stroke) {
   if (stroke && stroke->width > 0) {
-    records.push_back(new StrokeGlyphRun(std::move(glyphRun), state, style, *stroke));
+    records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), state, style, *stroke));
   } else {
-    records.push_back(new DrawGlyphRun(std::move(glyphRun), state, style));
+    records.push_back(new DrawGlyphRunList(std::move(glyphRunList), state, style));
   }
 }
 
@@ -96,7 +100,7 @@ void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCSta
   if (picture->records.size() > MaxPictureDrawsToUnrollInsteadOfReference) {
     records.push_back(new DrawPicture(picture, state));
   } else {
-    DrawContext::drawPicture(std::move(picture), state);
+    picture->playback(this, state);
   }
 }
 }  // namespace tgfx

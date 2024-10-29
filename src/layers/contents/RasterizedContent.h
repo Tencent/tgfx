@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,21 +18,29 @@
 
 #pragma once
 
-#include "tgfx/core/ColorFilter.h"
+#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-class ColorMatrixFilter : public ColorFilter {
+class RasterizedContent : public LayerContent {
  public:
-  explicit ColorMatrixFilter(const std::array<float, 20>& matrix);
-
-  bool isAlphaUnchanged() const override {
-    return alphaIsUnchanged;
+  RasterizedContent(uint32_t contextID, std::shared_ptr<Image> image, const Matrix& matrix)
+      : _contextID(contextID), image(std::move(image)), matrix(matrix) {
   }
 
- private:
-  std::array<float, 20> matrix;
-  bool alphaIsUnchanged;
+  /**
+   * Returns the unique ID of the associated GPU device.
+   */
+  uint32_t contextID() const {
+    return _contextID;
+  }
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  Rect getBounds() const override;
+
+  void draw(Canvas* canvas, const Paint& paint) const override;
+
+ private:
+  uint32_t _contextID = 0;
+  std::shared_ptr<Image> image = nullptr;
+  Matrix matrix = Matrix::I();
 };
 }  // namespace tgfx

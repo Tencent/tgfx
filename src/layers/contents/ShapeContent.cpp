@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,40 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/RenderFlags.h"
+#include "ShapeContent.h"
 
 namespace tgfx {
-/**
- * Describes properties and constraints of a given Surface. The rendering engine can parse these
- * during drawing, and can sometimes optimize its performance (e.g., disabling an expensive feature).
- */
-class SurfaceOptions {
- public:
-  SurfaceOptions() = default;
+ShapeContent::ShapeContent(Path path, std::shared_ptr<Shader> shader)
+    : path(std::move(path)), shader(std::move(shader)) {
+}
 
-  SurfaceOptions(uint32_t renderFlags) : _renderFlags(renderFlags) {
-  }
-
-  uint32_t renderFlags() const {
-    return _renderFlags;
-  }
-
-  bool cacheDisabled() const {
-    return _renderFlags & RenderFlags::DisableCache;
-  }
-
-  bool asyncTaskDisabled() const {
-    return _renderFlags & RenderFlags::DisableAsyncTask;
-  }
-
-  bool operator==(const SurfaceOptions& that) const {
-    return _renderFlags == that._renderFlags;
-  }
-
- private:
-  uint32_t _renderFlags = 0;
-};
-
+void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
+  auto shapePaint = paint;
+  shapePaint.setShader(shader);
+  canvas->drawPath(path, shapePaint);
+}
 }  // namespace tgfx

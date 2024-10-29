@@ -17,13 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
+#include <atomic>
+#include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
+#include "layers/DrawArgs.h"
+#include "layers/contents/RasterizedContent.h"
+#include "tgfx/core/Recorder.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace tgfx {
+static std::atomic_bool AllowsEdgeAntialiasing = true;
+static std::atomic_bool AllowsGroupOpacity = false;
+
+bool Layer::DefaultAllowsEdgeAntialiasing() {
+  return AllowsEdgeAntialiasing;
+}
+
+void Layer::SetDefaultAllowsEdgeAntialiasing(bool value) {
+  AllowsEdgeAntialiasing = value;
+}
+
+bool Layer::DefaultAllowsGroupOpacity() {
+  return AllowsGroupOpacity;
+}
+
+void Layer::SetDefaultAllowsGroupOpacity(bool value) {
+  AllowsGroupOpacity = value;
+}
+
 std::shared_ptr<Layer> Layer::Make() {
   auto layer = std::shared_ptr<Layer>(new Layer());
   layer->weakThis = layer;
   return layer;
+}
+
+Layer::Layer() {
+  memset(&bitFields, 0, sizeof(bitFields));
+  bitFields.visible = true;
+  bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
+  bitFields.allowsGroupOpacity = AllowsGroupOpacity;
 }
 
 void Layer::setAlpha(float value) {
@@ -60,18 +93,18 @@ void Layer::setMatrix(const Matrix& value) {
 }
 
 void Layer::setVisible(bool value) {
-  if (_visible == value) {
+  if (bitFields.visible == value) {
     return;
   }
-  _visible = value;
+  bitFields.visible = value;
   invalidate();
 }
 
 void Layer::setShouldRasterize(bool value) {
-  if (_shouldRasterize == value) {
+  if (bitFields.shouldRasterize == value) {
     return;
   }
-  _shouldRasterize = value;
+  bitFields.shouldRasterize = value;
   invalidate();
 }
 
@@ -83,12 +116,29 @@ void Layer::setRasterizationScale(float value) {
   invalidate();
 }
 
+void Layer::setAllowsEdgeAntialiasing(bool value) {
+  if (bitFields.allowsEdgeAntialiasing == value) {
+    return;
+  }
+  bitFields.allowsEdgeAntialiasing = value;
+  invalidate();
+}
+
+void Layer::setAllowsGroupOpacity(bool value) {
+  if (bitFields.allowsGroupOpacity == value) {
+    return;
+  }
+  bitFields.allowsGroupOpacity = value;
+  invalidate();
+}
+
 void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   if (_filters.size() == value.size() &&
       std::equal(_filters.begin(), _filters.end(), value.begin())) {
     return;
   }
   _filters = std::move(value);
+  rasterizedContent = nullptr;
   invalidate();
 }
 
@@ -100,14 +150,14 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   invalidate();
 }
 
-void Layer::setScrollRect(const Rect* rect) {
-  if (_scrollRect.get() == rect || (_scrollRect && rect && *_scrollRect == *rect)) {
+void Layer::setScrollRect(const Rect& rect) {
+  if ((_scrollRect && *_scrollRect == rect) || (!_scrollRect && rect.isEmpty())) {
     return;
   }
-  if (rect) {
-    _scrollRect = std::make_unique<Rect>(*rect);
-  } else {
+  if (rect.isEmpty()) {
     _scrollRect = nullptr;
+  } else {
+    _scrollRect = std::make_unique<Rect>(rect);
   }
   invalidate();
 }
@@ -133,8 +183,8 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   } else if (child->doContains(this)) {
     LOGE("addChildAt() The child is already a parent of the parent.");
     return false;
-  } else if (child->root() == child.get()) {
-    LOGE("A root cannot be added as a child to a layer.");
+  } else if (child->_root == child.get()) {
+    LOGE("A root layer cannot be added as a child to another layer.");
     return false;
   }
   if (child->parent().get() == this) {
@@ -144,7 +194,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   _children.insert(_children.begin() + index, child);
   child->_parent = this;
   child->onAttachToRoot(_root);
-  invalidateContent();
+  invalidateChildren();
   return true;
 }
 
@@ -185,7 +235,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   child->_parent = nullptr;
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
-  invalidateContent();
+  invalidateChildren();
   return child;
 }
 
@@ -216,7 +266,7 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   }
   _children.erase(_children.begin() + oldIndex);
   _children.insert(_children.begin() + index, child);
-  invalidateContent();
+  invalidateChildren();
   return true;
 }
 
@@ -230,58 +280,134 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
     return false;
   }
   oldChild->removeFromParent();
-  invalidateContent();
+  invalidateChildren();
   return true;
 }
 
-Rect Layer::getBounds(const Layer*) const {
-  return Rect::MakeEmpty();
+Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
+  Rect bounds = Rect::MakeEmpty();
+  auto content = getContent();
+  if (content) {
+    bounds.join(content->getBounds());
+  }
+  for (const auto& child : _children) {
+    auto childBounds = child->getBounds();
+    if (child->_scrollRect) {
+      if (!childBounds.intersect(*child->_scrollRect)) {
+        continue;
+      }
+    }
+    child->getMatrixWithScrollRect().mapRect(&childBounds);
+    bounds.join(childBounds);
+  }
+
+  auto imageFilter = getComposeFilter(_filters, 1.0f);
+  if (imageFilter) {
+    bounds = imageFilter->filterBounds(bounds);
+  }
+
+  if (targetCoordinateSpace && targetCoordinateSpace != this) {
+    auto totalMatrix = getGlobalMatrix();
+    auto coordinateMatrix = targetCoordinateSpace->getGlobalMatrix();
+    if (!coordinateMatrix.invert(&coordinateMatrix)) {
+      return Rect::MakeEmpty();
+    }
+    totalMatrix.postConcat(coordinateMatrix);
+    totalMatrix.mapRect(&bounds);
+  }
+
+  return bounds;
 }
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
-  return globalPoint;
+  auto globalMatrix = getGlobalMatrix();
+  auto inverseMatrix = Matrix::I();
+  if (!globalMatrix.invert(&inverseMatrix)) {
+    return Point::Make(0, 0);
+  }
+  return inverseMatrix.mapXY(globalPoint.x, globalPoint.y);
 }
 
 Point Layer::localToGlobal(const Point& localPoint) const {
-  return localPoint;
+  auto globalMatrix = getGlobalMatrix();
+  return globalMatrix.mapXY(localPoint.x, localPoint.y);
 }
 
 bool Layer::hitTestPoint(float, float, bool) {
   return false;
 }
 
+void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
+  if (canvas == nullptr || alpha <= 0) {
+    return;
+  }
+  auto surface = canvas->getSurface();
+  DrawArgs args = {};
+  if (surface) {
+    args.context = surface->getContext();
+    args.renderFlags = surface->renderFlags();
+  }
+  drawLayer(args, canvas, alpha, blendMode);
+}
+
 void Layer::invalidate() {
-  dirty = true;
+  if (bitFields.dirty) {
+    return;
+  }
+  bitFields.dirty = true;
+  if (_parent) {
+    _parent->invalidateChildren();
+  }
 }
 
 void Layer::invalidateContent() {
+  if (bitFields.contentDirty) {
+    return;
+  }
+  bitFields.contentDirty = true;
+  rasterizedContent = nullptr;
   invalidate();
 }
 
-void Layer::onAttachToRoot(Layer* root) {
-  _root = root;
-  for (auto child : _children) {
-    child->onAttachToRoot(root);
+void Layer::invalidateChildren() {
+  if (bitFields.childrenDirty) {
+    return;
+  }
+  bitFields.childrenDirty = true;
+  rasterizedContent = nullptr;
+  invalidate();
+}
+
+std::unique_ptr<LayerContent> Layer::onUpdateContent() {
+  return nullptr;
+}
+
+void Layer::onAttachToRoot(Layer* owner) {
+  _root = owner;
+  for (auto& child : _children) {
+    child->onAttachToRoot(owner);
   }
 }
 
 void Layer::onDetachFromRoot() {
   _root = nullptr;
-  for (auto child : _children) {
+  for (auto& child : _children) {
     child->onDetachFromRoot();
   }
 }
 
-int Layer::doGetChildIndex(Layer* child) const {
-  for (size_t i = 0; i < _children.size(); ++i) {
-    if (_children[i].get() == child) {
-      return static_cast<int>(i);
+int Layer::doGetChildIndex(const Layer* child) const {
+  int index = 0;
+  for (auto& layer : _children) {
+    if (layer.get() == child) {
+      return index;
     }
+    index++;
   }
   return -1;
 }
 
-bool Layer::doContains(Layer* child) const {
+bool Layer::doContains(const Layer* child) const {
   auto target = child;
   while (target) {
     if (target == this) {
@@ -292,6 +418,159 @@ bool Layer::doContains(Layer* child) const {
   return false;
 }
 
-void Layer::onDraw(Canvas*) {
+Matrix Layer::getGlobalMatrix() const {
+  // The global matrix transforms the layer's local coordinate space to the coordinate space of its
+  // top-level parent layer. This means the top-level parent layer's own matrix is not included in
+  // the global matrix.
+  auto matrix = Matrix::I();
+  auto layer = this;
+  while (layer->_parent) {
+    matrix.postConcat(layer->getMatrixWithScrollRect());
+    layer = layer->_parent;
+  }
+  return matrix;
 }
+
+Matrix Layer::getMatrixWithScrollRect() const {
+  auto matrix = _matrix;
+  if (_scrollRect) {
+    matrix.preTranslate(-_scrollRect->left, -_scrollRect->top);
+  }
+  return matrix;
+}
+
+LayerContent* Layer::getContent() {
+  if (bitFields.contentDirty) {
+    layerContent = onUpdateContent();
+    bitFields.contentDirty = false;
+  }
+  return layerContent.get();
+}
+
+Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
+  Paint paint;
+  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  return paint;
+}
+
+LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
+  if (!bitFields.shouldRasterize || args.context == nullptr) {
+    return nullptr;
+  }
+  auto contextID = args.context->uniqueID();
+  auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
+  if (content && content->contextID() == contextID) {
+    return content;
+  }
+  if (args.renderFlags & RenderFlags::DisableCache) {
+    return nullptr;
+  }
+  Rect bounds = getBounds();
+  auto width = roundf(bounds.width() * _rasterizationScale);
+  auto height = roundf(bounds.height() * _rasterizationScale);
+  Matrix matrix = Matrix::MakeScale(width / bounds.width(), height / bounds.height());
+  matrix.preTranslate(-bounds.left, -bounds.top);
+  Matrix drawingMatrix = {};
+  if (!matrix.invert(&drawingMatrix)) {
+    return nullptr;
+  }
+  auto renderFlags = args.renderFlags | RenderFlags::DisableCache;
+  auto surface = Surface::Make(args.context, static_cast<int>(width), static_cast<int>(height),
+                               false, 1, false, renderFlags);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->concat(matrix);
+  DrawArgs drawArgs(args.context, renderFlags, true);
+  drawOffscreen(drawArgs, canvas, 1.0, BlendMode::SrcOver, _filters);
+  auto image = surface->makeImageSnapshot();
+  rasterizedContent = std::make_unique<RasterizedContent>(contextID, image, drawingMatrix);
+  return rasterizedContent.get();
+}
+
+void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
+  DEBUG_ASSERT(canvas != nullptr);
+  auto rasterizedCache = getRasterizedCache(args);
+  if (rasterizedCache) {
+    Paint paint;
+    paint.setAlpha(alpha);
+    paint.setBlendMode(blendMode);
+    rasterizedCache->draw(canvas, paint);
+  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+             !_filters.empty()) {
+    drawOffscreen(args, canvas, alpha, blendMode, _filters);
+  } else {
+    // draw directly
+    drawContents(args, canvas, alpha);
+  }
+  if (args.cleanDirtyFlags) {
+    bitFields.dirty = false;
+  }
+}
+
+void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                          const std::vector<std::shared_ptr<LayerFilter>>& filters) {
+  if (filters.empty() && alpha == 1.0f && blendMode == BlendMode::SrcOver) {
+    drawContents(args, canvas, alpha);
+    return;
+  }
+
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto filter = getComposeFilter(filters, contentScale);
+  Recorder recorder;
+  auto contentCanvas = recorder.beginRecording();
+  contentCanvas->scale(contentScale, contentScale);
+  drawContents(args, contentCanvas, 1.0f);
+
+  Paint paint;
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  paint.setImageFilter(filter);
+  canvas->save();
+  canvas->scale(1.0f / contentScale, 1.0f / contentScale);
+  canvas->drawPicture(recorder.finishRecordingAsPicture(), nullptr, &paint);
+  canvas->restore();
+}
+
+void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
+  auto content = getContent();
+  if (content) {
+    content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
+  }
+  for (const auto& child : _children) {
+    if (!child->visible() || child->_alpha <= 0) {
+      continue;
+    }
+    canvas->save();
+    canvas->concat(child->getMatrixWithScrollRect());
+    if (child->_scrollRect) {
+      canvas->clipRect(Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
+    }
+    child->drawLayer(args, canvas, child->_alpha * alpha, child->_blendMode);
+    canvas->restore();
+  }
+  if (args.cleanDirtyFlags) {
+    bitFields.childrenDirty = false;
+  }
+}
+
+std::shared_ptr<ImageFilter> Layer::getComposeFilter(
+    const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale) {
+  if (filters.empty()) {
+    return nullptr;
+  }
+  std::vector<std::shared_ptr<ImageFilter>> imageFilters;
+  for (const auto& filter : filters) {
+    auto imageFilter = filter->getImageFilter(scale);
+    if (!imageFilter) {
+      continue;
+    }
+    imageFilters.push_back(imageFilter);
+  }
+  return ImageFilter::Compose(imageFilters);
+}
+
 }  // namespace tgfx

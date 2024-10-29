@@ -21,18 +21,18 @@
 namespace tgfx {
 class TextRasterizer : public Rasterizer {
  public:
-  TextRasterizer(std::shared_ptr<TextBlob> textBlob, const ISize& clipSize, const Matrix& matrix,
-                 const Stroke* stroke)
-      : Rasterizer(clipSize, matrix, stroke), textBlob(std::move(textBlob)) {
+  TextRasterizer(std::shared_ptr<GlyphRunList> glyphRunList, const ISize& clipSize,
+                 const Matrix& matrix, const Stroke* stroke)
+      : Rasterizer(clipSize, matrix, stroke), glyphRunList(std::move(glyphRunList)) {
   }
 
  protected:
   void onRasterize(Mask* mask, const Stroke* stroke) const override {
-    mask->fillText(textBlob.get(), stroke);
+    mask->fillText(glyphRunList.get(), stroke);
   }
 
  private:
-  std::shared_ptr<TextBlob> textBlob = nullptr;
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
 };
 
 class PathRasterizer : public Rasterizer {
@@ -50,13 +50,13 @@ class PathRasterizer : public Rasterizer {
   Path path = {};
 };
 
-std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(std::shared_ptr<TextBlob> textBlob,
+std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(std::shared_ptr<GlyphRunList> glyphRunList,
                                                  const ISize& clipSize, const Matrix& matrix,
                                                  const Stroke* stroke) {
-  if (textBlob == nullptr || clipSize.isEmpty()) {
+  if (glyphRunList == nullptr || clipSize.isEmpty()) {
     return nullptr;
   }
-  return std::make_shared<TextRasterizer>(std::move(textBlob), clipSize, matrix, stroke);
+  return std::make_shared<TextRasterizer>(std::move(glyphRunList), clipSize, matrix, stroke);
 }
 
 std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(Path path, const ISize& clipSize,
@@ -76,6 +76,14 @@ Rasterizer::Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke
 
 Rasterizer::~Rasterizer() {
   delete stroke;
+}
+
+bool Rasterizer::asyncSupport() const {
+#if defined(TGFX_BUILD_FOR_WEB) && !defined(TGFX_USE_FREETYPE)
+  return false;
+#else
+  return true;
+#endif
 }
 
 std::shared_ptr<ImageBuffer> Rasterizer::onMakeBuffer(bool tryHardware) const {

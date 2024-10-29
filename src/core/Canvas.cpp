@@ -21,7 +21,6 @@
 #include "core/LayerUnrollContext.h"
 #include "core/Records.h"
 #include "core/utils/Log.h"
-#include "core/utils/SimpleTextShaper.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Surface.h"
 
@@ -312,21 +311,17 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
     }
     state.matrix.preTranslate(offset.x, offset.y);
   }
-  auto rect = Rect::MakeWH(image->width(), image->height());
   auto style = CreateFillStyle(paint);
-  drawContext->drawImageRect(std::move(image), sampling, rect, state, style);
+  drawContext->drawImage(std::move(image), sampling, state, style);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
                             const Paint& paint) {
-  if (text.empty() || paint.nothingToDraw()) {
+  if (text.empty()) {
     return;
   }
-  auto glyphRun = SimpleTextShaper::Shape(text, font);
-  auto state = *mcState;
-  state.matrix.preTranslate(x, y);
-  auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), state, style, paint.getStroke());
+  auto textBlob = TextBlob::MakeFrom(text, font);
+  drawTextBlob(std::move(textBlob), x, y, paint);
 }
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
@@ -335,8 +330,22 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
     return;
   }
   GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRun(std::move(glyphRun), *mcState, style, paint.getStroke());
+  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
+}
+
+void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
+                          const Paint& paint) {
+  if (textBlob == nullptr || paint.nothingToDraw()) {
+    return;
+  }
+  auto state = *mcState;
+  state.matrix.preTranslate(x, y);
+  auto style = CreateFillStyle(paint);
+  for (auto& glyphRunList : textBlob->glyphRunLists) {
+    drawContext->drawGlyphRunList(glyphRunList, state, style, paint.getStroke());
+  }
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
@@ -361,15 +370,15 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 }
 
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
-                       const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  if (picture->records.size() == 1) {
-    LayerUnrollContext layerContext(drawContext, style, filter);
+                       const FillStyle& style, std::shared_ptr<ImageFilter> imageFilter) {
+  if (imageFilter == nullptr && picture->records.size() == 1 && style.maskFilter == nullptr) {
+    LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
     if (layerContext.hasUnrolled()) {
       return;
     }
   }
-  drawContext->drawLayer(std::move(picture), state, style, std::move(filter));
+  drawContext->drawLayer(std::move(picture), state, style, std::move(imageFilter));
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
@@ -393,7 +402,11 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     if (colors) {
       glyphStyle.color = colors[i].premultiply();
     }
-    drawContext->drawImageRect(atlas, sampling, rect, state, glyphStyle);
+    if (rect == atlasRect) {
+      drawContext->drawImage(atlas, sampling, state, glyphStyle);
+    } else {
+      drawContext->drawImageRect(atlas, rect, sampling, state, glyphStyle);
+    }
   }
 }
 }  // namespace tgfx

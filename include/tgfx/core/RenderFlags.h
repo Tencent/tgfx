@@ -22,7 +22,8 @@
 
 namespace tgfx {
 /**
- * Defines flags that can be passed to the rendering process.
+ * Defines flags that can be passed to the rendering process. The tgfx runtime can interpret these
+ * to optimize performance, such as by disabling certain expensive features.
  */
 class RenderFlags {
  public:

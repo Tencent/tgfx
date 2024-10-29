@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "ce1f4d55330727eb3f02595999c1a1b4fab23ebf",
+        "commit": "ca36f272af390e9abf07a425fca5220a060a6d8a",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -27,7 +27,7 @@
       },
       {
         "url": "https://github.com/glennrp/libpng.git",
-        "commit": "a40189cf881e9f0db80511c382292a5604c3c3d1",
+        "commit": "f135775ad4e5d4408d2e12ffcc71bb36e6b48551",
         "dir": "third_party/libpng"
       },
       {

@@ -30,7 +30,7 @@ void ImageLayer::setSampling(const SamplingOptions& value) {
     return;
   }
   _sampling = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ImageLayer::setImage(std::shared_ptr<Image> value) {
@@ -38,6 +38,10 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
     return;
   }
   _image = value;
-  invalidate();
+  invalidateContent();
+}
+
+std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
+  return std::make_unique<ImageContent>(_image, _sampling);
 }
 }  // namespace tgfx

@@ -18,15 +18,14 @@
 
 #pragma once
 
-#include "tgfx/core/Font.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Stroke.h"
+#include "tgfx/core/GlyphRun.h"
 
 namespace tgfx {
-class GlyphRun;
+class GlyphRunList;
 
 /**
- * TextBlob combines multiple glyphs, Font, and positions into an immutable container.
+ * TextBlob combines multiple text runs into an immutable container. Each text run consists of
+ * glyphs, positions, and font.
  */
 class TextBlob {
  public:
@@ -34,15 +33,29 @@ class TextBlob {
    * Creates a new TextBlob from the given text. The text must be in utf-8 encoding. This function
    * uses the default character-to-glyph mapping from the Typeface in font. It does not perform
    * typeface fallback for characters not found in the Typeface. Glyphs are positioned based on
-   * their default advances.
+   * their default advances. Returns nullptr if the text is empty or fails to map any characters to
+   * glyphs.
    */
   static std::shared_ptr<TextBlob> MakeFrom(const std::string& text, const Font& font);
 
   /**
-   * Creates a new TextBlob from the given glyphs, positions, and text font.
+   * Creates a new TextBlob from the given glyphs, positions, and text font. Returns nullptr if the
+   * glyphCount is 0.
    */
   static std::shared_ptr<TextBlob> MakeFrom(const GlyphID glyphIDs[], const Point positions[],
                                             size_t glyphCount, const Font& font);
+
+  /**
+   * Creates a new TextBlob from a single glyph run. Returns nullptr if the glyph run is empty or
+   * has mismatched glyph and position counts.
+   */
+  static std::shared_ptr<TextBlob> MakeFrom(GlyphRun glyphRun);
+
+  /**
+   * Creates a new TextBlob from the given glyph runs. Returns nullptr if glyphRuns is empty or if
+   * any of the glyph runs are invalid (i.e., have mismatched glyph and position counts).
+   */
+  static std::shared_ptr<TextBlob> MakeFrom(std::vector<GlyphRun> glyphRuns);
 
   virtual ~TextBlob() = default;
 
@@ -51,17 +64,14 @@ class TextBlob {
    */
   Rect getBounds(const Matrix& matrix = Matrix::I()) const;
 
- protected:
-  /**
-   * Returns the number of glyph runs in the text blob.
-   */
-  virtual size_t glyphRunCount() const = 0;
+ private:
+  std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};
 
-  /**
-   * Returns the glyph runs at the given index.
-   */
-  virtual const GlyphRun* getGlyphRun(size_t i) const = 0;
+  explicit TextBlob(std::vector<std::shared_ptr<GlyphRunList>> runLists)
+      : glyphRunLists(std::move(runLists)) {
+  }
 
+  friend class Canvas;
   friend class Mask;
 };
 }  // namespace tgfx

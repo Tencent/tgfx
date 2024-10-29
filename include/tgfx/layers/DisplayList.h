@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -32,42 +33,21 @@ class DisplayList {
   virtual ~DisplayList() = default;
 
   /**
-   * Returns true if the display list allows layers to perform edge antialiasing. This means the
-   * edges of shapes and images can be drawn with partial transparency. The default value is true.
-   */
-  bool allowsEdgeAntialiasing() const {
-    return _allowsEdgeAntialiasing;
-  }
-
-  /**
-   * Sets whether the display list allows layers to perform edge antialiasing.
-   */
-  void setAllowsEdgeAntialiasing(bool edgeAntiAlias);
-
-  /**
-   * Returns true if the display list allows layers to be composited as a separate group from their
-   * parent. When true and the layer’s alpha value is less than 1.0, the layer can composite itself
-   * separately from its parent. This ensures correct rendering for layers with multiple opaque
-   * components but may reduce performance. The default value is false.
-   */
-  bool allowsGroupOpacity() const {
-    return _allowsGroupOpacity;
-  }
-
-  /**
-   * Sets whether the display list allows layers to be composited as a separate group from their
-   * parent.
-   */
-  void setAllowsGroupOpacity(bool value);
-
-  /**
-   * Returns the root layer of the display list.
+   * Returns the root layer of the display list. Note: The root layer cannot be added to another
+   * layer. Therefore, properties like alpha, blendMode, position, matrix, visibility, scrollRect,
+   * and mask have no effect on the root layer since it will never have a parent.
    */
   Layer* root() const;
 
+  /**
+   * Draws the display list to the given surface.
+   * @param surface The surface to draw the display list to.
+   * @param replaceAll If true, the surface will be cleared before drawing the display list.
+   * Otherwise, the display list will be drawn on top of the existing content.
+   */
+  void render(Surface* surface, bool replaceAll = true);
+
  private:
-  bool _allowsEdgeAntialiasing = true;
-  bool _allowsGroupOpacity = false;
   std::shared_ptr<Layer> _root = nullptr;
 };
 }  // namespace tgfx

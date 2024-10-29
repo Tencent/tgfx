@@ -26,6 +26,7 @@ class Record;
 class Canvas;
 class DrawContext;
 class MCState;
+class Image;
 
 /**
  * The Picture class captures the drawing commands made on a Canvas, which can be replayed later.
@@ -55,9 +56,11 @@ class Picture {
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 
-  friend class DrawContext;
+  friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
+  friend class Image;
+  friend class PictureImage;
   friend class Canvas;
 };
 }  // namespace tgfx

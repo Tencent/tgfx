@@ -16,30 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SimpleTextShaper.h"
-#include "tgfx/core/UTF.h"
+#pragma once
+
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
-GlyphRun SimpleTextShaper::Shape(const std::string& text, const tgfx::Font& font) {
-  const char* textStart = text.data();
-  const char* textStop = textStart + text.size();
-  std::vector<GlyphID> glyphs = {};
-  std::vector<Point> positions = {};
-  auto emptyGlyphID = font.getGlyphID(" ");
-  auto emptyAdvance = font.getAdvance(emptyGlyphID);
-  float xOffset = 0;
-  while (textStart < textStop) {
-    auto unichar = UTF::NextUTF8(&textStart, textStop);
-    auto glyphID = font.getGlyphID(unichar);
-    if (glyphID > 0) {
-      glyphs.push_back(glyphID);
-      positions.push_back(Point::Make(xOffset, 0.0f));
-      auto advance = font.getAdvance(glyphID);
-      xOffset += advance;
-    } else {
-      xOffset += emptyAdvance;
-    }
+class MatrixColorFilter : public ColorFilter {
+ public:
+  explicit MatrixColorFilter(const std::array<float, 20>& matrix);
+
+  bool isAlphaUnchanged() const override {
+    return alphaIsUnchanged;
   }
-  return {font, std::move(glyphs), std::move(positions)};
-}
+
+ private:
+  std::array<float, 20> matrix;
+  bool alphaIsUnchanged;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+};
 }  // namespace tgfx

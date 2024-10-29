@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "layers/contents/ImageContent.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/layers/Layer.h"
 
@@ -64,6 +65,8 @@ class ImageLayer : public Layer {
  protected:
   ImageLayer() : _sampling(FilterMode::Linear, MipmapMode::Linear) {
   }
+
+  std::unique_ptr<LayerContent> onUpdateContent() override;
 
  private:
   SamplingOptions _sampling;

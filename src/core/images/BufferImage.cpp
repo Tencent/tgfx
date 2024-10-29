@@ -20,11 +20,11 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Image> BufferImage::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto image = std::shared_ptr<BufferImage>(new BufferImage(UniqueKey::Make(), std::move(buffer)));
+  auto image = std::make_shared<BufferImage>(UniqueKey::Make(), std::move(buffer));
   image->weakThis = image;
   return image;
 }

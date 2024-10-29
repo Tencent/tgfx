@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,13 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DrawContext.h"
-#include "tgfx/core/Picture.h"
+#pragma once
+
+#include "tgfx/core/Path.h"
+#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-void DrawContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  if (picture != nullptr) {
-    picture->playback(this, state);
+class ShapeContent : public LayerContent {
+ public:
+  ShapeContent(Path path, std::shared_ptr<Shader> shader);
+
+  Rect getBounds() const override {
+    return path.getBounds();
   }
-}
+
+  void draw(Canvas* canvas, const Paint& paint) const override;
+
+ private:
+  Path path = {};
+  std::shared_ptr<Shader> shader = nullptr;
+};
 }  // namespace tgfx

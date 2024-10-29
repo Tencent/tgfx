@@ -19,22 +19,51 @@
 #pragma once
 
 #include <memory>
+#include "core/utils/UniqueID.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/layers/LayerFilter.h"
+#include "tgfx/layers/LayerContent.h"
 #include "tgfx/layers/LayerType.h"
+#include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
+
+class DisplayList;
+class DrawArgs;
+
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
  * features for positioning, visibility, and alpha support, as well as methods for adding and
- * removing child layers. Note: All layers are not thread-safe and should be accessed from a single
- * thread.
+ * removing child layers. Note that all layers are not thread-safe and should be accessed from a
+ * single thread. Some properties only take effect if the layer has a parent, such as alpha,
+ * blendMode, position, matrix, visible, scrollRect, and mask.
  */
 class Layer {
  public:
+  /**
+   * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
+   * default value is true.
+   */
+  static bool DefaultAllowsEdgeAntialiasing();
+
+  /**
+   * Sets the default value for the allowsEdgeAntialiasing property for new Layer instances.
+   */
+  static void SetDefaultAllowsEdgeAntialiasing(bool value);
+
+  /**
+   * Returns the default value for the allowsGroupOpacity property for new Layer instances. The
+   * default value is false.
+   */
+  static bool DefaultAllowsGroupOpacity();
+
+  /**
+   * Sets the default value for the allowsGroupOpacity property for new Layer instances.
+   */
+  static void SetDefaultAllowsGroupOpacity(bool value);
+
   /**
    * Creates a new Layer instance.
    */
@@ -118,7 +147,7 @@ class Layer {
    * Returns whether the layer is visible. The default value is true.
    */
   bool visible() const {
-    return _visible;
+    return bitFields.visible;
   }
 
   /**
@@ -135,8 +164,8 @@ class Layer {
    * (like filters) require it. This caching can improve performance for layers with complex
    * content. The default value is false.
    */
-  bool shouldRasterize() {
-    return _shouldRasterize;
+  bool shouldRasterize() const {
+    return bitFields.shouldRasterize;
   }
 
   /**
@@ -161,6 +190,36 @@ class Layer {
   void setRasterizationScale(float value);
 
   /**
+   * Returns true if the layer is allowed to perform edge antialiasing. This means the edges of
+   * shapes and images can be drawn with partial transparency. The default value is read from the
+   * Layer::DefaultAllowsEdgeAntialiasing() method.
+   */
+  bool allowsEdgeAntialiasing() const {
+    return bitFields.allowsEdgeAntialiasing;
+  }
+
+  /**
+   * Sets whether the layer is allowed to perform edge antialiasing.
+   */
+  void setAllowsEdgeAntialiasing(bool value);
+
+  /**
+   * Returns true if the layer is allowed to be composited as a separate group from their parent.
+   * When true and the layer’s alpha value is less than 1.0, the layer can composite itself
+   * separately from its parent. This ensures correct rendering for layers with multiple opaque
+   * components but may reduce performance. The default value is read from the
+   * Layer::DefaultAllowsGroupOpacity() method.
+   */
+  bool allowsGroupOpacity() const {
+    return bitFields.allowsGroupOpacity;
+  }
+
+  /**
+   * Sets whether the layer is allowed to be composited as a separate group from their parent.
+   */
+  void setAllowsGroupOpacity(bool value);
+
+  /**
    * Returns the list of filters applied to the layer.
    */
   const std::vector<std::shared_ptr<LayerFilter>>& filters() const {
@@ -175,14 +234,9 @@ class Layer {
   /**
    * Returns the layer used as a mask for the calling layer. For masking to work (allowing scaling
    * or moving), the mask must be in an active part of the display list. However, the mask layer
-   * itself will not be drawn. When layers are cached by setting the cacheAsBitmap property to true,
-   * both the mask and the layer being masked must be part of the same cached bitmap. If the layer
-   * is cached, the mask must be a child of the layer. If an ancestor of the display object on the
-   * display list is cached, the mask must be a child of that ancestor or one of its descendants.
-   * If more than one ancestor of the masked layer is cached, the mask must be a descendant of the
-   * cached container closest to the masked layer in the display list. Note: A single mask object
-   * cannot be used to mask more than one layer. When the mask is assigned to a second layer, it is
-   * removed as the mask of the first object, and that object's mask property becomes nullptr.
+   * itself will not be drawn. Note: A single mask object cannot be used to mask more than one
+   * layer. When the mask is assigned to a second layer, it is removed as the mask of the first
+   * object, and that object's mask property becomes nullptr.
    */
   std::shared_ptr<Layer> mask() const {
     return _mask;
@@ -196,17 +250,25 @@ class Layer {
   /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
    * the rectangle, and it scrolls within the rectangle when you change the x and y properties of
-   * the scrollRect. The default value is nullptr, meaning the layer is displayed in its entirety.
+   * the scrollRect. The properties of the scrollRect Rectangle object use the layer's coordinate
+   * space and are scaled just like the overall layer. The corner bounds of the cropped viewport on
+   * the scrolling layer are the origin of the layer (0,0) and the point defined by the width and
+   * height of the rectangle. They are not centered around the origin, but use the origin to define
+   * the upper-left corner of the area. You can scroll a layer left and right by setting the x
+   * property of the scrollRect. You can scroll a layer up and down by setting the y property of the
+   * scrollRect. If the layer is rotated 90° and if you scroll it left and right, the layer actually
+   * scrolls up and down. The default value is an empty Rect, meaning the layer is displayed in its
+   * entirety and no scrolling is applied.
    */
-  const Rect* scrollRect() const {
-    return _scrollRect.get();
+  Rect scrollRect() const {
+    return _scrollRect ? *_scrollRect : Rect::MakeEmpty();
   }
 
   /**
    * Sets the scroll rectangle bounds of the layer. The scrollRect value is copied internally, so
    * changes to it after calling this function have no effect.
    */
-  void setScrollRect(const Rect* rect);
+  void setScrollRect(const Rect& rect);
 
   /**
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
@@ -279,18 +341,6 @@ class Layer {
   int getChildIndex(std::shared_ptr<Layer> child) const;
 
   /**
-   * Returns an array of layers that lie under the specified point and are children (or grandchildren,
-   * and so on) of the calling layer. The point parameter is in the root layer's coordinate space,
-   * not the parent layer's (unless the parent layer is the root). You can use the globalToLocal()
-   * and the localToGlobal() methods to convert points between these coordinate spaces.
-   * @param x The x coordinate under which to look.
-   * @param y The y coordinate under which to look.
-   * @return An array of layers that lie under the specified point and are children (or
-   * grandchildren, and so on) of the calling layer.
-   */
-  std::vector<std::shared_ptr<Layer>> getLayersUnderPoint(float x, float y);
-
-  /**
    * Removes the layer from its parent layer. If the layer is not a child of any layer, this method
    * has no effect.
    */
@@ -342,7 +392,7 @@ class Layer {
    * @return The rectangle that defines the area of the layer relative to the targetCoordinateSpace
    * layer's coordinate system.
    */
-  Rect getBounds(const Layer* targetCoordinateSpace = nullptr) const;
+  Rect getBounds(const Layer* targetCoordinateSpace = nullptr);
 
   /**
    * Converts the point from the root's (global) coordinates to the layer's (local) coordinates.
@@ -359,64 +409,124 @@ class Layer {
   Point localToGlobal(const Point& localPoint) const;
 
   /**
+   * Returns an array of layers under the specified point that are children (or descendants) of the
+   * calling layer. The layers are checked against their bounding boxes for quick selection. The
+   * first layer in the array is the top-most layer under the point, and the last layer is the
+   * bottom-most. The point parameter is in the root layer's coordinate space, not the parent
+   * layer's (unless the parent layer is the root). You can use the globalToLocal() and the
+   * localToGlobal() methods to convert points between these coordinate spaces.
+   * @param x The x coordinate under which to look.
+   * @param y The y coordinate under which to look.
+   * @return An array of layers that lie under the specified point and are children (or
+   * grandchildren, and so on) of the calling layer.
+   */
+  std::vector<std::shared_ptr<Layer>> getLayersUnderPoint(float x, float y);
+
+  /**
    * Checks if the layer overlaps or intersects with the specified point (x, y).
    * The x and y coordinates are in the root layer's coordinate space, not the parent layer's
    * (unless the parent layer is the root). You can use the globalToLocal() and the localToGlobal()
    * methods to convert points between these coordinate spaces.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
-   * @param shapeFlag Whether to check against the actual pixels of the layer (true) or just the
-   * bounding box (false).
+   * @param shapeFlag Whether to check the actual pixels of the layer (true) or just the bounding
+   * box (false). Note that Image layers are always checked against their bounding box. You can draw
+   * image layers to a Surface and use the Surface::getColor() method to check the actual pixels.
    * @return true if the layer overlaps or intersects with the specified point, false otherwise.
    */
   bool hitTestPoint(float x, float y, bool shapeFlag = false);
 
+  /**
+   * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
+   * mode to control how the layer is drawn. Note: The layer is drawn in its local space without
+   * applying its own matrix, alpha, blend mode, visible, scrollRect, or mask.
+   * @param canvas The canvas to draw the layer on.
+   * @param alpha The alpha transparency value used for drawing the layer and its children.
+   * @param blendMode The blend mode used to composite the layer with the existing content on the
+   * canvas.
+   */
+  void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
+
  protected:
   std::weak_ptr<Layer> weakThis;
 
-  Layer() = default;
+  Layer();
 
   /**
-   * Marks the layer as needing to be redrawn. Different from invalidateContent(), this method only
-   * marks the layer as dirty and does not update the cached content bounds or rasterized bitmap.
+   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
+   * the layer as dirty and does not update the layer content.
    */
   void invalidate();
 
   /**
-   * Marks the layer's content has changed and needs to be redrawn. The cached content bounds will
-   * be updated, and if the layer is rasterized, the rasterized bitmap will be recreated.
+   * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
+   * be called to create the new layer content.
    */
   void invalidateContent();
 
   /**
-   * Called when the layer's content needs to be redrawn. If the layer is rasterized, this method
-   * will draw the content into the rasterized bitmap. Otherwise, the layer will be drawn directly.
+   * Called when the layer's content needs to be updated. Subclasses should override this method to
+   * create the layer content used for measuring the bounding box and drawing the layer itself
+   * (children not included).
    */
-  virtual void onDraw(Canvas* canvas);
+  virtual std::unique_ptr<LayerContent> onUpdateContent();
 
  private:
-  void onAttachToRoot(Layer* root);
+  /**
+   * Marks the layer's children as changed and needing to be redrawn.
+   */
+  void invalidateChildren();
+
+  void onAttachToRoot(Layer* owner);
 
   void onDetachFromRoot();
 
-  int doGetChildIndex(Layer* child) const;
+  int doGetChildIndex(const Layer* child) const;
 
-  bool doContains(Layer* child) const;
+  bool doContains(const Layer* child) const;
 
-  bool dirty = true;
+  Matrix getGlobalMatrix() const;
+
+  Matrix getMatrixWithScrollRect() const;
+
+  LayerContent* getContent();
+
+  Paint getLayerPaint(float alpha, BlendMode blendMode);
+
+  LayerContent* getRasterizedCache(const DrawArgs& args);
+
+  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+
+  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const std::vector<std::shared_ptr<LayerFilter>>& filters);
+
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
+
+  std::shared_ptr<ImageFilter> getComposeFilter(
+      const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale);
+
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = Matrix::I();
-  bool _visible = true;
-  bool _shouldRasterize = false;
   float _rasterizationScale = 1.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
   Layer* _root = nullptr;
   Layer* _parent = nullptr;
+  std::unique_ptr<LayerContent> layerContent = nullptr;
+  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+  struct {
+    bool dirty : 1;          // need to redraw the layer
+    bool contentDirty : 1;   // need to update content
+    bool childrenDirty : 1;  // need to redraw child layers
+    bool visible : 1;
+    bool shouldRasterize : 1;
+    bool allowsEdgeAntialiasing : 1;
+    bool allowsGroupOpacity : 1;
+  } bitFields = {};
 
   friend class DisplayList;
 };

@@ -18,31 +18,29 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
-
 namespace tgfx {
 /**
- * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
- * adjustments. LayerFilters are mutable and can be changed at any time.
+ * Defines the vertical alignment of a text.
  */
-class LayerFilter {
- public:
+enum class VerticalAlign {
   /**
-   * Wraps an ImageFilter in a LayerFilter.
+   * Text is visually top aligned.
    */
-  static std::shared_ptr<LayerFilter> Wrap(const std::shared_ptr<ImageFilter>& filter);
-
-  virtual ~LayerFilter() = default;
+  Top,
 
   /**
-   * Returns the ImageFilter that represents the current state of this LayerFilter.
+   * Text is visually bottom aligned.
    */
-  virtual std::shared_ptr<ImageFilter> getImageFilter() const = 0;
+  Bottom,
 
- protected:
   /**
-   * Invalidates the filter, causing it to be re-computed the next time it is requested.
+   * Text is visually center aligned.
    */
-  void invalidate();
+  Center,
+
+  /**
+   * Text is justified.
+   */
+  Justify
 };
 }  // namespace tgfx

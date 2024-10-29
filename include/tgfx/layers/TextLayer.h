@@ -20,6 +20,8 @@
 
 #include "tgfx/core/Font.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/TextAlign.h"
+#include "tgfx/layers/VerticalAlign.h"
 
 namespace tgfx {
 /**
@@ -28,9 +30,14 @@ namespace tgfx {
 class TextLayer : public Layer {
  public:
   /**
-   * Creates a new text layer.
+   * Sets the typefaces to be used as fallbacks when the requested typeface is not available.
    */
-  std::shared_ptr<TextLayer> Make();
+  static void SetFallbackTypefaces(std::vector<std::shared_ptr<Typeface>> typefaces);
+
+  /**
+   * Creates a new text layer with the specified layout width and height.
+   */
+  static std::shared_ptr<TextLayer> Make();
 
   LayerType type() const override {
     return LayerType::Text;
@@ -72,12 +79,84 @@ class TextLayer : public Layer {
    */
   void setFont(const Font& font);
 
+  /**
+   * Returns the layout width of the text, used for horizontal alignment or wrapping. The default
+   * value is 0, meaning the text will be rendered without any horizontal alignment or wrapping.
+   */
+  float width() const {
+    return _width;
+  }
+
+  /**
+   * Sets the layout width of the text.
+   */
+  void setWidth(float width);
+
+  /**
+   * Returns the layout height of the text, used for vertical alignment. The default value is 0,
+   * meaning the text will be rendered without any vertical alignment.
+   */
+  float height() const {
+    return _height;
+  }
+
+  /**
+   * Sets the layout height of the text.
+   */
+  void setHeight(float height);
+
+  /**
+   * Specifies how the text should be horizontally aligned within the layout width. The default is
+   * HorizontalAlign::Left. This setting is ignored if the layout width is 0.
+   */
+  TextAlign textAlign() const {
+    return _textAlign;
+  }
+
+  /**
+   * Sets how the text should be horizontally aligned within the layout width.
+   */
+  void setTextAlign(TextAlign align);
+
+  /**
+   * Specifies how the text should be vertically aligned within the layout height. The default is
+   * VerticalAlign::Top. This setting is ignored if the layout height is 0.
+   */
+  VerticalAlign verticalAlign() const {
+    return _verticalAlign;
+  }
+
+  /**
+   * Sets how the text should be vertically aligned within the layout height.
+   */
+  void setVerticalAlign(VerticalAlign align);
+
+  /**
+   * Returns whether the text should be wrapped to fit within the text width. The default value is
+   * false. This setting is ignored if the layout width is 0.
+   */
+  bool autoWrap() const {
+    return _autoWrap;
+  }
+
+  /**
+   * Sets whether the text should be wrapped to fit within the text width.
+   */
+  void setAutoWrap(bool value);
+
  protected:
   TextLayer() = default;
+
+  std::unique_ptr<LayerContent> onUpdateContent() override;
 
  private:
   std::string _text;
   Color _textColor = Color::White();
   Font _font = {};
+  float _width = 0;
+  float _height = 0;
+  TextAlign _textAlign = TextAlign::Left;
+  VerticalAlign _verticalAlign = VerticalAlign::Top;
+  bool _autoWrap = false;
 };
 }  // namespace tgfx

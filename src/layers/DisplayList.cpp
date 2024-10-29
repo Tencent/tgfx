@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "layers/DrawArgs.h"
 
 namespace tgfx {
 
@@ -28,4 +29,15 @@ Layer* DisplayList::root() const {
   return _root.get();
 }
 
+void DisplayList::render(Surface* surface, bool replaceAll) {
+  if (surface == nullptr) {
+    return;
+  }
+  auto canvas = surface->getCanvas();
+  if (replaceAll) {
+    canvas->clear();
+  }
+  DrawArgs args(surface->getContext(), surface->renderFlags(), true);
+  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+}
 }  // namespace tgfx

@@ -19,7 +19,6 @@
 #include "RenderContext.h"
 #include "core/PathRef.h"
 #include "core/Rasterizer.h"
-#include "core/SimpleTextBlob.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/StrokeKey.h"
 #include "gpu/DrawingManager.h"
@@ -53,7 +52,7 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProx
 }
 
 RenderContext::RenderContext(Surface* surface) : surface(surface) {
-  renderFlags = surface->surfaceOptions.renderFlags();
+  renderFlags = surface->renderFlags();
   opContext = new OpContext(surface->renderTargetProxy);
 }
 
@@ -84,13 +83,9 @@ Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& stat
 }
 
 void RenderContext::clear() {
-  FillStyle style = {};
-  style.color = Color::Transparent();
-  style.blendMode = BlendMode::Src;
   auto renderTarget = opContext->renderTarget();
   auto rect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  MCState state = {};
-  drawAsClear(rect, state, style);
+  addOp(ClearOp::Make(Color::Transparent(), rect), [] { return true; });
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -110,17 +105,10 @@ static bool HasColorOnly(const FillStyle& style) {
 }
 
 bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (!HasColorOnly(style) || !state.matrix.rectStaysRect()) {
+  if (!HasColorOnly(style) || !style.isOpaque() || !state.matrix.rectStaysRect()) {
     return false;
   }
   auto color = style.color;
-  if (style.blendMode == BlendMode::Clear) {
-    color = Color::Transparent();
-  } else if (style.blendMode != BlendMode::Src) {
-    if (!color.isOpaque()) {
-      return false;
-    }
-  }
   auto bounds = rect;
   state.matrix.mapRect(&bounds);
   auto [clipRect, useScissor] = getClipRect(state.clip, &bounds);
@@ -183,22 +171,6 @@ void RenderContext::drawPath(const Path& path, const MCState& state, const FillS
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
-static std::unique_ptr<FragmentProcessor> CreateMaskFP(std::shared_ptr<TextureProxy> textureProxy,
-                                                       const Matrix* uvMatrix = nullptr) {
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  auto isAlphaOnly = textureProxy->isAlphaOnly();
-  auto processor = TextureEffect::Make(std::move(textureProxy), {}, uvMatrix);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  if (!isAlphaOnly) {
-    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
-  }
-  return processor;
-}
-
 std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& path,
                                                                   const Matrix& viewMatrix,
                                                                   const Stroke* stroke) {
@@ -221,11 +193,21 @@ std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& pa
   auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy(uniqueKey, rasterizer, false, renderFlags);
-  return CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
+  return TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
 }
 
-void RenderContext::drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                  const Rect& rect, const MCState& state, const FillStyle& style) {
+void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                              const MCState& state, const FillStyle& style) {
+  if (image == nullptr) {
+    return;
+  }
+  auto rect = Rect::MakeWH(image->width(), image->height());
+  return drawImageRect(std::move(image), rect, sampling, state, style);
+}
+
+void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+                                  const SamplingOptions& sampling, const MCState& state,
+                                  const FillStyle& style) {
   if (image == nullptr) {
     return;
   }
@@ -250,13 +232,14 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const SamplingOp
   }
 }
 
-void RenderContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle& style,
-                                 const Stroke* stroke) {
-  if (glyphRun.empty()) {
+void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                     const MCState& state, const FillStyle& style,
+                                     const Stroke* stroke) {
+  if (glyphRunList == nullptr) {
     return;
   }
-  if (glyphRun.hasColor()) {
-    drawColorGlyphs(glyphRun, state, style);
+  if (glyphRunList->hasColor()) {
+    drawColorGlyphs(std::move(glyphRunList), state, style);
     return;
   }
   auto maxScale = state.matrix.getMaxScale();
@@ -265,7 +248,7 @@ void RenderContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const 
   }
   auto scaleMatrix = Matrix::MakeScale(maxScale);
   // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-  auto bounds = glyphRun.getBounds(scaleMatrix, stroke);
+  auto bounds = glyphRunList->getBounds(scaleMatrix, stroke);
   auto localBounds = bounds;
   localBounds.scale(1.0f / maxScale, 1.0f / maxScale);
   localBounds = clipLocalBounds(localBounds, state);
@@ -276,12 +259,11 @@ void RenderContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const 
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto textBlob = std::make_shared<SimpleTextBlob>(std::move(glyphRun));
-  auto rasterizer = Rasterizer::MakeFrom(std::move(textBlob), ISize::Make(width, height),
+  auto rasterizer = Rasterizer::MakeFrom(std::move(glyphRunList), ISize::Make(width, height),
                                          rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
-  auto processor = CreateMaskFP(std::move(textureProxy), &rasterizeMatrix);
+  auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
   if (processor == nullptr) {
     return;
   }
@@ -290,30 +272,27 @@ void RenderContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const 
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
+void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+  if (picture != nullptr) {
+    picture->playback(this, state);
+  }
+}
+
 void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                               const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  auto bounds = picture->getBounds(state.matrix);
+  auto viewMatrix = filter ? Matrix::I() : state.matrix;
+  auto bounds = picture->getBounds(viewMatrix);
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto renderTarget = opContext->renderTarget()->makeRenderTargetProxy(width, height);
-  if (renderTarget == nullptr) {
-    return;
-  }
-  RenderContext renderContext(renderTarget, renderFlags);
-  auto viewMatrix = state.matrix;
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  MCState replayState(viewMatrix);
-  picture->playback(&renderContext, replayState);
-  if (renderTarget->sampleCount() > 1) {
-    auto drawingManager = getContext()->drawingManager();
-    drawingManager->addTextureResolveTask(renderTarget);
-  }
-  auto image = TextureImage::Wrap(renderTarget->getTextureProxy());
-  if (image == nullptr) {
+  auto alphaOnly = opContext->renderTarget()->format() == PixelFormat::ALPHA_8;
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, alphaOnly);
+  Matrix invertMatrix = {};
+  if (!viewMatrix.invert(&invertMatrix)) {
     return;
   }
   MCState drawState = state;
-  drawState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  drawState.matrix.preConcat(invertMatrix);
   if (filter) {
     auto offset = Point::Zero();
     image = image->makeWithFilter(std::move(filter), &offset);
@@ -322,31 +301,33 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& s
     }
     drawState.matrix.preTranslate(offset.x, offset.y);
   }
-  drawImageRect(std::move(image), {}, bounds, drawState, style);
+  drawImage(std::move(image), {}, drawState, style);
 }
 
-void RenderContext::drawColorGlyphs(const GlyphRun& glyphRun, const MCState& state,
-                                    const FillStyle& style) {
+void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
+                                    const MCState& state, const FillStyle& style) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
-  auto font = glyphRun.font();
-  font = font.makeWithSize(font.getSize() * scale);
-  auto glyphCount = glyphRun.runSize();
-  auto& glyphIDs = glyphRun.glyphIDs();
-  auto& positions = glyphRun.positions();
-  auto glyphState = state;
-  for (size_t i = 0; i < glyphCount; ++i) {
-    const auto& glyphID = glyphIDs[i];
-    const auto& position = positions[i];
-    auto glyphImage = font.getImage(glyphID, &glyphState.matrix);
-    if (glyphImage == nullptr) {
-      continue;
+  for (auto& glyphRun : glyphRunList->glyphRuns()) {
+    auto font = glyphRun.font;
+    font = font.makeWithSize(font.getSize() * scale);
+    auto& glyphIDs = glyphRun.glyphs;
+    auto glyphCount = glyphIDs.size();
+    auto& positions = glyphRun.positions;
+    auto glyphState = state;
+    for (size_t i = 0; i < glyphCount; ++i) {
+      const auto& glyphID = glyphIDs[i];
+      const auto& position = positions[i];
+      auto glyphImage = font.getImage(glyphID, &glyphState.matrix);
+      if (glyphImage == nullptr) {
+        continue;
+      }
+      glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
+      glyphState.matrix.postConcat(viewMatrix);
+      auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
     }
-    glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
-    glyphState.matrix.postConcat(viewMatrix);
-    auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-    drawImageRect(std::move(glyphImage), {}, rect, glyphState, style);
   }
 }
 
@@ -397,6 +378,9 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     return clipTexture;
   }
   auto bounds = clip.getBounds();
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
@@ -404,14 +388,12 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     auto drawOp =
         TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
     drawOp->setAA(AAType::Coverage);
-    auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true);
+    auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true, 1, false,
+                                                        ImageOrigin::TopLeft, true);
     if (renderTarget == nullptr) {
       return nullptr;
     }
     OpContext context(renderTarget);
-    // Since the clip may not coverage the entire render target, we need to clear the render target
-    // to transparent. Otherwise, the associated texture will have undefined pixels outside the clip.
-    context.addOp(ClearOp::Make(Color::Transparent(), Rect::MakeWH(width, height)));
     context.addOp(std::move(drawOp));
     clipTexture = renderTarget->getTextureProxy();
   } else {
@@ -427,7 +409,8 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
                                                               const Rect& deviceBounds,
                                                               const Matrix& viewMatrix,
                                                               Rect* scissorRect) {
-  if (!clip.isEmpty() && clip.contains(deviceBounds)) {
+  if ((!clip.isEmpty() && clip.contains(deviceBounds)) ||
+      (clip.isEmpty() && clip.isInverseFillType())) {
     return nullptr;
   }
   auto [rect, useScissor] = getClipRect(clip);
@@ -445,17 +428,13 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, opContext->renderTarget());
   scissorRect->roundOut();
-  auto texture = getClipTexture(clip);
-  if (texture == nullptr) {
+  auto textureProxy = getClipTexture(clip);
+  if (textureProxy == nullptr) {
     return nullptr;
   }
   auto uvMatrix = viewMatrix;
   uvMatrix.postTranslate(-clipBounds.left, -clipBounds.top);
-  auto maskEffect = TextureEffect::Make(texture, {}, &uvMatrix);
-  if (!texture->isAlphaOnly()) {
-    maskEffect = FragmentProcessor::MulInputByChildAlpha(std::move(maskEffect));
-  }
-  return maskEffect;
+  return TextureEffect::Make(std::move(textureProxy), {}, &uvMatrix, true);
 }
 
 void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds,
@@ -510,45 +489,6 @@ void RenderContext::addOp(std::unique_ptr<Op> op, const std::function<bool()>& w
   opContext->addOp(std::move(op));
 }
 
-enum class SrcColorOpacity {
-  Unknown,
-  // The src color is known to be opaque (alpha == 255)
-  Opaque,
-  // The src color is known to be fully transparent (color == 0)
-  TransparentBlack,
-  // The src alpha is known to be fully transparent (alpha == 0)
-  TransparentAlpha,
-};
-
-static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
-  BlendInfo blendInfo = {};
-  if (!BlendModeAsCoeff(mode, &blendInfo)) {
-    return false;
-  }
-  switch (blendInfo.srcBlend) {
-    case BlendModeCoeff::DA:
-    case BlendModeCoeff::DC:
-    case BlendModeCoeff::IDA:
-    case BlendModeCoeff::IDC:
-      return false;
-    default:
-      break;
-  }
-  switch (blendInfo.dstBlend) {
-    case BlendModeCoeff::Zero:
-      return true;
-    case BlendModeCoeff::ISA:
-      return opacityType == SrcColorOpacity::Opaque;
-    case BlendModeCoeff::SA:
-      return opacityType == SrcColorOpacity::TransparentBlack ||
-             opacityType == SrcColorOpacity::TransparentAlpha;
-    case BlendModeCoeff::SC:
-      return opacityType == SrcColorOpacity::TransparentBlack;
-    default:
-      return false;
-  }
-}
-
 bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state,
                                            const FillStyle& style, bool isRectOp) const {
   if (!isRectOp) {
@@ -569,24 +509,7 @@ bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCStat
   if (!deviceRect.contains(rtRect)) {
     return false;
   }
-  if (style.maskFilter) {
-    return false;
-  }
-  if (style.colorFilter && style.colorFilter->isAlphaUnchanged()) {
-    return false;
-  }
-  auto opacityType = SrcColorOpacity::Unknown;
-  auto alpha = style.color.alpha;
-  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
-    opacityType = SrcColorOpacity::Opaque;
-  } else if (alpha == 0) {
-    if (style.shader) {
-      opacityType = SrcColorOpacity::TransparentAlpha;
-    } else {
-      opacityType = SrcColorOpacity::TransparentBlack;
-    }
-  }
-  return BlendModeIsOpaque(style.blendMode, opacityType);
+  return style.isOpaque();
 }
 
 void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {

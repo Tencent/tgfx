@@ -23,17 +23,20 @@ std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureP
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto textureImage = std::shared_ptr<TextureImage>(new TextureImage(std::move(textureProxy)));
+  auto contextID = textureProxy->getContext()->uniqueID();
+  auto textureImage =
+      std::shared_ptr<TextureImage>(new TextureImage(std::move(textureProxy), contextID));
   textureImage->weakThis = textureImage;
   return textureImage;
 }
 
-TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy)
-    : ResourceImage(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)) {
+TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID)
+    : ResourceImage(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)),
+      contextID(contextID) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
-  if (context == nullptr) {
+  if (context == nullptr || context->uniqueID() != contextID) {
     return {};
   }
   context->flush();
@@ -49,14 +52,14 @@ BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* or
 
 std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context,
                                                       const SamplingOptions&) const {
-  if (textureProxy->getContext() == context) {
-    return std::static_pointer_cast<Image>(weakThis.lock());
+  if (context == nullptr || context->uniqueID() != contextID) {
+    return nullptr;
   }
-  return nullptr;
+  return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
 std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(const TPArgs& args) const {
-  if (textureProxy->getContext() != args.context) {
+  if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
   return textureProxy;

@@ -104,7 +104,7 @@ bool TaskGroup::checkThreads() {
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   std::lock_guard<std::mutex> autoLock(locker);
-#ifdef TGFX_BUILD_FOR_WEB
+#if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
   return false;
 #endif
   if (exited || !checkThreads()) {

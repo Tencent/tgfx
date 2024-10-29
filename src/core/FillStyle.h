@@ -56,5 +56,10 @@ class FillStyle {
    * The blend mode used to combine the fill with the destination pixels.
    */
   BlendMode blendMode = BlendMode::SrcOver;
+
+  /**
+   * Returns true if the FillStyle is guaranteed to produce only opaque colors.
+   */
+  bool isOpaque() const;
 };
 }  // namespace tgfx

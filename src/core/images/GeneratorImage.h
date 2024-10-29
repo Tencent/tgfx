@@ -26,7 +26,7 @@ namespace tgfx {
  */
 class GeneratorImage : public ResourceImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
+  GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator);
 
   int width() const override {
     return generator->width();
@@ -51,7 +51,5 @@ class GeneratorImage : public ResourceImage {
 
  protected:
   std::shared_ptr<ImageGenerator> generator = nullptr;
-
-  GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator);
 };
 }  // namespace tgfx

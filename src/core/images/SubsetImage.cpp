@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
+#include "core/utils/NeedMipmaps.h"
+#include "gpu/TPArgs.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, const Rect& bounds) {
@@ -47,7 +50,21 @@ std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
   auto matrix = concatUVMatrix(uvMatrix);
-  return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+  auto drawBounds = args.drawRect;
+  if (matrix) {
+    matrix->mapRect(&drawBounds);
+  }
+  if (bounds.contains(drawBounds)) {
+    return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+  }
+  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  auto textureProxy = lockTextureProxy(tpArgs, sampling);
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix,
+                                  source->isAlphaOnly());
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {

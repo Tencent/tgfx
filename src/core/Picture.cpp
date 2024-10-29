@@ -68,5 +68,4 @@ void Picture::playback(DrawContext* drawContext, const MCState& state) const {
     record->playback(drawContext);
   }
 }
-
 }  // namespace tgfx

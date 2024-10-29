@@ -126,8 +126,12 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
   if (fpMatrix) {
     drawBounds = fpMatrix->mapRect(drawBounds);
   }
+  auto clipBounds = bounds;
+  if (!clipBounds.intersect(drawBounds)) {
+    return nullptr;
+  }
   Rect dstBounds = Rect::MakeEmpty();
-  if (!filter->applyCropRect(inputBounds, &dstBounds, &drawBounds)) {
+  if (!filter->applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }
   if (dstBounds.contains(drawBounds)) {
@@ -144,6 +148,7 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, &matrix);
+  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, &matrix,
+                                  source->isAlphaOnly());
 }
 }  // namespace tgfx

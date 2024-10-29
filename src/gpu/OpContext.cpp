@@ -21,24 +21,14 @@
 #include "gpu/ops/FillRectOp.h"
 
 namespace tgfx {
-OpContext::~OpContext() {
-  if (autoResolve) {
-    auto drawingManager = renderTargetProxy->getContext()->drawingManager();
-    drawingManager->addTextureResolveTask(renderTargetProxy);
-  }
-}
-
-void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix) {
+void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix,
+                           bool autoResolve) {
   fillRectWithFP(Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height()),
-                 std::move(fp), uvMatrix);
-  if (autoResolve) {
-    auto drawingManager = renderTargetProxy->getContext()->drawingManager();
-    drawingManager->addTextureResolveTask(renderTargetProxy);
-  }
+                 std::move(fp), uvMatrix, autoResolve);
 }
 
 void OpContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                               const Matrix& uvMatrix) {
+                               const Matrix& uvMatrix, bool autoResolve) {
   if (fp == nullptr) {
     return;
   }
@@ -46,6 +36,10 @@ void OpContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProc
   op->addColorFP(std::move(fp));
   op->setBlendMode(BlendMode::Src);
   addOp(std::move(op));
+  if (autoResolve) {
+    auto drawingManager = renderTargetProxy->getContext()->drawingManager();
+    drawingManager->addTextureResolveTask(renderTargetProxy);
+  }
 }
 
 void OpContext::addOp(std::unique_ptr<Op> op) {

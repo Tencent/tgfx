@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,20 @@
 
 #pragma once
 
-#include "core/GlyphRun.h"
-#include "tgfx/core/TextBlob.h"
+#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-/**
- * A simple implementation of TextBlob that uses a single GlyphRun.
- */
-class SimpleTextBlob : public TextBlob {
+class ComposeContent : public LayerContent {
  public:
-  explicit SimpleTextBlob(GlyphRun glyphRun) : glyphRun(std::move(glyphRun)) {
+  explicit ComposeContent(std::vector<std::unique_ptr<LayerContent>> contents)
+      : contents(std::move(contents)) {
   }
 
- protected:
-  size_t glyphRunCount() const override {
-    return 1;
-  }
+  Rect getBounds() const override;
 
-  const GlyphRun* getGlyphRun(size_t i) const override {
-    return i == 0 ? &glyphRun : nullptr;
-  }
+  void draw(Canvas* canvas, const Paint& paint) const override;
 
  private:
-  GlyphRun glyphRun = {};
-
-  friend class TextBlob;
+  std::vector<std::unique_ptr<LayerContent>> contents = {};
 };
 }  // namespace tgfx

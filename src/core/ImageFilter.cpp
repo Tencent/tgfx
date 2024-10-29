@@ -53,8 +53,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   if (!processor) {
     return nullptr;
   }
-  OpContext opContext(renderTarget, true);
-  opContext.fillWithFP(std::move(processor), Matrix::I());
+  OpContext opContext(renderTarget);
+  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
   return renderTarget->getTextureProxy();
 }
 
@@ -81,6 +81,7 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }
+  auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs, sampling);
@@ -91,6 +92,6 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix);
+  return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix, isAlphaOnly);
 }
 }  // namespace tgfx

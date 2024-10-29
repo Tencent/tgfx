@@ -20,7 +20,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/SurfaceOptions.h"
+#include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 
@@ -48,8 +48,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
-                                       bool mipmapped = false,
-                                       const SurfaceOptions* options = nullptr);
+                                       bool mipmapped = false, uint32_t renderFlags = 0);
 
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
@@ -59,7 +58,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height, ColorType colorType,
                                        int sampleCount = 1, bool mipmapped = false,
-                                       const SurfaceOptions* options = nullptr);
+                                       uint32_t renderFlags = 0);
 
   /**
    * Wraps a backend render target into Surface. The caller must ensure the renderTarget is valid
@@ -68,8 +67,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin,
-                                           const SurfaceOptions* options = nullptr);
+                                           ImageOrigin origin, uint32_t renderFlags = 0);
 
   /**
    * Wraps a BackendTexture into the Surface. The caller must ensure the texture is valid for the
@@ -79,7 +77,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount = 1,
-                                           const SurfaceOptions* options = nullptr);
+                                           uint32_t renderFlags = 0);
 
   /**
    * Creates a Surface from the platform-specific hardware buffer. For example, the hardware buffer
@@ -88,8 +86,7 @@ class Surface {
    * context is nullptr or the hardwareBuffer is not renderable.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           int sampleCount = 1,
-                                           const SurfaceOptions* options = nullptr);
+                                           int sampleCount = 1, uint32_t renderFlags = 0);
 
   virtual ~Surface();
 
@@ -99,10 +96,10 @@ class Surface {
   Context* getContext() const;
 
   /**
-   * Returns the SurfaceOptions of the Surface.
+   * Returns the render flags associated with this Surface.
    */
-  const SurfaceOptions* options() const {
-    return &surfaceOptions;
+  uint32_t renderFlags() const {
+    return _renderFlags;
   }
 
   /**
@@ -173,18 +170,19 @@ class Surface {
 
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  SurfaceOptions surfaceOptions = {};
+  uint32_t _renderFlags = 0;
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           const SurfaceOptions* options = nullptr);
+                                           uint32_t renderFlags = 0);
 
-  Surface(std::shared_ptr<RenderTargetProxy> proxy, const SurfaceOptions* options);
+  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0);
 
   bool aboutToDraw(const std::function<bool()>& willDiscardContent);
 
   friend class RenderContext;
+  friend class PictureImage;
 };
 }  // namespace tgfx

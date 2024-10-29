@@ -26,6 +26,10 @@ class RGBAAAImage : public SubsetImage {
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, int displayWidth,
                                          int displayHeight, int alphaStartX, int alphaStartY);
 
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
  protected:
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 

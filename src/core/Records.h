@@ -28,8 +28,8 @@ enum class RecordType {
   StrokePath,
   DrawImage,
   DrawImageRect,
-  DrawGlyphRun,
-  StrokeGlyphRun,
+  DrawGlyphRunList,
+  StrokeGlyphRunList,
   DrawPicture,
   DrawLayer
 };
@@ -95,7 +95,6 @@ class DrawPath : public Record {
     context->drawPath(path, state, style, nullptr);
   }
 
- protected:
   Path path;
   MCState state;
   FillStyle style;
@@ -131,8 +130,7 @@ class DrawImage : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawImageRect(image, sampling, Rect::MakeWH(image->width(), image->height()), state,
-                           style);
+    context->drawImage(image, sampling, state, style);
   }
 
   std::shared_ptr<Image> image;
@@ -143,7 +141,7 @@ class DrawImage : public Record {
 
 class DrawImageRect : public DrawImage {
  public:
-  DrawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Rect& rect,
+  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
                 MCState state, FillStyle style)
       : DrawImage(std::move(image), sampling, std::move(state), std::move(style)), rect(rect) {
   }
@@ -153,43 +151,45 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawImageRect(image, sampling, rect, state, style);
+    context->drawImageRect(image, rect, sampling, state, style);
   }
 
   Rect rect;
 };
 
-class DrawGlyphRun : public Record {
+class DrawGlyphRunList : public Record {
  public:
-  DrawGlyphRun(GlyphRun glyphRun, MCState state, FillStyle style)
-      : glyphRun(std::move(glyphRun)), state(std::move(state)), style(std::move(style)) {
+  DrawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, MCState state, FillStyle style)
+      : glyphRunList(std::move(glyphRunList)), state(std::move(state)), style(std::move(style)) {
   }
 
   RecordType type() const override {
-    return RecordType::DrawGlyphRun;
+    return RecordType::DrawGlyphRunList;
   }
 
   void playback(DrawContext* context) const override {
-    context->drawGlyphRun(glyphRun, state, style, nullptr);
+    context->drawGlyphRunList(glyphRunList, state, style, nullptr);
   }
 
-  GlyphRun glyphRun;
+  std::shared_ptr<GlyphRunList> glyphRunList;
   MCState state;
   FillStyle style;
 };
 
-class StrokeGlyphRun : public DrawGlyphRun {
+class StrokeGlyphRunList : public DrawGlyphRunList {
  public:
-  StrokeGlyphRun(GlyphRun glyphRun, MCState state, FillStyle style, const Stroke& stroke)
-      : DrawGlyphRun(std::move(glyphRun), std::move(state), std::move(style)), stroke(stroke) {
+  StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, MCState state, FillStyle style,
+                     const Stroke& stroke)
+      : DrawGlyphRunList(std::move(glyphRunList), std::move(state), std::move(style)),
+        stroke(stroke) {
   }
 
   RecordType type() const override {
-    return RecordType::StrokeGlyphRun;
+    return RecordType::StrokeGlyphRunList;
   }
 
   void playback(DrawContext* context) const override {
-    context->drawGlyphRun(glyphRun, state, style, &stroke);
+    context->drawGlyphRunList(glyphRunList, state, style, &stroke);
   }
 
   Stroke stroke;

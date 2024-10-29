@@ -21,6 +21,7 @@
 #include "core/images/FilterImage.h"
 #include "core/images/GeneratorImage.h"
 #include "core/images/OrientImage.h"
+#include "core/images/PictureImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/RasterImage.h"
 #include "core/images/ScaleImage.h"
@@ -88,10 +89,6 @@ std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   return image->makeOriented(codec->orientation());
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
-  return GeneratorImage::MakeFrom(std::move(generator));
-}
-
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
   if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
     return nullptr;
@@ -121,10 +118,6 @@ std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColo
 std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));
-}
-
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
-  return BufferImage::MakeFrom(std::move(imageBuffer));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
@@ -260,12 +253,12 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
   }
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
-  auto processor = FragmentProcessor::Make(weakThis.lock(), fpArgs, sampling);
+  auto processor = asFragmentProcessor(fpArgs, TileMode::Clamp, TileMode::Clamp, sampling, nullptr);
   if (processor == nullptr) {
     return nullptr;
   }
-  OpContext opContext(renderTarget, true);
-  opContext.fillWithFP(std::move(processor), Matrix::I());
+  OpContext opContext(renderTarget);
+  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
   return textureProxy;
 }
 }  // namespace tgfx

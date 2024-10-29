@@ -21,12 +21,11 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Image> GeneratorImage::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
   if (generator == nullptr) {
     return nullptr;
   }
-  auto image =
-      std::shared_ptr<GeneratorImage>(new GeneratorImage(UniqueKey::Make(), std::move(generator)));
+  auto image = std::make_shared<GeneratorImage>(UniqueKey::Make(), std::move(generator));
   image->weakThis = image;
   return image;
 }

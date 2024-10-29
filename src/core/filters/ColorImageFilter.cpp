@@ -19,8 +19,15 @@
 #include "ColorImageFilter.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
+
+std::shared_ptr<ImageFilter> ImageFilter::ColorFilter(
+    std::shared_ptr<class ColorFilter> colorFilter) {
+  return std::make_shared<ColorImageFilter>(std::move(colorFilter));
+}
+
 ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
     : filter(std::move(filter)) {
 }

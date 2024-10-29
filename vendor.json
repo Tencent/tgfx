@@ -75,6 +75,34 @@
           "${SOURCE_DIR}/jpeglib.h",
           "${SOURCE_DIR}/jerror.h",
           "${BUILD_DIR}/jconfig.h"
+        ],
+        "platforms": [
+          "win",
+          "linux",
+          "mac",
+          "android",
+          "ios",
+          "ohos"
+        ]
+      }
+    },
+    {
+      "name": "libjpeg-turbo",
+      "cmake": {
+        "targets": [
+          "turbojpeg-static"
+        ],
+        "includes": [
+          "${SOURCE_DIR}/jmorecfg.h",
+          "${SOURCE_DIR}/jpeglib.h",
+          "${SOURCE_DIR}/jerror.h",
+          "${BUILD_DIR}/jconfig.h"
+        ],
+        "arguments": [
+          "-DWITH_SIMD=FALSE"
+        ],
+        "platforms": [
+          "web"
         ]
       }
     },
@@ -98,7 +126,8 @@
         "platforms": [
           "android",
           "win",
-          "linux"
+          "linux",
+          "web"
         ]
       }
     },

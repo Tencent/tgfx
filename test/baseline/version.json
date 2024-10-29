@@ -2,8 +2,12 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
-        "Picture": "72edd24",
-        "drawImage": "ded3c91",
+        "Picture": "7fd9cd9",
+        "PictureImage": "8a2ac4d",
+        "PictureImage_Path": "2212c4e",
+        "PictureImage_Text": "2212c4e",
+        "blendMode": "43cd416",
+        "drawImage": "8cb853c",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "d010fb8",
@@ -15,20 +19,23 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "f1d64c1",
+        "path": "8eee394",
         "rasterized": "f55f586",
         "rasterized_mipmap": "f55f586",
         "rasterized_scale_up": "721c9e0",
-        "scaleImage": "d038aa6",
+        "scaleImage": "8cb853c",
+        "shape": "8eee394",
         "text_shape": "74f94c4",
-        "tileMode": "3bfc2e8"
+        "tile_mode_normal": "8cb853c",
+        "tile_mode_rgbaaa": "8cb853c",
+        "tile_mode_subset": "8cb853c"
     },
     "DrawersTest": {
         "ConicGradient": "5a1fb11",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
-        "SimpleText": "74f94c4"
+        "SimpleText": "7fd9cd9"
     },
     "FilterTest": {
         "ComposeColorFilter": "f710e29",
@@ -46,6 +53,19 @@
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
         "update_mask": "d010fb8"
+    },
+    "LayerTest": {
+        "ModeColorFilter": "43cd416",
+        "PassThoughAndNormal": "43cd416",
+        "draw_shape": "8378211",
+        "draw_text": "fa90eb0",
+        "dropShadow": "43cd416",
+        "filterClip": "43cd416",
+        "filterTest": "43cd416",
+        "getBounds": "8a26de7",
+        "greyColorMatrix": "a1605b2",
+        "identityMatrix": "a1605b2",
+        "imageLayer": "99a5cd9"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

@@ -275,6 +275,15 @@ class Canvas {
                   const Font& font, const Paint& paint);
 
   /**
+   * Draws a TextBlob at (x, y) using clip, matrix, and paint.
+   * @param textBlob the text blob to draw.
+   * @param x horizontal offset applied to the text blob.
+   * @param y vertical offset applied to the text blob.
+   * @param paint blend, color, and so on, used to draw.
+   */
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y, const Paint& paint);
+
+  /**
    * Draws a Picture using the current clip and matrix. Clip and matrix are unchanged by picture
    * contents, as if save() was called before and restore() was called after drawPicture().
    */
@@ -316,7 +325,7 @@ class Canvas {
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
-                 std::shared_ptr<ImageFilter> filter = nullptr);
+                 std::shared_ptr<ImageFilter> imageFilter = nullptr);
   void resetMCState();
 
   friend class Surface;

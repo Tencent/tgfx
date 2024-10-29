@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/GlyphRunList.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/Mask.h"
 
@@ -31,7 +32,7 @@ class Rasterizer : public ImageGenerator {
   /**
    * Creates a Rasterizer from a TextBlob.
    */
-  static std::shared_ptr<Rasterizer> MakeFrom(std::shared_ptr<TextBlob> textBlob,
+  static std::shared_ptr<Rasterizer> MakeFrom(std::shared_ptr<GlyphRunList> glyphRunList,
                                               const ISize& clipSize, const Matrix& matrix,
                                               const Stroke* stroke = nullptr);
 
@@ -46,6 +47,8 @@ class Rasterizer : public ImageGenerator {
   bool isAlphaOnly() const override {
     return true;
   }
+
+  bool asyncSupport() const override;
 
  protected:
   Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* stroke);

@@ -36,16 +36,20 @@ class RecordingContext : public DrawContext {
   void drawPath(const Path& path, const MCState& state, const FillStyle& style,
                 const Stroke* stroke) override;
 
-  void drawImageRect(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                     const Rect& rect, const MCState& state, const FillStyle& style) override;
+  void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                 const MCState& state, const FillStyle& style) override;
 
-  void drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle& style,
-                    const Stroke* stroke) override;
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+                     const SamplingOptions& sampling, const MCState& state,
+                     const FillStyle& style) override;
+
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                        const FillStyle& style, const Stroke* stroke) override;
+
+  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
                  std::shared_ptr<ImageFilter> filter) override;
-
-  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
  private:
   std::vector<Record*> records = {};

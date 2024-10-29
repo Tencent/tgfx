@@ -40,7 +40,7 @@ bool Paint::nothingToDraw() const {
     case BlendMode::SrcATop:
     case BlendMode::DstOut:
     case BlendMode::DstOver:
-    case BlendMode::Plus:
+    case BlendMode::PlusLighter:
       if (color.alpha == 0) {
         return !AffectsAlpha(colorFilter.get()) && imageFilter == nullptr;
       }
@@ -49,6 +49,9 @@ bool Paint::nothingToDraw() const {
       return true;
     default:
       break;
+  }
+  if ((PaintStyle::Stroke == style) && (stroke.width <= 0.0f)) {
+    return true;
   }
   return false;
 }

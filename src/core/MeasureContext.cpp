@@ -40,14 +40,24 @@ void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill
   addLocalBounds(pathBounds, state);
 }
 
-void MeasureContext::drawImageRect(std::shared_ptr<Image>, const SamplingOptions&, const Rect& rect,
+void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
+                               const MCState& state, const FillStyle&) {
+  if (image == nullptr) {
+    return;
+  }
+  auto rect = Rect::MakeWH(image->width(), image->height());
+  addLocalBounds(rect, state);
+}
+
+void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
                                    const MCState& state, const FillStyle&) {
   addLocalBounds(rect, state);
 }
 
-void MeasureContext::drawGlyphRun(GlyphRun glyphRun, const MCState& state, const FillStyle&,
-                                  const Stroke* stroke) {
-  auto deviceBounds = glyphRun.getBounds(state.matrix, stroke);
+void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                      const MCState& state, const FillStyle&,
+                                      const Stroke* stroke) {
+  auto deviceBounds = glyphRunList->getBounds(state.matrix, stroke);
   addDeviceBounds(deviceBounds, state.clip);
 }
 
@@ -61,6 +71,12 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& 
     deviceBounds = imageFilter->filterBounds(deviceBounds);
   }
   addDeviceBounds(deviceBounds, state.clip);
+}
+
+void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+  if (picture != nullptr) {
+    picture->playback(this, state);
+  }
 }
 
 void MeasureContext::addLocalBounds(const Rect& localBounds, const MCState& state) {

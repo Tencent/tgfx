@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,11 +18,39 @@
 
 #pragma once
 
-#include "core/GlyphRun.h"
+#include "core/images/ResourceImage.h"
 
 namespace tgfx {
-class SimpleTextShaper {
+/**
+ * PictureImage is an image that draws a Picture.
+ */
+class PictureImage : public ResourceImage {
  public:
-  static GlyphRun Shape(const std::string& text, const Font& font);
+  PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width, int height,
+               const Matrix* matrix = nullptr, bool alphaOnly = false);
+
+  ~PictureImage() override;
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  bool isAlphaOnly() const override {
+    return alphaOnly;
+  }
+
+ protected:
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+
+ private:
+  std::shared_ptr<Picture> picture = nullptr;
+  int _width = 0;
+  int _height = 0;
+  Matrix* matrix = nullptr;
+  bool alphaOnly = false;
 };
 }  // namespace tgfx
