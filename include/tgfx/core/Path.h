@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <objc/objc.h>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
@@ -229,19 +230,19 @@ class Path {
     CCW,
   };
 
-  enum ArcSize : uint8_t {
+  enum class ArcSize : uint8_t {
     Small_ArcSize,  //!< smaller of arc pair
     Large_ArcSize,  //!< larger of arc pair
   };
 
   /** Appends arc to SkPath. Arc is implemented by one or more conics weighted to
     * describe part of oval with radii (rx, ry) rotated by xAxisRotate degrees. Arc
-    * curves from last SkPath SkPoint to (x, y), choosing one of four possible routes:
+    * curves from last Path Point to (x, y), choosing one of four possible routes:
     * clockwise or counterclockwise, and smaller or larger.
     *
     * Arc sweep is always less than 360 degrees. arcTo() appends line to (x, y) if
     * either radii are zero, or if last SkPath SkPoint equals (x, y). arcTo() scales radii
-    * (rx, ry) to fit last SkPath SkPoint and (x, y) if both are greater than zero but
+    * (rx, ry) to fit last Path Point and (x, y) if both are greater than zero but
     * too small.
 
     * arcTo() appends up to four conic curves.
