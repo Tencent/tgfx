@@ -96,8 +96,8 @@ void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
-  OpContext opContext(std::move(renderTarget), true);
-  opContext.fillWithFP(std::move(blurProcessor), uvMatrix);
+  OpContext opContext(std::move(renderTarget));
+  opContext.fillWithFP(std::move(blurProcessor), uvMatrix, true);
 }
 
 Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
