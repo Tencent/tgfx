@@ -33,13 +33,9 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, ColorType colorType,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
-  auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipmapped);
-  auto surface = MakeFrom(std::move(proxy), renderFlags);
-  if (surface != nullptr) {
-    // Clear the surface by default for internally created RenderTarget.
-    surface->getCanvas()->clear();
-  }
-  return surface;
+  auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipmapped,
+                                       ImageOrigin::TopLeft, true);
+  return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,

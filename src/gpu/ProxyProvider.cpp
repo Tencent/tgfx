@@ -162,7 +162,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
-    std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount) {
+    std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount,
+    bool clearAll) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -173,11 +174,12 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto uniqueKey = UniqueKey::Make();
   auto task = RenderTargetCreateTask::MakeFrom(uniqueKey, textureProxy->getUniqueKey(), format,
-                                               sampleCount);
+                                               sampleCount, clearAll);
   if (task == nullptr) {
     return nullptr;
   }
-  context->drawingManager()->addResourceTask(std::move(task));
+  auto drawingManager = context->drawingManager();
+  drawingManager->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<RenderTargetProxy>(
       new TextureRenderTargetProxy(uniqueKey, std::move(textureProxy), format, sampleCount));
   addResourceProxy(proxy, uniqueKey);

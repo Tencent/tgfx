@@ -257,8 +257,8 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
   if (processor == nullptr) {
     return nullptr;
   }
-  OpContext opContext(renderTarget, true);
-  opContext.fillWithFP(std::move(processor), Matrix::I());
+  OpContext opContext(renderTarget);
+  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
   return textureProxy;
 }
 }  // namespace tgfx

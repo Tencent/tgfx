@@ -28,7 +28,8 @@ class RenderTargetCreateTask : public ResourceTask {
    */
   static std::shared_ptr<RenderTargetCreateTask> MakeFrom(UniqueKey uniqueKey, UniqueKey textureKey,
                                                           PixelFormat pixelFormat,
-                                                          int sampleCount = 1);
+                                                          int sampleCount = 1,
+                                                          bool clearAll = false);
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
@@ -37,8 +38,9 @@ class RenderTargetCreateTask : public ResourceTask {
   UniqueKey textureKey = {};
   PixelFormat pixelFormat = PixelFormat::RGBA_8888;
   int sampleCount = 1;
+  bool clearAll = false;
 
   RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey textureKey, PixelFormat pixelFormat,
-                         int sampleCount);
+                         int sampleCount, bool clearAll);
 };
 }  // namespace tgfx

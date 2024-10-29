@@ -311,6 +311,15 @@ static void BlendHandler_Luminosity(FragmentShaderBuilder* fsBuilder, const char
                          srcColor, dstColor, dstColor, srcColor);
 }
 
+static void BlendHandler_PlusDarker(FragmentShaderBuilder* fsBuilder, const char* srcColor,
+                                    const char* dstColor, const char* outputColor) {
+  // MAX(0, (1 - ((Da * (1 - Dc) + Sa * (1 - Sc)))
+  // https://developer.apple.com/documentation/coregraphics/cgblendmode/kcgblendmodeplusdarker
+  fsBuilder->codeAppendf("%s.rgb = clamp(1.0 + %s.rgb + %s.rgb - %s.a - %s.a, 0, 1);", outputColor,
+                         srcColor, dstColor, dstColor, srcColor);
+  fsBuilder->codeAppendf("%s.rgb *= (%s.a != 0.0) ? 1.0 : 0.0;", outputColor, outputColor);
+}
+
 using BlendHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcColor,
                               const char* dstColor, const char* outputColor);
 
@@ -328,7 +337,8 @@ static constexpr std::pair<BlendMode, BlendHandler> kBlendHandlers[] = {
     {BlendMode::Hue, BlendHandler_Hue},
     {BlendMode::Saturation, BlendHandler_Saturation},
     {BlendMode::Color, BlendHandler_Color},
-    {BlendMode::Luminosity, BlendHandler_Luminosity}};
+    {BlendMode::Luminosity, BlendHandler_Luminosity},
+    {BlendMode::PlusDarker, BlendHandler_PlusDarker}};
 
 static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                              const std::string& dstColor, const std::string& outputColor,
@@ -421,7 +431,7 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
   BlendInfo blendInfo = {};
   if (BlendModeAsCoeff(blendMode, &blendInfo)) {
     // The only coeff mode that can go out of range is plus.
-    bool clamp = blendMode == BlendMode::Plus;
+    bool clamp = blendMode == BlendMode::PlusLighter;
 
     fsBuilder->codeAppendf("%s = ", outColor.c_str());
     if (clamp) {
@@ -445,12 +455,13 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
 }
 
 const char* BlendModeName(BlendMode mode) {
-  const char* ModeStrings[] = {"Clear",     "Src",        "Dst",        "SrcOver",    "DstOver",
-                               "SrcIn",     "DstIn",      "SrcOut",     "DstOut",     "SrcATop",
-                               "DstATop",   "Xor",        "Plus",       "Modulate",   "Screen",
-                               "Overlay",   "Darken",     "Lighten",    "ColorDodge", "ColorBurn",
-                               "HardLight", "SoftLight",  "Difference", "Exclusion",  "Multiply",
-                               "Hue",       "Saturation", "Color",      "Luminosity"};
+  const char* ModeStrings[] = {
+      "Clear",       "Src",       "Dst",        "SrcOver",   "DstOver",    "SrcIn",
+      "DstIn",       "SrcOut",    "DstOut",     "SrcATop",   "DstATop",    "Xor",
+      "PlusLighter", "Modulate",  "Screen",     "Overlay",   "Darken",     "Lighten",
+      "ColorDodge",  "ColorBurn", "HardLight",  "SoftLight", "Difference", "Exclusion",
+      "Multiply",    "Hue",       "Saturation", "Color",     "Luminosity", "PlusDarker",
+  };
   return ModeStrings[static_cast<int>(mode)];
 }
 }  // namespace tgfx

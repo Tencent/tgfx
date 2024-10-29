@@ -83,13 +83,9 @@ Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& stat
 }
 
 void RenderContext::clear() {
-  FillStyle style = {};
-  style.color = Color::Transparent();
-  style.blendMode = BlendMode::Src;
   auto renderTarget = opContext->renderTarget();
   auto rect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  MCState state = {};
-  drawAsClear(rect, state, style);
+  addOp(ClearOp::Make(Color::Transparent(), rect), [] { return true; });
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -109,17 +105,10 @@ static bool HasColorOnly(const FillStyle& style) {
 }
 
 bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (!HasColorOnly(style) || !state.matrix.rectStaysRect()) {
+  if (!HasColorOnly(style) || !style.isOpaque() || !state.matrix.rectStaysRect()) {
     return false;
   }
   auto color = style.color;
-  if (style.blendMode == BlendMode::Clear) {
-    color = Color::Transparent();
-  } else if (style.blendMode != BlendMode::Src) {
-    if (!color.isOpaque()) {
-      return false;
-    }
-  }
   auto bounds = rect;
   state.matrix.mapRect(&bounds);
   auto [clipRect, useScissor] = getClipRect(state.clip, &bounds);
@@ -399,14 +388,12 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     auto drawOp =
         TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
     drawOp->setAA(AAType::Coverage);
-    auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true);
+    auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true, 1, false,
+                                                        ImageOrigin::TopLeft, true);
     if (renderTarget == nullptr) {
       return nullptr;
     }
     OpContext context(renderTarget);
-    // Since the clip may not coverage the entire render target, we need to clear the render target
-    // to transparent. Otherwise, the associated texture will have undefined pixels outside the clip.
-    context.addOp(ClearOp::Make(Color::Transparent(), Rect::MakeWH(width, height)));
     context.addOp(std::move(drawOp));
     clipTexture = renderTarget->getTextureProxy();
   } else {
@@ -502,45 +489,6 @@ void RenderContext::addOp(std::unique_ptr<Op> op, const std::function<bool()>& w
   opContext->addOp(std::move(op));
 }
 
-enum class SrcColorOpacity {
-  Unknown,
-  // The src color is known to be opaque (alpha == 255)
-  Opaque,
-  // The src color is known to be fully transparent (color == 0)
-  TransparentBlack,
-  // The src alpha is known to be fully transparent (alpha == 0)
-  TransparentAlpha,
-};
-
-static bool BlendModeIsOpaque(BlendMode mode, SrcColorOpacity opacityType) {
-  BlendInfo blendInfo = {};
-  if (!BlendModeAsCoeff(mode, &blendInfo)) {
-    return false;
-  }
-  switch (blendInfo.srcBlend) {
-    case BlendModeCoeff::DA:
-    case BlendModeCoeff::DC:
-    case BlendModeCoeff::IDA:
-    case BlendModeCoeff::IDC:
-      return false;
-    default:
-      break;
-  }
-  switch (blendInfo.dstBlend) {
-    case BlendModeCoeff::Zero:
-      return true;
-    case BlendModeCoeff::ISA:
-      return opacityType == SrcColorOpacity::Opaque;
-    case BlendModeCoeff::SA:
-      return opacityType == SrcColorOpacity::TransparentBlack ||
-             opacityType == SrcColorOpacity::TransparentAlpha;
-    case BlendModeCoeff::SC:
-      return opacityType == SrcColorOpacity::TransparentBlack;
-    default:
-      return false;
-  }
-}
-
 bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state,
                                            const FillStyle& style, bool isRectOp) const {
   if (!isRectOp) {
@@ -561,24 +509,7 @@ bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCStat
   if (!deviceRect.contains(rtRect)) {
     return false;
   }
-  if (style.maskFilter) {
-    return false;
-  }
-  if (style.colorFilter && style.colorFilter->isAlphaUnchanged()) {
-    return false;
-  }
-  auto opacityType = SrcColorOpacity::Unknown;
-  auto alpha = style.color.alpha;
-  if (alpha == 1.0f && (!style.shader || style.shader->isOpaque())) {
-    opacityType = SrcColorOpacity::Opaque;
-  } else if (alpha == 0) {
-    if (style.shader) {
-      opacityType = SrcColorOpacity::TransparentAlpha;
-    } else {
-      opacityType = SrcColorOpacity::TransparentBlack;
-    }
-  }
-  return BlendModeIsOpaque(style.blendMode, opacityType);
+  return style.isOpaque();
 }
 
 void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {
