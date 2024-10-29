@@ -163,10 +163,17 @@ class Path {
   void cubicTo(const Point& control1, const Point& control2, const Point& point);
 
   /**
-   * Appends arc to Path. Arc is implemented by one or more conics weighted to describe part oval   * with radii (rx, ry) rotated by xAxisRotate degrees. Arc curves from last Path Point to (x,    * y),  choosing one of four possible routes: clockwise or counterclockwise, and smaller or      * larger.
-   * Arc sweep is always less than 360 degrees. arcTo() appends line to (x, y) if either radii are * zero, or if last Path Point equals (x, y). arcTo() scales radii (rx, ry) to fit last Path     * Point and (x, y) if both are greater than zero but too small.
+   * Appends arc to Path. Arc is implemented by one or more conics weighted to describe part oval   
+   * with radii (rx, ry) rotated by xAxisRotate degrees. Arc curves from last Path Point to (x,    
+   * y),  choosing one of four possible routes: clockwise or counterclockwise, and smaller or      
+   * larger.
+   * Arc sweep is always less than 360 degrees. arcTo() appends line to (x, y) if either radii are 
+   * zero, or if last Path Point equals (x, y). arcTo() scales radii (rx, ry) to fit last Path     
+   * Point and (x, y) if both are greater than zero but too small.
    * arcTo() appends up to four conic curves.
-   * arcTo() implements the functionality of SVG arc, although SVG sweep-flag value is opposite the * integer value of sweep; SVG sweep-flag uses 1 for clockwise,while counter-clockwise direction * cast to int is zero.
+   * arcTo() implements the functionality of SVG arc, although SVG sweep-flag value is opposite the 
+   * integer value of sweep; SVG sweep-flag uses 1 for clockwise,while counter-clockwise direction 
+   * cast to int is zero.
    * 
    * @param rx            x radii on axes before x-axis rotation
    * @param ry            y radii on axes before x-axis rotation
