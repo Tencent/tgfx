@@ -174,14 +174,4 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
   }
   return LayerContent::Compose(std::move(contents));
 }
-
-bool ShapeLayer::hitTestByPixel(float x, float y) {
-  if (_path.isEmpty()) {
-    return false;
-  }
-
-  const Point point = globalToLocal(Point::Make(x, y));
-  return _path.contains(point.x, point.y);
-}
-
 }  // namespace tgfx

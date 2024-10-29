@@ -43,5 +43,26 @@ class LayerContent {
    * Draws the content to the given canvas with the given paint.
    */
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
+
+  /**
+   * Determine if the given local coordinate point is within the bounding box.
+   * @param localX Relative local x-coordinate in the current Layer space.
+   * @param localY Relative local y-coordinate in the current Layer space.
+   * @return If the point (localX, localY) hits the bounding box, return true;
+   *         otherwise, return false.
+   */
+  virtual bool hitTestByBounds(float localX, float localY) {
+    const Rect bounds = getBounds();
+    return bounds.contains(localX, localY);
+  }
+
+  /**
+   * Determine if the given local coordinate point is within the bounds of the layer's
+   * drawing content, accurate to the pixel level.
+   * @return If the point (localX, localY) hits the content, return true; otherwise, return false.
+   */
+  virtual bool hitTestByPixel(float, float) {
+    return false;
+  }
 };
 }  // namespace tgfx

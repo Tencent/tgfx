@@ -32,6 +32,8 @@ class ShapeContent : public LayerContent {
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
+  bool hitTestByPixel(float localX, float localY) override;
+
  private:
   Path path = {};
   std::shared_ptr<Shader> shader = nullptr;

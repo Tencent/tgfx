@@ -338,19 +338,25 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
   const auto& layers = getLayersUnderPoint(x, y);
   if (pixelHitTest) {
+    const auto localPoint = globalToLocal(Point::Make(x, y));
     for (auto& layer : layers) {
+      const auto content = layer->getContent();
+      if (nullptr == content) {
+        continue;
+      }
+
       switch (layer->type()) {
         // Layer, Image, and Text Layer only check if the bounding box is hit.
         case LayerType::Layer:
         case LayerType::Image:
         case LayerType::Text:
-          if (layer->hitTestByBounds(x, y)) {
+          if (content->hitTestByBounds(localPoint.x, localPoint.y)) {
             return true;
           }
           break;
         // ShapeLayer needs to perform pixel-level hit testing to determine if the layer is hit.
         case LayerType::Shape:
-          if (layer->hitTestByPixel(x, y)) {
+          if (content->hitTestByPixel(localPoint.x, localPoint.y)) {
             return true;
           }
           break;
@@ -636,21 +642,4 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 
   return hasLayerUnderPoint;
 }
-
-bool Layer::hitTestByBounds(float x, float y) {
-  const auto content = getContent();
-  if (nullptr == content) {
-    return false;
-  }
-
-  Rect bounds = Rect::MakeEmpty();
-  bounds.join(content->getBounds());
-  getGlobalMatrix().mapRect(&bounds);
-  return bounds.contains(x, y);
-}
-
-bool Layer::hitTestByPixel(float, float) {
-  return false;
-}
-
 }  // namespace tgfx

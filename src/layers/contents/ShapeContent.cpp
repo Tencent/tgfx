@@ -28,4 +28,8 @@ void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
   shapePaint.setShader(shader);
   canvas->drawPath(path, shapePaint);
 }
+
+bool ShapeContent::hitTestByPixel(float localX, float localY) {
+  return path.contains(localX, localY);
+}
 }  // namespace tgfx

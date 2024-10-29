@@ -218,8 +218,6 @@ class ShapeLayer : public Layer {
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  bool hitTestByPixel(float x, float y) override;
-
  private:
   Path _path = {};
   std::shared_ptr<PathProvider> _pathProvider = nullptr;
