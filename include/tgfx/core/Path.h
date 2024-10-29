@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <objc/objc.h>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
