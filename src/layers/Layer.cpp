@@ -607,8 +607,8 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   }
 
   bool hasLayerUnderPoint = false;
-  for (auto iter = _children.rbegin(); iter != _children.rend(); iter++) {
-    const auto& childLayer = *iter;
+  for (auto item = _children.rbegin(); item != _children.rend(); item++) {
+    const auto& childLayer = *item;
     if (!childLayer->visible()) {
       continue;
     }
@@ -622,7 +622,11 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   if (hasLayerUnderPoint) {
     results->push_back(weakThis.lock());
   } else {
-    Rect layerBoundsRect = getBounds();
+    Rect layerBoundsRect = Rect::MakeEmpty();
+    const auto content = getContent();
+    if (nullptr != content) {
+      layerBoundsRect.join(content->getBounds());
+    }
     this->getGlobalMatrix().mapRect(&layerBoundsRect);
     if (layerBoundsRect.contains(x, y)) {
       results->push_back(weakThis.lock());

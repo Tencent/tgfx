@@ -799,8 +799,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
     layerNameJoin += layer->name() + "|";
   }
   printf("\n");
-  EXPECT_EQ(static_cast<int>(layers.size()), 1);
-  EXPECT_EQ(layerNameJoin, "root_layer|");
+  EXPECT_EQ(static_cast<int>(layers.size()), 0);
+  EXPECT_EQ(layerNameJoin, "");
 
   // P7(686.0488534297194, 375.2199363468245) is out of the root_layer
   layerNameJoin = "";
