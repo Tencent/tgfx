@@ -25,15 +25,17 @@ namespace tgfx {
 std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(UniqueKey uniqueKey,
                                                                          UniqueKey textureKey,
                                                                          PixelFormat pixelFormat,
-                                                                         int sampleCount) {
+                                                                         int sampleCount,
+                                                                         bool clearAll) {
   return std::shared_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
-      std::move(uniqueKey), std::move(textureKey), pixelFormat, sampleCount));
+      std::move(uniqueKey), std::move(textureKey), pixelFormat, sampleCount, clearAll));
 }
 
 RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey textureKey,
-                                               PixelFormat pixelFormat, int sampleCount)
+                                               PixelFormat pixelFormat, int sampleCount,
+                                               bool clearAll)
     : ResourceTask(std::move(uniqueKey)), textureKey(std::move(textureKey)),
-      pixelFormat(pixelFormat), sampleCount(sampleCount) {
+      pixelFormat(pixelFormat), sampleCount(sampleCount), clearAll(clearAll) {
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* context) {
@@ -46,7 +48,7 @@ std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* contex
     LOGE("RenderTargetCreateTask::onMakeResource() the texture format mismatch!");
     return nullptr;
   }
-  auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount);
+  auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount, clearAll);
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to create the render target!");
   }

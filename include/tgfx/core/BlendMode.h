@@ -72,9 +72,9 @@ enum class BlendMode {
    */
   Xor,
   /**
-   * Sum of colors.
+   * Adds the colors together. If the result exceeds 1 (for RGB), it displays white.
    */
-  Plus,
+  PlusLighter,
   /**
    * Product of premultiplied colors; darkens destination.
    */
@@ -138,6 +138,11 @@ enum class BlendMode {
   /**
    * Luminosity of source with hue and saturation of destination.
    */
-  Luminosity
+  Luminosity,
+  /**
+   * A variation of PlusLighter. It adds the colors together but subtracts 1 from the final values,
+   * making any values below 0 black.
+   */
+  PlusDarker
 };
 }  // namespace tgfx
