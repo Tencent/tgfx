@@ -216,6 +216,10 @@ int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
 }
 
 std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float x, float y) {
+  if (!visible()) {
+    return {};
+  }
+
   std::vector<std::shared_ptr<Layer>> results;
   getLayersUnderPointInternal(x, y, &results);
   return results;
@@ -608,15 +612,24 @@ std::shared_ptr<ImageFilter> Layer::getComposeFilter(
 
 bool Layer::getLayersUnderPointInternal(float x, float y,
                                         std::vector<std::shared_ptr<Layer>>* results) {
-  if (!visible()) {
-    return false;
-  }
-
   bool hasLayerUnderPoint = false;
   for (auto item = _children.rbegin(); item != _children.rend(); item++) {
     const auto& childLayer = *item;
     if (!childLayer->visible()) {
       continue;
+    }
+
+    if (nullptr != childLayer->_scrollRect) {
+      const Point pointInChildSpace = childLayer->globalToLocal(Point::Make(x, y));
+      if (!childLayer->_scrollRect->contains(pointInChildSpace.x, pointInChildSpace.y)) {
+        continue;
+      }
+    }
+
+    if (nullptr != childLayer->_mask) {
+      if (!childLayer->_mask->getLayersUnderPointInternal(x, y, results)) {
+        continue;
+      }
     }
 
     const auto success = childLayer->getLayersUnderPointInternal(x, y, results);
