@@ -99,7 +99,7 @@ enum class PathVerb {
 /**
  * Specify whether the arc is greater than 180 degrees pair or less than 180 degrees pair.
  */
-enum class ArcSize : uint8_t {
+enum class PathArcSize : uint8_t {
   /**
    * smaller of arc pair
    */

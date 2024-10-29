@@ -180,9 +180,9 @@ class Path {
    * @param xAxisRotate   x-axis rotation in degrees; positive values are clockwise
    * @param largeArc      chooses smaller or larger arc
    * @param reversed      Choose the rotation clockwise direction.（clockwise = false）
-   * @param endPt         end of arc
+   * @param endPoint      end of arc
    */
-  void arcTo(float rx, float ry, float xAxisRotate, ArcSize largeArc, bool reversed,
+  void arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bool reversed,
              Point endPoint);
   /**
    * Closes the current contour of Path. A closed contour connects the first and last Point with

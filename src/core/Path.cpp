@@ -222,7 +222,7 @@ void Path::cubicTo(const Point& control1, const Point& control2, const Point& po
 // See also SVG implementation notes:
 // http://www.w3.org/TR/SVG/implnote.html#ArcConversionEndpointToCenter
 // Note that arcSweep bool value is flipped from the original implementation.
-void Path::arcTo(float rx, float ry, float xAxisRotate, ArcSize largeArc, bool reversed,
+void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bool reversed,
                  Point endPoint) {
   std::array<Point, 2> srcPoints;
   this->getLastPoint(&srcPoints[0]);
@@ -242,10 +242,8 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, ArcSize largeArc, bool r
   ry = std::abs(ry);
   Point midPointDistance = (srcPoints[0] - srcPoints[1]) * 0.5f;
 
-  Matrix pointTransform;
-  pointTransform.setRotate(-xAxisRotate);
-
-  Point transformedMidPoint;
+  Matrix pointTransform = Matrix::MakeRotate(-xAxisRotate);
+  Point transformedMidPoint = Point::Zero();
   pointTransform.mapPoints(&transformedMidPoint, &midPointDistance, 1);
   float squareRx = rx * rx;
   float squareRy = ry * ry;
@@ -307,7 +305,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, ArcSize largeArc, bool r
     return;
   }
   float startTheta = theta1;
-  float w = std::sqrt(0.5f + std::cos(thetaWidth) * 0.5f);
+  float conicW = std::sqrt(0.5f + std::cos(thetaWidth) * 0.5f);
   auto float_is_integer = [](float scalar) -> bool { return scalar == std::floor(scalar); };
   bool expectIntegers = FloatNearlyZero(M_PI_F * 0.5f - std::abs(thetaWidth)) &&
                         float_is_integer(rx) && float_is_integer(ry) &&
@@ -316,8 +314,8 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, ArcSize largeArc, bool r
   auto path = &(writableRef()->path);
   for (int i = 0; i < static_cast<int>(segments); ++i) {
     float endTheta = startTheta + thetaWidth;
-    float sinEndTheta = SkScalarSinSnapToZero(endTheta);
-    float cosEndTheta = SkScalarCosSnapToZero(endTheta);
+    float sinEndTheta = SinSnapToZero(endTheta);
+    float cosEndTheta = CosSnapToZero(endTheta);
 
     unitPoints[1].set(cosEndTheta, sinEndTheta);
     unitPoints[1] += centerPoint;
@@ -335,7 +333,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, ArcSize largeArc, bool r
         point.y = std::round(point.y);
       }
     }
-    path->conicTo(mapped[0].x, mapped[0].y, mapped[1].x, mapped[1].y, w);
+    path->conicTo(mapped[0].x, mapped[0].y, mapped[1].x, mapped[1].y, conicW);
     startTheta = endTheta;
   }
 
@@ -546,7 +544,8 @@ int Path::countVerbs() const {
 }
 
 bool Path::getLastPoint(Point* lastPoint) const {
-  SkPoint skPoint;
+  if (!lastPoint) return false;
+  SkPoint skPoint = SkPoint::Make(0, 0);
   if (pathRef->path.getLastPt(&skPoint)) {
     lastPoint->set(skPoint.fX, skPoint.fY);
     return true;
