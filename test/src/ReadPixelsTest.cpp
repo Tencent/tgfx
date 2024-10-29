@@ -476,7 +476,7 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
 
 TGFX_TEST(ImageReaderTest, DataCheck) {
   auto stream =
-    Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/test_timestretch.png"));
+      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/test_timestretch.png"));
   ASSERT_TRUE(stream != nullptr && stream->size() >= 14);
   Buffer buffer(14);
   ASSERT_TRUE(stream->read(buffer.data(), 14) == 14);
