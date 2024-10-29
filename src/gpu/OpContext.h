@@ -28,29 +28,24 @@ namespace tgfx {
  */
 class OpContext {
  public:
-  /**
-   * If autoResolve is true, the RenderTarget will be resolved after OpContext is destroyed.
-   */
-  explicit OpContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, bool autoResolve = false)
-      : renderTargetProxy(std::move(renderTargetProxy)), autoResolve(autoResolve) {
+  explicit OpContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
+      : renderTargetProxy(std::move(renderTargetProxy)) {
   }
-
-  ~OpContext();
 
   RenderTargetProxy* renderTarget() const {
     return renderTargetProxy.get();
   }
 
-  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix);
+  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix,
+                  bool autoResolve = false);
 
   void fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                      const Matrix& uvMatrix);
+                      const Matrix& uvMatrix, bool autoResolve = false);
 
   void addOp(std::unique_ptr<Op> op);
 
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   std::shared_ptr<OpsRenderTask> opsTask = nullptr;
-  bool autoResolve = false;
 };
 }  // namespace tgfx
