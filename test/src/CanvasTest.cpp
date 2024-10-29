@@ -114,8 +114,6 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   int width = 72;
   int height = 72;
   auto surface = Surface::Make(context, width, height);
-  // clear the pending ClearOp.
-  context->flush();
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
   Paint paint;
@@ -173,8 +171,6 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   int width = 72;
   int height = 72;
   auto surface = Surface::Make(context, width, height);
-  // clear the pending ClearOp.
-  context->flush();
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(width, height), Color::White());
   Paint paint;
@@ -216,8 +212,6 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   int width = 72;
   int height = 72;
   auto surface = Surface::Make(context, width, height);
-  // clear the pending ClearOp.
-  context->flush();
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(width, height), Color::White());
   canvas->save();
