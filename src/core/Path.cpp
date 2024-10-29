@@ -307,7 +307,6 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
 // Note that arcSweep bool value is flipped from the original implementation.
 void Path::addArc(float rx, float ry, float xAxisRotate, ArcSize largeArc, PathDirection sweep,
                   Point endPt) {
-  // path->injectMoveToIfNeeded();
   std::array<Point, 2> srcPts;
   this->getLastPt(&srcPts[0]);
   // If rx = 0 or ry = 0 then this arc is treated as a straight line segment (a "lineto")

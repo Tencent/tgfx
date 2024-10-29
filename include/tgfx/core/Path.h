@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
@@ -327,7 +326,7 @@ class Path {
   int countVerbs() const;
 
   /**
-   * Returns last point on Path in lastPt. Returns false if SkPoint array is empty.
+   * Returns last point on Path in lastPt. Returns false if point array is empty.
    */
   bool getLastPt(Point* lastPt) const;
 

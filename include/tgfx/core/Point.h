@@ -111,7 +111,7 @@ struct Point {
   }
 
   /** 
-    * Subtracts vector point v from Point. Sets SkPoint to: (x - v.x, y - v.y).
+    * Subtracts vector Point v from Point. Sets Point to: (x - v.x, y - v.y).
     */
   void operator-=(const Point& v) {
     x -= v.x;
@@ -127,7 +127,7 @@ struct Point {
   }
 
   /** 
-    * offset vector point v from Point. Sets SkPoint to: (x + v.x, y + v.y).
+    * offset vector point v from Point. Sets Point to: (x + v.x, y + v.y).
     */
   void operator+=(const Point& v) {
     x += v.x;
@@ -135,15 +135,15 @@ struct Point {
   }
 
   /** 
-    * Returns SkPoint multiplied by scale.
-    * (x * scale, x * scale)
+    * Returns Point multiplied by scale.
+    * (x * scale, y * scale)
     */
-  Point operator*(float scale) const {
-    return {x * scale, y * scale};
+  friend Point operator*(const Point& p, float scale) {
+    return {p.x * scale, p.y * scale};
   }
 
   /** 
-    * Multiplies Point by scale. Sets Point to: (x * scale, x * scale).
+    * Multiplies Point by scale. Sets Point to: (x * scale, y * scale).
     */
   void operator*=(float scale) {
     x *= scale;
