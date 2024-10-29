@@ -19,7 +19,6 @@
 #include "ProxyProvider.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
-#include "gpu/ops/ClearOp.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GpuBufferCreateTask.h"
 #include "gpu/tasks/RenderTargetCreateTask.h"
@@ -175,7 +174,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto uniqueKey = UniqueKey::Make();
   auto task = RenderTargetCreateTask::MakeFrom(uniqueKey, textureProxy->getUniqueKey(), format,
-                                               sampleCount);
+                                               sampleCount, clearAll);
   if (task == nullptr) {
     return nullptr;
   }
@@ -183,11 +182,6 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   drawingManager->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<RenderTargetProxy>(
       new TextureRenderTargetProxy(uniqueKey, std::move(textureProxy), format, sampleCount));
-  if (clearAll) {
-    auto opsTask = drawingManager->addOpsTask(proxy);
-    auto rect = Rect::MakeWH(proxy->width(), proxy->height());
-    opsTask->addOp(ClearOp::Make(Color::Transparent(), rect));
-  }
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }

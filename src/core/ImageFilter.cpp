@@ -53,8 +53,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   if (!processor) {
     return nullptr;
   }
-  OpContext opContext(renderTarget, true);
-  opContext.fillWithFP(std::move(processor), Matrix::I());
+  OpContext opContext(renderTarget);
+  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
   return renderTarget->getTextureProxy();
 }
 
