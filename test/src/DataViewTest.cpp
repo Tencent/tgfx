@@ -33,7 +33,7 @@ TGFX_TEST(DataViewTest, PNGDataCheck) {
   auto secondByte = data.getUint8(1);
   auto thirdByte = data.getUint8(2);
   auto fourthByte = data.getUint8(3);
-  ASSERT_TRUE(secondByte == 'P' && thirdByte == 'N' && fourthByte == 'G');
+  EXPECT_TRUE(secondByte == 'P' && thirdByte == 'N' && fourthByte == 'G');
   buffer.clear();
 }
 
@@ -49,7 +49,7 @@ TGFX_TEST(DataViewTest, ReadString) {
     auto unichar = UTF::NextUTF8(&textStart, textStop);
     dataView.setInt32(offset, unichar);
   }
-  ASSERT_EQ(std::string((char*)buffer.bytes()), text);
+  EXPECT_EQ(std::string((char*)buffer.bytes(), text.size()), text);
 }
 
 TGFX_TEST(DataViewTest, ReadWriteData) {
@@ -65,21 +65,21 @@ TGFX_TEST(DataViewTest, ReadWriteData) {
   dataView.setUint64(22, 0xFFFFFFFFFFFFFFFF);
   dataView.setFloat(30, 1.123f);
   dataView.setDouble(34, 1.0E+39);
-  ASSERT_TRUE(dataView.getInt8(0) == 'T');
-  ASSERT_TRUE(dataView.getUint8(1) == 0xFF);
-  ASSERT_TRUE(dataView.getInt16(2) == 'G');
-  ASSERT_TRUE(dataView.getUint16(4) == 0xFFFF);
-  ASSERT_TRUE(dataView.getInt32(6) == 'F');
-  ASSERT_TRUE(dataView.getUint32(10) == 0xFFFFFFFF);
-  ASSERT_TRUE(dataView.getInt64(14) == 'X');
-  ASSERT_TRUE(dataView.getUint64(22) == 0xFFFFFFFFFFFFFFFF);
-  ASSERT_TRUE(dataView.getFloat(30) == 1.123f);
-  ASSERT_TRUE(dataView.getDouble(34) == 1.0E+39);
+  EXPECT_TRUE(dataView.getInt8(0) == 'T');
+  EXPECT_TRUE(dataView.getUint8(1) == 0xFF);
+  EXPECT_TRUE(dataView.getInt16(2) == 'G');
+  EXPECT_TRUE(dataView.getUint16(4) == 0xFFFF);
+  EXPECT_TRUE(dataView.getInt32(6) == 'F');
+  EXPECT_TRUE(dataView.getUint32(10) == 0xFFFFFFFF);
+  EXPECT_TRUE(dataView.getInt64(14) == 'X');
+  EXPECT_TRUE(dataView.getUint64(22) == 0xFFFFFFFFFFFFFFFF);
+  EXPECT_TRUE(dataView.getFloat(30) == 1.123f);
+  EXPECT_TRUE(dataView.getDouble(34) == 1.0E+39);
   buffer.clear();
   dataView.setByteOrder(ByteOrder::BigEndian);
   dataView.setUint16(0, 0x1234);
-  ASSERT_TRUE(dataView.getUint16(0) == 0x1234);
+  EXPECT_TRUE(dataView.getUint16(0) == 0x1234);
   dataView.setByteOrder(ByteOrder::LittleEndian);
-  ASSERT_TRUE(dataView.getUint16(0) == 0x3412);
+  EXPECT_TRUE(dataView.getUint16(0) == 0x3412);
 }
 }  // namespace tgfx
