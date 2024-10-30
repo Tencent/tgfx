@@ -22,13 +22,17 @@
 namespace tgfx {
 
 void LayerProperty::invalidate() {
-  dirty = true;
+  onInvalidate();
   for (auto& owner : owners) {
     if (auto layer = owner.lock()) {
       layer->invalidateContent();
     }
   }
 }
+
+void LayerProperty::onInvalidate() {
+}
+
 void LayerProperty::attachToLayer(const Layer* layer) {
   owners.push_back(layer->weakThis);
 }

@@ -49,7 +49,11 @@ class PathProvider : public LayerProperty {
 
   virtual Path onGeneratePath();
 
+  void onInvalidate() override;
+
  private:
   Path path = {};
+
+  bool dirty = true;
 };
 }  // namespace tgfx

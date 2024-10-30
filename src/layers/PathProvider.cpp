@@ -41,4 +41,9 @@ Path PathProvider::getPath() {
 Path PathProvider::onGeneratePath() {
   return path;
 }
+
+void PathProvider::onInvalidate() {
+  dirty = true;
+}
+
 }  // namespace tgfx

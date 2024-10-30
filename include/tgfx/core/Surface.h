@@ -175,6 +175,7 @@ class Surface {
   */
   uint32_t contentVersion() const;
 
+  uint32_t _uniqueID = 0;
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   uint32_t _renderFlags = 0;
   RenderContext* renderContext = nullptr;

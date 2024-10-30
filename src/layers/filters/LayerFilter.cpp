@@ -29,4 +29,8 @@ std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float filterScale) {
   return lastFilter;
 }
 
+void LayerFilter::onInvalidate() {
+  dirty = true;
+}
+
 }  // namespace tgfx

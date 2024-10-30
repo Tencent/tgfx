@@ -32,11 +32,14 @@ class LayerProperty {
 
  protected:
   /**
-   * Mark the property as dirty and notify the layer that the content needs to be updated.
+   * Invalidate this property and notify the layer that the content needs to be updated.
    */
   void invalidate();
 
-  bool dirty = true;
+  /**
+   * Called when the property is invalidated.
+   */
+  virtual void onInvalidate();
 
  private:
   void attachToLayer(const Layer* layer);

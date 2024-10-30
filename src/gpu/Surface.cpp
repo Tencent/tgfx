@@ -67,7 +67,7 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> re
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
-    : renderTargetProxy(std::move(proxy)), _renderFlags(renderFlags) {
+    : _uniqueID(UniqueID::Next()), renderTargetProxy(std::move(proxy)), _renderFlags(renderFlags) {
   DEBUG_ASSERT(this->renderTargetProxy != nullptr);
 }
 
