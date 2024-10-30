@@ -216,12 +216,9 @@ int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
 }
 
 std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float x, float y) {
-  if (!visible()) {
-    return {};
-  }
-
   std::vector<std::shared_ptr<Layer>> results;
-  getLayersUnderPointInternal(x, y, &results);
+  const Point localPoint = globalToLocal(Point::Make(x, y));
+  getLayersUnderPointInternal(localPoint.x, localPoint.y, &results);
   return results;
 }
 
@@ -610,7 +607,7 @@ std::shared_ptr<ImageFilter> Layer::getComposeFilter(
   return ImageFilter::Compose(imageFilters);
 }
 
-bool Layer::getLayersUnderPointInternal(float x, float y,
+bool Layer::getLayersUnderPointInternal(float localX, float localY,
                                         std::vector<std::shared_ptr<Layer>>* results) {
   bool hasLayerUnderPoint = false;
   for (auto item = _children.rbegin(); item != _children.rend(); item++) {
@@ -619,21 +616,26 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
       continue;
     }
 
+    Matrix inverseMatrix = Matrix::I();
+    Point pointInChildSpace = Point::Zero();
+    if (childLayer->matrix().invert(&inverseMatrix)) {
+      pointInChildSpace = inverseMatrix.mapXY(localX, localY);
+    }
+
     if (nullptr != childLayer->_scrollRect) {
-      const Point pointInChildSpace = childLayer->globalToLocal(Point::Make(x, y));
       if (!childLayer->_scrollRect->contains(pointInChildSpace.x, pointInChildSpace.y)) {
         continue;
       }
     }
 
     if (nullptr != childLayer->_mask) {
-      if (!childLayer->_mask->getLayersUnderPointInternal(x, y, results)) {
+      const auto maskBounds = childLayer->_mask->getBounds();
+      if (!maskBounds.contains(pointInChildSpace.x, pointInChildSpace.y)) {
         continue;
       }
     }
 
-    const auto success = childLayer->getLayersUnderPointInternal(x, y, results);
-    if (success) {
+    if (childLayer->getLayersUnderPointInternal(pointInChildSpace.x, pointInChildSpace.y, results)) {
       hasLayerUnderPoint = true;
     }
   }
@@ -646,8 +648,7 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
     if (nullptr != content) {
       layerBoundsRect.join(content->getBounds());
     }
-    this->getGlobalMatrix().mapRect(&layerBoundsRect);
-    if (layerBoundsRect.contains(x, y)) {
+    if (layerBoundsRect.contains(localX, localY)) {
       results->push_back(weakThis.lock());
       hasLayerUnderPoint = true;
     }

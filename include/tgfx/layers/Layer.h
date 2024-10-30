@@ -505,7 +505,7 @@ class Layer {
   std::shared_ptr<ImageFilter> getComposeFilter(
       const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale);
 
-  bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
+  bool getLayersUnderPointInternal(float localX, float localY, std::vector<std::shared_ptr<Layer>>* results);
 
   std::string _name;
   float _alpha = 1.0f;

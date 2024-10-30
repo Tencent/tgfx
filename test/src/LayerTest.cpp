@@ -851,8 +851,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
     layerNameJoin += layer->name() + "|";
   }
   printf("\n");
-  EXPECT_EQ(static_cast<int>(layers.size()), 2);
-  EXPECT_EQ(layerNameJoin, "shaper_layer2|root_layer|");
+  EXPECT_EQ(static_cast<int>(layers.size()), 0);
+  EXPECT_EQ(layerNameJoin, "");
 
   // P11(540, 200) is in the shaper_layer2, root_layer
   layerNameJoin = "";
