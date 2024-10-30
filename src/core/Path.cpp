@@ -240,19 +240,19 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
   }
   rx = std::abs(rx);
   ry = std::abs(ry);
-  Point midPointDistance = (srcPoints[0] - srcPoints[1]) * 0.5f;
+  auto midPointDistance = (srcPoints[0] - srcPoints[1]) * 0.5f;
 
-  Matrix pointTransform = Matrix::MakeRotate(-xAxisRotate);
-  Point transformedMidPoint = Point::Zero();
+  auto pointTransform = Matrix::MakeRotate(-xAxisRotate);
+  auto transformedMidPoint = Point::Zero();
   pointTransform.mapPoints(&transformedMidPoint, &midPointDistance, 1);
-  float squareRx = rx * rx;
-  float squareRy = ry * ry;
-  float squareX = transformedMidPoint.x * transformedMidPoint.x;
-  float squareY = transformedMidPoint.y * transformedMidPoint.y;
+  auto squareRx = rx * rx;
+  auto squareRy = ry * ry;
+  auto squareX = transformedMidPoint.x * transformedMidPoint.x;
+  auto squareY = transformedMidPoint.y * transformedMidPoint.y;
 
   // Check if the radii are big enough to draw the arc, scale radii if not.
   // http://www.w3.org/TR/SVG/implnote.html#ArcCorrectionOutOfRangeRadii
-  float radiiScale = squareX / squareRx + squareY / squareRy;
+  auto radiiScale = squareX / squareRx + squareY / squareRy;
   if (radiiScale > 1) {
     radiiScale = std::sqrt(radiiScale);
     rx *= radiiScale;
@@ -264,24 +264,24 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
 
   std::array<Point, 2> unitPoints;
   pointTransform.mapPoints(unitPoints.data(), srcPoints.data(), unitPoints.size());
-  Point delta = unitPoints[1] - unitPoints[0];
+  auto delta = unitPoints[1] - unitPoints[0];
 
-  float d = delta.x * delta.x + delta.y * delta.y;
-  float scaleFactorSquared = std::max(1 / d - 0.25f, 0.f);
+  auto d = delta.x * delta.x + delta.y * delta.y;
+  auto scaleFactorSquared = std::max(1 / d - 0.25f, 0.f);
 
-  float scaleFactor = std::sqrt(scaleFactorSquared);
+  auto scaleFactor = std::sqrt(scaleFactorSquared);
   if (reversed != static_cast<bool>(largeArc)) {  // flipped from the original implementation
     scaleFactor = -scaleFactor;
   }
   delta *= scaleFactor;
-  Point centerPoint = unitPoints[0] + unitPoints[1];
+  auto centerPoint = unitPoints[0] + unitPoints[1];
   centerPoint *= 0.5f;
   centerPoint.offset(-delta.y, delta.x);
   unitPoints[0] -= centerPoint;
   unitPoints[1] -= centerPoint;
-  float theta1 = std::atan2(unitPoints[0].y, unitPoints[0].x);
-  float theta2 = std::atan2(unitPoints[1].y, unitPoints[1].x);
-  float thetaArc = theta2 - theta1;
+  auto theta1 = std::atan2(unitPoints[0].y, unitPoints[0].x);
+  auto theta2 = std::atan2(unitPoints[1].y, unitPoints[1].x);
+  auto thetaArc = theta2 - theta1;
   if (thetaArc < 0 && !reversed) {  // arcSweep flipped from the original implementation
     thetaArc += M_PI_F * 2.0f;
   } else if (thetaArc > 0 && reversed) {  // arcSweep flipped from the original implementation
@@ -298,20 +298,20 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
   pointTransform.preScale(rx, ry);
 
   // the arc may be slightly bigger than 1/4 circle, so allow up to 1/3rd
-  float segments = std::ceil(std::abs(thetaArc / (2 * M_PI_F / 3)));
-  float thetaWidth = thetaArc / segments;
-  float t = std::tan(0.5f * thetaWidth);
+  auto segments = std::ceil(std::abs(thetaArc / (2 * M_PI_F / 3)));
+  auto thetaWidth = thetaArc / segments;
+  auto t = std::tan(0.5f * thetaWidth);
   if (!FloatsAreFinite(&t, 1)) {
     return;
   }
-  float startTheta = theta1;
-  float conicW = std::sqrt(0.5f + std::cos(thetaWidth) * 0.5f);
+  auto startTheta = theta1;
+  auto conicW = std::sqrt(0.5f + std::cos(thetaWidth) * 0.5f);
   auto float_is_integer = [](float scalar) -> bool { return scalar == std::floor(scalar); };
-  bool expectIntegers = FloatNearlyZero(M_PI_F * 0.5f - std::abs(thetaWidth)) &&
+  auto expectIntegers = FloatNearlyZero(M_PI_F * 0.5f - std::abs(thetaWidth)) &&
                         float_is_integer(rx) && float_is_integer(ry) &&
                         float_is_integer(endPoint.x) && float_is_integer(endPoint.y);
 
-  auto path = &(writableRef()->path);
+  auto* path = &(writableRef()->path);
   for (int i = 0; i < static_cast<int>(segments); ++i) {
     float endTheta = startTheta + thetaWidth;
     float sinEndTheta = SinSnapToZero(endTheta);
@@ -328,7 +328,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
     // marks.A round rect may lose convexity as a result.If the input values are on integers,
     // place the conic on integers as well.
     if (expectIntegers) {
-      for (Point& point : mapped) {
+      for (auto& point : mapped) {
         point.x = std::round(point.x);
         point.y = std::round(point.y);
       }
@@ -544,8 +544,10 @@ int Path::countVerbs() const {
 }
 
 bool Path::getLastPoint(Point* lastPoint) const {
-  if (!lastPoint) return false;
-  SkPoint skPoint = SkPoint::Make(0, 0);
+  if (!lastPoint) {
+    return false;
+  }
+  auto skPoint = SkPoint::Make(0, 0);
   if (pathRef->path.getLastPt(&skPoint)) {
     lastPoint->set(skPoint.fX, skPoint.fY);
     return true;

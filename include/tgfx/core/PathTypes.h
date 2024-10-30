@@ -103,11 +103,11 @@ enum class PathArcSize : uint8_t {
   /**
    * smaller of arc pair
    */
-  Small_ArcSize,
+  Small,
   /**
    * larger of arc pair
    */
-  Large_ArcSize,
+  Large,
 };
 
 /**
