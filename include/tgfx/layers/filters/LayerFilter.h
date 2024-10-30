@@ -51,7 +51,5 @@ class LayerFilter : public LayerProperty {
   std::unique_ptr<Rect> _clipBounds = nullptr;
 
   std::shared_ptr<ImageFilter> lastFilter;
-
-  friend class Layer;
 };
 }  // namespace tgfx
