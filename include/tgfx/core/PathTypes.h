@@ -97,6 +97,20 @@ enum class PathVerb {
 };
 
 /**
+ * Specify whether the arc is greater than 180 degrees pair or less than 180 degrees pair.
+ */
+enum class PathArcSize : uint8_t {
+  /**
+   * smaller of arc pair
+   */
+  Small,
+  /**
+   * larger of arc pair
+   */
+  Large,
+};
+
+/**
  * Zero to four Point are stored in points, depending on the returned PathVerb
  */
 using PathIterator = std::function<void(PathVerb verb, const Point points[4], void* info)>;
