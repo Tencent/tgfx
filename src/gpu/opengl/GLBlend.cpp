@@ -315,9 +315,9 @@ static void BlendHandler_PlusDarker(FragmentShaderBuilder* fsBuilder, const char
                                     const char* dstColor, const char* outputColor) {
   // MAX(0, (1 - ((Da * (1 - Dc) + Sa * (1 - Sc)))
   // https://developer.apple.com/documentation/coregraphics/cgblendmode/kcgblendmodeplusdarker
-  fsBuilder->codeAppendf("%s.rgb = clamp(1.0 + %s.rgb + %s.rgb - %s.a - %s.a, 0, 1);", outputColor,
-                         srcColor, dstColor, dstColor, srcColor);
-  fsBuilder->codeAppendf("%s.rgb *= (%s.a != 0.0) ? 1.0 : 0.0;", outputColor, outputColor);
+  fsBuilder->codeAppendf("%s.rgb = clamp(1.0 + %s.rgb + %s.rgb - %s.a - %s.a, 0.0, 1.0);",
+                         outputColor, srcColor, dstColor, dstColor, srcColor);
+  fsBuilder->codeAppendf("%s.rgb *= (%s.a > 0.0) ? 1.0 : 0.0;", outputColor, outputColor);
 }
 
 using BlendHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcColor,
