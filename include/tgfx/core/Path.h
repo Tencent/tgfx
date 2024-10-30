@@ -163,24 +163,24 @@ class Path {
   void cubicTo(const Point& control1, const Point& control2, const Point& point);
 
   /**
-   * Appends arc to Path. Arc is implemented by one or more conics weighted to describe part oval   
-   * with radii (rx, ry) rotated by xAxisRotate degrees. Arc curves from last Path Point to (x,    
-   * y),  choosing one of four possible routes: clockwise or counterclockwise, and smaller or      
-   * larger.
-   * Arc sweep is always less than 360 degrees. arcTo() appends line to (x, y) if either radii are 
-   * zero, or if last Path Point equals (x, y). arcTo() scales radii (rx, ry) to fit last Path     
-   * Point and (x, y) if both are greater than zero but too small.
-   * arcTo() appends up to four conic curves.
-   * arcTo() implements the functionality of SVG arc, although SVG sweep-flag value is opposite the 
-   * integer value of sweep; SVG sweep-flag uses 1 for clockwise,while counter-clockwise direction 
-   * cast to int is zero.
+   * Appends an arc to the Path. The arc is represented by one or more conic sections that describe
+   * part of an oval with radii (rx, ry) rotated by xAxisRotate degrees. The arc curves from the 
+   * last point in the Path to (x, y), choosing one of four possible routes: clockwise or 
+   * counterclockwise, and smaller or larger.
+   * The arc sweep is always less than 360 degrees. If either radius is zero, or if the last point 
+   * in the Path equals (x, y), a line to (x, y) is appended instead. If both radii are greater 
+   * than zero but too small to fit the arc, they are scaled to fit.
+   * This method appends up to four conic curves to represent the arc.
+   * It implements the functionality of the SVG arc, although the SVG sweep-flag value is the 
+   * opposite of the integer value of the sweep parameter; SVG uses 1 for clockwise, while 
+   * counterclockwise is represented by zero.
    * 
-   * @param rx            x radii on axes before x-axis rotation
-   * @param ry            y radii on axes before x-axis rotation
+   * @param rx            x radius before x-axis rotation
+   * @param ry            y radius before x-axis rotation
    * @param xAxisRotate   x-axis rotation in degrees; positive values are clockwise
-   * @param largeArc      chooses smaller or larger arc
-   * @param reversed      Choose the rotation clockwise direction.（clockwise = false）
-   * @param endPoint      end of arc
+   * @param largeArc      chooses the larger or smaller arc
+   * @param reversed      chooses the rotation direction; false for clockwise
+   * @param endPoint      end point of the arc
    */
   void arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bool reversed,
              Point endPoint);

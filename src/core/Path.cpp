@@ -313,9 +313,9 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
 
   auto* path = &(writableRef()->path);
   for (int i = 0; i < static_cast<int>(segments); ++i) {
-    float endTheta = startTheta + thetaWidth;
-    float sinEndTheta = SinSnapToZero(endTheta);
-    float cosEndTheta = CosSnapToZero(endTheta);
+    auto endTheta = startTheta + thetaWidth;
+    auto sinEndTheta = SinSnapToZero(endTheta);
+    auto cosEndTheta = CosSnapToZero(endTheta);
 
     unitPoints[1].set(cosEndTheta, sinEndTheta);
     unitPoints[1] += centerPoint;
