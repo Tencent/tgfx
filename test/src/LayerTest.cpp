@@ -683,18 +683,18 @@ TGFX_TEST(LayerTest, ContentVersion) {
   displayList.root()->addChild(shapeLayer);
   auto contentVersion = surface->contentVersion();
   displayList.render(surface.get());
-  ASSERT_NE(surface->contentVersion(), contentVersion);
+  EXPECT_NE(surface->contentVersion(), contentVersion);
   contentVersion = surface->contentVersion();
   displayList.render(surface.get());
-  ASSERT_EQ(surface->contentVersion(), contentVersion);
+  EXPECT_EQ(surface->contentVersion(), contentVersion);
   displayList.render(surface.get(), false);
-  ASSERT_NE(surface->contentVersion(), contentVersion);
+  EXPECT_NE(surface->contentVersion(), contentVersion);
   contentVersion = surface->contentVersion();
   surface->getCanvas()->clear();
-  ASSERT_NE(surface->contentVersion(), contentVersion);
+  EXPECT_NE(surface->contentVersion(), contentVersion);
   contentVersion = surface->contentVersion();
   displayList.render(surface.get());
-  ASSERT_NE(surface->contentVersion(), contentVersion);
+  EXPECT_NE(surface->contentVersion(), contentVersion);
   device->unlock();
 }
 

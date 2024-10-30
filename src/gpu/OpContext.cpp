@@ -21,6 +21,8 @@
 #include "gpu/ops/FillRectOp.h"
 
 namespace tgfx {
+static constexpr uint32_t InvalidContentVersion = 0;
+
 void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix,
                            bool autoResolve) {
   fillRectWithFP(Rect::MakeWH(renderTargetProxy->width(), renderTargetProxy->height()),
@@ -46,8 +48,10 @@ void OpContext::addOp(std::unique_ptr<Op> op) {
   if (opsTask == nullptr || opsTask->isClosed()) {
     auto drawingManager = renderTargetProxy->getContext()->drawingManager();
     opsTask = drawingManager->addOpsTask(renderTargetProxy);
-    _contentVersion++;
   }
   opsTask->addOp(std::move(op));
+  do {
+    _contentVersion++;
+  } while (InvalidContentVersion == _contentVersion);
 }
 }  // namespace tgfx
