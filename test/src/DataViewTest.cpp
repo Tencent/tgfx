@@ -25,9 +25,10 @@ namespace tgfx {
 TGFX_TEST(DataViewTest, PNGDataCheck) {
   auto stream =
       Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/test_timestretch.png"));
-  ASSERT_TRUE(stream != nullptr && stream->size() >= 14);
+  ASSERT_TRUE(stream != nullptr);
+  EXPECT_TRUE(stream->size() >= 14);
   Buffer buffer(14);
-  ASSERT_TRUE(stream->read(buffer.data(), 14) == 14);
+  EXPECT_TRUE(stream->read(buffer.data(), 14) == 14);
   auto data = DataView(buffer.bytes(), buffer.size());
   auto secondByte = data.getUint8(1);
   auto thirdByte = data.getUint8(2);
@@ -38,6 +39,7 @@ TGFX_TEST(DataViewTest, PNGDataCheck) {
 
 TGFX_TEST(DataViewTest, ReadString) {
   Buffer buffer(100);
+  memset(buffer.bytes(), 0, buffer.size());
   std::string text = "Hello TGFX 123";
   auto dataView = DataView(buffer.bytes(), buffer.size());
   const char* textStart = text.data();
