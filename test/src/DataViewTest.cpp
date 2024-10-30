@@ -21,7 +21,7 @@
 #include "tgfx/core/Buffer.h"
 #include "utils/TestUtils.h"
 
-namespace tgfx{
+namespace tgfx {
 TGFX_TEST(DataViewTest, PNGDataCheck) {
   auto stream =
       Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/test_timestretch.png"));
@@ -80,4 +80,4 @@ TGFX_TEST(DataViewTest, ReadWriteData) {
   dataView.setByteOrder(ByteOrder::LittleEndian);
   ASSERT_TRUE(dataView.getUint16(0) == 0x3412);
 }
-}
+}  // namespace tgfx
