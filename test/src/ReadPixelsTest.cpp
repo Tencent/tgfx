@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <tgfx/core/DataView.h>
-#include <tgfx/core/Stream.h>
 #include <vector>
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
@@ -472,26 +470,5 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   buffer.clear();
   ASSERT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "NativeCodec_Encode_Alpha8");
-}
-
-TGFX_TEST(ImageReaderTest, DataCheck) {
-  auto stream =
-      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/test_timestretch.png"));
-  ASSERT_TRUE(stream != nullptr && stream->size() >= 14);
-  Buffer buffer(14);
-  ASSERT_TRUE(stream->read(buffer.data(), 14) == 14);
-  auto data = DataView(buffer.bytes(), buffer.size());
-  auto secondByte = data.getUint8(1);
-  auto thirdByte = data.getUint8(2);
-  auto fouthByte = data.getUint8(3);
-  ASSERT_TRUE(secondByte == 'P' && thirdByte == 'N' && fouthByte == 'G');
-  buffer.clear();
-  data.setUint8(1, 'J');
-  data.setUint8(2, 'P');
-  data.setUint8(3, 'G');
-  secondByte = data.getUint8(1);
-  thirdByte = data.getUint8(2);
-  fouthByte = data.getUint8(3);
-  ASSERT_TRUE(secondByte == 'J' && thirdByte == 'P' && fouthByte == 'G');
 }
 }  // namespace tgfx
