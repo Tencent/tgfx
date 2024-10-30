@@ -21,6 +21,7 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
+class Layer;
 /**
  * PathProvider is an interface for classes that generates a Path. It defers the acquisition of the
  * Path until it is actually required, allowing the Path to be invalidated and regenerate if
@@ -56,7 +57,12 @@ class PathProvider {
   virtual Path onGeneratePath();
 
  private:
+  void attachToLayer(const Layer* layer);
+  void detachFromLayer(const Layer* layer);
   bool dirty = true;
   Path path = {};
+
+  std::vector<std::weak_ptr<Layer>> owners;
+  friend class Layer;
 };
 }  // namespace tgfx

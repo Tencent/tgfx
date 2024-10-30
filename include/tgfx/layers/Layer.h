@@ -68,7 +68,7 @@ class Layer {
    */
   static std::shared_ptr<Layer> Make();
 
-  virtual ~Layer() = default;
+  virtual ~Layer();
 
   /**
    * Returns the type of the layer.
@@ -528,5 +528,8 @@ class Layer {
   } bitFields = {};
 
   friend class DisplayList;
+  friend class LayerFilter;
+  friend class ShapeStyle;
+  friend class PathProvider;
 };
 }  // namespace tgfx

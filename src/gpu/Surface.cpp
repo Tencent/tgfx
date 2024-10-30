@@ -198,6 +198,13 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
+uint32_t Surface::contentVersion() const {
+  if (renderContext == nullptr) {
+    return 1u;
+  }
+  return renderContext->opContext->contentVersion();
+}
+
 bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
   if (cachedImage == nullptr) {
     return true;

@@ -21,6 +21,7 @@
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
+class Layer;
 /**
  * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
  * adjustments. LayerFilters are mutable and can be changed at any time.
@@ -52,6 +53,10 @@ class LayerFilter {
   virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
  private:
+  void attachToLayer(const Layer* layer);
+
+  void detachFromLayer(const Layer* layer);
+
   bool dirty = true;
 
   float lastScale = 1.0f;
@@ -59,5 +64,9 @@ class LayerFilter {
   std::unique_ptr<Rect> _clipBounds = nullptr;
 
   std::shared_ptr<ImageFilter> lastFilter;
+
+  std::vector<std::weak_ptr<Layer>> owners;
+
+  friend class Layer;
 };
 }  // namespace tgfx

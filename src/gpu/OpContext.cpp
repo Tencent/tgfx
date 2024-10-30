@@ -48,5 +48,6 @@ void OpContext::addOp(std::unique_ptr<Op> op) {
     opsTask = drawingManager->addOpsTask(renderTargetProxy);
   }
   opsTask->addOp(std::move(op));
+  _contentVersion++;
 }
 }  // namespace tgfx

@@ -52,6 +52,12 @@ std::shared_ptr<Layer> Layer::Make() {
   return layer;
 }
 
+Layer::~Layer() {
+  for (auto filter : _filters) {
+    filter->detachFromLayer(this);
+  }
+}
+
 Layer::Layer() {
   memset(&bitFields, 0, sizeof(bitFields));
   bitFields.visible = true;
@@ -137,7 +143,13 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
       std::equal(_filters.begin(), _filters.end(), value.begin())) {
     return;
   }
+  for (const auto& filter : _filters) {
+    filter->detachFromLayer(this);
+  }
   _filters = std::move(value);
+  for (const auto& filter : _filters) {
+    filter->attachToLayer(this);
+  }
   rasterizedContent = nullptr;
   invalidate();
 }

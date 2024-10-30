@@ -16,30 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/PathProvider.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
-  if (path.isEmpty()) {
-    return nullptr;
-  }
-  return std::shared_ptr<PathProvider>(new PathProvider(path));
-}
-
-PathProvider::PathProvider(Path path) : path(std::move(path)) {
-}
-
-Path PathProvider::getPath() {
-  if (dirty) {
-    path = onGeneratePath();
-    dirty = false;
-  }
-  return path;
-}
-
-void PathProvider::invalidate() {
-  dirty = true;
+void ShapeStyle::invalidate() {
   for (auto& owner : owners) {
     auto layer = owner.lock();
     if (layer) {
@@ -48,15 +29,11 @@ void PathProvider::invalidate() {
   }
 }
 
-Path PathProvider::onGeneratePath() {
-  return path;
-}
-
-void PathProvider::attachToLayer(const Layer* layer) {
+void ShapeStyle::attachToLayer(const Layer* layer) {
   owners.push_back(layer->weakThis);
 }
 
-void PathProvider::detachFromLayer(const Layer* layer) {
+void ShapeStyle::detachFromLayer(const Layer* layer) {
   for (auto it = owners.begin(); it != owners.end(); ++it) {
     if (it->lock().get() == layer) {
       owners.erase(it);

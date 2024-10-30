@@ -49,5 +49,6 @@ class DisplayList {
 
  private:
   std::shared_ptr<Layer> _root = nullptr;
+  uint32_t surfaceContentVersion = 0u;
 };
 }  // namespace tgfx
