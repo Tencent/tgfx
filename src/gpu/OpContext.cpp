@@ -46,8 +46,8 @@ void OpContext::addOp(std::unique_ptr<Op> op) {
   if (opsTask == nullptr || opsTask->isClosed()) {
     auto drawingManager = renderTargetProxy->getContext()->drawingManager();
     opsTask = drawingManager->addOpsTask(renderTargetProxy);
+    _contentVersion++;
   }
   opsTask->addOp(std::move(op));
-  _contentVersion++;
 }
 }  // namespace tgfx

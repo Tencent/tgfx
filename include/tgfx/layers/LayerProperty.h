@@ -16,30 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ShapeStyle.h"
-#include "tgfx/layers/Layer.h"
+#pragma once
+#include <vector>
 
 namespace tgfx {
-void ShapeStyle::invalidate() {
-  for (auto& owner : owners) {
-    auto layer = owner.lock();
-    if (layer) {
-      layer->invalidateContent();
-    }
-  }
-}
+class Layer;
 
-void ShapeStyle::attachToLayer(const Layer* layer) {
-  owners.push_back(layer->weakThis);
-}
+/**
+ * A property of a layer that may change the content of the layer.
+ */
+class LayerProperty {
+ public:
+  virtual ~LayerProperty() = default;
 
-void ShapeStyle::detachFromLayer(const Layer* layer) {
-  for (auto it = owners.begin(); it != owners.end(); ++it) {
-    if (it->lock().get() == layer) {
-      owners.erase(it);
-      break;
-    }
-  }
-}
+ protected:
+  /**
+   * Mark the property as dirty and notify the layer that the content needs to be updated.
+   */
+  void invalidate();
+
+  bool dirty = true;
+
+ private:
+  void attachToLayer(const Layer* layer);
+
+  void detachFromLayer(const Layer* layer);
+
+  std::vector<std::weak_ptr<Layer>> owners;
+
+  friend class Layer;
+};
 
 }  // namespace tgfx

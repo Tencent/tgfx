@@ -38,31 +38,7 @@ Path PathProvider::getPath() {
   return path;
 }
 
-void PathProvider::invalidate() {
-  dirty = true;
-  for (auto& owner : owners) {
-    auto layer = owner.lock();
-    if (layer) {
-      layer->invalidateContent();
-    }
-  }
-}
-
 Path PathProvider::onGeneratePath() {
   return path;
 }
-
-void PathProvider::attachToLayer(const Layer* layer) {
-  owners.push_back(layer->weakThis);
-}
-
-void PathProvider::detachFromLayer(const Layer* layer) {
-  for (auto it = owners.begin(); it != owners.end(); ++it) {
-    if (it->lock().get() == layer) {
-      owners.erase(it);
-      break;
-    }
-  }
-}
-
 }  // namespace tgfx

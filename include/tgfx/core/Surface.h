@@ -168,13 +168,13 @@ class Surface {
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
+ private:
   /**
-   * Returns the version of the content. The version is changed when the content is changed.
-   * The initial version is 1;
-   */
+  * Returns the version of the content. The version is changed when the content is changed.
+  * The initial version is 1;
+  */
   uint32_t contentVersion() const;
 
- private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   uint32_t _renderFlags = 0;
   RenderContext* renderContext = nullptr;
@@ -190,5 +190,6 @@ class Surface {
 
   friend class RenderContext;
   friend class PictureImage;
+  friend class DisplayList;
 };
 }  // namespace tgfx

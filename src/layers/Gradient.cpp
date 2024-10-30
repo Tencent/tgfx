@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Gradient.h"
-#include <tgfx/layers/Layer.h>
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 std::shared_ptr<LinearGradient> Gradient::MakeLinear(const Point& startPoint,

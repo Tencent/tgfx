@@ -19,31 +19,20 @@
 #pragma once
 
 #include "tgfx/core/Shader.h"
+#include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
-class Layer;
 /**
  * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
  * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
  * are not thread-safe and should only be accessed from a single thread.
  */
-class ShapeStyle {
- public:
-  virtual ~ShapeStyle() = default;
-
+class ShapeStyle : public LayerProperty {
  protected:
   /**
    * Returns the current shader that will be used to draw the shape.
    */
   virtual std::shared_ptr<Shader> getShader() const = 0;
-
-  void invalidate();
-
-  void attachToLayer(const Layer* layer);
-
-  void detachFromLayer(const Layer* layer);
-
-  std::vector<std::weak_ptr<Layer>> owners;
 
   friend class ShapeLayer;
 };

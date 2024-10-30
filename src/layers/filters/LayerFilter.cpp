@@ -20,16 +20,6 @@
 #include "tgfx/layers/Layer.h"
 namespace tgfx {
 
-void LayerFilter::invalidate() {
-  dirty = true;
-  for (auto& owner : owners) {
-    auto layer = owner.lock();
-    if (layer) {
-      layer->invalidateContent();
-    }
-  }
-}
-
 std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float filterScale) {
   if (dirty || lastScale != filterScale) {
     lastFilter = onCreateImageFilter(filterScale);
@@ -37,19 +27,6 @@ std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float filterScale) {
     dirty = false;
   }
   return lastFilter;
-}
-
-void LayerFilter::attachToLayer(const Layer* layer) {
-  owners.push_back(layer->weakThis);
-}
-
-void LayerFilter::detachFromLayer(const Layer* layer) {
-  for (auto it = owners.begin(); it != owners.end(); ++it) {
-    if (it->lock().get() == layer) {
-      owners.erase(it);
-      break;
-    }
-  }
 }
 
 }  // namespace tgfx

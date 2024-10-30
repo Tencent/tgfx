@@ -50,13 +50,9 @@ void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> style) {
   if (_fillStyle == style) {
     return;
   }
-  if (_fillStyle) {
-    _fillStyle->detachFromLayer(this);
-  }
+  detachProperty(_fillStyle.get());
   _fillStyle = std::move(style);
-  if (_fillStyle) {
-    _fillStyle->attachToLayer(this);
-  }
+  attachProperty(_fillStyle.get());
   invalidateContent();
 }
 
@@ -64,13 +60,9 @@ void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> style) {
   if (_strokeStyle == style) {
     return;
   }
-  if (_strokeStyle) {
-    _strokeStyle->detachFromLayer(this);
-  }
+  detachProperty(_strokeStyle.get());
   _strokeStyle = std::move(style);
-  if (_strokeStyle) {
-    _strokeStyle->attachToLayer(this);
-  }
+  attachProperty(_strokeStyle.get());
   invalidateContent();
 }
 
@@ -152,12 +144,8 @@ void ShapeLayer::setStrokeEnd(float end) {
 }
 
 ShapeLayer::~ShapeLayer() {
-  if (_strokeStyle) {
-    _strokeStyle->detachFromLayer(this);
-  }
-  if (_fillStyle) {
-    _fillStyle->detachFromLayer(this);
-  }
+  detachProperty(_strokeStyle.get());
+  detachProperty(_fillStyle.get());
 }
 
 std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {

@@ -470,6 +470,16 @@ class Layer {
    */
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
+  /**
+  * Attachs a property to this layer.
+  */
+  void attachProperty(LayerProperty* property) const;
+
+  /**
+   * Detaches a property from this layer.
+   */
+  void detachProperty(LayerProperty* property) const;
+
  private:
   /**
    * Marks the layer's children as changed and needing to be redrawn.
@@ -528,8 +538,6 @@ class Layer {
   } bitFields = {};
 
   friend class DisplayList;
-  friend class LayerFilter;
-  friend class ShapeStyle;
-  friend class PathProvider;
+  friend class LayerProperty;
 };
 }  // namespace tgfx

@@ -53,7 +53,7 @@ std::shared_ptr<Layer> Layer::Make() {
 }
 
 Layer::~Layer() {
-  for (auto filter : _filters) {
+  for (const auto& filter : _filters) {
     filter->detachFromLayer(this);
   }
 }
@@ -392,6 +392,18 @@ void Layer::invalidateChildren() {
 
 std::unique_ptr<LayerContent> Layer::onUpdateContent() {
   return nullptr;
+}
+
+void Layer::attachProperty(LayerProperty* property) const {
+  if (property) {
+    property->attachToLayer(this);
+  }
+}
+
+void Layer::detachProperty(LayerProperty* property) const {
+  if (property) {
+    property->detachFromLayer(this);
+  }
 }
 
 void Layer::onAttachToRoot(Layer* owner) {
