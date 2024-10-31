@@ -30,7 +30,9 @@ class TGFXBaseView {
 
   void updateSize(float devicePixelRatio);
 
-  void draw(int drawIndex);
+  void flush();
+
+  void changeText();
 
  protected:
   std::shared_ptr<drawers::AppHost> appHost;

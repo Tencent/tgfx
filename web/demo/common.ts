@@ -20,7 +20,8 @@ import * as types from '../types/types';
 
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
-    public draw: (drawIndex: number) => void;
+    public flush: () => void;
+    public changeText: () => void;
 }
 
 export class ShareData {
@@ -44,7 +45,7 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    shareData.tgfxBaseView.draw(shareData.drawIndex);
+    shareData.tgfxBaseView.flush();
 }
 
 export function onresizeEvent(shareData: ShareData) {
@@ -58,8 +59,7 @@ export function onclickEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
-    shareData.drawIndex++;
-    shareData.tgfxBaseView.draw(shareData.drawIndex);
+    shareData.tgfxBaseView.changeText();
 }
 
 export function loadImage(src: string) {

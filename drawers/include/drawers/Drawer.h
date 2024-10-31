@@ -37,12 +37,12 @@ class Drawer {
   /**
    * Returns the drawer with the given index.
    */
-  static const Drawer* GetByIndex(int index);
+  static Drawer* GetByIndex(int index);
 
   /**
    * Returns the drawer with the given name.
    */
-  static const Drawer* GetByName(const std::string& name);
+  static Drawer* GetByName(const std::string& name);
 
   explicit Drawer(std::string name);
 
@@ -55,10 +55,10 @@ class Drawer {
   /**
    * Draws the contents to the given canvas.
    */
-  void draw(tgfx::Surface* surface, const AppHost* host) const;
+  bool draw(tgfx::Surface* surface, const AppHost* host);
 
  protected:
-  virtual void onDraw(tgfx::Surface* surface, const AppHost* host) const = 0;
+  virtual bool onDraw(tgfx::Surface* surface, const AppHost* host) = 0;
 
  private:
   std::string _name;

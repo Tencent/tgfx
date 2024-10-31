@@ -67,10 +67,6 @@ void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> ima
     tgfx::PrintError("AppHost::addImage() image is nullptr!");
     return;
   }
-  if (images.count(name) > 0) {
-    tgfx::PrintError("AppHost::addImage() image with name %s already exists!", name.c_str());
-    return;
-  }
   images[name] = std::move(image);
 }
 

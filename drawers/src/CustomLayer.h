@@ -45,13 +45,27 @@ class CustomLayer : public tgfx::Layer {
  public:
   static std::shared_ptr<CustomLayer> Make();
   void setText(const std::string& text) {
+    if (text == _text) {
+      return;
+    }
     _text = text;
     invalidateContent();
   }
 
+  std::string text() const {
+    return _text;
+  }
+
   void setFont(const tgfx::Font& font) {
+    if (font == _font) {
+      return;
+    }
     _font = font;
     invalidateContent();
+  }
+
+  tgfx::Font font() const {
+    return _font;
   }
 
   std::unique_ptr<tgfx::LayerContent> onUpdateContent() override;

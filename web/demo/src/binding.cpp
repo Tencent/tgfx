@@ -27,7 +27,8 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
 
   class_<TGFXBaseView>("TGFXBaseView")
       .function("updateSize", &TGFXBaseView::updateSize)
-      .function("draw", &TGFXBaseView::draw);
+      .function("flush", &TGFXBaseView::flush)
+      .function("changeText", &TGFXBaseView::changeText);
 
   class_<TGFXView, base<TGFXBaseView>>("TGFXView")
       .smart_ptr<std::shared_ptr<TGFXView>>("TGFXView")

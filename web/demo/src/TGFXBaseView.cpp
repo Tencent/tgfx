@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXBaseView.h"
+#include "drawers/LayerDemoDrawer.h"
 
 using namespace emscripten;
 namespace hello2d {
@@ -42,7 +43,7 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
   }
 }
 
-void TGFXBaseView::draw(int drawIndex) {
+void TGFXBaseView::flush() {
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
@@ -62,12 +63,19 @@ void TGFXBaseView::draw(int drawIndex) {
     device->unlock();
     return;
   }
-  auto drawer = drawers::Drawer::GetByIndex(drawIndex);
-  drawer->draw(surface.get(), appHost.get());
-  context->flushAndSubmit();
-  window->present(context);
+  auto drawer = drawers::Drawer::GetByIndex(0);
+  if (drawer->draw(surface.get(), appHost.get())) {
+    context->flushAndSubmit();
+    window->present(context);
+  }
   device->unlock();
 }
+
+void TGFXBaseView::changeText() {
+  auto drawer = static_cast<drawers::LayerDemoDrawer*>(drawers::Drawer::GetByIndex(0));
+  drawer->changeText();
+}
+
 }  // namespace hello2d
 
 int main(int, const char*[]) {

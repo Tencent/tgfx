@@ -21,6 +21,11 @@ import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm/hello2d';
 import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
 
+function mainLoop() {
+    shareData.tgfxBaseView.flush();
+    window.requestAnimationFrame(mainLoop);
+}
+
 let shareData: ShareData = new ShareData();
 
 if (typeof window !== 'undefined') {
@@ -37,6 +42,7 @@ if (typeof window !== 'undefined') {
         let image = await loadImage('../../resources/assets/bridge.jpg');
         shareData.tgfxBaseView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d', image);
         updateSize(shareData);
+        window.requestAnimationFrame(mainLoop);
     };
 
     window.onresize = () => {
