@@ -39,7 +39,7 @@ TGFX_TEST(DataViewTest, PNGDataCheck) {
 
 TGFX_TEST(DataViewTest, ReadString) {
   Buffer buffer(100);
-  memset(buffer.bytes(), 0, buffer.size());
+  buffer.clear();
   std::string text = "Hello TGFX 123";
   auto dataView = DataView(buffer.bytes(), buffer.size());
   const char* textStart = text.data();
