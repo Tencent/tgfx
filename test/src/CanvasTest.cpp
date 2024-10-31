@@ -496,7 +496,7 @@ TGFX_TEST(CanvasTest, path) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 400);
+  auto surface = Surface::Make(context, 600, 500);
   auto canvas = surface->getCanvas();
   Path path;
   path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
@@ -584,6 +584,7 @@ TGFX_TEST(CanvasTest, path) {
   canvas->setMatrix(matrix);
   canvas->drawPath(path, paint);
 
+  paint.reset();
   auto arcStart = Point::Make(0, 0);
   auto arcEnd = Point::Make(45, 45);
   auto pathEnd = Point::Make(45, 0);
