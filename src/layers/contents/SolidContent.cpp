@@ -31,4 +31,8 @@ void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->drawRRect(_rRect, solidPaint);
 }
 
+bool SolidContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
+  return getBounds().contains(localX, localY);
+}
+
 }  // namespace tgfx

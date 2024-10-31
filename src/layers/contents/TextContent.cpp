@@ -34,29 +34,54 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
 
 bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
   if (pixelHitTest) {
-    return getTextContentPath().contains(localX, localY);
+    const auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
+
+    if (nullptr == glyphRunLists) {
+      return false;
+    }
+
+    for (const auto& glyphRunList : *glyphRunLists) {
+      if (hitTestPointInternal(localX, localY, glyphRunList)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
-  const Rect textBounds = textBlob->getBounds(Matrix::I());
+  const Rect textBounds = textBlob->getBounds();
   return textBounds.contains(localX, localY);
 }
 
-Path TextContent::getTextContentPath() const {
-  Path totalPath = {};
+bool TextContent::hitTestPointInternal(float localX, float localY,
+                                       const std::shared_ptr<GlyphRunList>& glyphRunList) {
+  const auto& glyphRuns = glyphRunList->glyphRuns();
+  for (const auto& glyphRun : glyphRuns) {
+    const auto& font = glyphRun.font;
+    const auto& positions = glyphRun.positions;
+    size_t index = 0;
 
-  for (const auto& runList : textBlob->glyphRunLists) {
-    Path glyphRunListPath = {};
-    if (runList->hasColor()) {
-      const Rect emojiBounds = runList->getBounds(Matrix::I());
-      glyphRunListPath.addRect(emojiBounds);
-      totalPath.addPath(glyphRunListPath);
-    } else {
-      if (runList->getPath(&glyphRunListPath, Matrix::I())) {
-        totalPath.addPath(glyphRunListPath);
+    for (const auto& glyphID : glyphRun.glyphs) {
+      const auto& position = positions[index];
+      if (font.hasColor()) {
+        auto bounds = font.getBounds(glyphID);
+        bounds.offset(position.x, position.y);
+        if (bounds.contains(localX, localY)) {
+          return true;
+        }
+      } else {
+        Path glyphPath = {};
+        if (font.getPath(glyphID, &glyphPath)) {
+          auto offsetMatrix = Matrix::MakeTrans(position.x, position.y);
+          glyphPath.transform(offsetMatrix);
+          if (glyphPath.contains(localX, localY)) {
+            return true;
+          }
+        }
       }
+      index++;
     }
   }
-
-  return totalPath;
+  return false;
 }
 }  // namespace tgfx
