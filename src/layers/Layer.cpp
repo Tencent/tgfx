@@ -605,7 +605,8 @@ bool Layer::getLayersUnderPointInternal(float localX, float localY,
       }
     }
 
-    if (childLayer->getLayersUnderPointInternal(pointInChildSpace.x, pointInChildSpace.y, results)) {
+    if (childLayer->getLayersUnderPointInternal(pointInChildSpace.x, pointInChildSpace.y,
+                                                results)) {
       hasLayerUnderPoint = true;
     }
   }

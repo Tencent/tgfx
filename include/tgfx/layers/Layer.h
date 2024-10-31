@@ -504,7 +504,8 @@ class Layer {
   std::shared_ptr<ImageFilter> getComposeFilter(
       const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale);
 
-  bool getLayersUnderPointInternal(float localX, float localY, std::vector<std::shared_ptr<Layer>>* results);
+  bool getLayersUnderPointInternal(float localX, float localY,
+                                   std::vector<std::shared_ptr<Layer>>* results);
 
   bool hitTestPointInternal(float localX, float localY, bool pixelHitTest);
 
