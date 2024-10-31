@@ -19,16 +19,15 @@
 #pragma once
 
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
 /**
  * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
  * adjustments. LayerFilters are mutable and can be changed at any time.
  */
-class LayerFilter {
+class LayerFilter : public LayerProperty {
  public:
-  virtual ~LayerFilter() = default;
-
   /**
    * Returns the current image filter for the given scale factor. If the filter has not been
    * created yet, it will be created and cached.
@@ -39,17 +38,17 @@ class LayerFilter {
 
  protected:
   /**
-   * Invalidates the filter, causing it to be re-computed the next time it is requested.
-   */
-  void invalidate();
-
-  /**
    * Creates a new image filter for the given scale factor. When it is necessary to recreate the
    * ImageFilter, the onCreateImageFilter method will be called.
    * @param scale The scale factor to apply to the filter.
    * @return A new image filter.
    */
   virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
+
+  /**
+   * Marks the filter as dirty and invalidates the cached filter.
+   */
+  void invalidateFilter();
 
  private:
   bool dirty = true;

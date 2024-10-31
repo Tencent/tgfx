@@ -1,13 +1,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making tgfx available.
+//  Tencent is pleased to support the open source community by making libpag available.
 //
 //  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
 //
-//      https://opensource.org/licenses/BSD-3-Clause
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
@@ -16,18 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextContent.h"
+#pragma once
+
+#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-Rect TextContent::getBounds() const {
-  return textBlob->getBounds();
-}
+class SolidContent : public LayerContent {
+ public:
+  SolidContent(const RRect& rRect, const Color& color);
 
-void TextContent::draw(Canvas* canvas, const Paint& paint) const {
-  auto textPaint = paint;
-  auto color = textColor;
-  color.alpha *= paint.getAlpha();
-  textPaint.setColor(color);
-  canvas->drawTextBlob(textBlob, 0, 0, textPaint);
-}
+  Rect getBounds() const override {
+    return _rRect.rect;
+  }
+
+  void draw(Canvas* canvas, const Paint& paint) const override;
+
+ private:
+  RRect _rRect;
+  Color _color;
+};
 }  // namespace tgfx

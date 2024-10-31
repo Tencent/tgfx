@@ -168,7 +168,7 @@ TGFX_TEST(FilterTest, Blur) {
   Path path;
   path.addRect(Rect::MakeWH(imageWidth, imageHeight));
   Stroke stroke(1.f);
-  PathEffect::MakeStroke(&stroke)->applyTo(&path);
+  PathEffect::MakeStroke(&stroke)->filterPath(&path);
   paint.setImageFilter(nullptr);
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   canvas->drawPath(path, paint);

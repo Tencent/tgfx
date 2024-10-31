@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Shader.h"
+#include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
 /**
@@ -26,10 +27,7 @@ namespace tgfx {
  * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
  * are not thread-safe and should only be accessed from a single thread.
  */
-class ShapeStyle {
- public:
-  virtual ~ShapeStyle() = default;
-
+class ShapeStyle : public LayerProperty {
  protected:
   /**
    * Returns the current shader that will be used to draw the shape.

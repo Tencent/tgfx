@@ -6,7 +6,7 @@
         "PictureImage": "8a2ac4d",
         "PictureImage_Path": "2212c4e",
         "PictureImage_Text": "2212c4e",
-        "blendMode": "43cd416",
+        "blendMode": "b3076a3",
         "drawImage": "8cb853c",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
@@ -19,7 +19,7 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "bf86e15",
+        "path": "b4a1231",
         "rasterized": "f55f586",
         "rasterized_mipmap": "f55f586",
         "rasterized_scale_up": "721c9e0",
@@ -65,7 +65,8 @@
         "getBounds": "8a26de7",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
-        "imageLayer": "99a5cd9"
+        "imageLayer": "99a5cd9",
+        "draw_solid": "b4a1231"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

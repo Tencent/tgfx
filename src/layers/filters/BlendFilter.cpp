@@ -29,7 +29,7 @@ void BlendFilter::setBlendMode(BlendMode mode) {
     return;
   }
   _blendMode = mode;
-  invalidate();
+  invalidateFilter();
 }
 
 void BlendFilter::setColor(const Color& color) {
@@ -37,7 +37,7 @@ void BlendFilter::setColor(const Color& color) {
     return;
   }
   _color = color;
-  invalidate();
+  invalidateFilter();
 }
 
 std::shared_ptr<ImageFilter> BlendFilter::onCreateImageFilter(float) {

@@ -29,7 +29,7 @@ void Mask::fillPath(const Path& path, const Stroke* stroke) {
   auto effect = PathEffect::MakeStroke(stroke);
   if (effect != nullptr) {
     auto newPath = path;
-    effect->applyTo(&newPath);
+    effect->filterPath(&newPath);
     onFillPath(newPath, matrix);
   } else {
     onFillPath(path, matrix);

@@ -52,9 +52,9 @@ class PathEffect {
   virtual ~PathEffect() = default;
 
   /**
-   * Applies this effect to specified path. Returns false if this effect cannot be applied, and
+   * Applies this effect to the given path. Returns false if this effect cannot be applied, and
    * leaves this path unchanged.
    */
-  virtual bool applyTo(Path* path) const = 0;
+  virtual bool filterPath(Path* path) const = 0;
 };
 }  // namespace tgfx

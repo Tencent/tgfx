@@ -213,6 +213,8 @@ class ShapeLayer : public Layer {
    */
   void setStrokeEnd(float end);
 
+  ~ShapeLayer() override;
+
  protected:
   ShapeLayer() = default;
 

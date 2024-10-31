@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include "core/utils/UniqueID.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
@@ -69,7 +68,7 @@ class Layer {
    */
   static std::shared_ptr<Layer> Make();
 
-  virtual ~Layer() = default;
+  virtual ~Layer();
 
   /**
    * Returns the type of the layer.
@@ -471,6 +470,16 @@ class Layer {
    */
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
+  /**
+  * Attachs a property to this layer.
+  */
+  void attachProperty(LayerProperty* property) const;
+
+  /**
+   * Detaches a property from this layer.
+   */
+  void detachProperty(LayerProperty* property) const;
+
  private:
   /**
    * Marks the layer's children as changed and needing to be redrawn.
@@ -529,5 +538,6 @@ class Layer {
   } bitFields = {};
 
   friend class DisplayList;
+  friend class LayerProperty;
 };
 }  // namespace tgfx

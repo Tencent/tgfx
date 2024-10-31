@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/PathProvider.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
@@ -37,11 +38,13 @@ Path PathProvider::getPath() {
   return path;
 }
 
-void PathProvider::invalidate() {
-  dirty = true;
-}
-
 Path PathProvider::onGeneratePath() {
   return path;
 }
+
+void PathProvider::invalidatePath() {
+  dirty = true;
+  invalidate();
+}
+
 }  // namespace tgfx

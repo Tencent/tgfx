@@ -24,6 +24,7 @@
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
@@ -462,6 +463,31 @@ TGFX_TEST(LayerTest, shapeLayer) {
   device->unlock();
 }
 
+TGFX_TEST(LayerTest, solidLayer) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 200, 100);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setWidth(150);
+  solidLayer->setHeight(80);
+  solidLayer->setRadiusX(30);
+  solidLayer->setRadiusY(40);
+  solidLayer->setColor(Color::Blue());
+  layer->addChild(solidLayer);
+  auto bounds = Rect::MakeXYWH(0, 0, 150, 80);
+  auto solidLayerRect = solidLayer->getBounds();
+  EXPECT_TRUE(solidLayerRect == bounds);
+
+  displayList->render(surface.get());
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_solid"));
+  device->unlock();
+}
+
 TGFX_TEST(LayerTest, FilterTest) {
   auto filter = DropShadowFilter::Make(-80, -80, 0, 0, Color::Black());
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
@@ -664,6 +690,45 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   root->setShouldRasterize(false);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, ContentVersion) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 100, 100);
+  DisplayList displayList;
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0)));
+  displayList.root()->addChild(shapeLayer);
+  auto contentVersion = surface->contentVersion();
+  displayList.render(surface.get());
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+  displayList.render(surface.get());
+  EXPECT_EQ(surface->contentVersion(), contentVersion);
+  displayList.render(surface.get(), false);
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+  surface->getCanvas()->clear();
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+  displayList.render(surface.get());
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+
+  auto surface2 = Surface::Make(context, 100, 100);
+  EXPECT_EQ(surface2->contentVersion(), 1u);
+  displayList.render(surface2.get());
+  EXPECT_NE(surface2->contentVersion(), 1u);
+  displayList.render(surface.get());
+  EXPECT_NE(surface->contentVersion(), contentVersion);
   device->unlock();
 }
 

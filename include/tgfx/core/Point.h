@@ -60,14 +60,14 @@ struct Point {
   }
 
   /**
-   * Returns true if fX and fY are both zero.
+   * Returns true if x and y are both zero.
    */
   bool isZero() const {
     return (0 == x) && (0 == y);
   }
 
   /**
-   * Sets fX to x and fY to y.
+   * Sets x to xValue and y to yValue.
    */
   void set(float xValue, float yValue) {
     x = xValue;
@@ -104,18 +104,50 @@ struct Point {
   }
 
   /**
-   * Returns a Point from b to a; computed as (a.fX - b.fX, a.fY - b.fY).
+   * Returns a Point from b to a; computed as (a.x - b.x, a.y - b.y).
    */
   friend Point operator-(const Point& a, const Point& b) {
     return {a.x - b.x, a.y - b.y};
   }
 
+  /** 
+    * Subtracts vector Point v from Point. Sets Point to: (x - v.x, y - v.y).
+    */
+  void operator-=(const Point& v) {
+    x -= v.x;
+    y -= v.y;
+  }
+
   /**
    * Returns Point resulting from Point a offset by Point b, computed as:
-   * (a.fX + b.fX, a.fY + b.fY).
+   * (a.x + b.x, a.y + b.y).
    */
   friend Point operator+(const Point& a, const Point& b) {
     return {a.x + b.x, a.y + b.y};
+  }
+
+  /** 
+    * offset vector point v from Point. Sets Point to: (x + v.x, y + v.y).
+    */
+  void operator+=(const Point& v) {
+    x += v.x;
+    y += v.y;
+  }
+
+  /** 
+    * Returns Point multiplied by scale.
+    * (x * scale, y * scale)
+    */
+  friend Point operator*(const Point& p, float scale) {
+    return {p.x * scale, p.y * scale};
+  }
+
+  /** 
+    * Multiplies Point by scale. Sets Point to: (x * scale, y * scale).
+    */
+  void operator*=(float scale) {
+    x *= scale;
+    y *= scale;
   }
 
   /**

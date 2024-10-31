@@ -234,7 +234,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
     auto effect = PathEffect::MakeStroke(stroke);
     if (effect != nullptr) {
       auto fillPath = path;
-      effect->applyTo(&fillPath);
+      effect->filterPath(&fillPath);
       if (drawSimplePath(fillPath, style)) {
         return;
       }
