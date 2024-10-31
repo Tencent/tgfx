@@ -33,7 +33,7 @@ namespace tgfx {
 
 class XMLWriter {
  public:
-  explicit XMLWriter(bool doEscapeMarkup = true);
+  explicit XMLWriter(bool doEscapeFlag = true);
   virtual ~XMLWriter();
 
   void addS32Attribute(const std::string& name, int32_t value);
@@ -62,14 +62,16 @@ class XMLWriter {
     bool hasChildren = false;
     bool hasText = false;
   };
+
   void doEnd();
   bool doStart(const std::string& elementName);
   const Elem& getEnd();
+  std::stack<Elem> _elementsStack;
+
   static std::string_view getHeader();
-  std::stack<Elem> fElems;
 
  private:
-  bool fDoEscapeMarkup;
+  bool _doEscapeFlag = true;
   // illegal operator
   XMLWriter& operator=(const XMLWriter&) = delete;
 };
@@ -77,7 +79,7 @@ class XMLWriter {
 class XMLStreamWriter : public XMLWriter {
  public:
   enum : uint32_t {
-    kNoPretty_Flag = 0x01,
+    NoPretty_Flag = 0x01,
   };
 
   explicit XMLStreamWriter(std::stringstream& stream, uint32_t flags = 0);
@@ -94,8 +96,8 @@ class XMLStreamWriter : public XMLWriter {
   void newline();
   void tab(int level);
 
-  std::stringstream& fStream;
-  const uint32_t fFlags;
+  std::stringstream& _stream;
+  const uint32_t _flags;
 };
 
 class XMLParserWriter : public XMLWriter {
@@ -110,7 +112,7 @@ class XMLParserWriter : public XMLWriter {
   void onAddText(const std::string& text) override;
 
  private:
-  XMLParser& fParser;
+  XMLParser& _parser;
 };
 
 }  // namespace tgfx

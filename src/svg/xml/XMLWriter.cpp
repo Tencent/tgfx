@@ -22,12 +22,10 @@
 #include <string>
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "tgfx/svg/xml/XMLParser.h"
-// #include "include/core/SkStream.h"
-// #include "include/private/base/SkTo.h"
 
 namespace tgfx {
 
-XMLWriter::XMLWriter(bool doEscapeMarkup) : fDoEscapeMarkup(doEscapeMarkup) {
+XMLWriter::XMLWriter(bool doEscapeFlag) : _doEscapeFlag(doEscapeFlag) {
 }
 
 XMLWriter::~XMLWriter() {
@@ -35,7 +33,7 @@ XMLWriter::~XMLWriter() {
 }
 
 void XMLWriter::flush() {
-  while (!fElems.empty()) {
+  while (!_elementsStack.empty()) {
     this->endElement();
   }
 }
@@ -61,29 +59,29 @@ void XMLWriter::addScalarAttribute(const std::string& name, float value) {
 }
 
 void XMLWriter::addText(const std::string& text) {
-  if (fElems.empty()) {
+  if (_elementsStack.empty()) {
     return;
   }
   this->onAddText(text);
-  fElems.top().hasText = true;
+  _elementsStack.top().hasText = true;
 }
 
 void XMLWriter::doEnd() {
-  fElems.pop();
+  _elementsStack.pop();
 }
 
 bool XMLWriter::doStart(const std::string& elementName) {
-  auto level = fElems.size();
-  bool firstChild = level > 0 && !fElems.top().hasChildren;
+  auto level = _elementsStack.size();
+  bool firstChild = level > 0 && !_elementsStack.top().hasChildren;
   if (firstChild) {
-    fElems.top().hasChildren = true;
+    _elementsStack.top().hasChildren = true;
   }
-  fElems.emplace(elementName);
+  _elementsStack.emplace(elementName);
   return firstChild;
 }
 
 const XMLWriter::Elem& XMLWriter::getEnd() {
-  return fElems.top();
+  return _elementsStack.top();
 }
 
 std::string_view XMLWriter::getHeader() {
@@ -131,7 +129,7 @@ static size_t escape_markup(char dst[], const char src[], size_t length) {
 }
 
 void XMLWriter::addAttribute(const std::string& name, const std::string& value) {
-  if (fDoEscapeMarkup) {
+  if (_doEscapeFlag) {
     auto convertedValue = value;
     auto extra = escape_markup(nullptr, value.data(), value.size());
     if (extra) {
@@ -153,7 +151,7 @@ void XMLWriter::startElement(const std::string& element) {
 static void write_dom(const DOM& dom, std::shared_ptr<DOM::Node> node, XMLWriter* writer,
                       bool skipRoot) {
   if (!skipRoot) {
-    std::string element = node->name;
+    auto element = node->name;
     if (node->type == DOM::Text_Type) {
       // SkASSERT(dom.countChildren(node) == 0);
       writer->addText(element);
@@ -190,7 +188,7 @@ void XMLWriter::writeHeader() {
 // SkXMLStreamWriter
 
 XMLStreamWriter::XMLStreamWriter(std::stringstream& stream, uint32_t flags)
-    : fStream(stream), fFlags(flags) {
+    : _stream(stream), _flags(flags) {
 }
 
 XMLStreamWriter::~XMLStreamWriter() {
@@ -199,69 +197,69 @@ XMLStreamWriter::~XMLStreamWriter() {
 
 void XMLStreamWriter::onAddAttribute(const std::string& name, const std::string& value) {
   // SkASSERT(!fElems.back()->fHasChildren && !fElems.back()->fHasText);
-  fStream << " " << name << "=\"" << value << "\"" << value << "\"";
+  _stream << " " << name << "=\"" << value << "\"" << value << "\"";
 }
 
 void XMLStreamWriter::onAddText(const std::string& text) {
-  auto elem = fElems.top();
+  auto elem = _elementsStack.top();
 
   if (!elem.hasChildren && !elem.hasText) {
-    fStream << ">";
+    _stream << ">";
     this->newline();
   }
 
-  this->tab(static_cast<int>(fElems.size()) + 1);
-  fStream << text;
+  this->tab(static_cast<int>(_elementsStack.size()) + 1);
+  _stream << text;
   this->newline();
 }
 
 void XMLStreamWriter::onEndElement() {
   auto element = getEnd();
   if (element.hasChildren || element.hasText) {
-    this->tab(static_cast<int>(fElems.size()));
-    fStream << "</" << element.name << ">";
+    this->tab(static_cast<int>(_elementsStack.size()));
+    _stream << "</" << element.name << ">";
   } else {
-    fStream << "/>";
+    _stream << "/>";
   }
   this->newline();
   doEnd();
 }
 
 void XMLStreamWriter::onStartElement(const std::string& element) {
-  auto level = fElems.size();
+  auto level = _elementsStack.size();
   if (this->doStart(element)) {
-    // the first child, need to close with >
-    fStream << ">";
+    // the first child, need to close with '>'
+    _stream << ">";
     this->newline();
   }
 
   this->tab(static_cast<int>(level));
-  fStream << "<";
-  fStream << element;
+  _stream << "<";
+  _stream << element;
 }
 
 void XMLStreamWriter::writeHeader() {
   auto header = getHeader();
-  fStream << header;
+  _stream << header;
   this->newline();
 }
 
 void XMLStreamWriter::newline() {
-  if (!(fFlags & kNoPretty_Flag)) {
-    fStream << std::endl;
+  if (!(_flags & NoPretty_Flag)) {
+    _stream << std::endl;
   }
 }
 
 void XMLStreamWriter::tab(int level) {
-  if (!(fFlags & kNoPretty_Flag)) {
+  if (!(_flags & NoPretty_Flag)) {
     for (int i = 0; i < level; i++) {
-      fStream << "\t";
+      _stream << "\t";
     }
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-XMLParserWriter::XMLParserWriter(XMLParser* parser) : XMLWriter(false), fParser(*parser) {
+XMLParserWriter::XMLParserWriter(XMLParser* parser) : XMLWriter(false), _parser(*parser) {
 }
 
 XMLParserWriter::~XMLParserWriter() {
@@ -270,22 +268,22 @@ XMLParserWriter::~XMLParserWriter() {
 
 void XMLParserWriter::onAddAttribute(const std::string& name, const std::string& value) {
   // SkASSERT(fElems.empty() || (!fElems.back()->fHasChildren && !fElems.back()->fHasText));
-  fParser.addAttribute(name.c_str(), value.c_str());
+  _parser.addAttribute(name.c_str(), value.c_str());
 }
 
 void XMLParserWriter::onAddText(const std::string& text) {
-  fParser.text(text.c_str(), static_cast<int>(text.size()));
+  _parser.text(text.c_str(), static_cast<int>(text.size()));
 }
 
 void XMLParserWriter::onEndElement() {
   Elem elem = this->getEnd();
-  fParser.endElement(elem.name.c_str());
+  _parser.endElement(elem.name.c_str());
   this->doEnd();
 }
 
 void XMLParserWriter::onStartElement(const std::string& element) {
   this->doStart(element);
-  fParser.startElement(element.c_str());
+  _parser.startElement(element.c_str());
 }
 
 }  // namespace tgfx
