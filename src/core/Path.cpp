@@ -393,6 +393,7 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
     points.push_back({x2, y2});
     (*numBeziers)++;
     if (end == endAngle) {
+      points.push_back({currentX, currentY});
       break;
     }
     start = end;
@@ -413,15 +414,19 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
   if (reversed) {
     std::swap(startAngle, endAngle);
   }
+  auto startRedius = DegreesToRadians(startAngle);
+  auto endRadius = DegreesToRadians(endAngle);
   int numBeziers = 0;
-  auto points = GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startAngle, endAngle,
-                             &numBeziers);
-  PointIterator iter(points, reversed, 0);
+  auto points = GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startRedius,
+                             endRadius, &numBeziers);
+  PointIterator iter(points, false, 0);
   auto path = &(writableRef()->path);
-  path->moveTo(iter.current());
+  path->moveTo(oval.centerX(), oval.centerY());
+  path->lineTo(iter.current());
   for (int i = 0; i < numBeziers; i++) {
     path->cubicTo(iter.next(), iter.next(), iter.next());
   }
+  path->lineTo(oval.centerX(), oval.centerY());
   path->close();
 }
 
