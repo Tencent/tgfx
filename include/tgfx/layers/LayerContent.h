@@ -44,8 +44,6 @@ class LayerContent {
    */
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
   /**
    * Checks if the given point P(localX, localY) is within the rendered content area of the layer.
    * localX is the local x-coordinate relative to the current layer,
@@ -54,9 +52,6 @@ class LayerContent {
    * Note that this method is time-consuming and should only be used when precise checking is needed.
    * If pixelHitTest is false, uses bounding box for hit testing.
   */
-  virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest = false) {
-    return false;
-  }
-#pragma clang diagnostic pop
+  virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
 };
 }  // namespace tgfx

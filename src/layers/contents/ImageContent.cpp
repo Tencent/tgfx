@@ -27,15 +27,10 @@ void ImageContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->drawImage(image, sampling, &paint);
 }
 
-bool ImageContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  if (pixelHitTest) {
-    // TODO: use bounding box judgment first, and then optimize it to pixel-level judgment.
-    const Rect imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
-    return imageBounds.contains(localX, localY);
-  }
+bool ImageContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
+  // The pixelHitTest flag is ignored because we cannot read pixels from images before they are drawn.
 
   const Rect imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
   return imageBounds.contains(localX, localY);
 }
-
 }  // namespace tgfx
