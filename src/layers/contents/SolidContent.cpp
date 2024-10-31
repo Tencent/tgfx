@@ -16,13 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 #include "SolidContent.h"
 #include <tgfx/layers/SolidLayer.h>
 
 namespace tgfx {
-SolidContent::SolidContent(const RRect& rRect, const Color& color)
-    : _rRect(rRect), _color(color) {
+SolidContent::SolidContent(const RRect& rRect, const Color& color) : _rRect(rRect), _color(color) {
 }
 
 void SolidContent::draw(Canvas* canvas, const Paint& paint) const {

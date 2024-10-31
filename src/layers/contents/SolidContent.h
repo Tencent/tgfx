@@ -16,14 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 #pragma once
 
 #include "tgfx/layers/LayerContent.h"
 
-namespace  tgfx {
+namespace tgfx {
 class SolidContent : public LayerContent {
-public:
+ public:
   SolidContent(const RRect& rRect, const Color& color);
 
   tgfx::Rect getBounds() const override {
@@ -32,9 +31,8 @@ public:
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
-private:
+ private:
   RRect _rRect;
   Color _color;
 };
-}
-
+}  // namespace tgfx
