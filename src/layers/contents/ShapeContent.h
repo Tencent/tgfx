@@ -32,7 +32,7 @@ class ShapeContent : public LayerContent {
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
-  bool hitTestByPixel(float localX, float localY) override;
+  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  private:
   Path path = {};

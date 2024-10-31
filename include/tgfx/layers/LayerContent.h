@@ -44,25 +44,19 @@ class LayerContent {
    */
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
   /**
-   * Determine if the given local coordinate point is within the bounding box.
-   * @param localX Relative local x-coordinate in the current Layer space.
-   * @param localY Relative local y-coordinate in the current Layer space.
-   * @return If the point (localX, localY) hits the bounding box, return true;
-   *         otherwise, return false.
-   */
-  virtual bool hitTestByBounds(float localX, float localY) {
-    const Rect bounds = getBounds();
-    return bounds.contains(localX, localY);
-  }
-
-  /**
-   * Determine if the given local coordinate point is within the bounds of the layer's
-   * drawing content, accurate to the pixel level.
-   * @return If the point (localX, localY) hits the content, return true; otherwise, return false.
-   */
-  virtual bool hitTestByPixel(float, float) {
+   * Checks if the given point P(localX, localY) is within the rendered content area of the layer.
+   * localX is the local x-coordinate relative to the current layer,
+   * and localY is the local y-coordinate relative to the current layer.
+   * If pixelHitTest is true, performs a pixel-level hit test.
+   * Note that this method is time-consuming and should only be used when precise checking is needed.
+   * If pixelHitTest is false, uses bounding box for hit testing.
+  */
+  virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest = false) {
     return false;
   }
+#pragma clang diagnostic pop
 };
 }  // namespace tgfx

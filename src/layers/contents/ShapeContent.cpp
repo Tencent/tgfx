@@ -29,7 +29,12 @@ void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->drawPath(path, shapePaint);
 }
 
-bool ShapeContent::hitTestByPixel(float localX, float localY) {
-  return path.contains(localX, localY);
+bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
+  if (pixelHitTest) {
+    return path.contains(localX, localY);
+  }
+
+  const auto bounds = path.getBounds();
+  return bounds.contains(localX, localY);
 }
 }  // namespace tgfx

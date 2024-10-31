@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContent.h"
+#include "core/GlyphRunList.h"
 
 namespace tgfx {
 Rect TextContent::getBounds() const {
@@ -29,5 +30,33 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
   color.alpha *= paint.getAlpha();
   textPaint.setColor(color);
   canvas->drawTextBlob(textBlob, 0, 0, textPaint);
+}
+
+bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
+  if (pixelHitTest) {
+    return getTextContentPath().contains(localX, localY);
+  }
+
+  const Rect textBounds = textBlob->getBounds(Matrix::I());
+  return textBounds.contains(localX, localY);
+}
+
+Path TextContent::getTextContentPath() const {
+  Path totalPath = {};
+
+  for (const auto& runList : textBlob->glyphRunLists) {
+    Path glyphRunListPath = {};
+    if (runList->hasColor()) {
+      const Rect emojiBounds = runList->getBounds(Matrix::I());
+      glyphRunListPath.addRect(emojiBounds);
+      totalPath.addPath(glyphRunListPath);
+    } else {
+      if (runList->getPath(&glyphRunListPath, Matrix::I())) {
+        totalPath.addPath(glyphRunListPath);
+      }
+    }
+  }
+
+  return totalPath;
 }
 }  // namespace tgfx

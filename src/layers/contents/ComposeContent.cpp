@@ -43,4 +43,14 @@ void ComposeContent::draw(Canvas* canvas, const Paint& paint) const {
     content->draw(canvas, paint);
   }
 }
+
+bool ComposeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
+  for (auto item = contents.rbegin(); item != contents.rend(); ++item) {
+    if ((*item)->hitTestPoint(localX, localY, pixelHitTest)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace tgfx

@@ -31,8 +31,12 @@ class TextContent : public LayerContent {
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
+  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+
  private:
   std::shared_ptr<TextBlob> textBlob = nullptr;
   Color textColor = Color::White();
+
+  Path getTextContentPath() const;
 };
 }  // namespace tgfx

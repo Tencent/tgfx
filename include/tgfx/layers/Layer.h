@@ -507,6 +507,8 @@ class Layer {
 
   bool getLayersUnderPointInternal(float localX, float localY, std::vector<std::shared_ptr<Layer>>* results);
 
+  bool hitTestPointInternal(float localX, float localY, bool pixelHitTest);
+
   std::string _name;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
