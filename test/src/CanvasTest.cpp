@@ -422,7 +422,7 @@ TGFX_TEST(CanvasTest, mipmap) {
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
-  ASSERT_TRUE(result);
+  EXPECT_TRUE(result);
   auto imageBuffer = bitmap.makeBuffer();
   auto image = Image::MakeFrom(imageBuffer);
   ASSERT_TRUE(image != nullptr);
@@ -471,7 +471,7 @@ TGFX_TEST(CanvasTest, hardwareMipmap) {
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
-  ASSERT_TRUE(result);
+  EXPECT_TRUE(result);
   auto image = Image::MakeFrom(bitmap);
   auto imageMipmapped = image->makeMipmapped(true);
   ASSERT_TRUE(imageMipmapped != nullptr);
