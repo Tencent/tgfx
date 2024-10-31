@@ -16,47 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Path.h"
 #include "tgfx/layers/LayerProperty.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-/**
- * PathProvider is an interface for classes that generates a Path. It defers the acquisition of the
- * Path until it is actually required, allowing the Path to be invalidated and regenerate if
- * necessary. Note: PathProvider is not thread-safe and should be accessed from a single thread.
- */
-class PathProvider : public LayerProperty {
- public:
-  /**
-   * Creates a new PathProvider that wraps the given Path.
-   */
-  static std::shared_ptr<PathProvider> Wrap(const Path& path);
 
-  /**
-   * Returns the Path provided by this object.
-   */
-  Path getPath();
+void LayerProperty::invalidate() {
+  for (auto& owner : owners) {
+    if (auto layer = owner.lock()) {
+      layer->invalidateContent();
+    }
+  }
+}
 
- protected:
-  PathProvider() = default;
+void LayerProperty::attachToLayer(const Layer* layer) {
+  owners.push_back(layer->weakThis);
+}
 
-  /**
-   * Creates a new PathProvider with an initial path.
-   */
-  explicit PathProvider(Path path);
+void LayerProperty::detachFromLayer(const Layer* layer) {
+  for (auto owner = owners.begin(); owner != owners.end(); ++owner) {
+    if (owner->lock().get() == layer) {
+      owners.erase(owner);
+      break;
+    }
+  }
+}
 
-  virtual Path onGeneratePath();
-
-  /**
-   * Marks the path as dirty and invalidates the cached path.
-   */
-  void invalidatePath();
-
- private:
-  Path path = {};
-
-  bool dirty = true;
-};
 }  // namespace tgfx

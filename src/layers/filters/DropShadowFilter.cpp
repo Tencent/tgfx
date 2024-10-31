@@ -31,7 +31,7 @@ void DropShadowFilter::setOffsetX(float offsetX) {
     return;
   }
   _offsetX = offsetX;
-  invalidate();
+  invalidateFilter();
 }
 
 void DropShadowFilter::setOffsetY(float offsetY) {
@@ -39,7 +39,7 @@ void DropShadowFilter::setOffsetY(float offsetY) {
     return;
   }
   _offsetY = offsetY;
-  invalidate();
+  invalidateFilter();
 }
 
 void DropShadowFilter::setBlurrinessX(float blurrinessX) {
@@ -47,7 +47,7 @@ void DropShadowFilter::setBlurrinessX(float blurrinessX) {
     return;
   }
   _blurrinessX = blurrinessX;
-  invalidate();
+  invalidateFilter();
 }
 
 void DropShadowFilter::setBlurrinessY(float blurrinessY) {
@@ -55,7 +55,7 @@ void DropShadowFilter::setBlurrinessY(float blurrinessY) {
     return;
   }
   _blurrinessY = blurrinessY;
-  invalidate();
+  invalidateFilter();
 }
 
 void DropShadowFilter::setColor(const Color& color) {
@@ -63,7 +63,7 @@ void DropShadowFilter::setColor(const Color& color) {
     return;
   }
   _color = color;
-  invalidate();
+  invalidateFilter();
 }
 
 void DropShadowFilter::setDropsShadowOnly(bool value) {
@@ -71,7 +71,7 @@ void DropShadowFilter::setDropsShadowOnly(bool value) {
     return;
   }
   _dropsShadowOnly = value;
-  invalidate();
+  invalidateFilter();
 }
 
 std::shared_ptr<ImageFilter> DropShadowFilter::onCreateImageFilter(float scale) {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Gradient.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 std::shared_ptr<LinearGradient> Gradient::MakeLinear(const Point& startPoint,
@@ -35,18 +36,55 @@ std::shared_ptr<ConicGradient> Gradient::MakeConic(const Point& center, float st
 
 void Gradient::setColors(std::vector<Color> colors) {
   _colors = std::move(colors);
+  invalidate();
 }
 
 void Gradient::setPositions(std::vector<float> positions) {
   _positions = std::move(positions);
+  invalidate();
+}
+
+void LinearGradient::setEndPoint(const Point& endPoint) {
+  _endPoint = endPoint;
+  invalidate();
+}
+
+void LinearGradient::setStartPoint(const Point& startPoint) {
+  _startPoint = startPoint;
+  invalidate();
 }
 
 std::shared_ptr<Shader> LinearGradient::getShader() const {
   return Shader::MakeLinearGradient(_startPoint, _endPoint, _colors, _positions);
 }
 
+void RadialGradient::setCenter(const Point& center) {
+  _center = center;
+  invalidate();
+}
+
+void RadialGradient::setRadius(float radius) {
+  _radius = radius;
+  invalidate();
+}
+
 std::shared_ptr<Shader> RadialGradient::getShader() const {
   return Shader::MakeRadialGradient(_center, _radius, _colors, _positions);
+}
+
+void ConicGradient::setStartAngle(float startAngle) {
+  _startAngle = startAngle;
+  invalidate();
+}
+
+void ConicGradient::setCenter(const Point& center) {
+  _center = center;
+  invalidate();
+}
+
+void ConicGradient::setEndAngle(float endAngle) {
+  _endAngle = endAngle;
+  invalidate();
 }
 
 std::shared_ptr<Shader> ConicGradient::getShader() const {

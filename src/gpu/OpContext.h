@@ -44,8 +44,13 @@ class OpContext {
 
   void addOp(std::unique_ptr<Op> op);
 
+  uint32_t contentVersion() const {
+    return _contentVersion;
+  }
+
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   std::shared_ptr<OpsRenderTask> opsTask = nullptr;
+  uint32_t _contentVersion = 1u;
 };
 }  // namespace tgfx

@@ -693,4 +693,43 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   device->unlock();
 }
 
+TGFX_TEST(LayerTest, ContentVersion) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 100, 100);
+  DisplayList displayList;
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0)));
+  displayList.root()->addChild(shapeLayer);
+  auto contentVersion = surface->contentVersion();
+  displayList.render(surface.get());
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+  displayList.render(surface.get());
+  EXPECT_EQ(surface->contentVersion(), contentVersion);
+  displayList.render(surface.get(), false);
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+  surface->getCanvas()->clear();
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+  displayList.render(surface.get());
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+
+  auto surface2 = Surface::Make(context, 100, 100);
+  EXPECT_EQ(surface2->contentVersion(), 1u);
+  displayList.render(surface2.get());
+  EXPECT_NE(surface2->contentVersion(), 1u);
+  displayList.render(surface.get());
+  EXPECT_NE(surface->contentVersion(), contentVersion);
+  device->unlock();
+}
+
 }  // namespace tgfx

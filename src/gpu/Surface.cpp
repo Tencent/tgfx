@@ -67,7 +67,7 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> re
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
-    : renderTargetProxy(std::move(proxy)), _renderFlags(renderFlags) {
+    : _uniqueID(UniqueID::Next()), renderTargetProxy(std::move(proxy)), _renderFlags(renderFlags) {
   DEBUG_ASSERT(this->renderTargetProxy != nullptr);
 }
 
@@ -196,6 +196,13 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
+}
+
+uint32_t Surface::contentVersion() const {
+  if (renderContext == nullptr) {
+    return 1u;
+  }
+  return renderContext->opContext->contentVersion();
 }
 
 bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
