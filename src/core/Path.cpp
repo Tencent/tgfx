@@ -372,15 +372,13 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
   float start = startAngle;
   float end = std::min(endAngle, start + M_PI_2_F);
   float currentX, currentY;
-  auto startPoint = centerX + cosf(start) * radiusX;
-  auto endPoint = centerY + sinf(start) * radiusY;
-  points.push_back({startPoint, endPoint});
   *numBeziers = 0;
   for (int i = 0; i < 4; i++) {
     auto angleStep = end - start;
     auto distance = DistanceToControlPoint(angleStep);
     currentX = centerX + cosf(start) * radiusX;
     currentY = centerY + sinf(start) * radiusY;
+    points.push_back({currentX, currentY});
     auto u = cosf(start);
     auto v = sinf(start);
     auto x1 = currentX - v * distance * radiusX;
@@ -393,9 +391,9 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
     auto x2 = currentX + v * distance * radiusX;
     auto y2 = currentY - u * distance * radiusY;
     points.push_back({x2, y2});
-    points.push_back({currentX, currentY});
     (*numBeziers)++;
     if (end == endAngle) {
+      points.push_back({currentX, currentY});
       break;
     }
     start = end;
