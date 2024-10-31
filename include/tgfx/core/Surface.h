@@ -168,7 +168,21 @@ class Surface {
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
+  /**
+   * Returns the unique ID of the Surface. The ID is unique among all Surfaces.
+   */
+  uint32_t uniqueID() const {
+    return _uniqueID;
+  }
+
  private:
+  /**
+  * Returns the version of the content. The version is changed when the content is changed.
+  * The initial version is 1;
+  */
+  uint32_t contentVersion() const;
+
+  uint32_t _uniqueID = 0;
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   uint32_t _renderFlags = 0;
   RenderContext* renderContext = nullptr;
@@ -184,5 +198,6 @@ class Surface {
 
   friend class RenderContext;
   friend class PictureImage;
+  friend class DisplayList;
 };
 }  // namespace tgfx

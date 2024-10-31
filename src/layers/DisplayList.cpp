@@ -30,7 +30,8 @@ Layer* DisplayList::root() const {
 }
 
 void DisplayList::render(Surface* surface, bool replaceAll) {
-  if (surface == nullptr) {
+  if (!surface || (replaceAll && surface->_uniqueID == surfaceID &&
+                   surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirty)) {
     return;
   }
   auto canvas = surface->getCanvas();
@@ -39,5 +40,8 @@ void DisplayList::render(Surface* surface, bool replaceAll) {
   }
   DrawArgs args(surface->getContext(), surface->renderFlags(), true);
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  surfaceContentVersion = surface->contentVersion();
+  surfaceID = surface->_uniqueID;
 }
+
 }  // namespace tgfx

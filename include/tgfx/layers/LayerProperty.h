@@ -17,35 +17,34 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <memory>
+#include <vector>
 
 namespace tgfx {
+class Layer;
+
 /**
- * Defines the types of a layer.
+ * A property of a layer that may change the content of the layer.
  */
-enum class LayerType {
+class LayerProperty {
+ public:
+  virtual ~LayerProperty() = default;
+
+ protected:
   /**
-   * The type for a generic layer. May be used as a container for other child layers.
+   *  Called when the property is invalidated. This method will notify the layer that the content
+   *  of the layer should be invalidated.
    */
-  Layer,
-  /**
-   * A layer displaying an image.
-   */
-  Image,
-  /**
-   * A layer displaying a shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a color gradient.
-   */
-  Gradient,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid
+  void invalidate();
+
+ private:
+  void attachToLayer(const Layer* layer);
+
+  void detachFromLayer(const Layer* layer);
+
+  std::vector<std::weak_ptr<Layer>> owners;
+
+  friend class Layer;
 };
+
 }  // namespace tgfx

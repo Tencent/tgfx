@@ -51,7 +51,7 @@ void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const
 
 void RecordingContext::drawPath(const Path& path, const MCState& state, const FillStyle& style,
                                 const Stroke* stroke) {
-  if (stroke && stroke->width > 0) {
+  if (stroke) {
     records.push_back(new StrokePath(path, state, style, *stroke));
   } else {
     records.push_back(new DrawPath(path, state, style));
@@ -78,7 +78,7 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
 void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                         const MCState& state, const FillStyle& style,
                                         const Stroke* stroke) {
-  if (stroke && stroke->width > 0) {
+  if (stroke) {
     records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), state, style, *stroke));
   } else {
     records.push_back(new DrawGlyphRunList(std::move(glyphRunList), state, style));

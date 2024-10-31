@@ -31,7 +31,7 @@ class TextBlob {
  public:
   /**
    * Creates a new TextBlob from the given text. The text must be in utf-8 encoding. This function
-   * uses the default character-to-glyph mapping from the Typeface in font. It does not perform
+   * uses the default character-to-glyph mapping from the Typeface in font. It doesn’t perform
    * typeface fallback for characters not found in the Typeface. Glyphs are positioned based on
    * their default advances. Returns nullptr if the text is empty or fails to map any characters to
    * glyphs.
@@ -60,9 +60,11 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
-   * Returns the bounding box of the TextBlob when drawn with the given Matrix.
+   * Returns the bounding box of the TextBlob when drawn with the given Matrix. Since text outlines
+   * may change with different scale factors, it's best to use the final drawing matrix for
+   * calculating the bounds to ensure accuracy.
    */
-  Rect getBounds(const Matrix& matrix = Matrix::I()) const;
+  Rect getBounds(const Matrix* matrix = nullptr) const;
 
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};
@@ -72,6 +74,7 @@ class TextBlob {
   }
 
   friend class Canvas;
+  friend class GlyphRunList;
   friend class Mask;
   friend class TextContent;
 };
