@@ -34,9 +34,9 @@ Picture::~Picture() {
   }
 }
 
-Rect Picture::getBounds(const Matrix& matrix) const {
+Rect Picture::getBounds(const Matrix* matrix) const {
   MeasureContext context = {};
-  MCState state(matrix);
+  MCState state(matrix ? *matrix : Matrix::I());
   playback(&context, state);
   return context.getBounds();
 }

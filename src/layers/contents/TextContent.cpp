@@ -20,7 +20,7 @@
 
 namespace tgfx {
 Rect TextContent::getBounds() const {
-  return textBlob->getBounds(Matrix::I());
+  return textBlob->getBounds();
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {

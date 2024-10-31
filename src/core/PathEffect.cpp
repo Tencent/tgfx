@@ -28,7 +28,7 @@ class PkPathEffect : public PathEffect {
   explicit PkPathEffect(sk_sp<SkPathEffect> effect) : pathEffect(std::move(effect)) {
   }
 
-  bool applyTo(Path* path) const override {
+  bool filterPath(Path* path) const override {
     if (path == nullptr) {
       return false;
     }
@@ -46,7 +46,7 @@ class StrokePathEffect : public PathEffect {
   explicit StrokePathEffect(SkPaint paint) : paint(std::move(paint)) {
   }
 
-  bool applyTo(Path* path) const override {
+  bool filterPath(Path* path) const override {
     if (path == nullptr) {
       return false;
     }
