@@ -72,13 +72,8 @@ bool TextContent::hitTestPointInternal(float localX, float localY,
       } else {
         Path glyphPath = {};
         if (font.getPath(glyphID, &glyphPath)) {
-          auto offsetMatrix = Matrix::MakeTrans(position.x, position.y);
-          auto inverseMatrix = Matrix::I();
-          if (offsetMatrix.invert(&inverseMatrix)) {
-            auto checkPoint = inverseMatrix.mapXY(localX, localY);
-            if (glyphPath.contains(checkPoint.x, checkPoint.y)) {
-              return true;
-            }
+          if (glyphPath.contains(localX - position.x, localY - position.y)) {
+            return true;
           }
         }
       }
