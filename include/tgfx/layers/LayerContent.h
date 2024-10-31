@@ -45,12 +45,10 @@ class LayerContent {
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
 
   /**
-   * Checks if the given point P(localX, localY) is within the rendered content area of the layer.
-   * localX is the local x-coordinate relative to the current layer,
-   * and localY is the local y-coordinate relative to the current layer.
-   * If pixelHitTest is true, performs a pixel-level hit test.
-   * Note that this method is time-consuming and should only be used when precise checking is needed.
-   * If pixelHitTest is false, uses bounding box for hit testing.
+    * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
+    * The localX and localY coordinates are in the layer's local coordinate space. If the
+    * pixelHitTest flag is true, it checks the actual pixels of the layer content; otherwise, it
+    * checks the bounding box.
   */
   virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
 };

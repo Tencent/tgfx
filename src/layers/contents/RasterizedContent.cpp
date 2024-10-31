@@ -30,7 +30,7 @@ void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool RasterizedContent::hitTestPoint(float localX, float localY, bool) {
-  const Rect imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
+  const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
   return imageBounds.contains(localX, localY);
 }
 }  // namespace tgfx

@@ -32,7 +32,7 @@ void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool SolidContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
-  return getBounds().contains(localX, localY);
+  return _rRect.rect.contains(localX, localY);
 }
 
 }  // namespace tgfx

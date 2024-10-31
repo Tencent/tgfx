@@ -45,8 +45,8 @@ void ComposeContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool ComposeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  for (auto item = contents.rbegin(); item != contents.rend(); ++item) {
-    if ((*item)->hitTestPoint(localX, localY, pixelHitTest)) {
+  for (const auto& content : contents) {
+    if (content->hitTestPoint(localX, localY, pixelHitTest)) {
       return true;
     }
   }
