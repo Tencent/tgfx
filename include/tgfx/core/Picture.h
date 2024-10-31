@@ -38,9 +38,11 @@ class Picture {
   ~Picture();
 
   /**
-   * Returns the bounding box of the Picture when drawn with the given Matrix.
+   * Returns the bounding box of the Picture when drawn with the given Matrix. Since the Picture
+   * may contain text drawing commands, and text outlines can change with different scale factors,
+   * it's best to use the final drawing matrix for calculating the bounds to ensure accuracy.
    */
-  Rect getBounds(const Matrix& matrix = Matrix::I()) const;
+  Rect getBounds(const Matrix* matrix = nullptr) const;
 
   /**
    * Replays the drawing commands on the specified canvas. In the case that the commands are

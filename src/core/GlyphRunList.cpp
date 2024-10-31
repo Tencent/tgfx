@@ -20,8 +20,16 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
+const std::vector<std::shared_ptr<GlyphRunList>>* GlyphRunList::Unwrap(const TextBlob* textBlob) {
+  if (textBlob == nullptr) {
+    return nullptr;
+  }
+  return &textBlob->glyphRunLists;
+}
+
 GlyphRunList::GlyphRunList(GlyphRun glyphRun) {
   DEBUG_ASSERT(!glyphRun.glyphs.empty());
   DEBUG_ASSERT(glyphRun.glyphs.size() == glyphRun.positions.size());
@@ -101,7 +109,7 @@ bool GlyphRunList::getPath(Path* path, const Matrix& matrix, const Stroke* strok
     scaledStroke.width *= maxScale;
     auto pathEffect = PathEffect::MakeStroke(&scaledStroke);
     if (pathEffect) {
-      pathEffect->applyTo(&totalPath);
+      pathEffect->filterPath(&totalPath);
     }
   }
   auto totalMatrix = matrix;

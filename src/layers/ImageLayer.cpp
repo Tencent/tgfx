@@ -43,6 +43,9 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
 }
 
 std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
+  if (!_image) {
+    return nullptr;
+  }
   return std::make_unique<ImageContent>(_image, _sampling);
 }
 }  // namespace tgfx

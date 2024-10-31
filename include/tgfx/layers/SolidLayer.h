@@ -88,7 +88,9 @@ class SolidLayer : public Layer {
   /**
    * Returns the color used to fill the solid layer. The default color is opaque white.
    */
-  Color color() const;
+  Color color() const {
+    return _color;
+  }
 
   /**
    * Sets the color used to fill the solid layer.
