@@ -556,6 +556,31 @@ TGFX_TEST(CanvasTest, path) {
   matrix.postTranslate(500, 10);
   canvas->setMatrix(matrix);
   canvas->drawPath(path, paint);
+
+  auto arcStart = Point::Make(0, 0);
+  auto arcEnd = Point::Make(45, 45);
+  auto pathEnd = Point::Make(45, 0);
+  std::vector<Point> transforms = {{0, 0}, {50, 0}, {100, -50}, {100, 0}};
+  std::vector<std::pair<PathArcSize, bool>> arcType = {{PathArcSize::Small, false},
+                                                       {PathArcSize::Large, false},
+                                                       {PathArcSize::Small, true},
+                                                       {PathArcSize::Large, true}};
+  matrix.reset();
+  matrix.setTranslate(10, 450);
+  canvas->setMatrix(matrix);
+  for (uint32_t i = 0; i < 4; i++) {
+    path.reset();
+    path.moveTo(arcStart);
+    path.arcTo(45, 45, 0, arcType[i].first, arcType[i].second, arcEnd);
+    path.lineTo(pathEnd);
+    canvas->translate(transforms[i].x, transforms[i].y);
+    canvas->drawPath(path, paint);
+  }
+
+  auto latestPoint = Point::Zero();
+  path.getLastPoint(&latestPoint);
+  EXPECT_EQ(latestPoint, Point::Make(45, 0));
+
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
   device->unlock();
 }
