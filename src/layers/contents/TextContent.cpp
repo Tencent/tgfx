@@ -80,7 +80,6 @@ bool TextContent::hitTestPointInternal(float localX, float localY,
               return true;
             }
           }
-
         }
       }
       index++;
