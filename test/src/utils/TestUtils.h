@@ -35,6 +35,8 @@ bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* tex
 
 std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);
 
+std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path);
+
 std::shared_ptr<Image> MakeImage(const std::string& path);
 
 std::shared_ptr<Typeface> MakeTypeface(const std::string& path);

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "layers/contents/ImageContent.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/layers/Layer.h"
 
