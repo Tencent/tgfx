@@ -66,7 +66,7 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& 
   if (picture == nullptr) {
     return;
   }
-  auto deviceBounds = picture->getBounds(state.matrix);
+  auto deviceBounds = picture->getBounds(&state.matrix);
   if (imageFilter) {
     deviceBounds = imageFilter->filterBounds(deviceBounds);
   }

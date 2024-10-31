@@ -174,10 +174,10 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
       }
       auto pathEffect =
           PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
-      pathEffect->applyTo(&strokedPath);
+      pathEffect->filterPath(&strokedPath);
     }
     auto strokeEffect = PathEffect::MakeStroke(&stroke);
-    strokeEffect->applyTo(&strokedPath);
+    strokeEffect->filterPath(&strokedPath);
     auto content = std::make_unique<ShapeContent>(strokedPath, _strokeStyle->getShader());
     contents.push_back(std::move(content));
   }

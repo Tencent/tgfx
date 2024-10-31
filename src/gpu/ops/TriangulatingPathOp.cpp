@@ -46,7 +46,7 @@ class PathTriangles : public DataProvider {
     auto finalPath = path;
     auto effect = PathEffect::MakeStroke(stroke);
     if (effect != nullptr) {
-      effect->applyTo(&finalPath);
+      effect->filterPath(&finalPath);
     }
     finalPath.transform(matrix);
     auto clipBounds = finalPath.getBounds();

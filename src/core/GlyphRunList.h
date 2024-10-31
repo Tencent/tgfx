@@ -22,12 +22,20 @@
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+class TextBlob;
+
 /**
  * GlyphRunList contains a list of glyph runs that can be drawn together. All glyph runs in a list
  * share the same font type, whether they have color or not.
  */
 class GlyphRunList {
  public:
+  /**
+   * Unwraps a TextBlob into a list of GlyphRunList objects. Returns nullptr if the TextBlob is
+   * nullptr.
+   */
+  static const std::vector<std::shared_ptr<GlyphRunList>>* Unwrap(const TextBlob* textBlob);
+
   /**
    * Constructs a GlyphRunList using a single glyph run.
    */
