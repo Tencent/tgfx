@@ -150,7 +150,10 @@ ShapeLayer::~ShapeLayer() {
 
 std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
   std::vector<std::unique_ptr<LayerContent>> contents = {};
-  auto path = _pathProvider ? _pathProvider->getPath() : _path;
+  if (_path.isEmpty() && _pathProvider == nullptr) {
+    return nullptr;
+  }
+  auto path = _path.isEmpty() ? _pathProvider->getPath() : _path;
   if (_fillStyle) {
     auto content = std::make_unique<ShapeContent>(path, _fillStyle->getShader());
     contents.push_back(std::move(content));
