@@ -22,9 +22,7 @@
 #include "tgfx/platform/Print.h"
 
 namespace drawers {
-static std::vector<Drawer*> drawers = {new GridBackground(), new ConicGradient(),
-                                       new ImageWithMipmap(), new ImageWithShadow(),
-                                       new SimpleText()};
+static std::vector<Drawer*> drawers = {new LayerDemo()};
 
 static std::vector<std::string> GetDrawerNames() {
   std::vector<std::string> names;
@@ -70,17 +68,15 @@ const Drawer* Drawer::GetByName(const std::string& name) {
 Drawer::Drawer(std::string name) : _name(std::move(name)) {
 }
 
-void Drawer::draw(tgfx::Canvas* canvas, const AppHost* host) const {
-  if (canvas == nullptr) {
-    tgfx::PrintError("Drawer::draw() canvas is nullptr!");
+void Drawer::draw(tgfx::Surface* surface, const AppHost* host) const {
+  if (surface == nullptr) {
+    tgfx::PrintError("Drawer::draw() surface is nullptr!");
     return;
   }
   if (host == nullptr) {
     tgfx::PrintError("Drawer::draw() appHost is nullptr!");
     return;
   }
-  canvas->save();
-  onDraw(canvas, host);
-  canvas->restore();
+  onDraw(surface, host);
 }
 }  // namespace drawers

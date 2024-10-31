@@ -55,10 +55,10 @@ class Drawer {
   /**
    * Draws the contents to the given canvas.
    */
-  void draw(tgfx::Canvas* canvas, const AppHost* host) const;
+  void draw(tgfx::Surface* surface, const AppHost* host) const;
 
  protected:
-  virtual void onDraw(tgfx::Canvas* canvas, const AppHost* host) const = 0;
+  virtual void onDraw(tgfx::Surface* surface, const AppHost* host) const = 0;
 
  private:
   std::string _name;

@@ -28,13 +28,9 @@ namespace drawers {
     }                                                                               \
                                                                                     \
    protected:                                                                       \
-    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const override; \
+    void onDraw(tgfx::Surface* surface, const drawers::AppHost* host) const override; \
   }
 
-DEFINE_DRAWER(GridBackground);
-DEFINE_DRAWER(ConicGradient);
-DEFINE_DRAWER(ImageWithMipmap);
-DEFINE_DRAWER(ImageWithShadow);
-DEFINE_DRAWER(SimpleText);
+DEFINE_DRAWER(LayerDemo);
 
 }  // namespace drawers

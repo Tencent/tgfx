@@ -62,14 +62,8 @@ void TGFXBaseView::draw(int drawIndex) {
     device->unlock();
     return;
   }
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(drawIndex);
+  drawer->draw(surface.get(), appHost.get());
   context->flushAndSubmit();
   window->present(context);
   device->unlock();

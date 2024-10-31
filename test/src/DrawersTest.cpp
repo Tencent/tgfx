@@ -32,13 +32,11 @@ TGFX_TEST(DrawersTest, Compare) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, appHost.width(), appHost.height());
-  auto canvas = surface->getCanvas();
   auto drawerNames = drawers::Drawer::Names();
   for (auto& name : drawerNames) {
     auto drawer = drawers::Drawer::GetByName(name);
     ASSERT_TRUE(drawer != nullptr);
-    canvas->clear();
-    drawer->draw(canvas, &appHost);
+    drawer->draw(surface.get(), &appHost);
     auto key = "DrawersTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {
