@@ -48,7 +48,7 @@ class DisplayList {
   void render(Surface* surface, bool replaceAll = true);
 
  private:
-  bool needRender(const Surface* surface) const;
+  bool needRender(const Surface* surface, bool replaceAll) const;
   std::shared_ptr<Layer> _root = nullptr;
   uint32_t surfaceContentVersion = 0u;
   uint32_t surfaceID = 0u;

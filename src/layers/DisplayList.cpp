@@ -30,7 +30,7 @@ Layer* DisplayList::root() const {
 }
 
 void DisplayList::render(Surface* surface, bool replaceAll) {
-  if (!surface || !needRender(surface)) {
+  if (!surface || !needRender(surface, replaceAll)) {
     return;
   }
   auto canvas = surface->getCanvas();
@@ -43,9 +43,9 @@ void DisplayList::render(Surface* surface, bool replaceAll) {
   surfaceID = surface->_uniqueID;
 }
 
-bool DisplayList::needRender(const Surface* surface) const {
-  return surface->_uniqueID != surfaceID || surface->contentVersion() != surfaceContentVersion ||
-         _root->bitFields.dirty;
+bool DisplayList::needRender(const Surface* surface, bool replaceAll) const {
+  return !replaceAll || surface->_uniqueID != surfaceID ||
+         surface->contentVersion() != surfaceContentVersion || _root->bitFields.dirty;
 }
 
 }  // namespace tgfx
