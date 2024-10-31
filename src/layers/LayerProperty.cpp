@@ -22,15 +22,11 @@
 namespace tgfx {
 
 void LayerProperty::invalidate() {
-  onInvalidate();
   for (auto& owner : owners) {
     if (auto layer = owner.lock()) {
       layer->invalidateContent();
     }
   }
-}
-
-void LayerProperty::onInvalidate() {
 }
 
 void LayerProperty::attachToLayer(const Layer* layer) {

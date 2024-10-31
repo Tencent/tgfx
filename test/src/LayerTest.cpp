@@ -695,6 +695,14 @@ TGFX_TEST(LayerTest, ContentVersion) {
   contentVersion = surface->contentVersion();
   displayList.render(surface.get());
   EXPECT_NE(surface->contentVersion(), contentVersion);
+  contentVersion = surface->contentVersion();
+
+  auto surface2 = Surface::Make(context, 100, 100);
+  EXPECT_EQ(surface2->contentVersion(), 1u);
+  displayList.render(surface2.get());
+  EXPECT_NE(surface2->contentVersion(), 1u);
+  displayList.render(surface.get());
+  EXPECT_NE(surface->contentVersion(), contentVersion);
   device->unlock();
 }
 

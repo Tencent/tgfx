@@ -45,7 +45,10 @@ class LayerFilter : public LayerProperty {
    */
   virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
-  void onInvalidate() override;
+  /**
+   * Marks the filter as dirty and invalidates the cached filter.
+   */
+  void invalidateFilter();
 
  private:
   bool dirty = true;

@@ -49,7 +49,10 @@ class PathProvider : public LayerProperty {
 
   virtual Path onGeneratePath();
 
-  void onInvalidate() override;
+  /**
+   * Marks the path as dirty and invalidates the cached path.
+   */
+  void invalidatePath();
 
  private:
   Path path = {};

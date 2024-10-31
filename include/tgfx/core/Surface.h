@@ -168,6 +168,13 @@ class Surface {
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
+  /**
+   * Returns the unique ID of the Surface. The ID is unique among all Surfaces.
+   */
+  uint32_t uniqueID() const {
+    return _uniqueID;
+  }
+
  private:
   /**
   * Returns the version of the content. The version is changed when the content is changed.

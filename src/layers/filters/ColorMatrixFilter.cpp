@@ -29,7 +29,7 @@ void ColorMatrixFilter::setMatrix(const std::array<float, 20>& matrix) {
     return;
   }
   _matrix = std::move(matrix);
-  invalidate();
+  invalidateFilter();
 }
 
 std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {

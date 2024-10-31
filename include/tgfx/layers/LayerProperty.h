@@ -32,14 +32,10 @@ class LayerProperty {
 
  protected:
   /**
-   * Invalidate this property and notify the layer that the content needs to be updated.
+   *  Called when the property is invalidated. This method will notify the layer that the content
+   *  of the layer should be invalidated.
    */
   void invalidate();
-
-  /**
-   * Called when the property is invalidated.
-   */
-  virtual void onInvalidate();
 
  private:
   void attachToLayer(const Layer* layer);
