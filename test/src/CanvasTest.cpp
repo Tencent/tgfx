@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/FillStyle.h"
 #include "core/images/ResourceImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
@@ -495,7 +496,7 @@ TGFX_TEST(CanvasTest, path) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 700, 500);
+  auto surface = Surface::Make(context, 600, 400);
   auto canvas = surface->getCanvas();
   Path path;
   path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
@@ -530,9 +531,9 @@ TGFX_TEST(CanvasTest, path) {
   matrix.postRotate(15, 50, 50);
   matrix.postScale(2, 2, 50, 50);
   matrix.postTranslate(250, 150);
-  paint.setShader(Shader::MakeLinearGradient(
-      Point{0.f, 0.f}, Point{static_cast<float>(25), static_cast<float>(100)},
-      {Color{0.f, 1.f, 0.f, 1.f}, Color{1.f, 0.f, 0.f, 0.f}}, {}));
+  paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 100.f},
+                                             {Color{0.f, 1.f, 0.f, 1.f}, Color{1.f, 0.f, 0.f, 0.f}},
+                                             {}));
   canvas->setMatrix(matrix);
   canvas->drawPath(roundPath, paint);
   matrix.reset();
@@ -553,7 +554,33 @@ TGFX_TEST(CanvasTest, path) {
   path.quadTo(Point{100, 150}, Point{150, 150});
   paint.setColor(Color::White());
   matrix.reset();
-  matrix.postTranslate(500, 10);
+  matrix.postTranslate(450, 10);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+  path.reset();
+  canvas->drawPath(path, paint);
+
+  path.addRect({0, 0, 150, 150});
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1);
+  matrix.reset();
+  matrix.postTranslate(450, 200);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+
+  path.reset();
+  path.addArc({0, 0, 150, 150}, -90.f, 235.f);
+  Color red = {1.f, 0.f, 0.f, 1.f};
+  Color green = {0.f, 1.f, 0.f, 1.f};
+  Color blue = {0.f, 0.f, 1.f, 1.f};
+  paint.setStyle(PaintStyle::Fill);
+  paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 150.f},
+                                             {red, green, blue, green, red, blue, red, green, red,
+                                              green, blue, green, red, blue, red, green, blue},
+                                             {}));
+  matrix.reset();
+  matrix.postTranslate(450, 200);
   canvas->setMatrix(matrix);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));

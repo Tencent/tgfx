@@ -245,13 +245,15 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
   float start = startAngle;
   float end = std::min(endAngle, start + M_PI_2_F);
   float currentX, currentY;
+  auto startPoint = centerX + cosf(start) * radiusX;
+  auto endPoint = centerY + sinf(start) * radiusY;
+  points.push_back({startPoint, endPoint});
   *numBeziers = 0;
   for (int i = 0; i < 4; i++) {
     auto angleStep = end - start;
     auto distance = DistanceToControlPoint(angleStep);
     currentX = centerX + cosf(start) * radiusX;
     currentY = centerY + sinf(start) * radiusY;
-    points.push_back({currentX, currentY});
     auto u = cosf(start);
     auto v = sinf(start);
     auto x1 = currentX - v * distance * radiusX;
@@ -264,6 +266,7 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
     auto x2 = currentX + v * distance * radiusX;
     auto y2 = currentY - u * distance * radiusY;
     points.push_back({x2, y2});
+    points.push_back({currentX, currentY});
     (*numBeziers)++;
     if (end == endAngle) {
       break;
@@ -286,15 +289,19 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
   if (reversed) {
     std::swap(startAngle, endAngle);
   }
+  auto startRedius = DegreesToRadians(startAngle);
+  auto endRadius = DegreesToRadians(endAngle);
   int numBeziers = 0;
-  auto points = GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startAngle, endAngle,
-                             &numBeziers);
-  PointIterator iter(points, reversed, 0);
+  auto points = GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startRedius,
+                             endRadius, &numBeziers);
+  PointIterator iter(points, false, 0);
   auto path = &(writableRef()->path);
-  path->moveTo(iter.current());
+  path->moveTo(oval.centerX(), oval.centerY());
+  path->lineTo(iter.current());
   for (int i = 0; i < numBeziers; i++) {
     path->cubicTo(iter.next(), iter.next(), iter.next());
   }
+  path->lineTo(oval.centerX(), oval.centerY());
   path->close();
 }
 
