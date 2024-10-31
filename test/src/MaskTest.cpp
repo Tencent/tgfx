@@ -54,7 +54,7 @@ TGFX_TEST(MaskTest, Rasterize) {
   Pixmap pixmap(bitmap);
   pixmap.clear();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-  ASSERT_TRUE(result);
+  EXPECT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture"));
 
   auto typeface =
