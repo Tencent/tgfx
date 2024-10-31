@@ -38,6 +38,8 @@ class RasterizedContent : public LayerContent {
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
+  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+
  private:
   uint32_t _contextID = 0;
   std::shared_ptr<Image> image = nullptr;

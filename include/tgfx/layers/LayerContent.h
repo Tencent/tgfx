@@ -43,5 +43,13 @@ class LayerContent {
    * Draws the content to the given canvas with the given paint.
    */
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
+
+  /**
+    * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
+    * The localX and localY coordinates are in the layer's local coordinate space. If the
+    * pixelHitTest flag is true, it checks the actual pixels of the layer content; otherwise, it
+    * checks the bounding box.
+  */
+  virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
 };
 }  // namespace tgfx

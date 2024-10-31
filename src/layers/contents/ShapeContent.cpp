@@ -28,4 +28,13 @@ void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
   shapePaint.setShader(shader);
   canvas->drawPath(path, shapePaint);
 }
+
+bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
+  if (pixelHitTest) {
+    return path.contains(localX, localY);
+  }
+
+  const auto bounds = path.getBounds();
+  return bounds.contains(localX, localY);
+}
 }  // namespace tgfx

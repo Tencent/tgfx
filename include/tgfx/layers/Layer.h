@@ -428,12 +428,12 @@ class Layer {
    * methods to convert points between these coordinate spaces.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
-   * @param shapeFlag Whether to check the actual pixels of the layer (true) or just the bounding
+   * @param pixelHitTest Whether to check the actual pixels of the layer (true) or just the bounding
    * box (false). Note that Image layers are always checked against their bounding box. You can draw
    * image layers to a Surface and use the Surface::getColor() method to check the actual pixels.
    * @return true if the layer overlaps or intersects with the specified point, false otherwise.
    */
-  bool hitTestPoint(float x, float y, bool shapeFlag = false);
+  bool hitTestPoint(float x, float y, bool pixelHitTest = false);
 
   /**
    * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
@@ -513,6 +513,8 @@ class Layer {
 
   std::shared_ptr<ImageFilter> getComposeFilter(
       const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale);
+
+  bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
   std::string _name;
   float _alpha = 1.0f;
