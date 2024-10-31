@@ -217,8 +217,7 @@ int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
 
 std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float x, float y) {
   std::vector<std::shared_ptr<Layer>> results;
-  const Point localPoint = globalToLocal(Point::Make(x, y));
-  getLayersUnderPointInternal(localPoint.x, localPoint.y, &results);
+  getLayersUnderPointInternal(x, y, &results);
   return results;
 }
 
@@ -337,8 +336,38 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
-  const Point localPoint = globalToLocal(Point::Make(x, y));
-  return hitTestPointInternal(localPoint.x, localPoint.y, pixelHitTest);
+  auto content = getContent();
+  if (nullptr != content) {
+    Point localPoint = globalToLocal(Point::Make(x, y));
+    if (content->hitTestPoint(localPoint.x, localPoint.y, pixelHitTest)) {
+      return true;
+    }
+  }
+
+  for (const auto& childLayer : _children) {
+    if (!childLayer->visible()) {
+      continue;
+    }
+
+    if (nullptr != childLayer->_scrollRect) {
+      auto pointInChildSpace = childLayer->globalToLocal(Point::Make(x, y));
+      if (!childLayer->_scrollRect->contains(pointInChildSpace.x, pointInChildSpace.y)) {
+        continue;
+      }
+    }
+
+    if (nullptr != childLayer->_mask) {
+      if (!childLayer->_mask->hitTestPoint(x, y, pixelHitTest)) {
+        continue;
+      }
+    }
+
+    if (childLayer->hitTestPoint(x, y, pixelHitTest)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
@@ -577,7 +606,7 @@ std::shared_ptr<ImageFilter> Layer::getComposeFilter(
   return ImageFilter::Compose(imageFilters);
 }
 
-bool Layer::getLayersUnderPointInternal(float localX, float localY,
+bool Layer::getLayersUnderPointInternal(float x, float y,
                                         std::vector<std::shared_ptr<Layer>>* results) {
   bool hasLayerUnderPoint = false;
   for (auto item = _children.rbegin(); item != _children.rend(); ++item) {
@@ -586,27 +615,20 @@ bool Layer::getLayersUnderPointInternal(float localX, float localY,
       continue;
     }
 
-    Matrix inverseMatrix = Matrix::I();
-    Point pointInChildSpace = Point::Zero();
-    if (childLayer->matrix().invert(&inverseMatrix)) {
-      pointInChildSpace = inverseMatrix.mapXY(localX, localY);
-    }
-
     if (nullptr != childLayer->_scrollRect) {
+      auto pointInChildSpace = childLayer->globalToLocal(Point::Make(x, y));
       if (!childLayer->_scrollRect->contains(pointInChildSpace.x, pointInChildSpace.y)) {
         continue;
       }
     }
 
     if (nullptr != childLayer->_mask) {
-      const auto maskBounds = childLayer->_mask->getBounds();
-      if (!maskBounds.contains(pointInChildSpace.x, pointInChildSpace.y)) {
+      if (!childLayer->_mask->hitTestPoint(x, y)) {
         continue;
       }
     }
 
-    if (childLayer->getLayersUnderPointInternal(pointInChildSpace.x, pointInChildSpace.y,
-                                                results)) {
+    if (childLayer->getLayersUnderPointInternal(x, y, results)) {
       hasLayerUnderPoint = true;
     }
   }
@@ -614,59 +636,17 @@ bool Layer::getLayersUnderPointInternal(float localX, float localY,
   if (hasLayerUnderPoint) {
     results->push_back(weakThis.lock());
   } else {
-    Rect layerBoundsRect = Rect::MakeEmpty();
-    const auto content = getContent();
+    auto content = getContent();
     if (nullptr != content) {
-      layerBoundsRect.join(content->getBounds());
-    }
-    if (layerBoundsRect.contains(localX, localY)) {
-      results->push_back(weakThis.lock());
-      hasLayerUnderPoint = true;
+      auto layerBoundsRect = content->getBounds();
+      auto localPoint = globalToLocal(Point::Make(x, y));
+      if (layerBoundsRect.contains(localPoint.x, localPoint.y)) {
+        results->push_back(weakThis.lock());
+        hasLayerUnderPoint = true;
+      }
     }
   }
 
   return hasLayerUnderPoint;
-}
-
-bool Layer::hitTestPointInternal(float localX, float localY, bool pixelHitTest) {
-  for (auto item = _children.rbegin(); item != _children.rend(); ++item) {
-    const auto& childLayer = *item;
-
-    if (!childLayer->visible()) {
-      continue;
-    }
-
-    Matrix inverseMatrix = Matrix::I();
-    Point pointInChildSpace = Point::Zero();
-    if (childLayer->matrix().invert(&inverseMatrix)) {
-      pointInChildSpace = inverseMatrix.mapXY(localX, localY);
-    }
-
-    if (nullptr != childLayer->_scrollRect) {
-      if (!childLayer->_scrollRect->contains(pointInChildSpace.x, pointInChildSpace.y)) {
-        continue;
-      }
-    }
-
-    if (nullptr != childLayer->_mask) {
-      const auto maskBounds = childLayer->_mask->getBounds();
-      if (!maskBounds.contains(pointInChildSpace.x, pointInChildSpace.y)) {
-        continue;
-      }
-    }
-
-    if (childLayer->hitTestPointInternal(pointInChildSpace.x, pointInChildSpace.y, pixelHitTest)) {
-      return true;
-    }
-  }
-
-  auto content = getContent();
-  if (nullptr != content) {
-    if (content->hitTestPoint(localX, localY, pixelHitTest)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 }  // namespace tgfx

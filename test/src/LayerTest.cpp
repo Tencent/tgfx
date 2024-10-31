@@ -1124,22 +1124,22 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   // P0(340.0, 340.0)
   paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Fill);
-  Point p4 = {340.0f, 340.0f};
-  canvas->drawCircle(p4.x, p4.y, 2.0f, paint);
-  EXPECT_EQ(true, textLayer->hitTestPoint(p4.x, p4.y));
-  EXPECT_EQ(false, textLayer->hitTestPoint(p4.x, p4.y, true));
-  EXPECT_EQ(true, shaperLayer->hitTestPoint(p4.x, p4.y));
-  EXPECT_EQ(true, shaperLayer->hitTestPoint(p4.x, p4.y, true));
-  EXPECT_EQ(true, imageLayer->hitTestPoint(p4.x, p4.y));
-  EXPECT_EQ(true, imageLayer->hitTestPoint(p4.x, p4.y, true));
-  EXPECT_EQ(true, parentLayer->hitTestPoint(p4.x, p4.y));
-  EXPECT_EQ(true, parentLayer->hitTestPoint(p4.x, p4.y, true));
-  EXPECT_EQ(true, childLayer->hitTestPoint(p4.x, p4.y));
-  EXPECT_EQ(true, childLayer->hitTestPoint(p4.x, p4.y, true));
-  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p4.x, p4.y));
-  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p4.x, p4.y, true));
-  EXPECT_EQ(true, rootLayer->hitTestPoint(p4.x, p4.y));
-  EXPECT_EQ(true, rootLayer->hitTestPoint(p4.x, p4.y, true));
+  Point p0 = {340.0f, 340.0f};
+  canvas->drawCircle(p0.x, p0.y, 2.0f, paint);
+  EXPECT_EQ(true, textLayer->hitTestPoint(p0.x, p0.y));
+  EXPECT_EQ(false, textLayer->hitTestPoint(p0.x, p0.y, true));
+  EXPECT_EQ(true, shaperLayer->hitTestPoint(p0.x, p0.y));
+  EXPECT_EQ(true, shaperLayer->hitTestPoint(p0.x, p0.y, true));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p0.x, p0.y));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p0.x, p0.y, true));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p0.x, p0.y));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p0.x, p0.y, true));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p0.x, p0.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p0.x, p0.y, true));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p0.x, p0.y));
+  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p0.x, p0.y, true));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p0.x, p0.y));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p0.x, p0.y, true));
 
   // P1(320.0, 320.0)
   paint.setColor(Color::Blue());
