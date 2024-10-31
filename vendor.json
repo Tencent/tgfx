@@ -222,6 +222,15 @@
           "linux"
         ]
       }
+    },
+    {
+      "name": "expat",
+      "dir": "expat/expat",
+      "cmake": {
+        "targets": [
+          "expat"
+        ]
+      }
     }
   ]
 }
