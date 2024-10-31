@@ -18,22 +18,13 @@
 
 #include "tgfx/layers/SolidLayer.h"
 #include "layers/contents/ShapeContent.h"
+#include "layers/contents/SolidContent.h"
 
 namespace tgfx {
-std::shared_ptr<SolidLayer> SolidLayer::Make(float width, float height,
-                                             std::shared_ptr<SolidColor> color) {
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto layer = std::shared_ptr<SolidLayer>(new SolidLayer(width, height, std::move(color)));
+std::shared_ptr<SolidLayer> SolidLayer::Make() {
+  auto layer = std::shared_ptr<SolidLayer>(new SolidLayer());
   layer->weakThis = layer;
   return layer;
-}
-
-SolidLayer::SolidLayer(float width, float height, std::shared_ptr<SolidColor> color)
-    : _width(width), _height(height) {
-  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
-  setSolidColor(std::move(color));
 }
 
 void SolidLayer::setWidth(float width) {
@@ -44,8 +35,6 @@ void SolidLayer::setWidth(float width) {
     return;
   }
   _width = width;
-  _path.reset();
-  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
   invalidateContent();
 }
 
@@ -57,8 +46,6 @@ void SolidLayer::setHeight(float height) {
     return;
   }
   _height = height;
-  _path.reset();
-  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
   invalidateContent();
 }
 
@@ -67,8 +54,6 @@ void SolidLayer::setRadiusX(float radiusX) {
     return;
   }
   _radiusX = radiusX;
-  _path.reset();
-  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
   invalidateContent();
 }
 
@@ -77,25 +62,22 @@ void SolidLayer::setRadiusY(float radiusY) {
     return;
   }
   _radiusY = radiusY;
-  _path.reset();
-  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
   invalidateContent();
 }
 
-void SolidLayer::setSolidColor(std::shared_ptr<SolidColor> color) {
-  if (_solidColor == color) {
+void SolidLayer::setColor(const Color& color) {
+  if (_color == color) {
     return;
   }
-  _solidColor = std::move(color);
+  _color = color;
   invalidateContent();
 }
 
 std::unique_ptr<LayerContent> SolidLayer::onUpdateContent() {
-  std::vector<std::unique_ptr<LayerContent>> contents = {};
-  auto shader = _solidColor ? _solidColor->getShader() : nullptr;
-  auto content = std::make_unique<ShapeContent>(_path, shader);
-  contents.push_back(std::move(content));
-  return LayerContent::Compose(std::move(contents));
+  RRect rRect = {};
+  rRect.setRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
+  auto content = std::make_unique<SolidContent>(rRect, _color);
+  return content;
 }
 
 }  // namespace tgfx

@@ -29,87 +29,83 @@ namespace tgfx {
 class SolidLayer : public Layer {
  public:
   /**
-   * Creates a new solid layer with the given dimensions and solid color.
+   * Creates a new solid layer.
    */
-  static std::shared_ptr<SolidLayer> Make(float width, float height,
-                                          std::shared_ptr<SolidColor> color);
+  static std::shared_ptr<SolidLayer> Make();
 
   LayerType type() const override {
     return LayerType::Solid;
   }
 
   /**
-   * Returns the width of the layer.
+   * Returns the width of the solid layer.
    */
   float width() const {
     return _width;
   }
 
   /**
-   * Sets the width of the layer.
+   * Sets the width of the solid layer.
    */
   void setWidth(float widht);
 
   /**
-   * Returns the height of the layer.
+   * Returns the height of the solid layer.
    */
   float height() const {
     return _height;
   }
 
   /**
-   * Sets the height of the layer.
+   * Sets the height of the solid layer.
    */
   void setHeight(float height);
 
   /**
-   * Returns the axis length on x-axis of the rounded corners.
+   * Returns the x-axis radius of corners.
    */
   float radiusX() const {
     return _radiusX;
   }
 
   /**
-   * Sets the axis length on x-axis of the rounded corners.
+   * Sets the x-axis radius of corners.
    */
   void setRadiusX(float radiusX);
 
   /**
-   * Returns the axis length on y-axis of the rounded corners.
+   * Returns the y-axis radius of corners.
    */
   float radiusY() const {
     return _radiusY;
   }
 
   /**
-   * Sets the axis length on y-axis of the rounded corners.
+   * Sets the y-axis radius of corners.
    */
   void setRadiusY(float radiusY);
 
   /**
-   * Returns the solid color used to fill the layer.
+   * Returns the color used to fill the solid layer.
    */
-  std::shared_ptr<SolidColor> solidColor() const {
-    return _solidColor;
-  }
+  Color color() const;
 
   /**
-   * Sets the solid color used to fill the layer.
+   * Sets the color used to fill the solid layer.
    */
-  void setSolidColor(std::shared_ptr<SolidColor> color);
+  void setColor(const Color& color);
 
  protected:
-  SolidLayer(float width, float height, std::shared_ptr<SolidColor> color);
+  SolidLayer() = default;
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
  private:
-  std::shared_ptr<SolidColor> _solidColor = nullptr;
+  Color _color;
   float _width = 0;
   float _height = 0;
   float _radiusX = 0;
   float _radiusY = 0;
-  Path _path = {};
 };
 
 }  // namespace tgfx
