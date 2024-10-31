@@ -1037,4 +1037,172 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint");
   device->unlock();
 }
+
+TGFX_TEST(LayerTest, hitTestPointNested) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 800, 800);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setName("root_layer");
+  displayList->root()->addChild(rootLayer);
+
+  auto parentLayer = Layer::Make();
+  parentLayer->setName("parent_layer");
+  parentLayer->setMatrix(Matrix::MakeTrans(50.0f, 50.0f));
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setName("image_layer");
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  imageLayer->setImage(image);
+  SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
+  imageLayer->setSampling(options);
+  imageLayer->setMatrix(Matrix::MakeScale(3.0f));
+  parentLayer->addChild(imageLayer);
+  rootLayer->addChild(parentLayer);
+  auto imageLayerBounds = imageLayer->getBounds();
+  imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
+  printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
+         imageLayerBounds.right, imageLayerBounds.bottom);
+
+  auto childLayer = Layer::Make();
+  childLayer->setName("child_layer");
+  childLayer->setMatrix(Matrix::MakeTrans(50.0f, 50.0f));
+  auto shaperLayer = ShapeLayer::Make();
+  shaperLayer->setName("shaper_layer");
+  Rect rect = Rect::MakeLTRB(150, 150, 370, 370);
+  Path path = {};
+  path.addRect(rect);
+  path.close();
+  shaperLayer->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(127, 255, 0, 127));
+  shaperLayer->setFillStyle(fillStyle);
+  childLayer->addChild(shaperLayer);
+  parentLayer->addChild(childLayer);
+  auto shaperLayerBounds = shaperLayer->getBounds();
+  shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
+  printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
+         shaperLayerBounds.right, shaperLayerBounds.bottom);
+
+  auto grandsonLayer = Layer::Make();
+  grandsonLayer->setName("grandson_layer");
+  grandsonLayer->setMatrix(Matrix::MakeTrans(50.0f, 50.0f));
+  auto textLayer = TextLayer::Make();
+  textLayer->setName("text_layer");
+  textLayer->setText("Hello World!");
+  textLayer->setMatrix(Matrix::MakeTrans(50.0f, -50.0f) * Matrix::MakeRotate(45.0f) *
+                       Matrix::MakeScale(5.0f, 5.0f));
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 20);
+  textLayer->setFont(font);
+  grandsonLayer->addChild(textLayer);
+  childLayer->addChild(grandsonLayer);
+  auto textLayerBounds = textLayer->getBounds();
+  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
+         textLayerBounds.right, textLayerBounds.bottom);
+
+  auto rootLayerBounds = rootLayer->getBounds();
+  rootLayer->getGlobalMatrix().mapRect(&rootLayerBounds);
+  printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
+         rootLayerBounds.right, rootLayerBounds.bottom);
+
+  displayList->render(surface.get());
+
+  auto paint = Paint();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1.0f);
+  paint.setColor(Color::Red());
+  canvas->drawRect(imageLayerBounds, paint);
+  canvas->drawRect(shaperLayerBounds, paint);
+  canvas->drawRect(textLayerBounds, paint);
+  paint.setColor(Color::Green());
+  canvas->drawRect(rootLayerBounds, paint);
+
+  // P0(340.0, 340.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p4 = {340.0f, 340.0f};
+  canvas->drawCircle(p4.x, p4.y, 2.0f, paint);
+  EXPECT_EQ(true, textLayer->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(false, textLayer->hitTestPoint(p4.x, p4.y, true));
+  EXPECT_EQ(true, shaperLayer->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(true, shaperLayer->hitTestPoint(p4.x, p4.y, true));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p4.x, p4.y, true));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p4.x, p4.y, true));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p4.x, p4.y, true));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p4.x, p4.y, true));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p4.x, p4.y));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p4.x, p4.y, true));
+
+  // P1(320.0, 320.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p1 = {320.0f, 320.0f};
+  canvas->drawCircle(p1.x, p1.y, 2.0f, paint);
+  EXPECT_EQ(true, textLayer->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(true, textLayer->hitTestPoint(p1.x, p1.y, true));
+  EXPECT_EQ(true, shaperLayer->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(true, shaperLayer->hitTestPoint(p1.x, p1.y, true));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p1.x, p1.y, true));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p1.x, p1.y, true));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p1.x, p1.y, true));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p1.x, p1.y, true));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p1.x, p1.y));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p1.x, p1.y, true));
+
+  // P2(180.0, 140.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p2 = {180.0f, 140.0f};
+  canvas->drawCircle(p2.x, p2.y, 2.0f, paint);
+  EXPECT_EQ(true, textLayer->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(true, textLayer->hitTestPoint(p2.x, p2.y, true));
+  EXPECT_EQ(false, shaperLayer->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(false, shaperLayer->hitTestPoint(p2.x, p2.y, true));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p2.x, p2.y, true));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p2.x, p2.y, true));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p2.x, p2.y, true));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p2.x, p2.y, true));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p2.x, p2.y));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p2.x, p2.y, true));
+
+  // P3(80.0, 80.0)
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  Point p3 = {80.0f, 80.0f};
+  canvas->drawCircle(p3.x, p3.y, 2.0f, paint);
+  EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y, true));
+  EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y, true));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, imageLayer->hitTestPoint(p3.x, p3.y, true));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y, true));
+  EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y, true));
+  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y, true));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y, true));
+
+  context->submit();
+  Baseline::Compare(surface, "LayerTest/Layer_hitTestPointNested");
+  device->unlock();
+}
 }  // namespace tgfx
