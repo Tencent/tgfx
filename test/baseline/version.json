@@ -65,7 +65,8 @@
         "getBounds": "8a26de7",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
-        "imageLayer": "99a5cd9"
+        "imageLayer": "99a5cd9",
+        "draw_solid": "b4a1231"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

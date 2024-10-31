@@ -24,6 +24,7 @@
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
@@ -459,6 +460,31 @@ TGFX_TEST(LayerTest, shapeLayer) {
   displayList->render(surface.get());
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_shape"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, solidLayer) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 200, 100);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setWidth(150);
+  solidLayer->setHeight(80);
+  solidLayer->setRadiusX(30);
+  solidLayer->setRadiusY(40);
+  solidLayer->setColor(Color::Blue());
+  layer->addChild(solidLayer);
+  auto bounds = Rect::MakeXYWH(0, 0, 150, 80);
+  auto solidLayerRect = solidLayer->getBounds();
+  EXPECT_TRUE(solidLayerRect == bounds);
+
+  displayList->render(surface.get());
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_solid"));
   device->unlock();
 }
 

@@ -43,5 +43,9 @@ enum class LayerType {
    * A layer displaying a simple text.
    */
   Text,
+  /**
+   * A layer that fills its bounds with a solid color.
+   */
+  Solid
 };
 }  // namespace tgfx
