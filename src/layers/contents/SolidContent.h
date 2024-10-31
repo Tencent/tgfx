@@ -25,7 +25,7 @@ class SolidContent : public LayerContent {
  public:
   SolidContent(const RRect& rRect, const Color& color);
 
-  tgfx::Rect getBounds() const override {
+  Rect getBounds() const override {
     return _rRect.rect;
   }
 

@@ -25,7 +25,9 @@ SolidContent::SolidContent(const RRect& rRect, const Color& color) : _rRect(rRec
 
 void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
   auto solidPaint = paint;
-  solidPaint.setColor(_color);
+  auto color = _color;
+  color.alpha *= paint.getAlpha();
+  solidPaint.setColor(color);
   canvas->drawRRect(_rRect, solidPaint);
 }
 

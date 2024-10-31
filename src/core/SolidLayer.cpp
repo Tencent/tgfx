@@ -74,6 +74,9 @@ void SolidLayer::setColor(const Color& color) {
 }
 
 std::unique_ptr<LayerContent> SolidLayer::onUpdateContent() {
+  if (_width == 0 || _height == 0) {
+    return nullptr;
+  }
   RRect rRect = {};
   rRect.setRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
   auto content = std::make_unique<SolidContent>(rRect, _color);

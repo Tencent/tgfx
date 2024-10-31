@@ -38,7 +38,7 @@ class SolidLayer : public Layer {
   }
 
   /**
-   * Returns the width of the solid layer.
+   * Returns the width of the solid layer. The default value is 0.
    */
   float width() const {
     return _width;
@@ -50,7 +50,7 @@ class SolidLayer : public Layer {
   void setWidth(float widht);
 
   /**
-   * Returns the height of the solid layer.
+   * Returns the height of the solid layer. The default value is 0.
    */
   float height() const {
     return _height;
@@ -62,7 +62,7 @@ class SolidLayer : public Layer {
   void setHeight(float height);
 
   /**
-   * Returns the x-axis radius of corners.
+   * Returns the x-axis radius of corners. The default value is 0.
    */
   float radiusX() const {
     return _radiusX;
@@ -74,7 +74,7 @@ class SolidLayer : public Layer {
   void setRadiusX(float radiusX);
 
   /**
-   * Returns the y-axis radius of corners.
+   * Returns the y-axis radius of corners. The default value is 0.
    */
   float radiusY() const {
     return _radiusY;
@@ -86,7 +86,7 @@ class SolidLayer : public Layer {
   void setRadiusY(float radiusY);
 
   /**
-   * Returns the color used to fill the solid layer.
+   * Returns the color used to fill the solid layer. The default color is opaque white.
    */
   Color color() const;
 
@@ -101,7 +101,7 @@ class SolidLayer : public Layer {
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
  private:
-  Color _color;
+  Color _color = Color::White();
   float _width = 0;
   float _height = 0;
   float _radiusX = 0;
