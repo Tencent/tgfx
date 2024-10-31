@@ -17,46 +17,34 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerProperty.h"
+#include <memory>
+#include <vector>
 
 namespace tgfx {
-/**
- * PathProvider is an interface for classes that generates a Path. It defers the acquisition of the
- * Path until it is actually required, allowing the Path to be invalidated and regenerate if
- * necessary. Note: PathProvider is not thread-safe and should be accessed from a single thread.
- */
-class PathProvider : public LayerProperty {
- public:
-  /**
-   * Creates a new PathProvider that wraps the given Path.
-   */
-  static std::shared_ptr<PathProvider> Wrap(const Path& path);
+class Layer;
 
-  /**
-   * Returns the Path provided by this object.
-   */
-  Path getPath();
+/**
+ * A property of a layer that may change the content of the layer.
+ */
+class LayerProperty {
+ public:
+  virtual ~LayerProperty() = default;
 
  protected:
-  PathProvider() = default;
-
   /**
-   * Creates a new PathProvider with an initial path.
+   *  Called when the property is invalidated. This method will notify the layer that the content
+   *  of the layer should be invalidated.
    */
-  explicit PathProvider(Path path);
-
-  virtual Path onGeneratePath();
-
-  /**
-   * Marks the path as dirty and invalidates the cached path.
-   */
-  void invalidatePath();
+  void invalidate();
 
  private:
-  Path path = {};
+  void attachToLayer(const Layer* layer);
 
-  bool dirty = true;
+  void detachFromLayer(const Layer* layer);
+
+  std::vector<std::weak_ptr<Layer>> owners;
+
+  friend class Layer;
 };
+
 }  // namespace tgfx
