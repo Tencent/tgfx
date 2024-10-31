@@ -44,7 +44,7 @@ enum class LayerType {
    */
   Text,
   /**
-   * A layer that fills its bounds with style.
+   * A layer that fills its bounds with a solid color.
    */
   Solid
 };

@@ -37,6 +37,5 @@ class ShapeStyle {
   virtual std::shared_ptr<Shader> getShader() const = 0;
 
   friend class ShapeLayer;
-  friend class SolidLayer;
 };
 }  // namespace tgfx

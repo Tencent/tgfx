@@ -473,8 +473,10 @@ TGFX_TEST(LayerTest, solidLayer) {
   displayList->root()->addChild(layer);
   auto solidLayer = SolidLayer::Make(150, 80, SolidColor::Make(Color::Blue()));
   layer->addChild(solidLayer);
-  auto solidLayerRect = solidLayer->getBounds();
+  solidLayer->setRadiusX(60);
+  solidLayer->setRadiusY(50);
   auto bounds = Rect::MakeXYWH(0, 0, 150, 80);
+  auto solidLayerRect = solidLayer->getBounds();
   ASSERT_TRUE(solidLayerRect == bounds);
 
   displayList->render(surface.get());

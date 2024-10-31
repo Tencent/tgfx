@@ -20,32 +20,79 @@
 #include "layers/contents/ShapeContent.h"
 
 namespace tgfx {
-std::shared_ptr<SolidLayer> SolidLayer::Make(int width, int height,
-                                             std::shared_ptr<ShapeStyle> style) {
-  if (width == 0 || height == 0) {
+std::shared_ptr<SolidLayer> SolidLayer::Make(float width, float height,
+                                             std::shared_ptr<SolidColor> color) {
+  if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto layer = std::shared_ptr<SolidLayer>(new SolidLayer(width, height, std::move(style)));
+  auto layer = std::shared_ptr<SolidLayer>(new SolidLayer(width, height, std::move(color)));
   layer->weakThis = layer;
   return layer;
 }
 
-SolidLayer::SolidLayer(int width, int height, std::shared_ptr<ShapeStyle> style) {
-  _path.addRect(0, 0, static_cast<float>(width), static_cast<float>(height));
-  setFillStyle(std::move(style));
+SolidLayer::SolidLayer(float width, float height, std::shared_ptr<SolidColor> color)
+    : _width(width), _height(height) {
+  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
+  setSolidColor(std::move(color));
 }
 
-void SolidLayer::setFillStyle(std::shared_ptr<ShapeStyle> style) {
-  if (_fillStyle == style) {
+void SolidLayer::setWidth(float width) {
+  if (width < 0) {
+    width = 0;
+  }
+  if (_width == width) {
     return;
   }
-  _fillStyle = std::move(style);
+  _width = width;
+  _path.reset();
+  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
+  invalidateContent();
+}
+
+void SolidLayer::setHeight(float height) {
+  if (height < 0) {
+    height = 0;
+  }
+  if (_height == height) {
+    return;
+  }
+  _height = height;
+  _path.reset();
+  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
+  invalidateContent();
+}
+
+void SolidLayer::setRadiusX(float radiusX) {
+  if (_radiusX == radiusX) {
+    return;
+  }
+  _radiusX = radiusX;
+  _path.reset();
+  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
+  invalidateContent();
+}
+
+void SolidLayer::setRadiusY(float radiusY) {
+  if (_radiusY == radiusY) {
+    return;
+  }
+  _radiusY = radiusY;
+  _path.reset();
+  _path.addRoundRect(Rect::MakeXYWH(0.0f, 0.0f, _width, _height), _radiusX, _radiusY);
+  invalidateContent();
+}
+
+void SolidLayer::setSolidColor(std::shared_ptr<SolidColor> color) {
+  if (_solidColor == color) {
+    return;
+  }
+  _solidColor = std::move(color);
   invalidateContent();
 }
 
 std::unique_ptr<LayerContent> SolidLayer::onUpdateContent() {
   std::vector<std::unique_ptr<LayerContent>> contents = {};
-  auto shader = _fillStyle ? _fillStyle->getShader() : nullptr;
+  auto shader = _solidColor ? _solidColor->getShader() : nullptr;
   auto content = std::make_unique<ShapeContent>(_path, shader);
   contents.push_back(std::move(content));
   return LayerContent::Compose(std::move(contents));
