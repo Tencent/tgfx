@@ -41,11 +41,12 @@ class DisplayList {
 
   /**
    * Draws the display list to the given surface.
+   * Returns false if the surface is a nullptr or if the surface does not require an update.
    * @param surface The surface to draw the display list to.
    * @param replaceAll If true, the surface will be cleared before drawing the display list.
    * Otherwise, the display list will be drawn on top of the existing content.
    */
-  void render(Surface* surface, bool replaceAll = true);
+  bool render(Surface* surface, bool replaceAll = true);
 
  private:
   std::shared_ptr<Layer> _root = nullptr;
