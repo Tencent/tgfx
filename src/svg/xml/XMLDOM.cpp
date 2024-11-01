@@ -120,6 +120,7 @@ class DOMParser : public XMLParser {
 };
 
 DOM::DOM(std::shared_ptr<DOMNode> root) : _root(std::move(root)) {};
+
 DOM::~DOM() = default;
 
 std::shared_ptr<DOM> DOM::MakeFromData(const Data& data) {

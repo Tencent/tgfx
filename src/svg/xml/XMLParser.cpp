@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "XMLParser.h"
-#include <expat.h>
 #include <cstdlib>
 #include <string>
 #include "core/utils/Log.h"
+#include "expat/lib/expat.h"
 
 namespace tgfx {
 namespace {
