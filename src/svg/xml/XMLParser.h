@@ -36,6 +36,7 @@ class XMLParser {
      */
   bool parse(const Data& data);
 
+ protected:
   /**
    * @brief Override in subclasses; return true to stop parsing
    * Each function represents a parsing stage of an XML element.

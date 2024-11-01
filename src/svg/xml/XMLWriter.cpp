@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "XMLWriter.h"
-#include <cstdint>
-#include <memory>
-#include <string>
 #include "XMLParser.h"
 #include "core/utils/Log.h"
 #include "tgfx/svg/xml/XMLDOM.h"

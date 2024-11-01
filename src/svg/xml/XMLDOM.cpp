@@ -17,10 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/xml/XMLDOM.h"
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <vector>
+#include <utility>
 #include "XMLParser.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Data.h"
@@ -122,7 +119,7 @@ class DOMParser : public XMLParser {
   int _level;
 };
 
-DOM::DOM(std::shared_ptr<DOMNode> root) : _root(root) {};
+DOM::DOM(std::shared_ptr<DOMNode> root) : _root(std::move(root)) {};
 DOM::~DOM() = default;
 
 std::shared_ptr<DOM> DOM::MakeFromData(const Data& data) {
@@ -174,7 +171,7 @@ std::shared_ptr<DOMNode> DOM::getRootNode() const {
   return _root;
 }
 
-std::shared_ptr<DOMNode> DOMNode::getFirstChild(const std::string& name) {
+std::shared_ptr<DOMNode> DOMNode::getFirstChild(const std::string& name) const {
   auto child = this->firstChild;
   if (!name.empty()) {
     for (; child != nullptr; child = child->nextSibling) {
@@ -186,7 +183,7 @@ std::shared_ptr<DOMNode> DOMNode::getFirstChild(const std::string& name) {
   return child;
 }
 
-std::shared_ptr<DOMNode> DOMNode::getNextSibling(const std::string& name) {
+std::shared_ptr<DOMNode> DOMNode::getNextSibling(const std::string& name) const {
   auto sibling = this->nextSibling;
   if (!name.empty()) {
     for (; sibling != nullptr; sibling = sibling->nextSibling) {
@@ -198,7 +195,7 @@ std::shared_ptr<DOMNode> DOMNode::getNextSibling(const std::string& name) {
   return sibling;
 }
 
-std::tuple<bool, std::string> DOMNode::findAttribute(const std::string& name) {
+std::tuple<bool, std::string> DOMNode::findAttribute(const std::string& name) const {
   if (!name.empty()) {
     for (const DOMAttr& attr : this->attributes) {
       if (attr.name == name) {
@@ -209,7 +206,7 @@ std::tuple<bool, std::string> DOMNode::findAttribute(const std::string& name) {
   return {false, ""};
 }
 
-int DOMNode::countChildren(const std::string& name) {
+int DOMNode::countChildren(const std::string& name) const {
   int count = 0;
   auto tempNode = this->getFirstChild(name);
   while (tempNode) {

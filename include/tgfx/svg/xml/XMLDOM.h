@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <sys/_types/_u_int32_t.h>
-#include <sys/_types/_u_int8_t.h>
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -47,33 +45,33 @@ struct DOMNode {
   /**
    * @brief Get the first child object, optionally filtered by name.
    * 
-   * @param name 
+   * @param name child name.
    * @return DOMNode object.
    */
-  std::shared_ptr<DOMNode> getFirstChild(const std::string& name = "");
+  std::shared_ptr<DOMNode> getFirstChild(const std::string& name = "") const;
 
   /**
    * @brief Get the next Sibling object, optionally filtered by name.
    * 
-   * @param name 
+   * @param name sibling name.
    * @return DOMNode object.
    */
-  std::shared_ptr<DOMNode> getNextSibling(const std::string& name = "");
+  std::shared_ptr<DOMNode> getNextSibling(const std::string& name = "") const;
 
   /**
    * @brief Get the value content of the node by attribute name.
    * 
    * @return value content.
    */
-  std::tuple<bool, std::string> findAttribute(const std::string& attrName);
+  std::tuple<bool, std::string> findAttribute(const std::string& attrName) const;
 
   /**
    * @brief Count the number of children of the node,optionally filtered by name.
    * 
-   * @param name 
+   * @param name node name.
    * @return The number of children.
    */
-  int countChildren(const std::string& name = "");
+  int countChildren(const std::string& name = "") const;
 };
 
 class DOM {
@@ -112,7 +110,7 @@ class DOM {
    * 
    * @param root The root node of the DOM tree.
    */
-  DOM(std::shared_ptr<DOMNode> root);
+  explicit DOM(std::shared_ptr<DOMNode> root);
 
   std::shared_ptr<DOMNode> _root = nullptr;
 };
