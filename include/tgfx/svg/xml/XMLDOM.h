@@ -33,7 +33,7 @@ struct DOMAttribute {
   std::string value;
 };
 
-enum class DOMNodeType : u_int8_t { Element, Text };
+enum class DOMNodeType : uint8_t { Element, Text };
 
 struct DOMNode {
   std::string name;

@@ -119,7 +119,9 @@ class DOMParser : public XMLParser {
   int _level;
 };
 
-DOM::DOM(std::shared_ptr<DOMNode> root) : _root(std::move(root)) {};
+DOM::DOM(std::shared_ptr<DOMNode> root) {
+  _root = std::move(root);
+};
 
 DOM::~DOM() = default;
 

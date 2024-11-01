@@ -23,6 +23,7 @@
 #include "expat/lib/expat.h"
 
 namespace tgfx {
+
 namespace {
 template <typename T, T* P>
 struct OverloadedFunctionObject {
@@ -56,7 +57,7 @@ const XML_Memory_Handling_Suite XML_alloc = {malloc, realloc, free};
 
 struct ParsingContext {
   explicit ParsingContext(XMLParser* parser)
-      : _parser(parser), XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)) {
+      : _parser(parser), _XMLParser(XML_ParserCreate_MM(nullptr, &XML_alloc, nullptr)) {
   }
 
   void flushText() {
@@ -71,7 +72,7 @@ struct ParsingContext {
   }
 
   XMLParser* _parser;
-  AutoTCallVProc<std::remove_pointer_t<XML_Parser>, XML_ParserFree> XMLParser;
+  AutoTCallVProc<std::remove_pointer_t<XML_Parser>, XML_ParserFree> _XMLParser;
 
  private:
   std::string _bufferedText;
@@ -111,7 +112,7 @@ void XMLCALL entity_decl_handler(void* data, const XML_Char* entityName,
   HANDLER_CONTEXT(data, context);
 
   LOGE("'%s' entity declaration found, stopping processing", entityName);
-  XML_StopParser(context->XMLParser, XML_FALSE);
+  XML_StopParser(context->_XMLParser, XML_FALSE);
 }
 
 }  // anonymous namespace
@@ -121,7 +122,7 @@ XMLParser::~XMLParser() = default;
 
 bool XMLParser::parse(const Data& data) {
   ParsingContext parsingContext(this);
-  if (!parsingContext.XMLParser) {
+  if (!parsingContext._XMLParser) {
     LOGE("could not create XML parser\n");
     return false;
   }
@@ -130,17 +131,17 @@ bool XMLParser::parse(const Data& data) {
   // with a known hash sequence so an address is sufficient. The provided
   // seed should not be zero as that results in a call to rand_s.
   auto seed = static_cast<unsigned long>(reinterpret_cast<size_t>(kHashSeed) & 0xFFFFFFFF);
-  XML_SetHashSalt(parsingContext.XMLParser, seed ? seed : 1);
+  XML_SetHashSalt(parsingContext._XMLParser, seed ? seed : 1);
 
-  XML_SetUserData(parsingContext.XMLParser, &parsingContext);
-  XML_SetElementHandler(parsingContext.XMLParser, start_element_handler, end_element_handler);
-  XML_SetCharacterDataHandler(parsingContext.XMLParser, text_handler);
+  XML_SetUserData(parsingContext._XMLParser, &parsingContext);
+  XML_SetElementHandler(parsingContext._XMLParser, start_element_handler, end_element_handler);
+  XML_SetCharacterDataHandler(parsingContext._XMLParser, text_handler);
 
   // Disable entity processing, to inhibit internal entity expansion. See expat CVE-2013-0340.
-  XML_SetEntityDeclHandler(parsingContext.XMLParser, entity_decl_handler);
+  XML_SetEntityDeclHandler(parsingContext._XMLParser, entity_decl_handler);
 
   XML_Status status =
-      XML_Parse(parsingContext.XMLParser, reinterpret_cast<const char*>(data.bytes()),
+      XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data.bytes()),
                 static_cast<int>(data.size()), true);
   return XML_STATUS_ERROR != status;
 }
