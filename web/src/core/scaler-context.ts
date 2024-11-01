@@ -63,6 +63,8 @@ export class ScalerContext {
         xHeight: number;
         capHeight: number;
     };
+    private static hasTestedMeasureApi: boolean = false;
+    private static directMeasurementEnabled: boolean = false;
 
     private fontBoundingBoxMap: { key: string; value: Rect }[] = [];
 
@@ -156,10 +158,20 @@ export class ScalerContext {
         }
     }
 
+
+    private static measureDirectly(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
+        if (!this.hasTestedMeasureApi) {
+            const metrics = ctx.measureText('x');
+            this.directMeasurementEnabled = metrics && metrics.actualBoundingBoxAscent > 0;
+            this.hasTestedMeasureApi = true;
+        }
+        return this.directMeasurementEnabled;
+    }
+
+
     private measureText(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, text: string): TextMetrics {
-        const metrics = ctx.measureText(text);
-        if (metrics && (metrics.actualBoundingBoxAscent > 0 || metrics.width === 0)) {
-            return metrics;
+        if (ScalerContext.measureDirectly(ctx)) {
+            return ctx.measureText(text);
         }
         ctx.canvas.width = this.size * 1.5;
         ctx.canvas.height = this.size * 1.5;
@@ -192,4 +204,5 @@ export class ScalerContext {
             width: fontMeasure.right - fontMeasure.left,
         };
     }
+
 }
