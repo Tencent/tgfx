@@ -55,6 +55,5 @@ class XMLParser {
   bool addAttribute(const std::string& name, const std::string& value);
   bool endElement(const std::string& element);
   bool text(const std::string& text);
-  void* _parser = nullptr;
 };
 }  // namespace tgfx

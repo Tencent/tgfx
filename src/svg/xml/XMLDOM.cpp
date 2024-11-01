@@ -98,12 +98,12 @@ class DOMParser : public XMLParser {
   }
 
  private:
-  void startCommon(const std::string& text, DOMNodeType type) {
+  void startCommon(const std::string& element, DOMNodeType type) {
     if (_level > 0 && _needToFlush) {
       this->flushAttributes();
     }
     _needToFlush = true;
-    _elementName = text;
+    _elementName = element;
     _elementType = type;
     ++_level;
   }
