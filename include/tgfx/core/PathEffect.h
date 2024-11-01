@@ -28,11 +28,6 @@ namespace tgfx {
 class PathEffect {
  public:
   /**
-   * Creates a stroke path effect with the specified stroke options.
-   */
-  static std::unique_ptr<PathEffect> MakeStroke(const Stroke* stroke);
-
-  /**
    * Creates a dash path effect.
    * @param intervals array containing an even number of entries (>=2), with the even indices
    * specifying the length of "on" intervals, and the odd indices specifying the length of "off"

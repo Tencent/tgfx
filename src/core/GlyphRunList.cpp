@@ -107,10 +107,7 @@ bool GlyphRunList::getPath(Path* path, const Matrix& matrix, const Stroke* strok
   if (stroke) {
     auto scaledStroke = *stroke;
     scaledStroke.width *= maxScale;
-    auto pathEffect = PathEffect::MakeStroke(&scaledStroke);
-    if (pathEffect) {
-      pathEffect->filterPath(&totalPath);
-    }
+    scaledStroke.applyToPath(&totalPath);
   }
   auto totalMatrix = matrix;
   totalMatrix.preScale(1.0f / maxScale, 1.0f / maxScale);
