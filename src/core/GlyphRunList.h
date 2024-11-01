@@ -26,7 +26,7 @@ class TextBlob;
 
 /**
  * GlyphRunList contains a list of glyph runs that can be drawn together. All glyph runs in a list
- * share the same font type, whether they have color or not.
+ * share the same font type, whether they have color, outlines, or neither.
  */
 class GlyphRunList {
  public:
@@ -43,7 +43,7 @@ class GlyphRunList {
 
   /**
    * Constructs a GlyphRunList using a list of glyph runs. All glyph runs in the list must share the
-   * same font type, whether they have color or not.
+   * same font type, whether they have color, outlines, or neither.
    */
   explicit GlyphRunList(std::vector<GlyphRun> glyphRuns);
 
@@ -52,6 +52,13 @@ class GlyphRunList {
    */
   bool hasColor() const {
     return _glyphRuns[0].font.hasColor();
+  }
+
+  /**
+   * Returns true if the GlyphRunList has outlines.
+   */
+  bool hasOutlines() const {
+    return _glyphRuns[0].font.hasOutlines();
   }
 
   /**

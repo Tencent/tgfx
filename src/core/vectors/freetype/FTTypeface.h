@@ -46,6 +46,8 @@ class FTTypeface : public Typeface {
 
   bool hasColor() const override;
 
+  bool hasOutlines() const override;
+
   GlyphID getGlyphID(Unichar unichar) const override;
 
   std::shared_ptr<Data> getBytes() const override;
