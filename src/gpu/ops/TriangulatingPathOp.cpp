@@ -44,9 +44,8 @@ class PathTriangles : public DataProvider {
   std::shared_ptr<Data> getData() const override {
     std::vector<float> vertices = {};
     auto finalPath = path;
-    auto effect = PathEffect::MakeStroke(stroke);
-    if (effect != nullptr) {
-      effect->applyTo(&finalPath);
+    if (stroke != nullptr) {
+      stroke->applyToPath(&finalPath);
     }
     finalPath.transform(matrix);
     auto clipBounds = finalPath.getBounds();

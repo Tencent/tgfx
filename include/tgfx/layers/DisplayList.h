@@ -40,14 +40,17 @@ class DisplayList {
   Layer* root() const;
 
   /**
-   * Draws the display list to the given surface.
-   * @param surface The surface to draw the display list to.
-   * @param replaceAll If true, the surface will be cleared before drawing the display list.
-   * Otherwise, the display list will be drawn on top of the existing content.
+   * Renders the display list onto the given surface.
+   * @param surface The surface to render the display list on.
+   * @param replaceAll If true, the surface will be cleared before rendering the display list.
+   * Otherwise, the display list will be rendered over the existing content.
+   * @return True if the surface content was updated, otherwise false.
    */
-  void render(Surface* surface, bool replaceAll = true);
+  bool render(Surface* surface, bool replaceAll = true);
 
  private:
   std::shared_ptr<Layer> _root = nullptr;
+  uint32_t surfaceContentVersion = 0u;
+  uint32_t surfaceID = 0u;
 };
 }  // namespace tgfx

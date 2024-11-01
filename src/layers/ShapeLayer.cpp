@@ -50,7 +50,9 @@ void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> style) {
   if (_fillStyle == style) {
     return;
   }
+  detachProperty(_fillStyle.get());
   _fillStyle = std::move(style);
+  attachProperty(_fillStyle.get());
   invalidateContent();
 }
 
@@ -58,7 +60,9 @@ void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> style) {
   if (_strokeStyle == style) {
     return;
   }
+  detachProperty(_strokeStyle.get());
   _strokeStyle = std::move(style);
+  attachProperty(_strokeStyle.get());
   invalidateContent();
 }
 
@@ -139,8 +143,16 @@ void ShapeLayer::setStrokeEnd(float end) {
   invalidateContent();
 }
 
+ShapeLayer::~ShapeLayer() {
+  detachProperty(_strokeStyle.get());
+  detachProperty(_fillStyle.get());
+}
+
 std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
   std::vector<std::unique_ptr<LayerContent>> contents = {};
+  if (_path.isEmpty() && _pathProvider == nullptr) {
+    return nullptr;
+  }
   auto path = _path.isEmpty() ? _pathProvider->getPath() : _path;
   if (_fillStyle) {
     auto content = std::make_unique<ShapeContent>(path, _fillStyle->getShader());
@@ -165,10 +177,9 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
       }
       auto pathEffect =
           PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
-      pathEffect->applyTo(&strokedPath);
+      pathEffect->filterPath(&strokedPath);
     }
-    auto strokeEffect = PathEffect::MakeStroke(&stroke);
-    strokeEffect->applyTo(&strokedPath);
+    stroke.applyToPath(&strokedPath);
     auto content = std::make_unique<ShapeContent>(strokedPath, _strokeStyle->getShader());
     contents.push_back(std::move(content));
   }

@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContent.h"
+#include "core/GlyphRunList.h"
 
 namespace tgfx {
 Rect TextContent::getBounds() const {
-  return textBlob->getBounds(Matrix::I());
+  return textBlob->getBounds();
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {
@@ -29,5 +30,56 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
   color.alpha *= paint.getAlpha();
   textPaint.setColor(color);
   canvas->drawTextBlob(textBlob, 0, 0, textPaint);
+}
+
+bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
+  if (pixelHitTest) {
+    const auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
+
+    if (nullptr == glyphRunLists) {
+      return false;
+    }
+
+    for (const auto& glyphRunList : *glyphRunLists) {
+      if (hitTestPointInternal(localX, localY, glyphRunList)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  const Rect textBounds = textBlob->getBounds();
+  return textBounds.contains(localX, localY);
+}
+
+bool TextContent::hitTestPointInternal(float localX, float localY,
+                                       const std::shared_ptr<GlyphRunList>& glyphRunList) {
+  const auto& glyphRuns = glyphRunList->glyphRuns();
+  for (const auto& glyphRun : glyphRuns) {
+    const auto& font = glyphRun.font;
+    const auto& positions = glyphRun.positions;
+    size_t index = 0;
+
+    for (const auto& glyphID : glyphRun.glyphs) {
+      const auto& position = positions[index];
+      if (font.hasColor()) {
+        auto bounds = font.getBounds(glyphID);
+        bounds.offset(position.x, position.y);
+        if (bounds.contains(localX, localY)) {
+          return true;
+        }
+      } else {
+        Path glyphPath = {};
+        if (font.getPath(glyphID, &glyphPath)) {
+          if (glyphPath.contains(localX - position.x, localY - position.y)) {
+            return true;
+          }
+        }
+      }
+      index++;
+    }
+  }
+  return false;
 }
 }  // namespace tgfx

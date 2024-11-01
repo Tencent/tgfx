@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/FillStyle.h"
 #include "core/images/ResourceImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
@@ -422,7 +423,7 @@ TGFX_TEST(CanvasTest, mipmap) {
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
-  ASSERT_TRUE(result);
+  EXPECT_TRUE(result);
   auto imageBuffer = bitmap.makeBuffer();
   auto image = Image::MakeFrom(imageBuffer);
   ASSERT_TRUE(image != nullptr);
@@ -471,7 +472,7 @@ TGFX_TEST(CanvasTest, hardwareMipmap) {
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
-  ASSERT_TRUE(result);
+  EXPECT_TRUE(result);
   auto image = Image::MakeFrom(bitmap);
   auto imageMipmapped = image->makeMipmapped(true);
   ASSERT_TRUE(imageMipmapped != nullptr);
@@ -495,7 +496,7 @@ TGFX_TEST(CanvasTest, path) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 700, 500);
+  auto surface = Surface::Make(context, 600, 500);
   auto canvas = surface->getCanvas();
   Path path;
   path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
@@ -530,9 +531,9 @@ TGFX_TEST(CanvasTest, path) {
   matrix.postRotate(15, 50, 50);
   matrix.postScale(2, 2, 50, 50);
   matrix.postTranslate(250, 150);
-  paint.setShader(Shader::MakeLinearGradient(
-      Point{0.f, 0.f}, Point{static_cast<float>(25), static_cast<float>(100)},
-      {Color{0.f, 1.f, 0.f, 1.f}, Color{1.f, 0.f, 0.f, 0.f}}, {}));
+  paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 100.f},
+                                             {Color{0.f, 1.f, 0.f, 1.f}, Color{1.f, 0.f, 0.f, 0.f}},
+                                             {}));
   canvas->setMatrix(matrix);
   canvas->drawPath(roundPath, paint);
   matrix.reset();
@@ -553,9 +554,61 @@ TGFX_TEST(CanvasTest, path) {
   path.quadTo(Point{100, 150}, Point{150, 150});
   paint.setColor(Color::White());
   matrix.reset();
-  matrix.postTranslate(500, 10);
+  matrix.postTranslate(450, 10);
   canvas->setMatrix(matrix);
   canvas->drawPath(path, paint);
+  path.reset();
+  canvas->drawPath(path, paint);
+
+  path.addRect({0, 0, 150, 150});
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1);
+  matrix.reset();
+  matrix.postTranslate(450, 200);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+
+  path.reset();
+  path.addArc({0, 0, 150, 150}, -90.f, 235.f);
+  Color red = {1.f, 0.f, 0.f, 1.f};
+  Color green = {0.f, 1.f, 0.f, 1.f};
+  Color blue = {0.f, 0.f, 1.f, 1.f};
+  paint.setStyle(PaintStyle::Fill);
+  paint.setShader(Shader::MakeLinearGradient(Point{0.f, 0.f}, Point{25.f, 150.f},
+                                             {red, green, blue, green, red, blue, red, green, red,
+                                              green, blue, green, red, blue, red, green, blue},
+                                             {}));
+  matrix.reset();
+  matrix.postTranslate(450, 200);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+
+  paint.reset();
+  auto arcStart = Point::Make(0, 0);
+  auto arcEnd = Point::Make(45, 45);
+  auto pathEnd = Point::Make(45, 0);
+  std::vector<Point> transforms = {{0, 0}, {50, 0}, {100, -50}, {100, 0}};
+  std::vector<std::pair<PathArcSize, bool>> arcType = {{PathArcSize::Small, false},
+                                                       {PathArcSize::Large, false},
+                                                       {PathArcSize::Small, true},
+                                                       {PathArcSize::Large, true}};
+  matrix.reset();
+  matrix.setTranslate(10, 450);
+  canvas->setMatrix(matrix);
+  for (uint32_t i = 0; i < 4; i++) {
+    path.reset();
+    path.moveTo(arcStart);
+    path.arcTo(45, 45, 0, arcType[i].first, arcType[i].second, arcEnd);
+    path.lineTo(pathEnd);
+    canvas->translate(transforms[i].x, transforms[i].y);
+    canvas->drawPath(path, paint);
+  }
+
+  auto latestPoint = Point::Zero();
+  path.getLastPoint(&latestPoint);
+  EXPECT_EQ(latestPoint, Point::Make(45, 0));
+
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
   device->unlock();
 }

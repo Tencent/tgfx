@@ -281,7 +281,7 @@ void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState&
 void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                               const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
   auto viewMatrix = filter ? Matrix::I() : state.matrix;
-  auto bounds = picture->getBounds(viewMatrix);
+  auto bounds = picture->getBounds(&viewMatrix);
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
