@@ -113,7 +113,7 @@ class DOMParser : public XMLParser {
   bool _needToFlush;
 
   // state needed for flushAttributes()
-  std::vector<DOMAttr> _attributes;
+  std::vector<DOMAttribute> _attributes;
   std::string _elementName;
   DOMNodeType _elementType;
   int _level;
@@ -142,7 +142,7 @@ static void walk_dom(std::shared_ptr<DOMNode> node, XMLParser* parser) {
 
   parser->startElement(element);
 
-  for (const DOMAttr& attr : node->attributes) {
+  for (const DOMAttribute& attr : node->attributes) {
     parser->addAttribute(attr.name, attr.value);
   }
 
@@ -197,7 +197,7 @@ std::shared_ptr<DOMNode> DOMNode::getNextSibling(const std::string& name) const 
 
 std::tuple<bool, std::string> DOMNode::findAttribute(const std::string& name) const {
   if (!name.empty()) {
-    for (const DOMAttr& attr : this->attributes) {
+    for (const DOMAttribute& attr : this->attributes) {
       if (attr.name == name) {
         return {true, attr.value};
       }

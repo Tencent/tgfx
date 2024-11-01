@@ -157,7 +157,7 @@ static void write_dom(std::shared_ptr<DOMNode> node, XMLWriter* writer, bool ski
 
     writer->startElement(element);
 
-    for (const DOMAttr& attr : node->attributes) {
+    for (const DOMAttribute& attr : node->attributes) {
       writer->addAttribute(attr.name, attr.value);
     }
   }

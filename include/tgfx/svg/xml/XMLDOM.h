@@ -28,7 +28,7 @@ namespace tgfx {
 class DOMParser;
 class XMLParser;
 
-struct DOMAttr {
+struct DOMAttribute {
   std::string name;
   std::string value;
 };
@@ -39,7 +39,7 @@ struct DOMNode {
   std::string name;
   std::shared_ptr<DOMNode> firstChild;
   std::shared_ptr<DOMNode> nextSibling;
-  std::vector<DOMAttr> attributes;
+  std::vector<DOMAttribute> attributes;
   DOMNodeType type;
 
   /**
