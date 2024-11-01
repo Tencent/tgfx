@@ -227,8 +227,10 @@ int Layer::getChildIndex(std::shared_ptr<Layer> child) const {
   return doGetChildIndex(child.get());
 }
 
-std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float, float) {
-  return {};
+std::vector<std::shared_ptr<Layer>> Layer::getLayersUnderPoint(float x, float y) {
+  std::vector<std::shared_ptr<Layer>> results;
+  getLayersUnderPointInternal(x, y, &results);
+  return results;
 }
 
 void Layer::removeFromParent() {
@@ -345,7 +347,38 @@ Point Layer::localToGlobal(const Point& localPoint) const {
   return globalMatrix.mapXY(localPoint.x, localPoint.y);
 }
 
-bool Layer::hitTestPoint(float, float, bool) {
+bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
+  auto content = getContent();
+  if (nullptr != content) {
+    Point localPoint = globalToLocal(Point::Make(x, y));
+    if (content->hitTestPoint(localPoint.x, localPoint.y, pixelHitTest)) {
+      return true;
+    }
+  }
+
+  for (const auto& childLayer : _children) {
+    if (!childLayer->visible()) {
+      continue;
+    }
+
+    if (nullptr != childLayer->_scrollRect) {
+      auto pointInChildSpace = childLayer->globalToLocal(Point::Make(x, y));
+      if (!childLayer->_scrollRect->contains(pointInChildSpace.x, pointInChildSpace.y)) {
+        continue;
+      }
+    }
+
+    if (nullptr != childLayer->_mask) {
+      if (!childLayer->_mask->hitTestPoint(x, y, pixelHitTest)) {
+        continue;
+      }
+    }
+
+    if (childLayer->hitTestPoint(x, y, pixelHitTest)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -597,4 +630,47 @@ std::shared_ptr<ImageFilter> Layer::getComposeFilter(
   return ImageFilter::Compose(imageFilters);
 }
 
+bool Layer::getLayersUnderPointInternal(float x, float y,
+                                        std::vector<std::shared_ptr<Layer>>* results) {
+  bool hasLayerUnderPoint = false;
+  for (auto item = _children.rbegin(); item != _children.rend(); ++item) {
+    const auto& childLayer = *item;
+    if (!childLayer->visible()) {
+      continue;
+    }
+
+    if (nullptr != childLayer->_scrollRect) {
+      auto pointInChildSpace = childLayer->globalToLocal(Point::Make(x, y));
+      if (!childLayer->_scrollRect->contains(pointInChildSpace.x, pointInChildSpace.y)) {
+        continue;
+      }
+    }
+
+    if (nullptr != childLayer->_mask) {
+      if (!childLayer->_mask->hitTestPoint(x, y)) {
+        continue;
+      }
+    }
+
+    if (childLayer->getLayersUnderPointInternal(x, y, results)) {
+      hasLayerUnderPoint = true;
+    }
+  }
+
+  if (hasLayerUnderPoint) {
+    results->push_back(weakThis.lock());
+  } else {
+    auto content = getContent();
+    if (nullptr != content) {
+      auto layerBoundsRect = content->getBounds();
+      auto localPoint = globalToLocal(Point::Make(x, y));
+      if (layerBoundsRect.contains(localPoint.x, localPoint.y)) {
+        results->push_back(weakThis.lock());
+        hasLayerUnderPoint = true;
+      }
+    }
+  }
+
+  return hasLayerUnderPoint;
+}
 }  // namespace tgfx
