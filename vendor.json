@@ -229,6 +229,9 @@
       "cmake": {
         "targets": [
           "expat"
+        ],
+        "arguments": [
+          "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
     }
