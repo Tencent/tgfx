@@ -25,28 +25,34 @@
 #include <string>
 #include <string_view>
 #include <utility>
-#include "XMLDOM.h"
+#include "tgfx/svg/xml/XMLDOM.h"
 
 class XMLParser;
 
 namespace tgfx {
 
+/**
+ * @brief Abstract class for writing XML, providing two implementations:
+ * 1. Use the writeDOM interface to input a DOM tree and serialize it into XML.
+ * 2. Use the startElement, endElement, addAttribute, and addText interfaces to manually construct
+ *    XML.
+ */
 class XMLWriter {
  public:
   explicit XMLWriter(bool doEscapeFlag = true);
   virtual ~XMLWriter();
 
-  void addS32Attribute(const std::string& name, int32_t value);
   void addAttribute(const std::string& name, const std::string& value);
+  void addS32Attribute(const std::string& name, int32_t value);
   void addHexAttribute(const std::string& name, uint32_t value, uint32_t minDigits = 0);
   void addScalarAttribute(const std::string& name, float value);
   void addText(const std::string& text);
+
+  void startElement(const std::string& element);
   void endElement() {
     this->onEndElement();
   }
-  void startElement(const std::string& element);
-  void writeDOM(const DOM&, const std::shared_ptr<DOM::Node>& node, bool skipRoot);
-  void flush();
+  void writeDOM(const std::shared_ptr<DOM>& DOM, bool skipRoot);
   virtual void writeHeader();
 
  protected:
@@ -63,6 +69,8 @@ class XMLWriter {
     bool hasText = false;
   };
 
+  // Maintain a stack to record the current element being processed and its parent elements
+  void flush();
   void doEnd();
   bool doStart(const std::string& elementName);
   const Elem& getEnd();
@@ -76,6 +84,9 @@ class XMLWriter {
   XMLWriter& operator=(const XMLWriter&) = delete;
 };
 
+/**
+ * @brief XMLStreamWriter is an XMLWriter implementation that writes XML to a string stream.
+ */
 class XMLStreamWriter : public XMLWriter {
  public:
   enum : uint32_t {
@@ -100,6 +111,10 @@ class XMLStreamWriter : public XMLWriter {
   const uint32_t _flags;
 };
 
+/**
+ * @brief XMLParserWriter is an XMLWriter implementation that writes XML to an XMLParser.
+ * Calls XMLParser's startElement, addAttribute, endElement, and text interfaces for each element.
+ */
 class XMLParserWriter : public XMLWriter {
  public:
   explicit XMLParserWriter(XMLParser*);

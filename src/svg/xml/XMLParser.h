@@ -27,20 +27,28 @@ class XMLParser {
   XMLParser();
   virtual ~XMLParser();
 
-  /** 
-    * Returns true for success
-    */
+  /**
+     * @brief Parses data in XML format, with the parsing results returned via callback functions.
+     * 
+     * @param data The data to be parsed.
+     * @return true if parsing is successful.
+     * @return false if parsing fails.
+     */
   bool parse(const Data& data);
 
- protected:
-  // override in subclasses; return true to stop parsing
+  /**
+   * @brief Override in subclasses; return true to stop parsing
+   * Each function represents a parsing stage of an XML element.
+   */
   virtual bool onStartElement(const char elem[]);
   virtual bool onAddAttribute(const char name[], const char value[]);
   virtual bool onEndElement(const char elem[]);
   virtual bool onText(const char text[], int len);
 
  public:
-  // public for ported implementation, not meant for clients to call
+  /**
+    * @brief public for internal parser library calls, not intended for client call
+    */
   bool startElement(const char elem[]);
   bool addAttribute(const char name[], const char value[]);
   bool endElement(const char elem[]);

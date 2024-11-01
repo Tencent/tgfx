@@ -18,7 +18,10 @@
 
 #pragma once
 
+#include <sys/_types/_u_int32_t.h>
+#include <sys/_types/_u_int8_t.h>
 #include <memory>
+#include <tuple>
 #include <vector>
 #include "tgfx/core/Data.h"
 
@@ -32,58 +35,86 @@ struct DOMAttr {
   std::string value;
 };
 
+enum class DOMNodeType : u_int8_t { Element, Text };
+
 struct DOMNode {
   std::string name;
   std::shared_ptr<DOMNode> firstChild;
   std::shared_ptr<DOMNode> nextSibling;
   std::vector<DOMAttr> attributes;
-  uint8_t type;
-  uint8_t pad;
+  DOMNodeType type;
 
-  const std::vector<DOMAttr>& attrs() const {
-    return attributes;
-  }
+  /**
+   * @brief Get the first child object, optionally filtered by name.
+   * 
+   * @param name 
+   * @return DOMNode object.
+   */
+  std::shared_ptr<DOMNode> getFirstChild(const std::string& name = "");
 
-  std::vector<DOMAttr>& attrs() {
-    return attributes;
-  }
+  /**
+   * @brief Get the next Sibling object, optionally filtered by name.
+   * 
+   * @param name 
+   * @return DOMNode object.
+   */
+  std::shared_ptr<DOMNode> getNextSibling(const std::string& name = "");
+
+  /**
+   * @brief Get the value content of the node by attribute name.
+   * 
+   * @return value content.
+   */
+  std::tuple<bool, std::string> findAttribute(const std::string& attrName);
+
+  /**
+   * @brief Count the number of children of the node,optionally filtered by name.
+   * 
+   * @param name 
+   * @return The number of children.
+   */
+  int countChildren(const std::string& name = "");
 };
 
 class DOM {
  public:
-  DOM();
+  /**
+   * @brief Destructor.
+   */
   ~DOM();
 
-  using Node = DOMNode;
-  using Attr = DOMAttr;
+  /**
+   * @brief Constructs a DOM tree from XML text data.
+   * 
+   * @param data XML text data.
+   * @return The DOM tree. Returns nullptr if construction fails.
+   */
+  static std::shared_ptr<DOM> MakeFromData(const Data& data);
 
-  /** Returns null on failure
-    */
-  std::shared_ptr<Node> build(const Data& data);
-  std::shared_ptr<Node> copy(const DOM& dom, const std::shared_ptr<Node>& node);
+  /**
+   * @brief Creates a deep copy of a DOM tree.
+   * 
+   * @param inputDOM The DOM tree to copy.
+   * @return The copied DOM tree. Returns nullptr if copying fails.
+   */
+  static std::shared_ptr<DOM> copy(const std::shared_ptr<DOM>& inputDOM);
 
-  const std::shared_ptr<Node>& getRootNode() const;
-
-  XMLParser* beginParsing();
-  std::shared_ptr<Node> finishParsing();
-
-  enum Type { Element_Type, Text_Type };
-  static Type getType(const std::shared_ptr<Node>& node);
-
-  static std::shared_ptr<Node> getFirstChild(const std::shared_ptr<Node>& node,
-                                             const std::string& name = "");
-
-  static std::shared_ptr<Node> getNextSibling(const std::shared_ptr<Node>& node,
-                                              const std::string& name = "");
-
-  static std::string findAttribute(const std::shared_ptr<Node>& node, const std::string& attrName);
-
-  // helpers for walking children
-  static int countChildren(const std::shared_ptr<Node>& node, const std::string& name = "");
+  /**
+   * @brief Gets the root node of the DOM tree.
+   * 
+   * @return The root node.
+   */
+  std::shared_ptr<DOMNode> getRootNode() const;
 
  private:
-  std::shared_ptr<Node> _root = nullptr;
-  std::unique_ptr<DOMParser> _parser;
+  /**
+   * @brief Constructor.
+   * 
+   * @param root The root node of the DOM tree.
+   */
+  DOM(std::shared_ptr<DOMNode> root);
+
+  std::shared_ptr<DOMNode> _root = nullptr;
 };
 
 }  // namespace tgfx

@@ -16,12 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/xml/XMLWriter.h"
+#include "XMLWriter.h"
 #include <cstdint>
 #include <memory>
 #include <string>
+#include "XMLParser.h"
+#include "core/utils/Log.h"
 #include "tgfx/svg/xml/XMLDOM.h"
-#include "tgfx/svg/xml/XMLParser.h"
 
 namespace tgfx {
 
@@ -29,7 +30,7 @@ XMLWriter::XMLWriter(bool doEscapeFlag) : _doEscapeFlag(doEscapeFlag) {
 }
 
 XMLWriter::~XMLWriter() {
-  // ASSERT(fElems.empty());
+  ASSERT(_elementsStack.empty());
 }
 
 void XMLWriter::flush() {
@@ -148,27 +149,26 @@ void XMLWriter::startElement(const std::string& element) {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-static void write_dom(const DOM& dom, std::shared_ptr<DOM::Node> node, XMLWriter* writer,
-                      bool skipRoot) {
+static void write_dom(std::shared_ptr<DOMNode> node, XMLWriter* writer, bool skipRoot) {
   if (!skipRoot) {
     auto element = node->name;
-    if (node->type == DOM::Text_Type) {
-      // SkASSERT(dom.countChildren(node) == 0);
+    if (node->type == DOMNodeType::Text) {
+      ASSERT(node->countChildren() == 0);
       writer->addText(element);
       return;
     }
 
     writer->startElement(element);
 
-    for (const DOM::Attr& attr : node->attrs()) {
+    for (const DOMAttr& attr : node->attributes) {
       writer->addAttribute(attr.name, attr.value);
     }
   }
 
-  node = DOM::getFirstChild(node);
+  node = node->getFirstChild();
   while (node) {
-    write_dom(dom, node, writer, false);
-    node = DOM::getNextSibling(node);
+    write_dom(node, writer, false);
+    node = node->getNextSibling();
   }
 
   if (!skipRoot) {
@@ -176,16 +176,14 @@ static void write_dom(const DOM& dom, std::shared_ptr<DOM::Node> node, XMLWriter
   }
 }
 
-void XMLWriter::writeDOM(const DOM& dom, const std::shared_ptr<DOM::Node>& node, bool skipRoot) {
-  if (node) {
-    write_dom(dom, node, this, skipRoot);
+void XMLWriter::writeDOM(const std::shared_ptr<DOM>& DOM, bool skipRoot) {
+  if (DOM) {
+    write_dom(DOM->getRootNode(), this, skipRoot);
   }
 }
 
 void XMLWriter::writeHeader() {
 }
-
-// SkXMLStreamWriter
 
 XMLStreamWriter::XMLStreamWriter(std::stringstream& stream, uint32_t flags)
     : _stream(stream), _flags(flags) {
@@ -196,7 +194,7 @@ XMLStreamWriter::~XMLStreamWriter() {
 }
 
 void XMLStreamWriter::onAddAttribute(const std::string& name, const std::string& value) {
-  // SkASSERT(!fElems.back()->fHasChildren && !fElems.back()->fHasText);
+  ASSERT(!_elementsStack.top().hasChildren && !_elementsStack.top().hasText);
   _stream << " " << name << "=\"" << value << "\"" << value << "\"";
 }
 
@@ -267,7 +265,8 @@ XMLParserWriter::~XMLParserWriter() {
 }
 
 void XMLParserWriter::onAddAttribute(const std::string& name, const std::string& value) {
-  // SkASSERT(fElems.empty() || (!fElems.back()->fHasChildren && !fElems.back()->fHasText));
+  ASSERT(_elementsStack.empty() ||
+         (!_elementsStack.top().hasChildren && !_elementsStack.top().hasText));
   _parser.addAttribute(name.c_str(), value.c_str());
 }
 

@@ -21,65 +21,11 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "../src/core/utils/Log.h"
+#include "XMLParser.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/svg/xml/XMLParser.h"
 
 namespace tgfx {
-
-DOM::DOM() = default;
-DOM::~DOM() = default;
-
-const std::shared_ptr<DOM::Node>& DOM::getRootNode() const {
-  return _root;
-}
-
-std::shared_ptr<DOM::Node> DOM::getFirstChild(const std::shared_ptr<Node>& node,
-                                              const std::string& name) {
-  ASSERT(node);
-  auto child = node->firstChild;
-  if (!name.empty()) {
-    for (; child != nullptr; child = child->nextSibling) {
-      if (child->name != name) {
-        break;
-      }
-    }
-  }
-  return child;
-}
-
-std::shared_ptr<DOM::Node> DOM::getNextSibling(const std::shared_ptr<Node>& node,
-                                               const std::string& name) {
-  ASSERT(node);
-  auto sibling = node->nextSibling;
-  if (!name.empty()) {
-    for (; sibling != nullptr; sibling = sibling->nextSibling) {
-      if (sibling->name != name) {
-        break;
-      }
-    }
-  }
-  return sibling;
-}
-
-DOM::Type DOM::getType(const std::shared_ptr<Node>& node) {
-  ASSERT(node);
-  return static_cast<Type>(node->type);
-}
-
-std::string DOM::findAttribute(const std::shared_ptr<Node>& node, const std::string& name) {
-  ASSERT(node);
-  const auto& attrs = node->attrs();
-  for (const Attr& attr : attrs) {
-    if (attr.name == name) {
-      return attr.value;
-    }
-  }
-  return "";
-}
-
-#include "tgfx/svg/xml/XMLParser.h"
-
 class DOMParser : public XMLParser {
  public:
   DOMParser() {
@@ -88,7 +34,7 @@ class DOMParser : public XMLParser {
     _needToFlush = true;
   }
 
-  std::shared_ptr<DOM::Node> getRoot() const {
+  std::shared_ptr<DOMNode> getRoot() const {
     return _root;
   }
 
@@ -96,7 +42,7 @@ class DOMParser : public XMLParser {
   void flushAttributes() {
     ASSERT(_level > 0);
 
-    auto node = std::make_shared<DOM::Node>();
+    auto node = std::make_shared<DOMNode>();
     node->name = _elementName;
     node->firstChild = nullptr;
     node->attributes.swap(this->_attributes);
@@ -116,7 +62,7 @@ class DOMParser : public XMLParser {
   }
 
   bool onStartElement(const char elem[]) override {
-    this->startCommon(elem, strlen(elem), DOM::Element_Type);
+    this->startCommon(elem, strlen(elem), DOMNodeType::Element);
     return false;
   }
 
@@ -126,7 +72,9 @@ class DOMParser : public XMLParser {
   }
 
   bool onEndElement(const char /*elem*/[]) override {
-    if (_needToFlush) this->flushAttributes();
+    if (_needToFlush) {
+      this->flushAttributes();
+    }
     _needToFlush = false;
     --_level;
 
@@ -134,7 +82,7 @@ class DOMParser : public XMLParser {
     _parentStack.pop_back();
 
     auto child = parent->firstChild;
-    std::shared_ptr<DOM::Node> prev = nullptr;
+    std::shared_ptr<DOMNode> prev = nullptr;
     while (child) {
       auto next = child->nextSibling;
       child->nextSibling = prev;
@@ -146,14 +94,14 @@ class DOMParser : public XMLParser {
   }
 
   bool onText(const char text[], int len) override {
-    this->startCommon(text, static_cast<size_t>(len), DOM::Text_Type);
+    this->startCommon(text, static_cast<size_t>(len), DOMNodeType::Text);
     this->DOMParser::onEndElement(_elementName.c_str());
 
     return false;
   }
 
  private:
-  void startCommon(const char elem[], size_t elemSize, DOM::Type type) {
+  void startCommon(const char elem[], size_t elemSize, DOMNodeType type) {
     if (_level > 0 && _needToFlush) {
       this->flushAttributes();
     }
@@ -163,82 +111,110 @@ class DOMParser : public XMLParser {
     ++_level;
   }
 
-  std::vector<std::shared_ptr<DOM::Node>> _parentStack;
-  std::shared_ptr<DOM::Node> _root;
+  std::vector<std::shared_ptr<DOMNode>> _parentStack;
+  std::shared_ptr<DOMNode> _root;
   bool _needToFlush;
 
   // state needed for flushAttributes()
-  std::vector<DOM::Attr> _attributes;
+  std::vector<DOMAttr> _attributes;
   std::string _elementName;
-  DOM::Type _elementType;
+  DOMNodeType _elementType;
   int _level;
 };
 
-std::shared_ptr<DOM::Node> DOM::build(const Data& data) {
+DOM::DOM(std::shared_ptr<DOMNode> root) : _root(root) {};
+DOM::~DOM() = default;
+
+std::shared_ptr<DOM> DOM::MakeFromData(const Data& data) {
   DOMParser parser;
   if (!parser.parse(data)) {
-    _root = nullptr;
     return nullptr;
   }
-  _root = parser.getRoot();
-  return _root;
+  auto root = parser.getRoot();
+  auto dom = std::shared_ptr<DOM>(new DOM(root));
+  return dom;
 }
 
-///////////////////////////////////////////////////////////////////////////
-
-static void walk_dom(const DOM& dom, std::shared_ptr<DOM::Node> node, XMLParser* parser) {
+static void walk_dom(std::shared_ptr<DOMNode> node, XMLParser* parser) {
   const auto* element = node->name.c_str();
-  if (DOM::getType(node) == DOM::Text_Type) {
-    ASSERT(dom.countChildren(node) == 0);
+  if (node->type == DOMNodeType::Text) {
+    ASSERT(node->countChildren() == 0);
     parser->text(element, static_cast<int>(strlen(element)));
     return;
   }
 
   parser->startElement(element);
 
-  for (const DOM::Attr& attr : node->attrs()) {
+  for (const DOMAttr& attr : node->attributes) {
     parser->addAttribute(attr.name.c_str(), attr.value.c_str());
   }
 
-  node = DOM::getFirstChild(node);
+  node = node->getFirstChild();
   while (node) {
-    walk_dom(dom, node, parser);
-    node = DOM::getNextSibling(node);
+    walk_dom(node, parser);
+    node = node->getNextSibling();
   }
 
   parser->endElement(element);
 }
 
-std::shared_ptr<DOM::Node> DOM::copy(const DOM& dom, const std::shared_ptr<DOM::Node>& node) {
+std::shared_ptr<DOM> DOM::copy(const std::shared_ptr<DOM>& inputDOM) {
+  ASSERT(inputDOM);
   DOMParser parser;
+  walk_dom(inputDOM->getRootNode(), &parser);
+  auto copiedRoot = parser.getRoot();
+  if (copiedRoot) {
+    auto copiedDOM = std::shared_ptr<DOM>(new DOM(copiedRoot));
+    return copiedDOM;
+  }
+  return nullptr;
+}
 
-  walk_dom(dom, node, &parser);
-
-  _root = parser.getRoot();
+std::shared_ptr<DOMNode> DOM::getRootNode() const {
   return _root;
 }
 
-XMLParser* DOM::beginParsing() {
-  ASSERT(!_parser);
-  _parser = std::make_unique<DOMParser>();
-
-  return _parser.get();
+std::shared_ptr<DOMNode> DOMNode::getFirstChild(const std::string& name) {
+  auto child = this->firstChild;
+  if (!name.empty()) {
+    for (; child != nullptr; child = child->nextSibling) {
+      if (child->name != name) {
+        break;
+      }
+    }
+  }
+  return child;
 }
 
-std::shared_ptr<DOM::Node> DOM::finishParsing() {
-  ASSERT(_parser);
-  _root = _parser->getRoot();
-  _parser.reset();
-
-  return _root;
+std::shared_ptr<DOMNode> DOMNode::getNextSibling(const std::string& name) {
+  auto sibling = this->nextSibling;
+  if (!name.empty()) {
+    for (; sibling != nullptr; sibling = sibling->nextSibling) {
+      if (sibling->name != name) {
+        break;
+      }
+    }
+  }
+  return sibling;
 }
 
-int DOM::countChildren(const std::shared_ptr<Node>& node, const std::string& name) {
+std::tuple<bool, std::string> DOMNode::findAttribute(const std::string& name) {
+  if (!name.empty()) {
+    for (const DOMAttr& attr : this->attributes) {
+      if (attr.name == name) {
+        return {true, attr.value};
+      }
+    }
+  }
+  return {false, ""};
+}
+
+int DOMNode::countChildren(const std::string& name) {
   int count = 0;
-  auto temp_node = getFirstChild(node, name);
-  while (temp_node) {
+  auto tempNode = this->getFirstChild(name);
+  while (tempNode) {
     count += 1;
-    temp_node = getNextSibling(temp_node, name);
+    tempNode = tempNode->getNextSibling(name);
   }
   return count;
 }
