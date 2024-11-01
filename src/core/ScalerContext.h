@@ -41,6 +41,10 @@ class ScalerContext {
     return typeface ? typeface->hasColor() : false;
   }
 
+  bool hasOutlines() const {
+    return typeface ? typeface->hasOutlines() : false;
+  }
+
   float getSize() const {
     return textSize;
   }

@@ -49,9 +49,14 @@ class Font {
   std::shared_ptr<Typeface> getTypeface() const;
 
   /**
-   * Returns true if the font has color.
+   * Returns true if the font has color glyphs, for example, color emojis.
    */
   bool hasColor() const;
+
+  /**
+   * Returns true if the font has outline glyphs, meaning it can generate paths.
+   */
+  bool hasOutlines() const;
 
   /**
    * Sets a new Typeface to this Font.

@@ -108,6 +108,11 @@ class Typeface {
   virtual bool hasColor() const = 0;
 
   /**
+   * Returns true if this typeface has outline glyphs, meaning it can generate paths.
+   */
+  virtual bool hasOutlines() const = 0;
+
+  /**
    * Returns the glyph ID corresponds to the specified glyph name. The glyph name must be in utf-8
    * encoding. Returns 0 if the glyph name is not in this typeface.
    */

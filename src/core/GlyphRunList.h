@@ -55,6 +55,13 @@ class GlyphRunList {
   }
 
   /**
+   * Returns true if the GlyphRunList has outlines.
+   */
+  bool hasOutlines() const {
+    return _glyphRuns[0].font.hasOutlines();
+  }
+
+  /**
    * Returns the glyph runs in the text blob.
    */
   const std::vector<GlyphRun>& glyphRuns() const {
