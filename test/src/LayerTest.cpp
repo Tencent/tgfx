@@ -31,6 +31,7 @@
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "utils/TestUtils.h"
+#include "utils/common.h"
 
 namespace tgfx {
 TGFX_TEST(LayerTest, LayerTree) {
@@ -690,6 +691,352 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   root->setShouldRasterize(false);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
+}
+
+TGFX_TEST(LayerTest, imageMask) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  auto surface = Surface::Make(context, image->width(), static_cast<int>(image->height() * 1.5));
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+
+  auto maskImage = MakeImage("resources/apitest/test_timestretch.png");
+
+  // Original image
+  auto originalLayer = Layer::Make();
+  layer->addChild(originalLayer);
+  auto imageLayer0 = ImageLayer::Make();
+  originalLayer->addChild(imageLayer0);
+  imageLayer0->setImage(image);
+  imageLayer0->setMatrix(Matrix::MakeScale(0.5f));
+
+  auto scrollRect = Rect::MakeXYWH(200, 200, 2600, 3600);
+  imageLayer0->setScrollRect(scrollRect);
+
+  auto imageLayer = ImageLayer::Make();
+  originalLayer->addChild(imageLayer);
+  imageLayer->setImage(maskImage);
+  imageLayer->setAlpha(1.0f);
+  Matrix maskMatrix = Matrix::MakeAll(1.2f, 0, 0, 0, 1.2f, 500);
+  imageLayer->setMatrix(maskMatrix);
+
+  auto originalLayerBounds = originalLayer->getBounds();
+  EXPECT_TRUE(originalLayerBounds == Rect::MakeXYWH(0, 0, 1536, 1800));
+
+  // Alpha mask effect
+  auto alphaLayer = Layer::Make();
+  layer->addChild(alphaLayer);
+  auto imageLayer1 = ImageLayer::Make();
+  alphaLayer->addChild(imageLayer1);
+  imageLayer1->setImage(image);
+  auto image1Matrix =
+      Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f, 0);
+  imageLayer1->setMatrix(image1Matrix);
+  imageLayer1->setAlpha(1.0f);
+  imageLayer1->setScrollRect(scrollRect);
+
+  auto alphaMaskImageLayer = ImageLayer::Make();
+  alphaLayer->addChild(alphaMaskImageLayer);
+  alphaMaskImageLayer->setImage(maskImage);
+  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
+  alphaMaskImageLayer->setFilters({alphaFilter});
+  imageLayer1->setAlpha(0.5f);
+  Matrix alphaMaskMatrix =
+      Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0, 1.2f, 500);
+  alphaMaskImageLayer->setMatrix(alphaMaskMatrix);
+  imageLayer1->setMask(alphaMaskImageLayer);
+
+  auto alphaLayerBounds = alphaLayer->getBounds();
+  EXPECT_TRUE(alphaLayerBounds == Rect::MakeXYWH(1512, 500, 1300, 864));
+
+  // Vector mask effect
+  auto imageLayer2 = ImageLayer::Make();
+  layer->addChild(imageLayer2);
+  imageLayer2->setImage(image);
+  auto image2Matrix =
+      Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
+  imageLayer2->setMatrix(image2Matrix);
+  imageLayer2->setAlpha(1.0f);
+  imageLayer2->setScrollRect(scrollRect);
+
+  const std::array<float, 20> vectorColorMatrix = {0, 0, 0, 0, 0,  // red
+                                                   0, 0, 0, 0, 0,  // green
+                                                   0, 0, 0, 0, 0,  // blue
+                                                   0, 0, 0, 0, 1.0f};
+  auto vectorMaskImageLayer = ImageLayer::Make();
+  layer->addChild(vectorMaskImageLayer);
+  vectorMaskImageLayer->setImage(maskImage);
+  auto vectorFilter = ColorMatrixFilter::Make(vectorColorMatrix);
+  vectorMaskImageLayer->setFilters({vectorFilter});
+  imageLayer2->setMask(vectorMaskImageLayer);
+  imageLayer2->setAlpha(0.5f);
+  Matrix vectorMaskMatrix =
+      Matrix::MakeAll(1.2f, 0, 0, 0, 1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
+  vectorMaskImageLayer->setMatrix(vectorMaskMatrix);
+
+  // Luma mask Effect
+  auto imageLayer3 = ImageLayer::Make();
+  layer->addChild(imageLayer3);
+  imageLayer3->setImage(image);
+  auto image3Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()) * 0.5f);
+  imageLayer3->setMatrix(image3Matrix);
+  imageLayer3->setAlpha(1.0f);
+  imageLayer3->setScrollRect(scrollRect);
+
+  auto lumaMaskImageLayer = ImageLayer::Make();
+  layer->addChild(lumaMaskImageLayer);
+  lumaMaskImageLayer->setImage(maskImage);
+  auto filter = ColorMatrixFilter::Make(lumaColorMatrix);
+  lumaMaskImageLayer->setFilters({filter});
+  imageLayer3->setMask(lumaMaskImageLayer);
+  imageLayer3->setAlpha(0.5f);
+  Matrix lumaMaskMatrix = Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
+                                          1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
+  lumaMaskImageLayer->setMatrix(lumaMaskMatrix);
+
+  // The layer and its mask have no intersection.
+  auto imageLayer4 = ImageLayer::Make();
+  layer->addChild(imageLayer4);
+  imageLayer4->setImage(image);
+  auto image4Matrix = Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()));
+  imageLayer4->setMatrix(image4Matrix);
+
+  auto maskImageLayer4 = ImageLayer::Make();
+  layer->addChild(maskImageLayer4);
+  maskImageLayer4->setImage(maskImage);
+  maskImageLayer4->setMatrix(Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
+                                             1.2f, 500 + static_cast<float>(image->height())));
+  imageLayer4->setMask(maskImageLayer4);
+
+  // The Layer's scroll rect and its mask have no intersection
+  auto imageLayer5 = ImageLayer::Make();
+  layer->addChild(imageLayer5);
+  imageLayer5->setImage(image);
+  auto image5Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()));
+  imageLayer5->setMatrix(image5Matrix);
+  auto imageLayer5ScrollRect = Rect::MakeXYWH(100, 100, 1200, 1000);
+  imageLayer5->setScrollRect(imageLayer5ScrollRect);
+
+  auto maskImageLayer5 = ImageLayer::Make();
+  layer->addChild(maskImageLayer5);
+  maskImageLayer5->setImage(maskImage);
+  maskImageLayer5->setMatrix(Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
+                                             1.2f, 500 + static_cast<float>(image->height())));
+  imageLayer5->setMask(maskImageLayer5);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageMask"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, shapeMask) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+
+  auto rect = Rect::MakeXYWH(0, 0, 1000, 1000);
+  Path path = {};
+  path.addRoundRect(rect, 200, 200);
+
+  // Original image
+  auto imageLayer0 = ImageLayer::Make();
+  layer->addChild(imageLayer0);
+  imageLayer0->setImage(image);
+  imageLayer0->setMatrix(Matrix::MakeScale(0.5f));
+
+  auto shaperLayer = ShapeLayer::Make();
+  shaperLayer->setPath(path);
+  auto filleStyle = SolidColor::Make(Color::Red());
+  shaperLayer->setFillStyle(filleStyle);
+  shaperLayer->setAlpha(0.5f);
+  layer->addChild(shaperLayer);
+  Matrix maskMatrix = Matrix::MakeAll(1.0f, 0, 300, 0, 1.0f, 300);
+  shaperLayer->setMatrix(maskMatrix);
+
+  // Alpha mask effect
+  auto imageLayer1 = ImageLayer::Make();
+  layer->addChild(imageLayer1);
+  imageLayer1->setImage(image);
+  auto image1Matrix =
+      Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f, 0);
+  imageLayer1->setMatrix(image1Matrix);
+  imageLayer1->setAlpha(1.0f);
+
+  auto alphaShaperLayer = ShapeLayer::Make();
+  alphaShaperLayer->setPath(path);
+  alphaShaperLayer->setFillStyle(filleStyle);
+  alphaShaperLayer->setAlpha(0.5f);
+  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
+  alphaShaperLayer->setFilters({alphaFilter});
+  layer->addChild(alphaShaperLayer);
+  Matrix alphaMaskMatrix =
+      Matrix::MakeAll(1.0f, 0, 300 + static_cast<float>(image->width()) * 0.5f, 0, 1.0f, 300);
+  alphaShaperLayer->setMatrix(alphaMaskMatrix);
+  imageLayer1->setMask(alphaShaperLayer);
+
+  // Vector mask effect
+  auto imageLayer2 = ImageLayer::Make();
+  layer->addChild(imageLayer2);
+  imageLayer2->setImage(image);
+  auto image2Matrix =
+      Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
+  imageLayer2->setMatrix(image2Matrix);
+  imageLayer2->setAlpha(1.0f);
+
+  auto vectorShaperLayer = ShapeLayer::Make();
+  vectorShaperLayer->setPath(path);
+  vectorShaperLayer->setFillStyle(filleStyle);
+  vectorShaperLayer->setAlpha(1.0f);
+  layer->addChild(vectorShaperLayer);
+  Matrix vectorMaskMatrix =
+      Matrix::MakeAll(1.0f, 0, 300, 0, 1.0f, 300 + static_cast<float>(image->height()) * 0.5f);
+  vectorShaperLayer->setMatrix(vectorMaskMatrix);
+  imageLayer2->setMask(vectorShaperLayer);
+
+  // Luma mask Effect
+  auto imageLayer3 = ImageLayer::Make();
+  layer->addChild(imageLayer3);
+  imageLayer3->setImage(image);
+  auto image3Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()) * 0.5f);
+  imageLayer3->setMatrix(image3Matrix);
+  imageLayer3->setAlpha(1.0f);
+
+  auto lumaShaperLayer = ShapeLayer::Make();
+  lumaShaperLayer->setPath(path);
+  lumaShaperLayer->setFillStyle(filleStyle);
+  lumaShaperLayer->setAlpha(0.5f);
+  auto lumaFilter = ColorMatrixFilter::Make(lumaColorMatrix);
+  lumaShaperLayer->setFilters({lumaFilter});
+  layer->addChild(lumaShaperLayer);
+  Matrix lumaMaskMatrix =
+      Matrix::MakeAll(1.0f, 0, 300 + static_cast<float>(image->width()) * 0.5f, 0, 1.0f,
+                      300 + static_cast<float>(image->height()) * 0.5f);
+  lumaShaperLayer->setMatrix(lumaMaskMatrix);
+  imageLayer3->setMask(lumaShaperLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/shapeMask"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, textMask) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 100);
+  auto textContent = "Hello, TGFX! \n Mask Test!";
+  auto color = Color::Red();
+
+  // Original image
+  auto originalLayer = Layer::Make();
+  layer->addChild(originalLayer);
+  auto imageLayer0 = ImageLayer::Make();
+  originalLayer->addChild(imageLayer0);
+  imageLayer0->setImage(image);
+  imageLayer0->setMatrix(Matrix::MakeScale(0.5f));
+
+  auto textLayer = TextLayer::Make();
+  originalLayer->addChild(textLayer);
+  textLayer->setText(textContent);
+  textLayer->setTextColor(color);
+  textLayer->setFont(font);
+  textLayer->setAlpha(1.0f);
+  auto textLayerMatrix = Matrix::MakeAll(1.5f, 0, 400, 0, 1.5f, 800);
+  textLayer->setMatrix(textLayerMatrix);
+
+  auto originalLayerBounds = originalLayer->getBounds();
+  EXPECT_TRUE(originalLayerBounds == Rect::MakeXYWH(0, 0, 1512, 2016));
+
+  // Alpha mask effect
+  auto alphaLayer = Layer::Make();
+  layer->addChild(alphaLayer);
+  auto imageLayer1 = ImageLayer::Make();
+  alphaLayer->addChild(imageLayer1);
+  imageLayer1->setImage(image);
+  auto image1Matrix =
+      Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f, 0);
+  imageLayer1->setMatrix(image1Matrix);
+  imageLayer1->setAlpha(1.0f);
+
+  auto alphaTextLayer = TextLayer::Make();
+  alphaLayer->addChild(alphaTextLayer);
+  alphaTextLayer->setText(textContent);
+  alphaTextLayer->setTextColor(color);
+  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
+  alphaTextLayer->setFilters({alphaFilter});
+  alphaTextLayer->setFont(font);
+  alphaTextLayer->setAlpha(1.0f);
+  auto alphaTextLayerMatrix =
+      Matrix::MakeAll(1.5f, 0, 400 + static_cast<float>(image->width()) * 0.5f, 0, 1.5f, 800);
+  alphaTextLayer->setMatrix(alphaTextLayerMatrix);
+  imageLayer1->setMask(alphaTextLayer);
+
+  auto alphaLayerBounds = alphaLayer->getBounds();
+  EXPECT_TRUE(alphaLayerBounds == Rect::MakeXYWH(1927.0f, 810.5f, 826.5f, 304.5f));
+
+  // Vector mask effect
+  auto imageLayer2 = ImageLayer::Make();
+  layer->addChild(imageLayer2);
+  imageLayer2->setImage(image);
+  auto image2Matrix =
+      Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
+  imageLayer2->setMatrix(image2Matrix);
+  imageLayer2->setAlpha(1.0f);
+
+  auto vectorTextLayer = TextLayer::Make();
+  layer->addChild(vectorTextLayer);
+  vectorTextLayer->setText(textContent);
+  vectorTextLayer->setTextColor(color);
+  vectorTextLayer->setFont(font);
+  vectorTextLayer->setAlpha(1.0f);
+  auto vectorTextLayerMatrix =
+      Matrix::MakeAll(1.5f, 0, 400, 0, 1.5f, 800 + static_cast<float>(image->height()) * 0.5f);
+  vectorTextLayer->setMatrix(vectorTextLayerMatrix);
+  imageLayer2->setMask(vectorTextLayer);
+
+  // Luma mask Effect
+  auto imageLayer3 = ImageLayer::Make();
+  layer->addChild(imageLayer3);
+  imageLayer3->setImage(image);
+  auto image3Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()) * 0.5f);
+  imageLayer3->setMatrix(image3Matrix);
+  imageLayer3->setAlpha(1.0f);
+
+  auto lumaTextLayer = TextLayer::Make();
+  layer->addChild(lumaTextLayer);
+  lumaTextLayer->setText(textContent);
+  lumaTextLayer->setTextColor(color);
+  auto lumaFilter = ColorMatrixFilter::Make(lumaColorMatrix);
+  lumaTextLayer->setFilters({lumaFilter});
+  lumaTextLayer->setFont(font);
+  lumaTextLayer->setAlpha(1.0f);
+  auto lumaTextLayerMatrix =
+      Matrix::MakeAll(1.5f, 0, 400 + static_cast<float>(image->width()) * 0.5f, 0, 1.5f,
+                      800 + static_cast<float>(image->height()) * 0.5f);
+  lumaTextLayer->setMatrix(lumaTextLayerMatrix);
+  imageLayer3->setMask(lumaTextLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/textMask"));
   device->unlock();
 }
 

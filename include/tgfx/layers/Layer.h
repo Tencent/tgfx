@@ -449,6 +449,8 @@ class Layer {
  protected:
   std::weak_ptr<Layer> weakThis;
 
+  Layer* maskOwner = nullptr;
+
   Layer();
 
   /**
@@ -515,6 +517,12 @@ class Layer {
       const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
+
+  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
+
+  Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+
+  Rect getVisibleBounds();
 
   std::string _name;
   float _alpha = 1.0f;
