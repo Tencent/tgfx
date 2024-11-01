@@ -21,7 +21,8 @@ import * as types from '../types/types';
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
     public flush: () => void;
-    public changeText: () => void;
+    public changeBlendMode: () => void;
+    public click: (x: number, y: number) => void;
 }
 
 export class ShareData {
@@ -45,7 +46,6 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    shareData.tgfxBaseView.flush();
 }
 
 export function onresizeEvent(shareData: ShareData) {
@@ -55,11 +55,12 @@ export function onresizeEvent(shareData: ShareData) {
     shareData.resized = true;
 }
 
-export function onclickEvent(shareData: ShareData) {
+export function onclickEvent(ev: MouseEvent, shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
-    shareData.tgfxBaseView.changeText();
+    shareData.tgfxBaseView.click(ev.x, ev.y);
+    shareData.tgfxBaseView.changeBlendMode();
 }
 
 export function loadImage(src: string) {

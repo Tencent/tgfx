@@ -32,7 +32,9 @@ class TGFXBaseView {
 
   void flush();
 
-  void changeText();
+  void changeBlendMode();
+
+  void click(float x, float y);
 
  protected:
   std::shared_ptr<drawers::AppHost> appHost;

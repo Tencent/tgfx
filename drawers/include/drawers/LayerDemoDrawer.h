@@ -33,7 +33,9 @@ class LayerDemoDrawer : public Drawer {
     initDisplayList();
   }
 
-  void changeText();
+  void changeLightAndDarkMode();
+
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
 
  protected:
   bool onDraw(tgfx::Surface* surface, const AppHost* host) override;
@@ -53,6 +55,9 @@ class LayerDemoDrawer : public Drawer {
 
   // use to updateFont
   std::shared_ptr<CustomLayer> textLayer;
+
+  // update blendmode
+  std::shared_ptr<tgfx::Layer> progressBar;
 
   // use to updateMatrix
   std::shared_ptr<tgfx::Layer> root;

@@ -50,8 +50,8 @@ if (typeof window !== 'undefined') {
         window.setTimeout(updateSize(shareData), 300);
     };
 
-    window.onclick = () => {
-        onclickEvent(shareData);
+    window.onclick = (ev: MouseEvent) => {
+        onclickEvent(ev, shareData);
     };
 }
 

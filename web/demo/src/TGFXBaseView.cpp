@@ -18,6 +18,7 @@
 
 #include "TGFXBaseView.h"
 #include "drawers/LayerDemoDrawer.h"
+#include "tgfx/platform/Print.h"
 
 using namespace emscripten;
 namespace hello2d {
@@ -71,11 +72,21 @@ void TGFXBaseView::flush() {
   device->unlock();
 }
 
-void TGFXBaseView::changeText() {
+void TGFXBaseView::changeBlendMode() {
   auto drawer = static_cast<drawers::LayerDemoDrawer*>(drawers::Drawer::GetByIndex(0));
-  drawer->changeText();
+  drawer->changeLightAndDarkMode();
 }
 
+void TGFXBaseView::click(float x, float y) {
+  auto drawer = static_cast<drawers::LayerDemoDrawer*>(drawers::Drawer::GetByIndex(0));
+  auto scale = appHost->density();
+  // convert to canvas coordinate
+  auto layers = drawer->getLayersUnderPoint(x * scale, y * scale);
+  tgfx::PrintLog("click x: %f, y: %f layer size %d", x, y, layers.size());
+  for (auto layer : layers) {
+    tgfx::PrintLog("click layer: %p layerType:%d", layer.get(), layer->type());
+  }
+}
 }  // namespace hello2d
 
 int main(int, const char*[]) {

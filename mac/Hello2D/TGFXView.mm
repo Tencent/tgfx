@@ -90,16 +90,14 @@
     device->unlock();
     return;
   }
-  auto canvas = surface->getCanvas();
-  canvas->clear();
   auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  context->flushAndSubmit();
-  window->present(context);
+  index = 0;
+  auto drawer = drawers::Drawer::GetByIndex(index);
+  if (drawer->draw(surface.get(), appHost.get())) {
+    context->flushAndSubmit();
+    window->present(context);
+  }
+
   device->unlock();
 }
 

@@ -38,7 +38,7 @@ static std::shared_ptr<tgfx::Layer> MakeRoundRectMask(const tgfx::Rect& rect, fl
   return nullptr;
 }
 
-static std::shared_ptr<tgfx::Layer> createProgressBar() {
+static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto progressBar = tgfx::Layer::Make();
   progressBar->setMatrix(tgfx::Matrix::MakeTrans(24, 670));
   progressBar->setBlendMode(tgfx::BlendMode::PlusDarker);
@@ -123,7 +123,8 @@ void LayerDemoDrawer::initDisplayList() {
   root->addChild(textLayer);
 
   // progress shape
-  root->addChild(createProgressBar());
+  progressBar = CreateProgressBar();
+  root->addChild(progressBar);
 
   displayList.root()->addChild(root);
 }
@@ -168,9 +169,16 @@ void LayerDemoDrawer::updateFont(const AppHost* host) {
   textLayer->setFont(font);
 }
 
-void LayerDemoDrawer::changeText() {
-  auto text = textLayer->text();
-  textLayer->setText(text + "!");
+void LayerDemoDrawer::changeLightAndDarkMode() {
+  if (progressBar->blendMode() == tgfx::BlendMode::PlusDarker) {
+    progressBar->setBlendMode(tgfx::BlendMode::PlusLighter);
+  } else {
+    progressBar->setBlendMode(tgfx::BlendMode::PlusDarker);
+  }
 }
 
+std::vector<std::shared_ptr<tgfx::Layer>> LayerDemoDrawer::getLayersUnderPoint(float x,
+                                                                               float y) const {
+  return displayList.root()->getLayersUnderPoint(x, y);
+}
 }  // namespace drawers

@@ -37,6 +37,11 @@ class CustomLayerContent : public tgfx::LayerContent {
     canvas->drawTextBlob(_textBlob, 0, 0, textPaint);
   }
 
+  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override {
+    auto bounds = _textBlob->getBounds();
+    return bounds.contains(localX, localY);
+  }
+
  private:
   std::shared_ptr<tgfx::TextBlob> _textBlob;
 };
