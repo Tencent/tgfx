@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/PathEffect.h"
+#include <cmath>
 #include "core/PathRef.h"
+#include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
@@ -54,8 +56,45 @@ class StrokePathEffect : public PathEffect {
     return paint.getFillPath(skPath, &skPath);
   }
 
+  Rect filterBounds(const Rect& rect) const override {
+    auto bounds = rect;
+    auto strokeWidth = paint.getStrokeWidth();
+    bounds.outset(strokeWidth, strokeWidth);
+    return bounds;
+  }
+
  private:
   SkPaint paint = {};
+};
+
+class TrimPathEffect : public PathEffect {
+ public:
+  TrimPathEffect(float startT, float stopT) : startT(startT), stopT(stopT) {
+  }
+
+  bool filterPath(Path* path) const override {
+    if (path == nullptr) {
+      return false;
+    }
+    if (startT >= stopT) {
+      path->reset();
+      return true;
+    }
+    auto pathMeasure = PathMeasure::MakeFrom(*path);
+    auto length = pathMeasure->getLength();
+    auto start = startT * length;
+    auto end = stopT * length;
+    Path tempPath = {};
+    if (!pathMeasure->getSegment(start, end, &tempPath)) {
+      return false;
+    }
+    *path = std::move(tempPath);
+    return true;
+  }
+
+ private:
+  float startT = 0.0f;
+  float stopT = 1.0f;
 };
 
 static SkPaint::Cap ToSkLineCap(LineCap cap) {
@@ -108,4 +147,17 @@ std::unique_ptr<PathEffect> PathEffect::MakeCorner(float radius) {
   }
   return std::unique_ptr<PathEffect>(new PkPathEffect(std::move(effect)));
 }
+
+std::unique_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT) {
+  if (isnan(startT) || isnan(stopT)) {
+    return nullptr;
+  }
+  if (startT <= 0 && stopT >= 1) {
+    return nullptr;
+  }
+  startT = std::max(0.f, std::min(startT, 1.f));
+  stopT = std::max(0.f, std::min(stopT, 1.f));
+  return std::unique_ptr<PathEffect>(new TrimPathEffect(startT, stopT));
+}
+
 }  // namespace tgfx

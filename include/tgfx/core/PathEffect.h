@@ -37,8 +37,8 @@ class PathEffect {
    * @param intervals array containing an even number of entries (>=2), with the even indices
    * specifying the length of "on" intervals, and the odd indices specifying the length of "off"
    * intervals.
-   * @param count number of elements in the intervals array
-   * @param phase  offset into the intervals array (mod the sum of all of the intervals).
+   * @param count number of elements in the interval array
+   * @param phase  offset into the interval array (mod the sum of all of the intervals).
    */
   static std::unique_ptr<PathEffect> MakeDash(const float intervals[], int count, float phase);
 
@@ -49,6 +49,16 @@ class PathEffect {
    */
   static std::unique_ptr<PathEffect> MakeCorner(float radius);
 
+  /**
+   * Creates a path effect that returns a segment of the input path based on the given start and
+   * stop "t" values. The startT and stopT values must be between 0 and 1, inclusive. If they are
+   * outside this range, they will be clamped to the nearest valid value. If either value is NaN,
+   * nullptr will be returned.
+   * @param startT The starting point of the path segment to be returned.
+   * @param stopT The ending point of the path segment to be returned.
+   */
+  static std::unique_ptr<PathEffect> MakeTrim(float startT, float stopT);
+
   virtual ~PathEffect() = default;
 
   /**
@@ -56,5 +66,12 @@ class PathEffect {
    * leaves this path unchanged.
    */
   virtual bool filterPath(Path* path) const = 0;
+
+  /**
+   * Returns the bounds of the path after applying this effect.
+   */
+  virtual Rect filterBounds(const Rect& rect) const {
+    return rect;
+  }
 };
 }  // namespace tgfx
