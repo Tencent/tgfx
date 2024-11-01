@@ -21,7 +21,6 @@
 #include <mutex>
 #include <unordered_map>
 #include "tgfx/core/Data.h"
-#include "tgfx/core/FontMetrics.h"
 
 namespace tgfx {
 /**
