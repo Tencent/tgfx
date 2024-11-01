@@ -26,10 +26,9 @@ void Mask::fillPath(const Path& path, const Stroke* stroke) {
   if (path.isEmpty()) {
     return;
   }
-  auto effect = PathEffect::MakeStroke(stroke);
-  if (effect != nullptr) {
+  if (stroke != nullptr) {
     auto newPath = path;
-    effect->filterPath(&newPath);
+    stroke->applyToPath(&newPath);
     onFillPath(newPath, matrix);
   } else {
     onFillPath(path, matrix);
