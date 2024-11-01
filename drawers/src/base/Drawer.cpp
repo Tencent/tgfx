@@ -18,13 +18,15 @@
 
 #include "drawers/Drawer.h"
 #include <unordered_map>
+#include "LayerDrawers.h"
 #include "base/Drawers.h"
+#include "layertree/LayerDemoTree.h"
 #include "tgfx/platform/Print.h"
 
 namespace drawers {
-static std::vector<Drawer*> drawers = {new GridBackground(), new ConicGradient(),
-                                       new ImageWithMipmap(), new ImageWithShadow(),
-                                       new SimpleText()};
+static std::vector<Drawer*> drawers = {
+    new GridBackground(), new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
+    new SimpleText(),     new LayerDemoTree(), new CustomLayerTree()};
 
 static std::vector<std::string> GetDrawerNames() {
   std::vector<std::string> names;
@@ -51,14 +53,14 @@ const std::vector<std::string>& Drawer::Names() {
   return names;
 }
 
-const Drawer* Drawer::GetByIndex(int index) {
+Drawer* Drawer::GetByIndex(int index) {
   if (index < 0 || index >= Count()) {
     return nullptr;
   }
   return drawers[static_cast<size_t>(index)];
 }
 
-const Drawer* Drawer::GetByName(const std::string& name) {
+Drawer* Drawer::GetByName(const std::string& name) {
   static auto drawerMap = GetDrawerMap();
   auto it = drawerMap.find(name);
   if (it == drawerMap.end()) {
@@ -70,7 +72,7 @@ const Drawer* Drawer::GetByName(const std::string& name) {
 Drawer::Drawer(std::string name) : _name(std::move(name)) {
 }
 
-void Drawer::draw(tgfx::Canvas* canvas, const AppHost* host) const {
+void Drawer::draw(tgfx::Canvas* canvas, const AppHost* host) {
   if (canvas == nullptr) {
     tgfx::PrintError("Drawer::draw() canvas is nullptr!");
     return;
