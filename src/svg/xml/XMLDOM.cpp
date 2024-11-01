@@ -58,17 +58,17 @@ class DOMParser : public XMLParser {
     _attributes.clear();
   }
 
-  bool onStartElement(const char elem[]) override {
-    this->startCommon(elem, strlen(elem), DOMNodeType::Element);
+  bool onStartElement(const std::string& element) override {
+    this->startCommon(element, DOMNodeType::Element);
     return false;
   }
 
-  bool onAddAttribute(const char name[], const char value[]) override {
+  bool onAddAttribute(const std::string& name, const std::string& value) override {
     _attributes.push_back({name, value});
     return false;
   }
 
-  bool onEndElement(const char /*elem*/[]) override {
+  bool onEndElement(const std::string& /*element*/) override {
     if (_needToFlush) {
       this->flushAttributes();
     }
@@ -90,20 +90,20 @@ class DOMParser : public XMLParser {
     return false;
   }
 
-  bool onText(const char text[], int len) override {
-    this->startCommon(text, static_cast<size_t>(len), DOMNodeType::Text);
+  bool onText(const std::string& text) override {
+    this->startCommon(text, DOMNodeType::Text);
     this->DOMParser::onEndElement(_elementName.c_str());
 
     return false;
   }
 
  private:
-  void startCommon(const char elem[], size_t elemSize, DOMNodeType type) {
+  void startCommon(const std::string& text, DOMNodeType type) {
     if (_level > 0 && _needToFlush) {
       this->flushAttributes();
     }
     _needToFlush = true;
-    _elementName = std::string(elem, elemSize);
+    _elementName = text;
     _elementType = type;
     ++_level;
   }
@@ -133,17 +133,17 @@ std::shared_ptr<DOM> DOM::MakeFromData(const Data& data) {
 }
 
 static void walk_dom(std::shared_ptr<DOMNode> node, XMLParser* parser) {
-  const auto* element = node->name.c_str();
+  auto element = node->name;
   if (node->type == DOMNodeType::Text) {
     ASSERT(node->countChildren() == 0);
-    parser->text(element, static_cast<int>(strlen(element)));
+    parser->text(element);
     return;
   }
 
   parser->startElement(element);
 
   for (const DOMAttr& attr : node->attributes) {
-    parser->addAttribute(attr.name.c_str(), attr.value.c_str());
+    parser->addAttribute(attr.name, attr.value);
   }
 
   node = node->getFirstChild();

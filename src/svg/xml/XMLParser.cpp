@@ -61,7 +61,7 @@ struct ParsingContext {
 
   void flushText() {
     if (!_bufferedText.empty()) {
-      _parser->text(_bufferedText.data(), static_cast<int>(_bufferedText.size()));
+      _parser->text(_bufferedText);
       _bufferedText.clear();
     }
   }
@@ -145,34 +145,20 @@ bool XMLParser::parse(const Data& data) {
   return XML_STATUS_ERROR != status;
 }
 
-bool XMLParser::startElement(const char elem[]) {
-  return this->onStartElement(elem);
+bool XMLParser::startElement(const std::string& element) {
+  return this->onStartElement(element);
 }
 
-bool XMLParser::addAttribute(const char name[], const char value[]) {
+bool XMLParser::addAttribute(const std::string& name, const std::string& value) {
   return this->onAddAttribute(name, value);
 }
 
-bool XMLParser::endElement(const char elem[]) {
-  return this->onEndElement(elem);
+bool XMLParser::endElement(const std::string& element) {
+  return this->onEndElement(element);
 }
 
-bool XMLParser::text(const char text[], int len) {
-  return this->onText(text, len);
+bool XMLParser::text(const std::string& text) {
+  return this->onText(text);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-bool XMLParser::onStartElement(const char /*elem*/[]) {
-  return false;
-}
-bool XMLParser::onAddAttribute(const char /*name*/[], const char /*value*/[]) {
-  return false;
-}
-bool XMLParser::onEndElement(const char /*elem*/[]) {
-  return false;
-}
-bool XMLParser::onText(const char /*text*/[], int /*len*/) {
-  return false;
-}
 }  // namespace tgfx

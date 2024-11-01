@@ -268,7 +268,7 @@ void XMLParserWriter::onAddAttribute(const std::string& name, const std::string&
 }
 
 void XMLParserWriter::onAddText(const std::string& text) {
-  _parser.text(text.c_str(), static_cast<int>(text.size()));
+  _parser.text(text);
 }
 
 void XMLParserWriter::onEndElement() {

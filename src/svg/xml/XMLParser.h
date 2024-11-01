@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <string>
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
@@ -41,19 +42,19 @@ class XMLParser {
    * @brief Override in subclasses; return true to stop parsing
    * Each function represents a parsing stage of an XML element.
    */
-  virtual bool onStartElement(const char elem[]);
-  virtual bool onAddAttribute(const char name[], const char value[]);
-  virtual bool onEndElement(const char elem[]);
-  virtual bool onText(const char text[], int len);
+  virtual bool onStartElement(const std::string& element) = 0;
+  virtual bool onAddAttribute(const std::string& name, const std::string& value) = 0;
+  virtual bool onEndElement(const std::string& element) = 0;
+  virtual bool onText(const std::string& text) = 0;
 
  public:
   /**
     * @brief public for internal parser library calls, not intended for client call
     */
-  bool startElement(const char elem[]);
-  bool addAttribute(const char name[], const char value[]);
-  bool endElement(const char elem[]);
-  bool text(const char text[], int len);
+  bool startElement(const std::string& element);
+  bool addAttribute(const std::string& name, const std::string& value);
+  bool endElement(const std::string& element);
+  bool text(const std::string& text);
   void* _parser = nullptr;
 };
 }  // namespace tgfx
