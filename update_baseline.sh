@@ -4,15 +4,16 @@
   if [ -f "$CACHE_VERSION_FILE" ]; then
     HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
     if [[ ${HAS_DIFF} == "" ]]; then
-      exit 0
+      #exit 0
     fi
   fi
   echo "~~~~~~~~~~~~~~~~~~~Update Baseline Start~~~~~~~~~~~~~~~~~~~~~"
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  echo $CURRENT_BRANCH
   STASH_LIST_BEFORE=$(git stash list)
-  git stash push --quiet
+  git stash push
   STASH_LIST_AFTER=$(git stash list)
-  git switch main --quiet
+  git switch main
 
   ./install_tools.sh
   depsync
@@ -59,9 +60,9 @@
 
   cd ..
 
-  git switch $CURRENT_BRANCH --quiet
+  git switch $CURRENT_BRANCH
   if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
-    git stash pop --index --quiet
+    git stash pop --index
   fi
 
   depsync
