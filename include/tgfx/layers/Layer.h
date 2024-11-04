@@ -449,7 +449,7 @@ class Layer {
  protected:
   std::weak_ptr<Layer> weakThis;
 
-  std::weak_ptr<Layer> maskOwner;
+  Layer* maskOwner;
 
   Layer();
 
@@ -527,7 +527,7 @@ class Layer {
 
   Rect getVisibleBounds();
 
-  bool validMask() const;
+  bool hasValidMask() const;
 
   std::string _name;
   float _alpha = 1.0f;
