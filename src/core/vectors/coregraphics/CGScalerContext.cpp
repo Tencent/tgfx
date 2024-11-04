@@ -251,8 +251,7 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
     if (fauxBold) {
       auto strokePath = *path;
       Stroke stroke(textSize * fauxBoldScale);
-      auto pathEffect = PathEffect::MakeStroke(&stroke);
-      pathEffect->filterPath(&strokePath);
+      stroke.applyToPath(&strokePath);
       path->addPath(strokePath, PathOp::Union);
     }
   } else {

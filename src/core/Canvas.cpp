@@ -231,13 +231,10 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   auto stroke = paint.getStroke();
   auto style = CreateFillStyle(paint);
   if (stroke && path.isLine()) {
-    auto effect = PathEffect::MakeStroke(stroke);
-    if (effect != nullptr) {
-      auto fillPath = path;
-      effect->filterPath(&fillPath);
-      if (drawSimplePath(fillPath, style)) {
-        return;
-      }
+    auto fillPath = path;
+    stroke->applyToPath(&fillPath);
+    if (drawSimplePath(fillPath, style)) {
+      return;
     }
   }
   if (!stroke && drawSimplePath(path, style)) {
@@ -371,7 +368,7 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                        const FillStyle& style, std::shared_ptr<ImageFilter> imageFilter) {
-  if (imageFilter == nullptr && picture->records.size() == 1 && style.maskFilter == nullptr) {
+  if (imageFilter == nullptr && picture->records.size() == 1) {
     LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
     if (layerContext.hasUnrolled()) {

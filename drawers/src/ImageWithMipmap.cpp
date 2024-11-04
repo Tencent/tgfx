@@ -19,7 +19,7 @@
 #include "base/Drawers.h"
 
 namespace drawers {
-void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
+void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   auto scale = host->density();
   auto width = host->width();
   auto height = host->height();

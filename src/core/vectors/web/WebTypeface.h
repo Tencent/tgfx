@@ -49,7 +49,13 @@ class WebTypeface : public Typeface {
     return 0;
   }
 
-  bool hasColor() const override;
+  bool hasColor() const override {
+    return _hasColor;
+  }
+
+  bool hasOutlines() const override {
+    return false;
+  }
 
   std::string getText(GlyphID glyphID) const;
 
@@ -65,6 +71,7 @@ class WebTypeface : public Typeface {
   explicit WebTypeface(std::string name, std::string style);
 
   uint32_t _uniqueID;
+  bool _hasColor = false;
   emscripten::val scalerContextClass = emscripten::val::null();
   std::string name;
   std::string style;
