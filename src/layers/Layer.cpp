@@ -547,7 +547,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
 std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float contentScale,
                                                  Matrix* drawingMatrix) {
   DEBUG_ASSERT(drawingMatrix != nullptr);
-  auto pictureq = getLayerPicture(args, contentScale);
+  auto picture = getLayerPicture(args, contentScale);
   if (!picture) {
     return nullptr;
   }
