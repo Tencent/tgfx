@@ -506,15 +506,18 @@ class Layer {
 
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
+  std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
+                                            Matrix* drawingMatrix);
+
+  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale);
+
+  std::shared_ptr<ImageFilter> getLayerFilter(float contentScale);
+
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
-  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const std::vector<std::shared_ptr<LayerFilter>>& filters);
+  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
-
-  std::shared_ptr<ImageFilter> getComposeFilter(
-      const std::vector<std::shared_ptr<LayerFilter>>& filters, float scale);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
