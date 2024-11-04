@@ -77,20 +77,9 @@ TGFX_TEST(TextAlignTest, TextAlign) {
 
 TGFX_TEST(TextAlignTest, TextAlignPrint) {
   std::string text = "ab\rcd\nef\r\ngh\n\rij\tk";
-  printf("before size: %zu\n", text.size());
-  for (auto c : text) {
-    printf("%d ", c);
-  }
-  printf("\n");
-
   auto textLayer = TextLayer::Make();
   textLayer->setText(text);
   text = textLayer->preprocessNewLines(text);
-  printf("after size: %zu\n", text.size());
-  for (auto c : text) {
-    printf("%d ", c);
-  }
-
   EXPECT_EQ(text, "ab\ncd\nef\ngh\nij\tk");
 }
 }  // namespace tgfx

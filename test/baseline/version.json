@@ -55,18 +55,21 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
+        "Layer_hitTestPoint": "bc64712",
+        "Layer_hitTestPointNested": "bc64712",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
         "draw_shape": "8378211",
-        "draw_text": "fa90eb0",
+        "draw_solid": "b4a1231",
+        "draw_text": "bc64712",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
-        "getBounds": "8a26de7",
+        "getBounds": "bc64712",
+        "getLayersUnderPoint": "bc64712",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
-        "imageLayer": "99a5cd9",
-        "draw_solid": "b4a1231"
+        "imageLayer": "99a5cd9"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -141,5 +144,8 @@
         "ImageSnapshot2": "d010fb8",
         "ImageSnapshot_Surface1": "d010fb8",
         "ImageSnapshot_Surface2": "d010fb8"
+    },
+    "TextAlignTest": {
+        "TextAlign": "bc64712"
     }
 }
