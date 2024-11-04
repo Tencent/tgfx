@@ -368,7 +368,7 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                        const FillStyle& style, std::shared_ptr<ImageFilter> imageFilter) {
-  if (imageFilter == nullptr && picture->records.size() == 1 && style.maskFilter == nullptr) {
+  if (imageFilter == nullptr && picture->records.size() == 1) {
     LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
     if (layerContext.hasUnrolled()) {
