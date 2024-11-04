@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "drawers/Drawer.h"
+#include "tgfx/layers/DisplayList.h"
+
 #pragma once
 
-#include "drawers/Drawer.h"
-
 namespace drawers {
-#define DEFINE_DRAWER(DrawerName)                                             \
-  class DrawerName : public drawers::Drawer {                                 \
-   public:                                                                    \
-    DrawerName() : drawers::Drawer(#DrawerName) {                             \
-    }                                                                         \
-                                                                              \
-   protected:                                                                 \
-    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) override; \
-  }
 
-DEFINE_DRAWER(GridBackground);
-DEFINE_DRAWER(ConicGradient);
-DEFINE_DRAWER(ImageWithMipmap);
-DEFINE_DRAWER(ImageWithShadow);
-DEFINE_DRAWER(SimpleText);
+class LayerTreeDrawer : public Drawer {
+ public:
+  LayerTreeDrawer(const std::string& treeName);
+
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
+
+ protected:
+  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
+
+  virtual void prepare(const AppHost* host) = 0;
+
+  void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
+
+ private:
+  void updateRootMatrix(const AppHost* host);
+
+  // use to updateMatrix
+  std::shared_ptr<tgfx::Layer> root;
+
+  tgfx::DisplayList displayList;
+};
 
 }  // namespace drawers
