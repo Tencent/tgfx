@@ -37,7 +37,7 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   backLineLayer->setPath(backLinePath);
   backLineLayer->setStrokeStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(143, 195, 228)));
   backLineLayer->setLineWidth(6);
-  backLineLayer->setAlpha(0.1);
+  backLineLayer->setAlpha(0.1f);
   progressBar->addChild(backLineLayer);
 
   auto frontLineLayer = tgfx::ShapeLayer::Make();
@@ -75,7 +75,7 @@ static std::shared_ptr<tgfx::Layer> CreateBackground() {
   gradientPath.addPath(backPath, tgfx::PathOp::Intersect);
   backgroundGradient->setFillStyle(gradient);
   backgroundGradient->setPath(gradientPath);
-  backgroundGradient->setAlpha(0.2);
+  backgroundGradient->setAlpha(0.2f);
   background->addChild(backgroundGradient);
   return background;
 }

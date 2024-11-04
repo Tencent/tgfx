@@ -40,9 +40,9 @@ void LayerDrawer::updateRootMatrix(const AppHost* host) {
   auto totalScale = std::min(host->width() / (padding * 2 + bounds.width()),
                              host->height() / (padding * 2 + bounds.height()));
 
-  auto rootMatrix = tgfx::Matrix::MakeScale(totalScale);
-  rootMatrix.postTranslate((host->width() - bounds.width() * totalScale) / 2,
-                           (host->height() - bounds.height() * totalScale) / 2);
+  auto rootMatrix = tgfx::Matrix::MakeScale(static_cast<float>(totalScale));
+  rootMatrix.postTranslate(static_cast<float>((host->width() - bounds.width() * totalScale) / 2),
+                           static_cast<float>((host->height() - bounds.height() * totalScale) / 2));
 
   root->setMatrix(rootMatrix);
 }
