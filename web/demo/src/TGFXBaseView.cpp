@@ -62,23 +62,17 @@ void TGFXBaseView::draw(int drawIndex) {
     device->unlock();
     return;
   }
-  if (onDraw(surface.get(), appHost.get(), drawIndex)) {
-    context->flushAndSubmit();
-    window->present(context);
-  }
-  device->unlock();
-}
-
-bool TGFXBaseView::onDraw(tgfx::Surface* surface, const drawers::AppHost* appHost, int drawIndex) {
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numDrawers = drawers::Drawer::Count() - 1;
   auto index = (drawIndex % numDrawers) + 1;
   auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost);
+  drawer->draw(canvas, appHost.get());
   drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost);
-  return true;
+  drawer->draw(canvas, appHost.get());
+  context->flushAndSubmit();
+  window->present(context);
+  device->unlock();
 }
 }  // namespace hello2d
 

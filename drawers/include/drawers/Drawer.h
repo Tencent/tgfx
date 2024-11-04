@@ -57,10 +57,6 @@ class Drawer {
    */
   void draw(tgfx::Canvas* canvas, const AppHost* host);
 
-  virtual bool isLayerTreeDrawer() const {
-    return false;
-  }
-
  protected:
   virtual void onDraw(tgfx::Canvas* canvas, const AppHost* host) = 0;
 

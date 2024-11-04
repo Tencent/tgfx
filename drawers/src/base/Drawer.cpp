@@ -18,15 +18,15 @@
 
 #include "drawers/Drawer.h"
 #include <unordered_map>
-#include "LayerTreeDrawers.h"
+#include "LayerDrawers.h"
 #include "base/Drawers.h"
-#include "layertree/SimpleLayerTree.h"
+#include "layertree/LayerDemoTree.h"
 #include "tgfx/platform/Print.h"
 
 namespace drawers {
 static std::vector<Drawer*> drawers = {
-    new GridBackground(), new ConicGradient(),   new ImageWithMipmap(), new ImageWithShadow(),
-    new SimpleText(),     new SimpleLayerTree(), new CustomLayerTree()};
+    new GridBackground(), new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
+    new SimpleText(),     new LayerDemoTree(), new CustomLayerTree()};
 
 static std::vector<std::string> GetDrawerNames() {
   std::vector<std::string> names;

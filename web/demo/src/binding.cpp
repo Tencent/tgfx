@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <emscripten/bind.h>
-#include "TGFXLayerView.h"
 #include "TGFXThreadsView.h"
 #include "TGFXView.h"
 
@@ -50,16 +49,4 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                         return std::make_shared<TGFXThreadsView>(canvasID, nativeImage);
                       }))
       .function("registerFonts", &TGFXThreadsView::registerFonts);
-
-  class_<TGFXLayerView, base<TGFXView>>("TGFXLayerView")
-      .smart_ptr<std::shared_ptr<TGFXLayerView>>("TGFXLayerView")
-      .class_function("MakeFrom",
-                      optional_override([](const std::string& canvasID, const val& nativeImage) {
-                        if (canvasID.empty()) {
-                          return std::shared_ptr<TGFXLayerView>(nullptr);
-                        }
-                        return std::make_shared<TGFXLayerView>(canvasID, nativeImage);
-                      }))
-      .function("hitTest", &TGFXLayerView::hitTest)
-      .function("setTreeName", &TGFXLayerView::setTreeName);
 }

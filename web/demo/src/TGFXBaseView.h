@@ -28,15 +28,11 @@ class TGFXBaseView {
  public:
   TGFXBaseView(std::string canvasID, const emscripten::val& nativeImage);
 
-  virtual ~TGFXBaseView() = default;
-
   void updateSize(float devicePixelRatio);
 
   void draw(int drawIndex);
 
  protected:
-  virtual bool onDraw(tgfx::Surface* surface, const drawers::AppHost* host, int drawIndex);
-
   std::shared_ptr<drawers::AppHost> appHost;
 
  private:

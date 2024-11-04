@@ -18,17 +18,18 @@
 
 #pragma once
 
-#include "drawers/LayerTreeDrawer.h"
+#include "base/LayerDrawer.h"
 
 namespace drawers {
 #define DEFINE_LAYER_DRAWER(LayerTreeName)                                              \
-  class LayerTreeName : public drawers::LayerTreeDrawer {                               \
+  class LayerTreeName : public drawers::LayerDrawer {                                   \
    public:                                                                              \
-    LayerTreeName() : drawers::LayerTreeDrawer(#LayerTreeName) {                        \
+    LayerTreeName() : drawers::LayerDrawer(#LayerTreeName) {                            \
     }                                                                                   \
                                                                                         \
    protected:                                                                           \
     std::shared_ptr<tgfx::Layer> buildLayerTree(const drawers::AppHost* host) override; \
+    void prepare(const drawers::AppHost*) override{};                                   \
   }
 
 DEFINE_LAYER_DRAWER(CustomLayerTree);

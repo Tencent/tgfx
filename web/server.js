@@ -23,9 +23,6 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 
   var url = `http://localhost:${port}/${fileName}.html`;
-  if (args.includes('layer')) {
-    url += '?type=layer';
-  }
   var start = (process.platform == 'darwin'? 'open': 'start');
   require('child_process').exec(start + ' ' + url);
 });

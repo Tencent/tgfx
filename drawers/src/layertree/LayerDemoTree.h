@@ -16,49 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "drawers/Drawer.h"
-#include "tgfx/layers/DisplayList.h"
-
 #pragma once
+
+#include "base/LayerDrawer.h"
 
 namespace drawers {
 
-class LayerTreeDrawer : public Drawer {
+class LayerDemoTree : public drawers::LayerDrawer {
  public:
-  LayerTreeDrawer(const std::string& treeName);
-
-  bool isLayerTreeDrawer() const override {
-    return true;
+  LayerDemoTree() : LayerDrawer("LayerDemoTree") {
   }
 
-  /*
-   *  click the layer tree at the given point.
-   *  @return A list of layers that were clicked.
-   */
-  std::vector<std::shared_ptr<tgfx::Layer>> click(float x, float y);
-
-  /*
-   *  Renders the layer tree onto the given surface.
-   *  @return True if the surface content was updated, otherwise false.
-   */
-  bool render(tgfx::Surface* surface, const AppHost* host);
-
  protected:
-  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
-
-  virtual void onClick(float x, float y);
-
-  void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
-
-  bool renderInternal(tgfx::Surface* surface, const AppHost* host, bool replaceAll);
+  std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override;
+  void prepare(const AppHost* host) override;
 
  private:
-  void updateRootMatrix(const AppHost* host);
-
-  // use to updateMatrix
-  std::shared_ptr<tgfx::Layer> root;
-
-  tgfx::DisplayList displayList;
+  void changeMode();
+  // update blendmode
+  std::shared_ptr<tgfx::Layer> progressBar;
 };
 
 }  // namespace drawers

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,24 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "drawers/Drawer.h"
+#include "tgfx/layers/DisplayList.h"
+
 #pragma once
 
-#include "TGFXView.h"
+namespace drawers {
 
-namespace hello2d {
-class TGFXLayerView : public TGFXView {
+class CustomLayer;
+
+class LayerDrawer : public Drawer {
  public:
-  TGFXLayerView(std::string canvasID, const emscripten::val& nativeImage);
+  LayerDrawer(const std::string& treeName);
 
-  void setTreeName(const std::string& treeName) {
-    _treeName = treeName;
-  }
-
-  void hitTest(float x, float y);
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
 
  protected:
-  bool onDraw(tgfx::Surface* surface, const drawers::AppHost* appHost, int drawIndex) override;
+  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
-  std::string _treeName;
+  virtual void prepare(const AppHost* host) = 0;
+
+  void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
+
+ private:
+  void updateRootMatrix(const AppHost* host);
+
+  // use to updateMatrix
+  std::shared_ptr<tgfx::Layer> root;
+
+  tgfx::DisplayList displayList;
 };
-}  // namespace hello2d
+
+}  // namespace drawers
