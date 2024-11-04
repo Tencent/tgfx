@@ -16,25 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "drawers/Drawer.h"
+#include "tgfx/layers/DisplayList.h"
 
-#include "base/LayerDrawer.h"
+#pragma once
 
 namespace drawers {
 
-class LayerDemoTree : public drawers::LayerDrawer {
+class LayerTreeDrawer : public Drawer {
  public:
-  LayerDemoTree() : LayerDrawer("LayerDemoTree") {
-  }
+  LayerTreeDrawer(const std::string& treeName);
+
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
 
  protected:
-  std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override;
-  void prepare(const AppHost* host) override;
+  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
+
+  virtual void prepare(const AppHost* host) = 0;
+
+  void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
 
  private:
-  void changeMode();
-  // update blendmode
-  std::shared_ptr<tgfx::Layer> progressBar;
+  void updateRootMatrix(const AppHost* host);
+
+  // use to updateMatrix
+  std::shared_ptr<tgfx::Layer> root;
+
+  tgfx::DisplayList displayList;
 };
 
 }  // namespace drawers

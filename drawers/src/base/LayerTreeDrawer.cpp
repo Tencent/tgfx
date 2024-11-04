@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LayerDrawer.h"
+#include "LayerTreeDrawer.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace drawers {
 
-LayerDrawer::LayerDrawer(const std::string& name) : Drawer(name + "Drawer") {
+LayerTreeDrawer::LayerTreeDrawer(const std::string& name) : Drawer(name + "Drawer") {
 }
 
-void LayerDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
+void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   if (!root) {
     root = buildLayerTree(host);
     displayList.root()->addChild(root);
@@ -34,7 +34,7 @@ void LayerDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   displayList.render(canvas->getSurface(), false);
 }
 
-void LayerDrawer::updateRootMatrix(const AppHost* host) {
+void LayerTreeDrawer::updateRootMatrix(const AppHost* host) {
   auto padding = 30.0;
   auto bounds = root->getBounds();
   auto totalScale = std::min(host->width() / (padding * 2 + bounds.width()),
@@ -47,7 +47,8 @@ void LayerDrawer::updateRootMatrix(const AppHost* host) {
   root->setMatrix(rootMatrix);
 }
 
-std::vector<std::shared_ptr<tgfx::Layer>> LayerDrawer::getLayersUnderPoint(float x, float y) const {
+std::vector<std::shared_ptr<tgfx::Layer>> LayerTreeDrawer::getLayersUnderPoint(float x,
+                                                                               float y) const {
   return displayList.root()->getLayersUnderPoint(x, y);
 }
 }  // namespace drawers

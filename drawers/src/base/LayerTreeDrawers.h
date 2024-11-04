@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "base/LayerDrawer.h"
+#include "base/LayerTreeDrawer.h"
 
 namespace drawers {
 #define DEFINE_LAYER_DRAWER(LayerTreeName)                                              \
-  class LayerTreeName : public drawers::LayerDrawer {                                   \
+  class LayerTreeName : public drawers::LayerTreeDrawer {                               \
    public:                                                                              \
-    LayerTreeName() : drawers::LayerDrawer(#LayerTreeName) {                            \
+    LayerTreeName() : drawers::LayerTreeDrawer(#LayerTreeName) {                        \
     }                                                                                   \
                                                                                         \
    protected:                                                                           \
