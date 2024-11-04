@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "ca36f272af390e9abf07a425fca5220a060a6d8a",
+        "commit": "b5a0cc72d0507df5c13251d16a1312288460e0b5",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -59,6 +59,11 @@
         "url": "https://github.com/nlohmann/json.git",
         "commit": "fec56a1a16c6e1c1b1f4e116a20e79398282626c",
         "dir": "third_party/json"
+      },
+      {
+        "url": "https://github.com/libexpat/libexpat.git",
+        "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
+        "dir": "third_party/expat"
       }
     ]
   },

@@ -598,7 +598,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
   drawingMatrix->preTranslate(bounds.left, bounds.top);
   if (auto filter = getLayerFilter(contentScale)) {
-    Point offset = Point::Zero();
+    auto offset = Point::Zero();
     image = image->makeWithFilter(std::move(filter), &offset);
     if (image == nullptr) {
       return nullptr;
@@ -696,8 +696,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
-  auto content = getContent();
-  if (content) {
+  if (auto content = getContent()) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
   }
   for (const auto& child : _children) {
