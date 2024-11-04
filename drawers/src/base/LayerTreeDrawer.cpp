@@ -16,25 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LayerDrawer.h"
+#include "drawers/LayerTreeDrawer.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace drawers {
 
-LayerDrawer::LayerDrawer(const std::string& name) : Drawer(name + "Drawer") {
+LayerTreeDrawer::LayerTreeDrawer(const std::string& name) : Drawer(name + "Drawer") {
 }
 
-void LayerDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
-  if (!root) {
-    root = buildLayerTree(host);
-    displayList.root()->addChild(root);
-  }
-  prepare(host);
-  updateRootMatrix(host);
-  displayList.render(canvas->getSurface(), false);
+bool LayerTreeDrawer::render(tgfx::Surface* surface, const AppHost* host) {
+  return renderInternal(surface, host, true);
 }
 
-void LayerDrawer::updateRootMatrix(const AppHost* host) {
+void LayerTreeDrawer::onClick(float, float) {
+}
+
+void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
+  renderInternal(canvas->getSurface(), host, false);
+}
+
+void LayerTreeDrawer::updateRootMatrix(const AppHost* host) {
   auto padding = 30.0;
   auto bounds = root->getBounds();
   auto totalScale = std::min(host->width() / (padding * 2 + bounds.width()),
@@ -47,7 +48,17 @@ void LayerDrawer::updateRootMatrix(const AppHost* host) {
   root->setMatrix(rootMatrix);
 }
 
-std::vector<std::shared_ptr<tgfx::Layer>> LayerDrawer::getLayersUnderPoint(float x, float y) const {
+bool LayerTreeDrawer::renderInternal(tgfx::Surface* surface, const AppHost* host, bool replaceAll) {
+  if (!root) {
+    root = buildLayerTree(host);
+    displayList.root()->addChild(root);
+  }
+  updateRootMatrix(host);
+  return displayList.render(surface, replaceAll);
+}
+
+std::vector<std::shared_ptr<tgfx::Layer>> LayerTreeDrawer::click(float x, float y) {
+  onClick(x, y);
   return displayList.root()->getLayersUnderPoint(x, y);
 }
 }  // namespace drawers

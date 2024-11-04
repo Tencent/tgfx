@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LayerDemoTree.h"
+#include "SimpleLayerTree.h"
 #include "CustomLayer.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -83,23 +83,18 @@ static std::shared_ptr<tgfx::Layer> CreateBackground() {
 static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   auto card = tgfx::Layer::Make();
   card->setMatrix(tgfx::Matrix::MakeTrans(24, 150));
-
-  auto imageLayer = tgfx::ShapeLayer::Make();
+  auto imageLayer = tgfx::ImageLayer::Make();
   auto image = host->getImage("bridge");
   auto imageScale = static_cast<float>(std::min(327.0 / image->width(), 344.0 / image->height()));
-  auto imagePath = tgfx::Path();
-  auto radius = 20.f / imageScale;
-  imagePath.addRoundRect(tgfx::Rect::MakeWH(image->width(), image->height()), radius, radius);
-  imageLayer->setPath(imagePath);
-  imageLayer->setFillStyle(tgfx::ImagePattern::Make(image));
   imageLayer->setMatrix(tgfx::Matrix::MakeScale(imageScale));
+  imageLayer->setImage(image);
   card->addChild(imageLayer);
   card->setFilters(
       {tgfx::DropShadowFilter::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 51))});
   return card;
 }
 
-std::shared_ptr<tgfx::Layer> LayerDemoTree::buildLayerTree(const AppHost* host) {
+std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
   // background
   root->addChild(CreateBackground());
@@ -109,7 +104,7 @@ std::shared_ptr<tgfx::Layer> LayerDemoTree::buildLayerTree(const AppHost* host) 
 
   // text
   auto textLayer = tgfx::TextLayer::Make();
-  textLayer->setText("612: Eliza Jackson  |  The Real Life \n            of a UI Designer");
+  textLayer->setText("        TGFX | Image of bridge");
   textLayer->setMatrix(tgfx::Matrix::MakeTrans(48, 550));
   tgfx::Font font(host->getTypeface("default"), 18);
   textLayer->setFont(font);
@@ -121,11 +116,11 @@ std::shared_ptr<tgfx::Layer> LayerDemoTree::buildLayerTree(const AppHost* host) 
   return root;
 }
 
-void LayerDemoTree::prepare(const AppHost*) {
+void SimpleLayerTree::onClick(float, float) {
   changeMode();
 }
 
-void LayerDemoTree::changeMode() {
+void SimpleLayerTree::changeMode() {
   if (progressBar->blendMode() == tgfx::BlendMode::PlusDarker) {
     progressBar->setBlendMode(tgfx::BlendMode::PlusLighter);
   } else {

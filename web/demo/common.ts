@@ -23,6 +23,11 @@ export class TGFXBaseView {
     public draw: (drawIndex: number) => void;
 }
 
+export class TGFXLayerView extends TGFXBaseView {
+    public setTreeName: (treeName: string) => void;
+    public hitTest: (x: number, y: number) => void;
+}
+
 export class ShareData {
     public Hello2DModule: types.TGFX = null;
     public tgfxBaseView: TGFXBaseView = null;

@@ -14,6 +14,7 @@
     "build:debug": "node script/cmake.demo.js -a wasm --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
     "dev": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w",
     "server": "node server.js",
+    "server:layer": "node server.js layer",
     "build:mt": "node script/cmake.demo.js -a wasm-mt && npm run build:tgfx && rollup -c ./script/rollup.demo.js --environment ARCH:wasm-mt",
     "build:mt:debug": "node script/cmake.demo.js -a wasm-mt --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js --environment ARCH:wasm-mt",
     "dev:mt": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w --environment ARCH:wasm-mt",

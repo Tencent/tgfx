@@ -19,9 +19,23 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
+import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage, TGFXLayerView} from "./common";
 
 let shareData: ShareData = new ShareData();
+
+function mainLoop() {
+    shareData.tgfxBaseView.draw(0);
+    window.requestAnimationFrame(mainLoop);
+}
+
+function checkQueryParam(paramName: string, paramValue: string): boolean {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(paramName) === paramValue;
+}
+
+function layerMode(): boolean {
+    return checkQueryParam('type', 'layer');
+}
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
@@ -35,7 +49,14 @@ if (typeof window !== 'undefined') {
                 throw new Error("Hello2D init failed. Please check the .wasm file path!.");
             });
         let image = await loadImage('../../resources/assets/bridge.jpg');
-        shareData.tgfxBaseView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d', image);
+        if (layerMode()) {
+            let layerView = shareData.Hello2DModule.TGFXLayerView.MakeFrom('#hello2d', image);
+            layerView.setTreeName("SimpleLayerTree");
+            shareData.tgfxBaseView = layerView;
+            window.requestAnimationFrame(mainLoop);
+        } else {
+            shareData.tgfxBaseView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d', image);
+        }
         updateSize(shareData);
     };
 
@@ -44,8 +65,12 @@ if (typeof window !== 'undefined') {
         window.setTimeout(updateSize(shareData), 300);
     };
 
-    window.onclick = () => {
+    window.onclick = (ev : MouseEvent) => {
         onclickEvent(shareData);
+        if(layerMode()) {
+            let layerView = shareData.tgfxBaseView as TGFXLayerView;
+            layerView.hitTest(ev.x, ev.y);
+        }
     };
 }
 

@@ -18,18 +18,18 @@
 
 #pragma once
 
-#include "base/LayerDrawer.h"
+#include "drawers/LayerTreeDrawer.h"
 
 namespace drawers {
 
-class LayerDemoTree : public drawers::LayerDrawer {
+class SimpleLayerTree : public drawers::LayerTreeDrawer {
  public:
-  LayerDemoTree() : LayerDrawer("LayerDemoTree") {
+  SimpleLayerTree() : LayerTreeDrawer("SimpleLayerTree") {
   }
 
  protected:
   std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override;
-  void prepare(const AppHost* host) override;
+  void onClick(float x, float y) override;
 
  private:
   void changeMode();
