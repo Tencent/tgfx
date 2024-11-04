@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,106 +18,12 @@
 
 #include "tgfx/svg/xml/XMLDOM.h"
 #include <utility>
+#include "DOMParser.h"
 #include "XMLParser.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
-class DOMParser : public XMLParser {
- public:
-  DOMParser() {
-    _root = nullptr;
-    _level = 0;
-    _needToFlush = true;
-  }
-
-  std::shared_ptr<DOMNode> getRoot() const {
-    return _root;
-  }
-
- protected:
-  void flushAttributes() {
-    ASSERT(_level > 0);
-
-    auto node = std::make_shared<DOMNode>();
-    node->name = _elementName;
-    node->firstChild = nullptr;
-    node->attributes.swap(this->_attributes);
-    node->type = _elementType;
-
-    if (_root == nullptr) {
-      node->nextSibling = nullptr;
-      _root = node;
-    } else {  // this adds siblings in reverse order. gets corrected in onEndElement()
-      auto parent = _parentStack.back();
-      ASSERT(_root && parent);
-      node->nextSibling = parent->firstChild;
-      parent->firstChild = node;
-    }
-    _parentStack.push_back(node);
-    _attributes.clear();
-  }
-
-  bool onStartElement(const std::string& element) override {
-    this->startCommon(element, DOMNodeType::Element);
-    return false;
-  }
-
-  bool onAddAttribute(const std::string& name, const std::string& value) override {
-    _attributes.push_back({name, value});
-    return false;
-  }
-
-  bool onEndElement(const std::string& /*element*/) override {
-    if (_needToFlush) {
-      this->flushAttributes();
-    }
-    _needToFlush = false;
-    --_level;
-
-    auto parent = _parentStack.back();
-    _parentStack.pop_back();
-
-    auto child = parent->firstChild;
-    std::shared_ptr<DOMNode> prev = nullptr;
-    while (child) {
-      auto next = child->nextSibling;
-      child->nextSibling = prev;
-      prev = child;
-      child = next;
-    }
-    parent->firstChild = prev;
-    return false;
-  }
-
-  bool onText(const std::string& text) override {
-    this->startCommon(text, DOMNodeType::Text);
-    this->DOMParser::onEndElement(_elementName.c_str());
-
-    return false;
-  }
-
- private:
-  void startCommon(const std::string& element, DOMNodeType type) {
-    if (_level > 0 && _needToFlush) {
-      this->flushAttributes();
-    }
-    _needToFlush = true;
-    _elementName = element;
-    _elementType = type;
-    ++_level;
-  }
-
-  std::vector<std::shared_ptr<DOMNode>> _parentStack;
-  std::shared_ptr<DOMNode> _root;
-  bool _needToFlush;
-
-  // state needed for flushAttributes()
-  std::vector<DOMAttribute> _attributes;
-  std::string _elementName;
-  DOMNodeType _elementType;
-  int _level;
-};
 
 DOM::DOM(std::shared_ptr<DOMNode> root) {
   _root = std::move(root);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -33,7 +33,7 @@ struct DOMAttribute {
   std::string value;
 };
 
-enum class DOMNodeType : uint8_t { Element, Text };
+enum class DOMNodeType { Element, Text };
 
 struct DOMNode {
   std::string name;
@@ -43,31 +43,26 @@ struct DOMNode {
   DOMNodeType type;
 
   /**
-   * @brief Get the first child object, optionally filtered by name.
-   * 
+   * Get the first child object, optionally filtered by name.
    * @param name child name.
    * @return DOMNode object.
    */
   std::shared_ptr<DOMNode> getFirstChild(const std::string& name = "") const;
 
   /**
-   * @brief Get the next Sibling object, optionally filtered by name.
-   * 
+   * Get the next Sibling object, optionally filtered by name.
    * @param name sibling name.
    * @return DOMNode object.
    */
   std::shared_ptr<DOMNode> getNextSibling(const std::string& name = "") const;
 
   /**
-   * @brief Get the value content of the node by attribute name.
-   * 
-   * @return value content.
+   * Get the value content of the node by attribute name.
    */
   std::tuple<bool, std::string> findAttribute(const std::string& attrName) const;
 
   /**
-   * @brief Count the number of children of the node,optionally filtered by name.
-   * 
+   * Count the number of children of the node,optionally filtered by name.
    * @param name node name.
    * @return The number of children.
    */
@@ -77,37 +72,33 @@ struct DOMNode {
 class DOM {
  public:
   /**
-   * @brief Destructor.
+   * Destructor.
    */
   ~DOM();
 
   /**
-   * @brief Constructs a DOM tree from XML text data.
-   * 
+   * Constructs a DOM tree from XML text data.
    * @param data XML text data.
    * @return The DOM tree. Returns nullptr if construction fails.
    */
   static std::shared_ptr<DOM> MakeFromData(const Data& data);
 
   /**
-   * @brief Creates a deep copy of a DOM tree.
-   * 
+   * Creates a deep copy of a DOM tree.
    * @param inputDOM The DOM tree to copy.
    * @return The copied DOM tree. Returns nullptr if copying fails.
    */
   static std::shared_ptr<DOM> copy(const std::shared_ptr<DOM>& inputDOM);
 
   /**
-   * @brief Gets the root node of the DOM tree.
-   * 
+   * Gets the root node of the DOM tree.
    * @return The root node.
    */
   std::shared_ptr<DOMNode> getRootNode() const;
 
  private:
   /**
-   * @brief Constructor.
-   * 
+   * Constructor.
    * @param root The root node of the DOM tree.
    */
   explicit DOM(std::shared_ptr<DOMNode> root);

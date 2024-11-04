@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -32,7 +32,7 @@ class XMLParser;
 namespace tgfx {
 
 /**
- * @brief Abstract class for writing XML, providing two implementations:
+ * Abstract class for writing XML, providing two implementations:
  * 1. Use the writeDOM interface to input a DOM tree and serialize it into XML.
  * 2. Use the startElement, endElement, addAttribute, and addText interfaces to manually construct
  *    XML.
@@ -85,7 +85,7 @@ class XMLWriter {
 };
 
 /**
- * @brief XMLStreamWriter is an XMLWriter implementation that writes XML to a string stream.
+ * XMLStreamWriter is an XMLWriter implementation that writes XML to a string stream.
  */
 class XMLStreamWriter : public XMLWriter {
  public:
@@ -112,7 +112,7 @@ class XMLStreamWriter : public XMLWriter {
 };
 
 /**
- * @brief XMLParserWriter is an XMLWriter implementation that writes XML to an XMLParser.
+ * XMLParserWriter is an XMLWriter implementation that writes XML to an XMLParser.
  * Calls XMLParser's startElement, addAttribute, endElement, and text interfaces for each element.
  */
 class XMLParserWriter : public XMLWriter {

@@ -13,9 +13,9 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 option(TGFX_USE_OPENGL "Allow the use of OpenGL as GPU backend" ON)
 option(TGFX_USE_QT "Allow build with QT frameworks." OFF)
 option(TGFX_USE_SWIFTSHADER "Allow build with SwiftShader library" OFF)
+option(TGFX_BUILD_SVG "Allow build the svg module" ON)
 option(TGFX_BUILD_DRAWERS "Build the tgfx-drawers library" OFF)
 option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
-option(TGFX_BUILD_SVG "Allow build the svg module" ON)
 
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))

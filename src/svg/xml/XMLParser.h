@@ -3,7 +3,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,17 +29,16 @@ class XMLParser {
   virtual ~XMLParser();
 
   /**
-     * @brief Parses data in XML format, with the parsing results returned via callback functions.
-     * 
-     * @param data The data to be parsed.
-     * @return true if parsing is successful.
-     * @return false if parsing fails.
-     */
+   * Parses data in XML format, with the parsing results returned via callback functions.
+   * @param data The data to be parsed.
+   * @return true if parsing is successful.
+   * @return false if parsing fails.
+   */
   bool parse(const Data& data);
 
  protected:
   /**
-   * @brief Override in subclasses; return true to stop parsing
+   * Override in subclasses; return true to stop parsing
    * Each function represents a parsing stage of an XML element.
    */
   virtual bool onStartElement(const std::string& element) = 0;
@@ -49,7 +48,7 @@ class XMLParser {
 
  public:
   /**
-    * @brief public for internal parser library calls, not intended for client call
+    * public for internal parser library calls, not intended for client call
     */
   bool startElement(const std::string& element);
   bool addAttribute(const std::string& name, const std::string& value);
