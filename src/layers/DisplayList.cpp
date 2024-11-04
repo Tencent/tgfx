@@ -29,9 +29,10 @@ Layer* DisplayList::root() const {
   return _root.get();
 }
 
-void DisplayList::render(Surface* surface, bool replaceAll) {
-  if (surface == nullptr) {
-    return;
+bool DisplayList::render(Surface* surface, bool replaceAll) {
+  if (!surface || (replaceAll && surface->_uniqueID == surfaceID &&
+                   surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirty)) {
+    return false;
   }
   auto canvas = surface->getCanvas();
   if (replaceAll) {
@@ -39,5 +40,9 @@ void DisplayList::render(Surface* surface, bool replaceAll) {
   }
   DrawArgs args(surface->getContext(), surface->renderFlags(), true);
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  surfaceContentVersion = surface->contentVersion();
+  surfaceID = surface->_uniqueID;
+  return true;
 }
+
 }  // namespace tgfx

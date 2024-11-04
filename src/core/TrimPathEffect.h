@@ -18,34 +18,18 @@
 
 #pragma once
 
+#include "tgfx/core/PathEffect.h"
+
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying an image.
-   */
-  Image,
-  /**
-   * A layer displaying a shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a color gradient.
-   */
-  Gradient,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid
+class TrimPathEffect : public PathEffect {
+ public:
+  TrimPathEffect(float startT, float stopT) : startT(startT), stopT(stopT) {
+  }
+
+  bool filterPath(Path* path) const override;
+
+ private:
+  float startT = 0.0f;
+  float stopT = 1.0f;
 };
 }  // namespace tgfx

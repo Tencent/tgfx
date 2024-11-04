@@ -16,36 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/layers/LayerProperty.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying an image.
-   */
-  Image,
-  /**
-   * A layer displaying a shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a color gradient.
-   */
-  Gradient,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid
-};
+
+void LayerProperty::invalidate() {
+  for (auto& owner : owners) {
+    if (auto layer = owner.lock()) {
+      layer->invalidateContent();
+    }
+  }
+}
+
+void LayerProperty::attachToLayer(const Layer* layer) {
+  owners.push_back(layer->weakThis);
+}
+
+void LayerProperty::detachFromLayer(const Layer* layer) {
+  for (auto owner = owners.begin(); owner != owners.end(); ++owner) {
+    if (owner->lock().get() == layer) {
+      owners.erase(owner);
+      break;
+    }
+  }
+}
+
 }  // namespace tgfx

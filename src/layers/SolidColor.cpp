@@ -25,6 +25,7 @@ std::shared_ptr<SolidColor> SolidColor::Make(const Color& color) {
 
 void SolidColor::setColor(const Color& color) {
   _color = color;
+  invalidate();
 }
 
 std::shared_ptr<Shader> SolidColor::getShader() const {

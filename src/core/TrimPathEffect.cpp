@@ -16,36 +16,43 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "TrimPathEffect.h"
+#include "core/PathRef.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying an image.
-   */
-  Image,
-  /**
-   * A layer displaying a shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a color gradient.
-   */
-  Gradient,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid
-};
+using namespace pk;
+
+std::unique_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT) {
+  if (isnan(startT) || isnan(stopT)) {
+    return nullptr;
+  }
+  if (startT <= 0 && stopT >= 1) {
+    return nullptr;
+  }
+  startT = std::max(0.f, std::min(startT, 1.f));
+  stopT = std::max(0.f, std::min(stopT, 1.f));
+  return std::unique_ptr<PathEffect>(new TrimPathEffect(startT, stopT));
+}
+
+bool TrimPathEffect::filterPath(Path* path) const {
+  if (path == nullptr) {
+    return false;
+  }
+  if (startT >= stopT) {
+    path->reset();
+    return true;
+  }
+  auto pathMeasure = PathMeasure::MakeFrom(*path);
+  auto length = pathMeasure->getLength();
+  auto start = startT * length;
+  auto end = stopT * length;
+  Path tempPath = {};
+  if (!pathMeasure->getSegment(start, end, &tempPath)) {
+    return false;
+  }
+  *path = std::move(tempPath);
+  return true;
+}
+
 }  // namespace tgfx

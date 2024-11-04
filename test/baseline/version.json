@@ -19,7 +19,7 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "8eee394",
+        "path": "d4f3780",
         "rasterized": "f55f586",
         "rasterized_mipmap": "f55f586",
         "rasterized_scale_up": "721c9e0",
@@ -65,7 +65,8 @@
         "getBounds": "8a26de7",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
-        "imageLayer": "99a5cd9"
+        "imageLayer": "99a5cd9",
+        "draw_solid": "b4a1231"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -81,6 +82,10 @@
         "JpegCodec_Encode_Gray8": "d010fb8",
         "JpegCodec_Encode_RGB565": "d010fb8",
         "JpegCodec_Encode_RGBA": "d010fb8",
+        "NativeCodec_Decode_Alpha8": "840f02f",
+        "NativeCodec_Decode_RGBA": "840f02f",
+        "NativeCodec_Encode_Alpha8": "840f02f",
+        "NativeCodec_Encode_RGBA": "840f02f",
         "PixelMap_BGRA_to_BGRA": "d010fb8",
         "PixelMap_BGRA_to_RGBA": "d010fb8",
         "PixelMap_BGRA_to_rgb_A": "d010fb8",

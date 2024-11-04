@@ -25,6 +25,7 @@ import type {Rect} from '../types';
 export class ScalerContext {
     public static canvas: HTMLCanvasElement | OffscreenCanvas;
     public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    private static hasMeasureBoundsAPI: boolean | undefined = undefined;
 
     public static setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas) {
         ScalerContext.canvas = canvas;
@@ -52,6 +53,14 @@ export class ScalerContext {
             emojiRegExp = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/;
         }
         return emojiRegExp.test(text);
+    }
+
+    private static measureDirectly(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D): boolean {
+        if (ScalerContext.hasMeasureBoundsAPI === undefined) {
+            const metrics = ctx.measureText('x');
+            ScalerContext.hasMeasureBoundsAPI = metrics && metrics.actualBoundingBoxAscent > 0;
+        }
+        return ScalerContext.hasMeasureBoundsAPI;
     }
 
     private readonly fontName: string;
@@ -157,9 +166,8 @@ export class ScalerContext {
     }
 
     private measureText(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, text: string): TextMetrics {
-        const metrics = ctx.measureText(text);
-        if (metrics && (metrics.actualBoundingBoxAscent > 0 || metrics.width === 0)) {
-            return metrics;
+        if (ScalerContext.measureDirectly(ctx)) {
+            return ctx.measureText(text);
         }
         ctx.canvas.width = this.size * 1.5;
         ctx.canvas.height = this.size * 1.5;
@@ -192,4 +200,5 @@ export class ScalerContext {
             width: fontMeasure.right - fontMeasure.left,
         };
     }
+
 }

@@ -30,7 +30,7 @@ void BlurFilter::setBlurrinessX(float blurrinessX) {
     return;
   }
   _blurrinessX = blurrinessX;
-  invalidate();
+  invalidateFilter();
 }
 
 void BlurFilter::setBlurrinessY(float blurrinessY) {
@@ -38,7 +38,7 @@ void BlurFilter::setBlurrinessY(float blurrinessY) {
     return;
   }
   _blurrinessY = blurrinessY;
-  invalidate();
+  invalidateFilter();
 }
 
 void BlurFilter::setTileMode(TileMode tileMode) {
@@ -46,7 +46,7 @@ void BlurFilter::setTileMode(TileMode tileMode) {
     return;
   }
   _tileMode = tileMode;
-  invalidate();
+  invalidateFilter();
 }
 
 BlurFilter::BlurFilter(float blurrinessX, float blurrinessY, TileMode tileMode)

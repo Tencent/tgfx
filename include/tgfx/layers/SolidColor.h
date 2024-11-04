@@ -54,5 +54,7 @@ class SolidColor : public ShapeStyle {
 
  private:
   Color _color;
+
+  friend class SolidLayer;
 };
 }  // namespace tgfx

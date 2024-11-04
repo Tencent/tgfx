@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Path.h"
+#include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
 /**
@@ -26,14 +27,12 @@ namespace tgfx {
  * Path until it is actually required, allowing the Path to be invalidated and regenerate if
  * necessary. Note: PathProvider is not thread-safe and should be accessed from a single thread.
  */
-class PathProvider {
+class PathProvider : public LayerProperty {
  public:
   /**
    * Creates a new PathProvider that wraps the given Path.
    */
   static std::shared_ptr<PathProvider> Wrap(const Path& path);
-
-  virtual ~PathProvider() = default;
 
   /**
    * Returns the Path provided by this object.
@@ -48,15 +47,16 @@ class PathProvider {
    */
   explicit PathProvider(Path path);
 
-  /**
-   * Invalidates the path, causing it to be re-computed the next time it is requested.
-   */
-  void invalidate();
-
   virtual Path onGeneratePath();
 
+  /**
+   * Marks the path as dirty and invalidates the cached path.
+   */
+  void invalidatePath();
+
  private:
-  bool dirty = true;
   Path path = {};
+
+  bool dirty = true;
 };
 }  // namespace tgfx
