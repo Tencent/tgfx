@@ -1,12 +1,12 @@
 #!/bin/sh
 {
-  CACHE_VERSION_FILE=./test/baseline/.cache/version.json
-  if [ -f "$CACHE_VERSION_FILE" ]; then
-    HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
-    if [[ ${HAS_DIFF} == "" ]]; then
-      #exit 0
-    fi
-  fi
+#  CACHE_VERSION_FILE=./test/baseline/.cache/version.json
+#  if [ -f "$CACHE_VERSION_FILE" ]; then
+#    HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
+##    if [[ ${HAS_DIFF} == "" ]]; then
+##      #exit 0
+##    fi
+#  fi
   echo "~~~~~~~~~~~~~~~~~~~Update Baseline Start~~~~~~~~~~~~~~~~~~~~~"
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
   echo $CURRENT_BRANCH
