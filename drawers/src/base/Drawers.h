@@ -21,14 +21,14 @@
 #include "drawers/Drawer.h"
 
 namespace drawers {
-#define DEFINE_DRAWER(DrawerName)                                             \
-  class DrawerName : public drawers::Drawer {                                 \
-   public:                                                                    \
-    DrawerName() : drawers::Drawer(#DrawerName) {                             \
-    }                                                                         \
-                                                                              \
-   protected:                                                                 \
-    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) override; \
+#define DEFINE_DRAWER(DrawerName)                                                   \
+  class DrawerName : public drawers::Drawer {                                       \
+   public:                                                                          \
+    DrawerName() : drawers::Drawer(#DrawerName) {                                   \
+    }                                                                               \
+                                                                                    \
+   protected:                                                                       \
+    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const override; \
   }
 
 DEFINE_DRAWER(GridBackground);
