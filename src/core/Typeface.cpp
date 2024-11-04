@@ -47,6 +47,10 @@ class EmptyTypeface : public Typeface {
     return false;
   }
 
+  bool hasOutlines() const override {
+    return false;
+  }
+
   GlyphID getGlyphID(Unichar) const override {
     return 0;
   }

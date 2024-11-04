@@ -285,8 +285,8 @@ class Image {
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
    * bounds of the source Image. If the clipRect is not nullptr, the filtered Image will be clipped
-   * accordingly. The offset stores the translation information for the filtered Image. If the
-   * filter is nullptr or fails to apply, nullptr is returned.
+   * accordingly. The offset will store the translation information to be applied when drawing the
+   * filtered Image. If the filter is nullptr or fails to apply, nullptr is returned.
    */
   std::shared_ptr<Image> makeWithFilter(std::shared_ptr<ImageFilter> filter,
                                         Point* offset = nullptr,

@@ -231,13 +231,10 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   auto stroke = paint.getStroke();
   auto style = CreateFillStyle(paint);
   if (stroke && path.isLine()) {
-    auto effect = PathEffect::MakeStroke(stroke);
-    if (effect != nullptr) {
-      auto fillPath = path;
-      effect->filterPath(&fillPath);
-      if (drawSimplePath(fillPath, style)) {
-        return;
-      }
+    auto fillPath = path;
+    stroke->applyToPath(&fillPath);
+    if (drawSimplePath(fillPath, style)) {
+      return;
     }
   }
   if (!stroke && drawSimplePath(path, style)) {
