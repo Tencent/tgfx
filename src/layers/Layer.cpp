@@ -161,8 +161,17 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   if (_mask == value) {
     return;
   }
+  if (value) {
+    auto valueMaskOwner = value->maskOwner.lock();
+    if (valueMaskOwner) {
+      valueMaskOwner->setMask(nullptr);
+      value->maskOwner.reset();
+    }
+  }
   _mask = std::move(value);
-  _mask->maskOwner = this;
+  if (_mask) {
+    _mask->maskOwner = weakThis;
+  }
   invalidate();
 }
 
@@ -316,9 +325,6 @@ Rect Layer::getVisibleBounds() {
     }
     auto maskBounds = _mask->getBounds();
     auto maskBoundsToCurrentLayer = relativeMatrix.mapRect(maskBounds);
-    if (_scrollRect) {
-      maskBoundsToCurrentLayer.offset(-_scrollRect->x(), -_scrollRect->y());
-    }
     if (!bounds.intersect(maskBoundsToCurrentLayer)) {
       return Rect::MakeEmpty();
     }
@@ -334,7 +340,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
     bounds.join(content->getBounds());
   }
   for (const auto& child : _children) {
-    if (child->maskOwner) {
+    if (!child->visible() || !child->maskOwner.expired()) {
       continue;
     }
     auto childBounds = child->getVisibleBounds();
@@ -378,7 +384,7 @@ bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
   }
 
   for (const auto& childLayer : _children) {
-    if (!childLayer->visible() || childLayer->_alpha <= 0.f) {
+    if (!childLayer->visible() || childLayer->_alpha <= 0.f || !childLayer->maskOwner.expired()) {
       continue;
     }
 
@@ -404,7 +410,7 @@ bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
-  if (canvas == nullptr || alpha <= 0 || maskOwner) {
+  if (canvas == nullptr || alpha <= 0) {
     return;
   }
   auto surface = canvas->getSurface();
@@ -533,6 +539,21 @@ Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
   return paint;
 }
 
+std::shared_ptr<ImageFilter> Layer::getLayerFilter(float contentScale) {
+  if (_filters.empty() || FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+  std::vector<std::shared_ptr<ImageFilter>> imageFilters;
+  for (const auto& filter : _filters) {
+    auto imageFilter = filter->getImageFilter(contentScale);
+    if (!imageFilter) {
+      continue;
+    }
+    imageFilters.push_back(imageFilter);
+  }
+  return ImageFilter::Compose(imageFilters);
+}
+
 LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   if (!bitFields.shouldRasterize || args.context == nullptr) {
     return nullptr;
@@ -598,31 +619,12 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
   return recorder.finishRecordingAsPicture();
 }
 
-std::shared_ptr<ImageFilter> Layer::getLayerFilter(float contentScale) {
-  if (_filters.empty() || FloatNearlyZero(contentScale)) {
-    return nullptr;
-  }
-  std::vector<std::shared_ptr<ImageFilter>> imageFilters;
-  for (const auto& filter : _filters) {
-    auto imageFilter = filter->getImageFilter(contentScale);
-    if (!imageFilter) {
-      continue;
-    }
-    imageFilters.push_back(imageFilter);
-  }
-  return ImageFilter::Compose(imageFilters);
-}
-
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
-  auto rasterizedCache = getRasterizedCache(args);
-  if (rasterizedCache) {
-    Paint paint;
-    paint.setAlpha(alpha);
-    paint.setBlendMode(blendMode);
-    rasterizedCache->draw(canvas, paint);
+  if (auto rasterizedCache = getRasterizedCache(args)) {
+    rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
-             !_filters.empty()) {
+             !_filters.empty() || validMask()) {
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
     // draw directly
@@ -649,32 +651,30 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 }
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
-  if (_mask == nullptr || _mask->root() != root()) {
+  if (!validMask()) {
     return nullptr;
   }
-  Recorder maskRecoder;
-  auto maskCanvas = maskRecoder.beginRecording();
-  _mask->drawLayer(args, maskCanvas, _mask->alpha(), BlendMode::SrcOver);
-  auto maskContentPicture = maskRecoder.finishRecordingAsPicture();
-  if (maskContentPicture) {
-    auto maskLayerBounds = _mask->getBounds();
-    auto contentMatrix = Matrix::MakeTrans(-maskLayerBounds.x(), -maskLayerBounds.y());
-    auto maskContentBounds = maskContentPicture->getBounds();
-    auto maskContentImage =
-        Image::MakeFrom(maskContentPicture, static_cast<int>(maskContentBounds.width()),
-                        static_cast<int>(maskContentBounds.height()), &contentMatrix);
 
-    if (maskContentImage) {
-      auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
-      if (shader) {
-        auto relativeMatrix = _mask->getRelativeMatrix(this);
-        relativeMatrix.postScale(scale, scale);
-        auto contentOffsetMatrix = Matrix::MakeTrans(maskLayerBounds.x(), maskLayerBounds.y());
-        relativeMatrix.preConcat(contentOffsetMatrix);
-        shader = shader->makeWithMatrix(relativeMatrix);
-        return MaskFilter::MakeShader(shader);
-      }
-    }
+  auto rasterizedCache = static_cast<RasterizedContent*>(_mask->getRasterizedCache(args));
+  std::shared_ptr<Image> maskContentImage = nullptr;
+  auto drawingMatrix = Matrix::I();
+  if (rasterizedCache) {
+    drawingMatrix = rasterizedCache->matrix;
+    maskContentImage = rasterizedCache->image;
+  }
+  if (maskContentImage == nullptr) {
+    maskContentImage = _mask->getRasterizedImage(args, 1.0f, &drawingMatrix);
+  }
+  if (maskContentImage == nullptr) {
+    return nullptr;
+  }
+  auto relativeMatrix = _mask->getRelativeMatrix(this);
+  relativeMatrix.postScale(scale, scale);
+  relativeMatrix.preConcat(drawingMatrix);
+  auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
+  if (shader) {
+    shader = shader->makeWithMatrix(relativeMatrix);
+    return MaskFilter::MakeShader(shader);
   }
   return nullptr;
 }
@@ -688,6 +688,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   Paint paint;
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
+  paint.setMaskFilter(getMaskFilter(args, contentScale));
   auto filter = getLayerFilter(contentScale);
   paint.setImageFilter(filter);
   auto matrix = Matrix::MakeScale(1.0f / contentScale);
@@ -700,8 +701,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
   }
   for (const auto& child : _children) {
-    if (!child->visible() || child->_alpha <= 0 || child->maskOwner ||
-        child->getVisibleBounds() == Rect::MakeEmpty()) {
+    if (!child->visible() || child->_alpha <= 0 || !child->maskOwner.expired()) {
       continue;
     }
     canvas->save();
@@ -760,4 +760,9 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 
   return hasLayerUnderPoint;
 }
+
+bool Layer::validMask() const {
+  return _mask && !_mask->maskOwner.expired() && _mask->root() == root();
+}
+
 }  // namespace tgfx
