@@ -121,9 +121,26 @@ std::shared_ptr<CGTypeface> CGTypeface::Make(CTFontRef ctFont, std::shared_ptr<D
   return typeface;
 }
 
+static bool HasOutlines(CTFontRef ctFont) {
+  auto fontFormat = CTFontCopyAttribute(ctFont, kCTFontFormatAttribute);
+  if (!fontFormat) {
+    return false;
+  }
+  SInt16 format;
+  CFNumberGetValue(static_cast<CFNumberRef>(fontFormat), kCFNumberSInt16Type, &format);
+  CFRelease(fontFormat);
+  if (format == kCTFontFormatUnrecognized || format == kCTFontFormatBitmap) {
+    return false;
+  }
+  return true;
+}
+
 CGTypeface::CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data)
     : _uniqueID(UniqueID::Next()), ctFont(ctFont), data(std::move(data)) {
   CFRetain(ctFont);
+  CTFontSymbolicTraits traits = CTFontGetSymbolicTraits(ctFont);
+  _hasColor = static_cast<bool>(traits & kCTFontTraitColorGlyphs);
+  _hasOutlines = HasOutlines(ctFont);
 }
 
 CGTypeface::~CGTypeface() {
@@ -157,11 +174,6 @@ int CGTypeface::unitsPerEm() const {
   auto ret = CGFontGetUnitsPerEm(cgFont);
   CGFontRelease(cgFont);
   return ret;
-}
-
-bool CGTypeface::hasColor() const {
-  CTFontSymbolicTraits traits = CTFontGetSymbolicTraits(ctFont);
-  return static_cast<bool>(traits & kCTFontTraitColorGlyphs);
 }
 
 static size_t ToUTF16(int32_t uni, uint16_t utf16[2]) {

@@ -58,12 +58,9 @@ WebTypeface::WebTypeface(std::string name, std::string style)
   if (!this->style.empty()) {
     webFontFamily += " " + this->style;
   }
-}
-
-bool WebTypeface::hasColor() const {
   auto emojiName = name;
   std::transform(emojiName.begin(), emojiName.end(), emojiName.begin(), ::tolower);
-  return emojiName.find("emoji") != std::string::npos;
+  _hasColor = emojiName.find("emoji") != std::string::npos;
 }
 
 // The web side does not involve multithreading and does not require locking.
@@ -74,7 +71,7 @@ static std::unordered_map<std::string, std::vector<Unichar>>& GlyphsMap() {
 
 GlyphID WebTypeface::getGlyphID(Unichar unichar) const {
   auto text = UTF::ToUTF8(unichar);
-  if (!hasColor() && scalerContextClass.call<bool>("isEmoji", text)) {
+  if (!_hasColor && scalerContextClass.call<bool>("isEmoji", text)) {
     return 0;
   }
   auto& glyphs = GlyphsMap()[webFontFamily];
