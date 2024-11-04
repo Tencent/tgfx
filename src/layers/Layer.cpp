@@ -530,7 +530,24 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   if (args.renderFlags & RenderFlags::DisableCache) {
     return nullptr;
   }
-  auto picture = getLayerPicture(args, _rasterizationScale);
+  auto drawingMatrix = Matrix::I();
+  auto image = getRasterizedImage(args, _rasterizationScale, &drawingMatrix);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  image = image->makeTextureImage(args.context);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  rasterizedContent =
+      std::make_unique<RasterizedContent>(contextID, std::move(image), drawingMatrix);
+  return rasterizedContent.get();
+}
+
+std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float contentScale,
+                                                 Matrix* drawingMatrix) {
+  DEBUG_ASSERT(drawingMatrix != nullptr);
+  auto pictureq = getLayerPicture(args, contentScale);
   if (!picture) {
     return nullptr;
   }
@@ -542,23 +559,17 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   if (image == nullptr) {
     return nullptr;
   }
-  auto drawingMatrix = Matrix::MakeScale(1.0f / _rasterizationScale);
-  drawingMatrix.preTranslate(bounds.left, bounds.top);
-  if (auto filter = getLayerFilter(_rasterizationScale)) {
+  drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+  drawingMatrix->preTranslate(bounds.left, bounds.top);
+  if (auto filter = getLayerFilter(contentScale)) {
     Point offset = Point::Zero();
     image = image->makeWithFilter(std::move(filter), &offset);
     if (image == nullptr) {
       return nullptr;
     }
-    drawingMatrix.preTranslate(offset.x, offset.y);
+    drawingMatrix->preTranslate(offset.x, offset.y);
   }
-  image = image->makeTextureImage(args.context);
-  if (image == nullptr) {
-    return nullptr;
-  }
-  rasterizedContent =
-      std::make_unique<RasterizedContent>(contextID, std::move(image), drawingMatrix);
-  return rasterizedContent.get();
+  return image;
 }
 
 std::shared_ptr<Picture> Layer::getLayerPicture(const DrawArgs& args, float contentScale) {

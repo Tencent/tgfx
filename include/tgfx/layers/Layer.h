@@ -504,6 +504,9 @@ class Layer {
 
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
+  std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
+                                            Matrix* drawingMatrix);
+
   std::shared_ptr<Picture> getLayerPicture(const DrawArgs& args, float contentScale);
 
   std::shared_ptr<ImageFilter> getLayerFilter(float contentScale);
