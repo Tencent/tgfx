@@ -17,14 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
+#include <regex>
 #include "core/utils/Log.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
-#include <regex>
 
 namespace tgfx {
 
-//static constexpr float DefaultLineHeight = 1.2f;
 static std::mutex& TypefaceMutex = *new std::mutex;
 static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
 
@@ -123,56 +122,6 @@ void TextLayer::setTabSpaceNum(uint32_t num) {
   invalidateContent();
 }
 
-#if 0
-std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
-  if (_text.empty()) {
-    return nullptr;
-  }
-  std::vector<GlyphID> glyphs = {};
-  std::vector<Point> positions = {};
-
-  // use middle alignment, refer to the document: https://paddywang.github.io/demo/list/css/baseline_line-height.html
-  auto metrics = _font.getMetrics();
-  auto lineHeight = ceil(_font.getSize() * DefaultLineHeight);
-  auto baseLine = (lineHeight + metrics.xHeight) / 2;
-  auto emptyGlyphID = _font.getGlyphID(" ");
-  auto emptyAdvance = _font.getAdvance(emptyGlyphID);
-  const char* textStart = _text.data();
-  const char* textStop = textStart + _text.size();
-  float xOffset = 0;
-  float yOffset = baseLine;
-  while (textStart < textStop) {
-    if (*textStart == '\n') {
-      xOffset = 0;
-      yOffset += lineHeight;
-      glyphs.push_back(emptyGlyphID);
-      positions.push_back(Point::Make(xOffset, yOffset));
-      textStart++;
-      continue;
-    }
-    auto unichar = UTF::NextUTF8(&textStart, textStop);
-    auto glyphID = _font.getGlyphID(unichar);
-    if (glyphID > 0) {
-      glyphs.push_back(glyphID);
-      positions.push_back(Point::Make(xOffset, yOffset));
-      auto advance = _font.getAdvance(glyphID);
-      xOffset += advance;
-    } else {
-      glyphs.push_back(emptyGlyphID);
-      positions.push_back(Point::Make(xOffset, yOffset));
-      xOffset += emptyAdvance;
-    }
-  }
-  GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
-  auto textBlob = TextBlob::MakeFrom(std::move(glyphRun));
-  if (textBlob == nullptr) {
-    return nullptr;
-  }
-  return std::make_unique<TextContent>(std::move(textBlob), _textColor);
-}
-#endif
-
-#if 1
 std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   if (_text.empty()) {
     return nullptr;
@@ -218,7 +167,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
         xOffset = 0;
         yOffset += lineHeight;
       } else if ('\t' == character) {
-        for (uint32_t i=0; i < _tabSpaceNum; i++) {
+        for (uint32_t i = 0; i < _tabSpaceNum; i++) {
           glyphs.push_back(spaceGlyphID);
           positions.push_back(Point::Make(xOffset, yOffset));
           xOffset += spaceAdvance;
@@ -241,7 +190,6 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   }
   return std::make_unique<TextContent>(std::move(textBlob), _textColor);
 }
-#endif
 
 std::string TextLayer::preprocessNewLines(const std::string& text) {
   std::regex newlineRegex(R"(\r\n|\n\r|\r)");
