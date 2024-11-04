@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
+#include "core/utils/Log.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
+#include <regex>
 
 namespace tgfx {
 
-static constexpr float DefaultLineHeight = 1.2f;
+//static constexpr float DefaultLineHeight = 1.2f;
 static std::mutex& TypefaceMutex = *new std::mutex;
 static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
 
@@ -112,6 +114,16 @@ void TextLayer::setAutoWrap(bool value) {
   invalidateContent();
 }
 
+void TextLayer::setTabSpaceNum(uint32_t num) {
+  if (_tabSpaceNum == num) {
+    return;
+  }
+
+  _tabSpaceNum = num;
+  invalidateContent();
+}
+
+#if 0
 std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   if (_text.empty()) {
     return nullptr;
@@ -131,7 +143,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   float yOffset = baseLine;
   while (textStart < textStop) {
     if (*textStart == '\n') {
-      xOffset = -emptyAdvance;
+      xOffset = 0;
       yOffset += lineHeight;
       glyphs.push_back(emptyGlyphID);
       positions.push_back(Point::Make(xOffset, yOffset));
@@ -157,5 +169,82 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     return nullptr;
   }
   return std::make_unique<TextContent>(std::move(textBlob), _textColor);
+}
+#endif
+
+#if 1
+std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
+  if (_text.empty()) {
+    return nullptr;
+  }
+
+  std::string text = preprocessNewLines(_text);
+
+  std::vector<GlyphID> glyphs = {};
+  std::vector<Point> positions = {};
+  const auto spaceGlyphID = _font.getGlyphID(" ");
+  const auto spaceAdvance = _font.getAdvance(spaceGlyphID);
+  const auto fontMetrics = _font.getMetrics();
+  const float lineHeight = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
+                           std::fabs(fontMetrics.leading);
+  float xOffset = 0;
+  float yOffset = std::fabs(fontMetrics.ascent);
+  const char* head = text.data();
+  const char* tail = head + text.size();
+  // refer to:
+  // https://developer.apple.com/library/archive/documentation/StringsTextFonts/Conceptual/TextAndWebiPhoneOS/TypoFeatures/TextSystemFeatures.html
+  // https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/text_layout.png
+  while (head < tail) {
+    const auto character = UTF::NextUTF8(&head, tail);
+    const auto glyphID = _font.getGlyphID(character);
+    if (glyphID > 0) {
+      glyphs.push_back(glyphID);
+      positions.push_back(Point::Make(xOffset, yOffset));
+      auto advance = _font.getAdvance(glyphID);
+      xOffset += advance;
+
+      if (_autoWrap) {
+        if (xOffset >= _width) {
+          xOffset = 0;
+          yOffset += lineHeight;
+        }
+      }
+    } else {
+#if DEBUG
+      const auto pos = text.find(static_cast<char>(character));
+      LOGE("invalid character: %c(%d), pos : %d, glyphID is 0.", character, character, pos);
+#endif
+      if ('\n' == character) {
+        xOffset = 0;
+        yOffset += lineHeight;
+      } else if ('\t' == character) {
+        for (uint32_t i=0; i < _tabSpaceNum; i++) {
+          glyphs.push_back(spaceGlyphID);
+          positions.push_back(Point::Make(xOffset, yOffset));
+          xOffset += spaceAdvance;
+
+          if (_autoWrap) {
+            if (xOffset >= _width) {
+              xOffset = 0;
+              yOffset += lineHeight;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRun));
+  if (nullptr == textBlob) {
+    return nullptr;
+  }
+  return std::make_unique<TextContent>(std::move(textBlob), _textColor);
+}
+#endif
+
+std::string TextLayer::preprocessNewLines(const std::string& text) {
+  std::regex newlineRegex(R"(\r\n|\n\r|\r)");
+  return std::regex_replace(text, newlineRegex, "\n");
 }
 }  // namespace tgfx

@@ -144,6 +144,18 @@ class TextLayer : public Layer {
    */
   void setAutoWrap(bool value);
 
+  /**
+   * Returns the number of spaces a tab character occupies, default is 4 spaces.
+   */
+  uint32_t tabSpaceNum() const {
+    return _tabSpaceNum;
+  }
+
+  /**
+   * Set the number of spaces for tab characters.
+   */
+  void setTabSpaceNum(uint32_t num);
+
  protected:
   TextLayer() = default;
 
@@ -158,5 +170,8 @@ class TextLayer : public Layer {
   TextAlign _textAlign = TextAlign::Left;
   VerticalAlign _verticalAlign = VerticalAlign::Top;
   bool _autoWrap = false;
+  uint32_t _tabSpaceNum = 4;
+
+  std::string preprocessNewLines(const std::string& text);
 };
 }  // namespace tgfx
