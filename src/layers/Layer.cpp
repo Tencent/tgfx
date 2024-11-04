@@ -547,7 +547,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
 std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float contentScale,
                                                  Matrix* drawingMatrix) {
   DEBUG_ASSERT(drawingMatrix != nullptr);
-  auto picture = getLayerPicture(args, contentScale);
+  auto picture = getLayerContents(args, contentScale);
   if (!picture) {
     return nullptr;
   }
@@ -572,7 +572,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   return image;
 }
 
-std::shared_ptr<Picture> Layer::getLayerPicture(const DrawArgs& args, float contentScale) {
+std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float contentScale) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
@@ -620,7 +620,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto picture = getLayerPicture(args, contentScale);
+  auto picture = getLayerContents(args, contentScale);
   if (picture == nullptr) {
     return;
   }
