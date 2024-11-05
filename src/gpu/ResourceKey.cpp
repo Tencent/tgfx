@@ -89,11 +89,18 @@ UniqueKey UniqueKey::Combine(const UniqueKey& uniqueKey, const BytesKey& bytesKe
   if (uniqueKey.empty()) {
     return {};
   }
-  auto data = CopyData(bytesKey.data(), bytesKey.size(), 2);
+  if (bytesKey.size() == 0) {
+    return uniqueKey;
+  }
+  auto offset = std::max(uniqueKey.count, static_cast<size_t>(2));
+  auto data = CopyData(bytesKey.data(), bytesKey.size(), offset);
   if (data == nullptr) {
     return uniqueKey;
   }
-  auto count = bytesKey.size() + 2;
+  if (uniqueKey.count > 2) {
+    memcpy(data + 2, uniqueKey.data + 2, uniqueKey.count - 2);
+  }
+  auto count = bytesKey.size() + offset;
   auto domain = uniqueKey.uniqueDomain;
   data[1] = domain->uniqueID();
   data[0] = HashRange(data + 1, count - 1);
@@ -205,7 +212,7 @@ LazyUniqueKey::~LazyUniqueKey() {
   reset();
 }
 
-UniqueKey LazyUniqueKey::get() {
+UniqueKey LazyUniqueKey::get() const {
   auto domain = uniqueDomain.load(std::memory_order_acquire);
   if (domain == nullptr) {
     auto newDomain = new UniqueDomain();

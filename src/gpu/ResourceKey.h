@@ -227,7 +227,7 @@ class LazyUniqueKey {
    * immediately. Calling this method from multiple threads will not create multiple UniqueKeys.
    * This method is thread-safe as long as there is no concurrent reset() call.
    */
-  UniqueKey get();
+  UniqueKey get() const;
 
   /**
    * Resets the LazyUniqueKey to an empty state. This method is not thread-safe.
@@ -235,6 +235,6 @@ class LazyUniqueKey {
   void reset();
 
  private:
-  std::atomic<UniqueDomain*> uniqueDomain = nullptr;
+  mutable std::atomic<UniqueDomain*> uniqueDomain = nullptr;
 };
 }  // namespace tgfx

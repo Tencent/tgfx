@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "tgfx/core/Path.h"
+
 namespace tgfx {
 /**
  * LineCap draws at the beginning and end of an open path contour.
@@ -72,6 +74,12 @@ class Stroke {
                   float miterLimit = 4.0f)
       : width(width), cap(cap), join(join), miterLimit(miterLimit) {
   }
+
+  /**
+   * Applies this stroke to the given path. Returns false if this stroke cannot be applied, and
+   * leaves the path unchanged.
+   */
+  bool applyToPath(Path* path) const;
 
   /**
    * The thickness of the pen used to outline the paths or glyphs.

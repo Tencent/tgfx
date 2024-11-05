@@ -69,7 +69,10 @@
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
-        "draw_solid": "b4a1231"
+        "draw_solid": "b4a1231",
+        "imageMask": "ba6aa7d",
+        "shapeMask": "ba6aa7d",
+        "textMask": "ba6aa7d"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

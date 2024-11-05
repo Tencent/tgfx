@@ -16,41 +16,43 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/layers/LayerContent.h"
+#include "TrimPathEffect.h"
+#include "core/PathRef.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
-class RasterizedContent : public LayerContent {
- public:
-  RasterizedContent(uint32_t contextID, std::shared_ptr<Image> image, const Matrix& matrix)
-      : _contextID(contextID), image(std::move(image)), matrix(matrix) {
+using namespace pk;
+
+std::unique_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT) {
+  if (isnan(startT) || isnan(stopT)) {
+    return nullptr;
   }
-
-  /**
-   * Returns the unique ID of the associated GPU device.
-   */
-  uint32_t contextID() const {
-    return _contextID;
+  if (startT <= 0 && stopT >= 1) {
+    return nullptr;
   }
+  startT = std::max(0.f, std::min(startT, 1.f));
+  stopT = std::max(0.f, std::min(stopT, 1.f));
+  return std::unique_ptr<PathEffect>(new TrimPathEffect(startT, stopT));
+}
 
-  Rect getBounds() const override;
+bool TrimPathEffect::filterPath(Path* path) const {
+  if (path == nullptr) {
+    return false;
+  }
+  if (startT >= stopT) {
+    path->reset();
+    return true;
+  }
+  auto pathMeasure = PathMeasure::MakeFrom(*path);
+  auto length = pathMeasure->getLength();
+  auto start = startT * length;
+  auto end = stopT * length;
+  Path tempPath = {};
+  if (!pathMeasure->getSegment(start, end, &tempPath)) {
+    return false;
+  }
+  *path = std::move(tempPath);
+  return true;
+}
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
-
-  std::shared_ptr<Image> getImage() const {
-    return image;
-  };
-
-  Matrix getMatrix() const {
-    return matrix;
-  };
-
- private:
-  uint32_t _contextID = 0;
-  std::shared_ptr<Image> image = nullptr;
-  Matrix matrix = Matrix::I();
-};
 }  // namespace tgfx

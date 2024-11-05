@@ -26,28 +26,9 @@
 #include "tgfx/gpu/RuntimeEffect.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
+#include "utils/common.h"
 
 namespace tgfx {
-std::array<float, 20> lumaColorMatrix = {0,
-                                         0,
-                                         0,
-                                         0,
-                                         0,  // red
-                                         0,
-                                         0,
-                                         0,
-                                         0,
-                                         0,  // green
-                                         0,
-                                         0,
-                                         0,
-                                         0,
-                                         0,  // blue
-                                         0.21260000000000001f,
-                                         0.71519999999999995f,
-                                         0.0722f,
-                                         0,
-                                         0};
 
 TGFX_TEST(FilterTest, ColorMatrixFilter) {
   auto device = DevicePool::Make();
@@ -168,7 +149,7 @@ TGFX_TEST(FilterTest, Blur) {
   Path path;
   path.addRect(Rect::MakeWH(imageWidth, imageHeight));
   Stroke stroke(1.f);
-  PathEffect::MakeStroke(&stroke)->filterPath(&path);
+  stroke.applyToPath(&path);
   paint.setImageFilter(nullptr);
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   canvas->drawPath(path, paint);

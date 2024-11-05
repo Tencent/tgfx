@@ -133,6 +133,11 @@ bool FTTypeface::hasColor() const {
   return FT_HAS_COLOR(face);
 }
 
+bool FTTypeface::hasOutlines() const {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return FT_IS_SCALABLE(face);
+}
+
 GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
   std::lock_guard<std::mutex> autoLock(locker);
   return static_cast<GlyphID>(FT_Get_Char_Index(face, static_cast<FT_ULong>(unichar)));
