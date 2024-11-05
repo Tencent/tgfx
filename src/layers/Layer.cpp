@@ -59,10 +59,7 @@ Layer::~Layer() {
   if (_mask) {
     _mask->maskOwner = nullptr;
   }
-  auto size = _children.size();
-  if (size > 0) {
-    removeChildren(0, static_cast<int>(size) - 1);
-  }
+  removeChildren();
 }
 
 Layer::Layer() {
