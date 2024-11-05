@@ -838,23 +838,26 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
 TGFX_TEST(CanvasTest, YUVImage) {
   int width = 1440;
   size_t height = 1280;
-  size_t line = 1440;
-  auto yStream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/y.txt"));
-  auto uStream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/u.txt"));
-  auto vStream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/v.txt"));
-  Buffer yBuffer(line * height);
-  Buffer uBuffer(line * height / 2);
-  Buffer vBuffer(line * height / 2);
-  yStream->read(yBuffer.data(), line * height);
-  uStream->read(uBuffer.data(), line * height / 2);
-  vStream->read(vBuffer.data(), line * height / 2);
+  size_t lineSize = 1440;
+  size_t yBufferSize = lineSize * height;
+  size_t halfYBufferSize = yBufferSize / 2;
+  auto yuvStream =
+      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/data.yuv"));
+  ASSERT_TRUE(yuvStream != nullptr);
+  Buffer yBuffer(yBufferSize);
+  Buffer uBuffer(halfYBufferSize);
+  Buffer vBuffer(halfYBufferSize);
+  EXPECT_TRUE(yuvStream->read(yBuffer.data(), yBufferSize) == yBufferSize);
+  EXPECT_TRUE(yuvStream->read(uBuffer.data(), halfYBufferSize) == halfYBufferSize);
+  EXPECT_TRUE(yuvStream->read(vBuffer.data(), halfYBufferSize) == halfYBufferSize);
   uint8_t* data[3];
   data[0] = static_cast<uint8_t*>(yBuffer.data());
   data[1] = static_cast<uint8_t*>(uBuffer.data());
   data[2] = static_cast<uint8_t*>(vBuffer.data());
-  const size_t lineSize[3] = {line, line / 2, line / 2};
-  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)data, lineSize,
+  const size_t lineSizes[3] = {lineSize, lineSize / 2, lineSize / 2};
+  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)data, lineSizes,
                                    YUVData::I420_PLANE_COUNT);
+  ASSERT_TRUE(yuvData != nullptr);
   auto image = Image::MakeI420(std::move(yuvData));
   ASSERT_TRUE(image != nullptr);
   auto device = DevicePool::Make();
