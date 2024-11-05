@@ -127,7 +127,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   const float lineHeight = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
                            std::fabs(fontMetrics.leading);
   float xOffset = 0;
-  float yOffset = std::fabs(fontMetrics.ascent);
+  float yOffset = lineHeight;
   const char* head = text.data();
   const char* tail = head + text.size();
   // refer to:
