@@ -691,6 +691,7 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   root->setShouldRasterize(false);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
+  device->unlock();
 }
 
 TGFX_TEST(LayerTest, imageMask) {
