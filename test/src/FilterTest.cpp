@@ -26,28 +26,9 @@
 #include "tgfx/gpu/RuntimeEffect.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
+#include "utils/common.h"
 
 namespace tgfx {
-std::array<float, 20> lumaColorMatrix = {0,
-                                         0,
-                                         0,
-                                         0,
-                                         0,  // red
-                                         0,
-                                         0,
-                                         0,
-                                         0,
-                                         0,  // green
-                                         0,
-                                         0,
-                                         0,
-                                         0,
-                                         0,  // blue
-                                         0.21260000000000001f,
-                                         0.71519999999999995f,
-                                         0.0722f,
-                                         0,
-                                         0};
 
 TGFX_TEST(FilterTest, ColorMatrixFilter) {
   auto device = DevicePool::Make();

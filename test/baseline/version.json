@@ -6,6 +6,9 @@
         "PictureImage": "8a2ac4d",
         "PictureImage_Path": "2212c4e",
         "PictureImage_Text": "2212c4e",
+        "YUVImage": "bc64712",
+        "YUVImage_RGBAA": "bc64712",
+        "altas": "b1cfcd4",
         "blendMode": "b3076a3",
         "drawImage": "8cb853c",
         "filter_mode_linear": "d010fb8",
@@ -24,7 +27,7 @@
         "rasterized_mipmap": "f55f586",
         "rasterized_scale_up": "721c9e0",
         "scaleImage": "8cb853c",
-        "shape": "8eee394",
+        "shape": "bc64712",
         "text_shape": "74f94c4",
         "tile_mode_normal": "8cb853c",
         "tile_mode_rgbaaa": "8cb853c",
@@ -32,11 +35,9 @@
     },
     "DrawersTest": {
         "ConicGradient": "5a1fb11",
-        "CustomLayerTreeDrawer": "81fc05e",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
-        "SimpleLayerTreeDrawer": "81fc05e",
         "SimpleText": "7fd9cd9"
     },
     "FilterTest": {
@@ -57,21 +58,21 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
-        "Layer_hitTestPoint": "bc64712",
-        "Layer_hitTestPointNested": "bc64712",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
         "draw_shape": "8378211",
-        "draw_solid": "b4a1231",
-        "draw_text": "bc64712",
+        "draw_text": "fa90eb0",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
-        "getBounds": "bc64712",
-        "getLayersUnderPoint": "bc64712",
+        "getBounds": "8a26de7",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
-        "imageLayer": "99a5cd9"
+        "imageLayer": "99a5cd9",
+        "draw_solid": "b4a1231",
+        "imageMask": "ba6aa7d",
+        "shapeMask": "ba6aa7d",
+        "textMask": "ba6aa7d"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -146,8 +147,5 @@
         "ImageSnapshot2": "d010fb8",
         "ImageSnapshot_Surface1": "d010fb8",
         "ImageSnapshot_Surface2": "d010fb8"
-    },
-    "TextAlignTest": {
-        "TextAlign": "5d5de8f"
     }
 }
