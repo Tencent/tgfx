@@ -449,6 +449,8 @@ class Layer {
  protected:
   std::weak_ptr<Layer> weakThis;
 
+  Layer* maskOwner;
+
   Layer();
 
   /**
@@ -502,14 +504,14 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
+  std::shared_ptr<ImageFilter> getLayerFilter(float contentScale);
+
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale);
-
-  std::shared_ptr<ImageFilter> getLayerFilter(float contentScale);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
@@ -518,6 +520,12 @@ class Layer {
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
+
+  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
+
+  Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+
+  bool hasValidMask() const;
 
   std::string _name;
   float _alpha = 1.0f;
