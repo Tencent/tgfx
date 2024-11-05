@@ -807,13 +807,13 @@ TGFX_TEST(CanvasTest, atlas) {
   auto rowBytes = static_cast<size_t>(imageCodec->width()) * 4;
   Buffer buffer(rowBytes * static_cast<size_t>(imageCodec->height()));
   auto pixels = buffer.data();
-  ASSERT_TRUE(pixels);
+  ASSERT_TRUE(pixels != nullptr);
   auto RGBAInfo = ImageInfo::Make(imageCodec->width(), imageCodec->height(), ColorType::RGBA_8888,
                                   AlphaType::Premultiplied);
   EXPECT_TRUE(imageCodec->readPixels(RGBAInfo, pixels));
   auto pixelsData = Data::MakeWithCopy(buffer.data(), buffer.size());
   auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData));
-  ASSERT_TRUE(image);
+  ASSERT_TRUE(image != nullptr);
   Matrix matrix[4] = {Matrix::I(), Matrix::MakeTrans(660, 0), Matrix::MakeTrans(0, 380),
                       Matrix::MakeTrans(660, 380)};
   Rect rect[4] = {Rect::MakeXYWH(0, 0, 640, 360), Rect::MakeXYWH(640, 0, 640, 360),
