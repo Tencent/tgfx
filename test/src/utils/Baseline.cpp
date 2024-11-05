@@ -243,9 +243,8 @@ void Baseline::TearDown() {
     outMD5File << std::setw(4) << OutputMD5 << std::endl;
     outMD5File.close();
     CreateFolder(CACHE_VERSION_PATH);
-    std::ofstream outVersionFile(CACHE_VERSION_PATH);
-    outVersionFile << std::setw(4) << BaselineVersion << std::endl;
-    outVersionFile.close();
+    std::filesystem::copy(BASELINE_VERSION_PATH, CACHE_VERSION_PATH,
+                          std::filesystem::copy_options::overwrite_existing);
   }
 #else
   std::filesystem::remove(OUT_MD5_PATH);

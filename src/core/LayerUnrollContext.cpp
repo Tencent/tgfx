@@ -43,13 +43,11 @@ void LayerUnrollContext::drawRRect(const RRect& rRect, const MCState& state,
 
 void LayerUnrollContext::drawPath(const Path& path, const MCState& state, const FillStyle& style,
                                   const Stroke* stroke) {
-  auto& skPath = PathRef::ReadAccess(path);
-  if (skPath.hasMultipleContours()) {
-    // If the path has multiple contours, they may overlap, so we can't unroll it.
-    return;
+  // The shape might have multiple contours and could overlap, so we can't unroll it directly.
+  if (style.isOpaque() && fillStyle.isOpaque()) {
+    drawContext->drawPath(path, state, merge(style), stroke);
+    unrolled = true;
   }
-  drawContext->drawPath(path, state, merge(style), stroke);
-  unrolled = true;
 }
 
 void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -68,7 +66,7 @@ void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect&
 void LayerUnrollContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                           const MCState& state, const FillStyle& style,
                                           const Stroke* stroke) {
-  // We presume that within a single GlyphRunList, glyphs usually do not overlap.
+  // We assume that glyphs within a single GlyphRunList usually do not overlap.
   drawContext->drawGlyphRunList(std::move(glyphRunList), state, merge(style), stroke);
   unrolled = true;
 }

@@ -63,6 +63,10 @@ bool Font::hasColor() const {
   return scalerContext->hasColor();
 }
 
+bool Font::hasOutlines() const {
+  return scalerContext->hasOutlines();
+}
+
 void Font::setTypeface(std::shared_ptr<Typeface> newTypeface) {
   if (newTypeface == scalerContext->getTypeface()) {
     return;

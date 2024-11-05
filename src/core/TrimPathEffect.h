@@ -18,39 +18,18 @@
 
 #pragma once
 
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
-class RasterizedContent : public LayerContent {
+class TrimPathEffect : public PathEffect {
  public:
-  RasterizedContent(uint32_t contextID, std::shared_ptr<Image> image, const Matrix& matrix)
-      : _contextID(contextID), image(std::move(image)), matrix(matrix) {
+  TrimPathEffect(float startT, float stopT) : startT(startT), stopT(stopT) {
   }
 
-  /**
-   * Returns the unique ID of the associated GPU device.
-   */
-  uint32_t contextID() const {
-    return _contextID;
-  }
-
-  Rect getBounds() const override;
-
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
-
-  std::shared_ptr<Image> getImage() const {
-    return image;
-  };
-
-  Matrix getMatrix() const {
-    return matrix;
-  };
+  bool filterPath(Path* path) const override;
 
  private:
-  uint32_t _contextID = 0;
-  std::shared_ptr<Image> image = nullptr;
-  Matrix matrix = Matrix::I();
+  float startT = 0.0f;
+  float stopT = 1.0f;
 };
 }  // namespace tgfx

@@ -38,6 +38,7 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
+#include "utils/common.h"
 
 namespace tgfx {
 TGFX_TEST(CanvasTest, clip) {
@@ -121,26 +122,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
   Paint paint;
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
-  auto lumaColorFilter = ColorFilter::Matrix({0,
-                                              0,
-                                              0,
-                                              0,
-                                              0,  // red
-                                              0,
-                                              0,
-                                              0,
-                                              0,
-                                              0,  // green
-                                              0,
-                                              0,
-                                              0,
-                                              0,
-                                              0,  // blue
-                                              0.21260000000000001f,
-                                              0.71519999999999995f,
-                                              0.0722f,
-                                              0,
-                                              0});
+  auto lumaColorFilter = ColorFilter::Matrix(lumaColorMatrix);
   paint.setColorFilter(lumaColorFilter);
   int tileSize = 8;
   size_t drawCallCount = 0;
