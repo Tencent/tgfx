@@ -42,7 +42,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   textLayer->setMatrix(Matrix::MakeTrans(0.0f, 0.0f) /* * Matrix::MakeScale(2.0f, 2.0f)*/);
   textLayer->setTextColor(Color::White());
   textLayer->setText(
-      "a\nb\rc\r\nd\n\refghijklmnopqrstuvwxyz~!@#$%^&*()_+`"
+      "ajkpy这是一段用于测试文字渲染的内容\nb\rc\r\nd\n\refghijklmnopqrstuvwxyz~!@#$%^&*()_+`"
       "gjpyh\n先帝\t创业未半而中道崩殂，今天下三分，益州疲弊，此诚危急存亡之秋也。"
       "然侍卫之臣不懈于内，忠志之士忘身于外者，盖追先帝之殊遇，欲报之于陛下也。"
       "诚宜开张圣听，以光先帝遗德，恢弘志士之气，不宜妄自菲薄，引喻失义，以塞忠谏之路也。"
@@ -50,7 +50,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
       "若有作奸犯科及为忠善者，宜付有司论其刑赏，以昭陛下平明之理，不宜偏私，使内外异法也。");
   textLayer->setWidth(250);
   textLayer->setHeight(400);
-  textLayer->setAutoWrap(false);
+  textLayer->setAutoWrap(true);
   textLayer->setTextAlign(TextAlign::Left);
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   Font font(typeface, 20);
@@ -76,10 +76,10 @@ TGFX_TEST(TextAlignTest, TextAlign) {
 }
 
 TGFX_TEST(TextAlignTest, TextAlignPrint) {
-  std::string text = "ab\rcd\nef\r\ngh\n\rij\tk";
+  std::string text = "ab\rcd\nef\r\ngh\n\rij\tk\r\r\rp";
   auto textLayer = TextLayer::Make();
   textLayer->setText(text);
   text = textLayer->preprocessNewLines(text);
-  EXPECT_EQ(text, "ab\ncd\nef\ngh\nij\tk");
+  EXPECT_EQ(text, "ab\ncd\nef\ngh\nij\tk\n\n\np");
 }
 }  // namespace tgfx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
-#include <regex>
 #include "core/utils/Log.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
@@ -113,15 +112,6 @@ void TextLayer::setAutoWrap(bool value) {
   invalidateContent();
 }
 
-void TextLayer::setTabSpaceNum(uint32_t num) {
-  if (_tabSpaceNum == num) {
-    return;
-  }
-
-  _tabSpaceNum = num;
-  invalidateContent();
-}
-
 std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   if (_text.empty()) {
     return nullptr;
@@ -167,7 +157,8 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
         xOffset = 0;
         yOffset += lineHeight;
       } else if ('\t' == character) {
-        for (uint32_t i = 0; i < _tabSpaceNum; i++) {
+        // tab width is 4 spaces
+        for (uint32_t i = 0; i < 4; i++) {
           glyphs.push_back(spaceGlyphID);
           positions.push_back(Point::Make(xOffset, yOffset));
           xOffset += spaceAdvance;
@@ -192,7 +183,21 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
 }
 
 std::string TextLayer::preprocessNewLines(const std::string& text) {
-  std::regex newlineRegex(R"(\r\n|\n\r|\r)");
-  return std::regex_replace(text, newlineRegex, "\n");
+  std::string result;
+  const size_t size = text.size();
+  result.reserve(text.size());
+
+  for (size_t i = 0; i < size; ++i) {
+    if (text[i] == '\r' || text[i] == '\n') {
+      result += '\n';
+      if (i + 1 < size && text[i] != text[i + 1] && (text[i + 1] == '\r' || text[i + 1] == '\n')) {
+        ++i;
+      }
+    } else {
+      result += text[i];
+    }
+  }
+
+  return result;
 }
 }  // namespace tgfx
