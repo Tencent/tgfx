@@ -26,12 +26,14 @@
 #include "gpu/opengl/GLSampler.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Recorder.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
@@ -605,7 +607,7 @@ TGFX_TEST(CanvasTest, shape) {
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto image = MakeImage("resources/apitest/imageReplacement_VP8L.webp");
   ASSERT_TRUE(image != nullptr);
   Paint paint;
   paint.setStyle(PaintStyle::Stroke);
@@ -812,6 +814,42 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
   GLFunctions::Get(context)->deleteTextures(1, &(sampler.id));
+  device->unlock();
+}
+
+TGFX_TEST(CanvasTest, YUVImage) {
+  int width = 1440;
+  size_t height = 1280;
+  size_t lineSize = 1440;
+  size_t yDataSize = lineSize * height;
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/data.yuv"));
+  ASSERT_TRUE(data != nullptr);
+  EXPECT_TRUE(data->size() == yDataSize * 2);
+  const uint8_t* dataAddress[3];
+  dataAddress[0] = data->bytes();
+  dataAddress[1] = data->bytes() + yDataSize;
+  dataAddress[2] = data->bytes() + yDataSize + yDataSize / 2;
+  const size_t lineSizes[3] = {lineSize, lineSize / 2, lineSize / 2};
+  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)dataAddress,
+                                   lineSizes, YUVData::I420_PLANE_COUNT);
+  ASSERT_TRUE(yuvData != nullptr);
+  auto image = Image::MakeI420(std::move(yuvData));
+  ASSERT_TRUE(image != nullptr);
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, image->width(), image->height());
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/YUVImage"));
+  canvas->clear();
+  auto rgbaa = image->makeRGBAAA(width / 2, static_cast<int>(height), width / 2, 0);
+  ASSERT_TRUE(rgbaa != nullptr);
+  canvas->setMatrix(Matrix::MakeTrans(static_cast<float>(width / 4), 0.f));
+  canvas->drawImage(rgbaa);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/YUVImage_RGBAA"));
   device->unlock();
 }
 
