@@ -792,6 +792,37 @@ TGFX_TEST(CanvasTest, scaleImage) {
   device->unlock();
 }
 
+TGFX_TEST(CanvasTest, atlas) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1300, 740, false, 1, false, RenderFlags::DisableCache);
+  auto canvas = surface->getCanvas();
+  auto imageCodec = MakeImageCodec("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(imageCodec != nullptr);
+  EXPECT_EQ(imageCodec->width(), 1280);
+  EXPECT_EQ(imageCodec->height(), 720);
+  EXPECT_EQ(imageCodec->orientation(), Orientation::TopLeft);
+  auto rowBytes = static_cast<size_t>(imageCodec->width()) * 4;
+  Buffer buffer(rowBytes * static_cast<size_t>(imageCodec->height()));
+  auto pixels = buffer.data();
+  ASSERT_TRUE(pixels);
+  auto RGBAInfo = ImageInfo::Make(imageCodec->width(), imageCodec->height(), ColorType::RGBA_8888,
+                                  AlphaType::Premultiplied);
+  EXPECT_TRUE(imageCodec->readPixels(RGBAInfo, pixels));
+  auto pixelsData = Data::MakeWithCopy(buffer.data(), buffer.size());
+  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData));
+  ASSERT_TRUE(image);
+  Matrix matrix[4] = {Matrix::I(), Matrix::MakeTrans(660, 0), Matrix::MakeTrans(0, 380),
+                      Matrix::MakeTrans(660, 380)};
+  Rect rect[4] = {Rect::MakeXYWH(0, 0, 640, 360), Rect::MakeXYWH(640, 0, 640, 360),
+                  Rect::MakeXYWH(0, 360, 640, 360), Rect::MakeXYWH(640, 360, 640, 360)};
+  canvas->drawAtlas(std::move(image), matrix, rect, nullptr, 4);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/altas"));
+  device->unlock();
+}
+
 static GLTextureInfo CreateRectangleTexture(Context* context, int width, int heigh) {
   auto gl = GLFunctions::Get(context);
   GLTextureInfo sampler = {};
