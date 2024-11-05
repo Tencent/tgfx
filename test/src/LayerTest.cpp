@@ -357,9 +357,9 @@ TGFX_TEST(LayerTest, getbounds) {
   child->setFont(font);
   auto bounds = child->getBounds();
   EXPECT_FLOAT_EQ(bounds.left, 1);
-  EXPECT_FLOAT_EQ(bounds.top, 6.1999989f);
+  EXPECT_FLOAT_EQ(bounds.top, 11.959999f);
   EXPECT_FLOAT_EQ(bounds.right, 47);
-  EXPECT_FLOAT_EQ(bounds.bottom, 23.199999f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 28.959999f);
 
   auto grandChild = ImageLayer::Make();
   grandChild->setMatrix(Matrix::MakeRotate(40, 55, 55));
@@ -991,7 +991,7 @@ TGFX_TEST(LayerTest, textMask) {
   imageLayer1->setMask(alphaTextLayer);
 
   auto alphaLayerBounds = alphaLayer->getBounds();
-  EXPECT_TRUE(alphaLayerBounds == Rect::MakeXYWH(1927.0f, 810.5f, 826.5f, 304.5f));
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeXYWH(1927.0f, 896.0f, 826.5f, 340.5f));
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1130,7 +1130,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto textLayer = TextLayer::Make();
   textLayer->setName("text_layer");
   textLayer->setText("Hello World!");
-  textLayer->setMatrix(Matrix::MakeTrans(50.0f, 50.0f) * Matrix::MakeScale(5.0f, 5.0f));
+  textLayer->setMatrix(Matrix::MakeTrans(50.0f, 0.0f) * Matrix::MakeScale(5.0f, 5.0f));
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   tgfx::Font font(typeface, 20);
   textLayer->setFont(font);
@@ -1576,10 +1576,10 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   paint.setColor(Color::Green());
   canvas->drawRect(rootLayerBounds, paint);
 
-  // P0(330.0, 340.0)
+  // P0(320.0, 340.0)
   paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Fill);
-  Point p0 = {330.0f, 340.0f};
+  Point p0 = {320.0f, 340.0f};
   canvas->drawCircle(p0.x, p0.y, 2.0f, paint);
   EXPECT_EQ(true, textLayer->hitTestPoint(p0.x, p0.y));
   EXPECT_EQ(false, textLayer->hitTestPoint(p0.x, p0.y, true));
@@ -1596,10 +1596,10 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, rootLayer->hitTestPoint(p0.x, p0.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p0.x, p0.y, true));
 
-  // P1(315.0, 320.0)
+  // P1(280.0, 360.0)
   paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Fill);
-  Point p1 = {315.0f, 320.0f};
+  Point p1 = {280.0f, 360.0f};
   canvas->drawCircle(p1.x, p1.y, 2.0f, paint);
   EXPECT_EQ(true, textLayer->hitTestPoint(p1.x, p1.y));
   EXPECT_EQ(true, textLayer->hitTestPoint(p1.x, p1.y, true));
@@ -1616,10 +1616,10 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, rootLayer->hitTestPoint(p1.x, p1.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p1.x, p1.y, true));
 
-  // P2(170.0, 150.0)
+  // P2(150.0, 170.0)
   paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Fill);
-  Point p2 = {170.0f, 150.0f};
+  Point p2 = {150.0f, 170.0f};
   canvas->drawCircle(p2.x, p2.y, 2.0f, paint);
   EXPECT_EQ(true, textLayer->hitTestPoint(p2.x, p2.y));
   EXPECT_EQ(true, textLayer->hitTestPoint(p2.x, p2.y, true));
