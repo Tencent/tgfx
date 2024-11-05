@@ -840,8 +840,7 @@ TGFX_TEST(CanvasTest, YUVImage) {
   size_t height = 1280;
   size_t lineSize = 1440;
   size_t yDataSize = lineSize * height;
-  auto data =
-      Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/data.yuv"));
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/yuv_data/data.yuv"));
   ASSERT_TRUE(data != nullptr);
   EXPECT_TRUE(data->size() == yDataSize * 2);
   const uint8_t* dataAddress[3];
@@ -849,8 +848,8 @@ TGFX_TEST(CanvasTest, YUVImage) {
   dataAddress[1] = data->bytes() + yDataSize;
   dataAddress[2] = data->bytes() + yDataSize + yDataSize / 2;
   const size_t lineSizes[3] = {lineSize, lineSize / 2, lineSize / 2};
-  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)dataAddress, lineSizes,
-                                   YUVData::I420_PLANE_COUNT);
+  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)dataAddress,
+                                   lineSizes, YUVData::I420_PLANE_COUNT);
   ASSERT_TRUE(yuvData != nullptr);
   auto image = Image::MakeI420(std::move(yuvData));
   ASSERT_TRUE(image != nullptr);
