@@ -812,6 +812,7 @@ TGFX_TEST(CanvasTest, atlas) {
                                   AlphaType::Premultiplied);
   EXPECT_TRUE(imageCodec->readPixels(RGBAInfo, pixels));
   auto pixelsData = Data::MakeWithCopy(buffer.data(), buffer.size());
+  ASSERT_TRUE(pixelsData != nullptr);
   auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData));
   ASSERT_TRUE(image != nullptr);
   Matrix matrix[4] = {Matrix::I(), Matrix::MakeTrans(660, 0), Matrix::MakeTrans(0, 380),
