@@ -525,8 +525,6 @@ class Layer {
 
   Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
-  Rect getVisibleBounds();
-
   bool hasValidMask() const;
 
   std::string _name;

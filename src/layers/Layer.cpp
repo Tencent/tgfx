@@ -59,7 +59,10 @@ Layer::~Layer() {
   if (_mask) {
     _mask->maskOwner = nullptr;
   }
-  removeFromParent();
+  auto size = _children.size();
+  if (size > 0) {
+    removeChildren(0, static_cast<int>(size) - 1);
+  }
 }
 
 Layer::Layer() {
@@ -312,28 +315,6 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
   return true;
 }
 
-Rect Layer::getVisibleBounds() {
-  auto bounds = getBounds();
-  if (_scrollRect) {
-    if (!bounds.intersect(*_scrollRect)) {
-      return Rect::MakeEmpty();
-    }
-  }
-  if (_mask) {
-    auto relativeMatrix = _mask->getRelativeMatrix(this);
-    if (relativeMatrix.isIdentity()) {
-      return Rect::MakeEmpty();
-    }
-    auto maskBounds = _mask->getBounds();
-    auto maskBoundsToCurrentLayer = relativeMatrix.mapRect(maskBounds);
-    if (!bounds.intersect(maskBoundsToCurrentLayer)) {
-      return Rect::MakeEmpty();
-    }
-  }
-  getMatrixWithScrollRect().mapRect(&bounds);
-  return bounds;
-}
-
 Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
   Rect bounds = Rect::MakeEmpty();
   auto content = getContent();
@@ -344,7 +325,22 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
     if (!child->visible() || child->maskOwner) {
       continue;
     }
-    auto childBounds = child->getVisibleBounds();
+    auto childBounds = child->getBounds();
+    if (child->_scrollRect) {
+      if (!childBounds.intersect(*child->_scrollRect)) {
+        continue;
+      }
+    }
+    if (child->hasValidMask()) {
+      auto relativeMatrix = child->_mask->getRelativeMatrix(child.get());
+      auto maskBounds = child->_mask->getBounds();
+      auto maskBoundsToCurrentLayer = relativeMatrix.mapRect(maskBounds);
+      if (!childBounds.intersect(maskBoundsToCurrentLayer)) {
+        continue;
+      }
+    }
+    child->getMatrixWithScrollRect().mapRect(&childBounds);
+
     bounds.join(childBounds);
   }
 
@@ -637,8 +633,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
 }
 
 Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
-  if (targetCoordinateSpace == nullptr || targetCoordinateSpace == this ||
-      targetCoordinateSpace->root() != root()) {
+  if (targetCoordinateSpace == nullptr || targetCoordinateSpace == this) {
     return Matrix::I();
   }
   auto targetLayerMatrix = targetCoordinateSpace->getGlobalMatrix();
@@ -760,7 +755,7 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 }
 
 bool Layer::hasValidMask() const {
-  return _mask && _mask->maskOwner && _mask->root() == root();
+  return _mask && _mask->root() == root();
 }
 
 }  // namespace tgfx
