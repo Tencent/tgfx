@@ -40,11 +40,17 @@ class RasterizedContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
+  std::shared_ptr<Image> getImage() const {
+    return image;
+  };
+
+  Matrix getMatrix() const {
+    return matrix;
+  };
+
  private:
   uint32_t _contextID = 0;
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = Matrix::I();
-
-  friend class Layer;
 };
 }  // namespace tgfx

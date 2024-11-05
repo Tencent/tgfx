@@ -655,8 +655,8 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   std::shared_ptr<Image> maskContentImage = nullptr;
   auto drawingMatrix = Matrix::I();
   if (rasterizedCache) {
-    drawingMatrix = rasterizedCache->matrix;
-    maskContentImage = rasterizedCache->image;
+    drawingMatrix = rasterizedCache->getMatrix();
+    maskContentImage = rasterizedCache->getImage();
   } else {
     maskContentImage = _mask->getRasterizedImage(args, 1.0f, &drawingMatrix);
   }
