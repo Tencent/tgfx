@@ -84,7 +84,6 @@ FillStyle LayerUnrollContext::merge(const FillStyle& style) {
   auto newStyle = style;
   newStyle.color.alpha *= fillStyle.color.alpha;
   newStyle.blendMode = fillStyle.blendMode;
-  newStyle.maskFilter = MaskFilter::Compose(style.maskFilter, fillStyle.maskFilter);
   newStyle.colorFilter = ColorFilter::Compose(style.colorFilter, fillStyle.colorFilter);
   return newStyle;
 }
