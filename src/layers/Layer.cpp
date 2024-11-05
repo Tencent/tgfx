@@ -654,16 +654,17 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   auto rasterizedCache = static_cast<RasterizedContent*>(_mask->getRasterizedCache(args));
   std::shared_ptr<Image> maskContentImage = nullptr;
   auto drawingMatrix = Matrix::I();
+  auto relativeMatrix = _mask->getRelativeMatrix(this);
   if (rasterizedCache) {
     drawingMatrix = rasterizedCache->getMatrix();
     maskContentImage = rasterizedCache->getImage();
   } else {
-    maskContentImage = _mask->getRasterizedImage(args, 1.0f, &drawingMatrix);
+    auto contentScale = relativeMatrix.getMaxScale() * scale;
+    maskContentImage = _mask->getRasterizedImage(args, contentScale, &drawingMatrix);
   }
   if (maskContentImage == nullptr) {
     return nullptr;
   }
-  auto relativeMatrix = _mask->getRelativeMatrix(this);
   relativeMatrix.postScale(scale, scale);
   relativeMatrix.preConcat(drawingMatrix);
   auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
