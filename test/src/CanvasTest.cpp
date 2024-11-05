@@ -33,8 +33,8 @@
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Recorder.h"
-#include "tgfx/core/Surface.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
@@ -853,7 +853,8 @@ TGFX_TEST(CanvasTest, YUVImage) {
   data[1] = static_cast<uint8_t*>(uBuffer.data());
   data[2] = static_cast<uint8_t*>(vBuffer.data());
   const size_t lineSize[3] = {line, line / 2, line / 2};
-  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)data, lineSize, YUVData::I420_PLANE_COUNT);
+  auto yuvData = YUVData::MakeFrom(width, static_cast<int>(height), (const void**)data, lineSize,
+                                   YUVData::I420_PLANE_COUNT);
   auto image = Image::MakeI420(std::move(yuvData));
   ASSERT_TRUE(image != nullptr);
   auto device = DevicePool::Make();
