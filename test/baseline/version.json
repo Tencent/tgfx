@@ -60,8 +60,8 @@
     "LayerTest": {
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "draw_shape": "8378211",
-        "draw_text": "fa90eb0",
+        "draw_shape": "0407b14",
+        "draw_text": "0407b14",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
@@ -71,7 +71,7 @@
         "imageLayer": "99a5cd9",
         "draw_solid": "b4a1231",
         "imageMask": "ba6aa7d",
-        "shapeMask": "ba6aa7d",
+        "shapeMask": "0407b14",
         "textMask": "ba6aa7d"
     },
     "MaskTest": {
