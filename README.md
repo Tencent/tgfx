@@ -207,12 +207,12 @@ At last, launch XCode and open the `mac/Hello2D.xcworkspace`. You'll be ready to
 ### Web
 
 The web demo project requires the **Emscripten SDK**. You can download and install
-it from the [official website](https://emscripten.org/). We recommend using the **3.1.20** version,
+it from the [official website](https://emscripten.org/). We recommend using the latest version,
 which has been fully tested with the tgfx library. If you are on macOS, you can also install it
 using the following script:
 
 ```
-web/script/install-emscripten.sh
+brew install emscripten
 ```
 
 To begin, navigate to the `web/` directory and execute the following command to install the 
@@ -250,6 +250,9 @@ npm run build:debug
 ```
 
 With these steps completed, you will be able to debug C++ files directly within Chrome DevTools.
+
+This version runs in single-threaded mode. We also offer a multithreaded version, distinguished by
+":mt".
 
 To build the demo project in CLion, please Open the `Settings` panel in CLion and go to 
 `Build, Execution, Deployment` > `CMake`. Create a new build target. And then set the `CMake options`

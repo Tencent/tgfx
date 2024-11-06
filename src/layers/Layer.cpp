@@ -268,6 +268,9 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
 }
 
 void Layer::removeChildren(int beginIndex, int endIndex) {
+  if (_children.empty()) {
+    return;
+  }
   if (beginIndex < 0 || static_cast<size_t>(beginIndex) >= _children.size()) {
     LOGE("The supplied beginIndex is out of bounds.");
     return;
