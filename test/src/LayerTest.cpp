@@ -21,6 +21,7 @@
 #include "core/filters/BlurImageFilter.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -200,9 +201,15 @@ TGFX_TEST(LayerTest, textLayer) {
   auto textLayer2 = TextLayer::Make();
   layer->addChild(textLayer2);
   textLayer2->setText("Hello, World!");
-  color.alpha = 0.5;
   textLayer2->setFont(font);
   textLayer2->setBlendMode(BlendMode::Difference);
+  auto emojiTypeface = MakeTypeface("resources/font/NotoColorEmoji.ttf");
+  tgfx::Font emojiFont(emojiTypeface, 10);
+  auto emojiLayer = TextLayer::Make();
+  layer->addChild(emojiLayer);
+  emojiLayer->setText("🤡👻🐠🤩😃🤪");
+  emojiLayer->setFont(emojiFont);
+  emojiLayer->setMatrix(Matrix::MakeTrans(0, 20));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
   device->unlock();
@@ -440,7 +447,8 @@ TGFX_TEST(LayerTest, shapeLayer) {
   Path path = {};
   path.addRect(rect);
   shaperLayer->setPath(path);
-  auto filleStyle = SolidColor::Make(Color::Blue());
+  auto filleStyle = Gradient::MakeLinear({10, 10}, {150, 80});
+  filleStyle->setColors({{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
   shaperLayer->setFillStyle(filleStyle);
   // stroke style
   shaperLayer->setLineWidth(10.0f);
@@ -857,8 +865,9 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   auto shaperLayer = ShapeLayer::Make();
   shaperLayer->setPath(path);
-  auto filleStyle = SolidColor::Make(Color::Red());
-  shaperLayer->setFillStyle(filleStyle);
+  auto radialFilleStyle = Gradient::MakeRadial({500, 500}, 500);
+  radialFilleStyle->setColors({{1.f, 0.f, 0.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+  shaperLayer->setFillStyle(radialFilleStyle);
   shaperLayer->setAlpha(0.5f);
   layer->addChild(shaperLayer);
   Matrix maskMatrix = Matrix::MakeAll(1.0f, 0, 300, 0, 1.0f, 300);
@@ -875,6 +884,7 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   auto alphaShaperLayer = ShapeLayer::Make();
   alphaShaperLayer->setPath(path);
+  auto filleStyle = SolidColor::Make(Color::Red());
   alphaShaperLayer->setFillStyle(filleStyle);
   alphaShaperLayer->setAlpha(0.5f);
   auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);

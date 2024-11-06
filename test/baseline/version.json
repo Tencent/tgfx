@@ -64,9 +64,9 @@
         "Layer_hitTestPointNested": "50c58e6",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "draw_shape": "8378211",
+        "draw_shape": "612c09e",
         "draw_solid": "b4a1231",
-        "draw_text": "50c58e6",
+        "draw_text": "612c09e",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
@@ -76,7 +76,7 @@
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
         "imageMask": "ba6aa7d",
-        "shapeMask": "ba6aa7d",
+        "shapeMask": "612c09e",
         "textMask": "50c58e6"
     },
     "MaskTest": {
