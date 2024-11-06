@@ -182,7 +182,7 @@ TGFX_TEST(LayerTest, textLayer) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
-  auto surface = Surface::Make(context, 210, 100);
+  auto surface = Surface::Make(context, 200, 100);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
