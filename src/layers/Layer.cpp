@@ -701,7 +701,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
     canvas->save();
     canvas->concat(child->getMatrixWithScrollRect());
     if (child->_scrollRect) {
-      canvas->clipRect(Rect::MakeWH(child->_scrollRect->width(), child->_scrollRect->height()));
+      canvas->clipRect(*child->_scrollRect);
     }
     child->drawLayer(args, canvas, child->_alpha * alpha, child->_blendMode);
     canvas->restore();
