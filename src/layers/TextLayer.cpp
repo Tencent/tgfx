@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
+#include "core/utils/Log.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
 
-static constexpr float DefaultLineHeight = 1.2f;
 static std::mutex& TypefaceMutex = *new std::mutex;
 static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
 
@@ -116,46 +116,88 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   if (_text.empty()) {
     return nullptr;
   }
+
+  std::string text = preprocessNewLines(_text);
+
   std::vector<GlyphID> glyphs = {};
   std::vector<Point> positions = {};
-
-  // use middle alignment, refer to the document: https://paddywang.github.io/demo/list/css/baseline_line-height.html
-  auto metrics = _font.getMetrics();
-  auto lineHeight = ceil(_font.getSize() * DefaultLineHeight);
-  auto baseLine = (lineHeight + metrics.xHeight) / 2;
-  auto emptyGlyphID = _font.getGlyphID(" ");
-  auto emptyAdvance = _font.getAdvance(emptyGlyphID);
-  const char* textStart = _text.data();
-  const char* textStop = textStart + _text.size();
+  const auto spaceGlyphID = _font.getGlyphID(" ");
+  const auto spaceAdvance = _font.getAdvance(spaceGlyphID);
+  const auto fontMetrics = _font.getMetrics();
+  const float lineHeight = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
+                           std::fabs(fontMetrics.leading);
   float xOffset = 0;
-  float yOffset = baseLine;
-  while (textStart < textStop) {
-    if (*textStart == '\n') {
-      xOffset = -emptyAdvance;
-      yOffset += lineHeight;
-      glyphs.push_back(emptyGlyphID);
-      positions.push_back(Point::Make(xOffset, yOffset));
-      textStart++;
-      continue;
-    }
-    auto unichar = UTF::NextUTF8(&textStart, textStop);
-    auto glyphID = _font.getGlyphID(unichar);
+  float yOffset = lineHeight;
+  const char* head = text.data();
+  const char* tail = head + text.size();
+  // refer to:
+  // https://developer.apple.com/library/archive/documentation/StringsTextFonts/Conceptual/TextAndWebiPhoneOS/TypoFeatures/TextSystemFeatures.html
+  // https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/text_layout.png
+  while (head < tail) {
+    const auto character = UTF::NextUTF8(&head, tail);
+    const auto glyphID = _font.getGlyphID(character);
     if (glyphID > 0) {
       glyphs.push_back(glyphID);
       positions.push_back(Point::Make(xOffset, yOffset));
       auto advance = _font.getAdvance(glyphID);
       xOffset += advance;
+
+      if (_autoWrap) {
+        if (xOffset >= _width) {
+          xOffset = 0;
+          yOffset += lineHeight;
+        }
+      }
     } else {
-      glyphs.push_back(emptyGlyphID);
-      positions.push_back(Point::Make(xOffset, yOffset));
-      xOffset += emptyAdvance;
+#if DEBUG
+      const auto pos = text.find(static_cast<char>(character));
+      LOGE("invalid character: %c(%d), pos : %d, glyphID is 0.", character, character, pos);
+#endif
+      if ('\n' == character) {
+        xOffset = 0;
+        yOffset += lineHeight;
+      } else if ('\t' == character) {
+        // tab width is 4 spaces
+        for (uint32_t i = 0; i < 4; i++) {
+          glyphs.push_back(spaceGlyphID);
+          positions.push_back(Point::Make(xOffset, yOffset));
+          xOffset += spaceAdvance;
+
+          if (_autoWrap) {
+            if (xOffset >= _width) {
+              xOffset = 0;
+              yOffset += lineHeight;
+            }
+          }
+        }
+      }
     }
   }
+
   GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRun));
-  if (textBlob == nullptr) {
+  if (nullptr == textBlob) {
     return nullptr;
   }
   return std::make_unique<TextContent>(std::move(textBlob), _textColor);
+}
+
+std::string TextLayer::preprocessNewLines(const std::string& text) {
+  std::string result;
+  const size_t size = text.size();
+  result.reserve(text.size());
+
+  for (size_t i = 0; i < size; ++i) {
+    if (text[i] == '\r' || text[i] == '\n') {
+      result += '\n';
+      if (i + 1 < size && text[i] != text[i + 1] && (text[i + 1] == '\r' || text[i + 1] == '\n')) {
+        ++i;
+      }
+    } else {
+      result += text[i];
+    }
+  }
+
+  return result;
 }
 }  // namespace tgfx
