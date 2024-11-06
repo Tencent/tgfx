@@ -25,9 +25,9 @@ if (DEFINED EMSCRIPTEN)
         list(APPEND H2D_LINK_OPTIONS -sTOTAL_MEMORY=512MB -sUSE_PTHREADS=1
                 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sPROXY_TO_PTHREAD=1
                 -sEXIT_RUNTIME=0 -sINVOKE_RUN=0
-        )
+                )
         list(APPEND H2D_COMPILE_OPTIONS -fPIC -pthread)
-    else ()
+    else()
         list(APPEND H2D_LINK_OPTIONS -sALLOW_MEMORY_GROWTH=1)
     endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
