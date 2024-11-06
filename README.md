@@ -57,7 +57,7 @@ TGFX utilizes the **C++17** features for development. Below are the minimum tool
 - CMake 3.13.0+
 - QT 5.13.0+
 - NDK 19.2+ (**19.2.5345600 recommended**)
-- Emscripten 3.1.20+ (**3.1.20 recommended**)
+- Emscripten 3.1.58+ 
 
 
 Please pay attention to the following additional notices:
@@ -207,9 +207,8 @@ At last, launch XCode and open the `mac/Hello2D.xcworkspace`. You'll be ready to
 ### Web
 
 The web demo project requires the **Emscripten SDK**. You can download and install
-it from the [official website](https://emscripten.org/). We recommend using the latest version,
-which has been fully tested with the tgfx library. If you are on macOS, you can also install it
-using the following script:
+it from the [official website](https://emscripten.org/). We recommend using the latest version. 
+If you are on macOS, you can also install it using the following script:
 
 ```
 brew install emscripten
@@ -251,8 +250,13 @@ npm run build:debug
 
 With these steps completed, you will be able to debug C++ files directly within Chrome DevTools.
 
-This version runs in single-threaded mode. We also offer a multithreaded version, distinguished by
-":mt".
+The above commands will build and run a single-threaded version. To build a multithreaded version, 
+just add the suffix ":mt" to each command. For example:
+```
+npm run build:mt
+npm run build:mt:debug
+npm run serser:mt
+``` 
 
 To build the demo project in CLion, please Open the `Settings` panel in CLion and go to 
 `Build, Execution, Deployment` > `CMake`. Create a new build target. And then set the `CMake options`
