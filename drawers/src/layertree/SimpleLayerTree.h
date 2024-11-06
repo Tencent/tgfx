@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,23 @@
 
 #pragma once
 
-#include "drawers/Drawer.h"
+#include "base/LayerTreeDrawer.h"
 
 namespace drawers {
-#define DEFINE_DRAWER(DrawerName)                                             \
-  class DrawerName : public drawers::Drawer {                                 \
-   public:                                                                    \
-    DrawerName() : drawers::Drawer(#DrawerName) {                             \
-    }                                                                         \
-                                                                              \
-   protected:                                                                 \
-    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) override; \
+
+class SimpleLayerTree : public drawers::LayerTreeDrawer {
+ public:
+  SimpleLayerTree() : LayerTreeDrawer("SimpleLayerTree") {
   }
 
-DEFINE_DRAWER(GridBackground);
-DEFINE_DRAWER(ConicGradient);
-DEFINE_DRAWER(ImageWithMipmap);
-DEFINE_DRAWER(ImageWithShadow);
-DEFINE_DRAWER(SimpleText);
+ protected:
+  std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override;
+  void prepare(const AppHost* host) override;
+
+ private:
+  void changeMode();
+  // update blendmode
+  std::shared_ptr<tgfx::Layer> progressBar;
+};
 
 }  // namespace drawers

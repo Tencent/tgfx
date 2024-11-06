@@ -19,7 +19,7 @@
 #include "base/Drawers.h"
 
 namespace drawers {
-void GridBackground::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
+void GridBackground::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   auto width = host->width();
   auto height = host->height();
   canvas->clearRect(tgfx::Rect::MakeWH(width, height), tgfx::Color::White());
