@@ -80,19 +80,25 @@ static std::shared_ptr<tgfx::Layer> CreateBackground() {
 }
 
 static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
-  auto card = tgfx::Layer::Make();
-  card->setMatrix(tgfx::Matrix::MakeTrans(24, 150));
-
-  auto imageLayer = tgfx::ShapeLayer::Make();
   auto image = host->getImage("bridge");
+  if (!image) {
+    return nullptr;
+  }
+  auto card = tgfx::Layer::Make();
+  auto cardMatrix = tgfx::Matrix::MakeTrans(24, 150);
+  auto imageLayer = tgfx::ImageLayer::Make();
+  imageLayer->setImage(image);
   auto imageScale = static_cast<float>(std::min(327.0 / image->width(), 344.0 / image->height()));
-  auto imagePath = tgfx::Path();
+  auto maskLayer = tgfx::ShapeLayer::Make();
+  auto maskPath = tgfx::Path();
   auto radius = 20.f / imageScale;
-  imagePath.addRoundRect(tgfx::Rect::MakeWH(image->width(), image->height()), radius, radius);
-  imageLayer->setPath(imagePath);
-  imageLayer->setFillStyle(tgfx::ImagePattern::Make(image));
-  imageLayer->setMatrix(tgfx::Matrix::MakeScale(imageScale));
+  maskPath.addRoundRect(tgfx::Rect::MakeWH(image->width(), image->height()), radius, radius);
+  maskLayer->setPath(maskPath);
+  imageLayer->setMask(maskLayer);
+  cardMatrix.preScale(imageScale, imageScale);
+  card->setMatrix(cardMatrix);
   card->addChild(imageLayer);
+  card->addChild(maskLayer);
   card->setFilters(
       {tgfx::DropShadowFilter::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 51))});
   return card;
