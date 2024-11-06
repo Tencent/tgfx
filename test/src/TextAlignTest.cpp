@@ -58,8 +58,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds();
   textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
-  printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
-         textLayerBounds.right, textLayerBounds.bottom);
+  EXPECT_EQ(Rect::MakeLTRB(0.000000f, 10.959999f, 264.000000f, 610.159973f), textLayerBounds);
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
@@ -71,7 +70,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   canvas->drawRect(textLayerBounds, paint);
 
   context->submit();
-  Baseline::Compare(surface, "TextAlignTest/TextAlign");
+  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlign"));
   device->unlock();
 }
 
