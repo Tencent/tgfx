@@ -19,7 +19,7 @@
 #include "base/Drawers.h"
 
 namespace drawers {
-void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) const {
+void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   auto scale = host->density();
   auto width = static_cast<float>(host->width());
   auto height = static_cast<float>(host->height());
