@@ -4,8 +4,10 @@ types
 *.js.map
 demo/*.js
 demo/wasm
+demo/wasm-mt
 demo/build-hello2d
 demo/.hello2d.wasm.md5
+demo/.hello2d.wasm-mt.md5
 src/wasm
 emsdk/
 
