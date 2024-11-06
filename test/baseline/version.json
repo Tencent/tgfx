@@ -35,9 +35,11 @@
     },
     "DrawersTest": {
         "ConicGradient": "5a1fb11",
+        "CustomLayerTreeDrawer": "83c88bb",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
+        "SimpleLayerTreeDrawer": "83c88bb",
         "SimpleText": "7fd9cd9"
     },
     "FilterTest": {
@@ -150,5 +152,8 @@
         "ImageSnapshot2": "d010fb8",
         "ImageSnapshot_Surface1": "d010fb8",
         "ImageSnapshot_Surface2": "d010fb8"
+    },
+    "TextAlignTest": {
+        "TextAlign": "83c88bb"
     }
 }
