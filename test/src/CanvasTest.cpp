@@ -444,7 +444,7 @@ TGFX_TEST(CanvasTest, mipmap) {
   device->unlock();
 }
 
-TGFX_TEST(CanvasTest, ShaderSimulationMipmap) {
+TGFX_TEST(CanvasTest, TileModeFallback) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
@@ -465,7 +465,7 @@ TGFX_TEST(CanvasTest, ShaderSimulationMipmap) {
   canvas->translate(100, 100);
   auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
   canvas->drawRect(drawRect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ShaderSimulation"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TileModeFallback"));
   caps->npotTextureTileSupport = true;
   device->unlock();
 }
