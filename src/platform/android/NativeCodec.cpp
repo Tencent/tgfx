@@ -73,16 +73,18 @@ void NativeCodec::JNIInit(JNIEnv* env) {
   BitmapFactoryOptions_outWidth = env->GetFieldID(BitmapFactoryOptionsClass.get(), "outWidth", "I");
   BitmapFactoryOptions_outHeight =
       env->GetFieldID(BitmapFactoryOptionsClass.get(), "outHeight", "I");
-  // for color space conversion
+  // for color space conversion (API level 26+)
   ColorSpaceClass = env->FindClass("android/graphics/ColorSpace");
-  ColorSpace_get =
-      env->GetStaticMethodID(ColorSpaceClass.get(), "get",
-                             "(Landroid/graphics/ColorSpace$Named;)Landroid/graphics/ColorSpace;");
-  ColorSpaceNamedClass = env->FindClass("android/graphics/ColorSpace$Named");
-  ColorSpaceNamed_SRGB = env->GetStaticFieldID(ColorSpaceNamedClass.get(), "SRGB",
-                                               "Landroid/graphics/ColorSpace$Named;");
-  BitmapFactoryOptions_inPreferredColorSpace = env->GetFieldID(
-      BitmapFactoryOptionsClass.get(), "inPreferredColorSpace", "Landroid/graphics/ColorSpace;");
+  if (ColorSpaceClass.get() != nullptr) {
+    ColorSpace_get = env->GetStaticMethodID(
+        ColorSpaceClass.get(), "get",
+        "(Landroid/graphics/ColorSpace$Named;)Landroid/graphics/ColorSpace;");
+    ColorSpaceNamedClass = env->FindClass("android/graphics/ColorSpace$Named");
+    ColorSpaceNamed_SRGB = env->GetStaticFieldID(ColorSpaceNamedClass.get(), "SRGB",
+                                                 "Landroid/graphics/ColorSpace$Named;");
+    BitmapFactoryOptions_inPreferredColorSpace = env->GetFieldID(
+        BitmapFactoryOptionsClass.get(), "inPreferredColorSpace", "Landroid/graphics/ColorSpace;");
+  }
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     BitmapFactoryOptions_inPreferredColorSpace = nullptr;
