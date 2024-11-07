@@ -51,10 +51,10 @@ class WebMask : public Mask {
     return stream;
   }
 
-  void onFillPath(const Path& path, const Matrix& matrix, bool) override;
+  void onFillPath(const Path& path, const Matrix& matrix, bool antiAlias, bool) override;
 
-  bool onFillText(const GlyphRunList* glyphRun, const Stroke* stroke,
-                  const Matrix& matrix) override;
+  bool onFillText(const GlyphRunList* glyphRun, const Stroke* stroke, const Matrix& matrix,
+                  bool antiAlias) override;
 
  private:
   std::shared_ptr<ImageBuffer> buffer = nullptr;

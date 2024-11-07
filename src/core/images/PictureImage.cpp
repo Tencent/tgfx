@@ -116,7 +116,8 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
       return nullptr;
     }
     return Rasterizer::MakeFrom(pathRecord->path, ISize::Make(width, height),
-                                GetMaskMatrix(pathRecord->state, matrix));
+                                GetMaskMatrix(pathRecord->state, matrix),
+                                pathRecord->style.antiAlias);
   }
   if (record->type() == RecordType::StrokePath) {
     auto strokeRecord = static_cast<const StrokePath*>(record);
@@ -124,7 +125,8 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
       return nullptr;
     }
     return Rasterizer::MakeFrom(strokeRecord->path, ISize::Make(width, height),
-                                GetMaskMatrix(strokeRecord->state, matrix), &strokeRecord->stroke);
+                                GetMaskMatrix(strokeRecord->state, matrix),
+                                strokeRecord->style.antiAlias, &strokeRecord->stroke);
   }
   if (record->type() == RecordType::DrawGlyphRunList) {
     auto glyphRecord = static_cast<const DrawGlyphRunList*>(record);
@@ -132,7 +134,8 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
       return nullptr;
     }
     return Rasterizer::MakeFrom(glyphRecord->glyphRunList, ISize::Make(width, height),
-                                GetMaskMatrix(glyphRecord->state, matrix));
+                                GetMaskMatrix(glyphRecord->state, matrix),
+                                glyphRecord->style.antiAlias);
   }
   if (record->type() == RecordType::StrokeGlyphRunList) {
     auto strokeGlyphRecord = static_cast<const StrokeGlyphRunList*>(record);
@@ -142,7 +145,7 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
     }
     return Rasterizer::MakeFrom(strokeGlyphRecord->glyphRunList, ISize::Make(width, height),
                                 GetMaskMatrix(strokeGlyphRecord->state, matrix),
-                                &strokeGlyphRecord->stroke);
+                                strokeGlyphRecord->style.antiAlias, &strokeGlyphRecord->stroke);
   }
   return nullptr;
 }
