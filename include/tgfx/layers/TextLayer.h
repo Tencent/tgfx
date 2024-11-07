@@ -158,7 +158,11 @@ class TextLayer : public Layer {
   TextAlign _textAlign = TextAlign::Left;
   VerticalAlign _verticalAlign = VerticalAlign::Top;
   bool _autoWrap = false;
+  std::vector<Font> _fonts;
 
   std::string preprocessNewLines(const std::string& text);
+  void updateFonts();
+  std::pair<GlyphID, Font> getGlyphIDAndFont(Unichar unichar) const;
+  float getEmptyAdvance() const;
 };
 }  // namespace tgfx

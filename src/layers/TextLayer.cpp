@@ -25,10 +25,12 @@ namespace tgfx {
 
 static std::mutex& TypefaceMutex = *new std::mutex;
 static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
+static bool isFontListChanged = false;
 
 void TextLayer::SetFallbackTypefaces(std::vector<std::shared_ptr<Typeface>> typefaces) {
   std::lock_guard<std::mutex> lock(TypefaceMutex);
   FallbackTypefaces = std::move(typefaces);
+  isFontListChanged = true;
 }
 
 std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
@@ -63,6 +65,7 @@ void TextLayer::setFont(const Font& font) {
     return;
   }
   _font = font;
+  isFontListChanged = true;
   invalidateContent();
 }
 
@@ -117,13 +120,23 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     return nullptr;
   }
 
-  std::string text = preprocessNewLines(_text);
+  updateFonts();
+
+  if (_fonts.empty()) {
+    LOGE("Font and font fallback list not set.");
+    return nullptr;
+  }
+
+  const std::string text = preprocessNewLines(_text);
 
   std::vector<GlyphID> glyphs = {};
   std::vector<Point> positions = {};
-  const auto spaceGlyphID = _font.getGlyphID(" ");
-  const auto spaceAdvance = _font.getAdvance(spaceGlyphID);
-  const auto fontMetrics = _font.getMetrics();
+
+  // space character glyph id
+  const auto spaceCharacterGlyphID = getGlyphIDAndFont('\u0020').first;
+  const auto emptyAdvance = getEmptyAdvance();
+
+  const auto fontMetrics = _fonts[0].getMetrics();
   const float lineHeight = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
                            std::fabs(fontMetrics.leading);
   float xOffset = 0;
@@ -134,42 +147,45 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   // https://developer.apple.com/library/archive/documentation/StringsTextFonts/Conceptual/TextAndWebiPhoneOS/TypoFeatures/TextSystemFeatures.html
   // https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/text_layout.png
   while (head < tail) {
-    const auto character = UTF::NextUTF8(&head, tail);
-    const auto glyphID = _font.getGlyphID(character);
-    if (glyphID > 0) {
-      glyphs.push_back(glyphID);
-      positions.push_back(Point::Make(xOffset, yOffset));
-      auto advance = _font.getAdvance(glyphID);
-      xOffset += advance;
+    if ('\n' == *head) {
+      xOffset = 0;
+      yOffset += lineHeight;
+      ++head;
+    } else if ('\t' == *head) {
+      // tab width default is 4 spaces
+      for (uint32_t i = 0; i < 4; i++) {
+        glyphs.push_back(spaceCharacterGlyphID);
+        positions.push_back(Point::Make(xOffset, yOffset));
+        xOffset += emptyAdvance;
 
-      if (_autoWrap) {
-        if (xOffset >= _width) {
-          xOffset = 0;
-          yOffset += lineHeight;
-        }
-      }
-    } else {
-#if DEBUG
-      const auto pos = text.find(static_cast<char>(character));
-      LOGE("invalid character: %c(%d), pos : %d, glyphID is 0.", character, character, pos);
-#endif
-      if ('\n' == character) {
-        xOffset = 0;
-        yOffset += lineHeight;
-      } else if ('\t' == character) {
-        // tab width is 4 spaces
-        for (uint32_t i = 0; i < 4; i++) {
-          glyphs.push_back(spaceGlyphID);
-          positions.push_back(Point::Make(xOffset, yOffset));
-          xOffset += spaceAdvance;
-
-          if (_autoWrap) {
-            if (xOffset >= _width) {
-              xOffset = 0;
-              yOffset += lineHeight;
-            }
+        if (_autoWrap) {
+          if (xOffset >= _width) {
+            xOffset = 0;
+            yOffset += lineHeight;
           }
         }
+      }
+      ++head;
+    } else {
+      const auto character = UTF::NextUTF8(&head, tail);
+      const auto glyphIDAndFont = getGlyphIDAndFont(character);
+      const auto glyphID = glyphIDAndFont.first;
+      if (glyphID > 0) {
+        glyphs.push_back(glyphID);
+        positions.push_back(Point::Make(xOffset, yOffset));
+        auto advance = glyphIDAndFont.second.getAdvance(glyphID);
+        xOffset += advance;
+
+        if (_autoWrap) {
+          if (xOffset >= _width) {
+            xOffset = 0;
+            yOffset += lineHeight;
+          }
+        }
+      } else {
+        glyphs.push_back(0);
+        positions.push_back(Point::Make(xOffset, yOffset));
+        xOffset += emptyAdvance;
       }
     }
   }
@@ -184,14 +200,16 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
 
 std::string TextLayer::preprocessNewLines(const std::string& text) {
   std::string result;
+  result.reserve(text.size()); // Pre-allocate enough space to improve efficiency
   const size_t size = text.size();
-  result.reserve(text.size());
 
   for (size_t i = 0; i < size; ++i) {
-    if (text[i] == '\r' || text[i] == '\n') {
-      result += '\n';
-      if (i + 1 < size && text[i] != text[i + 1] && (text[i + 1] == '\r' || text[i + 1] == '\n')) {
+    if ('\r' == text[i]) {
+      if (i + 1 < size && '\n' == text[i + 1]) {
+        result += '\n';
         ++i;
+      } else {
+        result += '\n';
       }
     } else {
       result += text[i];
@@ -199,5 +217,41 @@ std::string TextLayer::preprocessNewLines(const std::string& text) {
   }
 
   return result;
+}
+
+void TextLayer::updateFonts() {
+  if (!isFontListChanged) {
+    return;
+  }
+
+  isFontListChanged = false;
+  _fonts.clear();
+  _fonts.push_back(_font);
+  const auto typeFaces = GetFallbackTypefaces();
+  for (const auto& typeFace : typeFaces) {
+    _fonts.push_back(Font(typeFace, _font.getSize()));
+  }
+}
+
+std::pair<GlyphID, Font> TextLayer::getGlyphIDAndFont(Unichar unichar) const {
+  for (const auto& font : _fonts) {
+    const auto glyphID = font.getGlyphID(unichar);
+    if (glyphID > 0) {
+      return {glyphID, font};
+    }
+  }
+
+  return {};
+}
+
+float TextLayer::getEmptyAdvance() const {
+  for (const auto& font : _fonts) {
+    const auto xHeight = font.getMetrics().xHeight;
+    if (xHeight > 0.0f) {
+      return xHeight;
+    }
+  }
+
+  return 0.0f;
 }
 }  // namespace tgfx

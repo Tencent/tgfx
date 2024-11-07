@@ -48,6 +48,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
       "诚宜开张圣听，以光先帝遗德，恢弘志士之气，不宜妄自菲薄，引喻失义，以塞忠谏之路也。"
       "宫中府中，俱为一体；陟罚臧否，不宜异同。"
       "若有作奸犯科及为忠善者，宜付有司论其刑赏，以昭陛下平明之理，不宜偏私，使内外异法也。");
+  //textLayer->setText("abc这是\nf\rg\r\nh\r\rj\n\rk\nppp\tqqq");
   textLayer->setWidth(250);
   textLayer->setHeight(400);
   textLayer->setAutoWrap(true);
@@ -79,6 +80,6 @@ TGFX_TEST(TextAlignTest, TextAlignPrint) {
   auto textLayer = TextLayer::Make();
   textLayer->setText(text);
   text = textLayer->preprocessNewLines(text);
-  EXPECT_EQ(text, "ab\ncd\nef\ngh\nij\tk\n\n\np");
+  EXPECT_EQ(text, "ab\ncd\nef\ngh\n\nij\tk\n\n\np");
 }
 }  // namespace tgfx
