@@ -460,7 +460,7 @@ TGFX_TEST(CanvasTest, ShaderSimulationMipmap) {
   Paint paint;
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Nearest);
   auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror, sampling)
-  ->makeWithMatrix(Matrix::MakeScale(0.125f));
+                    ->makeWithMatrix(Matrix::MakeScale(0.125f));
   paint.setShader(shader);
   canvas->translate(100, 100);
   auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
