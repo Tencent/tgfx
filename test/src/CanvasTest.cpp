@@ -466,6 +466,7 @@ TGFX_TEST(CanvasTest, ShaderSimulationMipmap) {
   auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
   canvas->drawRect(drawRect, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ShaderSimulation"));
+  caps->npotTextureTileSupport = true;
   device->unlock();
 }
 
