@@ -22,14 +22,6 @@
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
-static ScratchKey ComputeScratchKey(BufferType bufferType) {
-  static const uint32_t Type = UniqueID::Next();
-  BytesKey bytesKey(2);
-  bytesKey.write(Type);
-  bytesKey.write(static_cast<uint32_t>(bufferType));
-  return bytesKey;
-}
-
 std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, const void* buffer, size_t size,
                                            BufferType bufferType) {
   if (buffer == nullptr || size == 0) {
@@ -39,19 +31,13 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, const void* buffer,
   CheckGLError(context);
 
   unsigned target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
-  auto scratchKey = ComputeScratchKey(bufferType);
-  auto glBuffer = Resource::Find<GLBuffer>(context, scratchKey);
   auto gl = GLFunctions::Get(context);
-  if (glBuffer == nullptr) {
-    unsigned bufferID = 0;
-    gl->genBuffers(1, &bufferID);
-    if (bufferID == 0) {
-      return nullptr;
-    }
-    glBuffer = Resource::AddToCache(context, new GLBuffer(bufferType, size, bufferID), scratchKey);
-  } else {
-    glBuffer->_sizeInBytes = size;
+  unsigned bufferID = 0;
+  gl->genBuffers(1, &bufferID);
+  if (bufferID == 0) {
+    return nullptr;
   }
+  auto glBuffer = Resource::AddToCache(context, new GLBuffer(bufferType, size, bufferID));
   gl->bindBuffer(target, glBuffer->_bufferID);
   gl->bufferData(target, static_cast<GLsizeiptr>(size), buffer, GL_STATIC_DRAW);
   if (!CheckGLError(context)) {

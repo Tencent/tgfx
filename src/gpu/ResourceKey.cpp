@@ -52,19 +52,20 @@ ResourceKey::ResourceKey(ResourceKey&& key) noexcept : data(key.data), count(key
   key.count = 0;
 }
 
-bool ResourceKey::equal(const ResourceKey& that) const {
+ResourceKey& ResourceKey::operator=(const ResourceKey& that) {
+  if (this == &that) {
+    return *this;
+  }
+  data = CopyData(that.data, that.count);
+  count = that.count;
+  return *this;
+}
+
+bool ResourceKey::operator==(const ResourceKey& that) const {
   if (count != that.count) {
     return false;
   }
   return memcmp(data, that.data, count * sizeof(uint32_t)) == 0;
-}
-
-void ResourceKey::copy(const ResourceKey& that) {
-  if (data == that.data) {
-    return;
-  }
-  data = CopyData(that.data, that.count);
-  count = that.count;
 }
 
 ScratchKey::ScratchKey(uint32_t* data, size_t count) : ResourceKey(data, count) {
@@ -175,7 +176,7 @@ UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addReference();
   }
-  copy(key);
+  ResourceKey::operator=(key);
   return *this;
 }
 
