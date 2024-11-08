@@ -25,12 +25,10 @@ namespace tgfx {
 
 static std::mutex& TypefaceMutex = *new std::mutex;
 static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
-static bool isFontListChanged = false;
 
 void TextLayer::SetFallbackTypefaces(std::vector<std::shared_ptr<Typeface>> typefaces) {
   std::lock_guard<std::mutex> lock(TypefaceMutex);
   FallbackTypefaces = std::move(typefaces);
-  isFontListChanged = true;
 }
 
 std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
@@ -65,7 +63,6 @@ void TextLayer::setFont(const Font& font) {
     return;
   }
   _font = font;
-  isFontListChanged = true;
   invalidateContent();
 }
 
@@ -233,11 +230,21 @@ std::string TextLayer::preprocessNewLines(const std::string& text) {
 }
 
 void TextLayer::updateFonts() {
-  if (!isFontListChanged) {
+  std::vector<uint32_t> uniqueIDs = {};
+  uniqueIDs.push_back(_font.getTypeface()->uniqueID());
+
+  const auto fallbackTypefaces = GetFallbackTypefaces();
+  for (const auto& typeface : fallbackTypefaces) {
+    if (typeface == _font.getTypeface()) {
+      uniqueIDs.push_back(typeface->uniqueID());
+    }
+  }
+
+  if (_fallbackTypefaceUniqueIDs == uniqueIDs) {
     return;
   }
 
-  isFontListChanged = false;
+  _fallbackTypefaceUniqueIDs = uniqueIDs;
   _fonts.clear();
   _fonts.push_back(_font);
 

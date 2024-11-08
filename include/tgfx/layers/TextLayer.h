@@ -159,6 +159,7 @@ class TextLayer : public Layer {
   VerticalAlign _verticalAlign = VerticalAlign::Top;
   bool _autoWrap = false;
   std::vector<Font> _fonts;
+  std::vector<uint32_t> _fallbackTypefaceUniqueIDs = {};
 
   struct OneLineParam {
     size_t index;
