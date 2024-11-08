@@ -162,7 +162,7 @@ void RenderContext::drawPath(const Path& path, const MCState& state, const FillS
   if (ShouldTriangulatePath(path, state.matrix)) {
     drawOp = TriangulatingPathOp::Make(style.color, path, state.matrix, stroke, renderFlags);
   } else {
-    auto maskFP = makeTextureMask(path, state.matrix, stroke);
+    auto maskFP = makeTextureMask(path, state.matrix, getAAType(style), stroke);
     if (maskFP != nullptr) {
       drawOp = FillRectOp::Make(style.color, localBounds, state.matrix);
       drawOp->addCoverageFP(std::move(maskFP));
@@ -173,6 +173,7 @@ void RenderContext::drawPath(const Path& path, const MCState& state, const FillS
 
 std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& path,
                                                                   const Matrix& viewMatrix,
+                                                                  AAType aaType,
                                                                   const Stroke* stroke) {
   auto scales = viewMatrix.getAxisScales();
   auto bounds = path.getBounds();
@@ -190,7 +191,8 @@ std::unique_ptr<FragmentProcessor> RenderContext::makeTextureMask(const Path& pa
   auto height = ceilf(bounds.height());
   auto rasterizeMatrix = Matrix::MakeScale(scales.x, scales.y);
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), rasterizeMatrix, stroke);
+  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), rasterizeMatrix,
+                                         aaType == AAType::Coverage, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy(uniqueKey, rasterizer, false, renderFlags);
   return TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
@@ -259,8 +261,9 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
+  auto aaType = getAAType(style);
   auto rasterizer = Rasterizer::MakeFrom(std::move(glyphRunList), ISize::Make(width, height),
-                                         rasterizeMatrix, stroke);
+                                         rasterizeMatrix, aaType == AAType::Coverage, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
   auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
@@ -372,7 +375,7 @@ std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip
   return {{}, false};
 }
 
-std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
+std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AAType aaType) {
   auto domainID = PathRef::GetUniqueKey(clip).domainID();
   if (domainID == clipID) {
     return clipTexture;
@@ -387,7 +390,7 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
   if (ShouldTriangulatePath(clip, rasterizeMatrix)) {
     auto drawOp =
         TriangulatingPathOp::Make(Color::White(), clip, rasterizeMatrix, nullptr, renderFlags);
-    drawOp->setAA(AAType::Coverage);
+    drawOp->setAA(aaType);
     auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true, 1, false,
                                                         ImageOrigin::TopLeft, true);
     if (renderTarget == nullptr) {
@@ -397,7 +400,8 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
     context.addOp(std::move(drawOp));
     clipTexture = renderTarget->getTextureProxy();
   } else {
-    auto rasterizer = Rasterizer::MakeFrom(clip, ISize::Make(width, height), rasterizeMatrix);
+    auto rasterizer = Rasterizer::MakeFrom(clip, ISize::Make(width, height), rasterizeMatrix,
+                                           aaType == AAType::Coverage);
     auto proxyProvider = getContext()->proxyProvider();
     clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
   }
@@ -408,7 +412,7 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip) {
 std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
                                                               const Rect& deviceBounds,
                                                               const Matrix& viewMatrix,
-                                                              Rect* scissorRect) {
+                                                              AAType aaType, Rect* scissorRect) {
   if ((!clip.isEmpty() && clip.contains(deviceBounds)) ||
       (clip.isEmpty() && clip.isInverseFillType())) {
     return nullptr;
@@ -428,7 +432,7 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, opContext->renderTarget());
   scissorRect->roundOut();
-  auto textureProxy = getClipTexture(clip);
+  auto textureProxy = getClipTexture(clip, aaType);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -444,15 +448,13 @@ void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBound
   }
   FPArgs args = {getContext(), renderFlags, localBounds, state.matrix};
   auto isRectOp = op->classID() == FillRectOp::ClassID();
-  auto aaType = AAType::None;
-  if (opContext->renderTarget()->sampleCount() > 1) {
-    aaType = AAType::MSAA;
-  } else if (style.antiAlias) {
-    if (!isRectOp || !args.viewMatrix.rectStaysRect() || !IsPixelAligned(op->bounds())) {
-      aaType = AAType::Coverage;
-    }
+  auto aaType = getAAType(style);
+  if (aaType == AAType::Coverage && isRectOp && args.viewMatrix.rectStaysRect() &&
+      IsPixelAligned(op->bounds())) {
+    op->setAA(AAType::None);
+  } else {
+    op->setAA(aaType);
   }
-  op->setAA(aaType);
   op->setBlendMode(style.blendMode);
   if (style.shader) {
     if (auto processor = FragmentProcessor::Make(style.shader, args)) {
@@ -474,7 +476,7 @@ void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBound
     }
   }
   Rect scissorRect = Rect::MakeEmpty();
-  auto clipMask = getClipMask(state.clip, op->bounds(), args.viewMatrix, &scissorRect);
+  auto clipMask = getClipMask(state.clip, op->bounds(), args.viewMatrix, aaType, &scissorRect);
   if (clipMask) {
     op->addCoverageFP(std::move(clipMask));
   }
@@ -487,6 +489,16 @@ void RenderContext::addOp(std::unique_ptr<Op> op, const std::function<bool()>& w
     return;
   }
   opContext->addOp(std::move(op));
+}
+
+AAType RenderContext::getAAType(const FillStyle& style) const {
+  if (opContext->renderTarget()->sampleCount() > 1) {
+    return AAType::MSAA;
+  }
+  if (style.antiAlias) {
+    return AAType::Coverage;
+  }
+  return AAType::None;
 }
 
 bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state,

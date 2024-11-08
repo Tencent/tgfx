@@ -53,7 +53,7 @@ class RenderContext : public DrawContext {
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const FillStyle& style, const Stroke* stroke) override;
 
-  void drawPicture(std::shared_ptr<Picture> picture, const tgfx::MCState& state) override;
+  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
                  std::shared_ptr<ImageFilter> filter) override;
@@ -67,20 +67,22 @@ class RenderContext : public DrawContext {
 
   explicit RenderContext(Surface* surface);
   Context* getContext() const;
-  std::shared_ptr<TextureProxy> getClipTexture(const Path& clip);
+  std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip,
                                                    const Rect* drawBounds = nullptr);
   std::unique_ptr<FragmentProcessor> getClipMask(const Path& clip, const Rect& deviceBounds,
-                                                 const Matrix& viewMatrix, Rect* scissorRect);
+                                                 const Matrix& viewMatrix, AAType aaType,
+                                                 Rect* scissorRect);
   Rect clipLocalBounds(const Rect& localBounds, const MCState& state);
   std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
-                                                     const Stroke* stroke = nullptr);
+                                                     AAType aaType, const Stroke* stroke = nullptr);
   bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
   void addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds, const MCState& state,
                  const FillStyle& style);
   void addOp(std::unique_ptr<Op> op, const std::function<bool()>& willDiscardContent);
+  AAType getAAType(const FillStyle& style) const;
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);
   bool wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state, const FillStyle& style,
                               bool isRectOp) const;

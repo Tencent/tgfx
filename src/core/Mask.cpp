@@ -49,18 +49,18 @@ bool Mask::fillText(const GlyphRunList* glyphRunList, const Stroke* stroke) {
   if (glyphRunList->hasColor()) {
     return false;
   }
-  if (onFillText(glyphRunList, stroke, matrix)) {
+  if (onFillText(glyphRunList, stroke, matrix, antiAlias)) {
     return true;
   }
   Path path = {};
   if (!glyphRunList->getPath(&path, matrix, stroke)) {
     return false;
   }
-  onFillPath(path, Matrix::I(), true);
+  onFillPath(path, Matrix::I(), antiAlias, true);
   return true;
 }
 
-bool Mask::onFillText(const GlyphRunList*, const Stroke*, const Matrix&) {
+bool Mask::onFillText(const GlyphRunList*, const Stroke*, const Matrix&, bool) {
   return false;
 }
 }  // namespace tgfx

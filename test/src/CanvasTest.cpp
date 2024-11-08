@@ -444,6 +444,32 @@ TGFX_TEST(CanvasTest, mipmap) {
   device->unlock();
 }
 
+TGFX_TEST(CanvasTest, TileModeFallback) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto caps = (Caps*)context->caps();
+  caps->npotTextureTileSupport = false;
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeMipmapped(true);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Nearest);
+  auto shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror, sampling)
+                    ->makeWithMatrix(Matrix::MakeScale(0.125f));
+  paint.setShader(shader);
+  canvas->translate(100, 100);
+  auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
+  canvas->drawRect(drawRect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TileModeFallback"));
+  caps->npotTextureTileSupport = true;
+  device->unlock();
+}
+
 TGFX_TEST(CanvasTest, hardwareMipmap) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);

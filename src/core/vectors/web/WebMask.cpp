@@ -80,7 +80,8 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool) {
+void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool /*antiAlias*/, bool) {
+  // The antiAlias parameter is ignored because the canvas2d API does not support anti-aliasing.
   if (path.isEmpty()) {
     return;
   }
@@ -113,7 +114,7 @@ static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::stri
 }
 
 bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
-                         const Matrix& matrix) {
+                         const Matrix& matrix, bool) {
   aboutToFill();
   auto bounds = glyphRunList->getBounds(matrix, stroke);
   if (bounds.isEmpty()) {

@@ -27,6 +27,7 @@ class FTMask : public PixelRefMask {
   }
 
  protected:
-  void onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) override;
+  void onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
+                  bool needsGammaCorrection) override;
 };
 }  // namespace tgfx

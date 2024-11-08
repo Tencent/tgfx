@@ -89,7 +89,8 @@ static void SpanFunc(int y, int, const FT_Span* spans, void* user) {
   }
 }
 
-void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
+void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
+                        bool needsGammaCorrection) {
   if (path.isEmpty()) {
     return;
   }
@@ -133,7 +134,10 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   target.pitch = pitch;
   target.gammaTable = PixelRefMask::GammaTable().data();
   FT_Raster_Params params;
-  params.flags = FT_RASTER_FLAG_AA | FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP;
+  params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP;
+  if (antiAlias) {
+    params.flags |= FT_RASTER_FLAG_AA;
+  }
   params.gray_spans = SpanFunc;
   params.user = &target;
   auto& clip = params.clip_box;
