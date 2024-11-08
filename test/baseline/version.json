@@ -54,6 +54,7 @@
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
+        "innerShadow": "01cce38",
         "shaderMaskFilter": "ded3c91"
     },
     "ImageReaderTest": {
@@ -77,6 +78,7 @@
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
         "imageMask": "af2e3ff",
+        "innerShadow": "01cce38",
         "shapeMask": "612c09e",
         "textMask": "50c58e6"
     },

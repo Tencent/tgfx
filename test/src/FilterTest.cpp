@@ -324,4 +324,39 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect"));
   device->unlock();
 }
+
+TGFX_TEST(FilterTest, InnerShadow) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  Paint paint;
+  auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
+                               static_cast<int>(imageHeight * 2.f + padding * 3.f));
+  auto canvas = surface->getCanvas();
+  canvas->concat(Matrix::MakeTrans(padding, padding));
+  paint.setImageFilter(ImageFilter::Blur(15, 15));
+  canvas->drawImage(image, &paint);
+
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
+  paint.setImageFilter(ImageFilter::InnerShadowOnly(0, 0, 15, 15, Color::White()));
+  canvas->drawImage(image, &paint);
+
+  canvas->concat(Matrix::MakeTrans(-imageWidth - padding, imageWidth + padding));
+  paint.setImageFilter(ImageFilter::InnerShadow(0, 0, 15, 15, Color::White()));
+  canvas->drawImage(image, &paint);
+
+  canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
+  auto filter = ImageFilter::InnerShadow(3, 3, 0, 0, Color::White());
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/innerShadow"));
+  device->unlock();
+}
 }  // namespace tgfx
