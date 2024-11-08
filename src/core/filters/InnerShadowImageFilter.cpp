@@ -25,28 +25,21 @@
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadow(float dx, float dy, float blurrinessX,
                                                       float blurrinessY, const Color& color) {
-
-  auto dropShadowFilter = DropShadowOnly(dx, dy, blurrinessX, blurrinessY, Color::Black());
-  if (!dropShadowFilter) {
-    return nullptr;
-  }
-
-  return std::make_shared<InnerShadowImageFilter>(dropShadowFilter, color, false);
+  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                           float blurrinessY, const Color& color) {
-  auto dropShadowFilter = DropShadowOnly(dx, dy, blurrinessX, blurrinessY, Color::Black());
-  if (!dropShadowFilter) {
-    return nullptr;
-  }
 
-  return std::make_shared<InnerShadowImageFilter>(dropShadowFilter, color, true);
+  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 
-InnerShadowImageFilter::InnerShadowImageFilter(std::shared_ptr<ImageFilter> dropShadowFilter,
-                                               const Color& color, bool shadowOnly)
-    : dropShadowFilter(std::move(dropShadowFilter)), color(color), shadowOnly(shadowOnly) {
+InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrinessX,
+                                               float blurrinessY, const Color& color,
+                                               bool shadowOnly)
+
+    : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
+      shadowOnly(shadowOnly) {
 }
 
 std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
@@ -57,9 +50,18 @@ std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     source = source->makeRasterized(needMipmaps, sampling);
   }
 
-  // get drop shadow mask
-  std::unique_ptr<FragmentProcessor> invertShadowMask =
-      dropShadowFilter->asFragmentProcessor(source, args, sampling, uvMatrix);
+  // get inverted shadow mask
+  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+  if (uvMatrix != nullptr) {
+    shadowMatrix.preConcat(*uvMatrix);
+  }
+  std::unique_ptr<FragmentProcessor> invertShadowMask;
+  if (blurFilter != nullptr) {
+    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
+  } else {
+    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                               sampling, &shadowMatrix);
+  }
 
   auto colorProcessor = ConstColorProcessor::Make(color, InputMode::Ignore);
 

@@ -23,8 +23,8 @@
 namespace tgfx {
 class InnerShadowImageFilter : public ImageFilter {
  public:
-  InnerShadowImageFilter(std::shared_ptr<ImageFilter> dropShadowFilter, const Color& color,
-                         bool shadowOnly);
+  InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
+                         const Color& color, bool shadowOnly);
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
@@ -33,7 +33,9 @@ class InnerShadowImageFilter : public ImageFilter {
                                                          const Matrix* uvMatrix) const override;
 
  private:
-  std::shared_ptr<ImageFilter> dropShadowFilter = nullptr;
+  float dx = 0.0f;
+  float dy = 0.0f;
+  std::shared_ptr<ImageFilter> blurFilter = nullptr;
   Color color = Color::Black();
   bool shadowOnly = false;
 };
