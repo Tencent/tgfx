@@ -131,16 +131,14 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
 
   std::vector<GlyphID> glyphs = {};
   std::vector<Point> positions = {};
+  std::vector<OneLineParam> oneLineParams = {};
 
   // space character glyph id
-  const auto spaceCharacterGlyphID = getGlyphIDAndFont('\u0020').first;
+  const auto [spaceCharacterGlyphID, spaceCharacterFont] = getGlyphIDAndFont('\u0020');
   const auto emptyAdvance = getEmptyAdvance();
 
-  const auto fontMetrics = _fonts[0].getMetrics();
-  const float lineHeight = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
-                           std::fabs(fontMetrics.leading);
   float xOffset = 0;
-  float yOffset = lineHeight;
+  float yOffset = getLineHeight(oneLineParams);
   const char* head = text.data();
   const char* tail = head + text.size();
   // refer to:
@@ -149,44 +147,59 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   while (head < tail) {
     if ('\n' == *head) {
       xOffset = 0;
-      yOffset += lineHeight;
+      yOffset += getLineHeight(oneLineParams);
       ++head;
+
+      resolveTextAlignment(positions, oneLineParams);
+      oneLineParams.clear();
     } else if ('\t' == *head) {
       // tab width default is 4 spaces
       for (uint32_t i = 0; i < 4; i++) {
-        glyphs.push_back(spaceCharacterGlyphID);
-        positions.push_back(Point::Make(xOffset, yOffset));
-        xOffset += emptyAdvance;
+        if (_autoWrap && xOffset + emptyAdvance > _width) {
+          xOffset = 0;
+          yOffset += getLineHeight(oneLineParams);
 
-        if (_autoWrap) {
-          if (xOffset >= _width) {
-            xOffset = 0;
-            yOffset += lineHeight;
-          }
+          resolveTextAlignment(positions, oneLineParams);
+          oneLineParams.clear();
         }
+
+        if (0 == spaceCharacterGlyphID) {
+          LOGE("Space character glyph id is 0.");
+          continue;
+        }
+
+        glyphs.push_back(spaceCharacterGlyphID);
+        const auto point = Point::Make(xOffset, yOffset);
+        positions.push_back(point);
+        xOffset += emptyAdvance;
+        oneLineParams.push_back({positions.size() - 1, point, spaceCharacterFont});
       }
       ++head;
     } else {
       const auto character = UTF::NextUTF8(&head, tail);
       const auto glyphIDAndFont = getGlyphIDAndFont(character);
       const auto glyphID = glyphIDAndFont.first;
-      if (glyphID > 0) {
-        glyphs.push_back(glyphID);
-        positions.push_back(Point::Make(xOffset, yOffset));
-        auto advance = glyphIDAndFont.second.getAdvance(glyphID);
-        xOffset += advance;
+      const auto advance = glyphID > 0 ? glyphIDAndFont.second.getAdvance(glyphID) : emptyAdvance;
 
-        if (_autoWrap) {
-          if (xOffset >= _width) {
-            xOffset = 0;
-            yOffset += lineHeight;
-          }
-        }
-      } else {
-        glyphs.push_back(0);
-        positions.push_back(Point::Make(xOffset, yOffset));
-        xOffset += emptyAdvance;
+      if (_autoWrap && xOffset + advance > _width) {
+        xOffset = 0;
+        yOffset += getLineHeight(oneLineParams);
+
+        resolveTextAlignment(positions, oneLineParams);
+        oneLineParams.clear();
       }
+
+      const auto tmpGlyphID = glyphID > 0 ? glyphID : spaceCharacterGlyphID;
+      if (0 == tmpGlyphID) {
+        LOGE("tmpGlyphID id is 0.");
+        continue;
+      }
+
+      glyphs.push_back(tmpGlyphID);
+      const auto point = Point::Make(xOffset, yOffset);
+      positions.push_back(point);
+      xOffset += advance;
+      oneLineParams.push_back({positions.size() - 1, point, glyphIDAndFont.second});
     }
   }
 
@@ -227,6 +240,7 @@ void TextLayer::updateFonts() {
   isFontListChanged = false;
   _fonts.clear();
   _fonts.push_back(_font);
+
   const auto typeFaces = GetFallbackTypefaces();
   for (const auto& typeFace : typeFaces) {
     _fonts.push_back(Font(typeFace, _font.getSize()));
@@ -241,17 +255,48 @@ std::pair<GlyphID, Font> TextLayer::getGlyphIDAndFont(Unichar unichar) const {
     }
   }
 
-  return {};
+  return {0, Font()};
 }
 
 float TextLayer::getEmptyAdvance() const {
   for (const auto& font : _fonts) {
-    const auto xHeight = font.getMetrics().xHeight;
-    if (xHeight > 0.0f) {
-      return xHeight;
+    const auto metrics = font.getMetrics();
+    if (metrics.xHeight > 0.0f) {
+      return metrics.xHeight;
     }
   }
 
   return 0.0f;
+}
+
+float TextLayer::getLineHeight(const std::vector<OneLineParam>& oneLineParams) const {
+  if (_fonts.empty()) {
+    return 0.0f;
+  }
+
+  const auto fontMetrics = _fonts[0].getMetrics();
+  float ascent = std::fabs(fontMetrics.ascent);
+  float descent = std::fabs(fontMetrics.descent);
+  float leading = std::fabs(fontMetrics.leading);
+  Font lastFont = {};
+
+  for (const auto& oneLineParam : oneLineParams) {
+    if (lastFont == oneLineParam.font) {
+      continue;
+    }
+
+    lastFont = oneLineParam.font;
+    const auto fontMetrics = lastFont.getMetrics();
+    ascent = std::max(ascent, std::fabs(fontMetrics.ascent));
+    descent = std::max(descent, std::fabs(fontMetrics.descent));
+    leading = std::max(leading, std::fabs(fontMetrics.leading));
+  }
+
+  return ascent + descent + leading;
+}
+
+void TextLayer::resolveTextAlignment(const std::vector<Point>& /*positions*/,
+                                     const std::vector<OneLineParam>& /*oneLineParams*/) {
+  // TODO: Implement text alignment
 }
 }  // namespace tgfx

@@ -160,9 +160,22 @@ class TextLayer : public Layer {
   bool _autoWrap = false;
   std::vector<Font> _fonts;
 
+  struct OneLineParam {
+    size_t index;
+    Point offsetPoint;
+    Font font;
+
+    OneLineParam(size_t idx, Point offsetPt, Font fnt)
+        : index(idx), offsetPoint(offsetPt), font(fnt) {
+    }
+  };
+
   std::string preprocessNewLines(const std::string& text);
   void updateFonts();
   std::pair<GlyphID, Font> getGlyphIDAndFont(Unichar unichar) const;
   float getEmptyAdvance() const;
+  float getLineHeight(const std::vector<OneLineParam>& oneLineParams) const;
+  void resolveTextAlignment(const std::vector<Point>& positions,
+                            const std::vector<OneLineParam>& oneLineParams);
 };
 }  // namespace tgfx
