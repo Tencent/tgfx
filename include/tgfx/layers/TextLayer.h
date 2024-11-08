@@ -21,7 +21,6 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/TextAlign.h"
-#include "tgfx/layers/VerticalAlign.h"
 
 namespace tgfx {
 /**
@@ -93,8 +92,8 @@ class TextLayer : public Layer {
   void setWidth(float width);
 
   /**
-   * Returns the layout height of the text, used for vertical alignment. The default value is 0,
-   * meaning the text will be rendered without any vertical alignment.
+   * Returns the layout height of the text. Any text that exceeds this height will be truncated (not
+   * displayed). The default value is 0, meaning the text will be rendered without any truncation.
    */
   float height() const {
     return _height;
@@ -117,19 +116,6 @@ class TextLayer : public Layer {
    * Sets how the text should be horizontally aligned within the layout width.
    */
   void setTextAlign(TextAlign align);
-
-  /**
-   * Specifies how the text should be vertically aligned within the layout height. The default is
-   * VerticalAlign::Top. This setting is ignored if the layout height is 0.
-   */
-  VerticalAlign verticalAlign() const {
-    return _verticalAlign;
-  }
-
-  /**
-   * Sets how the text should be vertically aligned within the layout height.
-   */
-  void setVerticalAlign(VerticalAlign align);
 
   /**
    * Returns whether the text should be wrapped to fit within the text width. The default value is
@@ -156,7 +142,6 @@ class TextLayer : public Layer {
   float _width = 0;
   float _height = 0;
   TextAlign _textAlign = TextAlign::Left;
-  VerticalAlign _verticalAlign = VerticalAlign::Top;
   bool _autoWrap = false;
 
   struct OneLineParam {
