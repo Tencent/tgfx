@@ -95,14 +95,14 @@ class ImageFilter {
                                                   float blurrinessY, const Color& color);
 
   /**
-  * Create a filter that renders an inner shadow, in exactly the same manner as the InnerShadow(),
-  * except that the resulting image does not include the input content.
-  * @param dx            The X offset of the shadow.
-  * @param dy            The Y offset of the shadow.
-  * @param blurrinessX   The blur radius for the shadow, along the X axis.
-  * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-  * @param color         The color of the inner shadow.
-  */
+   * Create a filter that renders an inner shadow, in exactly the same manner as the InnerShadow(),
+   * except that the resulting image does not include the input content.
+   * @param dx            The X offset of the shadow.
+   * @param dy            The Y offset of the shadow.
+   * @param blurrinessX   The blur radius for the shadow, along the X axis.
+   * @param blurrinessY   The blur radius for the shadow, along the Y axis.
+   * @param color         The color of the inner shadow.
+   */
   static std::shared_ptr<ImageFilter> InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                       float blurrinessY, const Color& color);
 
