@@ -230,27 +230,23 @@ std::string TextLayer::preprocessNewLines(const std::string& text) {
 }
 
 void TextLayer::updateFonts() {
-  std::vector<uint32_t> uniqueIDs = {};
+  std::vector<uint32_t> uniqueIDs;
   uniqueIDs.push_back(_font.getTypeface()->uniqueID());
 
-  const auto fallbackTypefaces = GetFallbackTypefaces();
-  for (const auto& typeface : fallbackTypefaces) {
-    if (typeface == _font.getTypeface()) {
-      uniqueIDs.push_back(typeface->uniqueID());
-    }
+  for (const auto& typeface : GetFallbackTypefaces()) {
+    uniqueIDs.push_back(typeface->uniqueID());
   }
 
   if (_fallbackTypefaceUniqueIDs == uniqueIDs) {
     return;
   }
 
-  _fallbackTypefaceUniqueIDs = uniqueIDs;
+  _fallbackTypefaceUniqueIDs = std::move(uniqueIDs);
   _fonts.clear();
   _fonts.push_back(_font);
 
-  const auto typeFaces = GetFallbackTypefaces();
-  for (const auto& typeFace : typeFaces) {
-    _fonts.push_back(Font(typeFace, _font.getSize()));
+  for (const auto& typeface : GetFallbackTypefaces()) {
+    _fonts.push_back(Font(typeface, _font.getSize()));
   }
 }
 
