@@ -158,22 +158,19 @@ class TextLayer : public Layer {
   TextAlign _textAlign = TextAlign::Left;
   VerticalAlign _verticalAlign = VerticalAlign::Top;
   bool _autoWrap = false;
-  std::vector<Font> _fonts;
-  std::vector<uint32_t> _fallbackTypefaceUniqueIDs = {};
 
   struct OneLineParam {
     size_t index;
     Point offsetPoint;
-    Font font;
+    std::shared_ptr<Typeface> typeface;
 
-    OneLineParam(size_t idx, Point offsetPt, Font fnt)
-        : index(idx), offsetPoint(offsetPt), font(fnt) {
+    OneLineParam(size_t idx, Point offsetPt, std::shared_ptr<Typeface> face)
+        : index(idx), offsetPoint(offsetPt), typeface(face) {
     }
   };
 
   std::string preprocessNewLines(const std::string& text);
-  void updateFonts();
-  std::pair<GlyphID, Font> getGlyphIDAndFont(Unichar unichar) const;
+  std::pair<GlyphID, std::shared_ptr<Typeface>> getGlyphIDAndTypeface(Unichar unichar) const;
   float getEmptyAdvance() const;
   float getLineHeight(const std::vector<OneLineParam>& oneLineParams) const;
   void resolveTextAlignment(const std::vector<Point>& positions,

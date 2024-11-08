@@ -117,13 +117,6 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     return nullptr;
   }
 
-  updateFonts();
-
-  if (_fonts.empty()) {
-    LOGE("Font and font fallback list not set.");
-    return nullptr;
-  }
-
   const std::string text = preprocessNewLines(_text);
 
   std::vector<GlyphID> glyphs = {};
@@ -131,7 +124,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   std::vector<OneLineParam> oneLineParams = {};
 
   // space character glyph id
-  const auto [spaceCharacterGlyphID, spaceCharacterFont] = getGlyphIDAndFont('\u0020');
+  const auto [spaceCharacterGlyphID, spaceCharacterTypeface] = getGlyphIDAndTypeface('\u0020');
   const auto emptyAdvance = getEmptyAdvance();
 
   float xOffset = 0;
@@ -169,14 +162,19 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
         const auto point = Point::Make(xOffset, yOffset);
         positions.push_back(point);
         xOffset += emptyAdvance;
-        oneLineParams.push_back({positions.size() - 1, point, spaceCharacterFont});
+        oneLineParams.push_back({positions.size() - 1, point, spaceCharacterTypeface});
       }
       ++head;
     } else {
       const auto character = UTF::NextUTF8(&head, tail);
-      const auto glyphIDAndFont = getGlyphIDAndFont(character);
-      const auto glyphID = glyphIDAndFont.first;
-      const auto advance = glyphID > 0 ? glyphIDAndFont.second.getAdvance(glyphID) : emptyAdvance;
+      const auto glyphIDAndTypeface = getGlyphIDAndTypeface(character);
+      const auto glyphID = glyphIDAndTypeface.first;
+      float advance = emptyAdvance;
+      if (glyphID > 0) {
+        auto font = _font;
+        font.setTypeface(glyphIDAndTypeface.second);
+        advance = font.getAdvance(glyphID);
+      }
 
       if (_autoWrap && xOffset + advance > _width) {
         xOffset = 0;
@@ -196,7 +194,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       const auto point = Point::Make(xOffset, yOffset);
       positions.push_back(point);
       xOffset += advance;
-      oneLineParams.push_back({positions.size() - 1, point, glyphIDAndFont.second});
+      oneLineParams.push_back({positions.size() - 1, point, glyphIDAndTypeface.second});
     }
   }
 
@@ -229,43 +227,41 @@ std::string TextLayer::preprocessNewLines(const std::string& text) {
   return result;
 }
 
-void TextLayer::updateFonts() {
-  std::vector<uint32_t> uniqueIDs;
-  uniqueIDs.push_back(_font.getTypeface()->uniqueID());
-
-  for (const auto& typeface : GetFallbackTypefaces()) {
-    uniqueIDs.push_back(typeface->uniqueID());
+std::pair<GlyphID, std::shared_ptr<Typeface>> TextLayer::getGlyphIDAndTypeface(Unichar unichar) const {
+  auto glyphID = _font.getGlyphID(unichar);
+  if (glyphID > 0) {
+    return {glyphID, _font.getTypeface()};
   }
 
-  if (_fallbackTypefaceUniqueIDs == uniqueIDs) {
-    return;
-  }
+  const auto& fallbackTypefaces = GetFallbackTypefaces();
+  for (const auto& fallbackTypeface : fallbackTypefaces) {
+    if (nullptr == fallbackTypeface) {
+      continue;
+    }
 
-  _fallbackTypefaceUniqueIDs = std::move(uniqueIDs);
-  _fonts.clear();
-  _fonts.push_back(_font);
-
-  for (const auto& typeface : GetFallbackTypefaces()) {
-    _fonts.push_back(Font(typeface, _font.getSize()));
-  }
-}
-
-std::pair<GlyphID, Font> TextLayer::getGlyphIDAndFont(Unichar unichar) const {
-  for (const auto& font : _fonts) {
-    const auto glyphID = font.getGlyphID(unichar);
+    glyphID = fallbackTypeface->getGlyphID(unichar);
     if (glyphID > 0) {
-      return {glyphID, font};
+      return {glyphID, fallbackTypeface};
     }
   }
 
-  return {0, Font()};
+  return {0, nullptr};
 }
 
 float TextLayer::getEmptyAdvance() const {
-  for (const auto& font : _fonts) {
-    const auto metrics = font.getMetrics();
-    if (metrics.xHeight > 0.0f) {
-      return metrics.xHeight;
+  if (_font.getMetrics().xHeight > 0.0f) {
+    return _font.getMetrics().xHeight;
+  }
+
+  const auto& fallbackTypefaces = GetFallbackTypefaces();
+  for (const auto& fallbackTypeface : fallbackTypefaces) {
+    if (nullptr == fallbackTypeface) {
+      continue;
+    }
+    auto font = _font;
+    font.setTypeface(fallbackTypeface);
+    if (font.getMetrics().xHeight > 0.0f) {
+      return font.getMetrics().xHeight;
     }
   }
 
@@ -273,23 +269,21 @@ float TextLayer::getEmptyAdvance() const {
 }
 
 float TextLayer::getLineHeight(const std::vector<OneLineParam>& oneLineParams) const {
-  if (_fonts.empty()) {
-    return 0.0f;
-  }
-
-  const auto fontMetrics = _fonts[0].getMetrics();
+  const auto fontMetrics = _font.getMetrics();
   float ascent = std::fabs(fontMetrics.ascent);
   float descent = std::fabs(fontMetrics.descent);
   float leading = std::fabs(fontMetrics.leading);
-  Font lastFont = {};
+  std::shared_ptr<Typeface> lastTypeface = nullptr;
 
   for (const auto& oneLineParam : oneLineParams) {
-    if (lastFont == oneLineParam.font) {
+    if (nullptr == oneLineParam.typeface || lastTypeface == oneLineParam.typeface) {
       continue;
     }
 
-    lastFont = oneLineParam.font;
-    const auto fontMetrics = lastFont.getMetrics();
+    lastTypeface = oneLineParam.typeface;
+    auto font = _font;
+    font.setTypeface(oneLineParam.typeface);
+    const auto fontMetrics = font.getMetrics();
     ascent = std::max(ascent, std::fabs(fontMetrics.ascent));
     descent = std::max(descent, std::fabs(fontMetrics.descent));
     leading = std::max(leading, std::fabs(fontMetrics.leading));
