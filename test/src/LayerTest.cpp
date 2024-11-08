@@ -31,6 +31,7 @@
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -1668,6 +1669,54 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
 
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPointNested"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, InnerShadowFilter) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  Paint paint;
+  auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
+                               static_cast<int>(imageHeight * 2.f + padding * 3.f));
+  auto filter = BlurFilter::Make(15, 15);
+  auto layer = ImageLayer::Make();
+  layer->setImage(image);
+  layer->setMatrix(Matrix::MakeTrans(padding, padding));
+  layer->setFilters({filter});
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(layer);
+
+  auto layer2 = ImageLayer::Make();
+  layer2->setImage(image);
+  layer2->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, padding));
+  auto filter2 = InnerShadowFilter::Make(0, 0, 15, 15, Color::Black(), true);
+  layer2->setFilters({filter2});
+  displayList->root()->addChild(layer2);
+
+  auto layer3 = ImageLayer::Make();
+  layer3->setImage(image);
+  layer3->setMatrix(Matrix::MakeTrans(padding, imageWidth + padding * 2));
+  auto filter3 = InnerShadowFilter::Make(0, 0, 15, 15, Color::Black());
+  layer3->setFilters({filter3});
+  displayList->root()->addChild(layer3);
+
+  auto layer4 = ImageLayer::Make();
+  layer4->setImage(image);
+  layer4->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, imageWidth + padding * 2));
+  auto filter4 = InnerShadowFilter::Make(1, 1, 0, 0, Color::Black());
+  layer4->setFilters({filter4});
+  displayList->root()->addChild(layer4);
+
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/innerShadow"));
   device->unlock();
 }
 }  // namespace tgfx
