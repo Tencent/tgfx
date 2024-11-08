@@ -96,14 +96,6 @@ void TextLayer::setTextAlign(TextAlign align) {
   invalidateContent();
 }
 
-void TextLayer::setVerticalAlign(VerticalAlign value) {
-  if (_verticalAlign == value) {
-    return;
-  }
-  _verticalAlign = value;
-  invalidateContent();
-}
-
 void TextLayer::setAutoWrap(bool value) {
   if (_autoWrap == value) {
     return;
