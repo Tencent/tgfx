@@ -34,13 +34,14 @@ class Rasterizer : public ImageGenerator {
    */
   static std::shared_ptr<Rasterizer> MakeFrom(std::shared_ptr<GlyphRunList> glyphRunList,
                                               const ISize& clipSize, const Matrix& matrix,
-                                              const Stroke* stroke = nullptr);
+                                              bool antiAlias, const Stroke* stroke = nullptr);
 
   /**
    * Creates a Rasterizer from a Path.
    */
   static std::shared_ptr<Rasterizer> MakeFrom(Path path, const ISize& clipSize,
-                                              const Matrix& matrix, const Stroke* stroke = nullptr);
+                                              const Matrix& matrix, bool antiAlias,
+                                              const Stroke* stroke = nullptr);
 
   virtual ~Rasterizer();
 
@@ -51,7 +52,7 @@ class Rasterizer : public ImageGenerator {
   bool asyncSupport() const override;
 
  protected:
-  Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* stroke);
+  Rasterizer(const ISize& clipSize, const Matrix& matrix, bool antiAlias, const Stroke* stroke);
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
@@ -59,6 +60,7 @@ class Rasterizer : public ImageGenerator {
 
  private:
   Matrix matrix = Matrix::I();
+  bool antiAlias = true;
   Stroke* stroke = nullptr;
 };
 }  // namespace tgfx
