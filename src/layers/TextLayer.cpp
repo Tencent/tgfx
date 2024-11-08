@@ -232,7 +232,8 @@ std::string TextLayer::preprocessNewLines(const std::string& text) {
   return result;
 }
 
-std::pair<GlyphID, std::shared_ptr<Typeface>> TextLayer::getGlyphIDAndTypeface(Unichar unichar) const {
+std::pair<GlyphID, std::shared_ptr<Typeface>> TextLayer::getGlyphIDAndTypeface(
+    Unichar unichar) const {
   auto glyphID = _font.getGlyphID(unichar);
   if (glyphID > 0) {
     return {glyphID, _font.getTypeface()};
