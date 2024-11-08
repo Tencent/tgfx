@@ -65,7 +65,7 @@ std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
 
   auto colorProcessor = ConstColorProcessor::Make(color, InputMode::Ignore);
 
-  // get inverted drop shadow mask and fill it with color
+  // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
       std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
 
@@ -77,7 +77,7 @@ std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     return XfermodeFragmentProcessor::MakeFromTwoProcessors(
         std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcIn);
   } else {
-    // mask the image with origin image and draw the drop shadow mask on top
+    // mask the image with origin image and draw the inner shadow mask on top
     return XfermodeFragmentProcessor::MakeFromTwoProcessors(
         std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcATop);
   }
