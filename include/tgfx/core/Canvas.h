@@ -331,5 +331,6 @@ class Canvas {
   friend class Surface;
   friend class Picture;
   friend class Recorder;
+  friend class SVGGenerator;
 };
 }  // namespace tgfx

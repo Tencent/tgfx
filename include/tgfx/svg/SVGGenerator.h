@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,31 +18,27 @@
 
 #pragma once
 
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/ColorFilter.h"
+#include <sstream>
+#include "tgfx/core/Canvas.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class ModeColorFilter : public ColorFilter {
+class SVGContext;
+
+class SVGGenerator {
  public:
-  ModeColorFilter(Color color, BlendMode mode) : color(color), mode(mode) {
-  }
+  SVGGenerator() = default;
+  ~SVGGenerator();
 
-  bool isAlphaUnchanged() const override;
-
-  bool asColorMode(Color* color, BlendMode* mode) const override {
-    if (color) {
-      *color = this->color;
-    }
-    if (mode) {
-      *mode = this->mode;
-    }
-    return true;
-  }
+  Canvas* beginGenerate(Context* GPUContext, const ISize& size);
+  Canvas* getCanvas() const;
+  std::string finishGenerate();
 
  private:
-  Color color;
-  BlendMode mode;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  bool _actively = false;
+  SVGContext* _svgContext = nullptr;
+  Canvas* _canvas = nullptr;
+  std::stringstream _svgStream;
 };
+
 }  // namespace tgfx

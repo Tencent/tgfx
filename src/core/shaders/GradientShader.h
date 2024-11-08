@@ -32,6 +32,10 @@ class GradientShader : public Shader {
     return colorsAreOpaque;
   }
 
+  ShaderType type() const override {
+    return ShaderType::Gradient;
+  }
+
   std::vector<Color> originalColors = {};
   std::vector<float> originalPositions = {};
 
@@ -45,9 +49,15 @@ class LinearGradientShader : public GradientShader {
   LinearGradientShader(const Point& startPoint, const Point& endPoint,
                        const std::vector<Color>& colors, const std::vector<float>& positions);
 
+  GradientType asGradient(GradientInfo*) const override;
+
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
+
+ private:
+  const Point _startPoint;
+  const Point _endPoint;
 };
 
 class RadialGradientShader : public GradientShader {
@@ -55,9 +65,15 @@ class RadialGradientShader : public GradientShader {
   RadialGradientShader(const Point& center, float radius, const std::vector<Color>& colors,
                        const std::vector<float>& positions);
 
+  GradientType asGradient(GradientInfo*) const override;
+
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
+
+ private:
+  const Point _center;
+  const float _radius;
 };
 
 class ConicGradientShader : public GradientShader {

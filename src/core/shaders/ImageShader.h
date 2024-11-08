@@ -28,6 +28,14 @@ class ImageShader : public Shader {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
 
+  ShaderType type() const override {
+    return ShaderType::Image;
+  }
+
+  std::tuple<std::shared_ptr<Image>, TileMode, TileMode> asImage() const override {
+    return {image, tileModeX, tileModeY};
+  }
+
  private:
   ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
               const SamplingOptions& sampling)

@@ -27,6 +27,8 @@
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/TileMode.h"
 
 namespace tgfx {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to
@@ -192,7 +194,8 @@ static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint)
 LinearGradientShader::LinearGradientShader(const Point& startPoint, const Point& endPoint,
                                            const std::vector<Color>& colors,
                                            const std::vector<float>& positions)
-    : GradientShader(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
+    : GradientShader(colors, positions, PointsToUnitMatrix(startPoint, endPoint)),
+      _startPoint(startPoint), _endPoint(endPoint) {
 }
 
 std::unique_ptr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
@@ -202,6 +205,16 @@ std::unique_ptr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   return MakeGradient(args.context, *this, LinearGradientLayout::Make(totalMatrix));
+}
+
+GradientType LinearGradientShader::asGradient(GradientInfo* info) const {
+  if (info) {
+    info->colors = originalColors;
+    info->positions = originalPositions;
+    info->points[0] = _startPoint;
+    info->points[1] = _endPoint;
+  }
+  return GradientType::Linear;
 }
 
 static Matrix RadialToUnitMatrix(const Point& center, float radius) {
@@ -214,7 +227,8 @@ static Matrix RadialToUnitMatrix(const Point& center, float radius) {
 RadialGradientShader::RadialGradientShader(const Point& center, float radius,
                                            const std::vector<Color>& colors,
                                            const std::vector<float>& positions)
-    : GradientShader(colors, positions, RadialToUnitMatrix(center, radius)) {
+    : GradientShader(colors, positions, RadialToUnitMatrix(center, radius)), _center(center),
+      _radius(radius) {
 }
 
 std::unique_ptr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
@@ -224,6 +238,16 @@ std::unique_ptr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   return MakeGradient(args.context, *this, RadialGradientLayout::Make(totalMatrix));
+}
+
+GradientType RadialGradientShader::asGradient(GradientInfo* info) const {
+  if (info) {
+    info->colors = originalColors;
+    info->positions = originalPositions;
+    info->points[0] = _center;
+    info->radiuses[0] = _radius;
+  }
+  return GradientType::Radial;
 }
 
 ConicGradientShader::ConicGradientShader(const Point& center, float t0, float t1,

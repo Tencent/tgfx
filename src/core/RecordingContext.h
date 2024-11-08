@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include "core/DrawContext.h"
 #include "core/Records.h"
 

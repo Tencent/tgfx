@@ -180,6 +180,8 @@ void XMLWriter::writeDOM(const std::shared_ptr<DOM>& DOM, bool skipRoot) {
   }
 }
 
+void XMLWriter::clear() {};
+
 void XMLWriter::writeHeader() {
 }
 
@@ -193,7 +195,7 @@ XMLStreamWriter::~XMLStreamWriter() {
 
 void XMLStreamWriter::onAddAttribute(const std::string& name, const std::string& value) {
   ASSERT(!_elementsStack.top().hasChildren && !_elementsStack.top().hasText);
-  _stream << " " << name << "=\"" << value << "\"" << value << "\"";
+  _stream << " " << name << "=\"" << value << "\"";
 }
 
 void XMLStreamWriter::onAddText(const std::string& text) {
@@ -238,6 +240,11 @@ void XMLStreamWriter::writeHeader() {
   auto header = getHeader();
   _stream << header;
   this->newline();
+}
+
+void XMLStreamWriter::clear() {
+  _stream.str("");
+  _stream.clear();
 }
 
 void XMLStreamWriter::newline() {

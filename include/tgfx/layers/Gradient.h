@@ -21,29 +21,10 @@
 #include <vector>
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/ShaderType.h"
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
-/**
- * Defines the type of gradient to be drawn.
- */
-enum class GradientType {
-  /**
-   * Linear gradients are defined by an axis, which is a line that the color gradient is aligned
-   * with.
-   */
-  Linear,
-  /**
-   * Radial gradients are defined by a center point and a radius. The color gradient is drawn from
-   * the center point to the edge of the radius.
-   */
-  Radial,
-  /**
-   * Conic gradients are defined by a center point and an angular range. The color gradient is drawn
-   * from the start angle to the end angle, wrapping around the center point.
-   */
-  Conic,
-};
 
 class LinearGradient;
 class RadialGradient;

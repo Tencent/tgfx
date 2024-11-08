@@ -53,7 +53,12 @@ class XMLWriter {
     this->onEndElement();
   }
   void writeDOM(const std::shared_ptr<DOM>& DOM, bool skipRoot);
+
+  virtual void clear();
   virtual void writeHeader();
+
+  // illegal operator
+  XMLWriter& operator=(const XMLWriter&) = delete;
 
  protected:
   virtual void onStartElement(const std::string& element) = 0;
@@ -80,8 +85,6 @@ class XMLWriter {
 
  private:
   bool _doEscapeFlag = true;
-  // illegal operator
-  XMLWriter& operator=(const XMLWriter&) = delete;
 };
 
 /**
@@ -95,6 +98,7 @@ class XMLStreamWriter : public XMLWriter {
 
   explicit XMLStreamWriter(std::stringstream& stream, uint32_t flags = 0);
   ~XMLStreamWriter() override;
+  void clear() override;
   void writeHeader() override;
 
  protected:
