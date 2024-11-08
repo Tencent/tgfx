@@ -109,18 +109,19 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     return nullptr;
   }
 
+  // preprocess newlines, convert \r\n, \r to \n
   const std::string text = preprocessNewLines(_text);
 
-  std::vector<GlyphID> glyphs = {};
   std::vector<Point> positions = {};
-  std::vector<OneLineParam> oneLineParams = {};
+  std::vector<OneLineGlyphs> lines = {};
+  std::vector<std::tuple<size_t, GlyphID, std::shared_ptr<Typeface>>> glyphs = {};
 
   // space character glyph id
   const auto [spaceCharacterGlyphID, spaceCharacterTypeface] = getGlyphIDAndTypeface('\u0020');
   const auto emptyAdvance = getEmptyAdvance();
 
   float xOffset = 0;
-  float yOffset = getLineHeight(oneLineParams);
+  float yOffset = getLineHeight(OneLineGlyphs(glyphs));
   const char* head = text.data();
   const char* tail = head + text.size();
   // refer to:
@@ -129,20 +130,20 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   while (head < tail) {
     if ('\n' == *head) {
       xOffset = 0;
-      yOffset += getLineHeight(oneLineParams);
+      yOffset += getLineHeight(OneLineGlyphs(glyphs));
       ++head;
 
-      resolveTextAlignment(positions, oneLineParams);
-      oneLineParams.clear();
+      lines.emplace_back(std::move(glyphs));
+      glyphs.clear();
     } else if ('\t' == *head) {
       // tab width default is 4 spaces
       for (uint32_t i = 0; i < 4; i++) {
         if (_autoWrap && xOffset + emptyAdvance > _width) {
           xOffset = 0;
-          yOffset += getLineHeight(oneLineParams);
+          yOffset += getLineHeight(OneLineGlyphs(glyphs));
 
-          resolveTextAlignment(positions, oneLineParams);
-          oneLineParams.clear();
+          lines.emplace_back(std::move(glyphs));
+          glyphs.clear();
         }
 
         if (0 == spaceCharacterGlyphID) {
@@ -150,11 +151,10 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
           continue;
         }
 
-        glyphs.push_back(spaceCharacterGlyphID);
         const auto point = Point::Make(xOffset, yOffset);
-        positions.push_back(point);
+        positions.emplace_back(point);
         xOffset += emptyAdvance;
-        oneLineParams.push_back({positions.size() - 1, point, spaceCharacterTypeface});
+        glyphs.emplace_back(positions.size() - 1, spaceCharacterGlyphID, spaceCharacterTypeface);
       }
       ++head;
     } else {
@@ -163,17 +163,21 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       const auto glyphID = glyphIDAndTypeface.first;
       float advance = emptyAdvance;
       if (glyphID > 0) {
-        auto font = _font;
-        font.setTypeface(glyphIDAndTypeface.second);
-        advance = font.getAdvance(glyphID);
+        if (glyphIDAndTypeface.second == _font.getTypeface()) {
+          advance = _font.getAdvance(glyphID);
+        } else {
+          auto font = _font;
+          font.setTypeface(glyphIDAndTypeface.second);
+          advance = font.getAdvance(glyphID);
+        }
       }
 
       if (_autoWrap && xOffset + advance > _width) {
         xOffset = 0;
-        yOffset += getLineHeight(oneLineParams);
+        yOffset += getLineHeight(OneLineGlyphs(glyphs));
 
-        resolveTextAlignment(positions, oneLineParams);
-        oneLineParams.clear();
+        lines.emplace_back(std::move(glyphs));
+        glyphs.clear();
       }
 
       const auto tmpGlyphID = glyphID > 0 ? glyphID : spaceCharacterGlyphID;
@@ -182,15 +186,24 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
         continue;
       }
 
-      glyphs.push_back(tmpGlyphID);
       const auto point = Point::Make(xOffset, yOffset);
-      positions.push_back(point);
+      positions.emplace_back(point);
       xOffset += advance;
-      oneLineParams.push_back({positions.size() - 1, point, glyphIDAndTypeface.second});
+      glyphs.emplace_back(positions.size() - 1, tmpGlyphID, glyphIDAndTypeface.second);
     }
   }
+  lines.emplace_back(std::move(glyphs));
 
-  GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
+  // Handle text alignment
+  resolveTextAlignment(positions, lines);
+
+  std::vector<GlyphID> finalGlyphIDs = {};
+  for (const auto& line : lines) {
+    const auto& lineGlyphIDs = line.getGlyphIDs();
+    finalGlyphIDs.insert(finalGlyphIDs.end(), lineGlyphIDs.begin(), lineGlyphIDs.end());
+  }
+
+  GlyphRun glyphRun(_font, std::move(finalGlyphIDs), std::move(positions));
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRun));
   if (nullptr == textBlob) {
     return nullptr;
@@ -260,21 +273,22 @@ float TextLayer::getEmptyAdvance() const {
   return 0.0f;
 }
 
-float TextLayer::getLineHeight(const std::vector<OneLineParam>& oneLineParams) const {
+float TextLayer::getLineHeight(const OneLineGlyphs& oneLineGlyphs) const {
   const auto fontMetrics = _font.getMetrics();
   float ascent = std::fabs(fontMetrics.ascent);
   float descent = std::fabs(fontMetrics.descent);
   float leading = std::fabs(fontMetrics.leading);
   std::shared_ptr<Typeface> lastTypeface = nullptr;
 
-  for (const auto& oneLineParam : oneLineParams) {
-    if (nullptr == oneLineParam.typeface || lastTypeface == oneLineParam.typeface) {
+  for (size_t i = 0; i < oneLineGlyphs.size(); ++i) {
+    const auto typeface = oneLineGlyphs.getTypeface(i);
+    if (nullptr == typeface || lastTypeface == typeface) {
       continue;
     }
 
-    lastTypeface = oneLineParam.typeface;
+    lastTypeface = typeface;
     auto font = _font;
-    font.setTypeface(oneLineParam.typeface);
+    font.setTypeface(typeface);
     const auto fontMetrics = font.getMetrics();
     ascent = std::max(ascent, std::fabs(fontMetrics.ascent));
     descent = std::max(descent, std::fabs(fontMetrics.descent));
@@ -285,7 +299,7 @@ float TextLayer::getLineHeight(const std::vector<OneLineParam>& oneLineParams) c
 }
 
 void TextLayer::resolveTextAlignment(const std::vector<Point>& /*positions*/,
-                                     const std::vector<OneLineParam>& /*oneLineParams*/) {
+                                     const std::vector<OneLineGlyphs>& /*lines*/) {
   // TODO: Implement text alignment
 }
 }  // namespace tgfx

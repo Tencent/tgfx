@@ -144,21 +144,49 @@ class TextLayer : public Layer {
   TextAlign _textAlign = TextAlign::Left;
   bool _autoWrap = false;
 
-  struct OneLineParam {
-    size_t index;
-    Point offsetPoint;
-    std::shared_ptr<Typeface> typeface;
-
-    OneLineParam(size_t idx, Point offsetPt, std::shared_ptr<Typeface> face)
-        : index(idx), offsetPoint(offsetPt), typeface(face) {
+  class OneLineGlyphs final {
+   public:
+    explicit OneLineGlyphs(
+        const std::vector<std::tuple<size_t, GlyphID, std::shared_ptr<Typeface>>>& glyphs)
+        : _glyphs(std::move(glyphs)) {
     }
+
+    size_t getCharacterIndex(const size_t index) const {
+      return std::get<0>(_glyphs[index]);
+    }
+
+    GlyphID getGlyphID(const size_t index) const {
+      return std::get<1>(_glyphs[index]);
+      ;
+    }
+
+    std::shared_ptr<Typeface> getTypeface(const size_t index) const {
+      return std::get<2>(_glyphs[index]);
+    }
+
+    std::vector<GlyphID> getGlyphIDs() const {
+      std::vector<GlyphID> glyphIDs;
+      glyphIDs.reserve(_glyphs.size());
+      for (const auto& glyph : _glyphs) {
+        glyphIDs.push_back(std::get<1>(glyph));
+      }
+      return glyphIDs;
+    }
+
+    size_t size() const {
+      return _glyphs.size();
+    }
+
+   private:
+    OneLineGlyphs() = delete;
+    std::vector<std::tuple<size_t, GlyphID, std::shared_ptr<Typeface>>> _glyphs;
   };
 
   std::string preprocessNewLines(const std::string& text);
   std::pair<GlyphID, std::shared_ptr<Typeface>> getGlyphIDAndTypeface(Unichar unichar) const;
   float getEmptyAdvance() const;
-  float getLineHeight(const std::vector<OneLineParam>& oneLineParams) const;
+  float getLineHeight(const OneLineGlyphs& oneLineGlyphs) const;
   void resolveTextAlignment(const std::vector<Point>& positions,
-                            const std::vector<OneLineParam>& oneLineParams);
+                            const std::vector<OneLineGlyphs>& lines);
 };
 }  // namespace tgfx
