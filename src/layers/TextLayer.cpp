@@ -210,7 +210,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
 
 std::string TextLayer::preprocessNewLines(const std::string& text) {
   std::string result;
-  result.reserve(text.size()); // Pre-allocate enough space to improve efficiency
+  result.reserve(text.size());
   const size_t size = text.size();
 
   for (size_t i = 0; i < size; ++i) {
