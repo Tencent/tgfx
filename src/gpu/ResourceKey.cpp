@@ -56,6 +56,7 @@ ResourceKey& ResourceKey::operator=(const ResourceKey& that) {
   if (this == &that) {
     return *this;
   }
+  delete[] data;
   data = CopyData(that.data, that.count);
   count = that.count;
   return *this;
@@ -72,6 +73,7 @@ ScratchKey::ScratchKey(uint32_t* data, size_t count) : ResourceKey(data, count) 
 }
 
 ScratchKey& ScratchKey::operator=(const BytesKey& that) {
+  delete[] data;
   data = CopyData(that.data(), that.size(), 1);
   if (data != nullptr) {
     data[0] = HashRange(that.data(), that.size());
@@ -99,7 +101,7 @@ UniqueKey UniqueKey::Combine(const UniqueKey& uniqueKey, const BytesKey& bytesKe
     return uniqueKey;
   }
   if (uniqueKey.count > 2) {
-    memcpy(data + 2, uniqueKey.data + 2, uniqueKey.count - 2);
+    memcpy(data + 2, uniqueKey.data + 2, (uniqueKey.count - 2) * sizeof(uint32_t));
   }
   auto count = bytesKey.size() + offset;
   auto domain = uniqueKey.uniqueDomain;
