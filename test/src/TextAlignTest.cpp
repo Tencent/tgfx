@@ -27,7 +27,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   auto surface = Surface::Make(context, 800, 800);
-  //auto canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
 
   auto rootLayer = Layer::Make();
@@ -48,7 +48,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
       "宫中府中，俱为一体；陟罚臧否，不宜异同。"
       "若有作奸犯科及为忠善者，宜付有司论其刑赏，以昭陛下平明之理，不宜偏私，使内外异法也。");
   //textLayer->setText("abc这是\nf\rg\r\nh\r\rj\n\rk\nppp\tqqq");
-  //textLayer->setText("abcdefghijklmnopqrstuvwxyz");
+  //textLayer->setText("a\n\nbcdefghijklmnopqrstuvwxyz");
   textLayer->setWidth(250);
   textLayer->setHeight(400);
   textLayer->setAutoWrap(true);
@@ -59,6 +59,8 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds();
   textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  printf("textLayerBounds : %f, %f, %f, %f\n", textLayerBounds.left, textLayerBounds.top,
+         textLayerBounds.right, textLayerBounds.bottom);
   EXPECT_EQ(textLayerBounds, Rect::MakeLTRB(0.0f, 10.959999f, 249.0f, 668.080017f));
 
   displayList->root()->addChild(rootLayer);
@@ -68,7 +70,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   paint.setStyle(PaintStyle::Stroke);
   paint.setStrokeWidth(1.0f);
   paint.setColor(Color::Red());
-  //canvas->drawRect(textLayerBounds, paint);
+  canvas->drawRect(textLayerBounds, paint);
 
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlign"));

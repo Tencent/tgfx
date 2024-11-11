@@ -144,49 +144,68 @@ class TextLayer : public Layer {
   TextAlign _textAlign = TextAlign::Left;
   bool _autoWrap = false;
 
-  class OneLineGlyphs final {
+  class GlyphParam final {
    public:
-    explicit OneLineGlyphs(
-        const std::vector<std::tuple<size_t, GlyphID, std::shared_ptr<Typeface>>>& glyphs)
-        : _glyphs(std::move(glyphs)) {
+    GlyphParam() = delete;
+    GlyphParam(GlyphParam&&) = default;
+    GlyphParam(const GlyphParam&) = delete;
+    GlyphParam& operator=(const GlyphParam&) = delete;
+    GlyphParam& operator=(GlyphParam&&) = delete;
+
+    GlyphParam(const int32_t characterUnicode, const GlyphID glyphID,
+               std::shared_ptr<Typeface> typeface)
+        : _characterUnicode(characterUnicode), _glyphID(glyphID), _typeface(std::move(typeface)) {
     }
 
-    size_t getCharacterIndex(const size_t index) const {
-      return std::get<0>(_glyphs[index]);
+   private:
+    int32_t _characterUnicode;
+    GlyphID _glyphID;
+    std::shared_ptr<Typeface> _typeface;
+
+    friend class TextLayer;
+  };
+
+  class TextShaperGlyphs final {
+   public:
+    void append(int32_t unicodeCharacter, GlyphID glyphID, std::shared_ptr<Typeface> typeface) {
+      _glyphParams.emplace_back(unicodeCharacter, glyphID, std::move(typeface));
+    }
+
+    int32_t getCharacterUnicode(const size_t index) const {
+      return _glyphParams[index]._characterUnicode;
     }
 
     GlyphID getGlyphID(const size_t index) const {
-      return std::get<1>(_glyphs[index]);
-      ;
+      return _glyphParams[index]._glyphID;
     }
 
     std::shared_ptr<Typeface> getTypeface(const size_t index) const {
-      return std::get<2>(_glyphs[index]);
+      return _glyphParams[index]._typeface;
     }
 
     std::vector<GlyphID> getGlyphIDs() const {
       std::vector<GlyphID> glyphIDs;
-      glyphIDs.reserve(_glyphs.size());
-      for (const auto& glyph : _glyphs) {
-        glyphIDs.push_back(std::get<1>(glyph));
+      glyphIDs.reserve(_glyphParams.size());
+      for (const auto& glyphParam : _glyphParams) {
+        glyphIDs.push_back(glyphParam._glyphID);
       }
       return glyphIDs;
     }
 
     size_t size() const {
-      return _glyphs.size();
+      return _glyphParams.size();
     }
 
    private:
-    OneLineGlyphs() = delete;
-    std::vector<std::tuple<size_t, GlyphID, std::shared_ptr<Typeface>>> _glyphs;
+    std::vector<GlyphParam> _glyphParams = {};
   };
 
   std::string preprocessNewLines(const std::string& text);
-  std::pair<GlyphID, std::shared_ptr<Typeface>> getGlyphIDAndTypeface(Unichar unichar) const;
-  float getEmptyAdvance() const;
-  float getLineHeight(const OneLineGlyphs& oneLineGlyphs) const;
+  float getLineHeight(const std::shared_ptr<TextShaperGlyphs>& textShaperGlyphs, size_t startIndex,
+                      size_t count) const;
+  std::shared_ptr<TextShaperGlyphs> shapeText(const std::string& text,
+                                              const std::shared_ptr<Typeface>& typeface);
   void resolveTextAlignment(const std::vector<Point>& positions,
-                            const std::vector<OneLineGlyphs>& lines);
+                            const std::vector<std::pair<size_t, size_t>>& lineBreakIndices);
 };
 }  // namespace tgfx

@@ -26,8 +26,8 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
   const char* textStop = textStart + text.size();
   GlyphRun glyphRun = {};
   glyphRun.font = font;
-  // Use xHeight as the default advance for missing glyphs.
-  auto emptyAdvance = font.getMetrics().xHeight;
+  // Use half the font size as width for spaces
+  auto emptyAdvance = font.getSize() / 2.0f;
   float xOffset = 0;
   while (textStart < textStop) {
     auto unichar = UTF::NextUTF8(&textStart, textStop);
