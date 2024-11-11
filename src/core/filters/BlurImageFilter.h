@@ -39,8 +39,8 @@ class BlurImageFilter : public ImageFilter {
                                                          const Matrix* uvMatrix) const override;
 
   void draw(std::shared_ptr<RenderTargetProxy> renderTarget,
-            std::unique_ptr<FragmentProcessor> imageProcessor, const Rect& imageBounds,
-            bool isDown) const;
+            std::unique_ptr<FragmentProcessor> imageProcessor, const Rect& imageBounds, bool isDown,
+            uint32_t renderFlags) const;
 
  private:
   Point blurOffset;

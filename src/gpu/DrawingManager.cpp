@@ -26,9 +26,9 @@
 
 namespace tgfx {
 std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
-    std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
+    std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags) {
   checkIfResolveNeeded(renderTargetProxy);
-  auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy);
+  auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy, renderFlags);
   addRenderTask(opsTask);
   activeOpsTask = opsTask;
   return opsTask;
@@ -72,12 +72,11 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
   if (resourceTask == nullptr) {
     return;
   }
+#ifdef DEBUG
   auto result = resourceTaskMap.find(resourceTask->uniqueKey);
-  if (result != resourceTaskMap.end()) {
-    // Remove the UniqueKey from the old task, so it will be skipped when the task is executed.
-    result->second->uniqueKey = {};
-  }
+  DEBUG_ASSERT(result == resourceTaskMap.end());
   resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
+#endif
   resourceTasks.push_back(std::move(resourceTask));
 }
 
@@ -100,7 +99,9 @@ bool DrawingManager::flush() {
   for (auto& task : resourceTasks) {
     task->execute(context);
   }
+#ifdef DEBUG
   resourceTaskMap = {};
+#endif
   resourceTasks = {};
   for (auto& task : renderTasks) {
     task->execute(context->gpu());

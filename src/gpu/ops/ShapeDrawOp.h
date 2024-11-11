@@ -18,29 +18,36 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "core/DataProvider.h"
-#include "gpu/GpuBuffer.h"
+#include "DrawOp.h"
+#include "gpu/proxies/GpuShapeProxy.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-class GpuBufferCreateTask : public ResourceTask {
+class ShapeDrawOp : public DrawOp {
  public:
-  /**
-   * Create a new GpuBufferCreateTask to generate a GpuBuffer with the given data provider. If async
-   * is true, the data provider will be read from an asynchronous thread immediately. Otherwise, the
-   * data provider will be read from the current thread when the GpuBufferCreateTask is executed.
-   */
-  static std::shared_ptr<GpuBufferCreateTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
-                                                       std::shared_ptr<DataProvider> provider,
-                                                       bool async);
+  DEFINE_OP_CLASS_ID
+
+  static std::unique_ptr<ShapeDrawOp> Make(Color color, const Path& path, const Matrix& viewMatrix,
+                                           const Stroke* stroke = nullptr);
+
+  ~ShapeDrawOp() override;
+
+  void prepare(Context* context, uint32_t renderFlags) override;
+
+  void execute(RenderPass* renderPass) override;
 
  protected:
-  BufferType bufferType = BufferType::Vertex;
+  bool onCombineIfPossible(Op* op) override;
 
-  GpuBufferCreateTask(UniqueKey uniqueKey, BufferType bufferType);
+ private:
+  Color color = Color::Transparent();
+  Path path = {};
+  Matrix viewMatrix = Matrix::I();
+  Matrix rasterizeMatrix = Matrix::I();
+  Stroke* stroke = nullptr;
+  std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
 
-  std::shared_ptr<Resource> onMakeResource(Context* context) override;
-
-  virtual std::shared_ptr<Data> getData() = 0;
+  ShapeDrawOp(Color color, Path path, const Matrix& viewMatrix, const Stroke* stroke);
 };
 }  // namespace tgfx

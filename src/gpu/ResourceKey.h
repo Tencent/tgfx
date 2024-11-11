@@ -148,10 +148,11 @@ class UniqueKey : public ResourceKey {
   static UniqueKey Make();
 
   /**
-   * Creates a new UniqueKey by combining an existing UniqueKey and a BytesKey. The returned
-   * UniqueKey will share the same unique domain as the original UniqueKey.
+   * Creates a new UniqueKey by appending a list of uint32_t values to the given UniqueKey. The
+   * returned UniqueKey will share the same unique domain as the original UniqueKey. Returns the
+   * original UniqueKey if the data is empty.
    */
-  static UniqueKey Combine(const UniqueKey& uniqueKey, const BytesKey& bytesKey);
+  static UniqueKey Append(const UniqueKey& uniqueKey, const uint32_t* data, size_t count);
 
   /**
    * Creates an empty UniqueKey.

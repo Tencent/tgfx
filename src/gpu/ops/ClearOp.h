@@ -27,6 +27,9 @@ class ClearOp : public Op {
 
   static std::unique_ptr<ClearOp> Make(Color color, const Rect& scissor);
 
+  void prepare(Context*, uint32_t) override {
+  }
+
   void execute(RenderPass* renderPass) override;
 
  private:

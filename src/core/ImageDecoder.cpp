@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageDecoder.h"
-#include "tgfx/core/Task.h"
+#include "core/utils/DataTask.h"
 
 namespace tgfx {
 
@@ -74,22 +74,12 @@ class ImageGeneratorWrapper : public ImageDecoder {
   bool tryHardware = true;
 };
 
-struct ImageBufferHolder {
-  std::shared_ptr<ImageBuffer> imageBuffer;
-};
-
 class AsyncImageDecoder : public ImageDecoder {
  public:
   AsyncImageDecoder(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
       : imageGenerator(std::move(generator)) {
-    holder = std::make_shared<ImageBufferHolder>();
-    task = Task::Run([result = holder, generator = imageGenerator, tryHardware]() {
-      result->imageBuffer = generator->makeBuffer(tryHardware);
-    });
-  }
-
-  ~AsyncImageDecoder() override {
-    task->cancel();
+    task = DataTask<ImageBuffer>::Run(
+        [generator = imageGenerator, tryHardware]() { return generator->makeBuffer(tryHardware); });
   }
 
   int width() const override {
@@ -105,14 +95,12 @@ class AsyncImageDecoder : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
-    task->wait();
-    return holder->imageBuffer;
+    return task->wait();
   }
 
  private:
   std::shared_ptr<ImageGenerator> imageGenerator = nullptr;
-  std::shared_ptr<ImageBufferHolder> holder = nullptr;
-  std::shared_ptr<Task> task = nullptr;
+  std::shared_ptr<DataTask<ImageBuffer>> task = nullptr;
 };
 
 std::shared_ptr<ImageDecoder> ImageDecoder::Wrap(std::shared_ptr<ImageBuffer> imageBuffer) {

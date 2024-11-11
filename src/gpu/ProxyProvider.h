@@ -20,7 +20,9 @@
 
 #include "core/DataProvider.h"
 #include "core/ImageDecoder.h"
+#include "core/ShapeRasterizer.h"
 #include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -61,6 +63,14 @@ class ProxyProvider {
                                                        std::shared_ptr<DataProvider> provider,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
+
+  /**
+   * Creates a GpuShapeProxy for the given ShapeRasterizer. The rasterizer will be released after
+   * being uploaded to the GPU.
+   */
+  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(const UniqueKey& uniqueKey,
+                                                     std::shared_ptr<ShapeRasterizer> rasterizer,
+                                                     uint32_t renderFlags = 0);
 
   /*
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being

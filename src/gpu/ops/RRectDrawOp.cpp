@@ -16,12 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RRectOp.h"
+#include "RRectDrawOp.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 // We have three possible cases for geometry for a round rect.
@@ -276,29 +277,31 @@ class RRectIndicesProvider : public DataProvider {
   std::vector<std::shared_ptr<RRectPaint>> rRectPaints = {};
 };
 
-std::unique_ptr<RRectOp> RRectOp::Make(Color color, const RRect& rRect, const Matrix& viewMatrix) {
+std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Color color, const RRect& rRect,
+                                               const Matrix& viewMatrix) {
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
     return nullptr;
   }
   if (/*!isStrokeOnly && */ 0.5f <= rRect.radii.x && 0.5f <= rRect.radii.y) {
-    return std::unique_ptr<RRectOp>(new RRectOp(color, rRect, viewMatrix, matrix));
+    return std::unique_ptr<RRectDrawOp>(new RRectDrawOp(color, rRect, viewMatrix, matrix));
   }
   return nullptr;
 }
 
-RRectOp::RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& uvMatrix)
+RRectDrawOp::RRectDrawOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
+                         const Matrix& uvMatrix)
     : DrawOp(ClassID()), uvMatrix(uvMatrix) {
   setTransformedBounds(rRect.rect, viewMatrix);
   auto rRectPaint = std::make_shared<RRectPaint>(color, 0.f, 0.f, rRect, viewMatrix);
   rRectPaints.push_back(std::move(rRectPaint));
 }
 
-bool RRectOp::onCombineIfPossible(Op* op) {
+bool RRectDrawOp::onCombineIfPossible(Op* op) {
   if (!DrawOp::onCombineIfPossible(op)) {
     return false;
   }
-  auto* that = static_cast<RRectOp*>(op);
+  auto* that = static_cast<RRectDrawOp*>(op);
   if (uvMatrix != that->uvMatrix) {
     return false;
   }
@@ -310,21 +313,36 @@ static bool UseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
 
-void RRectOp::prepare(Context* context) {
+void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
+  auto indexProvider = std::make_shared<RRectIndicesProvider>(rRectPaints);
+  indexBufferProxy =
+      GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
   auto useScale = UseScale(context);
-  auto vertexData = std::make_shared<RRectVerticesProvider>(rRectPaints, aa, useScale);
-  vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexData), BufferType::Vertex);
-  auto indexData = std::make_shared<RRectIndicesProvider>(rRectPaints);
-  indexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(indexData), BufferType::Index);
+  auto vertexProvider = std::make_shared<RRectVerticesProvider>(rRectPaints, aa, useScale);
+  if (rRectPaints.size() > 1) {
+    vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexProvider),
+                                                 BufferType::Vertex, renderFlags);
+  } else {
+    // If we only have one rect, it is not worth the async task overhead.
+    vertexData = vertexProvider->getData();
+  }
 }
 
-void RRectOp::execute(RenderPass* renderPass) {
-  if (indexBufferProxy == nullptr || vertexBufferProxy == nullptr) {
+void RRectDrawOp::execute(RenderPass* renderPass) {
+  if (indexBufferProxy == nullptr) {
     return;
   }
-  auto vertexBuffer = vertexBufferProxy->getBuffer();
   auto indexBuffer = indexBufferProxy->getBuffer();
-  if (vertexBuffer == nullptr || indexBuffer == nullptr) {
+  if (indexBuffer == nullptr) {
+    return;
+  }
+  std::shared_ptr<GpuBuffer> vertexBuffer = nullptr;
+  if (vertexBufferProxy) {
+    vertexBuffer = vertexBufferProxy->getBuffer();
+    if (vertexBuffer == nullptr) {
+      return;
+    }
+  } else if (vertexData == nullptr) {
     return;
   }
   auto pipeline = createPipeline(
@@ -332,7 +350,11 @@ void RRectOp::execute(RenderPass* renderPass) {
                                                  renderPass->renderTarget()->height(), false,
                                                  UseScale(renderPass->getContext()), uvMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer);
+  if (vertexBuffer) {
+    renderPass->bindBuffers(indexBuffer, vertexBuffer);
+  } else {
+    renderPass->bindBuffers(indexBuffer, vertexData);
+  }
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rRectPaints.size() * kIndicesPerFillRRect);
 }
 }  // namespace tgfx
