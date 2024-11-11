@@ -22,6 +22,8 @@
 #include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
+#define BUFFER_USAGE_MEM_MMZ_CACHE (1ULL << 5)
+
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
                                                    YUVColorSpace colorSpace) {
   auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
@@ -43,8 +45,9 @@ HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) 
     return nullptr;
   }
   OH_NativeBuffer_Config config = {width, height, NATIVEBUFFER_PIXEL_FMT_RGBA_8888,
-                                   NATIVEBUFFER_USAGE_CPU_READ | NATIVEBUFFER_USAGE_CPU_WRITE |
-                                       NATIVEBUFFER_USAGE_HW_RENDER | NATIVEBUFFER_USAGE_HW_TEXTURE,
+                                   NATIVEBUFFER_USAGE_CPU_READ | BUFFER_USAGE_MEM_MMZ_CACHE |
+                                       NATIVEBUFFER_USAGE_CPU_WRITE | NATIVEBUFFER_USAGE_HW_RENDER |
+                                       NATIVEBUFFER_USAGE_HW_TEXTURE,
                                    0};
   return OH_NativeBuffer_Alloc(&config);
 }
