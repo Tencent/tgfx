@@ -2,7 +2,7 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
-        "Picture": "7fd9cd9",
+        "Picture": "d069eb4",
         "PictureImage": "8a2ac4d",
         "PictureImage_Path": "2212c4e",
         "PictureImage_Text": "2212c4e",
@@ -23,7 +23,7 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "d4f3780",
+        "path": "d069eb4",
         "rasterized": "f55f586",
         "rasterized_mipmap": "f55f586",
         "rasterized_scale_up": "721c9e0",
@@ -63,17 +63,17 @@
     },
     "LayerTest": {
         "Layer_hitTestPoint": "50c58e6",
-        "Layer_hitTestPointNested": "50c58e6",
+        "Layer_hitTestPointNested": "d069eb4",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "draw_shape": "612c09e",
+        "draw_shape": "d069eb4",
         "draw_solid": "b4a1231",
         "draw_text": "612c09e",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
-        "getBounds": "af2e3ff",
-        "getLayersUnderPoint": "50c58e6",
+        "getBounds": "d069eb4",
+        "getLayersUnderPoint": "d069eb4",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
@@ -157,6 +157,6 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "TextAlign": "348b9a7"
+        "TextAlign": "d069eb4"
     }
 }

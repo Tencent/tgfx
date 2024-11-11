@@ -19,28 +19,29 @@
 #pragma once
 
 #include "ResourceTask.h"
-#include "core/ImageDecoder.h"
 #include "tgfx/gpu/ImageOrigin.h"
 
 namespace tgfx {
 class TextureCreateTask : public ResourceTask {
  public:
   /**
-   * Creates a TextureCreateTask to generate a texture using the specified size and format.
+   * Creates a TextureCreateTask to create a texture using the specified size and format.
    */
   static std::shared_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey, int width, int height,
                                                      PixelFormat format, bool mipmapped = false,
                                                      ImageOrigin origin = ImageOrigin::TopLeft);
 
-  /*
-   * Creates a TextureCreateTask to generate a texture using the given ImageBuffer.
-   */
-  static std::shared_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey,
-                                                     std::shared_ptr<ImageDecoder> imageDecoder,
-                                                     bool mipmapped = false);
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
- protected:
-  explicit TextureCreateTask(UniqueKey uniqueKey) : ResourceTask(std::move(uniqueKey)) {
-  }
+ private:
+  int width = 0;
+  int height = 0;
+  PixelFormat format = PixelFormat::RGBA_8888;
+  bool mipmapped = false;
+  ImageOrigin origin = ImageOrigin::TopLeft;
+
+  TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
+                    ImageOrigin origin);
 };
+
 }  // namespace tgfx

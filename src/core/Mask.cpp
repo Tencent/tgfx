@@ -19,7 +19,6 @@
 #include "tgfx/core/Mask.h"
 #include "core/GlyphRunList.h"
 #include "core/ImageStream.h"
-#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 void Mask::fillPath(const Path& path, const Stroke* stroke) {

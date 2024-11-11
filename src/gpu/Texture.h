@@ -21,7 +21,6 @@
 #include "gpu/Resource.h"
 #include "gpu/TextureSampler.h"
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"

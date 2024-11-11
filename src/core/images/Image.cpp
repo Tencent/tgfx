@@ -257,7 +257,7 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
   if (processor == nullptr) {
     return nullptr;
   }
-  OpContext opContext(renderTarget);
+  OpContext opContext(renderTarget, args.renderFlags);
   opContext.fillWithFP(std::move(processor), Matrix::I(), true);
   return textureProxy;
 }

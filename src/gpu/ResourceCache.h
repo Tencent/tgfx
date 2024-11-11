@@ -112,8 +112,8 @@ class ResourceCache {
   size_t purgeableBytes = 0;
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
-  ScratchKeyMap<std::vector<Resource*>> scratchKeyMap = {};
-  UniqueKeyMap<Resource*> uniqueKeyMap = {};
+  ResourceKeyMap<std::vector<Resource*>> scratchKeyMap = {};
+  ResourceKeyMap<Resource*> uniqueKeyMap = {};
 
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);

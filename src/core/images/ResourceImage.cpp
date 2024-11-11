@@ -18,7 +18,7 @@
 
 #include "ResourceImage.h"
 #include "core/images/MipmapImage.h"
-#include "gpu/ops/FillRectOp.h"
+#include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {

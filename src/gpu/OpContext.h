@@ -28,8 +28,8 @@ namespace tgfx {
  */
 class OpContext {
  public:
-  explicit OpContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
-      : renderTargetProxy(std::move(renderTargetProxy)) {
+  explicit OpContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags)
+      : renderTargetProxy(std::move(renderTargetProxy)), renderFlags(renderFlags) {
   }
 
   RenderTargetProxy* renderTarget() const {
@@ -51,6 +51,7 @@ class OpContext {
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   std::shared_ptr<OpsRenderTask> opsTask = nullptr;
+  uint32_t renderFlags = 0;
   uint32_t _contentVersion = 1u;
 };
 }  // namespace tgfx

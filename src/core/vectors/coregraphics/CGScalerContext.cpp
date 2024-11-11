@@ -32,7 +32,7 @@ static constexpr float StdFakeBoldInterpValues[] = {
     1.f / 32.f,
 };
 
-static inline float Interpolate(const float& a, const float& b, const float& t) {
+inline float Interpolate(const float& a, const float& b, const float& t) {
   return a + (b - a) * t;
 }
 

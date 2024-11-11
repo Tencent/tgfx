@@ -20,8 +20,7 @@
 #include "GLUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
-#include "gpu/opengl/GLVertexArray.h"
-#include "gpu/opengl/GLVertexArrayCreateTask.h"
+#include "gpu/opengl/GLProgram.h"
 
 namespace tgfx {
 struct AttribLayout {
@@ -47,11 +46,12 @@ static AttribLayout GetAttribLayout(SLType type) {
 
 GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
   if (GLCaps::Get(context)->vertexArrayObjectSupport) {
-    vertexArrayHandle = UniqueKey::Make();
-    // Using VAO is required in the core profile.
-    auto task = std::make_shared<GLVertexArrayCreateTask>(vertexArrayHandle.key());
-    context->drawingManager()->addResourceTask(std::move(task));
+    vertexArray = GLVertexArray::Make(context);
+    DEBUG_ASSERT(vertexArray != nullptr);
   }
+  sharedVertexBuffer =
+      std::static_pointer_cast<GLBuffer>(GpuBuffer::Make(context, BufferType::Vertex));
+  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -111,12 +111,6 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   return true;
 }
 
-void GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                 std::shared_ptr<GpuBuffer> vertexBuffer) {
-  _indexBuffer = std::move(indexBuffer);
-  _vertexBuffer = std::move(vertexBuffer);
-}
-
 static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
@@ -142,11 +136,16 @@ void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, 
 
 void GLRenderPass::draw(const std::function<void()>& func) {
   auto gl = GLFunctions::Get(context);
-  auto vertexArray = Resource::Find<GLVertexArray>(context, vertexArrayHandle.key());
   if (vertexArray) {
     gl->bindVertexArray(vertexArray->id());
   }
-  gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(_vertexBuffer)->bufferID());
+  if (_vertexBuffer) {
+    gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(_vertexBuffer)->bufferID());
+  } else {
+    gl->bindBuffer(GL_ARRAY_BUFFER, sharedVertexBuffer->bufferID());
+    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertexData->size()),
+                   _vertexData->data(), GL_STATIC_DRAW);
+  }
   auto* program = static_cast<GLProgram*>(_program);
   for (const auto& attribute : program->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);

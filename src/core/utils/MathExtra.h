@@ -26,33 +26,33 @@ static constexpr float M_PI_2_F = static_cast<float>(M_PI_2);
 static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
 static constexpr float FLOAT_SQRT2 = 1.41421356f;
 
-static inline float DegreesToRadians(float degrees) {
+inline float DegreesToRadians(float degrees) {
   return degrees * (static_cast<float>(M_PI) / 180.0f);
 }
 
-static inline float RadiansToDegrees(float radians) {
+inline float RadiansToDegrees(float radians) {
   return radians * (180.0f / static_cast<float>(M_PI));
 }
 
-static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
+inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
   return fabsf(x) <= tolerance;
 }
 
-static inline bool FloatNearlyEqual(float x, float y, float tolerance = FLOAT_NEARLY_ZERO) {
+inline bool FloatNearlyEqual(float x, float y, float tolerance = FLOAT_NEARLY_ZERO) {
   return fabsf(x - y) <= tolerance;
 }
 
-static inline float SinSnapToZero(float radians) {
+inline float SinSnapToZero(float radians) {
   float v = sinf(radians);
   return FloatNearlyZero(v) ? 0.0f : v;
 }
 
-static inline float CosSnapToZero(float radians) {
+inline float CosSnapToZero(float radians) {
   float v = cosf(radians);
   return FloatNearlyZero(v) ? 0.0f : v;
 }
 
-static inline bool FloatsAreFinite(const float array[], int count) {
+inline bool FloatsAreFinite(const float array[], int count) {
   float prod = 0;
   for (int i = 0; i < count; ++i) {
     prod *= array[i];
