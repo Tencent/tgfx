@@ -20,7 +20,6 @@
 #include "ScalerContext.h"
 
 namespace tgfx {
-static auto EmptyContext = ScalerContext::MakeEmpty(0);
 
 class GlyphImageGenerator : public ImageGenerator {
  public:
@@ -43,7 +42,7 @@ class GlyphImageGenerator : public ImageGenerator {
   GlyphID glyphID = 0;
 };
 
-Font::Font() : scalerContext(EmptyContext) {
+Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
 }
 
 Font::Font(std::shared_ptr<Typeface> tf, float textSize)

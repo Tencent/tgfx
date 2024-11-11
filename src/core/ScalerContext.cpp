@@ -57,6 +57,10 @@ std::shared_ptr<ScalerContext> ScalerContext::MakeEmpty(float size) {
   if (size < 0) {
     size = 0;
   }
+  if (size == 0) {
+    static auto EmptyContext = std::make_shared<EmptyScalerContext>(0.0f);
+    return EmptyContext;
+  }
   return std::make_shared<EmptyScalerContext>(size);
 }
 
