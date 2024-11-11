@@ -32,7 +32,8 @@ class DrawingManager {
   explicit DrawingManager(Context* context) : context(context) {
   }
 
-  std::shared_ptr<OpsRenderTask> addOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  std::shared_ptr<OpsRenderTask> addOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                                            uint32_t renderFlags);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
                           std::shared_ptr<TextureProxy> source,
@@ -52,11 +53,13 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
-  ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
   std::unordered_set<std::shared_ptr<RenderTargetProxy>> needResolveTargets = {};
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
   std::shared_ptr<OpsRenderTask> activeOpsTask = nullptr;
+#ifdef DEBUG
+  ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
+#endif
 
   void addRenderTask(std::shared_ptr<RenderTask> renderTask);
   void checkIfResolveNeeded(std::shared_ptr<RenderTargetProxy> renderTargetProxy);

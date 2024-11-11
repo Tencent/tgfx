@@ -18,40 +18,38 @@
 
 #pragma once
 
-#include "DrawOp.h"
-#include "gpu/GpuBuffer.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Stroke.h"
+#include <optional>
+#include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-class TriangulatingPathOp : public DrawOp {
+class RectPaint;
+
+class RectDrawOp : public DrawOp {
  public:
   DEFINE_OP_CLASS_ID
 
-  static std::unique_ptr<TriangulatingPathOp> Make(Color color, const Path& path,
-                                                   const Matrix& viewMatrix,
-                                                   const Stroke* stroke = nullptr,
-                                                   uint32_t renderFlags = 0);
+  static std::unique_ptr<RectDrawOp> Make(std::optional<Color> color, const Rect& rect,
+                                          const Matrix& viewMatrix,
+                                          const Matrix* uvMatrix = nullptr);
 
-  ~TriangulatingPathOp() override;
-
-  void prepare(Context* context) override;
+  void prepare(Context* context, uint32_t renderFlags) override;
 
   void execute(RenderPass* renderPass) override;
 
- protected:
+ private:
+  RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+             const Matrix* uvMatrix = nullptr);
+
   bool onCombineIfPossible(Op* op) override;
 
- private:
-  Color color = Color::Transparent();
-  Path path = {};
-  Matrix viewMatrix = Matrix::I();
-  Matrix rasterizeMatrix = Matrix::I();
-  Stroke* stroke = nullptr;
-  uint32_t renderFlags = 0;
-  std::shared_ptr<GpuBufferProxy> vertexBuffer = nullptr;
+  bool canAdd(size_t count) const;
 
-  TriangulatingPathOp(Color color, Path path, const Matrix& viewMatrix, const Stroke* stroke,
-                      uint32_t renderFlags);
+  bool needsIndexBuffer() const;
+
+  bool hasColor = true;
+  std::vector<std::shared_ptr<RectPaint>> rectPaints = {};
+  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
+  std::shared_ptr<Data> vertexData = nullptr;
 };
 }  // namespace tgfx

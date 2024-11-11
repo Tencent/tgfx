@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,39 +18,35 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "ResourceTask.h"
+#include "core/ShapeBuffer.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
+class ShapeBufferProvider {
+ public:
+  virtual ~ShapeBufferProvider() = default;
+
+  virtual std::shared_ptr<ShapeBuffer> getBuffer() const = 0;
 };
 
-class GpuBuffer : public Resource {
+class ShapeBufferUploadTask : public ResourceTask {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
-                                         const void* buffer = nullptr, size_t size = 0);
+  static std::shared_ptr<ShapeBufferUploadTask> MakeFrom(
+      UniqueKey trianglesKey, UniqueKey textureKey, std::shared_ptr<ShapeBufferProvider> provider);
 
-  BufferType bufferType() const {
-    return _bufferType;
-  }
-
-  size_t size() const {
-    return _sizeInBytes;
-  }
-
-  size_t memoryUsage() const override {
-    return _sizeInBytes;
-  }
+  bool execute(Context* context) override;
 
  protected:
-  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _sizeInBytes(sizeInBytes) {
+  std::shared_ptr<Resource> onMakeResource(Context*) override {
+    // The execute() method is already overridden, so this method should never be called.
+    return nullptr;
   }
 
-  BufferType _bufferType;
-
  private:
-  size_t _sizeInBytes;
+  UniqueKey textureKey = {};
+  std::shared_ptr<ShapeBufferProvider> provider = nullptr;
+
+  ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
+                        std::shared_ptr<ShapeBufferProvider> provider);
 };
 }  // namespace tgfx

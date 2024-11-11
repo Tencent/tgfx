@@ -24,8 +24,8 @@
 #include "gpu/Texture.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLSampler.h"
-#include "gpu/ops/FillRectOp.h"
-#include "gpu/ops/RRectOp.h"
+#include "gpu/ops/RRectDrawOp.h"
+#include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageCodec.h"
@@ -142,7 +142,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rectPaints.size(), drawCallCount);
+  EXPECT_EQ(static_cast<RectDrawOp*>(task->ops[1].get())->rectPaints.size(), drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
   device->unlock();
@@ -183,7 +183,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRectPaints.size(), drawCallCount);
+  EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops[1].get())->rRectPaints.size(), drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
   device->unlock();

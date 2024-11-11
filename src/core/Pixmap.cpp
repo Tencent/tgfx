@@ -23,11 +23,11 @@
 
 namespace tgfx {
 
-static inline void* AddOffset(void* pixels, size_t offset) {
+inline void* AddOffset(void* pixels, size_t offset) {
   return reinterpret_cast<uint8_t*>(pixels) + offset;
 }
 
-static inline const void* AddOffset(const void* pixels, size_t offset) {
+inline const void* AddOffset(const void* pixels, size_t offset) {
   return reinterpret_cast<const uint8_t*>(pixels) + offset;
 }
 

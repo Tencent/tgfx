@@ -77,7 +77,7 @@ void Matrix::setTranslate(float tx, float ty) {
   }
 }
 
-static inline float sdot(float a, float b, float c, float d) {
+inline float sdot(float a, float b, float c, float d) {
   return a * b + c * d;
 }
 

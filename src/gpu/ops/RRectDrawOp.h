@@ -18,37 +18,35 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/ops/DrawOp.h"
+#include "DrawOp.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class RectPaint;
+class RRectPaint;
 
-class FillRectOp : public DrawOp {
+class RRectDrawOp : public DrawOp {
  public:
   DEFINE_OP_CLASS_ID
 
-  static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
-                                          const Matrix& viewMatrix,
-                                          const Matrix* uvMatrix = nullptr);
+  static std::unique_ptr<RRectDrawOp> Make(Color color, const RRect& rRect,
+                                           const Matrix& viewMatrix);
 
-  void prepare(Context* context) override;
+  void prepare(Context* context, uint32_t renderFlags) override;
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-             const Matrix* uvMatrix = nullptr);
+  RRectDrawOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& uvMatrix);
 
   bool onCombineIfPossible(Op* op) override;
 
-  bool canAdd(size_t count) const;
+  std::vector<std::shared_ptr<RRectPaint>> rRectPaints;
+  Matrix uvMatrix = Matrix::I();
+  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
+  std::shared_ptr<Data> vertexData = nullptr;
 
-  bool needsIndexBuffer() const;
-
-  bool hasColor = true;
-  std::vector<std::shared_ptr<RectPaint>> rectPaints = {};
-  std::shared_ptr<GpuBufferProxy> vertexBufferProxy;
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy;
+  //  bool stroked = false;
+  //  Point strokeWidths = Point::Zero();
 };
 }  // namespace tgfx

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/DrawingManager.h"
-#include "gpu/ops/FillRectOp.h"
+#include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"

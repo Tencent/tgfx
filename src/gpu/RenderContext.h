@@ -74,8 +74,6 @@ class RenderContext : public DrawContext {
                                                  const Matrix& viewMatrix, AAType aaType,
                                                  Rect* scissorRect);
   Rect clipLocalBounds(const Rect& localBounds, const MCState& state);
-  std::unique_ptr<FragmentProcessor> makeTextureMask(const Path& path, const Matrix& viewMatrix,
-                                                     AAType aaType, const Stroke* stroke = nullptr);
   bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);

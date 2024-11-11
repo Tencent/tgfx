@@ -24,7 +24,7 @@
 namespace tgfx {
 class Quad {
  public:
-  static Quad MakeFromRect(const Rect& rect, const Matrix& matrix);
+  static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
 
   const Point& point(size_t i) const {
     return points[i];

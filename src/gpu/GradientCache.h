@@ -23,7 +23,6 @@
 #include "core/PixelBuffer.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Color.h"
-#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 class GradientCache {

@@ -58,7 +58,20 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer));
+  _indexBuffer = std::move(indexBuffer);
+  _vertexBuffer = std::move(vertexBuffer);
+  _vertexData = nullptr;
+}
+
+void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                             std::shared_ptr<Data> vertexData) {
+  if (drawPipelineStatus != DrawPipelineStatus::Ok) {
+    return;
+  }
+  _indexBuffer = std::move(indexBuffer);
+  _vertexBuffer = nullptr;
+  _vertexData = std::move(vertexData);
+  ;
 }
 
 void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {

@@ -40,8 +40,7 @@ class Op {
 
   virtual ~Op() = default;
 
-  virtual void prepare(Context*) {
-  }
+  virtual void prepare(Context* context, uint32_t renderFlags) = 0;
 
   virtual void execute(RenderPass* renderPass) = 0;
 

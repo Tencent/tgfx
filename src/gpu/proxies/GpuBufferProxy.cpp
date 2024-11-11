@@ -22,20 +22,24 @@
 namespace tgfx {
 std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
                                                          std::shared_ptr<Data> data,
-                                                         BufferType bufferType) {
+                                                         BufferType bufferType,
+                                                         uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  return context->proxyProvider()->createGpuBufferProxy({}, std::move(data), bufferType);
+  return context->proxyProvider()->createGpuBufferProxy({}, std::move(data), bufferType,
+                                                        renderFlags);
 }
 
 std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
                                                          std::shared_ptr<DataProvider> dataProvider,
-                                                         BufferType bufferType) {
+                                                         BufferType bufferType,
+                                                         uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  return context->proxyProvider()->createGpuBufferProxy({}, std::move(dataProvider), bufferType);
+  return context->proxyProvider()->createGpuBufferProxy({}, std::move(dataProvider), bufferType,
+                                                        renderFlags);
 }
 
 GpuBufferProxy::GpuBufferProxy(UniqueKey uniqueKey, BufferType bufferType)

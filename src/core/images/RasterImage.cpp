@@ -20,7 +20,6 @@
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {

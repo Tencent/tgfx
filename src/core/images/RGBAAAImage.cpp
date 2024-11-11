@@ -20,7 +20,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/TPArgs.h"
-#include "gpu/ops/FillRectOp.h"
+#include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 

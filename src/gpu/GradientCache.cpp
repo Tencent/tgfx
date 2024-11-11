@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientCache.h"
-#include <utility>
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 // Each bitmap will be 256x1.
