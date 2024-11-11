@@ -52,7 +52,7 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
-  UniqueKeyMap<ResourceTask*> resourceTaskMap = {};
+  ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
   std::unordered_set<std::shared_ptr<RenderTargetProxy>> needResolveTargets = {};
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};

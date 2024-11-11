@@ -52,25 +52,28 @@ ResourceKey::ResourceKey(ResourceKey&& key) noexcept : data(key.data), count(key
   key.count = 0;
 }
 
-bool ResourceKey::equal(const ResourceKey& that) const {
+ResourceKey& ResourceKey::operator=(const ResourceKey& that) {
+  if (this == &that) {
+    return *this;
+  }
+  delete[] data;
+  data = CopyData(that.data, that.count);
+  count = that.count;
+  return *this;
+}
+
+bool ResourceKey::operator==(const ResourceKey& that) const {
   if (count != that.count) {
     return false;
   }
   return memcmp(data, that.data, count * sizeof(uint32_t)) == 0;
 }
 
-void ResourceKey::copy(const ResourceKey& that) {
-  if (data == that.data) {
-    return;
-  }
-  data = CopyData(that.data, that.count);
-  count = that.count;
-}
-
 ScratchKey::ScratchKey(uint32_t* data, size_t count) : ResourceKey(data, count) {
 }
 
 ScratchKey& ScratchKey::operator=(const BytesKey& that) {
+  delete[] data;
   data = CopyData(that.data(), that.size(), 1);
   if (data != nullptr) {
     data[0] = HashRange(that.data(), that.size());
@@ -98,7 +101,7 @@ UniqueKey UniqueKey::Combine(const UniqueKey& uniqueKey, const BytesKey& bytesKe
     return uniqueKey;
   }
   if (uniqueKey.count > 2) {
-    memcpy(data + 2, uniqueKey.data + 2, uniqueKey.count - 2);
+    memcpy(data + 2, uniqueKey.data + 2, (uniqueKey.count - 2) * sizeof(uint32_t));
   }
   auto count = bytesKey.size() + offset;
   auto domain = uniqueKey.uniqueDomain;
@@ -175,7 +178,7 @@ UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addReference();
   }
-  copy(key);
+  ResourceKey::operator=(key);
   return *this;
 }
 
