@@ -200,7 +200,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::wrapBackendRenderTarget(
 }
 
 void ProxyProvider::purgeExpiredProxies() {
-  std::vector<const UniqueKey*> keys = {};
+  std::vector<const ResourceKey*> keys = {};
   for (auto& pair : proxyMap) {
     if (pair.second.expired()) {
       keys.push_back(&pair.first);

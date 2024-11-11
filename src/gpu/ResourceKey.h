@@ -30,6 +30,10 @@ namespace tgfx {
  */
 class ResourceKey {
  public:
+  ResourceKey() = default;
+
+  ResourceKey(const ResourceKey& that);
+
   virtual ~ResourceKey();
 
   /**
@@ -46,22 +50,31 @@ class ResourceKey {
     return data == nullptr ? 0 : data[0];
   }
 
- protected:
-  ResourceKey() = default;
+  ResourceKey& operator=(const ResourceKey& that);
 
+  bool operator==(const ResourceKey& that) const;
+
+  bool operator!=(const ResourceKey& that) const {
+    return !(*this == that);
+  }
+
+ protected:
   ResourceKey(uint32_t* data, size_t count);
 
-  ResourceKey(const ResourceKey& that);
-
   ResourceKey(ResourceKey&& key) noexcept;
-
-  bool equal(const ResourceKey& that) const;
-
-  void copy(const ResourceKey& that);
 
   uint32_t* data = nullptr;
   size_t count = 0;
 };
+
+struct ResourceKeyHasher {
+  size_t operator()(const ResourceKey& key) const {
+    return key.hash();
+  }
+};
+
+template <typename T>
+using ResourceKeyMap = std::unordered_map<ResourceKey, T, ResourceKeyHasher>;
 
 /**
  * A key used for scratch resources. There are three important rules about scratch keys:
@@ -91,32 +104,23 @@ class ScratchKey : public ResourceKey {
   }
 
   ScratchKey& operator=(const ScratchKey& that) {
-    copy(that);
+    ResourceKey::operator=(that);
     return *this;
   }
 
   ScratchKey& operator=(const BytesKey& that);
 
   bool operator==(const ScratchKey& that) const {
-    return equal(that);
+    return ResourceKey::operator==(that);
   }
 
   bool operator!=(const ScratchKey& that) const {
-    return !equal(that);
+    return !(*this == that);
   }
 
  private:
   ScratchKey(uint32_t* data, size_t count);
 };
-
-struct ScratchKeyHasher {
-  size_t operator()(const ScratchKey& scratchKey) const {
-    return scratchKey.hash();
-  }
-};
-
-template <typename T>
-using ScratchKeyMap = std::unordered_map<ScratchKey, T, ScratchKeyHasher>;
 
 class UniqueDomain;
 
@@ -179,11 +183,11 @@ class UniqueKey : public ResourceKey {
   UniqueKey& operator=(UniqueKey&& key) noexcept;
 
   bool operator==(const UniqueKey& that) const {
-    return equal(that);
+    return ResourceKey::operator==(that);
   }
 
   bool operator!=(const UniqueKey& that) const {
-    return !equal(that);
+    return !(*this == that);
   }
 
  private:
@@ -201,15 +205,6 @@ class UniqueKey : public ResourceKey {
   friend class LazyUniqueKey;
 };
 
-struct UniqueKeyHasher {
-  size_t operator()(const UniqueKey& uniqueKey) const {
-    return uniqueKey.hash();
-  }
-};
-
-template <typename T>
-using UniqueKeyMap = std::unordered_map<UniqueKey, T, UniqueKeyHasher>;
-
 /**
  * LazyUniqueKey defers the acquisition of the UniqueKey until it is actually needed.
  */
@@ -222,7 +217,7 @@ class LazyUniqueKey {
    * immediately. Calling this method from multiple threads will not create multiple UniqueKeys.
    * This method is thread-safe as long as there is no concurrent reset() call.
    */
-  UniqueKey get();
+  UniqueKey get() const;
 
   /**
    * Resets the LazyUniqueKey to an empty state. This method is not thread-safe.
@@ -230,6 +225,6 @@ class LazyUniqueKey {
   void reset();
 
  private:
-  std::atomic<UniqueDomain*> uniqueDomain = nullptr;
+  mutable std::atomic<UniqueDomain*> uniqueDomain = nullptr;
 };
 }  // namespace tgfx

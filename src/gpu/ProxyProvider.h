@@ -117,7 +117,7 @@ class ProxyProvider {
 
  private:
   Context* context = nullptr;
-  UniqueKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
+  ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
 
   static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
