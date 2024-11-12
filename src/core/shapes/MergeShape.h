@@ -31,6 +31,8 @@ class MergeShape : public Shape {
       : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
   }
 
+  bool isRect(Rect* rect = nullptr) const override;
+
   Rect getBounds(float resolutionScale = 1.0f) const override;
 
   Path getPath(float resolutionScale = 1.0f) const override;

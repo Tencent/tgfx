@@ -20,6 +20,27 @@
 #include "PathShape.h"
 
 namespace tgfx {
+bool MergeShape::isRect(Rect* rect) const {
+  if (pathOp != PathOp::Intersect) {
+    return false;
+  }
+  Rect firstRect = {};
+  if (!first->isRect(&firstRect)) {
+    return false;
+  }
+  Rect secondRect = {};
+  if (!second->isRect(&secondRect)) {
+    return false;
+  }
+  if (rect) {
+    if (!firstRect.intersect(secondRect)) {
+      return false;
+    }
+    *rect = firstRect;
+  }
+  return true;
+}
+
 Rect MergeShape::getBounds(float resolutionScale) const {
   auto bounds = first->getBounds(resolutionScale);
   if (pathOp == PathOp::Difference) {
