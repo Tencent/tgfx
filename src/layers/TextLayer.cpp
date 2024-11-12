@@ -189,7 +189,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   return std::make_unique<TextContent>(std::move(textBlob), _textColor);
 }
 
-std::string TextLayer::preprocessNewLines(const std::string& text) {
+std::string TextLayer::preprocessNewLines(const std::string& text) const {
   std::string result;
   result.reserve(text.size());
   const size_t size = text.size();
@@ -288,18 +288,45 @@ std::shared_ptr<TextLayer::TextShaperGlyphs> TextLayer::shapeText(
   return glyphs;
 }
 
-void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) {
+void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const {
   if (glyphLines.empty()) {
     return;
   }
 
-  // for (const auto& line : lineIndices) {
-  //   const auto lineStartIndex = line.first;
-  //   const auto lineGlyphCount = line.second;
-  //   auto point = positions[lineStartIndex + lineGlyphCount - 1];
-  //   float lineWidth = point.x + ;
-  //
-  // }
+  for (const auto& glyphLine : glyphLines) {
+    const auto lineWidth = glyphLine->lineWidth();
+    const auto lineGlyphCount = glyphLine->getGlyphCount();
 
+    float xOffset = 0.0f;
+    float spaceWidth = 0.0f;
+    switch (_textAlign) {
+      case TextAlign::Left:
+        // do nothing
+        break;
+      case TextAlign::Center:
+        xOffset = (_width - lineWidth) / 2.0f;
+        break;
+      case TextAlign::Right:
+        xOffset = _width - lineWidth;
+        break;
+      case TextAlign::Justify: {
+        if (lineGlyphCount > 1) {
+          spaceWidth = (_width - lineWidth) / (lineGlyphCount - 1);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    for (size_t i = 0; i < lineGlyphCount; ++i) {
+      auto& position = glyphLine->getPosition(i);
+      if (lineGlyphCount >= 1) {
+        position.x += xOffset + spaceWidth * i;
+      } else {
+        position.x += xOffset;
+      }
+    }
+  }
 }
 }  // namespace tgfx
