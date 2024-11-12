@@ -156,4 +156,7 @@ bool Shape::isRRect(RRect*) const {
   return false;
 }
 
+bool Shape::isSimplePath(Path*) const {
+  return false;
+}
 }  // namespace tgfx

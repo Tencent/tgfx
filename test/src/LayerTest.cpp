@@ -465,7 +465,8 @@ TGFX_TEST(LayerTest, shapeLayer) {
   layer->addChild(shaperLayer);
   auto shapeLayerRect = shaperLayer->getBounds();
   auto bounds = Rect::MakeXYWH(5, 5, 160, 90);
-  ASSERT_TRUE(shapeLayerRect == bounds);
+
+  EXPECT_EQ(shapeLayerRect, bounds);
 
   displayList->render(surface.get());
   context->submit();

@@ -44,6 +44,11 @@ bool PathShape::isRRect(RRect* rRect) const {
   return path.isRRect(rRect);
 }
 
+bool PathShape::isSimplePath(Path* result) const {
+  *result = path;
+  return true;
+}
+
 UniqueKey PathShape::getUniqueKey() const {
   return PathRef::GetUniqueKey(path);
 }

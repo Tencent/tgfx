@@ -118,7 +118,7 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
   aboutToFill();
   auto bounds = glyphRunList->getBounds(matrix.getMaxScale());
   if (stroke) {
-    bounds.outset(stroke->width, stroke->width);
+    stroke->applyToBounds(&bounds);
   }
   matrix.mapRect(&bounds);
   if (bounds.isEmpty()) {

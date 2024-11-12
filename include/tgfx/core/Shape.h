@@ -99,6 +99,13 @@ class Shape {
   virtual bool isRRect(RRect* rRect = nullptr) const;
 
   /**
+   * Returns true if the Shape is a simple path without any deferred operations. If it is, the
+   * backing Path is stored in the provided path parameter. Otherwise, it returns false and leaves
+   * the path parameter unchanged.
+   */
+  virtual bool isSimplePath(Path* path = nullptr) const;
+
+  /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
    * the exact bounds can't be determined until the shape is computed. Note: Since the Shape may
    * contain strokes or text glyphs whose outlines can change with different scale factors, it's

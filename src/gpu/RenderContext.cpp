@@ -200,7 +200,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto bounds = glyphRunList->getBounds(maxScale);
   if (stroke) {
-    bounds.outset(stroke->width, stroke->width);
+    stroke->applyToBounds(&bounds);
   }
   auto localBounds = bounds;
   localBounds = clipLocalBounds(localBounds, state);

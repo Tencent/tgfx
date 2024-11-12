@@ -87,6 +87,11 @@ class Stroke {
   bool applyToPath(Path* path, float resolutionScale = 1.0f) const;
 
   /**
+   * Applies the stroke options to the given bounds.
+   */
+  void applyToBounds(Rect* bounds) const;
+
+  /**
    * The thickness of the pen used to outline the paths or glyphs.
    */
   float width = 1.0f;

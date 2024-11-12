@@ -23,7 +23,7 @@
 namespace tgfx {
 Rect StrokeShape::getBounds(float resolutionScale) const {
   auto bounds = shape->getBounds(resolutionScale);
-  bounds.outset(stroke.width, stroke.width);
+  stroke.applyToBounds(&bounds);
   return bounds;
 }
 

@@ -56,7 +56,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const Stroke* stroke) {
   auto localBounds = glyphRunList->getBounds(state.matrix.getMaxScale());
   if (stroke) {
-    localBounds.outset(stroke->width, stroke->width);
+    stroke->applyToBounds(&localBounds);
   }
   addLocalBounds(localBounds, state);
 }

@@ -37,6 +37,8 @@ class PathShape : public Shape {
 
   bool isRRect(RRect* rRect = nullptr) const override;
 
+  bool isSimplePath(Path* path) const override;
+
   Rect getBounds(float resolutionScale = 1.0f) const override;
 
   Path getPath(float resolutionScale = 1.0f) const override;
