@@ -124,7 +124,8 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   auto glyphLine = std::make_shared<OneLineGlyphs>();
   auto fontMetrics = _font.getMetrics();
   float xOffset = 0.0f;
-  float yOffset = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) + std::fabs(fontMetrics.leading);
+  float yOffset = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
+                  std::fabs(fontMetrics.leading);
   const auto glyphInfos = textShaperGlyphs->getGlyphInfos();
   for (size_t i = 0; i < glyphInfos.size(); i++) {
     const auto& glyphInfo = glyphInfos[i];
@@ -173,11 +174,13 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   }
 
 #if 1
-  printf("textShaperGlyphs->getGlyphInfos().size() = %lu\n", textShaperGlyphs->getGlyphInfos().size());
+  printf("textShaperGlyphs->getGlyphInfos().size() = %lu\n",
+         textShaperGlyphs->getGlyphInfos().size());
   printf("glyphIDs.size() = %lu, positions.size() = %lu\n", glyphIDs.size(), positions.size());
   printf("glyphLines.size() = %lu\n", glyphLines.size());
   for (const auto& line : glyphLines) {
-    printf("lineWidth = %f, lineHeight = %f, line->getGlyphCount() = %lu\n", line->lineWidth(), line->lineHeight(), line->getGlyphCount());
+    printf("lineWidth = %f, lineHeight = %f, line->getGlyphCount() = %lu\n", line->lineWidth(),
+           line->lineHeight(), line->getGlyphCount());
   }
 #endif
 
@@ -288,7 +291,8 @@ std::shared_ptr<TextLayer::TextShaperGlyphs> TextLayer::shapeText(
   return glyphs;
 }
 
-void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const {
+void TextLayer::resolveTextAlignment(
+    const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const {
   if (glyphLines.empty()) {
     return;
   }

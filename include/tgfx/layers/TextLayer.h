@@ -153,7 +153,7 @@ class TextLayer : public Layer {
     GlyphInfo& operator=(GlyphInfo&&) = delete;
 
     GlyphInfo(const int32_t characterUnicode, const GlyphID glyphID, const float advance,
-               std::shared_ptr<Typeface> typeface)
+              std::shared_ptr<Typeface> typeface)
         : _characterUnicode(characterUnicode), _glyphID(glyphID), _advance(advance),
           _typeface(std::move(typeface)) {
     }
@@ -184,7 +184,7 @@ class TextLayer : public Layer {
   };
 
   class OneLineGlyphs final {
-  public:
+   public:
     OneLineGlyphs() = default;
 
     void append(const std::shared_ptr<GlyphInfo>& glyphInfo, const Point& position) {
@@ -212,14 +212,14 @@ class TextLayer : public Layer {
     }
 
     std::shared_ptr<GlyphInfo>& getGlyphInfo(size_t index) {
-        return _glyphInfosAndPositions[index].first;
+      return _glyphInfosAndPositions[index].first;
     }
 
     Point& getPosition(size_t index) {
       return _glyphInfosAndPositions[index].second;
     }
 
-  private:
+   private:
     float _lineWidth = 0;
     float _lineHeight = 0;
     std::vector<std::pair<std::shared_ptr<GlyphInfo>, Point>> _glyphInfosAndPositions = {};
@@ -229,7 +229,8 @@ class TextLayer : public Layer {
    public:
     void append(int32_t unicodeCharacter, GlyphID glyphID, float advance,
                 std::shared_ptr<Typeface> typeface) {
-      _glyphInfos.emplace_back(std::make_shared<GlyphInfo>(unicodeCharacter, glyphID, advance, std::move(typeface)));
+      _glyphInfos.emplace_back(
+          std::make_shared<GlyphInfo>(unicodeCharacter, glyphID, advance, std::move(typeface)));
     }
 
     std::vector<std::shared_ptr<GlyphInfo>> getGlyphInfos() const {
