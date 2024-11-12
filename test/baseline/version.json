@@ -40,8 +40,8 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
-        "SimpleLayerTreeDrawer": "83c88bb",
-        "SimpleText": "7fd9cd9"
+        "SimpleLayerTreeDrawer": "0ee494a",
+        "SimpleText": "0ee494a"
     },
     "FilterTest": {
         "ComposeColorFilter": "f710e29",
@@ -63,7 +63,7 @@
     },
     "LayerTest": {
         "Layer_hitTestPoint": "50c58e6",
-        "Layer_hitTestPointNested": "d069eb4",
+        "Layer_hitTestPointNested": "0ee494a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
         "draw_shape": "d069eb4",
@@ -73,7 +73,7 @@
         "filterClip": "43cd416",
         "filterTest": "43cd416",
         "getBounds": "d069eb4",
-        "getLayersUnderPoint": "d069eb4",
+        "getLayersUnderPoint": "0ee494a",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
