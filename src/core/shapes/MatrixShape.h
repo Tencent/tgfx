@@ -18,39 +18,43 @@
 
 #pragma once
 
-#include "core/Rasterizer.h"
-#include "core/ShapeBuffer.h"
-#include "tgfx/core/Data.h"
+#include "gpu/ResourceKey.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
- * ShapeRasterizer converts a shape into its rasterized form.
+ * Shape that applies a matrix transformation to another Shape.
  */
-class ShapeRasterizer : public Rasterizer {
+class MatrixShape : public Shape {
  public:
-  /**
-   * Creates a ShapeRasterizer from a shape.
-   */
-  ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias);
+  MatrixShape(std::shared_ptr<Shape> shape, const Matrix& matrix)
+      : shape(std::move(shape)), matrix(matrix) {
+  }
 
-  /**
-   * Rasterizes the shape into a ShapeBuffer. Unlike the makeBuffer() method, which always returns
-   * an image buffer, this method returns a ShapeBuffer that may contain either a triangle mesh or
-   * an image buffer, depending on the shape's complexity. This method aims to balance performance
-   * and memory usage. Returns nullptr if rasterization fails.
-   */
-  std::shared_ptr<ShapeBuffer> makeRasterized(bool tryHardware = true) const;
+  bool isLine(Point line[2] = nullptr) const override;
+
+  bool isRect(Rect* rect = nullptr) const override;
+
+  bool isOval(Rect* bounds = nullptr) const override;
+
+  bool isRRect(RRect* rRect = nullptr) const override;
+
+  Rect getBounds(float resolutionScale = 1.0f) const override;
+
+  Path getPath(float resolutionScale = 1.0f) const override;
 
  protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+  Type type() const override {
+    return Type::Matrix;
+  }
+
+  UniqueKey getUniqueKey() const override;
 
  private:
   std::shared_ptr<Shape> shape = nullptr;
-  bool antiAlias = true;
+  Matrix matrix = {};
 
-  std::shared_ptr<Data> makeTriangles(const Path& finalPath) const;
-
-  std::shared_ptr<ImageBuffer> makeImageBuffer(const Path& finalPath, bool tryHardware) const;
+  friend class Shape;
+  friend class ShapeDrawOp;
 };
 }  // namespace tgfx

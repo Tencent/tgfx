@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,30 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/RRect.h"
+#include "MergeShape.h"
+#include "PathShape.h"
 
 namespace tgfx {
-bool RRect::isRect() const {
-  return radii.x == 0.0f && radii.y == 0.0f;
+Rect MergeShape::getBounds(float resolutionScale) const {
+  auto bounds = first->getBounds(resolutionScale);
+  if (pathOp == PathOp::Difference) {
+    return bounds;
+  }
+  auto secondBounds = second->getBounds(resolutionScale);
+  if (pathOp == PathOp::Intersect) {
+    if (!bounds.intersects(secondBounds)) {
+      return Rect::MakeEmpty();
+    }
+    return bounds;
+  }
+  bounds.join(secondBounds);
+  return bounds;
 }
 
-bool RRect::isOval() const {
-  return radii.x >= rect.width() * 0.5f && radii.y >= rect.height() * 0.5f;
+Path MergeShape::getPath(float resolutionScale) const {
+  auto path = first->getPath(resolutionScale);
+  auto secondPath = second->getPath(resolutionScale);
+  path.addPath(secondPath, pathOp);
+  return path;
 }
 
-void RRect::setRectXY(const Rect& r, float radiusX, float radiusY) {
-  rect = r.makeSorted();
-  radii = {radiusX, radiusY};
-}
-
-void RRect::setOval(const Rect& oval) {
-  rect = oval.makeSorted();
-  radii = {rect.width() / 2, rect.height() / 2};
-}
-
-void RRect::scale(float scaleX, float scaleY) {
-  rect.scale(scaleX, scaleY);
-  radii.x *= scaleX;
-  radii.y *= scaleY;
-}
 }  // namespace tgfx

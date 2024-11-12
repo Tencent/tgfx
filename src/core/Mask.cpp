@@ -52,9 +52,13 @@ bool Mask::fillText(const GlyphRunList* glyphRunList, const Stroke* stroke) {
     return true;
   }
   Path path = {};
-  if (!glyphRunList->getPath(&path, matrix, stroke)) {
+  if (!glyphRunList->getPath(&path, matrix.getMaxScale())) {
     return false;
   }
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  path.transform(matrix);
   onFillPath(path, Matrix::I(), antiAlias, true);
   return true;
 }

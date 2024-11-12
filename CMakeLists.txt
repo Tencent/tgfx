@@ -93,6 +93,7 @@ file(GLOB_RECURSE SRC_FILES
         src/core/filters/*.*
         src/core/images/*.*
         src/core/shaders/*.*
+        src/core/shapes/*.*
         src/core/utils/*.*
         src/gpu/ops/*.*
         src/gpu/processors/*.*

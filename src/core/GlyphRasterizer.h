@@ -19,38 +19,25 @@
 #pragma once
 
 #include "core/Rasterizer.h"
-#include "core/ShapeBuffer.h"
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
- * ShapeRasterizer converts a shape into its rasterized form.
+ * A Rasterizer that rasterizes a set of glyphs.
  */
-class ShapeRasterizer : public Rasterizer {
+class GlyphRasterizer : public Rasterizer {
  public:
-  /**
-   * Creates a ShapeRasterizer from a shape.
-   */
-  ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias);
+  GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
+                  const Matrix& matrix, const Stroke* stroke);
 
-  /**
-   * Rasterizes the shape into a ShapeBuffer. Unlike the makeBuffer() method, which always returns
-   * an image buffer, this method returns a ShapeBuffer that may contain either a triangle mesh or
-   * an image buffer, depending on the shape's complexity. This method aims to balance performance
-   * and memory usage. Returns nullptr if rasterization fails.
-   */
-  std::shared_ptr<ShapeBuffer> makeRasterized(bool tryHardware = true) const;
+  ~GlyphRasterizer() override;
 
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  std::shared_ptr<Shape> shape = nullptr;
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
   bool antiAlias = true;
-
-  std::shared_ptr<Data> makeTriangles(const Path& finalPath) const;
-
-  std::shared_ptr<ImageBuffer> makeImageBuffer(const Path& finalPath, bool tryHardware) const;
+  Matrix matrix = Matrix::I();
+  Stroke* stroke = nullptr;
 };
 }  // namespace tgfx

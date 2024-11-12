@@ -46,48 +46,45 @@ GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::mo
                            }));
 }
 
-Rect GlyphRunList::getBounds(const Matrix& matrix, const Stroke* stroke) const {
-  auto maxScale = matrix.getMaxScale();
-  if (maxScale <= 0.0f) {
+Rect GlyphRunList::getBounds(float resolutionScale) const {
+  if (resolutionScale <= 0.0f) {
     return Rect::MakeEmpty();
   }
+  auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto totalBounds = Rect::MakeEmpty();
   for (auto& run : _glyphRuns) {
     auto font = run.font;
-    if (!FloatNearlyEqual(maxScale, 1.0f)) {
+    if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-      font = font.makeWithSize(font.getSize() * maxScale);
+      font = font.makeWithSize(font.getSize() * resolutionScale);
     }
     size_t index = 0;
     auto& positions = run.positions;
     for (auto& glyphID : run.glyphs) {
       auto bounds = font.getBounds(glyphID);
       auto& position = positions[index];
-      bounds.offset(position.x * maxScale, position.y * maxScale);
+      bounds.offset(position.x * resolutionScale, position.y * resolutionScale);
       totalBounds.join(bounds);
       index++;
     }
   }
-  if (!totalBounds.isEmpty() && stroke && !hasColor()) {
-    auto strokeWidth = stroke->width * maxScale;
-    totalBounds.outset(strokeWidth, strokeWidth);
+  if (hasScale) {
+    totalBounds.scale(1.0f / resolutionScale, 1.0f / resolutionScale);
   }
-  auto totalMatrix = matrix;
-  totalMatrix.preScale(1.0f / maxScale, 1.0f / maxScale);
-  return totalMatrix.mapRect(totalBounds);
+  return totalBounds;
 }
 
-bool GlyphRunList::getPath(Path* path, const Matrix& matrix, const Stroke* stroke) const {
-  auto maxScale = matrix.getMaxScale();
-  if (maxScale <= 0.0f || hasColor()) {
+bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
+  if (resolutionScale <= 0.0f || hasColor()) {
     return false;
   }
+  auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   Path totalPath = {};
   for (auto& run : _glyphRuns) {
     auto font = run.font;
-    if (!FloatNearlyEqual(maxScale, 1.0f)) {
+    if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-      font = font.makeWithSize(font.getSize() * maxScale);
+      font = font.makeWithSize(font.getSize() * resolutionScale);
     }
     size_t index = 0;
     auto& positions = run.positions;
@@ -95,8 +92,9 @@ bool GlyphRunList::getPath(Path* path, const Matrix& matrix, const Stroke* strok
       Path glyphPath = {};
       if (font.getPath(glyphID, &glyphPath)) {
         auto& position = positions[index];
-        auto offsetMatrix = Matrix::MakeTrans(position.x * maxScale, position.y * maxScale);
-        glyphPath.transform(offsetMatrix);
+        auto glyphMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+        glyphMatrix.postTranslate(position.x, position.y);
+        glyphPath.transform(glyphMatrix);
         totalPath.addPath(glyphPath);
       } else {
         return false;
@@ -104,15 +102,7 @@ bool GlyphRunList::getPath(Path* path, const Matrix& matrix, const Stroke* strok
       index++;
     }
   }
-  if (stroke) {
-    auto scaledStroke = *stroke;
-    scaledStroke.width *= maxScale;
-    scaledStroke.applyToPath(&totalPath);
-  }
-  auto totalMatrix = matrix;
-  totalMatrix.preScale(1.0f / maxScale, 1.0f / maxScale);
-  totalPath.transform(totalMatrix);
-  *path = totalPath;
+  *path = std::move(totalPath);
   return true;
 }
 }  // namespace tgfx

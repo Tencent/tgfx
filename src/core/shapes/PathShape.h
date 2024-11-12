@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,13 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "StrokeKey.h"
+#pragma once
+
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-void WriteStrokeKey(BytesKey* bytesKey, const Stroke* stroke) {
-  auto flags = static_cast<uint32_t>(stroke->join) << 16 | static_cast<uint32_t>(stroke->cap);
-  bytesKey->write(flags);
-  bytesKey->write(stroke->width);
-  bytesKey->write(stroke->miterLimit);
-}
+/**
+ * Shape that contains a single path.
+ */
+class PathShape : public Shape {
+ public:
+  explicit PathShape(Path path) : path(std::move(path)) {
+  }
+
+  bool isLine(Point line[2] = nullptr) const override;
+
+  bool isRect(Rect* rect = nullptr) const override;
+
+  bool isOval(Rect* bounds = nullptr) const override;
+
+  bool isRRect(RRect* rRect = nullptr) const override;
+
+  Rect getBounds(float resolutionScale = 1.0f) const override;
+
+  Path getPath(float resolutionScale = 1.0f) const override;
+
+ protected:
+  Type type() const override {
+    return Type::Path;
+  }
+
+  UniqueKey getUniqueKey() const override;
+
+ private:
+  Path path = {};
+};
 }  // namespace tgfx

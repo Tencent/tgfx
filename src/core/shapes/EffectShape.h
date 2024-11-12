@@ -18,39 +18,35 @@
 
 #pragma once
 
-#include "core/Rasterizer.h"
-#include "core/ShapeBuffer.h"
-#include "tgfx/core/Data.h"
+#include "gpu/ResourceKey.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
- * ShapeRasterizer converts a shape into its rasterized form.
+ * Shape that applies a PathEffect to another Shape.
  */
-class ShapeRasterizer : public Rasterizer {
+class EffectShape : public Shape {
  public:
-  /**
-   * Creates a ShapeRasterizer from a shape.
-   */
-  ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias);
+  EffectShape(std::shared_ptr<Shape> shape, std::shared_ptr<PathEffect> effect)
+      : shape(std::move(shape)), effect(std::move(effect)) {
+  }
 
-  /**
-   * Rasterizes the shape into a ShapeBuffer. Unlike the makeBuffer() method, which always returns
-   * an image buffer, this method returns a ShapeBuffer that may contain either a triangle mesh or
-   * an image buffer, depending on the shape's complexity. This method aims to balance performance
-   * and memory usage. Returns nullptr if rasterization fails.
-   */
-  std::shared_ptr<ShapeBuffer> makeRasterized(bool tryHardware = true) const;
+  Rect getBounds(float resolutionScale = 1.0f) const override;
+
+  Path getPath(float resolutionScale = 1.0f) const override;
 
  protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+  Type type() const override {
+    return Type::Effect;
+  }
+
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
 
  private:
+  LazyUniqueKey uniqueKey = {};
   std::shared_ptr<Shape> shape = nullptr;
-  bool antiAlias = true;
-
-  std::shared_ptr<Data> makeTriangles(const Path& finalPath) const;
-
-  std::shared_ptr<ImageBuffer> makeImageBuffer(const Path& finalPath, bool tryHardware) const;
+  std::shared_ptr<PathEffect> effect = nullptr;
 };
 }  // namespace tgfx

@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeDrawOp.h"
-#include "core/PathRef.h"
 #include "core/PathTriangulator.h"
-#include "core/ShapeRasterizer.h"
-#include "core/utils/StrokeKey.h"
+#include "core/shapes/MatrixShape.h"
+#include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
@@ -28,64 +27,55 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, const Path& path,
-                                               const Matrix& viewMatrix, const Stroke* stroke) {
-  if (path.isEmpty()) {
+std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shape> shape,
+                                               const Matrix& viewMatrix) {
+  if (shape == nullptr) {
     return nullptr;
   }
-
-  return std::unique_ptr<ShapeDrawOp>(new ShapeDrawOp(color, path, viewMatrix, stroke));
+  auto uvMatrix = Matrix::I();
+  auto totalMatrix = viewMatrix;
+  if (shape->type() == Shape::Type::Matrix) {
+    // always unwrap the matrix shape.
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    if (!matrixShape->matrix.invert(&uvMatrix)) {
+      return nullptr;
+    }
+    totalMatrix.preConcat(matrixShape->matrix);
+    shape = matrixShape->shape;
+  }
+  return std::unique_ptr<ShapeDrawOp>(
+      new ShapeDrawOp(color, std::move(shape), totalMatrix, uvMatrix));
 }
 
-ShapeDrawOp::ShapeDrawOp(Color color, Path p, const Matrix& viewMatrix, const Stroke* stroke)
-    : DrawOp(ClassID()), color(color), path(std::move(p)), viewMatrix(viewMatrix),
-      stroke(stroke ? new Stroke(*stroke) : nullptr) {
-  auto bounds = path.getBounds();
+ShapeDrawOp::ShapeDrawOp(Color color, std::shared_ptr<Shape> s, const Matrix& viewMatrix,
+                         const Matrix& uvMatrix)
+    : DrawOp(ClassID()), color(color), shape(std::move(s)), viewMatrix(viewMatrix),
+      uvMatrix(uvMatrix) {
+  auto bounds = shape->getBounds(viewMatrix.getMaxScale());
   viewMatrix.mapRect(&bounds);
   setBounds(bounds);
 }
 
-ShapeDrawOp::~ShapeDrawOp() {
-  delete stroke;
-}
-
 bool ShapeDrawOp::onCombineIfPossible(Op*) {
+  // Shapes are rasterized in parallel, so we don't combine them.
   return false;
 }
 
 void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  BytesKey bytesKey = {};
+  auto matrix = viewMatrix;
   auto scales = viewMatrix.getAxisScales();
   if (scales.x == scales.y) {
-    rasterizeMatrix.setScale(scales.x, scales.y);
-    bytesKey.reserve(1 + (stroke ? StrokeKeyCount : 0));
-    bytesKey.write(scales.x);
-  } else {
-    rasterizeMatrix = viewMatrix;
-    rasterizeMatrix.setTranslateX(0);
-    rasterizeMatrix.setTranslateY(0);
-    bytesKey.reserve(4 + (stroke ? StrokeKeyCount : 0));
-    bytesKey.write(rasterizeMatrix.getScaleX());
-    bytesKey.write(rasterizeMatrix.getSkewX());
-    bytesKey.write(rasterizeMatrix.getSkewY());
-    bytesKey.write(rasterizeMatrix.getScaleY());
+    DEBUG_ASSERT(scales.x != 0.0f);
+    matrix.setScale(scales.x, scales.y);
   }
-  if (stroke) {
-    WriteStrokeKey(&bytesKey, stroke);
+  auto rasterizeShape = Shape::ApplyMatrix(shape, matrix);
+  shapeProxy = context->proxyProvider()->createGpuShapeProxy(std::move(rasterizeShape),
+                                                             aa == AAType::Coverage, renderFlags);
+  if (shapeProxy) {
+    auto& bounds = shapeProxy->getBounds();
+    matrix.postTranslate(-bounds.x(), -bounds.y());
   }
-  auto uniqueKey = UniqueKey::Append(PathRef::GetUniqueKey(path), bytesKey.data(), bytesKey.size());
-  auto bounds = path.getBounds();
-  if (stroke) {
-    bounds.outset(stroke->width, stroke->width);
-  }
-  rasterizeMatrix.mapRect(&bounds);
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto width = ceilf(bounds.width());
-  auto height = ceilf(bounds.height());
-  auto rasterizer = Rasterizer::MakeFrom(path, ISize::Make(width, height), rasterizeMatrix,
-                                         aa == AAType::Coverage, stroke);
-  shapeProxy =
-      context->proxyProvider()->createGpuShapeProxy(uniqueKey, std::move(rasterizer), renderFlags);
+  rasterizeMatrix = matrix;
 }
 
 static std::shared_ptr<Data> MakeVertexData(const Rect& rect) {
@@ -127,12 +117,14 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
   if (shapeProxy == nullptr) {
     return;
   }
-  Matrix uvMatrix = {};
-  if (!rasterizeMatrix.invert(&uvMatrix)) {
+  auto invert = Matrix::I();
+  if (!rasterizeMatrix.invert(&invert)) {
     return;
   }
+  auto realUVMatrix = uvMatrix;
+  realUVMatrix.postConcat(invert);
   auto realViewMatrix = viewMatrix;
-  realViewMatrix.preConcat(uvMatrix);
+  realViewMatrix.preConcat(invert);
   auto vertexBuffer = shapeProxy->getTriangles();
   std::shared_ptr<Data> vertexData = nullptr;
   if (vertexBuffer == nullptr) {
@@ -151,7 +143,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
   auto pipeline = createPipeline(
       renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
                                                  renderPass->renderTarget()->height(), aa,
-                                                 realViewMatrix, uvMatrix));
+                                                 realViewMatrix, realUVMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   auto vertexDataSize = vertexBuffer ? vertexBuffer->size() : vertexData->size();
   auto vertexCount = aa == AAType::Coverage ? PathTriangulator::GetAATriangleCount(vertexDataSize)

@@ -31,13 +31,10 @@ void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const F
   addLocalBounds(rRect.rect, state);
 }
 
-void MeasureContext::drawPath(const Path& path, const MCState& state, const FillStyle&,
-                              const Stroke* stroke) {
-  auto pathBounds = path.getBounds();
-  if (stroke != nullptr) {
-    pathBounds.outset(stroke->width, stroke->width);
-  }
-  addLocalBounds(pathBounds, state);
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                               const FillStyle&) {
+  auto localBounds = shape->getBounds(state.matrix.getMaxScale());
+  addLocalBounds(localBounds, state);
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
@@ -57,8 +54,11 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, con
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                       const MCState& state, const FillStyle&,
                                       const Stroke* stroke) {
-  auto deviceBounds = glyphRunList->getBounds(state.matrix, stroke);
-  addDeviceBounds(deviceBounds, state.clip);
+  auto localBounds = glyphRunList->getBounds(state.matrix.getMaxScale());
+  if (stroke) {
+    localBounds.outset(stroke->width, stroke->width);
+  }
+  addLocalBounds(localBounds, state);
 }
 
 void MeasureContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
