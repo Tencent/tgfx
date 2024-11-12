@@ -109,68 +109,77 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     return nullptr;
   }
 
-  // preprocess newlines, convert \r\n, \r to \n
+  // 1. preprocess newlines, convert \r\n, \r to \n
   const std::string text = preprocessNewLines(_text);
 
+  // 2. shape text to glyphs, handle font fallback
   const auto textShaperGlyphs = shapeText(text, _font.getTypeface());
   if (nullptr == textShaperGlyphs) {
     LOGE("TextLayer::onUpdateContent textShaperGlyphs is nullptr.");
     return nullptr;
   }
 
+  // 3. Handle text wrapping and auto-wrapping
+  std::vector<std::shared_ptr<OneLineGlyphs>> glyphLines = {};
+  auto glyphLine = std::make_shared<OneLineGlyphs>();
+  auto fontMetrics = _font.getMetrics();
   float xOffset = 0.0f;
-  float yOffset = getLineHeight(textShaperGlyphs, 0, 0);
-  size_t newLineStartIndex = 0;
-  size_t glyphCountPerLine = 0;
-  std::vector<Point> positions = {};
-  std::vector<GlyphID> glyphIDs = {};
-  std::vector<std::pair<size_t, size_t>> lineBreakIndices = {};
-  const auto glyphSize = textShaperGlyphs->size();
-  for (size_t i = 0; i < glyphSize; i++) {
-    const auto characterUnicode = textShaperGlyphs->getCharacterUnicode(i);
-    const auto glyphID = textShaperGlyphs->getGlyphID(i);
+  float yOffset = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) + std::fabs(fontMetrics.leading);
+  const auto glyphInfos = textShaperGlyphs->getGlyphInfos();
+  for (size_t i = 0; i < glyphInfos.size(); i++) {
+    const auto& glyphInfo = glyphInfos[i];
+    const auto characterUnicode = glyphInfo->getCharacterUnicode();
     if ('\u000A' == characterUnicode) {
+      glyphLine->setLineWidth(xOffset);
+      glyphLine->setLineHeight(yOffset);
+      glyphLines.emplace_back(glyphLine);
+
       xOffset = 0.0f;
-      yOffset += getLineHeight(textShaperGlyphs, newLineStartIndex, glyphCountPerLine);
-      lineBreakIndices.emplace_back(newLineStartIndex, glyphCountPerLine);
-      newLineStartIndex = positions.size();
-      glyphCountPerLine = 0;
+      yOffset += getLineHeight(glyphLine);
+
+      glyphLine = std::make_shared<OneLineGlyphs>();
     } else {
-      float advance = 0.0f;
-      const auto typeface = textShaperGlyphs->getTypeface(i);
-      if (nullptr == typeface || _font.getTypeface() == typeface) {
-        advance = _font.getAdvance(glyphID);
-      } else {
-        auto font = _font;
-        font.setTypeface(typeface);
-        advance = font.getAdvance(glyphID);
-      }
+      const float advance = glyphInfo->getAdvance();
       if (_autoWrap && xOffset + advance > _width) {
+        glyphLine->setLineWidth(xOffset);
+        glyphLine->setLineHeight(yOffset);
+        glyphLines.emplace_back(glyphLine);
+
         xOffset = 0;
-        yOffset += getLineHeight(textShaperGlyphs, newLineStartIndex, glyphCountPerLine);
-        lineBreakIndices.emplace_back(newLineStartIndex, glyphCountPerLine);
-        newLineStartIndex = positions.size();
-        glyphCountPerLine = 0;
+        yOffset += getLineHeight(glyphLine);
+
+        glyphLine = std::make_shared<OneLineGlyphs>();
       }
-      positions.emplace_back(Point::Make(xOffset, yOffset));
-      glyphIDs.emplace_back(glyphID);
-      glyphCountPerLine++;
+      glyphLine->append(glyphInfo, Point::Make(xOffset, yOffset));
       xOffset += advance;
     }
   }
-  lineBreakIndices.emplace_back(newLineStartIndex, glyphCountPerLine);
+  glyphLine->setLineWidth(xOffset);
+  glyphLine->setLineHeight(yOffset);
+  glyphLines.emplace_back(glyphLine);
+
+  // 4. Handle text alignment
+  resolveTextAlignment(glyphLines);
+
+  // 5. Calculate the final glyphs and positions for rendering
+  std::vector<GlyphID> glyphIDs = {};
+  std::vector<Point> positions = {};
+  for (const auto& line : glyphLines) {
+    const auto lineGlyphCount = line->getGlyphCount();
+    for (size_t i = 0; i < lineGlyphCount; ++i) {
+      glyphIDs.push_back(line->getGlyphInfo(i)->getGlyphID());
+      positions.push_back(line->getPosition(i));
+    }
+  }
 
 #if 1
-  printf("textShaperGlyphs->size() = %lu, positions.size() = %lu, glyphIDs.size() = %lu\n", textShaperGlyphs->size(), positions.size(), glyphIDs.size());
-  printf("lineBreakIndices.size() = %lu\n", lineBreakIndices.size());
-  for (const auto& lineBreakIndex : lineBreakIndices) {
-    printf("lineBreakIndex.first = %lu, lineBreakIndex.second = %lu\n", lineBreakIndex.first,
-           lineBreakIndex.second);
+  printf("textShaperGlyphs->getGlyphInfos().size() = %lu\n", textShaperGlyphs->getGlyphInfos().size());
+  printf("glyphIDs.size() = %lu, positions.size() = %lu\n", glyphIDs.size(), positions.size());
+  printf("glyphLines.size() = %lu\n", glyphLines.size());
+  for (const auto& line : glyphLines) {
+    printf("lineWidth = %f, lineHeight = %f, line->getGlyphCount() = %lu\n", line->lineWidth(), line->lineHeight(), line->getGlyphCount());
   }
 #endif
-
-  // Handle text alignment
-  resolveTextAlignment(positions, lineBreakIndices);
 
   GlyphRun glyphRun(_font, std::move(glyphIDs), std::move(positions));
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRun));
@@ -201,16 +210,19 @@ std::string TextLayer::preprocessNewLines(const std::string& text) {
   return result;
 }
 
-float TextLayer::getLineHeight(const std::shared_ptr<TextShaperGlyphs>& textShaperGlyphs,
-                               size_t startIndex, size_t count) const {
-  const auto fontMetrics = _font.getMetrics();
-  float ascent = std::fabs(fontMetrics.ascent);
-  float descent = std::fabs(fontMetrics.descent);
-  float leading = std::fabs(fontMetrics.leading);
+float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const {
+  if (nullptr == oneLineGlyphs) {
+    return 0.0f;
+  }
+
+  float ascent = 0.0f;
+  float descent = 0.0f;
+  float leading = 0.0f;
   std::shared_ptr<Typeface> lastTypeface = nullptr;
 
-  for (size_t i = startIndex; i < startIndex + count && i < textShaperGlyphs->size(); ++i) {
-    const auto typeface = textShaperGlyphs->getTypeface(i);
+  const auto size = oneLineGlyphs->getGlyphCount();
+  for (size_t i = 0; i < size; ++i) {
+    const auto& typeface = oneLineGlyphs->getGlyphInfo(i)->getTypeface();
     if (nullptr == typeface || lastTypeface == typeface) {
       continue;
     }
@@ -218,7 +230,7 @@ float TextLayer::getLineHeight(const std::shared_ptr<TextShaperGlyphs>& textShap
     lastTypeface = typeface;
     auto font = _font;
     font.setTypeface(typeface);
-    const auto fontMetrics = font.getMetrics();
+    const auto& fontMetrics = font.getMetrics();
     ascent = std::max(ascent, std::fabs(fontMetrics.ascent));
     descent = std::max(descent, std::fabs(fontMetrics.descent));
     leading = std::max(leading, std::fabs(fontMetrics.leading));
@@ -241,7 +253,7 @@ std::shared_ptr<TextLayer::TextShaperGlyphs> TextLayer::shapeText(
   while (head < tail) {
     if ('\n' == *head) {
       const GlyphID lineFeedCharacterGlyphID = typeface ? typeface->getGlyphID('\u000A') : 0;
-      glyphs->append('\u000A', lineFeedCharacterGlyphID, typeface);
+      glyphs->append('\u000A', lineFeedCharacterGlyphID, 0.0f, typeface);
       ++head;
       continue;
     }
@@ -253,21 +265,41 @@ std::shared_ptr<TextLayer::TextShaperGlyphs> TextLayer::shapeText(
         if (nullptr != fallbackTypeface) {
           glyphID = fallbackTypeface->getGlyphID(characterUnicode);
           if (glyphID > 0) {
-            glyphs->append(characterUnicode, glyphID, fallbackTypeface);
+            auto font = _font;
+            font.setTypeface(fallbackTypeface);
+            glyphs->append(characterUnicode, glyphID, font.getAdvance(glyphID), fallbackTypeface);
             break;
           }
         }
       }
     } else {
-      glyphs->append(characterUnicode, glyphID, typeface);
+      float advance = 0.0f;
+      if (typeface == _font.getTypeface()) {
+        advance = _font.getAdvance(glyphID);
+      } else {
+        auto font = _font;
+        font.setTypeface(typeface);
+        advance = font.getAdvance(glyphID);
+      }
+      glyphs->append(characterUnicode, glyphID, advance, typeface);
     }
   }
 
   return glyphs;
 }
 
-void TextLayer::resolveTextAlignment(const std::vector<Point>& /*positions*/,
-                                     const std::vector<std::pair<size_t, size_t>>& /*lineBreakIndices*/) {
-  // TODO: Implement text alignment
+void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) {
+  if (glyphLines.empty()) {
+    return;
+  }
+
+  // for (const auto& line : lineIndices) {
+  //   const auto lineStartIndex = line.first;
+  //   const auto lineGlyphCount = line.second;
+  //   auto point = positions[lineStartIndex + lineGlyphCount - 1];
+  //   float lineWidth = point.x + ;
+  //
+  // }
+
 }
 }  // namespace tgfx
