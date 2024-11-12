@@ -72,7 +72,7 @@
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
-        "getBounds": "d069eb4",
+        "getBounds": "febf424",
         "getLayersUnderPoint": "0ee494a",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
@@ -80,7 +80,7 @@
         "imageMask": "af2e3ff",
         "innerShadow": "01cce38",
         "shapeMask": "612c09e",
-        "textMask": "50c58e6"
+        "textMask": "febf424"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
