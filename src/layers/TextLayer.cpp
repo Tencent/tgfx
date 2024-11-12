@@ -122,10 +122,8 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   // 3. Handle text wrapping and auto-wrapping
   std::vector<std::shared_ptr<OneLineGlyphs>> glyphLines = {};
   auto glyphLine = std::make_shared<OneLineGlyphs>();
-  auto fontMetrics = _font.getMetrics();
   float xOffset = 0.0f;
-  float yOffset = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
-                  std::fabs(fontMetrics.leading);
+  float yOffset = getLineHeight(glyphLine);
   const auto glyphInfos = textShaperGlyphs->getGlyphInfos();
   for (size_t i = 0; i < glyphInfos.size(); i++) {
     const auto& glyphInfo = glyphInfos[i];
@@ -218,9 +216,10 @@ float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyp
     return 0.0f;
   }
 
-  float ascent = 0.0f;
-  float descent = 0.0f;
-  float leading = 0.0f;
+  const auto fontMetrics = _font.getMetrics();
+  float ascent = std::fabs(fontMetrics.ascent);
+  float descent = std::fabs(fontMetrics.descent);
+  float leading = std::fabs(fontMetrics.leading);
   std::shared_ptr<Typeface> lastTypeface = nullptr;
 
   const auto size = oneLineGlyphs->getGlyphCount();
