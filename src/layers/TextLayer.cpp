@@ -124,6 +124,9 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   auto glyphLine = std::make_shared<OneLineGlyphs>();
   float xOffset = 0.0f;
   float yOffset = getLineHeight(glyphLine);
+  const float miniWidth = getMiniWidth(textShaperGlyphs);
+  const float width = _width > miniWidth ? _width : miniWidth;
+  const float height = _height > yOffset ? _height : yOffset;
   const auto glyphInfos = textShaperGlyphs->getGlyphInfos();
   for (size_t i = 0; i < glyphInfos.size(); i++) {
     const auto& glyphInfo = glyphInfos[i];
@@ -133,19 +136,31 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       glyphLine->setLineHeight(yOffset);
       glyphLines.emplace_back(glyphLine);
 
+      const float lineHeight = getLineHeight(glyphLine);
+      if (0 != _height && yOffset + lineHeight > height) {
+        glyphLine = nullptr;
+        break;
+      }
+
       xOffset = 0.0f;
-      yOffset += getLineHeight(glyphLine);
+      yOffset += lineHeight;
 
       glyphLine = std::make_shared<OneLineGlyphs>();
     } else {
       const float advance = glyphInfo->getAdvance();
-      if (_autoWrap && xOffset + advance > _width) {
+      if (_autoWrap && (0.0f != _width) && (xOffset + advance > width)) {
         glyphLine->setLineWidth(xOffset);
         glyphLine->setLineHeight(yOffset);
         glyphLines.emplace_back(glyphLine);
 
+        const float lineHeight = getLineHeight(glyphLine);
+        if (0 != _height && yOffset + lineHeight > height) {
+          glyphLine = nullptr;
+          break;
+        }
+
         xOffset = 0;
-        yOffset += getLineHeight(glyphLine);
+        yOffset += lineHeight;
 
         glyphLine = std::make_shared<OneLineGlyphs>();
       }
@@ -153,9 +168,11 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       xOffset += advance;
     }
   }
-  glyphLine->setLineWidth(xOffset);
-  glyphLine->setLineHeight(yOffset);
-  glyphLines.emplace_back(glyphLine);
+  if (nullptr != glyphLine) {
+    glyphLine->setLineWidth(xOffset);
+    glyphLine->setLineHeight(yOffset);
+    glyphLines.emplace_back(glyphLine);
+  }
 
   // 4. Handle text alignment
   resolveTextAlignment(glyphLines);
@@ -171,7 +188,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     }
   }
 
-#if 1
+#if 0
   printf("textShaperGlyphs->getGlyphInfos().size() = %lu\n",
          textShaperGlyphs->getGlyphInfos().size());
   printf("glyphIDs.size() = %lu, positions.size() = %lu\n", glyphIDs.size(), positions.size());
@@ -211,6 +228,29 @@ std::string TextLayer::preprocessNewLines(const std::string& text) const {
   return result;
 }
 
+float TextLayer::getMiniWidth(const std::shared_ptr<TextShaperGlyphs>& textShaperGlyphs) const {
+  if (nullptr == textShaperGlyphs) {
+    return 0.0f;
+  }
+
+  for (const auto& glyphInfo : textShaperGlyphs->getGlyphInfos()) {
+    if (nullptr == glyphInfo) {
+      continue;
+    }
+
+    if ('\u000A' == glyphInfo->getCharacterUnicode()) {
+      continue;
+    }
+
+    const auto advance = glyphInfo->getAdvance();
+    if (advance > 0.0f) {
+      return advance;
+    }
+  }
+
+  return 0.0f;
+}
+
 float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const {
   if (nullptr == oneLineGlyphs) {
     return 0.0f;
@@ -242,7 +282,7 @@ float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyp
 }
 
 std::shared_ptr<TextLayer::TextShaperGlyphs> TextLayer::shapeText(
-    const std::string& text, const std::shared_ptr<Typeface>& typeface) {
+    const std::string& text, const std::shared_ptr<Typeface>& typeface) const {
   if (text.empty()) {
     return nullptr;
   }
@@ -298,8 +338,11 @@ void TextLayer::resolveTextAlignment(
 
   for (const auto& glyphLine : glyphLines) {
     const auto lineWidth = glyphLine->lineWidth();
-    const auto lineGlyphCount = glyphLine->getGlyphCount();
+    if (lineWidth > _width) {
+      continue;
+    }
 
+    const auto lineGlyphCount = glyphLine->getGlyphCount();
     float xOffset = 0.0f;
     float spaceWidth = 0.0f;
     switch (_textAlign) {

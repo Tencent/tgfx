@@ -242,9 +242,10 @@ class TextLayer : public Layer {
   };
 
   std::string preprocessNewLines(const std::string& text) const;
+  float getMiniWidth(const std::shared_ptr<TextShaperGlyphs>& textShaperGlyphs) const;
   float getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const;
   std::shared_ptr<TextShaperGlyphs> shapeText(const std::string& text,
-                                              const std::shared_ptr<Typeface>& typeface);
+                                              const std::shared_ptr<Typeface>& typeface) const;
   void resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const;
 };
 }  // namespace tgfx
