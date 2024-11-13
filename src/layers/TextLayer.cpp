@@ -363,7 +363,7 @@ void TextLayer::resolveTextAlignment(
 
         // 3. The last line should not be justified (align it to the left), or if auto-wrap is disabled and there is only one line of text, it should be justified.
         if (i < glyphLines.size() - 1 || (!_autoWrap && 1 == glyphLines.size())) {
-          spaceWidth = (width - lineWidth) / (lineGlyphCount - 1);
+          spaceWidth = (width - lineWidth) / static_cast<float>(lineGlyphCount - 1);
         }
         break;
       }
@@ -374,7 +374,7 @@ void TextLayer::resolveTextAlignment(
     for (size_t i = 0; i < lineGlyphCount; ++i) {
       auto& position = glyphLine->getPosition(i);
       if (lineGlyphCount >= 1) {
-        position.x += xOffset + spaceWidth * i;
+        position.x += xOffset + spaceWidth * static_cast<float>(i);
       } else {
         position.x += xOffset;
       }
