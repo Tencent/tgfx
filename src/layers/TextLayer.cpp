@@ -125,6 +125,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   float xOffset = 0.0f;
   float yOffset = getLineHeight(glyphLine);
   const float miniWidth = getMiniWidth(textShaperGlyphs);
+  // Calculate the minimum width and height to ensure at least one character is displayed correctly even when the dimensions are set very small.
   const float width = _width > miniWidth ? _width : miniWidth;
   const float height = _height > yOffset ? _height : yOffset;
   const auto glyphInfos = textShaperGlyphs->getGlyphInfos();
@@ -137,7 +138,8 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       glyphLines.emplace_back(glyphLine);
 
       const float lineHeight = getLineHeight(glyphLine);
-      if (0 != _height && yOffset + lineHeight > height) {
+      // If _height is 0, it means there is no height limit, and the text will not be truncated.
+      if (0.0f != _height && yOffset + lineHeight > height) {
         glyphLine = nullptr;
         break;
       }
@@ -148,13 +150,14 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       glyphLine = std::make_shared<OneLineGlyphs>();
     } else {
       const float advance = glyphInfo->getAdvance();
+      // If _width is 0, auto-wrap is disabled and no wrapping will occur.
       if (_autoWrap && (0.0f != _width) && (xOffset + advance > width)) {
         glyphLine->setLineWidth(xOffset);
         glyphLine->setLineHeight(yOffset);
         glyphLines.emplace_back(glyphLine);
 
         const float lineHeight = getLineHeight(glyphLine);
-        if (0 != _height && yOffset + lineHeight > height) {
+        if (0.0f != _height && yOffset + lineHeight > height) {
           glyphLine = nullptr;
           break;
         }
@@ -187,17 +190,6 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
       positions.push_back(line->getPosition(i));
     }
   }
-
-#if 0
-  printf("textShaperGlyphs->getGlyphInfos().size() = %lu\n",
-         textShaperGlyphs->getGlyphInfos().size());
-  printf("glyphIDs.size() = %lu, positions.size() = %lu\n", glyphIDs.size(), positions.size());
-  printf("glyphLines.size() = %lu\n", glyphLines.size());
-  for (const auto& line : glyphLines) {
-    printf("lineWidth = %f, lineHeight = %f, line->getGlyphCount() = %lu\n", line->lineWidth(),
-           line->lineHeight(), line->getGlyphCount());
-  }
-#endif
 
   GlyphRun glyphRun(_font, std::move(glyphIDs), std::move(positions));
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRun));
