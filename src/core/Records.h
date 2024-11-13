@@ -24,8 +24,7 @@ namespace tgfx {
 enum class RecordType {
   DrawRect,
   DrawRRect,
-  DrawPath,
-  StrokePath,
+  DrawShape,
   DrawImage,
   DrawImageRect,
   DrawGlyphRunList,
@@ -81,40 +80,23 @@ class DrawRRect : public Record {
   FillStyle style;
 };
 
-class DrawPath : public Record {
+class DrawShape : public Record {
  public:
-  DrawPath(Path path, MCState state, FillStyle style)
-      : path(std::move(path)), state(std::move(state)), style(std::move(style)) {
+  DrawShape(std::shared_ptr<Shape> shape, MCState state, FillStyle style)
+      : shape(std::move(shape)), state(std::move(state)), style(std::move(style)) {
   }
 
   RecordType type() const override {
-    return RecordType::DrawPath;
+    return RecordType::DrawShape;
   }
 
   void playback(DrawContext* context) const override {
-    context->drawPath(path, state, style, nullptr);
+    context->drawShape(shape, state, style);
   }
 
-  Path path;
+  std::shared_ptr<Shape> shape;
   MCState state;
   FillStyle style;
-};
-
-class StrokePath : public DrawPath {
- public:
-  StrokePath(Path path, MCState state, FillStyle style, const Stroke& stroke)
-      : DrawPath(std::move(path), std::move(state), std::move(style)), stroke(stroke) {
-  }
-
-  RecordType type() const override {
-    return RecordType::StrokePath;
-  }
-
-  void playback(DrawContext* context) const override {
-    context->drawPath(path, state, style, &stroke);
-  }
-
-  Stroke stroke;
 };
 
 class DrawImage : public Record {

@@ -19,22 +19,22 @@
 #include "ShapeContent.h"
 
 namespace tgfx {
-ShapeContent::ShapeContent(Path path, std::shared_ptr<Shader> shader)
-    : path(std::move(path)), shader(std::move(shader)) {
+ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader)
+    : shape(std::move(shape)), shader(std::move(shader)) {
 }
 
 void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
   auto shapePaint = paint;
   shapePaint.setShader(shader);
-  canvas->drawPath(path, shapePaint);
+  canvas->drawShape(shape, shapePaint);
 }
 
 bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
   if (pixelHitTest) {
+    auto path = shape->getPath();
     return path.contains(localX, localY);
   }
-
-  const auto bounds = path.getBounds();
+  const auto bounds = shape->getBounds();
   return bounds.contains(localX, localY);
 }
 }  // namespace tgfx

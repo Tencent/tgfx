@@ -18,24 +18,35 @@
 
 #pragma once
 
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerContent.h"
+#include "core/GlyphRunList.h"
+#include "gpu/ResourceKey.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class ShapeContent : public LayerContent {
+/**
+ * Shape that contains a GlyphRunList.
+ */
+class GlyphShape : public Shape {
  public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
-
-  Rect getBounds() const override {
-    return shape->getBounds();
+  explicit GlyphShape(std::shared_ptr<GlyphRunList> glyphRunList)
+      : glyphRunList(std::move(glyphRunList)) {
   }
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
+  Rect getBounds(float resolutionScale = 1.0f) const override;
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  Path getPath(float resolutionScale = 1.0f) const override;
+
+ protected:
+  Type type() const override {
+    return Type::Glyph;
+  }
+
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
 
  private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
+  LazyUniqueKey uniqueKey = {};
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
 };
 }  // namespace tgfx

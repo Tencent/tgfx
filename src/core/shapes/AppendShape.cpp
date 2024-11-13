@@ -16,35 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/PathProvider.h"
-#include "tgfx/layers/Layer.h"
+#include "AppendShape.h"
+#include "MergeShape.h"
 
 namespace tgfx {
-std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
-  if (path.isEmpty()) {
-    return nullptr;
+Rect AppendShape::getBounds(float resolutionScale) const {
+  auto bounds = Rect::MakeEmpty();
+  for (const auto& shape : shapes) {
+    bounds.join(shape->getBounds(resolutionScale));
   }
-  return std::shared_ptr<PathProvider>(new PathProvider(path));
+  return bounds;
 }
 
-PathProvider::PathProvider(Path path) : path(std::move(path)) {
-}
-
-Path PathProvider::getPath() {
-  if (dirty) {
-    path = onGeneratePath();
-    dirty = false;
+Path AppendShape::getPath(float resolutionScale) const {
+  Path path = {};
+  for (const auto& shape : shapes) {
+    path.addPath(shape->getPath(resolutionScale));
   }
   return path;
 }
-
-Path PathProvider::onGeneratePath() {
-  return path;
-}
-
-void PathProvider::invalidatePath() {
-  dirty = true;
-  invalidate();
-}
-
 }  // namespace tgfx

@@ -114,11 +114,10 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(std::vector<GlyphRun> glyphRuns) {
   return std::shared_ptr<TextBlob>(new TextBlob(std::move(runLists)));
 }
 
-Rect TextBlob::getBounds(const Matrix* matrix) const {
+Rect TextBlob::getBounds(float resolutionScale) const {
   auto bounds = Rect::MakeEmpty();
-  auto& glyphMatrix = matrix ? *matrix : Matrix::I();
   for (auto& runList : glyphRunLists) {
-    bounds.join(runList->getBounds(glyphMatrix));
+    bounds.join(runList->getBounds(resolutionScale));
   }
   return bounds;
 }

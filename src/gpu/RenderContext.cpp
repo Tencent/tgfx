@@ -18,8 +18,8 @@
 
 #include "RenderContext.h"
 #include "core/PathRef.h"
+#include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-#include "core/utils/StrokeKey.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
@@ -130,17 +130,21 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
-void RenderContext::drawPath(const Path& path, const MCState& state, const FillStyle& style,
-                             const Stroke* stroke) {
-  auto pathBounds = path.getBounds();
-  if (stroke != nullptr) {
-    pathBounds.outset(stroke->width, stroke->width);
+void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                              const FillStyle& style) {
+  if (shape == nullptr) {
+    return;
   }
-  auto localBounds = clipLocalBounds(pathBounds, state);
+  auto maxScale = state.matrix.getMaxScale();
+  if (maxScale <= 0.0f) {
+    return;
+  }
+  auto localBounds = shape->getBounds(maxScale);
+  localBounds = clipLocalBounds(localBounds, state);
   if (localBounds.isEmpty()) {
     return;
   }
-  auto drawOp = ShapeDrawOp::Make(style.color, path, state.matrix, stroke);
+  auto drawOp = ShapeDrawOp::Make(style.color, std::move(shape), state.matrix);
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
@@ -194,22 +198,23 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (maxScale <= 0.0f) {
     return;
   }
-  auto scaleMatrix = Matrix::MakeScale(maxScale);
-  // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-  auto bounds = glyphRunList->getBounds(scaleMatrix, stroke);
+  auto bounds = glyphRunList->getBounds(maxScale);
+  if (stroke) {
+    stroke->applyToBounds(&bounds);
+  }
   auto localBounds = bounds;
-  localBounds.scale(1.0f / maxScale, 1.0f / maxScale);
   localBounds = clipLocalBounds(localBounds, state);
   if (localBounds.isEmpty()) {
     return;
   }
-  auto rasterizeMatrix = scaleMatrix;
+  bounds.scale(maxScale, maxScale);
+  auto rasterizeMatrix = Matrix::MakeScale(maxScale);
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto aaType = getAAType(style);
-  auto rasterizer = Rasterizer::MakeFrom(std::move(glyphRunList), ISize::Make(width, height),
-                                         rasterizeMatrix, aaType == AAType::Coverage, stroke);
+  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList),
+                                         aaType == AAType::Coverage, rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
   auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
@@ -333,8 +338,8 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  if (ShapeRasterizer::ShouldTriangulatePath(clip)) {
-    auto drawOp = ShapeDrawOp::Make(Color::White(), clip, rasterizeMatrix);
+  if (PathTriangulator::ShouldTriangulatePath(clip)) {
+    auto drawOp = ShapeDrawOp::Make(Color::White(), Shape::MakeFrom(clip), rasterizeMatrix);
     drawOp->setAA(aaType);
     auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true, 1, false,
                                                         ImageOrigin::TopLeft, true);
@@ -345,8 +350,8 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
     context.addOp(std::move(drawOp));
     clipTexture = renderTarget->getTextureProxy();
   } else {
-    auto rasterizer = Rasterizer::MakeFrom(clip, ISize::Make(width, height), rasterizeMatrix,
-                                           aaType == AAType::Coverage);
+    auto rasterizer =
+        Rasterizer::MakeFrom(width, height, clip, aaType == AAType::Coverage, rasterizeMatrix);
     auto proxyProvider = getContext()->proxyProvider();
     clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
   }

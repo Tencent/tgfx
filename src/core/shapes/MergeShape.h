@@ -18,45 +18,38 @@
 
 #pragma once
 
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerProperty.h"
+#include "gpu/ResourceKey.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
- * PathProvider is an interface for classes that generates a Path. It defers the acquisition of the
- * Path until it is actually required, allowing the Path to be invalidated and regenerate if
- * necessary. Note: PathProvider is not thread-safe and should be accessed from a single thread.
+ * Shape that merges multiple shapes together.
  */
-class PathProvider : public LayerProperty {
+class MergeShape : public Shape {
  public:
-  /**
-   * Creates a new PathProvider that wraps the given Path.
-   */
-  static std::shared_ptr<PathProvider> Wrap(const Path& path);
+  MergeShape(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second, PathOp pathOp)
+      : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
+  }
 
-  /**
-   * Returns the Path provided by this object.
-   */
-  Path getPath();
+  bool isRect(Rect* rect = nullptr) const override;
+
+  Rect getBounds(float resolutionScale = 1.0f) const override;
+
+  Path getPath(float resolutionScale = 1.0f) const override;
 
  protected:
-  PathProvider() = default;
+  Type type() const override {
+    return Type::Merge;
+  }
 
-  /**
-   * Creates a new PathProvider with an initial path.
-   */
-  explicit PathProvider(Path path);
-
-  virtual Path onGeneratePath();
-
-  /**
-   * Marks the path as dirty and invalidates the cached path.
-   */
-  void invalidatePath();
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
 
  private:
-  Path path = {};
-
-  bool dirty = true;
+  LazyUniqueKey uniqueKey = {};
+  std::shared_ptr<Shape> first = nullptr;
+  std::shared_ptr<Shape> second = nullptr;
+  PathOp pathOp = PathOp::Append;
 };
 }  // namespace tgfx

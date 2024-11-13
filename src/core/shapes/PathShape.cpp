@@ -16,26 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerContent.h"
+#include "PathShape.h"
+#include "core/PathRef.h"
 
 namespace tgfx {
-class ShapeContent : public LayerContent {
- public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
+Rect PathShape::getBounds(float) const {
+  return path.getBounds();
+}
 
-  Rect getBounds() const override {
-    return shape->getBounds();
-  }
+Path PathShape::getPath(float) const {
+  return path;
+}
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
+bool PathShape::isLine(Point line[2]) const {
+  return path.isLine(line);
+}
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+bool PathShape::isRect(Rect* rect) const {
+  return path.isRect(rect);
+}
 
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
-};
+bool PathShape::isOval(Rect* bounds) const {
+  return path.isOval(bounds);
+}
+
+bool PathShape::isRRect(RRect* rRect) const {
+  return path.isRRect(rRect);
+}
+
+bool PathShape::isSimplePath(Path* result) const {
+  *result = path;
+  return true;
+}
+
+UniqueKey PathShape::getUniqueKey() const {
+  return PathRef::GetUniqueKey(path);
+}
+
 }  // namespace tgfx

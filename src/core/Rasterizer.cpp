@@ -17,50 +17,41 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Rasterizer.h"
+#include "core/GlyphRasterizer.h"
+#include "core/ShapeRasterizer.h"
 
 namespace tgfx {
-class GlyphRasterizer : public Rasterizer {
- public:
-  GlyphRasterizer(std::shared_ptr<GlyphRunList> glyphRunList, const ISize& clipSize,
-                  const Matrix& matrix, bool antiAlias, const Stroke* stroke)
-      : Rasterizer(clipSize, matrix, antiAlias, stroke), glyphRunList(std::move(glyphRunList)) {
-  }
-
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
-    auto mask = Mask::Make(width(), height(), tryHardware);
-    if (!mask) {
-      return nullptr;
-    }
-    mask->setAntiAlias(antiAlias);
-    mask->setMatrix(matrix);
-    mask->fillText(glyphRunList.get(), stroke);
-    return mask->makeBuffer();
-  }
-
- private:
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-};
-
-std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(std::shared_ptr<GlyphRunList> glyphRunList,
-                                                 const ISize& clipSize, const Matrix& matrix,
-                                                 bool antiAlias, const Stroke* stroke) {
-  if (glyphRunList == nullptr || clipSize.isEmpty()) {
+std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
+                                                 std::shared_ptr<GlyphRunList> glyphRunList,
+                                                 bool antiAlias, const Matrix& matrix,
+                                                 const Stroke* stroke) {
+  if (glyphRunList == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::make_shared<GlyphRasterizer>(std::move(glyphRunList), clipSize, matrix, antiAlias,
-                                           stroke);
+  return std::make_shared<GlyphRasterizer>(width, height, std::move(glyphRunList), antiAlias,
+                                           matrix, stroke);
 }
 
-Rasterizer::Rasterizer(const ISize& clipSize, const Matrix& matrix, bool antiAlias, const Stroke* s)
-    : ImageGenerator(clipSize.width, clipSize.height), matrix(matrix), antiAlias(antiAlias) {
-  if (s != nullptr) {
-    stroke = new Stroke(*s);
+std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height, Path path, bool antiAlias,
+                                                 const Matrix& matrix, const Stroke* stroke) {
+  if (width <= 0 || height <= 0) {
+    return nullptr;
   }
+  auto shape = Shape::MakeFrom(std::move(path));
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
+  shape = Shape::ApplyMatrix(std::move(shape), matrix);
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<ShapeRasterizer>(width, height, std::move(shape), antiAlias);
 }
 
-Rasterizer::~Rasterizer() {
-  delete stroke;
+std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
+                                                 std::shared_ptr<Shape> shape, bool antiAlias) {
+  if (shape == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  return std::make_shared<ShapeRasterizer>(width, height, std::move(shape), antiAlias);
 }
 
 bool Rasterizer::asyncSupport() const {
