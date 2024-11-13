@@ -55,9 +55,9 @@ class TransformContext : public DrawContext {
     drawContext->drawRRect(rRect, transform(state), style);
   }
 
-  void drawPath(const Path& path, const MCState& state, const FillStyle& style,
-                const Stroke* stroke) override {
-    drawContext->drawPath(path, transform(state), style, stroke);
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                 const FillStyle& style) override {
+    drawContext->drawShape(std::move(shape), transform(state), style);
   }
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

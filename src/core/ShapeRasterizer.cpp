@@ -21,57 +21,22 @@
 #include "tgfx/core/Mask.h"
 
 namespace tgfx {
-// https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
-static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
-// A factor used to estimate the memory size of a tessellated path, based on the average value of
-// Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
-static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
-
-bool ShapeRasterizer::ShouldTriangulatePath(const Path& path) {
-  if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
-    return true;
-  }
-  auto bounds = path.getBounds();
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
-}
-
-std::shared_ptr<ShapeRasterizer> Rasterizer::MakeFrom(Path path, const ISize& clipSize,
-                                                      const Matrix& matrix, bool antiAlias,
-                                                      const Stroke* stroke) {
-  if (path.isEmpty() || clipSize.isEmpty()) {
-    return nullptr;
-  }
-  return std::shared_ptr<ShapeRasterizer>(
-      new ShapeRasterizer(std::move(path), clipSize, matrix, antiAlias, stroke));
-}
-
-ShapeRasterizer::ShapeRasterizer(Path path, const ISize& clipSize, const Matrix& matrix,
-                                 bool antiAlias, const Stroke* stroke)
-    : Rasterizer(clipSize, matrix, antiAlias, stroke), path(std::move(path)) {
+ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape,
+                                 bool antiAlias)
+    : Rasterizer(width, height), shape(std::move(shape)), antiAlias(antiAlias) {
 }
 
 std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) const {
-  auto finalPath = getFinalPath();
-  if (ShouldTriangulatePath(finalPath)) {
+  auto finalPath = shape->getPath();
+  if (PathTriangulator::ShouldTriangulatePath(finalPath)) {
     return ShapeBuffer::MakeFrom(makeTriangles(finalPath));
   }
   return ShapeBuffer::MakeFrom(makeImageBuffer(finalPath, tryHardware));
 }
 
 std::shared_ptr<ImageBuffer> ShapeRasterizer::onMakeBuffer(bool tryHardware) const {
-  auto finalPath = getFinalPath();
+  auto finalPath = shape->getPath();
   return makeImageBuffer(finalPath, tryHardware);
-}
-
-Path ShapeRasterizer::getFinalPath() const {
-  auto finalPath = path;
-  if (stroke != nullptr) {
-    stroke->applyToPath(&finalPath);
-  }
-  finalPath.transform(matrix);
-  return finalPath;
 }
 
 std::shared_ptr<Data> ShapeRasterizer::makeTriangles(const Path& finalPath) const {

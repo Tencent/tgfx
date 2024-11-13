@@ -41,11 +41,11 @@ void LayerUnrollContext::drawRRect(const RRect& rRect, const MCState& state,
   unrolled = true;
 }
 
-void LayerUnrollContext::drawPath(const Path& path, const MCState& state, const FillStyle& style,
-                                  const Stroke* stroke) {
+void LayerUnrollContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                                   const FillStyle& style) {
   // The shape might have multiple contours and could overlap, so we can't unroll it directly.
   if (style.isOpaque() && fillStyle.isOpaque()) {
-    drawContext->drawPath(path, state, merge(style), stroke);
+    drawContext->drawShape(std::move(shape), state, merge(style));
     unrolled = true;
   }
 }

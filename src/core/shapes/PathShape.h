@@ -18,24 +18,39 @@
 
 #pragma once
 
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class ShapeContent : public LayerContent {
+/**
+ * Shape that contains a single path.
+ */
+class PathShape : public Shape {
  public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
-
-  Rect getBounds() const override {
-    return shape->getBounds();
+  explicit PathShape(Path path) : path(std::move(path)) {
   }
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
+  bool isLine(Point line[2] = nullptr) const override;
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  bool isRect(Rect* rect = nullptr) const override;
+
+  bool isOval(Rect* bounds = nullptr) const override;
+
+  bool isRRect(RRect* rRect = nullptr) const override;
+
+  bool isSimplePath(Path* path) const override;
+
+  Rect getBounds(float resolutionScale = 1.0f) const override;
+
+  Path getPath(float resolutionScale = 1.0f) const override;
+
+ protected:
+  Type type() const override {
+    return Type::Path;
+  }
+
+  UniqueKey getUniqueKey() const override;
 
  private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
+  Path path = {};
 };
 }  // namespace tgfx

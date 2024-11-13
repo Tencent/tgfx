@@ -20,18 +20,15 @@
 
 #include "DrawOp.h"
 #include "gpu/proxies/GpuShapeProxy.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Stroke.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 class ShapeDrawOp : public DrawOp {
  public:
   DEFINE_OP_CLASS_ID
 
-  static std::unique_ptr<ShapeDrawOp> Make(Color color, const Path& path, const Matrix& viewMatrix,
-                                           const Stroke* stroke = nullptr);
-
-  ~ShapeDrawOp() override;
+  static std::unique_ptr<ShapeDrawOp> Make(Color color, std::shared_ptr<Shape> shape,
+                                           const Matrix& viewMatrix);
 
   void prepare(Context* context, uint32_t renderFlags) override;
 
@@ -42,12 +39,13 @@ class ShapeDrawOp : public DrawOp {
 
  private:
   Color color = Color::Transparent();
-  Path path = {};
+  std::shared_ptr<Shape> shape = nullptr;
   Matrix viewMatrix = Matrix::I();
+  Matrix uvMatrix = Matrix::I();
   Matrix rasterizeMatrix = Matrix::I();
-  Stroke* stroke = nullptr;
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
 
-  ShapeDrawOp(Color color, Path path, const Matrix& viewMatrix, const Stroke* stroke);
+  ShapeDrawOp(Color color, std::shared_ptr<Shape> shape, const Matrix& viewMatrix,
+              const Matrix& uvMatrix);
 };
 }  // namespace tgfx
