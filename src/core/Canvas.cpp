@@ -234,6 +234,10 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     return;
   }
   shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
+  if (shape->isLine()) {
+    // a line has no fill to draw.
+    return;
+  }
   auto style = CreateFillStyle(paint);
   Rect rect = {};
   if (shape->isRect(&rect)) {
