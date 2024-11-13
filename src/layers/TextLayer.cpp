@@ -175,7 +175,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   }
 
   // 4. Handle text alignment
-  resolveTextAlignment(glyphLines);
+  resolveTextAlignment(width, glyphLines);
 
   // 5. Calculate the final glyphs and positions for rendering
   std::vector<GlyphID> glyphIDs = {};
@@ -331,16 +331,19 @@ std::shared_ptr<TextLayer::TextShaperGlyphs> TextLayer::shapeText(
 }
 
 void TextLayer::resolveTextAlignment(
-    const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const {
+    float width, const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const {
+  if (0.0f == _width) {
+    return;
+  }
+
   if (glyphLines.empty()) {
     return;
   }
 
-  for (const auto& glyphLine : glyphLines) {
+  // Special handling for the last line, align it to the left
+  for (size_t i = 0; i < glyphLines.size(); ++i) {
+    const auto& glyphLine = glyphLines[i];
     const auto lineWidth = glyphLine->lineWidth();
-    if (lineWidth > _width) {
-      continue;
-    }
 
     const auto lineGlyphCount = glyphLine->getGlyphCount();
     float xOffset = 0.0f;
@@ -350,14 +353,17 @@ void TextLayer::resolveTextAlignment(
         // do nothing
         break;
       case TextAlign::Center:
-        xOffset = (_width - lineWidth) / 2.0f;
+        xOffset = (width - lineWidth) / 2.0f;
         break;
       case TextAlign::Right:
-        xOffset = _width - lineWidth;
+        xOffset = width - lineWidth;
         break;
       case TextAlign::Justify: {
-        if (lineGlyphCount > 1) {
-          spaceWidth = (_width - lineWidth) / (lineGlyphCount - 1);
+        // 1. Each line must have more than one character
+        // 2. The last line is aligned to the left
+        // 3. If auto-wrap is disabled and the width is set very small, spaceWidth might be negative, causing characters to overlap. This needs to be avoided.
+        if (lineGlyphCount > 1 && i < glyphLines.size() - 1 && width > lineWidth) {
+          spaceWidth = (width - lineWidth) / (lineGlyphCount - 1);
         }
         break;
       }

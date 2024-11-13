@@ -246,6 +246,6 @@ class TextLayer : public Layer {
   float getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const;
   std::shared_ptr<TextShaperGlyphs> shapeText(const std::string& text,
                                               const std::shared_ptr<Typeface>& typeface) const;
-  void resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const;
+  void resolveTextAlignment(float width, const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const;
 };
 }  // namespace tgfx
