@@ -360,9 +360,17 @@ void TextLayer::resolveTextAlignment(
         break;
       case TextAlign::Justify: {
         // 1. Each line must have more than one character
-        // 2. The last line is aligned to the left
-        // 3. If auto-wrap is disabled and the width is set very small, spaceWidth might be negative, causing characters to overlap. This needs to be avoided.
-        if (lineGlyphCount > 1 && i < glyphLines.size() - 1 && width > lineWidth) {
+        if (lineGlyphCount <= 1) {
+          continue;
+        }
+
+        // 2. If auto-wrap is disabled and the width is set very small, spaceWidth might be negative, causing characters to overlap. This needs to be avoided.
+        if (width <= lineWidth) {
+          continue;
+        }
+
+        // 3. The last line should not be justified (align it to the left), or if auto-wrap is disabled and there is only one line of text, it should be justified.
+        if (i < glyphLines.size() - 1 || (!_autoWrap && 1 == glyphLines.size())) {
           spaceWidth = (width - lineWidth) / (lineGlyphCount - 1);
         }
         break;

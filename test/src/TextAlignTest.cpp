@@ -419,44 +419,96 @@ TGFX_TEST(TextAlignTest, VerticalTextAlign) {
   device->unlock();
 }
 
-// TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
-//   auto device = DevicePool::Make();
-//   ASSERT_TRUE(device != nullptr);
-//   auto context = device->lockContext();
-//   auto surface = Surface::Make(context, 600, 800);
-//   //auto canvas = surface->getCanvas();
-//   auto displayList = std::make_unique<DisplayList>();
-//
-//   auto rootLayer = Layer::Make();
-//   rootLayer->setName("root_layer");
-//
-//   auto parentLayer = Layer::Make();
-//   parentLayer->setName("parent_layer");
-//   rootLayer->addChild(parentLayer);
-//
-//   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-//   Font font(typeface, 20);
-//   std::string testText = "这是一段测试文字，TGFX";
-//   auto textLayer = TextLayer::Make();
-//   textLayer->setName("text_layer1");
-//   textLayer->setTextColor(Color::White());
-//   textLayer->setText(testText);
-//   textLayer->setWidth(400);
-//   textLayer->setHeight(0);
-//   textLayer->setAutoWrap(false);
-//   textLayer->setTextAlign(TextAlign::Justify);
-//   textLayer->setFont(font);
-//   parentLayer->addChild(textLayer);
-//   auto textLayerBounds = textLayer->getBounds();
-//   textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
-//
-//   displayList->root()->addChild(rootLayer);
-//   displayList->render(surface.get());
-//
-//   context->submit();
-//   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/SingleLineTextAlign"));
-//   device->unlock();
-// }
+TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 600, 400);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setName("root_layer");
+
+  auto parentLayer = Layer::Make();
+  parentLayer->setName("parent_layer");
+  rootLayer->addChild(parentLayer);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  Font font(typeface, 20);
+  std::string testText = "这是一段测试文字，TGFX";
+
+  auto textLayer = TextLayer::Make();
+  textLayer->setName("text_layer1");
+  textLayer->setTextColor(Color::White());
+  textLayer->setText(testText);
+  textLayer->setWidth(500);
+  textLayer->setHeight(0);
+  textLayer->setAutoWrap(false);
+  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setFont(font);
+  parentLayer->addChild(textLayer);
+  auto textLayerBounds = textLayer->getBounds();
+  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+
+  auto textLayer2 = TextLayer::Make();
+  textLayer2->setMatrix(Matrix::MakeTrans(0.0f, 50.0f));
+  textLayer2->setName("text_layer2");
+  textLayer2->setTextColor(Color::White());
+  textLayer2->setText(testText);
+  textLayer2->setWidth(500);
+  textLayer2->setHeight(0);
+  textLayer2->setAutoWrap(false);
+  textLayer2->setTextAlign(TextAlign::Center);
+  textLayer2->setFont(font);
+  parentLayer->addChild(textLayer2);
+  auto textLayer2Bounds = textLayer2->getBounds();
+  textLayer2->getGlobalMatrix().mapRect(&textLayer2Bounds);
+
+  auto textLayer3 = TextLayer::Make();
+  textLayer3->setMatrix(Matrix::MakeTrans(0.0f, 100.0f));
+  textLayer3->setName("text_layer3");
+  textLayer3->setTextColor(Color::White());
+  textLayer3->setText(testText);
+  textLayer3->setWidth(500);
+  textLayer3->setHeight(0);
+  textLayer3->setAutoWrap(false);
+  textLayer3->setTextAlign(TextAlign::Right);
+  textLayer3->setFont(font);
+  parentLayer->addChild(textLayer3);
+  auto textLayer3Bounds = textLayer3->getBounds();
+  textLayer3->getGlobalMatrix().mapRect(&textLayer3Bounds);
+
+  auto textLayer4 = TextLayer::Make();
+  textLayer4->setMatrix(Matrix::MakeTrans(0.0f, 150.0f));
+  textLayer4->setName("text_layer4");
+  textLayer4->setTextColor(Color::White());
+  textLayer4->setText(testText);
+  textLayer4->setWidth(500);
+  textLayer4->setHeight(0);
+  textLayer4->setAutoWrap(false);
+  textLayer4->setTextAlign(TextAlign::Justify);
+  textLayer4->setFont(font);
+  parentLayer->addChild(textLayer4);
+  auto textLayer4Bounds = textLayer4->getBounds();
+  textLayer4->getGlobalMatrix().mapRect(&textLayer4Bounds);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+
+  auto paint = Paint();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1.0f);
+  paint.setColor(Color::Red());
+  canvas->drawRect(textLayerBounds, paint);
+  canvas->drawRect(textLayer2Bounds, paint);
+  canvas->drawRect(textLayer3Bounds, paint);
+  canvas->drawRect(textLayer4Bounds, paint);
+
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/SingleLineTextAlign"));
+  device->unlock();
+}
 
 TGFX_TEST(TextAlignTest, TextAlignPrint) {
   std::string text = "ab\rcd\nef\r\ngh\n\rij\tk\r\r\rp";
