@@ -157,6 +157,9 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "TextAlign": "d069eb4"
+        "TextAlign": "7683ec5",
+        "TextAlignWidth0Height0": "7683ec5",
+        "TextAlignWidth10Height10": "7683ec5",
+        "VerticalTextAlign": "7683ec5"
     }
 }
