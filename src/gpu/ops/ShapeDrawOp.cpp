@@ -37,9 +37,7 @@ std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shap
   if (shape->type() == Shape::Type::Matrix) {
     // always unwrap the matrix shape.
     auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    if (!matrixShape->matrix.invert(&uvMatrix)) {
-      return nullptr;
-    }
+    uvMatrix = matrixShape->matrix;
     totalMatrix.preConcat(matrixShape->matrix);
     shape = matrixShape->shape;
   }
@@ -122,7 +120,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     return;
   }
   auto realUVMatrix = uvMatrix;
-  realUVMatrix.postConcat(invert);
+  realUVMatrix.preConcat(invert);
   auto realViewMatrix = viewMatrix;
   realViewMatrix.preConcat(invert);
   auto vertexBuffer = shapeProxy->getTriangles();
@@ -132,9 +130,13 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     if (textureProxy == nullptr) {
       return;
     }
+    Matrix maskMatrix = Matrix::I();
+    if (!realUVMatrix.invert(&maskMatrix)) {
+      return;
+    }
     auto rect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
     vertexData = aa == AAType::Coverage ? MakeAAVertexData(rect) : MakeVertexData(rect);
-    auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
+    auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &maskMatrix, true);
     if (maskFP == nullptr) {
       return;
     }
