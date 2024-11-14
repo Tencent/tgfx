@@ -24,12 +24,11 @@
 namespace tgfx {
 const std::string text =
     "abcdefghijklmnopqrstuvwxyz\njpyq\r这是一段测试文字\r\n"
-    "先帝创业\t未半而中道崩殂，今天下三分，益州疲弊，此诚危急存亡之秋也。"
+    "先帝创业未半而中道崩殂，今天下三分，益州疲弊，此诚危急存亡之秋也。"
     "然侍卫之臣不懈于内，忠志之士忘身于外者，盖追先帝之殊遇，欲报之于陛下也。"
     "诚宜开张圣听，以光先帝遗德，恢弘志士之气，不宜妄自菲薄，引喻失义，以塞忠谏之路也。"
     "宫中府中，俱为一体；陟罚臧否，不宜异同。"
-    "若有作奸犯科及为忠善者，宜付有司论其刑赏，以昭陛下平明之理，不宜偏私，使内外异法也。hello "
-    "tfgx!";
+    "若有作奸犯科及为忠善者，宜付有司论其刑赏，以昭陛下平明之理，不宜偏私，使内外异法也。hello\ttfgx!";
 
 TGFX_TEST(TextAlignTest, TextAlign) {
   auto device = DevicePool::Make();
@@ -98,7 +97,7 @@ TGFX_TEST(TextAlignTest, TextAlign) {
   displayList->render(surface.get());
 
   context->submit();
-  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlign"));
+  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlign1"));
   device->unlock();
 }
 
@@ -508,6 +507,44 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
 
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/SingleLineTextAlign"));
+  device->unlock();
+}
+
+TGFX_TEST(TextAlignTest, TextAlignDebug) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 800, 800);
+  //auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setName("root_layer");
+
+  auto parentLayer = Layer::Make();
+  parentLayer->setName("parent_layer");
+  rootLayer->addChild(parentLayer);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  Font font(typeface, 20);
+  //std::string testText = "abc";
+
+  auto textLayer = TextLayer::Make();
+  textLayer->setName("text_layer1");
+  textLayer->setTextColor(Color::White());
+  textLayer->setText(text);
+  textLayer->setWidth(200);
+  textLayer->setHeight(500);
+  textLayer->setAutoWrap(true);
+  textLayer->setTextAlign(TextAlign::Justify);
+  textLayer->setFont(font);
+  parentLayer->addChild(textLayer);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignDebug"));
   device->unlock();
 }
 
