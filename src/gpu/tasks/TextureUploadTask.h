@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,25 @@
 
 #pragma once
 
-#include "DrawOp.h"
-#include "tgfx/core/Path.h"
+#include "ResourceTask.h"
+#include "core/ImageDecoder.h"
 
 namespace tgfx {
-class RRectPaint;
-
-class RRectOp : public DrawOp {
+class TextureUploadTask : public ResourceTask {
  public:
-  DEFINE_OP_CLASS_ID
+  /*
+   * Creates a TextureUploadTask to generate a texture using the given image decoder.
+   */
+  static std::shared_ptr<TextureUploadTask> MakeFrom(UniqueKey uniqueKey,
+                                                     std::shared_ptr<ImageDecoder> imageDecoder,
+                                                     bool mipmapped = false);
 
-  static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix);
-
-  void prepare(Context* context) override;
-
-  void execute(RenderPass* renderPass) override;
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& uvMatrix);
+  std::shared_ptr<ImageDecoder> decoder = nullptr;
+  bool mipmapped = false;
 
-  bool onCombineIfPossible(Op* op) override;
-
-  std::vector<std::shared_ptr<RRectPaint>> rRectPaints;
-  Matrix uvMatrix = Matrix::I();
-  std::shared_ptr<GpuBufferProxy> vertexBufferProxy;
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy;
-
-  //  bool stroked = false;
-  //  Point strokeWidths = Point::Zero();
+  TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped);
 };
 }  // namespace tgfx

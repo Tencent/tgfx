@@ -23,26 +23,28 @@
 #include "tgfx/core/Mask.h"
 
 namespace tgfx {
+class ShapeRasterizer;
+
 /**
- * An ImageGenerator that can take vector graphics (paths, texts) and convert them into a raster
- * image.
+ * Rasterizer is the base class for converting vector graphics (shapes and glyphs) into their
+ * rasterized forms.
  */
 class Rasterizer : public ImageGenerator {
  public:
   /**
-   * Creates a Rasterizer from a TextBlob.
+   * Creates a Rasterizer from a GlyphRunList.
    */
   static std::shared_ptr<Rasterizer> MakeFrom(std::shared_ptr<GlyphRunList> glyphRunList,
                                               const ISize& clipSize, const Matrix& matrix,
-                                              const Stroke* stroke = nullptr);
-
+                                              bool antiAlias, const Stroke* stroke = nullptr);
   /**
    * Creates a Rasterizer from a Path.
    */
-  static std::shared_ptr<Rasterizer> MakeFrom(Path path, const ISize& clipSize,
-                                              const Matrix& matrix, const Stroke* stroke = nullptr);
+  static std::shared_ptr<ShapeRasterizer> MakeFrom(Path path, const ISize& clipSize,
+                                                   const Matrix& matrix, bool antiAlias,
+                                                   const Stroke* stroke = nullptr);
 
-  virtual ~Rasterizer();
+  ~Rasterizer() override;
 
   bool isAlphaOnly() const override {
     return true;
@@ -51,14 +53,10 @@ class Rasterizer : public ImageGenerator {
   bool asyncSupport() const override;
 
  protected:
-  Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* stroke);
-
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
-  virtual void onRasterize(Mask* mask, const Stroke* stroke) const = 0;
-
- private:
   Matrix matrix = Matrix::I();
+  bool antiAlias = true;
   Stroke* stroke = nullptr;
+
+  Rasterizer(const ISize& clipSize, const Matrix& matrix, bool antiAlias, const Stroke* stroke);
 };
 }  // namespace tgfx

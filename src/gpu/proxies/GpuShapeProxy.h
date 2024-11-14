@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,19 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLVertexArrayCreateTask.h"
-#include "GLVertexArray.h"
+#pragma once
+
+#include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-GLVertexArrayCreateTask::GLVertexArrayCreateTask(UniqueKey uniqueKey)
-    : ResourceTask(std::move(uniqueKey)) {
-}
-
-std::shared_ptr<Resource> GLVertexArrayCreateTask::onMakeResource(Context* context) {
-  auto vertexArray = GLVertexArray::Make(context);
-  if (vertexArray == nullptr) {
-    LOGE("GLVertexArrayCreateTask::onMakeResource() Failed to create the vertex array!");
+class GpuShapeProxy {
+ public:
+  GpuShapeProxy(std::shared_ptr<GpuBufferProxy> triangles, std::shared_ptr<TextureProxy> texture)
+      : triangles(std::move(triangles)), texture(std::move(texture)) {
   }
-  return vertexArray;
-}
+
+  std::shared_ptr<GpuBuffer> getTriangles() const {
+    return triangles ? triangles->getBuffer() : nullptr;
+  }
+
+  std::shared_ptr<TextureProxy> getTextureProxy() const {
+    return texture;
+  }
+
+ private:
+  std::shared_ptr<GpuBufferProxy> triangles = nullptr;
+  std::shared_ptr<TextureProxy> texture = nullptr;
+};
 }  // namespace tgfx

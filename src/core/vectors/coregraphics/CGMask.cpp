@@ -58,11 +58,12 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   return std::make_shared<CGMask>(std::move(pixelRef));
 }
 
-static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& info) {
+static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& info,
+                     bool antiAlias) {
   auto cgPath = CGPathCreateMutable();
   path.decompose(Iterator, cgPath);
 
-  CGContextSetShouldAntialias(cgContext, true);
+  CGContextSetShouldAntialias(cgContext, antiAlias);
   static const CGFloat white[] = {1.f, 1.f, 1.f, 1.f};
   if (path.isInverseFillType()) {
     auto rect = CGRectMake(0.f, 0.f, info.width(), info.height());
@@ -88,14 +89,15 @@ static void DrawPath(const Path& path, CGContextRef cgContext, const ImageInfo& 
   CGPathRelease(cgPath);
 }
 
-static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo& info, float left,
-                                float top, const std::array<uint8_t, 256>& gammaTable) {
+static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo& info,
+                                bool antiAlias, float left, float top,
+                                const std::array<uint8_t, 256>& gammaTable) {
   auto cgContext = CreateBitmapContext(info, pixels);
   if (cgContext == nullptr) {
     return nullptr;
   }
   CGContextTranslateCTM(cgContext, -left, -top);
-  DrawPath(path, cgContext, info);
+  DrawPath(path, cgContext, info, antiAlias);
   CGContextFlush(cgContext);
   auto* p = static_cast<uint8_t*>(pixels);
   auto stride = info.rowBytes();
@@ -111,7 +113,8 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
   return image;
 }
 
-void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaCorrection) {
+void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
+                        bool needsGammaCorrection) {
   if (path.isEmpty()) {
     return;
   }
@@ -136,7 +139,7 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
   markContentDirty(bounds, true);
 
   if (!needsGammaCorrection) {
-    DrawPath(finalPath, cgContext, info);
+    DrawPath(finalPath, cgContext, info, antiAlias);
     CGContextRelease(cgContext);
     pixelRef->unlockPixels();
     return;
@@ -156,8 +159,8 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool needsGammaC
     return;
   }
   memset(tempPixels, 0, tempBuffer->info().byteSize());
-  auto image = CreateCGImage(finalPath, tempPixels, tempBuffer->info(), bounds.left, bounds.top,
-                             PixelRefMask::GammaTable());
+  auto image = CreateCGImage(finalPath, tempPixels, tempBuffer->info(), antiAlias, bounds.left,
+                             bounds.top, PixelRefMask::GammaTable());
   tempBuffer->unlockPixels();
   if (image == nullptr) {
     CGContextRelease(cgContext);
@@ -179,7 +182,7 @@ static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
 }
 
 bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
-                        const Matrix& matrix) {
+                        const Matrix& matrix, bool antiAlias) {
   if (glyphRunList == nullptr || stroke) {
     return false;
   }
@@ -198,7 +201,7 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
   CGContextSetBlendMode(cgContext, kCGBlendModeCopy);
   CGContextSetTextDrawingMode(cgContext, kCGTextFill);
   CGContextSetGrayFillColor(cgContext, 1.0f, 1.0f);
-  CGContextSetShouldAntialias(cgContext, true);
+  CGContextSetShouldAntialias(cgContext, antiAlias);
   CGContextSetShouldSmoothFonts(cgContext, true);
   CGContextSetAllowsFontSubpixelQuantization(cgContext, false);
   CGContextSetShouldSubpixelQuantizeFonts(cgContext, false);

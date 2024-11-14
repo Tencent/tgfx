@@ -18,42 +18,27 @@
 
 #pragma once
 
-#include "ResourceProxy.h"
+#include "ResourceTask.h"
 #include "core/DataProvider.h"
 #include "gpu/GpuBuffer.h"
 
 namespace tgfx {
-class GpuBufferProxy : public ResourceProxy {
+class GpuBufferUploadTask : public ResourceTask {
  public:
   /**
-   * Creates a GpuBufferProxy from the given data.
+   * Create a new GpuBufferUploadTask to generate a GpuBuffer with the given data provider.
    */
-  static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context, std::shared_ptr<Data> data,
-                                                  BufferType bufferType, uint32_t renderFlags);
-  /**
-   * Creates a GpuBufferProxy from the given data provider.
-   */
-  static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context,
-                                                  std::shared_ptr<DataProvider> dataProvider,
-                                                  BufferType bufferType, uint32_t renderFlags);
+  static std::shared_ptr<GpuBufferUploadTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
+                                                       std::shared_ptr<DataProvider> provider);
 
-  /**
-   * Returns the type of the buffer.
-   */
-  BufferType bufferType() const {
-    return _bufferType;
-  }
-
-  /**
-   * Returns the associated GpuBuffer instance.
-   */
-  std::shared_ptr<GpuBuffer> getBuffer() const;
+ protected:
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  BufferType _bufferType = BufferType::Vertex;
+  BufferType bufferType = BufferType::Vertex;
+  std::shared_ptr<DataProvider> provider = nullptr;
 
-  GpuBufferProxy(UniqueKey uniqueKey, BufferType bufferType);
-
-  friend class ProxyProvider;
+  GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
+                      std::shared_ptr<DataProvider> provider);
 };
 }  // namespace tgfx

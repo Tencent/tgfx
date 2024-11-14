@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillRectOp.h"
-#include "core/utils/UniqueID.h"
+#include "RectDrawOp.h"
 #include "gpu/Gpu.h"
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 class RectPaint {
@@ -59,12 +59,12 @@ class RectCoverageVerticesProvider : public DataProvider {
       // we want the new edge to be .5px away from the old line.
       auto padding = 0.5f / scale;
       auto insetBounds = rect.makeInset(padding, padding);
-      auto insetQuad = Quad::MakeFromRect(insetBounds, viewMatrix);
+      auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
       auto outsetBounds = rect.makeOutset(padding, padding);
-      auto outsetQuad = Quad::MakeFromRect(outsetBounds, viewMatrix);
+      auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
 
-      auto normalInsetQuad = Quad::MakeFromRect(insetBounds, uvMatrix);
-      auto normalOutsetQuad = Quad::MakeFromRect(outsetBounds, uvMatrix);
+      auto normalInsetQuad = Quad::MakeFrom(insetBounds, &uvMatrix);
+      auto normalOutsetQuad = Quad::MakeFrom(outsetBounds, &uvMatrix);
 
       for (int j = 0; j < 2; ++j) {
         const auto& quad = j == 0 ? insetQuad : outsetQuad;
@@ -101,7 +101,7 @@ class RectNonCoverageVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto floatCount = rectPaints.size() * 4 * (hasColor ? 9 : 5);
+    auto floatCount = rectPaints.size() * 4 * (hasColor ? 8 : 4);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
     auto index = 0;
@@ -109,8 +109,8 @@ class RectNonCoverageVerticesProvider : public DataProvider {
       auto& viewMatrix = rectPaint->viewMatrix;
       auto& rect = rectPaint->rect;
       auto& uvMatrix = rectPaint->uvMatrix;
-      auto quad = Quad::MakeFromRect(rect, viewMatrix);
-      auto localQuad = Quad::MakeFromRect(rect, uvMatrix);
+      auto quad = Quad::MakeFrom(rect, &viewMatrix);
+      auto localQuad = Quad::MakeFrom(rect, &uvMatrix);
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
@@ -133,12 +133,12 @@ class RectNonCoverageVerticesProvider : public DataProvider {
   bool hasColor;
 };
 
-std::unique_ptr<FillRectOp> FillRectOp::Make(std::optional<Color> color, const Rect& rect,
+std::unique_ptr<RectDrawOp> RectDrawOp::Make(std::optional<Color> color, const Rect& rect,
                                              const Matrix& viewMatrix, const Matrix* uvMatrix) {
-  return std::unique_ptr<FillRectOp>(new FillRectOp(color, rect, viewMatrix, uvMatrix));
+  return std::unique_ptr<RectDrawOp>(new RectDrawOp(color, rect, viewMatrix, uvMatrix));
 }
 
-FillRectOp::FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+RectDrawOp::RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
                        const Matrix* uvMatrix)
     : DrawOp(ClassID()), hasColor(color) {
   auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix, uvMatrix);
@@ -147,14 +147,14 @@ FillRectOp::FillRectOp(std::optional<Color> color, const Rect& rect, const Matri
   setBounds(bounds);
 }
 
-bool FillRectOp::canAdd(size_t count) const {
+bool RectDrawOp::canAdd(size_t count) const {
   return rectPaints.size() + count <=
          static_cast<size_t>(aa == AAType::Coverage ? ResourceProvider::MaxNumAAQuads()
                                                     : ResourceProvider::MaxNumNonAAQuads());
 }
 
-bool FillRectOp::onCombineIfPossible(Op* op) {
-  auto* that = static_cast<FillRectOp*>(op);
+bool RectDrawOp::onCombineIfPossible(Op* op) {
+  auto* that = static_cast<RectDrawOp*>(op);
   if (hasColor != that->hasColor || !canAdd(that->rectPaints.size()) ||
       !DrawOp::onCombineIfPossible(op)) {
     return false;
@@ -163,33 +163,34 @@ bool FillRectOp::onCombineIfPossible(Op* op) {
   return true;
 }
 
-bool FillRectOp::needsIndexBuffer() const {
+bool RectDrawOp::needsIndexBuffer() const {
   return rectPaints.size() > 1 || aa == AAType::Coverage;
 }
 
-void FillRectOp::prepare(Context* context) {
-  std::shared_ptr<DataProvider> vertexData = nullptr;
-  if (aa == AAType::Coverage) {
-    vertexData = std::make_shared<RectCoverageVerticesProvider>(rectPaints, hasColor);
-  } else {
-    vertexData = std::make_shared<RectNonCoverageVerticesProvider>(rectPaints, hasColor);
+void RectDrawOp::prepare(Context* context, uint32_t renderFlags) {
+  if (needsIndexBuffer()) {
+    if (aa == AAType::Coverage) {
+      indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
+    } else {
+      indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
+    }
   }
-  vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexData), BufferType::Vertex);
+  std::shared_ptr<DataProvider> dataProvider = nullptr;
   if (aa == AAType::Coverage) {
-    indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
+    dataProvider = std::make_shared<RectCoverageVerticesProvider>(rectPaints, hasColor);
   } else {
-    indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
+    dataProvider = std::make_shared<RectNonCoverageVerticesProvider>(rectPaints, hasColor);
+  }
+  if (rectPaints.size() > 1) {
+    vertexBufferProxy =
+        GpuBufferProxy::MakeFrom(context, std::move(dataProvider), BufferType::Vertex, renderFlags);
+  } else {
+    // If we only have one rect, it is not worth the async task overhead.
+    vertexData = dataProvider->getData();
   }
 }
 
-void FillRectOp::execute(RenderPass* renderPass) {
-  if (vertexBufferProxy == nullptr) {
-    return;
-  }
-  auto vertexBuffer = vertexBufferProxy->getBuffer();
-  if (vertexBuffer == nullptr) {
-    return;
-  }
+void RectDrawOp::execute(RenderPass* renderPass) {
   std::shared_ptr<GpuBuffer> indexBuffer;
   if (needsIndexBuffer()) {
     if (indexBufferProxy == nullptr) {
@@ -200,13 +201,26 @@ void FillRectOp::execute(RenderPass* renderPass) {
       return;
     }
   }
+  std::shared_ptr<GpuBuffer> vertexBuffer;
+  if (vertexBufferProxy) {
+    vertexBuffer = vertexBufferProxy->getBuffer();
+    if (vertexBuffer == nullptr) {
+      return;
+    }
+  } else if (vertexData == nullptr) {
+    return;
+  }
   auto pipeline = createPipeline(
       renderPass,
       QuadPerEdgeAAGeometryProcessor::Make(renderPass->renderTarget()->width(),
                                            renderPass->renderTarget()->height(), aa, hasColor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer);
-  if (needsIndexBuffer()) {
+  if (vertexBuffer) {
+    renderPass->bindBuffers(indexBuffer, vertexBuffer);
+  } else {
+    renderPass->bindBuffers(indexBuffer, vertexData);
+  }
+  if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aa == AAType::Coverage) {
       numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();

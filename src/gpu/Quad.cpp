@@ -19,13 +19,15 @@
 #include "Quad.h"
 
 namespace tgfx {
-Quad Quad::MakeFromRect(const Rect& rect, const Matrix& matrix) {
+Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
   std::vector<Point> points;
   points.push_back(Point::Make(rect.left, rect.top));
   points.push_back(Point::Make(rect.left, rect.bottom));
   points.push_back(Point::Make(rect.right, rect.top));
   points.push_back(Point::Make(rect.right, rect.bottom));
-  matrix.mapPoints(points.data(), 4);
+  if (matrix) {
+    matrix->mapPoints(points.data(), 4);
+  }
   return Quad(points);
 }
 

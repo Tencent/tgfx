@@ -70,17 +70,17 @@ static const uint32_t kBitMask[VP8L_MAX_NUM_BIT_READ + 1] = {
     0x0001ff, 0x0003ff, 0x0007ff, 0x000fff, 0x001fff, 0x003fff, 0x007fff, 0x00ffff, 0x01ffff,
     0x03ffff, 0x07ffff, 0x0fffff, 0x1fffff, 0x3fffff, 0x7fffff, 0xffffff};
 
-static inline int GetLE16(const uint8_t* const data) {
+inline int GetLE16(const uint8_t* const data) {
   return static_cast<int>((data[0] << 0) | (data[1] << 8));
 }
-static inline int GetLE24(const uint8_t* const data) {
+inline int GetLE24(const uint8_t* const data) {
   return GetLE16(data) | (data[2] << 16);
 }
-static inline uint32_t GetLE32(const uint8_t* const data) {
+inline uint32_t GetLE32(const uint8_t* const data) {
   return (uint32_t)GetLE16(data) | ((uint32_t)GetLE16(data + 2) << 16);
 }
 
-static inline void Skip(WebpFile* const ptr, size_t size) {
+inline void Skip(WebpFile* const ptr, size_t size) {
   ptr->_start += size;
 }
 static bool VP8CheckSignature(const uint8_t* const data) {
@@ -92,13 +92,13 @@ static bool VP8LCheckSignature(const uint8_t* const data) {
 }
 
 // Return the prefetched bits, so they can be looked up.
-static inline uint32_t VP8LPrefetchBits(VP8LBitReader* const br) {
+inline uint32_t VP8LPrefetchBits(VP8LBitReader* const br) {
   return (uint32_t)(br->val_ >> (br->bit_pos_ & (VP8L_LBITS - 1)));
 }
 
 // Returns true if there was an attempt at reading bit past the end of
 // the buffer. Doesn't set br->eos_ flag.
-static inline int VP8LIsEndOfStream(const VP8LBitReader* const br) {
+inline int VP8LIsEndOfStream(const VP8LBitReader* const br) {
   ASSERT(br->pos_ <= br->len_);
   return br->eos_ || ((br->pos_ == br->len_) && (br->bit_pos_ > VP8L_LBITS));
 }

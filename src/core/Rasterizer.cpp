@@ -19,56 +19,41 @@
 #include "Rasterizer.h"
 
 namespace tgfx {
-class TextRasterizer : public Rasterizer {
+class GlyphRasterizer : public Rasterizer {
  public:
-  TextRasterizer(std::shared_ptr<GlyphRunList> glyphRunList, const ISize& clipSize,
-                 const Matrix& matrix, const Stroke* stroke)
-      : Rasterizer(clipSize, matrix, stroke), glyphRunList(std::move(glyphRunList)) {
+  GlyphRasterizer(std::shared_ptr<GlyphRunList> glyphRunList, const ISize& clipSize,
+                  const Matrix& matrix, bool antiAlias, const Stroke* stroke)
+      : Rasterizer(clipSize, matrix, antiAlias, stroke), glyphRunList(std::move(glyphRunList)) {
   }
 
  protected:
-  void onRasterize(Mask* mask, const Stroke* stroke) const override {
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
+    auto mask = Mask::Make(width(), height(), tryHardware);
+    if (!mask) {
+      return nullptr;
+    }
+    mask->setAntiAlias(antiAlias);
+    mask->setMatrix(matrix);
     mask->fillText(glyphRunList.get(), stroke);
+    return mask->makeBuffer();
   }
 
  private:
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
 };
 
-class PathRasterizer : public Rasterizer {
- public:
-  PathRasterizer(Path path, const ISize& clipSize, const Matrix& matrix, const Stroke* stroke)
-      : Rasterizer(clipSize, matrix, stroke), path(std::move(path)) {
-  }
-
- protected:
-  void onRasterize(Mask* mask, const Stroke* stroke) const override {
-    mask->fillPath(path, stroke);
-  }
-
- private:
-  Path path = {};
-};
-
 std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(std::shared_ptr<GlyphRunList> glyphRunList,
                                                  const ISize& clipSize, const Matrix& matrix,
-                                                 const Stroke* stroke) {
+                                                 bool antiAlias, const Stroke* stroke) {
   if (glyphRunList == nullptr || clipSize.isEmpty()) {
     return nullptr;
   }
-  return std::make_shared<TextRasterizer>(std::move(glyphRunList), clipSize, matrix, stroke);
+  return std::make_shared<GlyphRasterizer>(std::move(glyphRunList), clipSize, matrix, antiAlias,
+                                           stroke);
 }
 
-std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(Path path, const ISize& clipSize,
-                                                 const Matrix& matrix, const Stroke* stroke) {
-  if (path.isEmpty() || clipSize.isEmpty()) {
-    return nullptr;
-  }
-  return std::make_shared<PathRasterizer>(std::move(path), clipSize, matrix, stroke);
-}
-
-Rasterizer::Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* s)
-    : ImageGenerator(clipSize.width, clipSize.height), matrix(matrix) {
+Rasterizer::Rasterizer(const ISize& clipSize, const Matrix& matrix, bool antiAlias, const Stroke* s)
+    : ImageGenerator(clipSize.width, clipSize.height), matrix(matrix), antiAlias(antiAlias) {
   if (s != nullptr) {
     stroke = new Stroke(*s);
   }
@@ -84,15 +69,5 @@ bool Rasterizer::asyncSupport() const {
 #else
   return true;
 #endif
-}
-
-std::shared_ptr<ImageBuffer> Rasterizer::onMakeBuffer(bool tryHardware) const {
-  auto mask = Mask::Make(width(), height(), tryHardware);
-  if (!mask) {
-    return nullptr;
-  }
-  mask->setMatrix(matrix);
-  onRasterize(mask.get(), stroke);
-  return mask->makeBuffer();
 }
 }  // namespace tgfx

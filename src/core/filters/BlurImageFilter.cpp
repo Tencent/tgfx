@@ -86,7 +86,7 @@ BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iterat
 
 void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
                            std::unique_ptr<FragmentProcessor> imageProcessor,
-                           const Rect& imageBounds, bool isDown) const {
+                           const Rect& imageBounds, bool isDown, uint32_t renderFlags) const {
   auto dstWidth = static_cast<float>(renderTarget->width());
   auto dstHeight = static_cast<float>(renderTarget->height());
   auto uvMatrix =
@@ -96,7 +96,7 @@ void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
-  OpContext opContext(std::move(renderTarget));
+  OpContext opContext(std::move(renderTarget), renderFlags);
   opContext.fillWithFP(std::move(blurProcessor), uvMatrix, true);
 }
 
@@ -133,14 +133,14 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(
     if (renderTarget == nullptr) {
       return nullptr;
     }
-    draw(renderTarget, std::move(processor), imageBounds, true);
+    draw(renderTarget, std::move(processor), imageBounds, true, args.renderFlags);
     lastRenderTarget = renderTarget;
     imageBounds = Rect::MakeWH(downWidth, downHeight);
   }
   for (size_t i = renderTargets.size(); i > 0; --i) {
     processor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, nullptr, isAlphaOnly);
     auto renderTarget = renderTargets[i - 1];
-    draw(renderTarget, std::move(processor), imageBounds, false);
+    draw(renderTarget, std::move(processor), imageBounds, false, args.renderFlags);
     lastRenderTarget = renderTarget;
     imageBounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   }

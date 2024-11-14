@@ -34,13 +34,12 @@ class ResourceTask {
   /**
    * Returns false if the resource creation is failed.
    */
-  bool execute(Context* context);
+  virtual bool execute(Context* context);
 
  protected:
-  virtual std::shared_ptr<Resource> onMakeResource(Context* context) = 0;
-
- private:
   UniqueKey uniqueKey = {};
+
+  virtual std::shared_ptr<Resource> onMakeResource(Context* context) = 0;
 
   friend class DrawingManager;
 };

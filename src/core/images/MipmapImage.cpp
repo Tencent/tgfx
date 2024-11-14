@@ -21,20 +21,13 @@
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
-static BytesKey MakeMipmapBytesKey() {
-  auto mipmapFlag = UniqueID::Next();
-  BytesKey bytesKey(1);
-  bytesKey.write(mipmapFlag);
-  return bytesKey;
-}
-
 std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<ResourceImage> source) {
   if (source == nullptr) {
     return nullptr;
   }
   DEBUG_ASSERT(!source->hasMipmaps());
-  static const auto MipmapBytesKey = MakeMipmapBytesKey();
-  auto uniqueKey = UniqueKey::Combine(source->uniqueKey, MipmapBytesKey);
+  static const auto MipmapFlag = UniqueID::Next();
+  auto uniqueKey = UniqueKey::Append(source->uniqueKey, &MipmapFlag, 1);
   auto image =
       std::shared_ptr<MipmapImage>(new MipmapImage(std::move(uniqueKey), std::move(source)));
   image->weakThis = image;

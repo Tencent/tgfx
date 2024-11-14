@@ -31,7 +31,7 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
 void OpsRenderTask::prepare(Context* context) {
   renderPass = context->gpu()->getRenderPass();
   for (auto& op : ops) {
-    op->prepare(context);
+    op->prepare(context, renderFlags);
   }
 }
 

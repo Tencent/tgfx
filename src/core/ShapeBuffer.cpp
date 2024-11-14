@@ -16,31 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "ShapeBuffer.h"
 
 namespace tgfx {
-/**
- * Defines the vertical alignment of a text.
- */
-enum class VerticalAlign {
-  /**
-   * Text is visually top aligned.
-   */
-  Top,
+std::shared_ptr<ShapeBuffer> ShapeBuffer::MakeFrom(std::shared_ptr<Data> triangles) {
+  if (triangles == nullptr || triangles->empty()) {
+    return nullptr;
+  }
+  return std::shared_ptr<ShapeBuffer>(new ShapeBuffer(std::move(triangles)));
+}
 
-  /**
-   * Text is visually bottom aligned.
-   */
-  Bottom,
-
-  /**
-   * Text is visually center aligned.
-   */
-  Center,
-
-  /**
-   * Text is justified.
-   */
-  Justify
-};
+std::shared_ptr<ShapeBuffer> ShapeBuffer::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
+  if (imageBuffer == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<ShapeBuffer>(new ShapeBuffer(std::move(imageBuffer)));
+}
 }  // namespace tgfx
