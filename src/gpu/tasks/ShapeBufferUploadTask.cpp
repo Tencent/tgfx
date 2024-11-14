@@ -46,7 +46,7 @@ bool ShapeBufferUploadTask::execute(Context* context) {
   }
   auto shapeBuffer = provider->getBuffer();
   if (shapeBuffer == nullptr) {
-    LOGE("ShapeBufferUploadTask::execute() Failed to get the shape buffer!");
+    // No need to log an error here; the shape might not be a filled path or could be invisible.
     return false;
   }
   if (auto triangles = shapeBuffer->triangles()) {

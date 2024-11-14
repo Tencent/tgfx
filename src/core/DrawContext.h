@@ -22,9 +22,8 @@
 #include "core/FillStyle.h"
 #include "core/GlyphRunList.h"
 #include "core/MCState.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/Picture.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 class Surface;
@@ -60,10 +59,10 @@ class DrawContext {
   virtual void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) = 0;
 
   /**
-   * Draws a complex Path with the specified MCState, FillStyle and optional Stroke.
+   * Draws a complex Shape with the specified MCState and FillStyle.
    */
-  virtual void drawPath(const Path& path, const MCState& state, const FillStyle& style,
-                        const Stroke* stroke) = 0;
+  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                         const FillStyle& style) = 0;
 
   /**
    * Draws an Image with the specified SamplingOptions, MCState, and FillStyle.

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,13 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "StrokeKey.h"
+#include "GlyphRasterizer.h"
+#include "tgfx/core/Mask.h"
 
 namespace tgfx {
-void WriteStrokeKey(BytesKey* bytesKey, const Stroke* stroke) {
-  auto flags = static_cast<uint32_t>(stroke->join) << 16 | static_cast<uint32_t>(stroke->cap);
-  bytesKey->write(flags);
-  bytesKey->write(stroke->width);
-  bytesKey->write(stroke->miterLimit);
+GlyphRasterizer::GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList,
+                                 bool antiAlias, const Matrix& matrix, const Stroke* s)
+    : Rasterizer(width, height), glyphRunList(std::move(glyphRunList)), antiAlias(antiAlias),
+      matrix(matrix) {
+  if (s != nullptr) {
+    stroke = new Stroke(*s);
+  }
+}
+
+GlyphRasterizer::~GlyphRasterizer() {
+  delete stroke;
+}
+
+std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
+  auto mask = Mask::Make(width(), height(), tryHardware);
+  if (!mask) {
+    return nullptr;
+  }
+  mask->setAntiAlias(antiAlias);
+  mask->setMatrix(matrix);
+  mask->fillText(glyphRunList.get(), stroke);
+  return mask->makeBuffer();
 }
 }  // namespace tgfx

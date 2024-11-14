@@ -18,24 +18,26 @@
 
 #pragma once
 
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerContent.h"
+#include "core/Rasterizer.h"
 
 namespace tgfx {
-class ShapeContent : public LayerContent {
+/**
+ * A Rasterizer that rasterizes a set of glyphs.
+ */
+class GlyphRasterizer : public Rasterizer {
  public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
+  GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
+                  const Matrix& matrix, const Stroke* stroke);
 
-  Rect getBounds() const override {
-    return shape->getBounds();
-  }
+  ~GlyphRasterizer() override;
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+  bool antiAlias = true;
+  Matrix matrix = Matrix::I();
+  Stroke* stroke = nullptr;
 };
 }  // namespace tgfx

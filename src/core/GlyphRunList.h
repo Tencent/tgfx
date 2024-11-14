@@ -69,15 +69,19 @@ class GlyphRunList {
   }
 
   /**
-   * Returns the bounding box of the glyphs in this run when drawn with the given matrix and stroke.
+   * Returns the bounding box of the glyphs in this run. The resolutionScale parameter is used to
+   * scale the glyphs before measuring. However, the resolutionScale is not applied to the returned
+   * bounds; it just affects the precision of the bounds.
    */
-  Rect getBounds(const Matrix& matrix, const Stroke* stroke = nullptr) const;
+  Rect getBounds(float resolutionScale = 1.0f) const;
 
   /**
-   * Creates a path corresponding to the glyphs in this run when drawn with the given matrix and
-   * stroke. Returns true if the path was successfully created.
+   * Creates a path corresponding to the glyphs in this run. The resolutionScale parameter is used
+   * to scale the glyphs before creating the path. However, the resolutionScale is not applied to
+   * the returned path; it just affects the precision of the path. Returns true if the path was
+   * successfully created. Otherwise, returns false and leaves the path unchanged.
    */
-  bool getPath(Path* path, const Matrix& matrix, const Stroke* stroke = nullptr) const;
+  bool getPath(Path* path, float resolutionScale = 1.0f) const;
 
  private:
   std::vector<GlyphRun> _glyphRuns = {};

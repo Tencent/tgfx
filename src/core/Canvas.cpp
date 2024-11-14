@@ -225,44 +225,39 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
-  if (path.isEmpty() || paint.nothingToDraw()) {
-    return;
-  }
-  auto stroke = paint.getStroke();
-  auto style = CreateFillStyle(paint);
-  if (stroke && path.isLine()) {
-    auto fillPath = path;
-    stroke->applyToPath(&fillPath);
-    if (drawSimplePath(fillPath, style)) {
-      return;
-    }
-  }
-  if (!stroke && drawSimplePath(path, style)) {
-    return;
-  }
-  drawContext->drawPath(path, *mcState, style, stroke);
+  auto shape = Shape::MakeFrom(path);
+  drawShape(std::move(shape), paint);
 }
 
-bool Canvas::drawSimplePath(const Path& path, const FillStyle& style) {
-  Rect rect = {};
-  if (path.isRect(&rect)) {
-    drawContext->drawRect(rect, *mcState, style);
-    return true;
+void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
+  if (shape == nullptr || paint.nothingToDraw()) {
+    return;
   }
-  RRect rRect;
-  if (path.isOval(&rect)) {
+  shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
+  if (shape->isLine()) {
+    // a line has no fill to draw.
+    return;
+  }
+  auto style = CreateFillStyle(paint);
+  Rect rect = {};
+  if (shape->isRect(&rect)) {
+    drawContext->drawRect(rect, *mcState, style);
+    return;
+  }
+  RRect rRect = {};
+  if (shape->isOval(&rect)) {
     rRect.setOval(rect);
     drawContext->drawRRect(rRect, *mcState, style);
-    return true;
+    return;
   }
-  if (path.isRRect(&rRect)) {
+  if (shape->isRRect(&rRect)) {
     drawContext->drawRRect(rRect, *mcState, style);
-    return true;
+    return;
   }
-  return false;
+  drawContext->drawShape(std::move(shape), *mcState, style);
 }
 
-static SamplingOptions GetDefaultSamplingOptions(std::shared_ptr<Image> image) {
+static SamplingOptions GetDefaultSamplingOptions(Image* image) {
   if (image == nullptr) {
     return {};
   }
@@ -275,12 +270,12 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, cons
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
-  auto sampling = GetDefaultSamplingOptions(image);
+  auto sampling = GetDefaultSamplingOptions(image.get());
   drawImage(std::move(image), sampling, paint, &matrix);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
-  auto sampling = GetDefaultSamplingOptions(image);
+  auto sampling = GetDefaultSamplingOptions(image.get());
   drawImage(std::move(image), sampling, paint, nullptr);
 }
 

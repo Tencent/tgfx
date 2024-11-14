@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -27,6 +28,16 @@ namespace tgfx {
 struct RRect {
   Rect rect = Rect::MakeEmpty();
   Point radii = Point::Zero();
+
+  /**
+   * Returns true if the bounds are a simple rectangle.
+   */
+  bool isRect() const;
+
+  /**
+   * Returns true if the bounds are an oval.
+   */
+  bool isOval() const;
 
   /**
    * Sets to rounded rectangle with the same radii for all four corners.

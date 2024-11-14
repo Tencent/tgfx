@@ -16,26 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerContent.h"
+#include "EffectShape.h"
 
 namespace tgfx {
-class ShapeContent : public LayerContent {
- public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
+Rect EffectShape::getBounds(float resolutionScale) const {
+  auto bounds = shape->getBounds(resolutionScale);
+  return effect->filterBounds(bounds);
+}
 
-  Rect getBounds() const override {
-    return shape->getBounds();
-  }
+Path EffectShape::getPath(float resolutionScale) const {
+  auto path = shape->getPath(resolutionScale);
+  effect->filterPath(&path);
+  return path;
+}
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
-};
 }  // namespace tgfx

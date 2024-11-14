@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
+#include "core/ShapeRasterizer.h"
 #include "core/utils/DataTask.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
@@ -111,25 +112,30 @@ class AsyncShapeBufferProvider : public ShapeBufferProvider {
   std::shared_ptr<DataTask<ShapeBuffer>> task = nullptr;
 };
 
-std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(
-    const UniqueKey& uniqueKey, std::shared_ptr<ShapeRasterizer> rasterizer, uint32_t renderFlags) {
+std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_ptr<Shape> shape,
+                                                                  bool antiAlias,
+                                                                  uint32_t renderFlags) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
   static const auto TriangleShapeType = UniqueID::Next();
   static const auto TextureShapeType = UniqueID::Next();
+  auto uniqueKey = shape->getUniqueKey();
+  auto bounds = shape->getBounds();
   auto triangleKey = UniqueKey::Append(uniqueKey, &TriangleShapeType, 1);
   auto triangleProxy = findOrWrapGpuBufferProxy(triangleKey);
   if (triangleProxy != nullptr) {
-    return std::make_shared<GpuShapeProxy>(triangleProxy, nullptr);
+    return std::make_shared<GpuShapeProxy>(bounds, triangleProxy, nullptr);
   }
   auto textureKey = UniqueKey::Append(uniqueKey, &TextureShapeType, 1);
   auto textureProxy = findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
-    return std::make_shared<GpuShapeProxy>(nullptr, textureProxy);
+    return std::make_shared<GpuShapeProxy>(bounds, nullptr, textureProxy);
   }
-  if (rasterizer == nullptr) {
-    return nullptr;
-  }
-  auto width = rasterizer->width();
-  auto height = rasterizer->height();
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+  auto rasterizer = std::make_shared<ShapeRasterizer>(width, height, std::move(shape), antiAlias);
   std::shared_ptr<ShapeBufferProvider> provider = nullptr;
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     provider = std::make_shared<AsyncShapeBufferProvider>(std::move(rasterizer));
@@ -150,7 +156,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(
   textureProxy =
       std::shared_ptr<TextureProxy>(new TextureProxy(textureProxyKey, width, height, false, true));
   addResourceProxy(textureProxy, textureKey);
-  return std::make_shared<GpuShapeProxy>(triangleProxy, textureProxy);
+  return std::make_shared<GpuShapeProxy>(bounds, triangleProxy, textureProxy);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(

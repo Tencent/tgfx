@@ -21,6 +21,7 @@
 #include "core/Rasterizer.h"
 #include "core/ShapeBuffer.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
@@ -29,9 +30,9 @@ namespace tgfx {
 class ShapeRasterizer : public Rasterizer {
  public:
   /**
-   * Returns true if the path should be triangulated instead of rasterized as an image.
+   * Creates a ShapeRasterizer from a shape.
    */
-  static bool ShouldTriangulatePath(const Path& path);
+  ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias);
 
   /**
    * Rasterizes the shape into a ShapeBuffer. Unlike the makeBuffer() method, which always returns
@@ -45,17 +46,11 @@ class ShapeRasterizer : public Rasterizer {
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  Path path;
-
-  ShapeRasterizer(Path path, const ISize& clipSize, const Matrix& matrix, bool antiAlias,
-                  const Stroke* stroke);
-
-  Path getFinalPath() const;
+  std::shared_ptr<Shape> shape = nullptr;
+  bool antiAlias = true;
 
   std::shared_ptr<Data> makeTriangles(const Path& finalPath) const;
 
   std::shared_ptr<ImageBuffer> makeImageBuffer(const Path& finalPath, bool tryHardware) const;
-
-  friend class Rasterizer;
 };
 }  // namespace tgfx

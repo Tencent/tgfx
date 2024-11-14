@@ -16,26 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerContent.h"
+#include "GlyphShape.h"
+#include "core/GlyphRunList.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-class ShapeContent : public LayerContent {
- public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
+Rect GlyphShape::getBounds(float resolutionScale) const {
+  return glyphRunList->getBounds(resolutionScale);
+}
 
-  Rect getBounds() const override {
-    return shape->getBounds();
+Path GlyphShape::getPath(float resolutionScale) const {
+  Path path = {};
+  if (!glyphRunList->getPath(&path, resolutionScale)) {
+    LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
+    return {};
   }
-
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
-};
+  return path;
+}
 }  // namespace tgfx
