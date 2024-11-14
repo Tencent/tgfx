@@ -19,6 +19,7 @@
 #include "ShapeRasterizer.h"
 #include "core/PathTriangulator.h"
 #include "tgfx/core/Mask.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape,
@@ -59,6 +60,7 @@ std::shared_ptr<ImageBuffer> ShapeRasterizer::makeImageBuffer(const Path& finalP
                                                               bool tryHardware) const {
   auto mask = Mask::Make(width(), height(), tryHardware);
   if (!mask) {
+    LOGE("ShapeRasterizer::makeImageBuffer() Failed to create the mask!");
     return nullptr;
   }
   mask->setAntiAlias(antiAlias);
