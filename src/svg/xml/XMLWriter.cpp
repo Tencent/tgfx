@@ -265,7 +265,7 @@ XMLParserWriter::~XMLParserWriter() {
 void XMLParserWriter::onAddAttribute(const std::string& name, const std::string& value) {
   ASSERT(_elementsStack.empty() ||
          (!_elementsStack.top().hasChildren && !_elementsStack.top().hasText));
-  _parser.addAttribute(name.c_str(), value.c_str());
+  _parser.addAttribute(name, value);
 }
 
 void XMLParserWriter::onAddText(const std::string& text) {
@@ -274,13 +274,13 @@ void XMLParserWriter::onAddText(const std::string& text) {
 
 void XMLParserWriter::onEndElement() {
   Elem elem = this->getEnd();
-  _parser.endElement(elem.name.c_str());
+  _parser.endElement(elem.name);
   this->doEnd();
 }
 
 void XMLParserWriter::onStartElement(const std::string& element) {
   this->doStart(element);
-  _parser.startElement(element.c_str());
+  _parser.startElement(element);
 }
 
 }  // namespace tgfx

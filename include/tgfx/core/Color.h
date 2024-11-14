@@ -24,6 +24,14 @@
 
 namespace tgfx {
 
+enum class ColorChannel {
+  R,  // the red channel
+  G,  // the green channel
+  B,  // the blue channel
+  A,  // the alpha channel
+  LastEnum = A,
+};
+
 /**
  * RGBA color value, holding four floating point components. Color components are always in a known
  * order.

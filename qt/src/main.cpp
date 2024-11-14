@@ -23,11 +23,13 @@
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QThread>
+#include <iostream>
 #include "TGFXView.h"
 #include "qobject.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/svg/SVGDOM.h"
 
 int main(int argc, char* argv[]) {
-
   QApplication::setApplicationName("Hello2D");
   QApplication::setOrganizationName("org.tgfx");
   QSurfaceFormat defaultFormat = QSurfaceFormat();

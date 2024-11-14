@@ -215,7 +215,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   auto aaType = getAAType(style);
   auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList),
                                          aaType == AAType::Coverage, rasterizeMatrix, stroke);
-  auto proxyProvider = getContext()->proxyProvider();
+  auto* proxyProvider = getContext()->proxyProvider();
   auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
   auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
   if (processor == nullptr) {

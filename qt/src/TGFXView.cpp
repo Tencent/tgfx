@@ -91,9 +91,11 @@ void TGFXView::createAppHost() {
   std::string DefaultFont = "Microsoft YaHei";
   std::string DefualtEmojiFont = "Segoe UI Emoji";
 #endif
-  auto typeface = tgfx::Typeface::MakeFromName(DefaultFont, "");
+  auto typeface = tgfx::Typeface::MakeFromPath(
+      "/Users/yg/code/c++_space/tgfx/resources/font/NotoSansSC-Regular.otf");
   appHost->addTypeface("default", typeface);
-  typeface = tgfx::Typeface::MakeFromName(DefualtEmojiFont, "");
+  typeface = tgfx::Typeface::MakeFromPath(
+      "/Users/yg/code/c++_space/tgfx/resources/font/NotoColorEmoji.ttf");
   appHost->addTypeface("emoji", typeface);
 }
 
