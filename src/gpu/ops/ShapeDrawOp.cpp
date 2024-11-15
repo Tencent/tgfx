@@ -25,10 +25,12 @@
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/Buffer.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shape> shape,
                                                const Matrix& viewMatrix) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeDrawOp::Make");
   if (shape == nullptr) {
     return nullptr;
   }
@@ -60,6 +62,7 @@ bool ShapeDrawOp::onCombineIfPossible(Op*) {
 }
 
 void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeDrawOp::prepare");
   auto matrix = viewMatrix;
   auto scales = viewMatrix.getAxisScales();
   if (scales.x == scales.y) {
@@ -112,6 +115,7 @@ static std::shared_ptr<Data> MakeAAVertexData(const Rect& rect) {
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeDrawOp::execute");
   if (shapeProxy == nullptr) {
     return;
   }

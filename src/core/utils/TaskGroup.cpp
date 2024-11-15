@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include "core/utils/Log.h"
+#include "profileClient/Profile.h"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -49,6 +50,7 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
+  TGFX_PROFILE_THREAD_NAME("Thread");
   while (true) {
     auto task = taskGroup->popTask();
     if (!task) {

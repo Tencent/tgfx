@@ -23,6 +23,7 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
+#include "profileClient/Profile.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/codecs/webp/WebpCodec.h"
@@ -40,6 +41,7 @@
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ImageCodec::MakeFrom");
   std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream == nullptr || stream->size() <= 14) {

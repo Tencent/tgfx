@@ -24,6 +24,7 @@ SolidContent::SolidContent(const RRect& rRect, const Color& color) : _rRect(rRec
 }
 
 void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("SolidContent::draw");
   auto solidPaint = paint;
   auto color = _color;
   color.alpha *= paint.getAlpha();
@@ -32,6 +33,7 @@ void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool SolidContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("SolidContent::hitTestPoint");
   return _rRect.rect.contains(localX, localY);
 }
 

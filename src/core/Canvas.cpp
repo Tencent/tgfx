@@ -23,6 +23,8 @@
 #include "core/utils/Log.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Surface.h"
+#include "profileClient/Profile.h"
+
 
 namespace tgfx {
 Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {
@@ -166,6 +168,7 @@ static FillStyle CreateFillStyle(const Paint* paint) {
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawLine");
   Path path = {};
   path.moveTo(x0, y0);
   path.lineTo(x1, y1);
@@ -175,6 +178,7 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawRect");
   if (paint.getStroke()) {
     Path path = {};
     path.addRect(rect);
@@ -189,24 +193,28 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawOval");
   RRect rRect = {};
   rRect.setOval(oval);
   drawRRect(rRect, paint);
 }
 
 void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawCircle");
   Rect rect =
       Rect::MakeLTRB(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
   drawOval(rect, paint);
 }
 
 void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawRoundRect");
   RRect rRect = {};
   rRect.setRectXY(rect, radiusX, radiusY);
   drawRRect(rRect, paint);
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawRRect");
   if (rRect.radii.isZero()) {
     drawRect(rRect.rect, paint);
     return;
@@ -225,11 +233,13 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawPath");
   auto shape = Shape::MakeFrom(path);
   drawShape(std::move(shape), paint);
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawShape");
   if (shape == nullptr || paint.nothingToDraw()) {
     return;
   }
@@ -286,6 +296,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                        const Paint* paint, const Matrix* extraMatrix) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawImage");
   if (image == nullptr || (paint && paint->nothingToDraw())) {
     return;
   }
@@ -309,6 +320,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
                             const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawSimpleText");
   if (text.empty()) {
     return;
   }
@@ -318,6 +330,7 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawGlyphs");
   if (glyphCount == 0 || paint.nothingToDraw()) {
     return;
   }
@@ -329,6 +342,7 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
 
 void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
                           const Paint& paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawTextBlob");
   if (textBlob == nullptr || paint.nothingToDraw()) {
     return;
   }
@@ -341,11 +355,13 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawPicture");
   drawContext->drawPicture(std::move(picture), *mcState);
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
                          const Paint* paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawPictureWithMatrix");
   if (picture == nullptr) {
     return;
   }
@@ -363,6 +379,7 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                        const FillStyle& style, std::shared_ptr<ImageFilter> imageFilter) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawLayer");
   if (imageFilter == nullptr && picture->records.size() == 1 && style.maskFilter == nullptr) {
     LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
@@ -376,6 +393,7 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                        const Color colors[], size_t count, const SamplingOptions& sampling,
                        const Paint* paint) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Canvas::drawAtlas");
   // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
   if (atlas == nullptr || count == 0 || (paint && paint->nothingToDraw())) {
     return;

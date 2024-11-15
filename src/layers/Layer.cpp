@@ -25,6 +25,7 @@
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
@@ -47,6 +48,7 @@ void Layer::SetDefaultAllowsGroupOpacity(bool value) {
 }
 
 std::shared_ptr<Layer> Layer::Make() {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME_COLOR("Surface::Make", tracy::Color::ColorType::Yellow);
   auto layer = std::shared_ptr<Layer>(new Layer());
   layer->weakThis = layer;
   return layer;
@@ -521,6 +523,7 @@ Matrix Layer::getMatrixWithScrollRect() const {
 }
 
 LayerContent* Layer::getContent() {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Layer::getContent");
   if (bitFields.contentDirty) {
     layerContent = onUpdateContent();
     bitFields.contentDirty = false;
@@ -617,6 +620,7 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("drawLayer");
   DEBUG_ASSERT(canvas != nullptr);
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
@@ -691,6 +695,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("drawContents");
   if (auto content = getContent()) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
   }

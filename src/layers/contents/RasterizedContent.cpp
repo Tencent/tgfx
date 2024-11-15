@@ -17,19 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedContent.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 Rect RasterizedContent::getBounds() const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RasterizedContent::getBounds");
   auto bounds = Rect::MakeWH(image->width(), image->height());
   matrix.mapRect(&bounds);
   return bounds;
 }
 
 void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RasterizedContent::draw");
   canvas->drawImage(image, matrix, &paint);
 }
 
 bool RasterizedContent::hitTestPoint(float localX, float localY, bool) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RasterizedContent::hitTestPoint");
   const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
   return imageBounds.contains(localX, localY);
 }

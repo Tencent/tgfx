@@ -23,6 +23,7 @@
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/RenderFlags.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 // We have three possible cases for geometry for a round rect.
@@ -279,6 +280,7 @@ class RRectIndicesProvider : public DataProvider {
 
 std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Color color, const RRect& rRect,
                                                const Matrix& viewMatrix) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectDrawOp::Make");
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
     return nullptr;
@@ -314,6 +316,7 @@ static bool UseScale(Context* context) {
 }
 
 void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectDrawOp::prepare");
   auto indexProvider = std::make_shared<RRectIndicesProvider>(rRectPaints);
   indexBufferProxy =
       GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
@@ -329,6 +332,7 @@ void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectDrawOp::execute");
   if (indexBufferProxy == nullptr) {
     return;
   }

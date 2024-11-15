@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "layers/DrawArgs.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 
@@ -30,6 +31,7 @@ Layer* DisplayList::root() const {
 }
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("DisplayList::render");
   if (!surface || (replaceAll && surface->_uniqueID == surfaceID &&
                    surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirty)) {
     return false;

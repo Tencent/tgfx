@@ -23,6 +23,7 @@
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/RenderFlags.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 class RectPaint {
@@ -135,6 +136,7 @@ class RectNonCoverageVerticesProvider : public DataProvider {
 
 std::unique_ptr<RectDrawOp> RectDrawOp::Make(std::optional<Color> color, const Rect& rect,
                                              const Matrix& viewMatrix, const Matrix* uvMatrix) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RectDrawOp::Make");
   return std::unique_ptr<RectDrawOp>(new RectDrawOp(color, rect, viewMatrix, uvMatrix));
 }
 
@@ -168,6 +170,7 @@ bool RectDrawOp::needsIndexBuffer() const {
 }
 
 void RectDrawOp::prepare(Context* context, uint32_t renderFlags) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RectDrawOp::prepare");
   if (needsIndexBuffer()) {
     if (aa == AAType::Coverage) {
       indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
@@ -191,6 +194,7 @@ void RectDrawOp::prepare(Context* context, uint32_t renderFlags) {
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("RectDrawOp::execute");
   std::shared_ptr<GpuBuffer> indexBuffer;
   if (needsIndexBuffer()) {
     if (indexBufferProxy == nullptr) {

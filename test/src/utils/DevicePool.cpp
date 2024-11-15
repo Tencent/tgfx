@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DevicePool.h"
+#include "profileClient/Profile.h"
 #include <thread>
 #include <unordered_map>
 
@@ -24,6 +25,7 @@ namespace tgfx {
 thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;
 
 std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME_COLOR("MakeDevice", tracy::Color::ColorType::Green);
   auto device = cachedDevice;
   if (device == nullptr) {
     device = tgfx::GLDevice::Make();

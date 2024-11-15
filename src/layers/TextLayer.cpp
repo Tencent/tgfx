@@ -20,6 +20,7 @@
 #include "core/utils/Log.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 
@@ -37,6 +38,7 @@ std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
 }
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("TextLayer::Make");
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
   layer->weakThis = layer;
   return layer;
@@ -171,6 +173,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   if (nullptr == textBlob) {
     return nullptr;
   }
+
   return std::make_unique<TextContent>(std::move(textBlob), _textColor);
 }
 

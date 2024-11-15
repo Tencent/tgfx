@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Path.h"
 #include "tgfx/layers/LayerContent.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 class ShapeContent : public LayerContent {
@@ -27,6 +28,7 @@ class ShapeContent : public LayerContent {
   ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
 
   Rect getBounds() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeContent::getBounds");
     return shape->getBounds();
   }
 

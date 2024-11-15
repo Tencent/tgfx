@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ComposeContent.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 std::unique_ptr<LayerContent> LayerContent::Compose(
@@ -31,6 +32,7 @@ std::unique_ptr<LayerContent> LayerContent::Compose(
 }
 
 Rect ComposeContent::getBounds() const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ComposeContent::getBounds");
   auto bounds = Rect::MakeEmpty();
   for (const auto& content : contents) {
     bounds.join(content->getBounds());
@@ -39,12 +41,14 @@ Rect ComposeContent::getBounds() const {
 }
 
 void ComposeContent::draw(Canvas* canvas, const Paint& paint) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ComposeContent::draw");
   for (const auto& content : contents) {
     content->draw(canvas, paint);
   }
 }
 
 bool ComposeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ComposeContent::hitTestPoint");
   for (const auto& content : contents) {
     if (content->hitTestPoint(localX, localY, pixelHitTest)) {
       return true;

@@ -28,6 +28,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
+#include "profileClient/Profile.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
@@ -112,6 +113,7 @@ bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::stri
 }
 
 bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string& key) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("Baseline::Compare");
   if (surface == nullptr) {
     return false;
   }

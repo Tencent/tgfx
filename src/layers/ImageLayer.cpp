@@ -18,9 +18,11 @@
 
 #include "tgfx/layers/ImageLayer.h"
 #include "layers/contents/ImageContent.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 std::shared_ptr<ImageLayer> ImageLayer::Make() {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ImageLayer::Make");
   auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
   layer->weakThis = layer;
   return layer;

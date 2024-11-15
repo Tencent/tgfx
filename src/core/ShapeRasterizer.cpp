@@ -18,6 +18,7 @@
 
 #include "ShapeRasterizer.h"
 #include "core/PathTriangulator.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/Mask.h"
 #include "utils/Log.h"
 
@@ -28,6 +29,7 @@ ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> s
 }
 
 std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeRasterizer::makeRasterized");
   auto finalPath = shape->getPath();
   if (PathTriangulator::ShouldTriangulatePath(finalPath)) {
     return ShapeBuffer::MakeFrom(makeTriangles(finalPath));

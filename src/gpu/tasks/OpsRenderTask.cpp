@@ -19,6 +19,8 @@
 #include "OpsRenderTask.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
+#include "profileClient/Profile.h"
+
 
 namespace tgfx {
 void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
@@ -29,6 +31,7 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
 }
 
 void OpsRenderTask::prepare(Context* context) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME_COLOR("OpsRenderTask::prepare", tracy::Color::ColorType::Green);
   renderPass = context->gpu()->getRenderPass();
   for (auto& op : ops) {
     op->prepare(context, renderFlags);
@@ -36,6 +39,7 @@ void OpsRenderTask::prepare(Context* context) {
 }
 
 bool OpsRenderTask::execute(Gpu* gpu) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME_COLOR("OpsRenderTask::execute", tracy::Color::ColorType::Cyan);
   if (ops.empty()) {
     return false;
   }
