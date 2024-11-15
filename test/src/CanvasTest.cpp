@@ -655,6 +655,61 @@ TGFX_TEST(CanvasTest, shape) {
   device->unlock();
 }
 
+TGFX_TEST(CanvasTest, drawShape) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 300;
+  auto height = 200;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setColor(Color::Red());
+  Path path = {};
+  auto rect = Rect::MakeWH(50, 50);
+  path.addRect(rect);
+  auto shape = Shape::MakeFrom(path);
+  auto transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
+  canvas->drawShape(transShape, paint);
+  auto sacaleShape = Shape::ApplyMatrix(shape, Matrix::MakeScale(1.5, 0.5));
+  sacaleShape = Shape::ApplyMatrix(sacaleShape, Matrix::MakeTrans(10, 70));
+  canvas->setMatrix(Matrix::MakeScale(1.5, 1.5));
+  canvas->drawShape(sacaleShape, paint);
+
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::Blue());
+  auto mergeShape1 = Shape::ApplyMatrix(shape, Matrix::MakeTrans(0, 60));
+  mergeShape1 = Shape::Merge(mergeShape1, shape);
+  mergeShape1 = Shape::ApplyMatrix(mergeShape1, Matrix::MakeTrans(100, 10));
+  canvas->setMatrix(Matrix::MakeScale(1, 1));
+  canvas->drawShape(mergeShape1, paint);
+  paint.setColor(Color::Green());
+  auto mergeShape2 = Shape::ApplyMatrix(shape, Matrix::MakeTrans(0, 30));
+  mergeShape2 = Shape::Merge(mergeShape2, shape, PathOp::Intersect);
+  mergeShape2 = Shape::ApplyMatrix(mergeShape2, Matrix::MakeTrans(170, 10));
+  canvas->drawShape(mergeShape2, paint);
+
+  paint.setStyle(PaintStyle::Stroke);
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 30.f);
+  font.setFauxBold(true);
+  auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
+  auto textShape = Shape::MakeFrom(textBlob);
+  textShape = Shape::ApplyMatrix(textShape, Matrix::MakeTrans(10, 70));
+  auto matrix = Matrix::MakeRotate(10);
+  matrix.preConcat(Matrix::MakeScale(2, 1));
+  matrix.preConcat(Matrix::MakeTrans(0, 70));
+  canvas->setMatrix(matrix);
+  canvas->drawShape(textShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawShape"));
+
+  device->unlock();
+}
+
 TGFX_TEST(CanvasTest, image) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
