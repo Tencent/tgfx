@@ -212,6 +212,7 @@ class TextLayer : public Layer {
 
   float calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo, float emptyAdvance) const;
   float getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const;
+  void TruncateGlyphLines(std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const;
   void resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines,
                             float emptyAdvance,
                             std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphInfos,
