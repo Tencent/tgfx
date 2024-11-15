@@ -293,8 +293,7 @@ std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::shapeText(
   while (head < tail) {
     const auto characterUnicode = UTF::NextUTF8(&head, tail);
     if ('\n' == characterUnicode) {
-      const GlyphID lineFeedCharacterGlyphID =
-          nullptr != typeface ? typeface->getGlyphID('\n') : 0;
+      const GlyphID lineFeedCharacterGlyphID = nullptr != typeface ? typeface->getGlyphID('\n') : 0;
       glyphInfos.emplace_back(
           std::make_shared<GlyphInfo>('\n', lineFeedCharacterGlyphID, typeface));
     } else {
