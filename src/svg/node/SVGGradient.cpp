@@ -48,7 +48,7 @@ void SkSVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<C
   this->forEachChild<SkSVGStop>([&](const SkSVGStop* stop) {
     colors.push_back(this->resolveStopColor(ctx, *stop));
     positions.push_back(
-        std::clamp(ltx.resolve(stop->getOffset(), SVGLengthContext::LengthType::kOther), 0.f, 1.f));
+        std::clamp(ltx.resolve(stop->getOffset(), SVGLengthContext::LengthType::Other), 0.f, 1.f));
   });
 
   ASSERT(colors.size() == positions.size());

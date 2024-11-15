@@ -66,9 +66,9 @@ std::tuple<float, float> ResolveOptionalRadii(const std::optional<SVGLength>& op
   //        individually, resolving rx percentages against the used width, and resolving ry
   //        percentages against the used height.
   const float rx =
-      opt_rx.has_value() ? lctx.resolve(*opt_rx, SVGLengthContext::LengthType::kHorizontal) : 0;
+      opt_rx.has_value() ? lctx.resolve(*opt_rx, SVGLengthContext::LengthType::Horizontal) : 0;
   const float ry =
-      opt_ry.has_value() ? lctx.resolve(*opt_ry, SVGLengthContext::LengthType::kVertical) : 0;
+      opt_ry.has_value() ? lctx.resolve(*opt_ry, SVGLengthContext::LengthType::Vertical) : 0;
 
   return {opt_rx.has_value() ? rx : ry, opt_ry.has_value() ? ry : rx};
 }

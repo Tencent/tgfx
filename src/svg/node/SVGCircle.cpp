@@ -37,9 +37,9 @@ bool SVGCircle::parseAndSetAttribute(const char* n, const char* v) {
 
 #ifndef RENDER_SVG
 std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lctx) const {
-  const auto cx = lctx.resolve(fCx, SVGLengthContext::LengthType::kHorizontal);
-  const auto cy = lctx.resolve(fCy, SVGLengthContext::LengthType::kVertical);
-  const auto r = lctx.resolve(fR, SVGLengthContext::LengthType::kOther);
+  const auto cx = lctx.resolve(fCx, SVGLengthContext::LengthType::Horizontal);
+  const auto cy = lctx.resolve(fCy, SVGLengthContext::LengthType::Vertical);
+  const auto r = lctx.resolve(fR, SVGLengthContext::LengthType::Other);
 
   return std::make_tuple(Point::Make(cx, cy), r);
 }

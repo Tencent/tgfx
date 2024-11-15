@@ -85,8 +85,8 @@ Rect SkSVGUse::onObjectBoundingBox(const SVGRenderContext& ctx) const {
 
   auto lengthContext = ctx.lengthContext();
   lengthContext.clearPatternUnits();
-  float x = lengthContext.resolve(fX, SVGLengthContext::LengthType::kHorizontal);
-  float y = lengthContext.resolve(fY, SVGLengthContext::LengthType::kVertical);
+  float x = lengthContext.resolve(fX, SVGLengthContext::LengthType::Horizontal);
+  float y = lengthContext.resolve(fY, SVGLengthContext::LengthType::Vertical);
 
   Rect bounds = ref->objectBoundingBox(ctx);
   bounds.offset(x, y);

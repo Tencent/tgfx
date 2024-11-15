@@ -40,27 +40,26 @@ Rect SkSVGMask::bounds(const SVGRenderContext& ctx) const {
   return ctx.resolveOBBRect(fX, fY, fWidth, fHeight, fMaskUnits);
 }
 
-void SkSVGMask::renderMask(const SVGRenderContext& /*ctx*/) const {
+void SkSVGMask::renderMask(const SVGRenderContext& ctx) const {
   //TODO (YG)
 
-  // // https://www.w3.org/TR/SVG11/masking.html#Masking
+  // https://www.w3.org/TR/SVG11/masking.html#Masking
 
-  // // Propagate any inherited properties that may impact mask effect behavior (e.g.
-  // // color-interpolation). We call this explicitly here because the SkSVGMask
-  // // nodes do not participate in the normal onRender path, which is when property
-  // // propagation currently occurs.
-  // // The local context also restores the filter layer created below on scope exit.
-  // SVGRenderContext lctx(ctx);
-  // this->onPrepareToRender(&lctx);
+  // Propagate any inherited properties that may impact mask effect behavior (e.g.
+  // color-interpolation). We call this explicitly here because the SkSVGMask
+  // nodes do not participate in the normal onRender path, which is when property
+  // propagation currently occurs.
+  // The local context also restores the filter layer created below on scope exit.
+  SVGRenderContext lctx(ctx);
+  this->onPrepareToRender(&lctx);
 
-  // const auto ci = *lctx.presentationContext().fInherited.fColorInterpolation;
+  // const auto ci = *lctx.presentationContext()._inherited.fColorInterpolation;
   // auto ci_filter = (ci == SVGColorspace::kLinearRGB) ? ColorFilters::SRGBToLinearGamma() : nullptr;
 
   // Paint mask_filter;
-  // MaskFilter::Compose(std::shared_ptr<MaskFilter> inner, std::shared_ptr<MaskFilter> outer)
-  // mask_filter.setMaskFilter()
-  // mask_filter.setColorFilter(
-  //     SkColorFilters::Compose(SkLumaColorFilter::Make(), std::move(ci_filter)));
+  // MaskFilter::Compose();
+  //     mask_filter.setMaskFilter() mask_filter.setColorFilter(
+  //         SkColorFilters::Compose(SkLumaColorFilter::Make(), std::move(ci_filter)));
 
   // // Mask color filter layer.
   // // Note: We could avoid this extra layer if we invert the stacking order

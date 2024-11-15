@@ -37,10 +37,10 @@ bool SkSVGLine::parseAndSetAttribute(const char* n, const char* v) {
 
 #ifndef RENDER_SVG
 std::tuple<Point, Point> SkSVGLine::resolve(const SVGLengthContext& lctx) const {
-  return std::make_tuple(Point::Make(lctx.resolve(fX1, SVGLengthContext::LengthType::kHorizontal),
-                                     lctx.resolve(fY1, SVGLengthContext::LengthType::kVertical)),
-                         Point::Make(lctx.resolve(fX2, SVGLengthContext::LengthType::kHorizontal),
-                                     lctx.resolve(fY2, SVGLengthContext::LengthType::kVertical)));
+  return std::make_tuple(Point::Make(lctx.resolve(fX1, SVGLengthContext::LengthType::Horizontal),
+                                     lctx.resolve(fY1, SVGLengthContext::LengthType::Vertical)),
+                         Point::Make(lctx.resolve(fX2, SVGLengthContext::LengthType::Horizontal),
+                                     lctx.resolve(fY2, SVGLengthContext::LengthType::Vertical)));
 }
 
 void SkSVGLine::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,

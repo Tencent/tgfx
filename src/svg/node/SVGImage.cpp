@@ -90,7 +90,7 @@ std::vector<unsigned char> base64_decode(const std::string& encoded_string) {
   return out;
 }
 
-std::shared_ptr<Image> LoadImage(const std::shared_ptr<ResourceProvider>&, const SVGIRI& href) {
+std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
   const auto& base64URL = href.iri();
   auto pos = base64URL.find("base64,");
   if (pos == std::string::npos) {
@@ -99,41 +99,14 @@ std::shared_ptr<Image> LoadImage(const std::shared_ptr<ResourceProvider>&, const
   std::string base64Data = base64URL.substr(pos + 7);
   std::vector<unsigned char> imageData = base64_decode(base64Data);
   auto data = Data::MakeWithCopy(imageData.data(), imageData.size());
-  // {
-  //   std::ofstream out("/Users/yg/Downloads/yg2.png", std::ios::binary);
-  //   if (!out) {
-  //     return nullptr;
-  //   }
-  //   out.write(reinterpret_cast<const char*>(data->data()),
-  //             static_cast<std::streamsize>(data->size()));
-  // }
+
   return Image::MakeFromEncoded(data);
-
-  // TODO: It may be better to use the SVG 'id' attribute as the asset id, to allow
-  // clients to perform asset substitution based on element id.
-  // sk_sp<skresources::ImageAsset> imageAsset;
-  // switch (href.type()) {
-  //   case SVGIRI::Type::kDataURI:
-  //     imageAsset = rp.loadImageAsset("", href.iri().c_str(), "");
-  //     break;
-  //   case SVGIRI::Type::kNonlocal: {
-  //     const auto path = SkOSPath::Dirname(href.iri().c_str());
-  //     const auto name = SkOSPath::Basename(href.iri().c_str());
-  //     imageAsset = rp->loadImageAsset(path.c_str(), name.c_str(), /* id */ name.c_str());
-  //     break;
-  //   }
-  //   default:
-  //     return nullptr;
-  // }
-
-  // return imageAsset ? imageAsset->getFrameData(0).image : nullptr;
 }
 
-SkSVGImage::ImageInfo SkSVGImage::LoadImage(const std::shared_ptr<ResourceProvider>& rp,
-                                            const SVGIRI& iri, const Rect& viewPort,
+SkSVGImage::ImageInfo SkSVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
                                             SVGPreserveAspectRatio /*par*/) {
   // TODO: svg sources
-  std::shared_ptr<Image> image = ::tgfx::LoadImage(rp, iri);
+  std::shared_ptr<Image> image = ::tgfx::LoadImage(iri);
   if (!image) {
     return {};
   }
@@ -156,7 +129,7 @@ void SkSVGImage::onRender(const SVGRenderContext& ctx) const {
 
   //TODO (YG)
   ImageInfo image;
-  const auto imgInfo = LoadImage(ctx.resourceProvider(), fHref, viewPort, fPreserveAspectRatio);
+  const auto imgInfo = LoadImage(fHref, viewPort, fPreserveAspectRatio);
   if (!imgInfo.fImage) {
     LOGE("can't render image: load image failed\n");
     return;

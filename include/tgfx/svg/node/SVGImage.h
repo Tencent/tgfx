@@ -58,10 +58,7 @@ class SkSVGImage final : public SkSVGTransformableNode {
   void onRender(const SVGRenderContext&) const override;
   Path onAsPath(const SVGRenderContext&) const override;
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-
-  // TODO (YG)
-  static ImageInfo LoadImage(const std::shared_ptr<ResourceProvider>& rp, const SVGIRI&,
-                             const Rect&, SVGPreserveAspectRatio);
+  static ImageInfo LoadImage(const SVGIRI&, const Rect&, SVGPreserveAspectRatio);
 #endif
 
   SVG_ATTR(X, SVGLength, SVGLength(0))

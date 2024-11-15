@@ -36,26 +36,19 @@
 
 namespace tgfx {
 
-// class SkCanvas;
-// class SkPaint;
-// class SkString;
-// namespace skresources {
-// class ResourceProvider;
-// }
-
 class SVGNode;
 
 template <typename T>
 class CopyOnWrite {
  public:
-  explicit CopyOnWrite(const T& initial) : fObj(&initial) {
+  explicit CopyOnWrite(const T& initial) : _obj(&initial) {
   }
 
-  explicit CopyOnWrite(const T* initial) : fObj(initial) {
+  explicit CopyOnWrite(const T* initial) : _obj(initial) {
   }
 
   // Constructor for delayed initialization.
-  CopyOnWrite() : fObj(nullptr) {
+  CopyOnWrite() : _obj(nullptr) {
   }
 
   CopyOnWrite(const CopyOnWrite& that) {
@@ -67,46 +60,30 @@ class CopyOnWrite {
   }
 
   CopyOnWrite& operator=(const CopyOnWrite& that) {
-    fLazy = that.fLazy;
-    fObj = fLazy.has_value() ? &fLazy.value() : that.fObj;
+    _optional = that._optional;
+    _obj = _optional.has_value() ? &_optional.value() : that._obj;
     return *this;
   }
 
   CopyOnWrite& operator=(CopyOnWrite&& that) {
-    fLazy = std::move(that.fLazy);
-    fObj = fLazy.has_value() ? &fLazy.value() : that.fObj;
+    _optional = std::move(that._optional);
+    _obj = _optional.has_value() ? &_optional.value() : that._obj;
     return *this;
-  }
-
-  // Should only be called once, and only if the default constructor was used.
-  void init(const T& initial) {
-    SkASSERT(!fObj);
-    SkASSERT(!fLazy.has_value());
-    fObj = &initial;
-  }
-
-  // If not already initialized, in-place instantiates the writable object
-  template <typename... Args>
-  void initIfNeeded(Args&&... args) {
-    if (!fObj) {
-      SkASSERT(!fLazy.has_value());
-      fObj = &fLazy.emplace(std::forward<Args>(args)...);
-    }
   }
 
   /**
      * Returns a writable T*. The first time this is called the initial object is cloned.
      */
   T* writable() {
-    if (!fLazy.has_value()) {
-      fLazy = *fObj;
-      fObj = &fLazy.value();
+    if (!_optional.has_value()) {
+      _optional = *_obj;
+      _obj = &_optional.value();
     }
-    return &fLazy.value();
+    return &_optional.value();
   }
 
   const T* get() const {
-    return fObj;
+    return _obj;
   }
 
   /**
@@ -114,38 +91,34 @@ class CopyOnWrite {
      */
 
   const T* operator->() const {
-    return fObj;
-  }
-
-  operator const T*() const {
-    return fObj;
+    return _obj;
   }
 
   const T& operator*() const {
-    return *fObj;
+    return *_obj;
   }
 
  private:
-  const T* fObj;
-  std::optional<T> fLazy;
+  const T* _obj;
+  std::optional<T> _optional;
 };
 
 class SVGLengthContext {
  public:
-  explicit SVGLengthContext(const Size& viewport, float dpi = 90) : fViewport(viewport), fDPI(dpi) {
+  explicit SVGLengthContext(const Size& viewport, float dpi = 90) : _viewport(viewport), _dpi(dpi) {
   }
 
   enum class LengthType {
-    kHorizontal,
-    kVertical,
-    kOther,
+    Horizontal,
+    Vertical,
+    Other,
   };
 
   const Size& viewPort() const {
-    return fViewport;
+    return _viewport;
   }
   void setViewPort(const Size& viewport) {
-    fViewport = viewport;
+    _viewport = viewport;
   }
 
   float resolve(const SVGLength&, LengthType) const;
@@ -153,21 +126,21 @@ class SVGLengthContext {
                    const SVGLength& h) const;
 
   void setPatternUnits(SVGPatternUnits unit) {
-    fPatternUnit = unit;
+    _patternUnit = unit;
   }
 
   void clearPatternUnits() {
-    fPatternUnit.reset();
+    _patternUnit.reset();
   }
 
   std::optional<SVGPatternUnits> getPatternUnits() const {
-    return fPatternUnit;
+    return _patternUnit;
   }
 
  private:
-  Size fViewport;
-  float fDPI;
-  std::optional<SVGPatternUnits> fPatternUnit;
+  Size _viewport;
+  float _dpi;
+  std::optional<SVGPatternUnits> _patternUnit;
 };
 
 struct SkSVGPresentationContext {
@@ -175,22 +148,20 @@ struct SkSVGPresentationContext {
   SkSVGPresentationContext(const SkSVGPresentationContext&) = default;
   SkSVGPresentationContext& operator=(const SkSVGPresentationContext&) = default;
 
-  const std::unordered_map<std::string, SVGColorType>* fNamedColors = nullptr;
-
+  const std::unordered_map<std::string, SVGColorType>* _namedColors = nullptr;
   // Inherited presentation attributes, computed for the current node.
-  SkSVGPresentationAttributes fInherited;
+  SkSVGPresentationAttributes _inherited;
 };
 
 class SVGRenderContext {
  public:
   // Captures data required for object bounding box resolution.
   struct OBBScope {
-    const SVGNode* fNode;
-    const SVGRenderContext* fCtx;
+    const SVGNode* node;
+    const SVGRenderContext* context;
   };
 
-  SVGRenderContext(Canvas*, const std::shared_ptr<SVGFontManager>&,
-                   const std::shared_ptr<ResourceProvider>&, const SVGIDMapper&,
+  SVGRenderContext(Canvas*, const std::shared_ptr<SVGFontManager>&, const SVGIDMapper&,
                    const SVGLengthContext&, const SkSVGPresentationContext&, const OBBScope&);
   SVGRenderContext(const SVGRenderContext&);
   SVGRenderContext(const SVGRenderContext&, Canvas*);
@@ -201,18 +172,18 @@ class SVGRenderContext {
   ~SVGRenderContext();
 
   const SVGLengthContext& lengthContext() const {
-    return *fLengthContext;
+    return *_lengthContext;
   }
   SVGLengthContext* writableLengthContext() {
-    return fLengthContext.writable();
+    return _lengthContext.writable();
   }
 
   const SkSVGPresentationContext& presentationContext() const {
-    return *fPresentationContext;
+    return *_presentationContext;
   }
 
   Canvas* canvas() const {
-    return fCanvas;
+    return _canvas;
   }
   void saveOnce();
 
@@ -220,45 +191,6 @@ class SVGRenderContext {
     kLeaf = 1 << 0,  // the target node doesn't have descendants
   };
   void applyPresentationAttributes(const SkSVGPresentationAttributes&, uint32_t flags);
-
-  // Scoped wrapper that temporarily clears the original node reference.
-  // class BorrowedNode {
-  //  public:
-  //   explicit BorrowedNode(std::shared_ptr<SVGNode>* node) : fOwner(node) {
-  //     if (fOwner) {
-  //       fBorrowed = std::move(*fOwner);
-  //       *fOwner = nullptr;
-  //     }
-  //   }
-
-  //   ~BorrowedNode() {
-  //     if (fOwner) {
-  //       *fOwner = std::move(fBorrowed);
-  //     }
-  //   }
-
-  //   const SVGNode* get() const {
-  //     return fBorrowed.get();
-  //   }
-  //   const SVGNode* operator->() const {
-  //     return fBorrowed.get();
-  //   }
-  //   const SVGNode& operator*() const {
-  //     return *fBorrowed;
-  //   }
-
-  //   explicit operator bool() const {
-  //     return !!fBorrowed;
-  //   }
-
-  //   // noncopyable
-  //   BorrowedNode(const BorrowedNode&) = delete;
-  //   BorrowedNode& operator=(BorrowedNode&) = delete;
-
-  //  private:
-  //   std::shared_ptr<SVGNode>* fOwner;
-  //   std::shared_ptr<SVGNode> fBorrowed;
-  // };
 
   // Note: the id->node association is cleared for the lifetime of the returned value
   // (effectively breaks reference cycles, assuming appropriate return value scoping).
@@ -271,21 +203,17 @@ class SVGRenderContext {
 
   // The local computed clip path (not inherited).
   Path clipPath() const {
-    return fClipPath.value_or(Path());
-  }
-
-  const std::shared_ptr<ResourceProvider>& resourceProvider() const {
-    return fResourceProvider;
+    return _clipPath.value_or(Path());
   }
 
   const std::shared_ptr<SVGFontManager>& fontMgr() const {
-    return fFontMgr;
+    return _fontMgr;
   }
 
   std::shared_ptr<SVGFontManager>& fontMgr() {
-    // It is probably an oversight to try to render <text> without having set the SkFontMgr.
-    // We will assert this in debug mode, but fallback to an empty fontmgr in release builds.
-    return fFontMgr;
+    // It is probably an oversight to try to render <text> without having set the SVGFontManager.
+    // We will assert this in debug mode, but fallback to an empty _fontMgr in release builds.
+    return _fontMgr;
   }
 
   // Returns the translate/scale transformation required to map into the current OBB scope,
@@ -297,32 +225,14 @@ class SVGRenderContext {
   OBBTransform transformForCurrentOBB(SVGObjectBoundingBoxUnits) const;
 
   Rect resolveOBBRect(const SVGLength& x, const SVGLength& y, const SVGLength& w,
-                      const SVGLength& h, SVGObjectBoundingBoxUnits) const;
+                      const SVGLength& h, SVGObjectBoundingBoxUnits unit) const;
 
-  //   std::unique_ptr<SkShaper> makeShaper() const {
-  //     SkASSERT(fTextShapingFactory);
-  //     return fTextShapingFactory->makeShaper(this->fontMgr());
-  //   }
-
-  //   std::unique_ptr<SkShaper::BiDiRunIterator> makeBidiRunIterator(const char* utf8, size_t utf8Bytes,
-  //                                                                  uint8_t bidiLevel) const {
-  //     SkASSERT(fTextShapingFactory);
-  //     return fTextShapingFactory->makeBidiRunIterator(utf8, utf8Bytes, bidiLevel);
-  //   }
-
-  //   std::unique_ptr<SkShaper::ScriptRunIterator> makeScriptRunIterator(const char* utf8,
-  //                                                                      size_t utf8Bytes) const {
-  //     SkASSERT(fTextShapingFactory);
-  //     constexpr SkFourByteTag unknownScript = SkSetFourByteTag('Z', 'z', 'z', 'z');
-  //     return fTextShapingFactory->makeScriptRunIterator(utf8, utf8Bytes, unknownScript);
-  //   }
-
- private:
   // Stack-only
   void* operator new(size_t) = delete;
   void* operator new(size_t, void*) = delete;
   SVGRenderContext& operator=(const SVGRenderContext&) = delete;
 
+ private:
   void applyOpacity(float opacity, uint32_t flags, bool hasFilter);
   void applyFilter(const SVGFuncIRI&);
   void applyClip(const SVGFuncIRI&);
@@ -330,25 +240,22 @@ class SVGRenderContext {
 
   std::optional<Paint> commonPaint(const SVGPaint&, float opacity) const;
 
-  std::shared_ptr<SVGFontManager> fFontMgr;
-  // const sk_sp<SkShapers::Factory>& fTextShapingFactory;
-  const std::shared_ptr<ResourceProvider>& fResourceProvider;
-
-  const SVGIDMapper& fIDMapper;
-  CopyOnWrite<SVGLengthContext> fLengthContext;
-  CopyOnWrite<SkSVGPresentationContext> fPresentationContext;
-  Canvas* fCanvas;
-  // The save count on 'fCanvas' at construction time.
+  std::shared_ptr<SVGFontManager> _fontMgr;
+  const SVGIDMapper& _nodeIDMapper;
+  CopyOnWrite<SVGLengthContext> _lengthContext;
+  CopyOnWrite<SkSVGPresentationContext> _presentationContext;
+  Canvas* _canvas;
+  // The save count on '_canvas' at construction time.
   // A restoreToCount() will be issued on destruction.
-  size_t fCanvasSaveCount;
+  size_t _canvasSaveCount;
 
   // clipPath, if present for the current context (not inherited).
-  std::optional<Path> fClipPath;
+  std::optional<Path> _clipPath;
 
   // Deferred opacity optimization for leaf nodes.
-  float fDeferredPaintOpacity = 1;
+  float _deferredPaintOpacity = 1;
 
   // Current object bounding box scope.
-  const OBBScope fOBBScope;
+  const OBBScope _scope;
 };
 }  // namespace tgfx

@@ -38,8 +38,8 @@ bool SkSVGEllipse::parseAndSetAttribute(const char* n, const char* v) {
 
 #ifndef RENDER_SVG
 Rect SkSVGEllipse::resolve(const SVGLengthContext& lctx) const {
-  const auto cx = lctx.resolve(fCx, SVGLengthContext::LengthType::kHorizontal);
-  const auto cy = lctx.resolve(fCy, SVGLengthContext::LengthType::kVertical);
+  const auto cx = lctx.resolve(fCx, SVGLengthContext::LengthType::Horizontal);
+  const auto cy = lctx.resolve(fCy, SVGLengthContext::LengthType::Vertical);
 
   // https://www.w3.org/TR/SVG2/shapes.html#EllipseElement
   //

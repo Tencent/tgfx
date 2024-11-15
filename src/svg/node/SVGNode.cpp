@@ -18,10 +18,8 @@
 
 #include "tgfx/svg/node/SVGNode.h"
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <optional>
-#include "core/utils/Log.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -88,7 +86,7 @@ bool SVGNode::onPrepareToRender(SVGRenderContext* ctx) const {
   // visibility:hidden and display:none disable rendering.
   // TODO: if display is not a value (true when display="inherit"), we currently
   //   ignore it. Eventually we should be able to add SkASSERT(display.isValue()).
-  const auto visibility = ctx->presentationContext().fInherited.fVisibility->type();
+  const auto visibility = ctx->presentationContext()._inherited.fVisibility->type();
   const auto display = fPresentationAttributes.fDisplay;  // display is uninherited
   return visibility != SVGVisibility::Type::kHidden &&
          (!display.isValue() || *display != SVGDisplay::kNone);

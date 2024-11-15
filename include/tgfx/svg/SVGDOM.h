@@ -67,7 +67,7 @@ class SVGDOM {
      * Returns the root (outermost) SVG element.
      */
   const std::shared_ptr<SVGSVG>& getRoot() const {
-    return fRoot;
+    return _root;
   }
 
   /**
@@ -96,7 +96,7 @@ class SVGDOM {
   const Size& containerSize() const;
 
   // Returns the node with the given id, or nullptr if not found.
-  std::shared_ptr<SVGNode> findNodeById(const char* id);
+  std::shared_ptr<SVGNode> findNodeById(const std::string& id);
 
   void render(Canvas*) const;
 
@@ -106,11 +106,9 @@ class SVGDOM {
  private:
   SVGDOM(std::shared_ptr<SVGSVG>, SVGIDMapper&&, std::shared_ptr<SVGFontManager> fontManager);
 
-  const std::shared_ptr<SVGSVG> fRoot;
-  const std::shared_ptr<SVGFontManager> fFontMgr;
-  // const sk_sp<SkShapers::Factory>             fTextShapingFactory;
-  const std::shared_ptr<ResourceProvider> fResourceProvider;
-  const SVGIDMapper fIDMapper;
-  Size fContainerSize;
+  const std::shared_ptr<SVGSVG> _root;
+  const std::shared_ptr<SVGFontManager> _fontMgr;
+  const SVGIDMapper _nodeIDMapper;
+  Size _containerSize;
 };
 }  // namespace tgfx

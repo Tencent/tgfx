@@ -84,8 +84,8 @@ Size SVGSVG::intrinsicSize(const SVGLengthContext& lctx) const {
     return Size::Make(0, 0);
   }
 
-  return Size::Make(lctx.resolve(fWidth, SVGLengthContext::LengthType::kHorizontal),
-                    lctx.resolve(fHeight, SVGLengthContext::LengthType::kVertical));
+  return Size::Make(lctx.resolve(fWidth, SVGLengthContext::LengthType::Horizontal),
+                    lctx.resolve(fHeight, SVGLengthContext::LengthType::Vertical));
 }
 #endif
 

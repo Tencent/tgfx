@@ -53,7 +53,7 @@ std::shared_ptr<ImageFilter> SkSVGFeDisplacementMap::onMakeImageFilter(
     const auto obbt = ctx.transformForCurrentOBB(fctx.primitiveUnits());
     scale = SVGLengthContext({obbt.scale.x, obbt.scale.y})
                 .resolve(SVGLength(scale, SVGLength::Unit::kPercentage),
-                         SVGLengthContext::LengthType::kOther);
+                         SVGLengthContext::LengthType::Other);
   }
 
   return nullptr;

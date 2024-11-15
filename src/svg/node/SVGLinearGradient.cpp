@@ -46,10 +46,10 @@ std::shared_ptr<Shader> SkSVGLinearGradient::onMakeShader(const SVGRenderContext
           ? SVGLengthContext({1, 1})
           : ctx.lengthContext();
 
-  auto startPoint = Point::Make(lctx.resolve(fX1, SVGLengthContext::LengthType::kHorizontal),
-                                lctx.resolve(fY1, SVGLengthContext::LengthType::kVertical));
-  auto endPoint = Point::Make(lctx.resolve(fX2, SVGLengthContext::LengthType::kHorizontal),
-                              lctx.resolve(fY2, SVGLengthContext::LengthType::kVertical));
+  auto startPoint = Point::Make(lctx.resolve(fX1, SVGLengthContext::LengthType::Horizontal),
+                                lctx.resolve(fY1, SVGLengthContext::LengthType::Vertical));
+  auto endPoint = Point::Make(lctx.resolve(fX2, SVGLengthContext::LengthType::Horizontal),
+                              lctx.resolve(fY2, SVGLengthContext::LengthType::Vertical));
 
   return Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
 }

@@ -81,11 +81,11 @@ std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
     }
   };
 
-  const std::string& family = context.presentationContext().fInherited.fFontFamily->family();
+  const std::string& family = context.presentationContext()._inherited.fFontFamily->family();
 
-  auto fontWeight = weight(*context.presentationContext().fInherited.fFontWeight);
+  auto fontWeight = weight(*context.presentationContext()._inherited.fFontWeight);
   auto fontWidth = FontStyle::Width::kNormal_Width;
-  auto fontSlant = slant(*context.presentationContext().fInherited.fFontStyle);
+  auto fontSlant = slant(*context.presentationContext()._inherited.fFontStyle);
   FontStyle style(fontWeight, fontWidth, fontSlant);
 
   auto typeface = context.fontMgr()->getTypefaceForRender(family, style);
@@ -95,8 +95,8 @@ std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
   }
 
   float size =
-      context.lengthContext().resolve(context.presentationContext().fInherited.fFontSize->size(),
-                                      SVGLengthContext::LengthType::kVertical);
+      context.lengthContext().resolve(context.presentationContext()._inherited.fFontSize->size(),
+                                      SVGLengthContext::LengthType::Vertical);
   return {true, Font(typeface, size)};
 }
 
@@ -114,7 +114,7 @@ std::vector<float> ResolveLengths(const SVGLengthContext& lengthCtx,
 }
 
 float ComputeAlignmentFactor(const SkSVGPresentationContext& context) {
-  switch (context.fInherited.fTextAnchor->type()) {
+  switch (context._inherited.fTextAnchor->type()) {
     case SVGTextAnchor::Type::kStart:
       return 0.0f;
     case SVGTextAnchor::Type::kMiddle:
@@ -160,10 +160,10 @@ Path SkSVGTextFragment::onAsPath(const SVGRenderContext&) const {
 void SkSVGTextContainer::onShapeText(const SVGRenderContext& context,
                                      const ShapedTextCallback& function) const {
 
-  auto x = ResolveLengths(context.lengthContext(), fX, SVGLengthContext::LengthType::kHorizontal);
-  auto y = ResolveLengths(context.lengthContext(), fY, SVGLengthContext::LengthType::kVertical);
-  auto dx = ResolveLengths(context.lengthContext(), fDx, SVGLengthContext::LengthType::kHorizontal);
-  auto dy = ResolveLengths(context.lengthContext(), fDy, SVGLengthContext::LengthType::kVertical);
+  auto x = ResolveLengths(context.lengthContext(), fX, SVGLengthContext::LengthType::Horizontal);
+  auto y = ResolveLengths(context.lengthContext(), fY, SVGLengthContext::LengthType::Vertical);
+  auto dx = ResolveLengths(context.lengthContext(), fDx, SVGLengthContext::LengthType::Horizontal);
+  auto dy = ResolveLengths(context.lengthContext(), fDy, SVGLengthContext::LengthType::Vertical);
 
   // TODO (YGAurora) : Handle rotate
   for (uint32_t i = 0; i < fChildren.size(); i++) {

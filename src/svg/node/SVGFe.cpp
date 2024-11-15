@@ -101,7 +101,7 @@ Rect SkSVGFe::resolveFilterSubregion(const SVGRenderContext& ctx,
 SVGColorspace SkSVGFe::resolveColorspace(const SVGRenderContext& ctx,
                                          const SkSVGFilterContext&) const {
   constexpr SVGColorspace kDefaultCS = SVGColorspace::kSRGB;
-  const SVGColorspace cs = *ctx.presentationContext().fInherited.fColorInterpolationFilters;
+  const SVGColorspace cs = *ctx.presentationContext()._inherited.fColorInterpolationFilters;
   return cs == SVGColorspace::kAuto ? kDefaultCS : cs;
 }
 
