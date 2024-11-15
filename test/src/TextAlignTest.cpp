@@ -28,7 +28,8 @@ const std::string text =
     "然侍卫之臣不懈于内，忠志之士忘身于外者，盖追先帝之殊遇，欲报之于陛下也。"
     "诚宜开张圣听，以光先帝遗德，恢弘志士之气，不宜妄自菲薄，引喻失义，以塞忠谏之路也。"
     "宫中府中，俱为一体；陟罚臧否，不宜异同。"
-    "若有作奸犯科及为忠善者，宜付有司论其刑赏，以昭陛下平明之理，不宜偏私，使内外异法也。hello\ttfgx!";
+    "若有作奸犯科及为忠善者，宜付有司论其刑赏，以昭陛下平明之理，不宜偏私，使内外异法也。hello\ttfg"
+    "x!";
 
 TGFX_TEST(TextAlignTest, TextAlign) {
   auto device = DevicePool::Make();
@@ -629,7 +630,8 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   fallbackTypefaces.emplace_back(typeface2);
   TextLayer::SetFallbackTypefaces(fallbackTypefaces);
 
-  const std::string testText = "这是一段测试 emoji🤡👻🐠的文字，🤩😃🤪😅。";
+  const std::string testText =
+      "这是一段测试 emoji🤡👻🐠的文字，🤩😃🤪😅。";
 
   auto textLayer = TextLayer::Make();
   textLayer->setName("text_layer1");
@@ -771,8 +773,10 @@ TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
   paint.setStyle(PaintStyle::Stroke);
   paint.setStrokeWidth(1.0f);
   paint.setColor(Color::Red());
-  canvas->drawLine(textLayerBounds.left, textLayerBounds.top - 1.0f, 250.0f, textLayerBounds.top - 1.0f, paint);
-  canvas->drawLine(textLayerBounds.left, textLayerBounds.bottom + 1.0f, 250.0f, textLayerBounds.bottom + 1.0f, paint);
+  canvas->drawLine(textLayerBounds.left, textLayerBounds.top - 1.0f, 250.0f,
+                   textLayerBounds.top - 1.0f, paint);
+  canvas->drawLine(textLayerBounds.left, textLayerBounds.bottom + 1.0f, 250.0f,
+                   textLayerBounds.bottom + 1.0f, paint);
 
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignBlankLineTest"));

@@ -293,8 +293,10 @@ std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::shapeText(
   while (head < tail) {
     const auto characterUnicode = UTF::NextUTF8(&head, tail);
     if ('\u000A' == characterUnicode) {
-      const GlyphID lineFeedCharacterGlyphID = nullptr != typeface ? typeface->getGlyphID('\u000A') : 0;
-      glyphInfos.emplace_back(std::make_shared<GlyphInfo>('\u000A', lineFeedCharacterGlyphID, typeface));
+      const GlyphID lineFeedCharacterGlyphID =
+          nullptr != typeface ? typeface->getGlyphID('\u000A') : 0;
+      glyphInfos.emplace_back(
+          std::make_shared<GlyphInfo>('\u000A', lineFeedCharacterGlyphID, typeface));
     } else {
       GlyphID glyphID = typeface ? typeface->getGlyphID(characterUnicode) : 0;
       if (glyphID <= 0) {
@@ -302,7 +304,8 @@ std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::shapeText(
           if (nullptr != fallbackTypeface) {
             glyphID = fallbackTypeface->getGlyphID(characterUnicode);
             if (glyphID > 0) {
-              glyphInfos.emplace_back(std::make_shared<GlyphInfo>(characterUnicode, glyphID, fallbackTypeface));
+              glyphInfos.emplace_back(
+                  std::make_shared<GlyphInfo>(characterUnicode, glyphID, fallbackTypeface));
               break;
             }
           }
@@ -346,13 +349,13 @@ void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGl
       switch (_textAlign) {
         case TextAlign::Left:
           // do nothing
-            break;
+          break;
         case TextAlign::Center:
           xOffset = (_width - lineWidth) / 2.0f;
-        break;
+          break;
         case TextAlign::Right:
           xOffset = _width - lineWidth;
-        break;
+          break;
         case TextAlign::Justify: {
           // 1. Each line must have more than one character
           if (lineGlyphCount <= 1) {
