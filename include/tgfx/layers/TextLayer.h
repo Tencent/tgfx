@@ -146,11 +146,11 @@ class TextLayer : public Layer {
 
   class GlyphInfo final {
    public:
-    GlyphInfo(const int32_t unichar, const GlyphID glyphID, std::shared_ptr<Typeface> typeface)
+    GlyphInfo(const Unichar unichar, const GlyphID glyphID, std::shared_ptr<Typeface> typeface)
         : _unichar(unichar), _glyphID(glyphID), _typeface(std::move(typeface)) {
     }
 
-    int32_t getUnichar() const {
+    Unichar getUnichar() const {
       return _unichar;
     }
 
@@ -169,7 +169,7 @@ class TextLayer : public Layer {
     GlyphInfo& operator=(const GlyphInfo&) = delete;
     GlyphInfo& operator=(GlyphInfo&&) = delete;
 
-    int32_t _unichar;
+    Unichar _unichar;
     GlyphID _glyphID;
     std::shared_ptr<Typeface> _typeface;
   };

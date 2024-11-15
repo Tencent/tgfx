@@ -127,7 +127,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   for (size_t i = 0; i < glyphInfos.size(); i++) {
     const auto& glyphInfo = glyphInfos[i];
     const auto characterUnicode = glyphInfo->getUnichar();
-    if ('\u000A' == characterUnicode) {
+    if ('\n' == characterUnicode) {
       xOffset = 0;
       glyphLines.emplace_back(glyphLine);
       glyphLine = std::make_shared<OneLineGlyphs>();
@@ -195,14 +195,14 @@ std::string TextLayer::preprocessNewLines(const std::string& text) {
 
 float TextLayer::calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo,
                              float emptyAdvance) const {
-  if (nullptr == glyphInfo) {
+  if (glyphInfo == nullptr) {
     return 0.0f;
   }
 
   float advance = 0.0f;
   const auto glyphID = glyphInfo->getGlyphID();
   const auto typeface = glyphInfo->getTypeface();
-  if (glyphID <= 0 || nullptr == typeface) {
+  if (glyphID <= 0 || typeface == nullptr) {
     advance = emptyAdvance;
   } else {
     if (_font.getTypeface() == typeface) {
@@ -218,12 +218,12 @@ float TextLayer::calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo,
 }
 
 float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const {
-  if (nullptr == oneLineGlyphs) {
+  if (oneLineGlyphs == nullptr) {
     return 0.0f;
   }
 
   // For a blank line with only newline characters, use the font's ascent, descent, and leading as the line height.
-  if (0 == oneLineGlyphs->getGlyphCount()) {
+  if (oneLineGlyphs->getGlyphCount() == 0) {
     const auto fontMetrics = _font.getMetrics();
     return std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
            std::fabs(fontMetrics.leading);
@@ -237,7 +237,7 @@ float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyp
   const auto size = oneLineGlyphs->getGlyphCount();
   for (size_t i = 0; i < size; ++i) {
     const auto& typeface = oneLineGlyphs->getGlyphInfo(i)->getTypeface();
-    if (nullptr == typeface || lastTypeface == typeface) {
+    if (typeface == nullptr || lastTypeface == typeface) {
       continue;
     }
 
@@ -254,7 +254,7 @@ float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyp
 }
 
 void TextLayer::TruncateGlyphLines(std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const {
-  if (0.0f == _height || glyphLines.empty()) {
+  if (_height == 0.0f || glyphLines.empty()) {
     return;
   }
 
@@ -292,11 +292,11 @@ std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::shapeText(
 
   while (head < tail) {
     const auto characterUnicode = UTF::NextUTF8(&head, tail);
-    if ('\u000A' == characterUnicode) {
+    if ('\n' == characterUnicode) {
       const GlyphID lineFeedCharacterGlyphID =
-          nullptr != typeface ? typeface->getGlyphID('\u000A') : 0;
+          nullptr != typeface ? typeface->getGlyphID('\n') : 0;
       glyphInfos.emplace_back(
-          std::make_shared<GlyphInfo>('\u000A', lineFeedCharacterGlyphID, typeface));
+          std::make_shared<GlyphInfo>('\n', lineFeedCharacterGlyphID, typeface));
     } else {
       GlyphID glyphID = typeface ? typeface->getGlyphID(characterUnicode) : 0;
       if (glyphID <= 0) {
@@ -313,7 +313,7 @@ std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::shapeText(
 
         // If the glyph is still not found, use the space character.
         if (glyphID <= 0) {
-          glyphInfos.emplace_back(std::make_shared<GlyphInfo>('\u0020', 0, typeface));
+          glyphInfos.emplace_back(std::make_shared<GlyphInfo>(' ', 0, typeface));
         }
       } else {
         glyphInfos.emplace_back(std::make_shared<GlyphInfo>(characterUnicode, glyphID, typeface));
@@ -345,7 +345,7 @@ void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGl
     yOffset += lineHeight;
     float spaceWidth = 0.0f;
 
-    if (0.0f != _width) {
+    if (_width != 0.0f) {
       switch (_textAlign) {
         case TextAlign::Left:
           // do nothing
@@ -380,7 +380,7 @@ void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGl
 
     for (size_t i = 0; i < lineGlyphCount; ++i) {
       const auto& glyphInfo = glyphLine->getGlyphInfo(i);
-      if (nullptr == glyphInfo) {
+      if (glyphInfo == nullptr) {
         continue;
       }
 
@@ -411,12 +411,12 @@ void TextLayer::buildGlyphRunList(const std::vector<std::shared_ptr<GlyphInfo>>&
   std::unordered_map<uint32_t, GlyphRun> glyphRunMap = {};
   for (size_t i = 0; i < finalGlyphs.size(); ++i) {
     const auto& glyphInfo = finalGlyphs[i];
-    if (nullptr == glyphInfo) {
+    if (glyphInfo == nullptr) {
       continue;
     }
 
     const auto& typeface = glyphInfo->getTypeface();
-    if (nullptr == typeface) {
+    if (typeface == nullptr) {
       continue;
     }
 
