@@ -19,7 +19,7 @@ option(TGFX_ENABLE_PROFILE "Enable profile" OFF)
 option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    option(TGFX_ENABLE_PROFILE "Enable profile" OFF)
+    option(TGFX_ENABLE_PROFILE "Enable profile" ON)
 endif ()
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
