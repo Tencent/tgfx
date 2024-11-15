@@ -174,9 +174,9 @@ class TextLayer : public Layer {
     std::shared_ptr<Typeface> _typeface;
   };
 
-  class OneLineGlyphs final {
+  class GlyphLine final {
    public:
-    OneLineGlyphs() = default;
+    GlyphLine() = default;
 
     void append(const std::shared_ptr<GlyphInfo>& glyphInfo, const float advance) {
       _glyphInfosAndAdvance.emplace_back(std::move(glyphInfo), advance);
@@ -211,9 +211,9 @@ class TextLayer : public Layer {
       const std::string& text, const std::shared_ptr<Typeface>& typeface);
 
   float calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo, float emptyAdvance) const;
-  float getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const;
-  void TruncateGlyphLines(std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const;
-  void resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines,
+  float getLineHeight(const std::shared_ptr<GlyphLine>& glyphLine) const;
+  void TruncateGlyphLines(std::vector<std::shared_ptr<GlyphLine>>& glyphLines) const;
+  void resolveTextAlignment(const std::vector<std::shared_ptr<GlyphLine>>& glyphLines,
                             float emptyAdvance,
                             std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphInfos,
                             std::vector<Point>& positions) const;

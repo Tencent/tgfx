@@ -120,8 +120,8 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   }
 
   // 3. Handle text wrapping and auto-wrapping
-  std::vector<std::shared_ptr<OneLineGlyphs>> glyphLines = {};
-  auto glyphLine = std::make_shared<OneLineGlyphs>();
+  std::vector<std::shared_ptr<GlyphLine>> glyphLines = {};
+  auto glyphLine = std::make_shared<GlyphLine>();
   const auto emptyAdvance = _font.getSize() / 2.0f;
   float xOffset = 0;
   for (size_t i = 0; i < glyphInfos.size(); i++) {
@@ -130,7 +130,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     if ('\n' == characterUnicode) {
       xOffset = 0;
       glyphLines.emplace_back(glyphLine);
-      glyphLine = std::make_shared<OneLineGlyphs>();
+      glyphLine = std::make_shared<GlyphLine>();
     } else {
       const float advance = calcAdvance(glyphInfo, emptyAdvance);
       // If _width is 0, auto-wrap is disabled and no wrapping will occur.
@@ -138,7 +138,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
         xOffset = 0;
         if (glyphLine->getGlyphCount() > 0) {
           glyphLines.emplace_back(glyphLine);
-          glyphLine = std::make_shared<OneLineGlyphs>();
+          glyphLine = std::make_shared<GlyphLine>();
         }
       }
       glyphLine->append(glyphInfo, advance);
@@ -217,13 +217,13 @@ float TextLayer::calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo,
   return advance;
 }
 
-float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const {
-  if (oneLineGlyphs == nullptr) {
+float TextLayer::getLineHeight(const std::shared_ptr<GlyphLine>& glyphLine) const {
+  if (glyphLine == nullptr) {
     return 0.0f;
   }
 
   // For a blank line with only newline characters, use the font's ascent, descent, and leading as the line height.
-  if (oneLineGlyphs->getGlyphCount() == 0) {
+  if (glyphLine->getGlyphCount() == 0) {
     const auto fontMetrics = _font.getMetrics();
     return std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
            std::fabs(fontMetrics.leading);
@@ -234,9 +234,9 @@ float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyp
   float leading = 0.0f;
   std::shared_ptr<Typeface> lastTypeface = nullptr;
 
-  const auto size = oneLineGlyphs->getGlyphCount();
+  const auto size = glyphLine->getGlyphCount();
   for (size_t i = 0; i < size; ++i) {
-    const auto& typeface = oneLineGlyphs->getGlyphInfo(i)->getTypeface();
+    const auto& typeface = glyphLine->getGlyphInfo(i)->getTypeface();
     if (typeface == nullptr || lastTypeface == typeface) {
       continue;
     }
@@ -253,7 +253,7 @@ float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyp
   return ascent + descent + leading;
 }
 
-void TextLayer::TruncateGlyphLines(std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines) const {
+void TextLayer::TruncateGlyphLines(std::vector<std::shared_ptr<GlyphLine>>& glyphLines) const {
   if (_height == 0.0f || glyphLines.empty()) {
     return;
   }
@@ -324,7 +324,7 @@ std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::shapeText(
   return glyphInfos;
 }
 
-void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<OneLineGlyphs>>& glyphLines,
+void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<GlyphLine>>& glyphLines,
                                      float emptyAdvance,
                                      std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphInfos,
                                      std::vector<Point>& positions) const {
