@@ -19,7 +19,7 @@ option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
-    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)
+    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" ON)
 else ()
     option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" ON)
 endif ()

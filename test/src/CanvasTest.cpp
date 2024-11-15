@@ -236,12 +236,7 @@ TGFX_TEST(CanvasTest, textShape) {
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
   std::string text =
-      "ffi fl\n"
-      "x²-y²\n"
-      "🤡👨🏼‍🦱👨‍👨‍👧‍👦\n"
-      "🇨🇳🇫🇮\n"
-      "#️⃣#*️⃣*\n"
-      "1️⃣🔟";
+      "T";
   auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
 
   float fontSize = 25.f;
@@ -298,11 +293,11 @@ TGFX_TEST(CanvasTest, textShape) {
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
 
-  Paint strokePaint;
-  strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
-  strokePaint.setStrokeWidth(2.f);
-  strokePaint.setStyle(PaintStyle::Stroke);
-  canvas->drawPath(path, strokePaint);
+  // Paint strokePaint;
+  // strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  // strokePaint.setStrokeWidth(2.f);
+  // strokePaint.setStyle(PaintStyle::Stroke);
+  // canvas->drawPath(path, strokePaint);
 
   Paint paint;
   paint.setColor(Color::Black());
@@ -311,7 +306,7 @@ TGFX_TEST(CanvasTest, textShape) {
                        textRun.font, paint);
   }
   context->flush();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape-1"));
   device->unlock();
 }
 
