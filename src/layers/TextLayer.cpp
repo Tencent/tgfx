@@ -129,10 +129,8 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
     const auto characterUnicode = glyphInfo->getUnichar();
     if ('\u000A' == characterUnicode) {
       xOffset = 0;
-      if (glyphLine->getGlyphCount() > 0) {
-        glyphLines.emplace_back(glyphLine);
-        glyphLine = std::make_shared<OneLineGlyphs>();
-      }
+      glyphLines.emplace_back(glyphLine);
+      glyphLine = std::make_shared<OneLineGlyphs>();
     } else {
       const float advance = calcAdvance(glyphInfo, emptyAdvance);
       // If _width is 0, auto-wrap is disabled and no wrapping will occur.
@@ -222,6 +220,13 @@ float TextLayer::calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo,
 float TextLayer::getLineHeight(const std::shared_ptr<OneLineGlyphs>& oneLineGlyphs) const {
   if (nullptr == oneLineGlyphs) {
     return 0.0f;
+  }
+
+  // For a blank line with only newline characters, use the font's ascent, descent, and leading as the line height.
+  if (0 == oneLineGlyphs->getGlyphCount()) {
+    const auto fontMetrics = _font.getMetrics();
+    return std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
+           std::fabs(fontMetrics.leading);
   }
 
   float ascent = 0.0f;

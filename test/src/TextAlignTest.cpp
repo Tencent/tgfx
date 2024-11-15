@@ -718,6 +718,67 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   device->unlock();
 }
 
+TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 800, 800);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setName("root_layer");
+
+  auto parentLayer = Layer::Make();
+  parentLayer->setName("parent_layer");
+  rootLayer->addChild(parentLayer);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  Font font(typeface, 20);
+
+  const std::string testText = "\n\nabc\n\ndef\r\r";
+
+  auto textLayer = TextLayer::Make();
+  textLayer->setMatrix(Matrix::MakeTrans(10.0f, 0.0f));
+  textLayer->setName("text_layer1");
+  textLayer->setTextColor(Color::White());
+  textLayer->setText("\n\nabc\n\ndef\r\r");
+  textLayer->setWidth(100);
+  textLayer->setHeight(0);
+  textLayer->setAutoWrap(false);
+  textLayer->setTextAlign(TextAlign::Left);
+  textLayer->setFont(font);
+  parentLayer->addChild(textLayer);
+  auto textLayerBounds = textLayer->getBounds();
+  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+
+  auto textLayer2 = TextLayer::Make();
+  textLayer2->setMatrix(Matrix::MakeTrans(150.0f, 0.0f));
+  textLayer2->setName("text_layer2");
+  textLayer2->setTextColor(Color::White());
+  textLayer2->setText("a\na\nabc\na\ndef\ra\r");
+  textLayer2->setWidth(100);
+  textLayer2->setHeight(0);
+  textLayer2->setAutoWrap(false);
+  textLayer2->setTextAlign(TextAlign::Left);
+  textLayer2->setFont(font);
+  parentLayer->addChild(textLayer2);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+
+  auto paint = Paint();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1.0f);
+  paint.setColor(Color::Red());
+  canvas->drawLine(textLayerBounds.left, textLayerBounds.top - 1.0f, 250.0f, textLayerBounds.top - 1.0f, paint);
+  canvas->drawLine(textLayerBounds.left, textLayerBounds.bottom + 1.0f, 250.0f, textLayerBounds.bottom + 1.0f, paint);
+
+  context->submit();
+  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignBlankLineTest"));
+  device->unlock();
+}
+
 TGFX_TEST(TextAlignTest, TextAlignPrint) {
   std::string text = "ab\rcd\nef\r\ngh\n\rij\tk\r\r\rp";
   auto textLayer = TextLayer::Make();
