@@ -375,16 +375,16 @@ void Path::addRect(float left, float top, float right, float bottom, bool revers
 }
 
 static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiusX, float radiusY,
-                                       float startRad, float endRad, int* numBeziers) {
+                                       float startRadius, float endRadius, int* numBeziers) {
   std::vector<Point> points = {};
-  float start = startRad;
-  std::function<float()> increaseRad;
-  if (startRad < endRad) {
-    increaseRad = [&] { return std::min(endRad, start + M_PI_2_F); };
+  float start = startRadius;
+  std::function<float()> increaseRadius;
+  if (startRadius < endRadius) {
+    increaseRadius = [&] { return std::min(endRadius, start + M_PI_2_F); };
   } else {
-    increaseRad = [&] { return std::max(endRad, start - M_PI_2_F); };
+    increaseRadius = [&] { return std::max(endRadius, start - M_PI_2_F); };
   }
-  float end = increaseRad();
+  float end = increaseRadius();
   float currentX, currentY;
   *numBeziers = 0;
   for (int i = 0; i < 4; i++) {
@@ -408,11 +408,11 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
     points.push_back({x2, y2});
     points.push_back({currentX, currentY});
     (*numBeziers)++;
-    if (end == endRad) {
+    if (end == endRadius) {
       break;
     }
     start = end;
-    end = increaseRad();
+    end = increaseRadius();
   }
   return points;
 }
