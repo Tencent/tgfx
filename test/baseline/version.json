@@ -158,6 +158,13 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "TextAlign": "d069eb4"
+        "FontFallbackTest": "110c3ee",
+        "SingleLineTextAlign": "7683ec5",
+        "TextAlign": "7683ec5",
+        "TextAlignBlankLineTest": "110c3ee",
+        "TextAlignSimulateVerticalTextLayout": "110c3ee",
+        "TextAlignWidth0Height0": "7683ec5",
+        "TextAlignWidth1Height10": "110c3ee",
+        "TruncateTextLineTest": "110c3ee"
     }
 }

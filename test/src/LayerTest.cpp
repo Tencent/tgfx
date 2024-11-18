@@ -188,6 +188,7 @@ TGFX_TEST(LayerTest, textLayer) {
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
   auto textLayer = TextLayer::Make();
+  textLayer->setName("text_layer1");
   layer->addChild(textLayer);
   layer->setMatrix(Matrix::MakeTrans(10, 10));
   textLayer->setText("Hello, World!");
@@ -200,6 +201,7 @@ TGFX_TEST(LayerTest, textLayer) {
   textLayer->setAlpha(0.5f);
   textLayer->setMatrix(Matrix::MakeRotate(30));
   auto textLayer2 = TextLayer::Make();
+  textLayer2->setName("text_layer2");
   layer->addChild(textLayer2);
   textLayer2->setText("Hello, World!");
   textLayer2->setFont(font);
