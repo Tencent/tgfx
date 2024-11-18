@@ -28,6 +28,7 @@
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureCreateTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context) : context(context) {
@@ -52,6 +53,7 @@ class AsyncDataProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("AsyncDataProvider::getData");
     return task->wait();
   }
 
@@ -90,6 +92,7 @@ class ShapeRasterizerWrapper : public ShapeBufferProvider {
   }
 
   std::shared_ptr<ShapeBuffer> getBuffer() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeRasterizerWrapper::getBuffer");
     return rasterizer->makeRasterized();
   }
 
@@ -105,6 +108,7 @@ class AsyncShapeBufferProvider : public ShapeBufferProvider {
   }
 
   std::shared_ptr<ShapeBuffer> getBuffer() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("AsyncShapeBufferProvider::getBuffer");
     return task->wait();
   }
 

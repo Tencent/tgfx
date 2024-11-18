@@ -39,7 +39,7 @@ void OpsRenderTask::prepare(Context* context) {
 }
 
 bool OpsRenderTask::execute(Gpu* gpu) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME_COLOR("OpsRenderTask::execute", tracy::Color::ColorType::Cyan);
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("OpsRenderTask::execute");
   if (ops.empty()) {
     return false;
   }

@@ -38,6 +38,7 @@ std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) c
 }
 
 std::shared_ptr<ImageBuffer> ShapeRasterizer::onMakeBuffer(bool tryHardware) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeRasterizer::onMakeBuffer");
   auto finalPath = shape->getPath();
   return makeImageBuffer(finalPath, tryHardware);
 }

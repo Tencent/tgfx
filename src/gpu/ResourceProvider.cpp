@@ -20,6 +20,7 @@
 #include "GradientCache.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Buffer.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 class PatternedIndexBufferProvider : public DataProvider {
@@ -30,6 +31,7 @@ class PatternedIndexBufferProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("PatternedIndexBufferProvider::getData");
     auto size = static_cast<size_t>(reps * patternSize * sizeof(uint16_t));
     Buffer buffer(size);
     if (buffer.isEmpty()) {

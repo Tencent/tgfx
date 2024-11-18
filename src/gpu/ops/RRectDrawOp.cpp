@@ -131,6 +131,7 @@ class RRectVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectVerticesProvider::getData");
     auto floatCount = rRectPaints.size() * 4 * 48;
     if (useScale) {
       floatCount += rRectPaints.size() * 4 * 4;
@@ -261,6 +262,7 @@ class RRectIndicesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectIndicesProvider::getData");
     auto bufferSize = rRectPaints.size() * kIndicesPerFillRRect * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());

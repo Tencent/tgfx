@@ -23,6 +23,7 @@
 #include "platform/android/AHardwareBufferFunctions.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 static Global<jclass> ColorSpaceClass;
@@ -321,6 +322,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("NativeCodec::onMakeBuffer");
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {

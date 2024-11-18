@@ -137,6 +137,7 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ImageCodec::onMakeBuffer");
   auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;

@@ -18,6 +18,7 @@
 
 #include "GlyphRasterizer.h"
 #include "tgfx/core/Mask.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 GlyphRasterizer::GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList,
@@ -34,6 +35,7 @@ GlyphRasterizer::~GlyphRasterizer() {
 }
 
 std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("GlyphRasterizer::onMakeBuffer");
   auto mask = Mask::Make(width(), height(), tryHardware);
   if (!mask) {
     return nullptr;

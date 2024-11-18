@@ -47,6 +47,7 @@ class RectCoverageVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("RectCoverageVerticesProvider::getData");
     auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 9 : 5);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
@@ -102,6 +103,7 @@ class RectNonCoverageVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("RectNonCoverageVerticesProvider::getData");
     auto floatCount = rectPaints.size() * 4 * (hasColor ? 8 : 4);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());

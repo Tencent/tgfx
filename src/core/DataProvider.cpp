@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DataProvider.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 class DataWrapper : public DataProvider {
@@ -25,6 +26,7 @@ class DataWrapper : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TGFX_PROFILE_ZONE_SCOPPE_NAME("DataWrapper::getData");
     return data;
   }
 

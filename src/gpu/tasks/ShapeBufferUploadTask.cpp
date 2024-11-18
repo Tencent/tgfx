@@ -19,6 +19,7 @@
 #include "ShapeBufferUploadTask.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/Texture.h"
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeBufferUploadTask> ShapeBufferUploadTask::MakeFrom(
@@ -37,6 +38,7 @@ ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey t
 }
 
 bool ShapeBufferUploadTask::execute(Context* context) {
+  TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeBufferUploadTask::execute");
   if (uniqueKey.strongCount() <= 0) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;

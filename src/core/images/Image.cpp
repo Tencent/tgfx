@@ -263,7 +263,6 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 
 std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
                                                       const SamplingOptions& sampling) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::lockTextureProxy");
   auto context = args.context;
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
