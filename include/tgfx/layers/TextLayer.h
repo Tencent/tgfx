@@ -146,7 +146,7 @@ class TextLayer : public Layer {
 
   class GlyphInfo final {
    public:
-    GlyphInfo(const Unichar unichar, const GlyphID glyphID, std::shared_ptr<Typeface> typeface)
+    GlyphInfo(Unichar unichar, GlyphID glyphID, std::shared_ptr<Typeface> typeface)
         : _unichar(unichar), _glyphID(glyphID), _typeface(std::move(typeface)) {
     }
 
@@ -163,15 +163,9 @@ class TextLayer : public Layer {
     }
 
    private:
-    GlyphInfo() = delete;
-    GlyphInfo(GlyphInfo&&) = delete;
-    GlyphInfo(const GlyphInfo&) = delete;
-    GlyphInfo& operator=(const GlyphInfo&) = delete;
-    GlyphInfo& operator=(GlyphInfo&&) = delete;
-
-    Unichar _unichar;
-    GlyphID _glyphID;
-    std::shared_ptr<Typeface> _typeface;
+    Unichar _unichar = 0;
+    GlyphID _glyphID = 0;
+    std::shared_ptr<Typeface> _typeface = nullptr;
   };
 
   class GlyphLine final {
@@ -206,8 +200,8 @@ class TextLayer : public Layer {
     std::vector<std::pair<std::shared_ptr<GlyphInfo>, float>> _glyphInfosAndAdvance = {};
   };
 
-  static std::string preprocessNewLines(const std::string& text);
-  static std::vector<std::shared_ptr<GlyphInfo>> shapeText(
+  static std::string PreprocessNewLines(const std::string& text);
+  static std::vector<std::shared_ptr<GlyphInfo>> ShapeText(
       const std::string& text, const std::shared_ptr<Typeface>& typeface);
 
   float calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo, float emptyAdvance) const;

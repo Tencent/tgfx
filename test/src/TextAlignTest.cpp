@@ -294,7 +294,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   device->unlock();
 }
 
-TGFX_TEST(TextAlignTest, VerticalTextAlign) {
+TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
@@ -440,7 +440,7 @@ TGFX_TEST(TextAlignTest, VerticalTextAlign) {
   canvas->drawRect(textLayer8Bounds, paint);
 
   context->submit();
-  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/VerticalTextAlign"));
+  EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignSimulateVerticalTextLayout"));
   device->unlock();
 }
 
@@ -787,7 +787,7 @@ TGFX_TEST(TextAlignTest, TextAlignPrint) {
   std::string text = "ab\rcd\nef\r\ngh\n\rij\tk\r\r\rp";
   auto textLayer = TextLayer::Make();
   textLayer->setText(text);
-  text = textLayer->preprocessNewLines(text);
+  text = textLayer->PreprocessNewLines(text);
   EXPECT_EQ(text, "ab\ncd\nef\ngh\n\nij\tk\n\n\np");
 }
 }  // namespace tgfx

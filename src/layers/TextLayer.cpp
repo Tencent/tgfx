@@ -110,12 +110,11 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   }
 
   // 1. preprocess newlines, convert \r\n, \r to \n
-  const std::string text = preprocessNewLines(_text);
+  const std::string text = PreprocessNewLines(_text);
 
   // 2. shape text to glyphs, handle font fallback
-  const auto& glyphInfos = shapeText(text, _font.getTypeface());
+  const auto& glyphInfos = ShapeText(text, _font.getTypeface());
   if (glyphInfos.empty()) {
-    LOGE("TextLayer::onUpdateContent glyphInfos is empty.");
     return nullptr;
   }
 
@@ -172,7 +171,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   return std::make_unique<TextContent>(std::move(textBlob), _textColor);
 }
 
-std::string TextLayer::preprocessNewLines(const std::string& text) {
+std::string TextLayer::PreprocessNewLines(const std::string& text) {
   std::string result;
   result.reserve(text.size());
   const size_t size = text.size();
@@ -205,13 +204,9 @@ float TextLayer::calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo,
   if (glyphID <= 0 || typeface == nullptr) {
     advance = emptyAdvance;
   } else {
-    if (_font.getTypeface() == typeface) {
-      advance = _font.getAdvance(glyphID);
-    } else {
-      auto font = _font;
-      font.setTypeface(typeface);
-      advance = font.getAdvance(glyphID);
-    }
+    auto font = _font;
+    font.setTypeface(typeface);
+    advance = font.getAdvance(glyphID);
   }
 
   return advance;
@@ -229,28 +224,29 @@ float TextLayer::getLineHeight(const std::shared_ptr<GlyphLine>& glyphLine) cons
            std::fabs(fontMetrics.leading);
   }
 
-  float ascent = 0.0f;
-  float descent = 0.0f;
-  float leading = 0.0f;
-  std::shared_ptr<Typeface> lastTypeface = nullptr;
+  float lineHeight = 0.0f;
+  std::unordered_map<uint32_t, float> fontHeightMap = {};
 
   const auto size = glyphLine->getGlyphCount();
   for (size_t i = 0; i < size; ++i) {
     const auto& typeface = glyphLine->getGlyphInfo(i)->getTypeface();
-    if (typeface == nullptr || lastTypeface == typeface) {
+    if (typeface == nullptr) {
       continue;
     }
 
-    lastTypeface = typeface;
-    auto font = _font;
-    font.setTypeface(typeface);
-    const auto& fontMetrics = font.getMetrics();
-    ascent = std::max(ascent, std::fabs(fontMetrics.ascent));
-    descent = std::max(descent, std::fabs(fontMetrics.descent));
-    leading = std::max(leading, std::fabs(fontMetrics.leading));
+    const uint32_t typefaceID = typeface->uniqueID();
+    if (fontHeightMap.find(typefaceID) == fontHeightMap.end()) {
+      auto font = _font;
+      font.setTypeface(typeface);
+      const auto& fontMetrics = font.getMetrics();
+      fontHeightMap[typefaceID] = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
+                                  std::fabs(fontMetrics.leading);
+    }
+
+    lineHeight = std::max(lineHeight, fontHeightMap[typefaceID]);
   }
 
-  return ascent + descent + leading;
+  return lineHeight;
 }
 
 void TextLayer::TruncateGlyphLines(std::vector<std::shared_ptr<GlyphLine>>& glyphLines) const {
@@ -278,7 +274,7 @@ void TextLayer::TruncateGlyphLines(std::vector<std::shared_ptr<GlyphLine>>& glyp
   }
 }
 
-std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::shapeText(
+std::vector<std::shared_ptr<TextLayer::GlyphInfo>> TextLayer::ShapeText(
     const std::string& text, const std::shared_ptr<Typeface>& typeface) {
   if (text.empty()) {
     return {};
