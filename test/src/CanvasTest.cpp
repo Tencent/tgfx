@@ -1223,4 +1223,34 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/blendMode"));
   device->unlock();
 }
+
+TGFX_TEST(CanvasTest, Path_addArc) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  for (int i = 1; i <= 8; ++i) {
+    canvas->clear();
+    Path path;
+    path.moveTo(150, 100);
+    path.addArc(Rect::MakeXYWH(50, 50, 100, 100), 0, static_cast<float>(45 * i));
+    path.close();
+    canvas->drawPath(path, paint);
+    EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc" + std::to_string(i)));
+  }
+  for (int i = 1; i <= 8; ++i) {
+    canvas->clear();
+    Path path;
+    path.moveTo(100, 50);
+    path.addArc(Rect::MakeXYWH(50, 50, 100, 100), -90.f, -static_cast<float>(45 * i));
+    path.close();
+    canvas->drawPath(path, paint);
+    EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc_reversed" + std::to_string(i)));
+  }
+  device->unlock();
+}
 }  // namespace tgfx

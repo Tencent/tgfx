@@ -27,7 +27,7 @@ static SkPathDirection ToSkDirection(bool reversed) {
   return reversed ? SkPathDirection::kCCW : SkPathDirection::kCW;
 }
 
-#define DistanceToControlPoint(angleStep) (4 * tanf((angleStep)*0.25f) / 3)
+#define DistanceToControlPoint(radStep) (4 * tanf((radStep)*0.25f) / 3)
 
 class PointIterator {
  public:
@@ -367,20 +367,27 @@ void Path::addRect(float left, float top, float right, float bottom, bool revers
 }
 
 static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiusX, float radiusY,
-                                       float startAngle, float endAngle, int* numBeziers) {
+                                       float startRad, float endRad, int* numBeziers) {
   std::vector<Point> points = {};
-  float start = startAngle;
-  float end = std::min(endAngle, start + M_PI_2_F);
+  float start = startRad;
+  std::function<float()> increaseRad;
+  if (startRad < endRad) {
+    increaseRad = [&] { return std::min(endRad, start + M_PI_2_F); };
+  } else {
+    increaseRad = [&] { return std::max(endRad, start - M_PI_2_F); };
+  }
+  float end = increaseRad();
   float currentX, currentY;
   *numBeziers = 0;
   for (int i = 0; i < 4; i++) {
-    auto angleStep = end - start;
-    auto distance = DistanceToControlPoint(angleStep);
-    currentX = centerX + cosf(start) * radiusX;
-    currentY = centerY + sinf(start) * radiusY;
-    points.push_back({currentX, currentY});
+    auto radStep = end - start;
+    auto distance = DistanceToControlPoint(radStep);
     auto u = cosf(start);
     auto v = sinf(start);
+    if (i == 0) {
+      currentX = centerX + u * radiusX;
+      currentY = centerY + v * radiusY;
+    }
     auto x1 = currentX - v * distance * radiusX;
     auto y1 = currentY + u * distance * radiusY;
     points.push_back({x1, y1});
@@ -391,13 +398,13 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
     auto x2 = currentX + v * distance * radiusX;
     auto y2 = currentY - u * distance * radiusY;
     points.push_back({x2, y2});
+    points.push_back({currentX, currentY});
     (*numBeziers)++;
-    if (end == endAngle) {
-      points.push_back({currentX, currentY});
+    if (end == endRad) {
       break;
     }
     start = end;
-    end = std::min(endAngle, start + M_PI_2_F);
+    end = increaseRad();
   }
   return points;
 }
@@ -407,27 +414,35 @@ void Path::addOval(const Rect& oval, bool reversed, unsigned startIndex) {
 }
 
 void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
+  if (oval.isEmpty() || sweepAngle == 0.0f) {
+    return;
+  }
+  constexpr auto kFullCircleAngle = static_cast<float>(360);
+  if (sweepAngle >= kFullCircleAngle || sweepAngle <= -kFullCircleAngle) {
+    // We can treat the arc as an oval if it begins at one of our legal starting positions.
+    float startOver90 = startAngle / 90.f;
+    float startOver90I = std::roundf(startOver90);
+    float error = startOver90 - startOver90I;
+    if (FloatNearlyEqual(error, 0)) {
+      // Index 1 is at startAngle == 0.
+      float startIndex = std::fmod(startOver90I + 1.f, 4.f);
+      startIndex = startIndex < 0 ? startIndex + 4.f : startIndex;
+      return addOval(oval, sweepAngle < 0, static_cast<unsigned>(startIndex));
+    }
+  }
+  auto startRad = DegreesToRadians(startAngle);
+  auto sweepRad = DegreesToRadians(sweepAngle);
   auto radiusX = oval.width() * 0.5f;
   auto radiusY = oval.height() * 0.5f;
-  auto endAngle = startAngle + sweepAngle;
-  auto reversed = sweepAngle < 0;
-  if (reversed) {
-    std::swap(startAngle, endAngle);
-  }
-  auto startRedius = DegreesToRadians(startAngle);
-  auto endRadius = DegreesToRadians(endAngle);
+  auto endRad = startRad + sweepRad;
   int numBeziers = 0;
-  auto points = GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startRedius,
-                             endRadius, &numBeziers);
+  auto points =
+      GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startRad, endRad, &numBeziers);
   PointIterator iter(points, false, 0);
   auto path = &(writableRef()->path);
-  path->moveTo(oval.centerX(), oval.centerY());
-  path->lineTo(iter.current());
   for (int i = 0; i < numBeziers; i++) {
-    path->cubicTo(iter.next(), iter.next(), iter.next());
+    path->cubicTo(i == 0 ? iter.current() : iter.next(), iter.next(), iter.next());
   }
-  path->lineTo(oval.centerX(), oval.centerY());
-  path->close();
 }
 
 void Path::addRoundRect(const Rect& rect, float radiusX, float radiusY, bool reversed,
