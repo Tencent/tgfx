@@ -619,7 +619,7 @@ bool generateFacePathCOLRv1(FT_Face face, GlyphID glyphID, Path* path) {
       return false;
     }
 
-    err = FT_Load_Glyph(face, glyphID, flags);
+    err = FT_Load_Glyph(face, glyphID, static_cast<FT_Int32>(flags));
     if (err != 0) {
       path->reset();
       return false;
@@ -643,7 +643,7 @@ bool generateFacePathCOLRv1(FT_Face face, GlyphID glyphID, Path* path) {
 /* In drawing mode, concatenates the transforms directly on SkCanvas. In
  * bounding box calculation mode, no SkCanvas is specified, but we only want to
  * retrieve the transform from the FreeType paint object. */
-void colrv1_transform(FT_Face face, const FT_COLR_Paint& colrPaint, Canvas* canvas,
+void colrv1_transform(const FT_COLR_Paint& colrPaint, Canvas* canvas,
                       Matrix* outTransform = nullptr) {
   if (!canvas && !outTransform) {
     return;
@@ -716,7 +716,6 @@ bool colrv1_start_glyph_bounds(Matrix *ctm,
 
 bool colrv1_traverse_paint_bounds(Matrix* ctm, Rect* bounds, FT_Face face,
                                   FT_OpaquePaint opaquePaint) {
-  FT_OpaquePaint opaquePaint{nullptr, 1};
   // Cycle detection, see section "5.7.11.1.9 Color glyphs as a directed acyclic graph".
   // if (activePaints->contains(opaquePaint)) {
   //   return false;
@@ -730,7 +729,7 @@ bool colrv1_traverse_paint_bounds(Matrix* ctm, Rect* bounds, FT_Face face,
     return false;
   }
 
-  Matrix restoreMatrix = *ctm;
+//  Matrix restoreMatrix = *ctm;
 
   switch (paint.format) {
     case FT_COLR_PAINTFORMAT_COLR_LAYERS: {
@@ -746,7 +745,7 @@ bool colrv1_traverse_paint_bounds(Matrix* ctm, Rect* bounds, FT_Face face,
     case FT_COLR_PAINTFORMAT_GLYPH: {
       FT_UInt glyphID = paint.u.glyph.glyphID;
       Path path;
-      if (!generateFacePathCOLRv1(face, glyphID, &path)) {
+      if (!generateFacePathCOLRv1(face, static_cast<GlyphID>(glyphID), &path)) {
         return false;
       }
       path.transform(*ctm);
@@ -755,39 +754,39 @@ bool colrv1_traverse_paint_bounds(Matrix* ctm, Rect* bounds, FT_Face face,
     }
     case FT_COLR_PAINTFORMAT_COLR_GLYPH: {
       FT_UInt glyphID = paint.u.colr_glyph.glyphID;
-      return colrv1_start_glyph_bounds(ctm, bounds, face, glyphID, FT_COLOR_NO_ROOT_TRANSFORM);
+      return colrv1_start_glyph_bounds(ctm, bounds, face, static_cast<uint16_t>(glyphID), FT_COLOR_NO_ROOT_TRANSFORM);
     }
     case FT_COLR_PAINTFORMAT_TRANSFORM: {
       Matrix transformMatrix;
-      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      colrv1_transform(paint, nullptr, &transformMatrix);
       ctm->preConcat(transformMatrix);
       FT_OpaquePaint& transformPaint = paint.u.transform.paint;
       return colrv1_traverse_paint_bounds(ctm, bounds, face, transformPaint);
     }
     case FT_COLR_PAINTFORMAT_TRANSLATE: {
       Matrix transformMatrix;
-      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      colrv1_transform(paint, nullptr, &transformMatrix);
       ctm->preConcat(transformMatrix);
       FT_OpaquePaint& translatePaint = paint.u.translate.paint;
       return colrv1_traverse_paint_bounds(ctm, bounds, face, translatePaint);
     }
     case FT_COLR_PAINTFORMAT_SCALE: {
       Matrix transformMatrix;
-      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      colrv1_transform(paint, nullptr, &transformMatrix);
       ctm->preConcat(transformMatrix);
       FT_OpaquePaint& scalePaint = paint.u.scale.paint;
       return colrv1_traverse_paint_bounds(ctm, bounds, face, scalePaint);
     }
     case FT_COLR_PAINTFORMAT_ROTATE: {
       Matrix transformMatrix;
-      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      colrv1_transform(paint, nullptr, &transformMatrix);
       ctm->preConcat(transformMatrix);
       FT_OpaquePaint& rotatePaint = paint.u.rotate.paint;
       return colrv1_traverse_paint_bounds(ctm, bounds, face, rotatePaint);
     }
     case FT_COLR_PAINTFORMAT_SKEW: {
       Matrix transformMatrix;
-      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      colrv1_transform(paint, nullptr, &transformMatrix);
       ctm->preConcat(transformMatrix);
       FT_OpaquePaint& skewPaint = paint.u.skew.paint;
       return colrv1_traverse_paint_bounds(ctm, bounds, face, skewPaint);
@@ -824,6 +823,21 @@ bool computeColrV1GlyphBoundingBox(FT_Face face, GlyphID glyphId, Rect* bounds) 
   Matrix ctm;
   *bounds = Rect::MakeEmpty();
   return colrv1_start_glyph_bounds(&ctm, bounds, face, glyphId, FT_COLOR_NO_ROOT_TRANSFORM);
+}
+
+bool getBoundsOfCurrentOutlineGlyph(FT_GlyphSlot glyph, Rect* bounds) {
+  if (glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+    return false;
+  }
+  if (0 == glyph->outline.n_contours) {
+    return false;
+  }
+
+  FT_BBox bbox;
+  FT_Outline_Get_CBox(&glyph->outline, &bbox);
+  *bounds = Rect::MakeLTRB(FDot6ToFloat(bbox.xMin), -FDot6ToFloat(bbox.yMax),
+                           FDot6ToFloat(bbox.xMax), -FDot6ToFloat(bbox.yMin));
+  return true;
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
@@ -876,34 +890,34 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
         FT_LayerIterator layerIterator = { 0, 0, nullptr };
         FT_UInt layerGlyphIndex;
         FT_UInt layerColorIndex;
-        FT_Int32 flags = fLoadGlyphFlags;
+        FT_Int32 flags = loadGlyphFlags;
         flags |= FT_LOAD_BITMAP_METRICS_ONLY;  // Don't decode any bitmaps.
         flags |= FT_LOAD_NO_BITMAP; // Ignore embedded bitmaps.
         flags &= ~FT_LOAD_RENDER;  // Don't scan convert.
         flags &= ~FT_LOAD_COLOR;  // Ignore SVG.
         // For COLRv0 compute the glyph bounding box from the union of layer bounding boxes.
-        while (FT_Get_Color_Glyph_Layer(fFace, glyph.getGlyphID(), &layerGlyphIndex,
+        while (FT_Get_Color_Glyph_Layer(face, glyphID, &layerGlyphIndex,
                                         &layerColorIndex, &layerIterator)) {
           haveLayers = true;
-          if (FT_Load_Glyph(fFace, layerGlyphIndex, flags)) {
-            return mx;
+          if (FT_Load_Glyph(face, layerGlyphIndex, flags)) {
+            return bounds;
           }
 
-          SkRect currentBounds;
-          if (getBoundsOfCurrentOutlineGlyph(fFace->glyph, &currentBounds)) {
+          Rect currentBounds;
+          if (getBoundsOfCurrentOutlineGlyph(face->glyph, &currentBounds)) {
             bounds.join(currentBounds);
           }
                                         }
-        if (haveLayers) {
-          mx.extraBits = ScalerContextBits::COLRv0;
-        }
+//        if (haveLayers) {
+//          mx.extraBits = ScalerContextBits::COLRv0;
+//        }
       }
 
       if (haveLayers) {
-        mx.maskFormat = SkMask::kARGB32_Format;
-        mx.neverRequestPath = true;
-        updateGlyphBoundsIfSubpixel(glyph, &bounds, this->isSubpixel());
-        mx.bounds = bounds;
+//        mx.maskFormat = SkMask::kARGB32_Format;
+//        mx.neverRequestPath = true;
+//        updateGlyphBoundsIfSubpixel(glyph, &bounds, this->isSubpixel());
+//        mx.bounds = bounds;
       }
     }
   #endif
