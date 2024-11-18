@@ -215,6 +215,14 @@ void Path::cubicTo(const Point& control1, const Point& control2, const Point& po
   cubicTo(control1.x, control1.y, control2.x, control2.y, point.x, point.y);
 }
 
+void Path::arcTo(float x1, float y1, float x2, float y2, float radius) {
+  writableRef()->path.arcTo(x1, y1, x2, y2, radius);
+}
+
+void Path::arcTo(const Point& p1, const Point& p2, float radius) {
+  arcTo(p1.x, p1.y, p2.x, p2.y, radius);
+}
+
 // This converts the SVG arc to conics based on the SVG standard.
 // Code source:
 // 1. kdelibs/kdecore/svgicons Niko's code
