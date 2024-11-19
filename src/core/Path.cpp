@@ -392,10 +392,9 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
     auto distance = DistanceToControlPoint(radStep);
     auto u = cosf(start);
     auto v = sinf(start);
-    if (i == 0) {
-      currentX = centerX + u * radiusX;
-      currentY = centerY + v * radiusY;
-    }
+    currentX = centerX + u * radiusX;
+    currentY = centerY + v * radiusY;
+    points.push_back({currentX, currentY});
     auto x1 = currentX - v * distance * radiusX;
     auto y1 = currentY + u * distance * radiusY;
     points.push_back({x1, y1});
@@ -406,9 +405,9 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
     auto x2 = currentX + v * distance * radiusX;
     auto y2 = currentY - u * distance * radiusY;
     points.push_back({x2, y2});
-    points.push_back({currentX, currentY});
     (*numBeziers)++;
     if (end == endRadius) {
+      points.push_back({currentX, currentY});
       break;
     }
     start = end;
@@ -448,8 +447,9 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
       GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startRad, endRad, &numBeziers);
   PointIterator iter(points, false, 0);
   auto path = &(writableRef()->path);
+  path->moveTo(iter.current());
   for (int i = 0; i < numBeziers; i++) {
-    path->cubicTo(i == 0 ? iter.current() : iter.next(), iter.next(), iter.next());
+    path->cubicTo(iter.next(), iter.next(), iter.next());
   }
 }
 

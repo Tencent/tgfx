@@ -1236,7 +1236,6 @@ TGFX_TEST(CanvasTest, Path_addArc) {
   for (int i = 1; i <= 8; ++i) {
     canvas->clear();
     Path path;
-    path.moveTo(150, 100);
     path.addArc(Rect::MakeXYWH(50, 50, 100, 100), 0, static_cast<float>(45 * i));
     path.close();
     canvas->drawPath(path, paint);
@@ -1245,7 +1244,6 @@ TGFX_TEST(CanvasTest, Path_addArc) {
   for (int i = 1; i <= 8; ++i) {
     canvas->clear();
     Path path;
-    path.moveTo(100, 50);
     path.addArc(Rect::MakeXYWH(50, 50, 100, 100), -90.f, -static_cast<float>(45 * i));
     path.close();
     canvas->drawPath(path, paint);
