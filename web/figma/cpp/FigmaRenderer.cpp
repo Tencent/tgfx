@@ -1,15 +1,22 @@
 #include "FigmaRenderer.h"
+#include <emscripten/console.h> 
+#include <iostream>
 
 void FigmaRenderer::initialize(std::string canvasID) {
+    emscripten_log(EM_LOG_CONSOLE, "initialize called， canvasID is %s", canvasID.c_str());
   tgfx_window_ = tgfx::WebGLWindow::MakeFrom(canvasID);
 }
 void FigmaRenderer::invalisize() {
+  emscripten_log(EM_LOG_CONSOLE, "invalisize called");
   if (tgfx_window_ == nullptr) {
     return;
   }
   tgfx_window_->invalidSize();
 }
 void FigmaRenderer::updateShape() {
+  emscripten_log(EM_LOG_CONSOLE, "updateShape called");
+  // 打印log
+  std::cout << "ffjiefan：：updateShape" << std::endl;
   if (tgfx_window_ == nullptr) return;
   if (tgfx_device_ == nullptr) {
     tgfx_device_ = tgfx_window_->getDevice();
