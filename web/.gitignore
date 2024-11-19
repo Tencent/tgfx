@@ -11,3 +11,6 @@ demo/.hello2d.wasm-mt.md5
 src/wasm
 emsdk/
 
+/figma/js/
+/figma/wasm/
+/figma/.figma.wasm.md5
