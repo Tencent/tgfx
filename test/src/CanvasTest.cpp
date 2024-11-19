@@ -619,6 +619,15 @@ TGFX_TEST(CanvasTest, path) {
   path.getLastPoint(&latestPoint);
   EXPECT_EQ(latestPoint, Point::Make(45, 0));
 
+  paint.setColor(Color::Red());
+  path.reset();
+  path.arcTo({50, 0}, {50, 50}, 50);
+  path.arcTo({50, 100}, {0, 100}, 50);
+  matrix.reset();
+  matrix.postTranslate(450, 390);
+  canvas->setMatrix(matrix);
+  canvas->drawPath(path, paint);
+
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
   device->unlock();
 }
