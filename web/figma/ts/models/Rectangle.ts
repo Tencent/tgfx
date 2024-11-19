@@ -1,5 +1,7 @@
 // js/models/Rectangle.ts
+
 import BaseElement from './BaseElement.js';
+
 export default class Rectangle extends BaseElement {
     /**
      * 创建矩形元素
@@ -13,20 +15,22 @@ export default class Rectangle extends BaseElement {
         this.setAttribute('height', this.getRandomInt(50, 200).toString());
         this.setAttribute('fill', this.getRandomColor());
     }
+
     /**
      * 生成指定范围内的随机整数
      * @param min - 最小值
      * @param max - 最大值
      * @returns 随机整数
      */
-    getRandomInt(min, max) {
+    getRandomInt(min: number, max: number): number {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
+
     /**
      * 生成随机颜色
      * @returns 随机颜色
      */
-    getRandomColor() {
+    getRandomColor(): string {
         const letters = '0123456789ABCDEF';
         let color = '#';
         for (let i = 0; i < 6; i++) {
@@ -35,4 +39,3 @@ export default class Rectangle extends BaseElement {
         return color;
     }
 }
-//# sourceMappingURL=Rectangle.js.map
