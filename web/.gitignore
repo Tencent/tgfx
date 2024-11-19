@@ -14,3 +14,4 @@ emsdk/
 /figma/js/
 /figma/wasm/
 /figma/.figma.wasm.md5
+/figma/build-figma/
