@@ -17,7 +17,9 @@
     "build:mt": "node script/cmake.demo.js -a wasm-mt && npm run build:tgfx && rollup -c ./script/rollup.demo.js --environment ARCH:wasm-mt",
     "build:mt:debug": "node script/cmake.demo.js -a wasm-mt --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js --environment ARCH:wasm-mt",
     "dev:mt": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w --environment ARCH:wasm-mt",
-    "server:mt": "node server.js wasm-mt"
+    "server:mt": "node server.js wasm-mt",
+    "server:figma": "npm run build:mt && node server_figma.js figma"
+
   },
   "repository": {
     "type": "git",
