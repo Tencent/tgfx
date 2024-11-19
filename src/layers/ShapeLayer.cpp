@@ -191,9 +191,9 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
       strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
     }
     if (_strokeAlign != StrokeAlign::Center) {
-      auto terminalStroke = stroke;
-      terminalStroke.width *= 2;
-      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &terminalStroke);
+      auto tempStroke = stroke;
+      tempStroke.width *= 2;
+      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
       if (_strokeAlign == StrokeAlign::Inside) {
         strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
       } else {

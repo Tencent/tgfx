@@ -25,7 +25,7 @@
 
 namespace tgfx {
 /**
- * The alignment of the stroke concerning the boundaries of the shape.
+ * The alignment of the stroke relative to the boundaries of the shape.
  */
 enum class StrokeAlign {
   /**
