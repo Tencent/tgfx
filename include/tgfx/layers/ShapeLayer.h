@@ -25,6 +25,24 @@
 
 namespace tgfx {
 /**
+ * The alignment of the stroke concerning the boundaries of the shape.
+ */
+enum class StrokeAlign {
+  /**
+  * Draw a stroke centered along the shape boundary.
+  */
+  Center,
+  /**
+  * Draw a stroke inside the shape boundary.
+  */
+  Inside,
+  /**
+  * Draw a stroke outside the shape boundary.
+  */
+  Outside
+};
+
+/**
  * ShapeLayer represents a layer that draws a shape.
  */
 class ShapeLayer : public Layer {
@@ -207,6 +225,18 @@ class ShapeLayer : public Layer {
    */
   void setStrokeEnd(float end);
 
+  /**
+ * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
+ */
+  StrokeAlign strokeAlign() const {
+    return _strokeAlign;
+  }
+
+  /**
+ * Sets the stroke alignment applied to the shape’s path when stroked.
+ */
+  void setStrokeAlign(StrokeAlign align);
+
   ~ShapeLayer() override;
 
  protected:
@@ -223,5 +253,6 @@ class ShapeLayer : public Layer {
   float _lineDashPhase = 0.0f;
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
+  StrokeAlign _strokeAlign = StrokeAlign::Center;
 };
 }  // namespace tgfx
