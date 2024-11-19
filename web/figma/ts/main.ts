@@ -4,6 +4,7 @@ import ElementManager from './models/ElementManager.js';
 import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
+import FigmaRenderer from '../wasm/figma.js'; // 导入 FigmaRenderer
 
 /**
  * 应用程序主类
@@ -17,8 +18,9 @@ class App {
     uiManager: UIManager;
     backendManager: BackendManager;
     eventManager: EventManager;
+    figmaRenderer: any; // 修改类型为 any 或者适当的类型
 
-    constructor() {
+    constructor(FigmaModule: any) { // 接受 FigmaModule 作为参数
         // 获取DOM元素
         const svgCanvasElement = document.getElementById('canvas');
 
@@ -44,6 +46,12 @@ class App {
         });
         this.backendManager = new BackendManager((data) => this.handleBackendMessage(data));
         this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);
+
+        // 实例化 FigmaRenderer
+        this.figmaRenderer = new FigmaModule.FigmaRenderer();
+        // 定义 canvas 的 id，对应页面中的真实 canvas 元素
+        const canvasId = 'realCanvas'; // 更新为实际的 canvas id
+        this.figmaRenderer.initialize(canvasId); // 调用 initialize 方法
 
         // 初始化
         this.init();
@@ -92,6 +100,7 @@ class App {
         // 监听图形添加事件
         document.addEventListener('shapeAdded', () => {
             this.updateShapeCount();
+            this.figmaRenderer.updateShape(); // 调用 updateShape 方法
         });
 
         // 如有需要，可以监听其他自定义事件，例如图形更新
@@ -193,8 +202,12 @@ class App {
 }
 
 // 启动应用
-document.addEventListener('DOMContentLoaded', () => {
-    new App();
+document.addEventListener('DOMContentLoaded', async () => {
+    // 加载 WebAssembly 模块
+    const FigmaModule = await import('../wasm/figma.js');
+    
+    // 实例化应用并传入 FigmaModule
+    new App(FigmaModule);
 });
 
 // 确保文件被视为 ES 模块
