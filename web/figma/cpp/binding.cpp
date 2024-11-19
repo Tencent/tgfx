@@ -25,7 +25,8 @@ EMSCRIPTEN_BINDINGS(figma_module) {
     class_<FigmaRenderer>("FigmaRenderer")
         .constructor<>()
         .function("initialize", &FigmaRenderer::initialize)
-        .function("draw", &FigmaRenderer::draw)
+        .function("invalisize", &FigmaRenderer::invalisize)
+        .function("updateShape", &FigmaRenderer::updateShape)
         ;
 }
 
