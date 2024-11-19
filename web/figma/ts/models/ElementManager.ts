@@ -1,20 +1,29 @@
+
 // js/models/ElementManager.ts
+
 import Rectangle from './Rectangle.js';
 import Circle from './Circle.js';
 import TextElement from './TextElement.js';
+import BaseElement from './BaseElement.js';
+
 export default class ElementManager {
-    constructor(svgCanvas) {
+    svgCanvas: SVGElement;
+    elements: BaseElement[];
+    selectedElement: BaseElement | null;
+
+    constructor(svgCanvas: SVGElement) {
         this.svgCanvas = svgCanvas;
         this.elements = [];
         this.selectedElement = null;
     }
+
     /**
      * 创建并添加元素
      * @param type - 元素类型
      * @returns 创建的元素或null
      */
-    createElement(type) {
-        let element = null;
+    createElement(type: string): BaseElement | null {
+        let element: BaseElement | null = null;
         switch (type) {
             case 'rect':
                 element = new Rectangle();
@@ -33,11 +42,12 @@ export default class ElementManager {
         this.elements.push(element);
         return element;
     }
+
     /**
      * 选择元素
      * @param element - 要选择的元素
      */
-    selectElement(element) {
+    selectElement(element: BaseElement | null): void {
         if (this.selectedElement) {
             this.selectedElement.setAttribute('stroke', '');
             this.selectedElement.setAttribute('stroke-width', '');
@@ -48,45 +58,50 @@ export default class ElementManager {
             element.setAttribute('stroke-width', '2');
         }
     }
+
     /**
      * 获取元素列表
      * @returns 元素列表
      */
-    getElements() {
+    getElements(): BaseElement[] {
         return this.elements;
     }
+
     /**
      * 根据ID获取元素
      * @param id - 元素ID
      * @returns 元素或null
      */
-    getElementById(id) {
+    getElementById(id: string): BaseElement | null {
         return this.elements.find(el => el.id === id) || null;
     }
+
     /**
      * 设置所有元素的可见性
      * @param isVisible - 是否可见
      */
-    setAllElementsVisibility(isVisible) {
+    setAllElementsVisibility(isVisible: boolean): void {
         this.elements.forEach(el => {
             el.element.style.opacity = isVisible ? '1' : '0';
         });
     }
+
     /**
      * 渲染所有元素到前端
      */
-    renderAllElements() {
+    renderAllElements(): void {
         this.svgCanvas.innerHTML = '';
         this.elements.forEach(el => {
             el.render(this.svgCanvas);
             el.element.style.opacity = '1';
         });
     }
+
     /**
      * 从数据加载元素
      * @param dataList - 元素数据列表
      */
-    loadFromData(dataList) {
+    loadFromData(dataList: Array<any>): void {
         this.elements = [];
         dataList.forEach(data => {
             let element;
@@ -110,4 +125,3 @@ export default class ElementManager {
         });
     }
 }
-//# sourceMappingURL=ElementManager.js.map

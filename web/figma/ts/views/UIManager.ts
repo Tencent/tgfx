@@ -1,40 +1,53 @@
 // js/views/UIManager.ts
+
+import BaseElement from '../models/BaseElement.js';
+
 export default class UIManager {
+    propertiesPanel: HTMLElement;
+    layersList: HTMLElement;
+    onPropertyChange: (element: BaseElement, attr: string, value: any) => void;
+
     /**
      * 创建UI管理器
      * @param propertiesPanel - 属性面板元素
      * @param layersList - 图层列表元素
      * @param onPropertyChange - 属性变化的回调
      */
-    constructor(propertiesPanel, layersList, onPropertyChange) {
+    constructor(propertiesPanel: HTMLElement, layersList: HTMLElement, onPropertyChange: (element: BaseElement, attr: string, value: any) => void) {
         this.propertiesPanel = propertiesPanel;
         this.layersList = layersList;
         this.onPropertyChange = onPropertyChange;
     }
+
     /**
      * 显示选中元素的属性
      * @param element - 选中的元素
      */
-    showProperties(element) {
+    showProperties(element: BaseElement | null): void {
         console.log('显示属性面板:', element);
         if (!element) {
             this.propertiesPanel.innerHTML = '<p>选择一个元素以编辑其属性。</p>';
             return;
         }
+
         this.propertiesPanel.innerHTML = '';
         const attrs = element.getAttributes();
+
         // 可编辑的属性列表
         const editableAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'fill', 'font-size', 'font-family', 'textContent'];
+
         editableAttrs.forEach(attr => {
             if (attr in attrs) {
                 this.createPropertyField(attr, attrs[attr], element);
             }
         });
+
         // 如果是文本元素，添加文本内容编辑
         if (element.type === 'text' && element.getText) {
-            this.createPropertyField('textContent', element.getText(), element, true);
+            this.createPropertyField('textContent', element.getText()!, element, true);
         }
     }
+
     /**
      * 创建单个属性编辑字段
      * @param name - 属性名称
@@ -42,22 +55,23 @@ export default class UIManager {
      * @param element - 所属元素
      * @param isText - 是否为文本内容
      */
-    createPropertyField(name, value, element, isText = false) {
+    createPropertyField(name: string, value: any, element: BaseElement, isText: boolean = false): void {
         const label = document.createElement('label');
         label.textContent = this.getDisplayName(name);
+
         let input;
         if (isText && name === 'textContent') {
             // 对于文本内容，使用 textarea
             input = document.createElement('textarea');
             input.rows = 3;
-        }
-        else {
+        } else {
             input = document.createElement('input');
             input.type = this.getInputType(name);
         }
+
         input.value = isText ? value || '' : value;
         input.addEventListener('input', (e) => {
-            let updatedValue = e.target.value;
+            let updatedValue: string | number = (e.target as HTMLInputElement).value;
             if (['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'font-size'].includes(name)) {
                 updatedValue = Number(updatedValue);
                 if (isNaN(updatedValue)) {
@@ -68,23 +82,24 @@ export default class UIManager {
             }
             if (isText && name === 'textContent') {
                 if (element.setText) {
-                    element.setText(updatedValue);
+                    element.setText(updatedValue as string);
                 }
-            }
-            else {
+            } else {
                 this.onPropertyChange(element, name, updatedValue);
             }
         });
+
         this.propertiesPanel.appendChild(label);
         this.propertiesPanel.appendChild(input);
     }
+
     /**
      * 获取属性的显示名称
      * @param name - 属性名称
      * @returns 显示名称
      */
-    getDisplayName(name) {
-        const mapping = {
+    getDisplayName(name: string): string {
+        const mapping: { [key: string]: string } = {
             'x': 'X',
             'y': 'Y',
             'width': '宽度',
@@ -99,21 +114,23 @@ export default class UIManager {
         };
         return mapping[name] || name;
     }
+
     /**
      * 获取输入类型
      * @param name - 属性名称
      * @returns 输入类型
      */
-    getInputType(name) {
+    getInputType(name: string): string {
         const numberAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'font-size'];
         return numberAttrs.includes(name) ? 'number' : 'text';
     }
+
     /**
      * 更新图层管理列表
      * @param elements - 元素列表
      * @param selectedElement - 选中的元素
      */
-    updateLayersList(elements, selectedElement) {
+    updateLayersList(elements: BaseElement[], selectedElement: BaseElement | null): void {
         this.layersList.innerHTML = '';
         // 从后往前渲染，以最新的在上
         [...elements].reverse().forEach(el => {
@@ -132,16 +149,16 @@ export default class UIManager {
             this.layersList.appendChild(layerItem);
         });
     }
+
     /**
      * 显示提示信息
      * @param text - 提示文本
      * @param x - X坐标
      * @param y - Y坐标
      */
-    showTooltip(text, x, y) {
+    showTooltip(text: string, x: number, y: number): void {
         const tooltip = document.getElementById('tooltip');
-        if (!tooltip)
-            return;
+        if (!tooltip) return;
         tooltip.textContent = text;
         tooltip.style.left = `${x}px`;
         tooltip.style.top = `${y}px`;
@@ -151,4 +168,3 @@ export default class UIManager {
         }, 2000);
     }
 }
-//# sourceMappingURL=UIManager.js.map
