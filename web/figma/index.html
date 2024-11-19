@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>简易Web设计工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- 顶部操作菜单 -->
+    <div class="top-menu">
+        <label class="toggle-switch">
+            后端渲染
+            <input type="checkbox" id="backendToggle">
+            <div class="toggle-slider"></div>
+        </label>
+    </div>
+
+    <div class="container">
+        <!-- 左侧工具栏 -->
+        <div class="toolbar">
+            <button id="addRect" title="添加矩形">□</button>
+            <button id="addCircle" title="添加圆形">○</button>
+            <button id="addText" title="添加文本">Ⓣ</button>
+            <input type="number" id="shapeCounts" value="50" title="设置数量">
+            <button id="addRandom" title="添加随机形状">随机</button>
+            <button id="performanceTest" title="性能测试">性能测试</button> <!-- 新增按钮 -->
+
+        </div>
+
+        <!-- 画布区域 -->
+        <div class="canvas-container">
+            <svg id="canvas" viewBox="0 0 1000 800" preserveAspectRatio="xMinYMin meet">
+                <!-- 元素将被动态添加到这里 -->
+            </svg>
+            <!-- 操作反馈提示 -->
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <!-- 右侧属性编辑面板 -->
+        <div class="properties-panel">
+            <h3>属性编辑</h3>
+            <div id="properties">
+                <p>选择一个元素以编辑其属性。</p>
+            </div>
+            <div class="layers">
+                <h3>图层管理</h3>
+                <div id="layersList">
+                    <!-- 图层列表将动态添加到这里 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 将计数器放入容器中 -->
+    <div class="counters-container">
+        <div id="shapeCounter" class="shape-counter">图形数量: 0</div>
+        <div id="fpsCounter" class="fps-counter">FPS: 0</div>
+    </div>
+
+    <!-- 引入主脚本 -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
