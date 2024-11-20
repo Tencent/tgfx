@@ -32,11 +32,11 @@ void FigmaRenderer::updateShape() {
 
   auto shapeLayer = tgfx::ShapeLayer::Make();
   tgfx::Path path;
-  path.addRect({0, 0, 1200, 1200});
+  path.addRect({100, 100, 200, 200});
   shapeLayer->setPath(path);
   std::cout << "ffjiefan：：make shape ok" << std::endl;
 
-  auto fillStyle = tgfx::SolidColor::Make(tgfx::Color::Blue());
+  auto fillStyle = tgfx::SolidColor::Make(tgfx::Color::Red());
   shapeLayer->setFillStyle(fillStyle);
 
   tgfx_display_list_->root()->addChild(shapeLayer);
@@ -48,8 +48,6 @@ void FigmaRenderer::updateShape() {
     tgfx_device_->unlock();
     return;
   }
-  surface->getCanvas()->clear();
-  surface->getCanvas()->clearRect({0, 0, 500, 500}, tgfx::Color::Red());
   tgfx_display_list_->render(surface.get());
 
   context->flushAndSubmit();

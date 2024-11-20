@@ -44,7 +44,7 @@ class App {
         this.uiManager = new UIManager(this.propertiesPanel, this.layersList, (element, attr, value) => {
             this.eventManager.handlePropertyChange(element, attr, value);
         });
-        this.backendManager = new BackendManager((data) => this.handleBackendMessage(data));
+        this.backendManager = new BackendManager();
         this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);
 
         // 实例化 FigmaRenderer
@@ -108,11 +108,6 @@ class App {
             this.updateShapeCount();
             this.figmaRenderer.updateShape(); // 调用 updateShape 方法
         });
-
-        // 如有需要，可以监听其他自定义事件，例如图形更新
-        // document.addEventListener('shapeUpdated', () => {
-        //     this.updateShapeCount();
-        // });
     }
 
     /**
@@ -128,82 +123,6 @@ class App {
      */
     initViewBox(): void {
         this.svgCanvas.setAttribute('viewBox', `0 0 ${this.eventManager.viewBox.width} ${this.eventManager.viewBox.height}`);
-    }
-
-    /**
-     * 处理来自后端的消息
-     * @param data - 后端发送的数据
-     */
-    handleBackendMessage(data: any): void {
-        switch (data.action) {
-            case 'add':
-                this.handleBackendAdd(data.data);
-                break;
-            case 'update':
-                this.handleBackendUpdate(data.data);
-                break;
-            case 'canvasPan':
-                this.handleBackendCanvasPan(data.data);
-                break;
-            default:
-                console.warn('未知的后端动作:', data.action);
-        }
-
-        this.updateShapeCount(); // 更新图形数量
-    }
-
-    /**
-     * 处理后端添加元素
-     * @param elementData - 元素数据
-     */
-    handleBackendAdd(elementData: any): void {
-        let element;
-        switch (elementData.tagName) {
-            case 'rect':
-                element = this.elementManager.createElement('rect');
-                break;
-            case 'circle':
-                element = this.elementManager.createElement('circle');
-                break;
-            case 'text':
-                element = this.elementManager.createElement('text');
-                break;
-            default:
-                console.error('未知的元素类型:', elementData.tagName);
-                return;
-        }
-        if (element) {
-            element.fromData(elementData);
-            this.uiManager.updateLayersList(this.elementManager.getElements(), this.elementManager.selectedElement);
-            this.uiManager.showTooltip('后端添加了元素', 50, 60);
-        }
-        this.updateShapeCount();
-    }
-
-    /**
-     * 处理后端更新元素
-     * @param updateData - 更新数据
-     */
-    handleBackendUpdate(updateData: any): void {
-        const element = this.elementManager.getElementById(updateData.id);
-        if (element) {
-            element.setAttribute(updateData.attribute, updateData.value);
-            this.uiManager.showTooltip('后端更新了元素', 50, 60);
-        }
-        this.updateShapeCount();
-    }
-
-    /**
-     * 处理后端画布平移
-     * @param panData - 平移数据
-     */
-    handleBackendCanvasPan(panData: any): void {
-        const { x, y } = panData;
-        const viewBoxAttr = `${x} ${y} ${this.eventManager.viewBox.width} ${this.eventManager.viewBox.height}`;
-        this.svgCanvas.setAttribute('viewBox', viewBoxAttr);
-        this.eventManager.viewBox.x = x;
-        this.eventManager.viewBox.y = y;
-        this.uiManager.showTooltip('后端平移了画布', 50, 60);
     }
 }
 
