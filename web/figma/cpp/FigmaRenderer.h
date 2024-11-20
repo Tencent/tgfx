@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include <tgfx/layers/DisplayList.h>
+#include <tgfx/layers/ShapeLayer.h>
 
 class FigmaRenderer {
  public:
@@ -13,4 +15,5 @@ class FigmaRenderer {
  private:
   std::shared_ptr<tgfx::Window> tgfx_window_;
   std::shared_ptr<tgfx::Device> tgfx_device_;
+  std::shared_ptr<tgfx::DisplayList> tgfx_display_list_;
 };
