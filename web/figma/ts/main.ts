@@ -51,7 +51,7 @@ class App {
         
         this.figmaRenderer = new figma.FigmaRenderer();
         // 定义 canvas 的 id，对应页面中的真实 canvas 元素
-        const canvasId = 'realCanvas'; // 更新为实际的 canvas id
+        const canvasId = '#realCanvas'; // 更新为实际的 canvas id
         this.figmaRenderer.initialize(canvasId); // 调用 initialize 方法
 
         // 初始化
@@ -211,5 +211,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     new App(figma);
 });
 
+
 // 确保文件被视为 ES 模块
-export {};
+export { };
