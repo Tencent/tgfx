@@ -120,6 +120,10 @@ class SVGNode {
     return fTag;
   }
 
+  const SVGPresentationAttributes* presentationAttributes() const {
+    return &fPresentationAttributes;
+  }
+
   virtual void appendChild(std::shared_ptr<SVGNode>) = 0;
 
   virtual bool hasChildren() const {
@@ -207,7 +211,7 @@ class SVGNode {
   SVGTag fTag;
 
   // FIXME: this should be sparse
-  SkSVGPresentationAttributes fPresentationAttributes;
+  SVGPresentationAttributes fPresentationAttributes;
 };
 
 //NOLINTBEGIN

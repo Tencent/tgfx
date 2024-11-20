@@ -884,10 +884,4 @@ enum class SVGFeFuncType {
   kLinear,
   kGamma,
 };
-
-//https://www.w3.org/TR/SVG2/pservers.html#PatternElementPatternUnitsAttribute
-enum class SVGPatternUnits {
-  UserSpaceOnUse,
-  ObjectBoundingBox,
-};
 }  // namespace tgfx

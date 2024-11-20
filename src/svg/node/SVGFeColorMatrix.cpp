@@ -57,7 +57,6 @@ ColorMatrix SkSVGFeColorMatrix::makeMatrixForType() const {
         return ColorMatrix();
       }
       ColorMatrix m;
-      // m.setRowMajor(fValues.data());
       std::copy_n(fValues.data(), 20, m.begin());
       return m;
     }
@@ -147,12 +146,8 @@ ColorMatrix SkSVGFeColorMatrix::MakeLuminanceToAlpha() {
 }
 
 std::shared_ptr<ImageFilter> SkSVGFeColorMatrix::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SkSVGFilterContext& /*fctx*/) const {
+    const SVGRenderContext&, const SkSVGFilterContext&) const {
   return ImageFilter::ColorFilter(ColorFilter::Matrix(makeMatrixForType()));
-  // return ImageFilter::ColorFilter(
-  //     SkColorFilters::Matrix(makeMatrixForType()),
-  //     fctx.resolveInput(ctx, this->getIn(), this->resolveColorspace(ctx, fctx)),
-  //     this->resolveFilterSubregion(ctx, fctx));
 }
 #endif
 }  // namespace tgfx

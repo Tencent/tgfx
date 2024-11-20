@@ -105,7 +105,6 @@ std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
 
 SkSVGImage::ImageInfo SkSVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
                                             SVGPreserveAspectRatio /*par*/) {
-  // TODO: svg sources
   std::shared_ptr<Image> image = ::tgfx::LoadImage(iri);
   if (!image) {
     return {};

@@ -20,8 +20,8 @@
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
-SkSVGPresentationAttributes SkSVGPresentationAttributes::MakeInitial() {
-  SkSVGPresentationAttributes result;
+SVGPresentationAttributes SVGPresentationAttributes::MakeInitial() {
+  SVGPresentationAttributes result;
 
   result.fFill.set(SVGPaint(SVGColor(Color::Black())));
   result.fFillOpacity.set(static_cast<SVGNumberType>(1));

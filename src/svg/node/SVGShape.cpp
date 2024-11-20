@@ -37,7 +37,7 @@ void SVGShape::onRender(const SVGRenderContext& ctx) const {
   auto selfRect = onObjectBoundingBox(ctx);
   auto lengthCtx = ctx.lengthContext();
   lengthCtx.setViewPort(Size::Make(selfRect.width(), selfRect.height()));
-  SVGRenderContext paintCtx(ctx, ctx.canvas(), lengthCtx);
+  auto paintCtx = SVGRenderContext::CopyForPaint(ctx, ctx.canvas(), lengthCtx);
 
   const auto fillPaint = paintCtx.fillPaint();
   const auto strokePaint = paintCtx.strokePaint();

@@ -44,18 +44,9 @@ bool SkSVGPattern::parseAndSetAttribute(const char* name, const char* value) {
              SVGAttributeParser::parse<SVGTransformType>("patternTransform", name, value)) ||
          this->setHref(SVGAttributeParser::parse<SVGIRI>("xlink:href", name, value)) ||
          this->setPatternUnits(
-             SVGAttributeParser::parse<SVGPatternUnits>("patternUnits", name, value)) ||
-         this->setContentUnits(
-             SVGAttributeParser::parse<SVGPatternUnits>("patternContentUnits", name, value));
-}
-
-template <>
-bool SVGAttributeParser::parse(SVGPatternUnits* type) {
-  static constexpr std::tuple<const char*, SVGPatternUnits> gTypeMap[] = {
-      {"userSpaceOnUse", SVGPatternUnits::UserSpaceOnUse},
-      {"objectBoundingBox", SVGPatternUnits::ObjectBoundingBox},
-  };
-  return this->parseEnumMap(gTypeMap, type) && this->parseEOSToken();
+             SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("patternUnits", name, value)) ||
+         this->setContentUnits(SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>(
+             "patternContentUnits", name, value));
 }
 
 #ifndef RENDER_SVG
@@ -115,20 +106,19 @@ const SkSVGPattern* SkSVGPattern::resolveHref(const SVGRenderContext& ctx,
       break;
     }
 
-    // TODO: reference loop mitigation.
     currentNode = currentNode->hrefTarget(ctx);
   } while (currentNode);
 
   // To unify with Chrome and macOS preview, the width and height attributes here need to be
   // converted to percentages, direct numbers are not supported.
-  if (fPatternUnits == SVGPatternUnits::UserSpaceOnUse) {
+  if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse) {
     if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::kPercentage) {
       attrs->fWidth = SVGLength(attrs->fWidth->value() / 100.f, SVGLength::Unit::kNumber);
     }
     if (attrs->fHeight.has_value() && attrs->fHeight->unit() == SVGLength::Unit::kPercentage) {
       attrs->fHeight = SVGLength(attrs->fHeight->value() / 100.f, SVGLength::Unit::kNumber);
     }
-  } else if (fPatternUnits == SVGPatternUnits::ObjectBoundingBox) {
+  } else if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox) {
     if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::kNumber) {
       attrs->fWidth = SVGLength(attrs->fWidth->value() * 100.f, SVGLength::Unit::kPercentage);
     }
@@ -154,44 +144,17 @@ bool SkSVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
     return false;
   }
 
-  auto* context = ctx.canvas()->getSurface()->getContext();
-  if (!context) {
-    return false;
-  }
-  auto tempSurface =
-      Surface::Make(context, static_cast<int>(tile.width()), static_cast<int>(tile.height()));
-  if (!tempSurface) {
-    return false;
-  }
-  auto* tempCanvas = tempSurface->getCanvas();
+  Recorder patternRecorder;
+  auto* canvas = patternRecorder.beginRecording();
   auto patternMatrix = attrs.fPatternTransform.value_or(Matrix::I());
-  tempCanvas->concat(patternMatrix);
-
-  lengthContext.setPatternUnits(fContentUnits);
-  SVGRenderContext recordingContext(ctx, tempCanvas, lengthContext);
-  contentNode->SkSVGContainer::onRender(recordingContext);
-  context->flushAndSubmit();
-  // {
-  //   tgfx::Bitmap bitmap = {};
-  //   bitmap.allocPixels(tempSurface->width(), tempSurface->height());
-  //   auto* pixels = bitmap.lockPixels();
-  //   auto success = tempSurface->readPixels(bitmap.info(), pixels);
-  //   bitmap.unlockPixels();
-  //   if (!success) {
-  //     return false;
-  //   }
-  //   auto imageData = bitmap.encode();
-  //   imageData->bytes();
-
-  //   std::ofstream out("/Users/yg/Downloads/yg.png", std::ios::binary);
-  //   if (!out) {
-  //     return false;
-  //   }
-  //   out.write(reinterpret_cast<const char*>(imageData->data()),
-  //             static_cast<std::streamsize>(imageData->size()));
-  // }
-  auto shaderImage = tempSurface->makeImageSnapshot();
-  shaderImage = shaderImage->makeTextureImage(context);
+  canvas->concat(patternMatrix);
+  {
+    SVGRenderContext recordingContext(ctx, canvas, lengthContext);
+    contentNode->SkSVGContainer::onRender(recordingContext);
+  }
+  auto picture = patternRecorder.finishRecordingAsPicture();
+  auto shaderImage =
+      Image::MakeFrom(picture, static_cast<int>(tile.width()), static_cast<int>(tile.height()));
   auto shader = Shader::MakeImageShader(shaderImage, TileMode::Repeat, TileMode::Repeat);
   paint->setShader(shader);
   return true;

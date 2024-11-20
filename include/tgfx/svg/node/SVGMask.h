@@ -31,10 +31,10 @@ class SkSVGMask final : public SVGHiddenContainer {
     return std::shared_ptr<SkSVGMask>(new SkSVGMask());
   }
 
-  SVG_ATTR(X, SVGLength, SVGLength(-10, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Y, SVGLength, SVGLength(-10, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Width, SVGLength, SVGLength(120, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Height, SVGLength, SVGLength(120, SVGLength::Unit::kPercentage))
+  SVG_OPTIONAL_ATTR(X, SVGLength)
+  SVG_OPTIONAL_ATTR(Y, SVGLength)
+  SVG_OPTIONAL_ATTR(Width, SVGLength)
+  SVG_OPTIONAL_ATTR(Height, SVGLength)
 
   SVG_ATTR(MaskUnits, SVGObjectBoundingBoxUnits,
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox))

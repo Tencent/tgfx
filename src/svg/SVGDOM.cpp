@@ -30,6 +30,7 @@
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGTypes.h"
@@ -472,17 +473,18 @@ void SVGDOM::render(Canvas* canvas) const {
   if (_root) {
     SVGLengthContext lctx(_containerSize);
     SkSVGPresentationContext pctx;
-    _root->render(
-        SVGRenderContext(canvas, _fontMgr, _nodeIDMapper, lctx, pctx, {nullptr, nullptr}));
+    SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, _fontMgr, _nodeIDMapper,
+                               lctx, pctx, {nullptr, nullptr});
+    _root->render(renderCtx);
   }
 }
 
 void SVGDOM::renderNode(Canvas* canvas, SkSVGPresentationContext& pctx, const char* id) const {
   if (_root) {
     SVGLengthContext lctx(_containerSize);
-    _root->renderNode(
-        SVGRenderContext(canvas, _fontMgr, _nodeIDMapper, lctx, pctx, {nullptr, nullptr}),
-        SVGIRI(SVGIRI::Type::kLocal, SVGStringType(id)));
+    SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, _fontMgr, _nodeIDMapper,
+                               lctx, pctx, {nullptr, nullptr});
+    _root->renderNode(renderCtx, SVGIRI(SVGIRI::Type::kLocal, SVGStringType(id)));
   }
 }
 

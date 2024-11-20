@@ -41,10 +41,8 @@ std::shared_ptr<Shader> SkSVGLinearGradient::onMakeShader(const SVGRenderContext
                                                           const std::vector<Color>& colors,
                                                           const std::vector<float>& positions,
                                                           TileMode, const Matrix&) const {
-  const SVGLengthContext lctx =
-      this->getGradientUnits().type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox
-          ? SVGLengthContext({1, 1})
-          : ctx.lengthContext();
+  SVGLengthContext lctx = ctx.lengthContext();
+  lctx.setPatternUnits(getGradientUnits());
 
   auto startPoint = Point::Make(lctx.resolve(fX1, SVGLengthContext::LengthType::Horizontal),
                                 lctx.resolve(fY1, SVGLengthContext::LengthType::Vertical));

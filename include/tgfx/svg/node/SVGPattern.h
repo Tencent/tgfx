@@ -39,8 +39,10 @@ class SkSVGPattern final : public SVGHiddenContainer {
   SVG_OPTIONAL_ATTR(Width, SVGLength)
   SVG_OPTIONAL_ATTR(Height, SVGLength)
   SVG_OPTIONAL_ATTR(PatternTransform, SVGTransformType)
-  SVG_ATTR(PatternUnits, SVGPatternUnits, SVGPatternUnits::ObjectBoundingBox)
-  SVG_ATTR(ContentUnits, SVGPatternUnits, SVGPatternUnits::UserSpaceOnUse)
+  SVG_ATTR(PatternUnits, SVGObjectBoundingBoxUnits,
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox))
+  SVG_ATTR(ContentUnits, SVGObjectBoundingBoxUnits,
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse))
 
  protected:
   SkSVGPattern();

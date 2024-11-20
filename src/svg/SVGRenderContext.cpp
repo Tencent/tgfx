@@ -19,16 +19,23 @@
 #include "tgfx/svg/SVGRenderContext.h"
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include "core/utils/Log.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/svg/node/SVGClipPath.h"
 #include "tgfx/svg/node/SVGFilter.h"
 #include "tgfx/svg/node/SVGMask.h"
@@ -71,7 +78,7 @@ float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
   switch (l.unit()) {
     case SVGLength::Unit::kNumber: {
       if (_patternUnit.has_value()) {
-        if (_patternUnit.value() == SVGPatternUnits::ObjectBoundingBox) {
+        if (_patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox) {
           return l.value() * length_size_for_type(_viewport, t);
         } else {
           return l.value();
@@ -82,17 +89,8 @@ float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
     }
     case SVGLength::Unit::kPX:
       return l.value();
-    case SVGLength::Unit::kPercentage: {
-      if (_patternUnit.has_value()) {
-        if (_patternUnit.value() == SVGPatternUnits::ObjectBoundingBox) {
-          return l.value() * length_size_for_type(_viewport, t) / 100.f;
-        } else {
-          return l.value() / 100.f;
-        }
-      } else {
-        return l.value() * length_size_for_type(_viewport, t) / 100;
-      }
-    }
+    case SVGLength::Unit::kPercentage:
+      return l.value() * length_size_for_type(_viewport, t) / 100;
     case SVGLength::Unit::kCM:
       return l.value() * _dpi * kCMMultiplier;
     case SVGLength::Unit::kMM:
@@ -145,7 +143,7 @@ LineJoin toSkJoin(const SVGLineJoin& join) {
   }
 }
 
-std::unique_ptr<PathEffect> dash_effect(const SkSVGPresentationAttributes& props,
+std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
                                         const SVGLengthContext& lctx) {
   if (props.fStrokeDashArray->type() != SVGDashArray::Type::kDashArray) {
     return nullptr;
@@ -176,46 +174,65 @@ std::unique_ptr<PathEffect> dash_effect(const SkSVGPresentationAttributes& props
 }  // namespace
 
 SkSVGPresentationContext::SkSVGPresentationContext()
-    : _inherited(SkSVGPresentationAttributes::MakeInitial()) {
+    : _inherited(SVGPresentationAttributes::MakeInitial()) {
 }
 
-SVGRenderContext::SVGRenderContext(Canvas* canvas,
+SVGRenderContext::SVGRenderContext(Context* device, Canvas* canvas,
                                    const std::shared_ptr<SVGFontManager>& fontManager,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lctx,
                                    const SkSVGPresentationContext& pctx, const OBBScope& obbs)
     : _fontMgr(fontManager), _nodeIDMapper(mapper), _lengthContext(lctx),
-      _presentationContext(pctx), _canvas(canvas), _canvasSaveCount(canvas->getSaveCount()),
-      _scope(obbs) {
+      _presentationContext(pctx), _renderCanvas(canvas), _recorder(),
+      _canvas(_recorder.beginRecording()), _scope(obbs), _deviceContext(device) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
-    : SVGRenderContext(other._canvas, other._fontMgr, other._nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, other._scope) {
+    : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
+                       *other._lengthContext, *other._presentationContext, other._scope) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
-    : SVGRenderContext(canvas, other._fontMgr, other._nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, other._scope) {
+    : SVGRenderContext(other._deviceContext, canvas, other._fontMgr, other._nodeIDMapper,
+                       *other._lengthContext, *other._presentationContext, other._scope) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGLengthContext& lengthCtx)
-    : SVGRenderContext(other._canvas, other._fontMgr, other._nodeIDMapper, lengthCtx,
-                       *other._presentationContext, other._scope) {
+    : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
+                       lengthCtx, *other._presentationContext, other._scope) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
                                    const SVGLengthContext& lengthCtx)
-    : SVGRenderContext(canvas, other._fontMgr, other._nodeIDMapper, lengthCtx,
+    : SVGRenderContext(other._deviceContext, canvas, other._fontMgr, other._nodeIDMapper, lengthCtx,
                        *other._presentationContext, other._scope) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
-    : SVGRenderContext(other._canvas, other._fontMgr, other._nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, OBBScope{node, this}) {
+    : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
+                       *other._lengthContext, *other._presentationContext, OBBScope{node, this}) {
 }
 
 SVGRenderContext::~SVGRenderContext() {
-  _canvas->restoreToCount(_canvasSaveCount);
+  _canvas->restoreToCount(0);
+  auto picture = _recorder.finishRecordingAsPicture();
+  if (!picture) {
+    return;
+  }
+
+  _renderCanvas->save();
+  if (_clipPath.has_value()) {
+    _renderCanvas->clipPath(_clipPath.value());
+  }
+  auto matrix = Matrix::I();
+  _renderCanvas->drawPicture(picture, &matrix, &_picturePaint);
+  _renderCanvas->restore();
+}
+
+SVGRenderContext SVGRenderContext::CopyForPaint(const SVGRenderContext& context, Canvas* canvas,
+                                                const SVGLengthContext& lengthCtx) {
+  SVGRenderContext copyContext(context, canvas, lengthCtx);
+  copyContext._deferredPaintOpacity = context._deferredPaintOpacity;
+  return copyContext;
 }
 
 std::shared_ptr<SVGNode> SVGRenderContext::findNodeById(const SVGIRI& iri) const {
@@ -226,9 +243,8 @@ std::shared_ptr<SVGNode> SVGRenderContext::findNodeById(const SVGIRI& iri) const
   return p;
 }
 
-void SVGRenderContext::applyPresentationAttributes(const SkSVGPresentationAttributes& attrs,
+void SVGRenderContext::applyPresentationAttributes(const SVGPresentationAttributes& attrs,
                                                    uint32_t flags) {
-
 #define ApplyLazyInheritedAttribute(ATTR)                                       \
   do {                                                                          \
     /* All attributes should be defined on the inherited context. */            \
@@ -264,41 +280,30 @@ void SVGRenderContext::applyPresentationAttributes(const SkSVGPresentationAttrib
 
 #undef ApplyLazyInheritedAttribute
 
-  // Uninherited attributes.  Only apply to the current context.
+  if (attrs.fClipPath.isValue()) {
+    _clipPath = this->applyClip(*attrs.fClipPath);
+  }
 
   const bool hasFilter = attrs.fFilter.isValue();
   if (attrs.fOpacity.isValue()) {
-    this->applyOpacity(*attrs.fOpacity, flags, hasFilter);
-  }
-
-  if (attrs.fClipPath.isValue()) {
-    this->applyClip(*attrs.fClipPath);
+    _picturePaint.setAlpha(this->applyOpacity(*attrs.fOpacity, flags, hasFilter));
   }
 
   if (attrs.fMask.isValue()) {
-    this->applyMask(*attrs.fMask);
+    if (auto maskFilter = this->applyMask(*attrs.fMask)) {
+      _picturePaint.setMaskFilter(maskFilter);
+    }
   }
 
-  // TODO: when both a filter and opacity are present, we can apply both with a single layer
   if (hasFilter) {
-    this->applyFilter(*attrs.fFilter);
+    if (auto imageFilter = this->applyFilter(*attrs.fFilter)) {
+      _picturePaint.setImageFilter(imageFilter);
+    }
   }
-
-  // Remaining uninherited presentation attributes are accessed as SkSVGNode fields, not via
-  // the render context.
-  // TODO: resolve these in a pre-render styling pass and assert here that they are values.
-  // - stop-color
-  // - stop-opacity
-  // - flood-color
-  // - flood-opacity
-  // - lighting-color
 }
 
-void SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilter) {
-  if (opacity >= 1) {
-    return;
-  }
-
+float SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilter) {
+  opacity = std::clamp(opacity, 0.0f, 1.0f);
   const auto& props = _presentationContext->_inherited;
   const bool hasFill = props.fFill->type() != SVGPaint::Type::kNone;
   const bool hasStroke = props.fStroke->type() != SVGPaint::Type::kNone;
@@ -311,104 +316,125 @@ void SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilte
   // Going forward, we may needto refine this heuristic (e.g. to accommodate markers).
   if ((flags & kLeaf) && (hasFill ^ hasStroke) && !hasFilter) {
     _deferredPaintOpacity *= opacity;
+    return 1.0f;
   } else {
-    // Expensive, layer-based fall back.
-    Paint opacityPaint;
-    opacityPaint.setAlpha(std::clamp(opacity, 0.0f, 1.0f));
-    // Balanced in the destructor, via restoreToCount().
-
-    //TODO (YG)
-    // fCanvas.saveLayer(nullptr, &opacityPaint);
+    return opacity;
   }
 }
 
-void SVGRenderContext::applyFilter(const SVGFuncIRI& filter) {
+std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& filter) {
   if (filter.type() != SVGFuncIRI::Type::kIRI) {
-    return;
+    return nullptr;
   }
 
   const auto node = this->findNodeById(filter.iri());
   if (!node || node->tag() != SVGTag::kFilter) {
-    return;
+    return nullptr;
   }
 
   const auto* filterNode = reinterpret_cast<const SkSVGFilter*>(node.get());
-  auto imageFilter = filterNode->buildFilterDAG(*this);
-  if (imageFilter) {
-    Paint filterPaint;
-    filterPaint.setImageFilter(imageFilter);
-    // Balanced in the destructor, via restoreToCount().
-    //TODO (YG)
-    // fCanvas->saveLayer(nullptr, &filterPaint);
-  }
+  return filterNode->buildFilterDAG(*this);
 }
 
 void SVGRenderContext::saveOnce() {
-  // The canvas only needs to be saved once, per local SVGRenderContext.
-  if (_canvas->getSaveCount() == _canvasSaveCount) {
-    _canvas->save();
-  }
-  ASSERT(_canvas->getSaveCount() > _canvasSaveCount);
+  _canvas->save();
 }
 
-void SVGRenderContext::applyClip(const SVGFuncIRI& clip) {
+Path SVGRenderContext::applyClip(const SVGFuncIRI& clip) {
   if (clip.type() != SVGFuncIRI::Type::kIRI) {
-    return;
+    return Path();
   }
 
   const auto clipNode = this->findNodeById(clip.iri());
   if (!clipNode || clipNode->tag() != SVGTag::kClipPath) {
-    return;
+    return Path();
   }
 
-  const Path clipPath = static_cast<const SVGClipPath*>(clipNode.get())->resolveClip(*this);
-
-  // We use the computed clip path in two ways:
-  //
-  //   - apply to the current canvas, for drawing
-  //   - track in the presentation context, for asPath() composition
-  //
-  // TODO: the two uses are exclusive, avoid canvas churn when non needed.
-
-  this->saveOnce();
-
-  _canvas->clipPath(clipPath);
-  _clipPath = clipPath;
+  return static_cast<const SVGClipPath*>(clipNode.get())->resolveClip(*this);
 }
 
-void SVGRenderContext::applyMask(const SVGFuncIRI& mask) {
+std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) {
   if (mask.type() != SVGFuncIRI::Type::kIRI) {
-    return;
+    return nullptr;
   }
 
   const auto node = this->findNodeById(mask.iri());
   if (!node || node->tag() != SVGTag::kMask) {
-    return;
+    return nullptr;
   }
 
-  const auto* mask_node = static_cast<const SkSVGMask*>(node.get());
-  const auto mask_bounds = mask_node->bounds(*this);
+  auto maskNode = std::static_pointer_cast<SkSVGMask>(node);
+  auto maskBound = maskNode->bounds(*this);
 
-  // Isolation/mask layer.
-  // TODO (YG)
-  // fCanvas->saveLayer(mask_bounds, nullptr);
+  Recorder maskRecorder;
+  auto* maskCanvas = maskRecorder.beginRecording();
+  {
+    SVGRenderContext maskCtx(*this, maskCanvas);
+    maskNode->renderMask(maskCtx);
+  }
+  auto picture = maskRecorder.finishRecordingAsPicture();
+  if (!picture) {
+    return nullptr;
+  }
 
-  // Render and filter mask content.
-  mask_node->renderMask(*this);
+  auto bound = picture->getBounds();
+  maskBound.join(bound);
 
-  // Content layer
-  Paint masking_paint;
-  masking_paint.setBlendMode(BlendMode::SrcIn);
+  // if (!_deviceContext) {
+  //   return nullptr;
+  // }
+  // auto tempSurface = Surface::Make(_deviceContext, static_cast<int>(bound.width()),
+  //                                  static_cast<int>(bound.height()));
+  // if (!tempSurface) {
+  //   return nullptr;
+  // }
+  // auto* tempCanvas = tempSurface->getCanvas();
+  // tempCanvas->translate(bound.x(), bound.y());
+  // // Matrix matrix = Matrix::I();
+  // // Paint paint;
+  // // paint.setColor(Color::Green());
+  // // tempCanvas->drawPicture(picture, &matrix, &paint);
+  // tempCanvas->drawPicture(picture);
+  // // Paint paint;
+  // // paint.setColor(Color::Black());
+  // // tempCanvas->drawCircle(50, 50, 50, paint);
+  // _deviceContext->flushAndSubmit();
+  // auto shaderImage = tempSurface->makeImageSnapshot();
+  // if (!shaderImage) {
+  //   return nullptr;
+  // }
+  auto matrix = Matrix::MakeTrans(-maskBound.left, -maskBound.top);
+  auto shaderImage = Image::MakeFrom(picture, static_cast<int>(bound.width()),
+                                     static_cast<int>(bound.height()), &matrix);
+  // {
+  //   auto tempSurface = Surface::Make(_deviceContext, static_cast<int>(bound.width()) * 2,
+  //                                    static_cast<int>(bound.height()) * 2);
+  //   tempSurface->getCanvas()->clear();
+  //   tempSurface->getCanvas()->drawPicture(picture);
+  //   tgfx::Bitmap bitmap = {};
+  //   bitmap.allocPixels(tempSurface->width(), tempSurface->height());
+  //   auto* pixels = bitmap.lockPixels();
+  //   auto success = tempSurface->readPixels(bitmap.info(), pixels);
+  //   bitmap.unlockPixels();
+  //   if (!success) {
+  //     return nullptr;
+  //   }
+  //   auto imageData = bitmap.encode();
+  //   imageData->bytes();
 
-  // TODO (YG)
-  // fCanvas->saveLayer(mask_bounds, &masking_paint);
-
-  // Content is also clipped to the specified mask bounds.
-  _canvas->clipRect(mask_bounds);
-
-  // At this point we're set up for content rendering.
-  // The pending layers are restored in the destructor (render context scope exit).
-  // Restoring triggers srcIn-compositing the content against the mask.
+  //   std::ofstream out("/Users/yg/Downloads/yg.png", std::ios::binary);
+  //   if (!out) {
+  //     return nullptr;
+  //   }
+  //   out.write(reinterpret_cast<const char*>(imageData->data()),
+  //             static_cast<std::streamsize>(imageData->size()));
+  // }
+  auto shader = Shader::MakeImageShader(shaderImage, TileMode::Decal, TileMode::Decal);
+  if (!shader) {
+    return nullptr;
+  }
+  // return nullptr;
+  return MaskFilter::MakeShader(shader);
 }
 
 std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selector,
@@ -418,7 +444,6 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selecto
   }
 
   std::optional<Paint> p = Paint();
-  p->getAlpha();
   switch (paint_selector.type()) {
     case SVGPaint::Type::kColor:
       p->setColor(this->resolveSvgColor(paint_selector.color()));
@@ -434,7 +459,8 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selecto
       // and node being rendered.
       SkSVGPresentationContext pctx;
       pctx._namedColors = _presentationContext->_namedColors;
-      SVGRenderContext local_ctx(_canvas, _fontMgr, _nodeIDMapper, *_lengthContext, pctx, _scope);
+      SVGRenderContext local_ctx(_deviceContext, _canvas, _fontMgr, _nodeIDMapper, *_lengthContext,
+                                 pctx, _scope);
 
       const auto node = this->findNodeById(paint_selector.iri());
       if (!node || !node->asPaint(local_ctx, &(p.value()))) {

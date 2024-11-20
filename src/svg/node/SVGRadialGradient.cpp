@@ -42,26 +42,21 @@ bool SkSVGRadialGradient::parseAndSetAttribute(const char* name, const char* val
 std::shared_ptr<Shader> SkSVGRadialGradient::onMakeShader(const SVGRenderContext& ctx,
                                                           const std::vector<Color>& colors,
                                                           const std::vector<float>& position,
-                                                          TileMode, const Matrix&) const {
-  SVGLengthContext lctx =
-      this->getGradientUnits().type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox
-          ? SVGLengthContext({1, 1})
-          : ctx.lengthContext();
+                                                          TileMode, const Matrix& matrix) const {
+  SVGLengthContext lctx = ctx.lengthContext();
+  lctx.setPatternUnits(getGradientUnits());
 
   auto radius = lctx.resolve(fR, SVGLengthContext::LengthType::Other);
   auto center = Point::Make(lctx.resolve(fCx, SVGLengthContext::LengthType::Horizontal),
                             lctx.resolve(fCy, SVGLengthContext::LengthType::Vertical));
 
   // TODO(YGAurora): MakeTwoPointConical are unimplemented in tgfx
-  // const auto focal = Point::Make(
-  //     fFx.has_value() ? lctx.resolve(*fFx, SkSVGLengthContext::LengthType::kHorizontal) : center.x,
-  //     fFy.has_value() ? lctx.resolve(*fFy, SkSVGLengthContext::LengthType::kVertical) : center.y);
-
   if (radius == 0) {
     const auto lastColor = colors.size() > 0 ? *colors.end() : Color::Black();
     return Shader::MakeColorShader(lastColor);
   }
-
+  matrix.mapPoints(&center, 1);
+  radius *= matrix.getAxisScales().x;
   return Shader::MakeRadialGradient(center, radius, colors, position);
 }
 #endif

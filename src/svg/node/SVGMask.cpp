@@ -17,9 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGMask.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Recorder.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGAttributeParser.h"
+#include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
@@ -36,46 +42,54 @@ bool SkSVGMask::parseAndSetAttribute(const char* n, const char* v) {
 }
 
 #ifndef RENDER_SVG
-Rect SkSVGMask::bounds(const SVGRenderContext& ctx) const {
-  return ctx.resolveOBBRect(fX, fY, fWidth, fHeight, fMaskUnits);
+Rect SkSVGMask::bounds(const SVGRenderContext& context) const {
+  auto lengthContext = context.lengthContext();
+  lengthContext.setPatternUnits(fMaskUnits);
+  SVGRenderContext resolveContext(context, lengthContext);
+  if (fWidth.has_value() && fHeight.has_value()) {
+    return resolveContext.resolveOBBRect(fX.value_or(SVGLength(0, SVGLength::Unit::kNumber)),
+                                         fY.value_or(SVGLength(0, SVGLength::Unit::kNumber)),
+                                         fWidth.value(), fHeight.value(), fMaskUnits);
+  }
+  return Rect::MakeEmpty();
 }
 
-void SkSVGMask::renderMask(const SVGRenderContext& ctx) const {
-  //TODO (YG)
+/** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
+constexpr float LUM_COEFF_R = 0.2126f;
+constexpr float LUM_COEFF_G = 0.7152f;
+constexpr float LUM_COEFF_B = 0.0722f;
 
+std::array<float, 20> MakeLuminanceToAlpha() {
+  return std::array<float, 20>{0, 0, 0, 0, 0, 0,           0,           0,           0, 0,
+                               0, 0, 0, 0, 0, LUM_COEFF_R, LUM_COEFF_G, LUM_COEFF_B, 0, 0};
+}
+
+void SkSVGMask::renderMask(const SVGRenderContext& context) const {
   // https://www.w3.org/TR/SVG11/masking.html#Masking
-
   // Propagate any inherited properties that may impact mask effect behavior (e.g.
   // color-interpolation). We call this explicitly here because the SkSVGMask
   // nodes do not participate in the normal onRender path, which is when property
   // propagation currently occurs.
   // The local context also restores the filter layer created below on scope exit.
-  SVGRenderContext lctx(ctx);
-  this->onPrepareToRender(&lctx);
 
-  // const auto ci = *lctx.presentationContext()._inherited.fColorInterpolation;
-  // auto ci_filter = (ci == SVGColorspace::kLinearRGB) ? ColorFilters::SRGBToLinearGamma() : nullptr;
-
-  // Paint mask_filter;
-  // MaskFilter::Compose();
-  //     mask_filter.setMaskFilter() mask_filter.setColorFilter(
-  //         SkColorFilters::Compose(SkLumaColorFilter::Make(), std::move(ci_filter)));
-
-  // // Mask color filter layer.
-  // // Note: We could avoid this extra layer if we invert the stacking order
-  // // (mask/content -> content/mask, kSrcIn -> kDstIn) and apply the filter
-  // // via the top (mask) layer paint.  That requires deferring mask rendering
-  // // until after node content, which introduces extra state/complexity.
-  // // Something to consider if masking performance ever becomes an issue.
-  // lctx.canvas()->saveLayer(nullptr, &mask_filter);
-
-  // const auto obbt = ctx.transformForCurrentOBB(fMaskContentUnits);
-  // lctx.canvas()->translate(obbt.offset.x, obbt.offset.y);
-  // lctx.canvas()->scale(obbt.scale.x, obbt.scale.y);
-
-  // for (const auto& child : fChildren) {
-  //   child->render(lctx);
-  // }
+  Recorder recorder;
+  auto* canvas = recorder.beginRecording();
+  {
+    // Ensure the render context is destructed, drawing to the canvas upon destruction
+    SVGRenderContext localContext(context, canvas);
+    this->onPrepareToRender(&localContext);
+    for (const auto& child : fChildren) {
+      child->render(localContext);
+    }
+  }
+  auto picture = recorder.finishRecordingAsPicture();
+  if (!picture) {
+    return;
+  }
+  auto luminanceFilter = ColorFilter::Matrix(MakeLuminanceToAlpha());
+  Paint luminancePaint;
+  luminancePaint.setColorFilter(luminanceFilter);
+  context.canvas()->drawPicture(picture, nullptr, &luminancePaint);
 }
 #endif
 }  // namespace tgfx

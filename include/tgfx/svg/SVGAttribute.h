@@ -74,8 +74,8 @@ enum class SVGAttribute {
   kUnknown,
 };
 
-struct SkSVGPresentationAttributes {
-  static SkSVGPresentationAttributes MakeInitial();
+struct SVGPresentationAttributes {
+  static SVGPresentationAttributes MakeInitial();
 
   // TODO: SVGProperty adds an extra ptr per attribute; refactor to reduce overhead.
 

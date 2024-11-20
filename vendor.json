@@ -231,7 +231,7 @@
           "expat"
         ],
         "arguments": [
-          "-DCMAKE_C_FLAGS=\"-w\""
+          "-DBUILD_SHARED_LIBS=OFF"
         ]
       }
     }

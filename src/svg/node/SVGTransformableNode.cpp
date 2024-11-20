@@ -19,9 +19,9 @@
 #include "tgfx/svg/node/SVGTransformableNode.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGAttribute.h"
+#include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
 
 namespace tgfx {
@@ -35,7 +35,8 @@ bool SkSVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
   if (!fTransform.isIdentity()) {
     auto transform = fTransform;
     if (auto unit = ctx->lengthContext().getPatternUnits();
-        unit.has_value() && unit.value() == SVGPatternUnits::ObjectBoundingBox) {
+        unit.has_value() &&
+        unit.value().type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox) {
       transform.postScale(ctx->lengthContext().viewPort().width,
                           ctx->lengthContext().viewPort().height);
     }

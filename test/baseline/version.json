@@ -151,6 +151,15 @@
         "WebpCodec_Encode_RGB565": "d010fb8",
         "WebpCodec_Encode_RGBA": "d010fb8"
     },
+    "SVGTest": {
+        "blur": "b1db872",
+        "jpg_image": "b1db872",
+        "mask": "b1db872",
+        "path": "b1db872",
+        "png_image": "b1db872",
+        "radialGradient": "b1db872",
+        "text": "b1db872"
+    },
     "SurfaceTest": {
         "ImageSnapshot1": "d010fb8",
         "ImageSnapshot2": "d010fb8",
