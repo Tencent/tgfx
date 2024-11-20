@@ -54,6 +54,11 @@ class App {
         const canvasId = '#realCanvas'; // 更新为实际的 canvas id
         this.figmaRenderer.initialize(canvasId); // 调用 initialize 方法
 
+        this.figmaRenderer.updateShape(); // 调用 updateShape 方法
+
+        this.figmaRenderer.updateShape(); // 调用 updateShape 方法
+
+
         // 初始化
         this.init();
         this.initViewBox(); /* 初始化 viewBox */
