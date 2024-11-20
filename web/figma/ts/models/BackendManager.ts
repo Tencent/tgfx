@@ -8,14 +8,11 @@ declare global {
 }
 
 export default class BackendManager {
-    onMessageReceived: (data: any) => void;
-
     /**
      * 创建后端通信管理器
      * @param onMessageReceived - 接收到消息时的回调
      */
-    constructor(onMessageReceived: (data: any) => void) {
-        this.onMessageReceived = onMessageReceived;
+    constructor() {
         this.initialize();
     }
 
@@ -53,20 +50,5 @@ export default class BackendManager {
                 console.error(`发送失败 (${error_code}): ${error_message}`);
             }
         });
-    }
-
-    /**
-     * 接收来自后端的消息
-     * @param message - 后端消息
-     */
-    receive(message: string): void {
-        if (this.onMessageReceived) {
-            try {
-                const data = JSON.parse(message);
-                this.onMessageReceived(data);
-            } catch (error) {
-                console.error('解析后端消息失败:', error);
-            }
-        }
     }
 }
