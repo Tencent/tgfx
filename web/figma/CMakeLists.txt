@@ -13,7 +13,7 @@ set(TGFX_BUILD_DRAWERS ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../ ./tgfx)
 
-file(GLOB_RECURSE FIGMA_FILES cpp/*.cpp)
+file(GLOB_RECURSE FIGMA_FILES cpp/*.cpp cpp/MessageParser.cpp)
 
 if (DEFINED EMSCRIPTEN)
     add_executable(figma ${FIGMA_FILES})
@@ -40,7 +40,7 @@ if (DEFINED EMSCRIPTEN)
 else ()
     add_library(figma SHARED ${FIGMA_FILES})
 endif ()
-
+target_include_directories(figma PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/json/include)
 target_compile_options(figma PUBLIC ${H2D_COMPILE_OPTIONS})
 target_link_options(figma PUBLIC ${H2D_LINK_OPTIONS})
 target_link_libraries(figma tgfx-drawers tgfx ${HELLO_2D_SHARED_LIBS})

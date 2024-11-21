@@ -1,7 +1,9 @@
 #include "FigmaRenderer.h"
 #include <emscripten/console.h>
-
+#include <nlohmann/json.hpp>
+#include "Element.h"
 #include <iostream>
+#include "MessageParser.h"
 
 void FigmaRenderer::initialize(std::string canvasID) {
   emscripten_log(EM_LOG_CONSOLE, "initialize called， canvasID is %s", canvasID.c_str());
@@ -60,4 +62,12 @@ void FigmaRenderer::updateShape() {
 void FigmaRenderer::handMessage(std::string message){
   // 打印log
   std::cout << "ffjiefan：：handMessage called, message is " << message << std::endl;
+
+  JsMessage jsMessage;
+  if(MessageParser::parseMessage(message, jsMessage)){
+      // 处理解析后的 jsMessage
+      std::cout << "ffjiefan：：handMessage jsMessage.action is " << jsMessage.action << std::endl;
+  } else {
+      std::cerr << "ffjiefan：：handMessage 解析消息失败" << std::endl;
+  }
 }
