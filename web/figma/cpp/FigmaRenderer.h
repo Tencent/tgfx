@@ -1,8 +1,10 @@
-#include <memory>
-#include <string>
-#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include <tgfx/layers/DisplayList.h>
 #include <tgfx/layers/ShapeLayer.h>
+#include <tgfx/layers/Layer.h>
+#include <memory>
+#include <string>
+#include "Element.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 class FigmaRenderer {
  public:
@@ -14,7 +16,13 @@ class FigmaRenderer {
   void handMessage(std::string message);
 
  private:
-  std::shared_ptr<tgfx::Window> tgfx_window_;
-  std::shared_ptr<tgfx::Device> tgfx_device_;
-  std::shared_ptr<tgfx::DisplayList> tgfx_display_list_;
+  void dispatchMessage(const JsMessage& message);
+  void render();
+  tgfx::Layer* getDrawingLayer();
+
+  std::shared_ptr<tgfx::Layer> layer = nullptr;
+  std::shared_ptr<tgfx::Window> tgfx_window_ = nullptr;
+  std::shared_ptr<tgfx::Device> tgfx_device_ = nullptr;
+  std::shared_ptr<tgfx::DisplayList> tgfx_display_list_ = nullptr;
+  bool enableBackend = false;
 };
