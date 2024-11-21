@@ -15,7 +15,6 @@ option(TGFX_USE_QT "Allow build with QT frameworks." OFF)
 option(TGFX_USE_SWIFTSHADER "Allow build with SwiftShader library" OFF)
 option(TGFX_BUILD_SVG "Allow build the svg module" OFF)
 option(TGFX_BUILD_DRAWERS "Build the tgfx-drawers library" OFF)
-option(TGFX_ENABLE_PROFILE "Enable profile" OFF)
 option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
