@@ -72,9 +72,4 @@ export default class BaseElement {
         svg.appendChild(this.element);
     }
 
-    /**
-     * 从数据创建元素
-     * @param data - 元素数据
-     */
-    fromData(data: any): void { /* ...existing code... */ }
 }

@@ -25,7 +25,7 @@ export default class BackendManager {
             // 具体实现取决于后端如何与前端通信
             // 例如，通过WebSockets或其他方式
         } else {
-            console.warn('cefQuery 未定义���后端通信不可用');
+            console.warn('cefQuery 未定义,后端通信不可用');
         }
     }
 
@@ -34,6 +34,14 @@ export default class BackendManager {
      * @param messageObj - 完整的消息对象
      */
     send(messageObj: object): void {
+        this.sendToCef(messageObj);
+    }
+
+    private sendToWASM(messageObj: object) {
+
+    }
+
+    private sendToCef(messageObj: object) {
         if (!(window as any).cefQuery) {
             console.error('cefQuery 未定义，无法发送消息到后端');
             return;

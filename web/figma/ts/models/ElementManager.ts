@@ -96,32 +96,4 @@ export default class ElementManager {
             el.element.style.opacity = '1';
         });
     }
-
-    /**
-     * 从数据加载元素
-     * @param dataList - 元素数据列表
-     */
-    loadFromData(dataList: Array<any>): void {
-        this.elements = [];
-        dataList.forEach(data => {
-            let element;
-            switch (data.tagName) {
-                case 'rect':
-                    element = new Rectangle();
-                    break;
-                case 'circle':
-                    element = new Circle();
-                    break;
-                case 'text':
-                    element = new TextElement();
-                    break;
-                default:
-                    console.error('未知的元素类型:', data.tagName);
-                    return;
-            }
-            element.fromData(data);
-            element.render(this.svgCanvas);
-            this.elements.push(element);
-        });
-    }
 }

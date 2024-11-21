@@ -164,7 +164,6 @@ export default class EventManager {
     enableBackendRendering(): void {
         this.elementManager.setAllElementsVisibility(false);
         this.uiManager.showTooltip('后端渲染已启用', 50, 60);
-        this.setElementsOpacity(0);
         this.sendEnableBackendMessage();
     }
 
@@ -175,7 +174,6 @@ export default class EventManager {
         this.elementManager.setAllElementsVisibility(true);
         this.elementManager.renderAllElements();
         this.uiManager.showTooltip('后端渲染已关闭', 50, 60);
-        this.setElementsOpacity(1);
         this.sendDisableBackendMessage();
     }
 
@@ -447,17 +445,6 @@ export default class EventManager {
     isBackend(): boolean {
         const backendToggle = document.getElementById('backendToggle') as HTMLInputElement;
         return backendToggle.checked;
-    }
-
-    /**
-     * 设置所有元素的透明度
-     * @param opacity - 透明度值 (0-1)
-     */
-    setElementsOpacity(opacity: number): void {
-        const elements = this.elementManager.getElements();
-        elements.forEach(element => {
-            element.element.style.opacity = opacity.toString();
-        });
     }
 
     /**
