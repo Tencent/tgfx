@@ -9,6 +9,7 @@
 void FigmaRenderer::initialize(std::string canvasID) {
   emscripten_log(EM_LOG_CONSOLE, "initialize called， canvasID is %s", canvasID.c_str());
   tgfx_window_ = tgfx::WebGLWindow::MakeFrom(canvasID);
+  canvas_id_ = canvasID;
 }
 
 void FigmaRenderer::invalisize() {
@@ -16,6 +17,11 @@ void FigmaRenderer::invalisize() {
   if (tgfx_window_ == nullptr) {
     return;
   }
+  int width = 0;
+  int height = 0;
+  emscripten_get_canvas_element_size(canvas_id_.c_str(), &width, &height);
+  // 打印宽高
+  std::cout << "ffjiefan：：invalisize width is " << width << ", height is " << height << std::endl;
   tgfx_window_->invalidSize();
 }
 

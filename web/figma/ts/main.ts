@@ -51,6 +51,11 @@ class App {
         this.backendManager = new BackendManager(this.figmaRenderer);
         this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);
 
+        // 监听窗口大小变化
+        window.onresize = () => {
+            this.figmaRenderer.invalisize();
+        };
+
         // 初始化
         this.init();
         this.initViewBox(); /* 初始化 viewBox */
@@ -125,7 +130,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 实例化应用并传入 FigmaModule
     new App(figma);
 });
-
 
 // 确保文件被视为 ES 模块
 export { };
