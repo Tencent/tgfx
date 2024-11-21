@@ -144,6 +144,75 @@ class TextLayer : public Layer {
   TextAlign _textAlign = TextAlign::Left;
   bool _autoWrap = false;
 
-  std::string preprocessNewLines(const std::string& text);
+  class GlyphInfo final {
+   public:
+    GlyphInfo(Unichar unichar, GlyphID glyphID, std::shared_ptr<Typeface> typeface)
+        : _unichar(unichar), _glyphID(glyphID), _typeface(std::move(typeface)) {
+    }
+
+    Unichar getUnichar() const {
+      return _unichar;
+    }
+
+    GlyphID getGlyphID() const {
+      return _glyphID;
+    }
+
+    std::shared_ptr<Typeface> getTypeface() const {
+      return _typeface;
+    }
+
+   private:
+    Unichar _unichar = 0;
+    GlyphID _glyphID = 0;
+    std::shared_ptr<Typeface> _typeface = nullptr;
+  };
+
+  class GlyphLine final {
+   public:
+    GlyphLine() = default;
+
+    void append(const std::shared_ptr<GlyphInfo>& glyphInfo, const float advance) {
+      _glyphInfosAndAdvance.emplace_back(std::move(glyphInfo), advance);
+    }
+
+    size_t getGlyphCount() const {
+      return _glyphInfosAndAdvance.size();
+    }
+
+    std::shared_ptr<GlyphInfo> getGlyphInfo(const size_t index) const {
+      return _glyphInfosAndAdvance[index].first;
+    }
+
+    float getAdvance(const size_t index) const {
+      return _glyphInfosAndAdvance[index].second;
+    }
+
+    float getLineWidth() const {
+      float lineWidth = 0.0f;
+      for (const auto& glyphInfoAndAdvance : _glyphInfosAndAdvance) {
+        lineWidth += glyphInfoAndAdvance.second;
+      }
+      return lineWidth;
+    }
+
+   private:
+    std::vector<std::pair<std::shared_ptr<GlyphInfo>, float>> _glyphInfosAndAdvance = {};
+  };
+
+  static std::string PreprocessNewLines(const std::string& text);
+  static std::vector<std::shared_ptr<GlyphInfo>> ShapeText(
+      const std::string& text, const std::shared_ptr<Typeface>& typeface);
+
+  float calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo, float emptyAdvance) const;
+  float getLineHeight(const std::shared_ptr<GlyphLine>& glyphLine) const;
+  void TruncateGlyphLines(std::vector<std::shared_ptr<GlyphLine>>& glyphLines) const;
+  void resolveTextAlignment(const std::vector<std::shared_ptr<GlyphLine>>& glyphLines,
+                            float emptyAdvance,
+                            std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphInfos,
+                            std::vector<Point>& positions) const;
+  void buildGlyphRunList(const std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphs,
+                         const std::vector<Point>& positions,
+                         std::vector<GlyphRun>& glyphRunList) const;
 };
 }  // namespace tgfx

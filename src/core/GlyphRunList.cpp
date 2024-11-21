@@ -38,8 +38,8 @@ GlyphRunList::GlyphRunList(GlyphRun glyphRun) {
 
 GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
   DEBUG_ASSERT(!_glyphRuns.empty());
-  DEBUG_ASSERT(std::all_of(glyphRuns.begin(), glyphRuns.end(),
-                           [hasColor = glyphRuns[0].font.hasColor()](const GlyphRun& glyphRun) {
+  DEBUG_ASSERT(std::all_of(_glyphRuns.begin(), _glyphRuns.end(),
+                           [hasColor = _glyphRuns[0].font.hasColor()](const GlyphRun& glyphRun) {
                              return !glyphRun.glyphs.empty() &&
                                     glyphRun.glyphs.size() == glyphRun.positions.size() &&
                                     glyphRun.font.hasColor() == hasColor;

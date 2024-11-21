@@ -155,6 +155,14 @@ void ShapeLayer::setStrokeEnd(float end) {
   invalidateContent();
 }
 
+void ShapeLayer::setStrokeAlign(StrokeAlign align) {
+  if (_strokeAlign == align) {
+    return;
+  }
+  _strokeAlign = align;
+  invalidateContent();
+}
+
 ShapeLayer::~ShapeLayer() {
   detachProperty(_strokeStyle.get());
   detachProperty(_fillStyle.get());
@@ -184,7 +192,18 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
           PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
       strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
     }
-    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
+    if (_strokeAlign != StrokeAlign::Center) {
+      auto tempStroke = stroke;
+      tempStroke.width *= 2;
+      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
+      if (_strokeAlign == StrokeAlign::Inside) {
+        strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
+      } else {
+        strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
+      }
+    } else {
+      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
+    }
     auto content =
         std::make_unique<ShapeContent>(std::move(strokeShape), _strokeStyle->getShader());
     contents.push_back(std::move(content));
