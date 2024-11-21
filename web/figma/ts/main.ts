@@ -44,20 +44,12 @@ class App {
         this.uiManager = new UIManager(this.propertiesPanel, this.layersList, (element, attr, value) => {
             this.eventManager.handlePropertyChange(element, attr, value);
         });
-        this.backendManager = new BackendManager();
-        this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);
-
         // 实例化 FigmaRenderer
-        
         this.figmaRenderer = new figma.FigmaRenderer();
-        // 定义 canvas 的 id，对应页面中的真实 canvas 元素
-        const canvasId = '#realCanvas'; // 更新为实际的 canvas id
-        this.figmaRenderer.initialize(canvasId); // 调用 initialize 方法
+        this.figmaRenderer.initialize('#realCanvas');
 
-        this.figmaRenderer.updateShape(); // 调用 updateShape 方法
-
-        this.figmaRenderer.updateShape(); // 调用 updateShape 方法
-
+        this.backendManager = new BackendManager(this.figmaRenderer);
+        this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);
 
         // 初始化
         this.init();
@@ -106,7 +98,6 @@ class App {
         // 监听图形添加事件
         document.addEventListener('shapeAdded', () => {
             this.updateShapeCount();
-            this.figmaRenderer.updateShape(); // 调用 updateShape 方法
         });
     }
 

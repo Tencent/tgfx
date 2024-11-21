@@ -57,3 +57,7 @@ void FigmaRenderer::updateShape() {
 
   tgfx_device_->unlock();
 }
+void FigmaRenderer::handMessage(std::string message){
+  // 打印log
+  std::cout << "ffjiefan：：handMessage called, message is " << message << std::endl;
+}
