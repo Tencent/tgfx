@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
@@ -27,7 +27,7 @@ class SolidContent : public LayerContent {
   SolidContent(const RRect& rRect, const Color& color);
 
   Rect getBounds() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("SolidContent::getBounds");
+    TRACE_ZONE_SCOPED_N("SolidContent::getBounds");
     return _rRect.rect;
   }
 

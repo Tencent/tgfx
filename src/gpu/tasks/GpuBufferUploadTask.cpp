@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GpuBufferUploadTask.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
@@ -36,7 +36,7 @@ GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferT
 }
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("GpuBufferUploadTask::onMakeResource");
+  TRACE_ZONE_SCOPED_N("GpuBufferUploadTask::onMakeResource");
   if (provider == nullptr) {
     return nullptr;
   }

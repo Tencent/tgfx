@@ -19,7 +19,7 @@
 #include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -33,7 +33,7 @@ Device::~Device() {
 }
 
 Context* Device::lockContext() {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME_COLOR("MakeDevice", tracy::Color::ColorType::GreenYellow);
+  TRACE_ZONE_SCOPED_NC("MakeDevice", tracy::Color::ColorType::GreenYellow);
   locker.lock();
   contextLocked = onLockContext();
   if (!contextLocked) {

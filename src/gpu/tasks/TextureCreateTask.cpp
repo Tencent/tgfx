@@ -18,7 +18,7 @@
 
 #include "TextureCreateTask.h"
 #include "gpu/Texture.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(UniqueKey uniqueKey, int width,
@@ -38,7 +38,7 @@ TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height,
 }
 
 std::shared_ptr<Resource> TextureCreateTask::onMakeResource(Context* context) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TextureCreateTask::onMakeResource");
+  TRACE_ZONE_SCOPED_N("TextureCreateTask::onMakeResource");
   auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
   if (texture == nullptr) {
     LOGE("TextureCreateTask::onMakeResource() Failed to create the texture!");

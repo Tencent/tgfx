@@ -19,7 +19,7 @@
 #include <math.h>
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"

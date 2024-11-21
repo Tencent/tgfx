@@ -17,14 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformImage.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {
 }
 
 std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryHardware) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TransformImage::onMakeDecoded");
+  TRACE_ZONE_SCOPED_N("TransformImage::onMakeDecoded");
   auto newSource = source->onMakeDecoded(context, tryHardware);
   if (newSource == nullptr) {
     return nullptr;
@@ -33,7 +33,7 @@ std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryH
 }
 
 std::shared_ptr<Image> TransformImage::onMakeMipmapped(bool enabled) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TransformImage::onMakeMipmapped");
+  TRACE_ZONE_SCOPED_N("TransformImage::onMakeMipmapped");
   auto newSource = source->makeMipmapped(enabled);
   if (newSource == nullptr) {
     return nullptr;

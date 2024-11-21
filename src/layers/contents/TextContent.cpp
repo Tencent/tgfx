@@ -18,16 +18,16 @@
 
 #include "TextContent.h"
 #include "core/GlyphRunList.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 Rect TextContent::getBounds() const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TextContent::getBounds");
+  TRACE_ZONE_SCOPED_N("TextContent::getBounds");
   return textBlob->getBounds();
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TextContent::draw");
+  TRACE_ZONE_SCOPED_N("TextContent::draw");
   auto textPaint = paint;
   auto color = textColor;
   color.alpha *= paint.getAlpha();
@@ -36,7 +36,7 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TextContent::hitTestPoint");
+  TRACE_ZONE_SCOPED_N("TextContent::hitTestPoint");
   if (pixelHitTest) {
     const auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
 

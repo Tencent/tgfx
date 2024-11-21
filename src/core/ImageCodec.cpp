@@ -19,7 +19,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/USE.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
@@ -41,7 +41,7 @@
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("ImageCodec::MakeFrom");
+  TRACE_ZONE_SCOPED_N("ImageCodec::MakeFrom");
   std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream == nullptr || stream->size() <= 14) {
@@ -137,7 +137,7 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("ImageCodec::onMakeBuffer");
+  TRACE_ZONE_SCOPED_N("ImageCodec::onMakeBuffer");
   auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;

@@ -30,7 +30,7 @@
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -64,7 +64,7 @@ class PixelDataConverter : public ImageGenerator {
 };
 
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeFromFile");
+  TRACE_ZONE_SCOPED_N("Image::MakeFromFile");
   auto codec = ImageCodec::MakeFrom(filePath);
   auto image = MakeFrom(codec);
   if (image == nullptr) {
@@ -74,7 +74,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeFromEncoded");
+  TRACE_ZONE_SCOPED_N("Image::MakeFromEncoded");
   auto codec = ImageCodec::MakeFrom(std::move(encodedData));
   auto image = MakeFrom(codec);
   if (image == nullptr) {
@@ -84,7 +84,7 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
 }
 
 std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeFromNativeImageRef");
+  TRACE_ZONE_SCOPED_N("Image::MakeFromNativeImageRef");
   auto codec = ImageCodec::MakeFrom(nativeImage);
   auto image = MakeFrom(codec);
   if (image == nullptr) {
@@ -94,7 +94,7 @@ std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeFromPixelsData");
+  TRACE_ZONE_SCOPED_N("Image::MakeFromPixelsData");
   if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
     return nullptr;
   }
@@ -107,31 +107,31 @@ std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Da
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeFromBitmap");
+  TRACE_ZONE_SCOPED_N("Image::MakeFromBitmap");
   return MakeFrom(bitmap.makeBuffer());
 }
 
 std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeFromHardwareBufferRef");
+  TRACE_ZONE_SCOPED_N("Image::MakeFromHardwareBufferRef");
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
   return MakeFrom(std::move(buffer));
 }
 
 std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeI420");
+  TRACE_ZONE_SCOPED_N("Image::MakeI420");
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));
 }
 
 std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeNV12");
+  TRACE_ZONE_SCOPED_N("Image::MakeNV12");
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                        ImageOrigin origin) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeFromBackendTexture");
+  TRACE_ZONE_SCOPED_N("Image::MakeFromBackendTexture");
   if (context == nullptr) {
     return nullptr;
   }
@@ -141,7 +141,7 @@ std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& b
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
                                           ImageOrigin origin) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::MakeAdopted");
+  TRACE_ZONE_SCOPED_N("Image::MakeAdopted");
   if (context == nullptr) {
     return nullptr;
   }
@@ -155,19 +155,19 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
 
 std::shared_ptr<Image> Image::makeRasterized(bool mipmapped,
                                              const SamplingOptions& sampling) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeRasterized");
+  TRACE_ZONE_SCOPED_N("Image::makeRasterized");
   return RasterImage::MakeFrom(weakThis.lock(), mipmapped, sampling);
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context,
                                                const SamplingOptions& sampling) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeTextureImage");
+  TRACE_ZONE_SCOPED_N("Image::makeTextureImage");
   TPArgs args(context, 0, hasMipmaps());
   return TextureImage::Wrap(lockTextureProxy(args, sampling));
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeDecoded");
+  TRACE_ZONE_SCOPED_N("Image::makeDecoded");
   if (isFullyDecoded()) {
     return weakThis.lock();
   }
@@ -183,7 +183,7 @@ std::shared_ptr<Image> Image::onMakeDecoded(Context*, bool) const {
 }
 
 std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeMipmapped");
+  TRACE_ZONE_SCOPED_N("Image::makeMipmapped");
   if (hasMipmaps() == enabled) {
     return weakThis.lock();
   }
@@ -191,7 +191,7 @@ std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
 }
 
 std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeSubset");
+  TRACE_ZONE_SCOPED_N("Image::makeSubset");
   auto rect = subset;
   rect.round();
   auto bounds = Rect::MakeWH(width(), height());
@@ -205,7 +205,7 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> Image::makeScaled(float scaleX, float scaleY) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeScaled");
+  TRACE_ZONE_SCOPED_N("Image::makeScaled");
   auto w = width();
   auto h = height();
   auto scaledWidth = ScaleImage::GetSize(w, scaleX);
@@ -217,12 +217,12 @@ std::shared_ptr<Image> Image::makeScaled(float scaleX, float scaleY) const {
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::onMakeSubset");
+  TRACE_ZONE_SCOPED_N("Image::onMakeSubset");
   return SubsetImage::MakeFrom(weakThis.lock(), subset);
 }
 
 std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeOriented");
+  TRACE_ZONE_SCOPED_N("Image::makeOriented");
   if (orientation == Orientation::TopLeft) {
     return weakThis.lock();
   }
@@ -230,30 +230,30 @@ std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
 }
 
 std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::onMakeOriented");
+  TRACE_ZONE_SCOPED_N("Image::onMakeOriented");
   return OrientImage::MakeFrom(weakThis.lock(), orientation);
 }
 
 std::shared_ptr<Image> Image::onMakeScaled(float scaleX, float scaleY) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::onMakeScaled");
+  TRACE_ZONE_SCOPED_N("Image::onMakeScaled");
   return ScaleImage::MakeFrom(weakThis.lock(), Point::Make(scaleX, scaleY));
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                              const Rect* clipRect) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeWithFilter");
+  TRACE_ZONE_SCOPED_N("Image::makeWithFilter");
   return onMakeWithFilter(std::move(filter), offset, clipRect);
 }
 
 std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                                const Rect* clipRect) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::onMakeWithFilter");
+  TRACE_ZONE_SCOPED_N("Image::onMakeWithFilter");
   return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect);
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                          int alphaStartY) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Image::makeRGBAAA");
+  TRACE_ZONE_SCOPED_N("Image::makeRGBAAA");
   if (alphaStartX == 0 && alphaStartY == 0) {
     return makeSubset(Rect::MakeWH(displayWidth, displayHeight));
   }

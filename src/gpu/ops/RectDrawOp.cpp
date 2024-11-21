@@ -21,7 +21,7 @@
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -47,7 +47,7 @@ class RectCoverageVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("RectCoverageVerticesProvider::getData");
+    TRACE_ZONE_SCOPED_N("RectCoverageVerticesProvider::getData");
     auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 9 : 5);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
@@ -103,7 +103,7 @@ class RectNonCoverageVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("RectNonCoverageVerticesProvider::getData");
+    TRACE_ZONE_SCOPED_N("RectNonCoverageVerticesProvider::getData");
     auto floatCount = rectPaints.size() * 4 * (hasColor ? 8 : 4);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
@@ -138,7 +138,7 @@ class RectNonCoverageVerticesProvider : public DataProvider {
 
 std::unique_ptr<RectDrawOp> RectDrawOp::Make(std::optional<Color> color, const Rect& rect,
                                              const Matrix& viewMatrix, const Matrix* uvMatrix) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("RectDrawOp::Make");
+  TRACE_ZONE_SCOPED_N("RectDrawOp::Make");
   return std::unique_ptr<RectDrawOp>(new RectDrawOp(color, rect, viewMatrix, uvMatrix));
 }
 
@@ -172,7 +172,7 @@ bool RectDrawOp::needsIndexBuffer() const {
 }
 
 void RectDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("RectDrawOp::prepare");
+  TRACE_ZONE_SCOPED_N("RectDrawOp::prepare");
   if (needsIndexBuffer()) {
     if (aa == AAType::Coverage) {
       indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
@@ -196,7 +196,7 @@ void RectDrawOp::prepare(Context* context, uint32_t renderFlags) {
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("RectDrawOp::execute");
+  TRACE_ZONE_SCOPED_N("RectDrawOp::execute");
   std::shared_ptr<GpuBuffer> indexBuffer;
   if (needsIndexBuffer()) {
     if (indexBufferProxy == nullptr) {

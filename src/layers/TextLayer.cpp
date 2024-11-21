@@ -19,7 +19,7 @@
 #include "tgfx/layers/TextLayer.h"
 #include "core/utils/Log.h"
 #include "layers/contents/TextContent.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -38,7 +38,7 @@ std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
 }
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TextLayer::Make");
+  TRACE_ZONE_SCOPED_N("TextLayer::Make");
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
   layer->weakThis = layer;
   return layer;

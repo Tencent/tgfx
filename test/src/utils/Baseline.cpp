@@ -24,7 +24,7 @@
 #include <unordered_set>
 #include "base/TGFXTest.h"
 #include "nlohmann/json.hpp"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Surface.h"
@@ -113,7 +113,7 @@ bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::stri
 }
 
 bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string& key) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("Baseline::Compare");
+  TRACE_ZONE_SCOPED_N("Baseline::Compare");
   if (surface == nullptr) {
     return false;
   }

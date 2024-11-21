@@ -21,7 +21,7 @@
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -131,7 +131,7 @@ class RRectVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectVerticesProvider::getData");
+    TRACE_ZONE_SCOPED_N("RRectVerticesProvider::getData");
     auto floatCount = rRectPaints.size() * 4 * 48;
     if (useScale) {
       floatCount += rRectPaints.size() * 4 * 4;
@@ -262,7 +262,7 @@ class RRectIndicesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectIndicesProvider::getData");
+    TRACE_ZONE_SCOPED_N("RRectIndicesProvider::getData");
     auto bufferSize = rRectPaints.size() * kIndicesPerFillRRect * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
@@ -282,7 +282,7 @@ class RRectIndicesProvider : public DataProvider {
 
 std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Color color, const RRect& rRect,
                                                const Matrix& viewMatrix) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectDrawOp::Make");
+  TRACE_ZONE_SCOPED_N("RRectDrawOp::Make");
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
     return nullptr;
@@ -318,7 +318,7 @@ static bool UseScale(Context* context) {
 }
 
 void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectDrawOp::prepare");
+  TRACE_ZONE_SCOPED_N("RRectDrawOp::prepare");
   auto indexProvider = std::make_shared<RRectIndicesProvider>(rRectPaints);
   indexBufferProxy =
       GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
@@ -334,7 +334,7 @@ void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("RRectDrawOp::execute");
+  TRACE_ZONE_SCOPED_N("RRectDrawOp::execute");
   if (indexBufferProxy == nullptr) {
     return;
   }

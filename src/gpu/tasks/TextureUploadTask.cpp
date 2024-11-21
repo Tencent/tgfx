@@ -18,7 +18,7 @@
 
 #include "TextureUploadTask.h"
 #include "gpu/Texture.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::shared_ptr<TextureUploadTask> TextureUploadTask::MakeFrom(
@@ -36,7 +36,7 @@ TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<ImageD
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("TextureUploadTask::onMakeResource");
+  TRACE_ZONE_SCOPED_N("TextureUploadTask::onMakeResource");
   if (decoder == nullptr) {
     return nullptr;
   }

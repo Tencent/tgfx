@@ -21,7 +21,7 @@
 #include "NativeImageBuffer.h"
 #include "core/utils/Log.h"
 #include "platform/android/AHardwareBufferFunctions.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
 
@@ -322,7 +322,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("NativeCodec::onMakeBuffer");
+  TRACE_ZONE_SCOPED_N("NativeCodec::onMakeBuffer");
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {

@@ -66,9 +66,9 @@
         "dir": "third_party/expat"
       },
       {
-        "url": "${PAG_GROUP}/traceprofiler.git",
-        "commit": "0e536b15815e7020e6b8d8a03fed1c5bcba90887",
-        "dir": "third_party/tracyprofile"
+        "url": "${PAG_GROUP}/tracy.git",
+        "commit": "759b4c3bfe207ab382c01080f0417aca5af4411a",
+        "dir": "third_party/tracy"
       }
     ]
   },

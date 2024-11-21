@@ -18,7 +18,7 @@
 
 #include "ImageDecoder.h"
 #include "core/utils/DataTask.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 
@@ -41,7 +41,7 @@ class ImageBufferWrapper : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("ImageBufferWrapper::decode");
+    TRACE_ZONE_SCOPED_N("ImageBufferWrapper::decode");
     return imageBuffer;
   }
 
@@ -68,7 +68,7 @@ class ImageGeneratorWrapper : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("ImageGeneratorWrapper::decode");
+    TRACE_ZONE_SCOPED_N("ImageGeneratorWrapper::decode");
     return imageGenerator->makeBuffer(tryHardware);
   }
 

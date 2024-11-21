@@ -25,10 +25,10 @@
       }
     },
     {
-      "name": "tracyprofile",
+      "name": "tracy",
       "cmake": {
         "targets": [
-          "TracyProfile"
+          "TracyClient"
         ],
         "arguments": [
           "-DCMAKE_CXX_FLAGS=\"-w\""

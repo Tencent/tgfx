@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/layers/LayerContent.h"
 
@@ -28,7 +28,7 @@ class ShapeContent : public LayerContent {
   ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
 
   Rect getBounds() const override {
-    TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeContent::getBounds");
+    TRACE_ZONE_SCOPED_N("ShapeContent::getBounds");
     return shape->getBounds();
   }
 

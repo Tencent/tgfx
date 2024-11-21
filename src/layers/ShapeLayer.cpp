@@ -18,13 +18,13 @@
 
 #include "tgfx/layers/ShapeLayer.h"
 #include "layers/contents/ShapeContent.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("ShapeLayer::Make");
+  TRACE_ZONE_SCOPED_N("ShapeLayer::Make");
   auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
   layer->weakThis = layer;
   return layer;

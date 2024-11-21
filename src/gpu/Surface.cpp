@@ -22,12 +22,12 @@
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/RenderContext.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME_COLOR("Surface::Make", tracy::Color::ColorType::Yellow);
+  TRACE_ZONE_SCOPED_NC("Surface::Make", tracy::Color::ColorType::Yellow);
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
               sampleCount, mipmapped, renderFlags);
 }

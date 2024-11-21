@@ -23,7 +23,7 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
-#include "profileClient/Profile.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
@@ -82,9 +82,9 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
 }
 
 bool DrawingManager::flush() {
-  TGFX_PROFILE_ZONE_SCOPPE_NAME("DrawingManager::flush");
+  TRACE_ZONE_SCOPED_N("DrawingManager::flush");
   if (resourceTasks.empty() && renderTasks.empty()) {
-    TGFX_PROFILE_FRAME_MARK;
+    FRAME_MARK;
     return false;
   }
   if (activeOpsTask) {
@@ -110,7 +110,7 @@ bool DrawingManager::flush() {
     task->execute(context->gpu());
   }
   renderTasks = {};
-  TGFX_PROFILE_FRAME_MARK;
+  FRAME_MARK;
   return true;
 }
 

@@ -15,36 +15,32 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#pragma once
+#ifdef TGFX_ENABLE_PROFILER
+#include "public/tracy/Tracy.hpp"
+#include "public/common/TracySystem.hpp"
 
-#include "tgfx/layers/DisplayList.h"
-#include "layers/DrawArgs.h"
-#include "core/utils/Profiling.h"
+#define TRACE_ZONE_SCOPED ZoneScopedN
+#define TRACE_ZONE_SCOPED_N(name) ZoneScopedN(name)
+#define TRACE_ZONE_SCOPED_C(color) ZoneScopedC(color)
+#define TRACE_ZONE_SCOPED_NC(name, color) ZoneScopedNC(name, color)
 
-namespace tgfx {
+#define FRAME_MARK FrameMark
+#define FRAME_MARK_NAME(name) FrameMarkNamed(name)
+#define FRAME_MARK_START(name) FrameMarkStart(name)
+#define FRAME_MARK_START_END(name) FrameMarkEnd(name)
 
-DisplayList::DisplayList() : _root(Layer::Make()) {
-  _root->_root = _root.get();
-}
+#define TRACY_THREAD_NAME(name) tracy::SetThreadName(name)
+#else
+#define TRACE_ZONE_SCOPED
+#define TRACE_ZONE_SCOPED_N(name)
+#define TRACE_ZONE_SCOPED_C(color)
+#define TRACE_ZONE_SCOPED_NC(name, color)
 
-Layer* DisplayList::root() const {
-  return _root.get();
-}
+#define FRAME_MARK
+#define FRAME_MARK_NAME(name)
+#define FRAME_MARK_START(name)
+#define FRAME_MARK_START_END(name)
 
-bool DisplayList::render(Surface* surface, bool replaceAll) {
-  TRACE_ZONE_SCOPED_N("DisplayList::render");
-  if (!surface || (replaceAll && surface->_uniqueID == surfaceID &&
-                   surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirty)) {
-    return false;
-  }
-  auto canvas = surface->getCanvas();
-  if (replaceAll) {
-    canvas->clear();
-  }
-  DrawArgs args(surface->getContext(), surface->renderFlags(), true);
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-  surfaceContentVersion = surface->contentVersion();
-  surfaceID = surface->_uniqueID;
-  return true;
-}
-
-}  // namespace tgfx
+#define TRACY_THREAD_NAME(name)
+#endif
