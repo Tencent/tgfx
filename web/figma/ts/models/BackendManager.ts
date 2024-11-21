@@ -30,6 +30,82 @@ export default class BackendManager {
     }
 
     /**
+     * 发送启用后端渲染的消息到后端
+     */
+    sendEnableBackendMessage(elementDataList: any[], canvasRect : any, viewBox: any): void {
+        const messageObj = {
+            action: 'enableBackend',
+            canvasRect: canvasRect,
+            viewBox: viewBox,
+            elements: elementDataList
+        };
+        this.send(messageObj);
+    }
+
+    /**
+     * 发送禁用后端渲染的消息到后端
+     */
+    sendDisableBackendMessage(): void {
+        const messageObj = {
+            action: 'disableBackend',
+        };
+        this.send(messageObj);
+    }
+
+
+    sendMoveMessage(elements: any[]): void {
+        if (!this.isBackend()) {
+            return;
+        }
+        const messageObj = {
+            action: 'move',
+            elements: elements
+        };
+        this.send(messageObj);
+    }
+
+    /**
+     * 发送更新元素的消息到后端
+     * @param elements - 元素数据
+     */
+    sendUpdateMessage(elements: any[], canvasRect : any, viewBox: any): void {
+        if (!this.isBackend()) {
+            return;
+        }
+        const messageObj = {
+            action: 'update',
+            canvasRect: canvasRect,
+            viewBox: viewBox,
+            elements: elements
+        };
+        this.send(messageObj);
+    }
+
+    /**
+     * 发送画布平移的消息到后端
+     */
+    sendCanvasPanMessage(canvasRect : any, viewBox: any): void {
+        if (!this.isBackend()) {
+            return;
+        }
+        const messageObj = {
+            action: 'canvasPan',
+            canvasRect: canvasRect,
+            viewBox: viewBox,
+        };
+        this.send(messageObj);
+    }
+
+    /**
+     * 判断是否启用后端渲染
+     * @returns 是否启用
+     */
+    isBackend(): boolean {
+        const backendToggle = document.getElementById('backendToggle') as HTMLInputElement;
+        return backendToggle.checked;
+    }
+
+    /**
      * 发送消息到后端
      * @param messageObj - 完整的消息对象
      */

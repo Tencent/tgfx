@@ -41,7 +41,7 @@ export default class EventManager {
         this.isCanvasDragging = false;
         this.canvasStartX = 0;
         this.canvasStartY = 0;
-        this.viewBox = { x: 0, y: 0, width: 1000, height: 800 };
+        this.viewBox = {x: 0, y: 0, width: 1000, height: 800};
         this.isPerformanceTestRunning = false;
         this.animationFrameId = null;
         this.initEvents();
@@ -83,7 +83,7 @@ export default class EventManager {
                 }
             }
             this.updateLayers();
-            this.sendUpdateMessage(elementList);
+            this.backendManager.sendUpdateMessage(elementList, this.getCanvasRect(), this.viewBox);
             // 触发自定义事件以通知图形已添加
             const event = new CustomEvent('shapeAdded');
             document.dispatchEvent(event);
@@ -148,7 +148,7 @@ export default class EventManager {
             this.uiManager.showProperties(element);
             this.uiManager.showTooltip(tooltip, 50, 60);
             this.updateLayers();
-            this.sendUpdateMessage([this.getElementData(element)]);
+            this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
             if (this.isBackend()) {
                 element.element.style.opacity = '0';
             }
@@ -164,7 +164,9 @@ export default class EventManager {
     enableBackendRendering(): void {
         this.elementManager.setAllElementsVisibility(false);
         this.uiManager.showTooltip('后端渲染已启用', 50, 60);
-        this.sendEnableBackendMessage();
+        const elements = this.elementManager.getElements();
+        const elementDataList = elements.map(element => this.getElementData(element));
+        this.backendManager.sendEnableBackendMessage(elementDataList, this.getCanvasRect(), this.viewBox);
     }
 
     /**
@@ -174,75 +176,7 @@ export default class EventManager {
         this.elementManager.setAllElementsVisibility(true);
         this.elementManager.renderAllElements();
         this.uiManager.showTooltip('后端渲染已关闭', 50, 60);
-        this.sendDisableBackendMessage();
-    }
-
-    sendMoveMessage(elements: any[]): void {
-        if (!this.isBackend()) {
-            return;
-        }
-        const messageObj = {
-            action: 'move',
-            elements: elements
-        };
-        this.backendManager.send(messageObj);
-    }
-
-    /**
-     * 发送更新元素的消息到后端
-     * @param elements - 元素数据
-     */
-    sendUpdateMessage(elements: any[]): void {
-        if (!this.isBackend()) {
-            return;
-        }
-        const messageObj = {
-            action: 'update',
-            canvasRect: this.getCanvasRect(),
-            viewBox: this.viewBox,
-            elements: elements
-        };
-        this.backendManager.send(messageObj);
-    }
-
-    /**
-     * 发送画布平移的消息到后端
-     */
-    sendCanvasPanMessage(): void {
-        if (!this.isBackend()) {
-            return;
-        }
-        const messageObj = {
-            action: 'canvasPan',
-            canvasRect: this.getCanvasRect(),
-            viewBox: this.viewBox
-        };
-        this.backendManager.send(messageObj);
-    }
-
-    /**
-     * 发送启用后端渲染的消息到后端
-     */
-    sendEnableBackendMessage(): void {
-        const elements = this.elementManager.getElements();
-        const elementDataList = elements.map(element => this.getElementData(element));
-        const messageObj = {
-            action: 'enableBackend',
-            canvasRect: this.getCanvasRect(),
-            viewBox: this.viewBox,
-            elements: elementDataList
-        };
-        this.backendManager.send(messageObj);
-    }
-
-    /**
-     * 发送禁用后端渲染的消息到后端
-     */
-    sendDisableBackendMessage(): void {
-        const messageObj = {
-            action: 'disableBackend',
-        };
-        this.backendManager.send(messageObj);
+        this.backendManager.sendDisableBackendMessage();
     }
 
     /**
@@ -311,10 +245,10 @@ export default class EventManager {
         if (this.isDragging && this.draggingElement) {
             const mousePos = this.getMousePosition(e);
             this.updateElementPosition(this.draggingElement, mousePos);
-            this.sendUpdateMessage([this.getElementData(this.draggingElement)]);
+            this.backendManager.sendUpdateMessage([this.getElementData(this.draggingElement)], this.getCanvasRect(), this.viewBox);
         } else if (this.isCanvasDragging) {
             this.updateViewBox(e);
-            this.sendCanvasPanMessage();
+            this.backendManager.sendCanvasPanMessage(this.getCanvasRect(), this.viewBox);
         }
     }
 
@@ -391,7 +325,7 @@ export default class EventManager {
                 element.setAttribute(attribute, value);
             }
 
-            this.sendUpdateMessage([this.getElementData(element)]);
+            this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
         } catch (error) {
             console.error(`设置属性失败: ${attribute} = ${value}`, error);
         }
@@ -572,7 +506,7 @@ export default class EventManager {
             elementInfoList.push(this.getElementData(element));
         });
 
-        this.sendUpdateMessage(elementInfoList);
+        this.backendManager.sendUpdateMessage(elementInfoList, this.getCanvasRect(), this.viewBox);
         // 使用 requestAnimationFrame 调度下一帧
         if (this.isPerformanceTestRunning) {
             this.animationFrameId = requestAnimationFrame(() => this.animateElements());
