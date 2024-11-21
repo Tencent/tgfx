@@ -1732,4 +1732,48 @@ TGFX_TEST(LayerTest, InnerShadowFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/innerShadow"));
   device->unlock();
 }
+
+TGFX_TEST(LayerTest, DirtyFlag) {
+  auto device = DevicePool::Make();
+  auto displayList = std::make_unique<DisplayList>();
+
+  EXPECT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 100, 100);
+  auto child = ImageLayer::Make();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
+  child->setImage(image);
+  displayList->root()->addChild(child);
+
+  auto grandChild = ImageLayer::Make();
+  grandChild->setImage(image);
+  grandChild->setMatrix(Matrix::MakeTrans(10, 10));
+  grandChild->setVisible(false);
+  child->addChild(grandChild);
+
+  displayList->render(surface.get());
+
+  auto root = displayList->root();
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
+  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+
+  grandChild->setVisible(true);
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(child->bitFields.childrenDirty);
+  EXPECT_TRUE(root->bitFields.childrenDirty);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
+  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+
+  child->setVisible(false);
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
+  EXPECT_TRUE(root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+
+  device->unlock();
+}
 }  // namespace tgfx
