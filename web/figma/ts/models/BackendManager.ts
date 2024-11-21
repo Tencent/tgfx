@@ -8,11 +8,13 @@ declare global {
 }
 
 export default class BackendManager {
+    figmaRenderer: any; // 修改类型为 any 或者适当的类型
+
     /**
      * 创建后端通信管理器
-     * @param onMessageReceived - 接收到消息时的回调
      */
-    constructor() {
+    constructor(figmaRenderer: any) {
+        this.figmaRenderer = figmaRenderer;
         this.initialize();
     }
 
@@ -32,7 +34,7 @@ export default class BackendManager {
     /**
      * 发送启用后端渲染的消息到后端
      */
-    sendEnableBackendMessage(elementDataList: any[], canvasRect : any, viewBox: any): void {
+    sendEnableBackendMessage(elementDataList: any[], canvasRect: any, viewBox: any): void {
         const messageObj = {
             action: 'enableBackend',
             canvasRect: canvasRect,
@@ -68,7 +70,7 @@ export default class BackendManager {
      * 发送更新元素的消息到后端
      * @param elements - 元素数据
      */
-    sendUpdateMessage(elements: any[], canvasRect : any, viewBox: any): void {
+    sendUpdateMessage(elements: any[], canvasRect: any, viewBox: any): void {
         if (!this.isBackend()) {
             return;
         }
@@ -84,7 +86,7 @@ export default class BackendManager {
     /**
      * 发送画布平移的消息到后端
      */
-    sendCanvasPanMessage(canvasRect : any, viewBox: any): void {
+    sendCanvasPanMessage(canvasRect: any, viewBox: any): void {
         if (!this.isBackend()) {
             return;
         }
@@ -110,11 +112,11 @@ export default class BackendManager {
      * @param messageObj - 完整的消息对象
      */
     send(messageObj: object): void {
-        this.sendToCef(messageObj);
+        this.sendToWASM(messageObj);
     }
 
     private sendToWASM(messageObj: object) {
-
+        this.figmaRenderer.handMessage(JSON.stringify(messageObj));
     }
 
     private sendToCef(messageObj: object) {

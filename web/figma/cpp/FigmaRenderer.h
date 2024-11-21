@@ -11,6 +11,7 @@ class FigmaRenderer {
   void initialize(std::string canvasID);
   void invalisize();
   void updateShape();
+  void handMessage(std::string message);
 
  private:
   std::shared_ptr<tgfx::Window> tgfx_window_;

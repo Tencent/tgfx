@@ -24,7 +24,7 @@ export default class UIManager {
      * @param element - 选中的元素
      */
     showProperties(element: BaseElement | null): void {
-        console.log('显示属性面板:', element);
+        // console.log('显示属性面板:', element);
         if (!element) {
             this.propertiesPanel.innerHTML = '<p>选择一个元素以编辑其属性。</p>';
             return;
