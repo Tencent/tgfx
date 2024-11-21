@@ -24,7 +24,8 @@ export default class BaseElement {
      */
     getAttributes(): { [key: string]: string } {
         const attrs: { [key: string]: string } = {};
-        for (let attr of this.element.attributes) {
+        const attributes = Array.from(this.element.attributes);
+        for (let attr of attributes) {
             attrs[attr.name] = attr.value;
         }
         return attrs;
