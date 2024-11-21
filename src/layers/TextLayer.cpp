@@ -19,8 +19,8 @@
 #include "tgfx/layers/TextLayer.h"
 #include "core/utils/Log.h"
 #include "layers/contents/TextContent.h"
-#include "tgfx/core/UTF.h"
 #include "profileClient/Profile.h"
+#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 

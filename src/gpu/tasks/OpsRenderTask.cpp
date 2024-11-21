@@ -21,7 +21,6 @@
 #include "gpu/RenderPass.h"
 #include "profileClient/Profile.h"
 
-
 namespace tgfx {
 void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
   if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {

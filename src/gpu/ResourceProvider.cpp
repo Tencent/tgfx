@@ -19,8 +19,8 @@
 #include "ResourceProvider.h"
 #include "GradientCache.h"
 #include "core/utils/Log.h"
-#include "tgfx/core/Buffer.h"
 #include "profileClient/Profile.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 class PatternedIndexBufferProvider : public DataProvider {

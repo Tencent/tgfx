@@ -23,9 +23,9 @@
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
 #include "layers/contents/RasterizedContent.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
-#include "profileClient/Profile.h"
 
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;

@@ -24,11 +24,11 @@
 #include <unordered_set>
 #include "base/TGFXTest.h"
 #include "nlohmann/json.hpp"
+#include "profileClient/Profile.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
-#include "profileClient/Profile.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 

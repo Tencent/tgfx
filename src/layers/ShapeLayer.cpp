@@ -18,9 +18,9 @@
 
 #include "tgfx/layers/ShapeLayer.h"
 #include "layers/contents/ShapeContent.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
-#include "profileClient/Profile.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {

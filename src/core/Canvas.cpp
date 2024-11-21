@@ -21,10 +21,9 @@
 #include "core/LayerUnrollContext.h"
 #include "core/Records.h"
 #include "core/utils/Log.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Surface.h"
-#include "profileClient/Profile.h"
-
 
 namespace tgfx {
 Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {

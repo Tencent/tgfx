@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "profileClient/Profile.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/layers/LayerContent.h"
-#include "profileClient/Profile.h"
 
 namespace tgfx {
 class ShapeContent : public LayerContent {

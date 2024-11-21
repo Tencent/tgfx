@@ -24,8 +24,8 @@
 #include "gpu/Quad.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "tgfx/core/Buffer.h"
 #include "profileClient/Profile.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shape> shape,

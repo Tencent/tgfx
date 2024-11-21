@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DevicePool.h"
-#include "profileClient/Profile.h"
 #include <thread>
 #include <unordered_map>
+#include "profileClient/Profile.h"
 
 namespace tgfx {
 thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;

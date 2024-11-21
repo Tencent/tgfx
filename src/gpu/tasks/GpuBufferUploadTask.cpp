@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GpuBufferUploadTask.h"
-#include "tgfx/core/Task.h"
 #include "profileClient/Profile.h"
+#include "tgfx/core/Task.h"
 
 namespace tgfx {
 std::shared_ptr<GpuBufferUploadTask> GpuBufferUploadTask::MakeFrom(

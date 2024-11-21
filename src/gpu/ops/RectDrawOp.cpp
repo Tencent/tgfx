@@ -21,9 +21,9 @@
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/RenderFlags.h"
-#include "profileClient/Profile.h"
 
 namespace tgfx {
 class RectPaint {

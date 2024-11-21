@@ -21,9 +21,9 @@
 #include "NativeImageBuffer.h"
 #include "core/utils/Log.h"
 #include "platform/android/AHardwareBufferFunctions.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
-#include "profileClient/Profile.h"
 
 namespace tgfx {
 static Global<jclass> ColorSpaceClass;

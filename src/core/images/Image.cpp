@@ -30,9 +30,9 @@
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
-#include "profileClient/Profile.h"
 
 namespace tgfx {
 class PixelDataConverter : public ImageGenerator {

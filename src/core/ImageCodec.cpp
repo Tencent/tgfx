@@ -19,11 +19,11 @@
 #include "tgfx/core/ImageCodec.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/USE.h"
+#include "profileClient/Profile.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
-#include "profileClient/Profile.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/codecs/webp/WebpCodec.h"

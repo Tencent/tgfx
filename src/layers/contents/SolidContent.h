@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/layers/LayerContent.h"
 #include "profileClient/Profile.h"
+#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
 class SolidContent : public LayerContent {
