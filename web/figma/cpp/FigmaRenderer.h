@@ -20,9 +20,10 @@ class FigmaRenderer {
   void render();
   tgfx::Layer* getDrawingLayer();
 
-  std::shared_ptr<tgfx::Layer> layer = nullptr;
+  std::string canvas_id_;
   std::shared_ptr<tgfx::Window> tgfx_window_ = nullptr;
   std::shared_ptr<tgfx::Device> tgfx_device_ = nullptr;
   std::shared_ptr<tgfx::DisplayList> tgfx_display_list_ = nullptr;
+  std::shared_ptr<tgfx::Layer> layer = nullptr;
   bool enableBackend = false;
 };
