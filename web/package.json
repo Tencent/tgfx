@@ -18,9 +18,9 @@
     "build:mt:debug": "node script/cmake.demo.js -a wasm-mt --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js --environment ARCH:wasm-mt",
     "dev:mt": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w --environment ARCH:wasm-mt",
     "server:mt": "node server.js wasm-mt",
-    "clean:figma": "rimraf figma/build* figma/wasm figma/.*.md5 figma/*.wasm figma/cmake-build-* figma/js",
-    "build:figma": "node script/cmake.figma.js -a wasm --debug && tsc -p ./tsconfig.figma.json && cp figma/wasm/figma.wasm figma/",
+    "clean:figma-all": "rimraf figma/build* figma/wasm figma/.*.md5 figma/*.wasm figma/cmake-build-* figma/js",
     "build:figma-ts": "tsc -p ./tsconfig.figma.json",
+    "build:figma-all": "npm run clean:figma-all && node script/cmake.figma.js -a wasm --debug && tsc -p ./tsconfig.figma.json && cp figma/wasm/figma.wasm figma/ && npm run build:figma-ts",
     "server:figma": "node server_figma.js figma"
   },
   "repository": {
