@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/Texture.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeBufferUploadTask> ShapeBufferUploadTask::MakeFrom(

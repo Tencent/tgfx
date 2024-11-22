@@ -20,11 +20,11 @@
 #include "core/PathTriangulator.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {

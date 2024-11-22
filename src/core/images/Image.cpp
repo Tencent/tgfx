@@ -27,10 +27,10 @@
 #include "core/images/ScaleImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/Profiling.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 

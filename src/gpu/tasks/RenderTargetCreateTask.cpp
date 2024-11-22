@@ -18,9 +18,9 @@
 
 #include "RenderTargetCreateTask.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/Texture.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(UniqueKey uniqueKey,

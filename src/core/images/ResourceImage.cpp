@@ -18,9 +18,9 @@
 
 #include "ResourceImage.h"
 #include "core/images/MipmapImage.h"
+#include "core/utils/Profiling.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {

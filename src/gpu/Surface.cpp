@@ -21,8 +21,8 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/RenderContext.h"
 #include "core/utils/Profiling.h"
+#include "gpu/RenderContext.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,

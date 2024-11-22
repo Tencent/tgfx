@@ -18,8 +18,8 @@
 
 #include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
-#include "core/utils/UniqueID.h"
 #include "core/utils/Profiling.h"
+#include "core/utils/UniqueID.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

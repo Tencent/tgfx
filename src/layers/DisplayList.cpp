@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
-#include "layers/DrawArgs.h"
 #include "core/utils/Profiling.h"
+#include "layers/DrawArgs.h"
 
 namespace tgfx {
 

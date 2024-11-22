@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectDrawOp.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/RenderFlags.h"
 

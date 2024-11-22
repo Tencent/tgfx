@@ -18,8 +18,8 @@
 
 #include "tgfx/core/ImageCodec.h"
 #include "core/PixelBuffer.h"
-#include "core/utils/USE.h"
 #include "core/utils/Profiling.h"
+#include "core/utils/USE.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"

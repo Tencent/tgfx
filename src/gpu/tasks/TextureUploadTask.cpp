@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
-#include "gpu/Texture.h"
 #include "core/utils/Profiling.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<TextureUploadTask> TextureUploadTask::MakeFrom(

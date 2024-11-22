@@ -21,9 +21,9 @@
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Profiling.h"
 #include "layers/DrawArgs.h"
 #include "layers/contents/RasterizedContent.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
 

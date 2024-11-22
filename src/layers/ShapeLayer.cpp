@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include "layers/contents/ShapeContent.h"
 #include "core/utils/Profiling.h"
+#include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 

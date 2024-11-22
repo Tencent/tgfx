@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureCreateTask.h"
-#include "gpu/Texture.h"
 #include "core/utils/Profiling.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(UniqueKey uniqueKey, int width,

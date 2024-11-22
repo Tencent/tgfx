@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 void OpsRenderTask::addOp(std::unique_ptr<Op> op) {

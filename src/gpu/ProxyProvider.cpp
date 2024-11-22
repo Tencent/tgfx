@@ -19,6 +19,7 @@
 #include "ProxyProvider.h"
 #include "core/ShapeRasterizer.h"
 #include "core/utils/DataTask.h"
+#include "core/utils/Profiling.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
@@ -28,7 +29,6 @@
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureCreateTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context) : context(context) {

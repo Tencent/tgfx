@@ -18,8 +18,8 @@
 
 #include "tgfx/layers/TextLayer.h"
 #include "core/utils/Log.h"
-#include "layers/contents/TextContent.h"
 #include "core/utils/Profiling.h"
+#include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {

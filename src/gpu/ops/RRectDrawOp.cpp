@@ -18,10 +18,10 @@
 
 #include "RRectDrawOp.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/RenderFlags.h"
 

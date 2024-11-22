@@ -19,8 +19,8 @@
 #ifdef TGFX_ENABLE_PROFILING
 #define TRACY_ENABLE
 
-#include "public/tracy/Tracy.hpp"
 #include "public/common/TracySystem.hpp"
+#include "public/tracy/Tracy.hpp"
 
 #define TRACY_ZONE_SCOPED ZoneScopedN
 #define TRACY_ZONE_SCOPED_N(name) ZoneScopedN(name)

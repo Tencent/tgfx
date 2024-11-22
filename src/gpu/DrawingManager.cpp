@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
