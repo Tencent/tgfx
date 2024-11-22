@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #ifdef TGFX_ENABLE_PROFILING
+#define TRACY_ENABLE
+
 #include "public/tracy/Tracy.hpp"
 #include "public/common/TracySystem.hpp"
 
