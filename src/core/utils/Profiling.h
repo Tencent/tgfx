@@ -22,6 +22,14 @@
 #include "public/common/TracySystem.hpp"
 #include "public/tracy/Tracy.hpp"
 
+struct TracyENV {
+  TracyENV() {
+    setenv("TRACY_NO_INVARIANT_CHECK", "1", 1);
+  }
+};
+
+static TracyENV tracyENV;
+
 #define TRACE_EVENT(name) ZoneScopedN(name)
 #define TRACE_EVENT_COLOR(name, color) ZoneScopedNC(name, color)
 
