@@ -30,10 +30,10 @@
 
     <!-- 画布区域 -->
     <div class="canvas-container">
-        <svg id="canvas" viewBox="0 0 1000 800" preserveAspectRatio="xMinYMin meet">
+        <svg id="canvas" viewBox="0 0 1920 1080" preserveAspectRatio="xMinYMin meet">
             <!-- 元素将被动态添加到这里 -->
         </svg>
-        <canvas class="realCanvas" id="realCanvas" width="1000" height="800"></canvas>
+        <canvas class="realCanvas" id="realCanvas" width="1920" height="1080" ></canvas>
         <div class="tooltip" id="tooltip"></div>
     </div>
 
@@ -60,5 +60,15 @@
 
 <!-- 引入主脚本 -->
 <script type="module" src="./js/ts/main.js"></script>
+<!-- 引入配置脚本 -->
+<script type="module" src="./js/ts/config.js"></script>
+
+<script type="module">
+    import { VIEWBOX_WIDTH, VIEWBOX_HEIGHT } from './js/ts/config.js'; // 新增
+
+    document.getElementById('canvas').setAttribute('viewBox', `0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`);
+    document.getElementById('realCanvas').setAttribute('width', VIEWBOX_WIDTH);
+    document.getElementById('realCanvas').setAttribute('height', VIEWBOX_HEIGHT);
+</script>
 </body>
 </html>

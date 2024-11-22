@@ -47,6 +47,8 @@ class App {
         // 实例化 FigmaRenderer
         this.figmaRenderer = new figma.FigmaRenderer();
         this.figmaRenderer.initialize('#realCanvas');
+        // 画个矩形测试
+        this.figmaRenderer.updateShape();
 
         this.backendManager = new BackendManager(this.figmaRenderer);
         this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);

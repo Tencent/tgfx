@@ -5,6 +5,7 @@
 #include "Element.h"
 #include "LayerUtils.h"
 #include "MessageParser.h"
+#include "utils.h"
 
 void FigmaRenderer::initialize(std::string canvasID) {
   emscripten_log(EM_LOG_CONSOLE, "initialize called， canvasID is %s", canvasID.c_str());
@@ -35,21 +36,6 @@ void FigmaRenderer::updateShape() {
   }
   if (tgfx_device_ == nullptr) return;
 
-  if (tgfx_display_list_ == nullptr) {
-    tgfx_display_list_ = std::make_shared<tgfx::DisplayList>();
-  }
-
-  auto shapeLayer = tgfx::ShapeLayer::Make();
-  tgfx::Path path;
-  path.addRect({100, 100, 200, 200});
-  shapeLayer->setPath(path);
-  std::cout << "ffjiefan：：make shape ok" << std::endl;
-
-  auto fillStyle = tgfx::SolidColor::Make(tgfx::Color::Red());
-  shapeLayer->setFillStyle(fillStyle);
-
-  tgfx_display_list_->root()->addChild(shapeLayer);
-
   auto context = tgfx_device_->lockContext();
   if (context == nullptr) return;
   auto surface = tgfx_window_->getSurface(context);
@@ -57,7 +43,9 @@ void FigmaRenderer::updateShape() {
     tgfx_device_->unlock();
     return;
   }
-  tgfx_display_list_->render(surface.get());
+  auto paint = tgfx::Paint();
+  paint.setColor(tgfx::Color::Red());
+  surface->getCanvas()->drawRect({490, 390, 510, 410}, paint);
 
   context->flushAndSubmit();
   tgfx_window_->present(context);
@@ -92,9 +80,6 @@ void FigmaRenderer::render() {
   if (tgfx_device_ == nullptr) return;
 
   if (tgfx_display_list_ == nullptr) return;
-
-  std::cout << "ffjiefan：：render begin" << std::endl;
-
   auto context = tgfx_device_->lockContext();
   if (context == nullptr) return;
   auto surface = tgfx_window_->getSurface(context);
@@ -102,8 +87,14 @@ void FigmaRenderer::render() {
     tgfx_device_->unlock();
     return;
   }
+
+  std::cout << "ffjiefan：：render begin" << std::endl;
+
   tgfx_display_list_->render(surface.get());
 
+  // 调试，打印layer的区域 begin
+  // printLayerBounds(tgfx_display_list_->root(), 0);
+  // 调试，打印layer的区域 end
   context->flushAndSubmit();
   tgfx_window_->present(context);
 
@@ -130,6 +121,8 @@ void FigmaRenderer::dispatchMessage(const JsMessage& message) {
     enableBackend = false;
   } else if (action == "viewRectChanged") {
     if (tgfx_window_ != nullptr) {
+      // 打印log
+      std::cout << "ffjiefan：：dispatchMessage viewRectChanged" << std::endl;
       tgfx_window_->invalidSize();
     }
   } else {

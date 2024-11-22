@@ -4,6 +4,7 @@ import ElementManager from '../models/ElementManager.js';
 import UIManager from '../views/UIManager.js';
 import BackendManager from '../models/BackendManager.js';
 import BaseElement from '../models/BaseElement.js';
+import { VIEWBOX_WIDTH, VIEWBOX_HEIGHT } from '../config.js';
 
 export default class EventManager {
     elementManager: ElementManager;
@@ -41,7 +42,7 @@ export default class EventManager {
         this.isCanvasDragging = false;
         this.canvasStartX = 0;
         this.canvasStartY = 0;
-        this.viewBox = {x: 0, y: 0, width: 1000, height: 800};
+        this.viewBox = {x: 0, y: 0, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT};
         this.isPerformanceTestRunning = false;
         this.animationFrameId = null;
         this.initEvents();
@@ -189,8 +190,8 @@ export default class EventManager {
         return {
             x: canvasRect.x,
             y: canvasRect.y,
-            width: canvasRect.width,
-            height: canvasRect.height
+            width: VIEWBOX_WIDTH,
+            height: VIEWBOX_HEIGHT
         };
     }
 
@@ -395,8 +396,8 @@ export default class EventManager {
         this.lastFrameTime = currentTime;
 
         const elementInfoList: any[] = [];
-        const containerWidth = this.viewBox.width;
-        const containerHeight = this.viewBox.height;
+        const containerWidth = VIEWBOX_WIDTH;
+        const containerHeight = VIEWBOX_HEIGHT;
 
         elements.forEach(element => {
             const tagName = element.element.tagName.toLowerCase();
