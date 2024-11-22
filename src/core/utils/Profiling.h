@@ -20,10 +20,10 @@
 #include "public/tracy/Tracy.hpp"
 #include "public/common/TracySystem.hpp"
 
-#define TRACE_ZONE_SCOPED ZoneScopedN
-#define TRACE_ZONE_SCOPED_N(name) ZoneScopedN(name)
-#define TRACE_ZONE_SCOPED_C(color) ZoneScopedC(color)
-#define TRACE_ZONE_SCOPED_NC(name, color) ZoneScopedNC(name, color)
+#define TRACY_ZONE_SCOPED ZoneScopedN
+#define TRACY_ZONE_SCOPED_N(name) ZoneScopedN(name)
+#define TRACY_ZONE_SCOPED_C(color) ZoneScopedC(color)
+#define TRACY_ZONE_SCOPED_NC(name, color) ZoneScopedNC(name, color)
 
 #define FRAME_MARK FrameMark
 #define FRAME_MARK_NAME(name) FrameMarkNamed(name)
@@ -32,10 +32,10 @@
 
 #define TRACY_THREAD_NAME(name) tracy::SetThreadName(name)
 #else
-#define TRACE_ZONE_SCOPED
-#define TRACE_ZONE_SCOPED_N(name)
-#define TRACE_ZONE_SCOPED_C(color)
-#define TRACE_ZONE_SCOPED_NC(name, color)
+#define TRACY_ZONE_SCOPED
+#define TRACY_ZONE_SCOPED_N(name)
+#define TRACY_ZONE_SCOPED_C(color)
+#define TRACY_ZONE_SCOPED_NC(name, color)
 
 #define FRAME_MARK
 #define FRAME_MARK_NAME(name)

@@ -30,7 +30,7 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
 }
 
 void OpsRenderTask::prepare(Context* context) {
-  TRACE_ZONE_SCOPED_NC("OpsRenderTask::prepare", tracy::Color::ColorType::Green);
+  TRACY_ZONE_SCOPED_NC("OpsRenderTask::prepare", tracy::Color::ColorType::Green);
   renderPass = context->gpu()->getRenderPass();
   for (auto& op : ops) {
     op->prepare(context, renderFlags);
@@ -38,7 +38,7 @@ void OpsRenderTask::prepare(Context* context) {
 }
 
 bool OpsRenderTask::execute(Gpu* gpu) {
-  TRACE_ZONE_SCOPED_N("OpsRenderTask::execute");
+  TRACY_ZONE_SCOPED_N("OpsRenderTask::execute");
   if (ops.empty()) {
     return false;
   }

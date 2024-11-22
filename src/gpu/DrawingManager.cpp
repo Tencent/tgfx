@@ -82,7 +82,7 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
 }
 
 bool DrawingManager::flush() {
-  TRACE_ZONE_SCOPED_N("DrawingManager::flush");
+  TRACY_ZONE_SCOPED_N("DrawingManager::flush");
   if (resourceTasks.empty() && renderTasks.empty()) {
     FRAME_MARK;
     return false;

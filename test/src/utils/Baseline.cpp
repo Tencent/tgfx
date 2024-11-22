@@ -113,7 +113,7 @@ bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::stri
 }
 
 bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string& key) {
-  TRACE_ZONE_SCOPED_N("Baseline::Compare");
+  TRACY_ZONE_SCOPED_N("Baseline::Compare");
   if (surface == nullptr) {
     return false;
   }

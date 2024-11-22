@@ -35,7 +35,7 @@ GlyphRasterizer::~GlyphRasterizer() {
 }
 
 std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
-  TRACE_ZONE_SCOPED_N("GlyphRasterizer::onMakeBuffer");
+  TRACY_ZONE_SCOPED_N("GlyphRasterizer::onMakeBuffer");
   auto mask = Mask::Make(width(), height(), tryHardware);
   if (!mask) {
     return nullptr;

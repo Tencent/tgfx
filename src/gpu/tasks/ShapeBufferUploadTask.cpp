@@ -38,7 +38,7 @@ ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey t
 }
 
 bool ShapeBufferUploadTask::execute(Context* context) {
-  TRACE_ZONE_SCOPED_N("ShapeBufferUploadTask::execute");
+  TRACY_ZONE_SCOPED_N("ShapeBufferUploadTask::execute");
   if (uniqueKey.strongCount() <= 0) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;

@@ -66,7 +66,7 @@
         "dir": "third_party/expat"
       },
       {
-        "url": "${PAG_GROUP}/tracy.git",
+        "url": "https://github.com/wolfpld/tracy.git",
         "commit": "759b4c3bfe207ab382c01080f0417aca5af4411a",
         "dir": "third_party/tracy"
       }

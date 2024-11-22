@@ -26,7 +26,7 @@ class DataWrapper : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACE_ZONE_SCOPED_N("DataWrapper::getData");
+    TRACY_ZONE_SCOPED_N("DataWrapper::getData");
     return data;
   }
 

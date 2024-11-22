@@ -32,7 +32,7 @@ std::unique_ptr<LayerContent> LayerContent::Compose(
 }
 
 Rect ComposeContent::getBounds() const {
-  TRACE_ZONE_SCOPED_N("ComposeContent::getBounds");
+  TRACY_ZONE_SCOPED_N("ComposeContent::getBounds");
   auto bounds = Rect::MakeEmpty();
   for (const auto& content : contents) {
     bounds.join(content->getBounds());
@@ -41,14 +41,14 @@ Rect ComposeContent::getBounds() const {
 }
 
 void ComposeContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_ZONE_SCOPED_N("ComposeContent::draw");
+  TRACY_ZONE_SCOPED_N("ComposeContent::draw");
   for (const auto& content : contents) {
     content->draw(canvas, paint);
   }
 }
 
 bool ComposeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TRACE_ZONE_SCOPED_N("ComposeContent::hitTestPoint");
+  TRACY_ZONE_SCOPED_N("ComposeContent::hitTestPoint");
   for (const auto& content : contents) {
     if (content->hitTestPoint(localX, localY, pixelHitTest)) {
       return true;

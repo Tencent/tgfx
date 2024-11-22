@@ -33,7 +33,7 @@ Device::~Device() {
 }
 
 Context* Device::lockContext() {
-  TRACE_ZONE_SCOPED_NC("MakeDevice", tracy::Color::ColorType::GreenYellow);
+  TRACY_ZONE_SCOPED_NC("MakeDevice", tracy::Color::ColorType::GreenYellow);
   locker.lock();
   contextLocked = onLockContext();
   if (!contextLocked) {

@@ -21,19 +21,19 @@
 
 namespace tgfx {
 Rect RasterizedContent::getBounds() const {
-  TRACE_ZONE_SCOPED_N("RasterizedContent::getBounds");
+  TRACY_ZONE_SCOPED_N("RasterizedContent::getBounds");
   auto bounds = Rect::MakeWH(image->width(), image->height());
   matrix.mapRect(&bounds);
   return bounds;
 }
 
 void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_ZONE_SCOPED_N("RasterizedContent::draw");
+  TRACY_ZONE_SCOPED_N("RasterizedContent::draw");
   canvas->drawImage(image, matrix, &paint);
 }
 
 bool RasterizedContent::hitTestPoint(float localX, float localY, bool) {
-  TRACE_ZONE_SCOPED_N("RasterizedContent::hitTestPoint");
+  TRACY_ZONE_SCOPED_N("RasterizedContent::hitTestPoint");
   const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
   return imageBounds.contains(localX, localY);
 }

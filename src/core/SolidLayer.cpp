@@ -22,7 +22,7 @@
 
 namespace tgfx {
 std::shared_ptr<SolidLayer> SolidLayer::Make() {
-  TRACE_ZONE_SCOPED_N("SolidLayer::Make");
+  TRACY_ZONE_SCOPED_N("SolidLayer::Make");
   auto layer = std::shared_ptr<SolidLayer>(new SolidLayer());
   layer->weakThis = layer;
   return layer;

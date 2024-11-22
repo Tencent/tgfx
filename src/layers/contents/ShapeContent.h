@@ -28,7 +28,7 @@ class ShapeContent : public LayerContent {
   ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
 
   Rect getBounds() const override {
-    TRACE_ZONE_SCOPED_N("ShapeContent::getBounds");
+    TRACY_ZONE_SCOPED_N("ShapeContent::getBounds");
     return shape->getBounds();
   }
 

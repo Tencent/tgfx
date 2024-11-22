@@ -21,18 +21,18 @@
 
 namespace tgfx {
 Rect ImageContent::getBounds() const {
-  TRACE_ZONE_SCOPED_N("ImageContent::getBounds");
+  TRACY_ZONE_SCOPED_N("ImageContent::getBounds");
   return Rect::MakeXYWH(0, 0, image->width(), image->height());
 }
 
 void ImageContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_ZONE_SCOPED_N("ImageContent::draw");
+  TRACY_ZONE_SCOPED_N("ImageContent::draw");
   canvas->drawImage(image, sampling, &paint);
 }
 
 bool ImageContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
   // The pixelHitTest flag is ignored because we cannot read pixels from images before they are drawn.
-  TRACE_ZONE_SCOPED_N("ImageContent::hitTestPoint");
+  TRACY_ZONE_SCOPED_N("ImageContent::hitTestPoint");
   const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
   return imageBounds.contains(localX, localY);
 }

@@ -38,7 +38,7 @@ std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
 }
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
-  TRACE_ZONE_SCOPED_N("TextLayer::Make");
+  TRACY_ZONE_SCOPED_N("TextLayer::Make");
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
   layer->weakThis = layer;
   return layer;

@@ -40,7 +40,7 @@ RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey te
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* context) {
-  TRACE_ZONE_SCOPED_N("RenderTargetCreateTask::onMakeResource");
+  TRACY_ZONE_SCOPED_N("RenderTargetCreateTask::onMakeResource");
   auto texture = Resource::Find<Texture>(context, textureKey);
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");
