@@ -36,7 +36,7 @@ TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<ImageD
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
-  TRACY_ZONE_SCOPED_N("TextureUploadTask::onMakeResource");
+  TRACE_EVENT("TextureUploadTask::onMakeResource");
   if (decoder == nullptr) {
     return nullptr;
   }

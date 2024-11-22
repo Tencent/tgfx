@@ -322,7 +322,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
-  TRACY_ZONE_SCOPED_N("NativeCodec::onMakeBuffer");
+  TRACE_EVENT("NativeCodec::onMakeBuffer");
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {

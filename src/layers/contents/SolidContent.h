@@ -27,7 +27,7 @@ class SolidContent : public LayerContent {
   SolidContent(const RRect& rRect, const Color& color);
 
   Rect getBounds() const override {
-    TRACY_ZONE_SCOPED_N("SolidContent::getBounds");
+    TRACE_EVENT("SolidContent::getBounds");
     return _rRect.rect;
   }
 

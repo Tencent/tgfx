@@ -48,7 +48,7 @@ void Layer::SetDefaultAllowsGroupOpacity(bool value) {
 }
 
 std::shared_ptr<Layer> Layer::Make() {
-  TRACY_ZONE_SCOPED_NC("Surface::Make", tracy::Color::ColorType::Yellow);
+  TRACE_EVENT_COLOR("Surface::Make", tracy::Color::ColorType::Yellow);
   auto layer = std::shared_ptr<Layer>(new Layer());
   layer->weakThis = layer;
   return layer;
@@ -519,7 +519,7 @@ Matrix Layer::getMatrixWithScrollRect() const {
 }
 
 LayerContent* Layer::getContent() {
-  TRACY_ZONE_SCOPED_N("Layer::getContent");
+  TRACE_EVENT("Layer::getContent");
   if (bitFields.contentDirty) {
     layerContent = onUpdateContent();
     bitFields.contentDirty = false;
@@ -616,7 +616,7 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
-  TRACY_ZONE_SCOPED_N("drawLayer");
+  TRACE_EVENT("drawLayer");
   DEBUG_ASSERT(canvas != nullptr);
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
@@ -688,7 +688,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
-  TRACY_ZONE_SCOPED_N("drawContents");
+  TRACE_EVENT("drawContents");
   if (auto content = getContent()) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
   }

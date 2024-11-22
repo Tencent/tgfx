@@ -24,7 +24,7 @@ SolidContent::SolidContent(const RRect& rRect, const Color& color) : _rRect(rRec
 }
 
 void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACY_ZONE_SCOPED_N("SolidContent::draw");
+  TRACE_EVENT("SolidContent::draw");
   auto solidPaint = paint;
   auto color = _color;
   color.alpha *= paint.getAlpha();
@@ -33,7 +33,7 @@ void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool SolidContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
-  TRACY_ZONE_SCOPED_N("SolidContent::hitTestPoint");
+  TRACE_EVENT("SolidContent::hitTestPoint");
   return _rRect.rect.contains(localX, localY);
 }
 

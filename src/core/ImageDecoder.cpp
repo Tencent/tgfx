@@ -41,7 +41,7 @@ class ImageBufferWrapper : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
-    TRACY_ZONE_SCOPED_N("ImageBufferWrapper::decode");
+    TRACE_EVENT("ImageBufferWrapper::decode");
     return imageBuffer;
   }
 
@@ -68,7 +68,7 @@ class ImageGeneratorWrapper : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
-    TRACY_ZONE_SCOPED_N("ImageGeneratorWrapper::decode");
+    TRACE_EVENT("ImageGeneratorWrapper::decode");
     return imageGenerator->makeBuffer(tryHardware);
   }
 

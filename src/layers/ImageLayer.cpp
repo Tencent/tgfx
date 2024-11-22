@@ -22,7 +22,7 @@
 
 namespace tgfx {
 std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  TRACY_ZONE_SCOPED_N("ImageLayer::Make");
+  TRACE_EVENT("ImageLayer::Make");
   auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
   layer->weakThis = layer;
   return layer;

@@ -131,7 +131,7 @@ class RRectVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACY_ZONE_SCOPED_N("RRectVerticesProvider::getData");
+    TRACE_EVENT("RRectVerticesProvider::getData");
     auto floatCount = rRectPaints.size() * 4 * 48;
     if (useScale) {
       floatCount += rRectPaints.size() * 4 * 4;
@@ -262,7 +262,7 @@ class RRectIndicesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACY_ZONE_SCOPED_N("RRectIndicesProvider::getData");
+    TRACE_EVENT("RRectIndicesProvider::getData");
     auto bufferSize = rRectPaints.size() * kIndicesPerFillRRect * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
@@ -282,7 +282,7 @@ class RRectIndicesProvider : public DataProvider {
 
 std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Color color, const RRect& rRect,
                                                const Matrix& viewMatrix) {
-  TRACY_ZONE_SCOPED_N("RRectDrawOp::Make");
+  TRACE_EVENT("RRectDrawOp::Make");
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
     return nullptr;
@@ -318,7 +318,7 @@ static bool UseScale(Context* context) {
 }
 
 void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  TRACY_ZONE_SCOPED_N("RRectDrawOp::prepare");
+  TRACE_EVENT("RRectDrawOp::prepare");
   auto indexProvider = std::make_shared<RRectIndicesProvider>(rRectPaints);
   indexBufferProxy =
       GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
@@ -334,7 +334,7 @@ void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
-  TRACY_ZONE_SCOPED_N("RRectDrawOp::execute");
+  TRACE_EVENT("RRectDrawOp::execute");
   if (indexBufferProxy == nullptr) {
     return;
   }

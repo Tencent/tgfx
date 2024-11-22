@@ -50,7 +50,7 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACY_THREAD_NAME("Thread");
+  TRACE_THREAD_NAME("Thread");
   while (true) {
     auto task = taskGroup->popTask();
     if (!task) {

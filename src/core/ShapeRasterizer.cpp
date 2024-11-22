@@ -29,7 +29,7 @@ ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> s
 }
 
 std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) const {
-  TRACY_ZONE_SCOPED_N("ShapeRasterizer::makeRasterized");
+  TRACE_EVENT("ShapeRasterizer::makeRasterized");
   auto finalPath = shape->getPath();
   if (PathTriangulator::ShouldTriangulatePath(finalPath)) {
     return ShapeBuffer::MakeFrom(makeTriangles(finalPath));
@@ -38,7 +38,7 @@ std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) c
 }
 
 std::shared_ptr<ImageBuffer> ShapeRasterizer::onMakeBuffer(bool tryHardware) const {
-  TRACY_ZONE_SCOPED_N("ShapeRasterizer::onMakeBuffer");
+  TRACE_EVENT("ShapeRasterizer::onMakeBuffer");
   auto finalPath = shape->getPath();
   return makeImageBuffer(finalPath, tryHardware);
 }

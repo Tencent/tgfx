@@ -38,7 +38,7 @@ TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height,
 }
 
 std::shared_ptr<Resource> TextureCreateTask::onMakeResource(Context* context) {
-  TRACY_ZONE_SCOPED_N("TextureCreateTask::onMakeResource");
+  TRACE_EVENT("TextureCreateTask::onMakeResource");
   auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
   if (texture == nullptr) {
     LOGE("TextureCreateTask::onMakeResource() Failed to create the texture!");

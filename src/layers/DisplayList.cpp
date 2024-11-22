@@ -31,7 +31,7 @@ Layer* DisplayList::root() const {
 }
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
-  TRACY_ZONE_SCOPED_N("DisplayList::render");
+  TRACE_EVENT("DisplayList::render");
   if (!surface ||
       (replaceAll && surface->_uniqueID == surfaceID &&
        surface->contentVersion() == surfaceContentVersion && !_root->bitFields.childrenDirty)) {

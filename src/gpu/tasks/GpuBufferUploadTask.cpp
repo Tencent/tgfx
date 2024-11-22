@@ -36,7 +36,7 @@ GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferT
 }
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {
-  TRACY_ZONE_SCOPED_N("GpuBufferUploadTask::onMakeResource");
+  TRACE_EVENT("GpuBufferUploadTask::onMakeResource");
   if (provider == nullptr) {
     return nullptr;
   }
