@@ -32,8 +32,9 @@ Layer* DisplayList::root() const {
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
   TRACY_ZONE_SCOPED_N("DisplayList::render");
-  if (!surface || (replaceAll && surface->_uniqueID == surfaceID &&
-                   surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirty)) {
+  if (!surface ||
+      (replaceAll && surface->_uniqueID == surfaceID &&
+       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.childrenDirty)) {
     return false;
   }
   auto canvas = surface->getCanvas();
