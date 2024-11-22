@@ -449,7 +449,7 @@ class Layer {
  protected:
   std::weak_ptr<Layer> weakThis;
 
-  Layer* maskOwner;
+  Layer* maskOwner = nullptr;
 
   Layer();
 
