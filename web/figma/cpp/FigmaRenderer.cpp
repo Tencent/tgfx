@@ -107,9 +107,9 @@ void FigmaRenderer::dispatchMessage(const JsMessage& message) {
 
   const auto [action, canvasRect, viewBox, elements] = message;
   if (action == "enableBackend") {
+    getDrawingLayer()->setAlpha(1);
     LayerUtils::UpdateCanvasMatrix(getDrawingLayer(), canvasRect, viewBox);
     LayerUtils::UpdateShape(getDrawingLayer(), elements);
-    enableBackend = true;
   } else if (action == "canvasPan") {
     LayerUtils::UpdateCanvasMatrix(getDrawingLayer(), canvasRect, viewBox);
   } else if (action == "add" || action == "update") {
@@ -118,7 +118,7 @@ void FigmaRenderer::dispatchMessage(const JsMessage& message) {
   } else if (action == "move") {
     LayerUtils::MoveShape(getDrawingLayer(), elements);
   } else if (action == "disableBackend") {
-    enableBackend = false;
+    getDrawingLayer()->setAlpha(0);
   } else if (action == "viewRectChanged") {
     if (tgfx_window_ != nullptr) {
       // 打印log
