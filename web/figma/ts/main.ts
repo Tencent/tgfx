@@ -5,6 +5,9 @@ import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
 import Figma from '../wasm/figma.js'; // 导入 FigmaRenderer
+import { TGFXBind } from '../../lib/tgfx.js';
+import * as types from '../../types/types.d.js';
+
 
 /**
  * 应用程序主类
@@ -64,7 +67,6 @@ class App {
 
         // 初始化自定义事件监听
         this.initEventListeners();
-        this.initFont();
     }
 
     /**
@@ -109,21 +111,6 @@ class App {
         });
     }
 
-    async initFont():Promise<void> {
-        const fontPath = "../../resources/font/NotoSansSC-Regular.otf";
-        console.log('fontPath:', fontPath); // 打印 fontPath
-        try {
-            const response = await fetch(fontPath);
-            console.log('fetch response status:', response.status); // 打印响应状态
-            const fontBuffer = await response.arrayBuffer();
-            console.log('fontBuffer length:', fontBuffer.byteLength); // 打印 fontBuffer 长度
-            const fontUIntArray = new Uint8Array(fontBuffer);
-            console.log('fontUIntArray length:', fontUIntArray.length); // 打印 fontUIntArray 长度
-            this.figmaRenderer.registerFonts(fontUIntArray);
-        } catch (error) {
-            console.error('加载字体时出错:', error);
-        }
-    }
     /**
      * 更新图形数量显示
      */
@@ -143,8 +130,22 @@ class App {
 // 启动应用
 document.addEventListener('DOMContentLoaded', async () => {
     // 加载 WebAssembly 模块
-    const figma = await Figma();
-    
+    // const figma = await Figma();
+
+    // 绑定 TGFX
+    const figma = await Figma({
+        locateFile: (file: string) => './wasm/' + file
+    })
+    .then((module: any) => {
+        TGFXBind(module);
+        return module;
+    })
+    .catch((error: any) => {
+        console.error(error);
+        throw new Error("TGFX init failed. Please check the .wasm file path!.");
+    });
+
+
     // 实例化应用并传入 FigmaModule
     new App(figma);
 });

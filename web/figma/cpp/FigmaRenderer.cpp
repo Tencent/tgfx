@@ -139,20 +139,3 @@ tgfx::Layer* FigmaRenderer::getDrawingLayer() {
   }
   return layer.get();
 }
-
-void FigmaRenderer::registerFonts(const emscripten::val& fontVal) {
-  std::cout << "ffjiefan::registerFonts called" << std::endl;
-
-  if (const auto fontData = GetDataFromEmscripten(fontVal)) {
-    std::cout << "ffjiefan::registerFonts fontData obtained" << std::endl;
-
-    if (const auto typeface = tgfx::Typeface::MakeFromData(fontData, 0)) {
-      std::cout << "ffjiefan::registerFonts typeface created" << std::endl;
-      LayerUtils::SetTypeface(typeface);
-    } else {
-      std::cerr << "ffjiefan::registerFonts failed to create typeface" << std::endl;
-    }
-  } else {
-    std::cerr << "ffjiefan::registerFonts failed to obtain fontData" << std::endl;
-  }
-}

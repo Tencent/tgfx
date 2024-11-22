@@ -59,12 +59,12 @@
 </div>
 
 <!-- 引入主脚本 -->
-<script type="module" src="./js/ts/main.js"></script>
+<script type="module" src="./js/figma/ts/main.js"></script>
 <!-- 引入配置脚本 -->
-<script type="module" src="./js/ts/config.js"></script>
+<script type="module" src="./js/figma/ts/config.js"></script>
 
 <script type="module">
-    import { VIEWBOX_WIDTH, VIEWBOX_HEIGHT } from './js/ts/config.js'; // 新增
+    import { VIEWBOX_WIDTH, VIEWBOX_HEIGHT } from './js/figma/ts/config.js'; // 新增
 
     document.getElementById('canvas').setAttribute('viewBox', `0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`);
     document.getElementById('realCanvas').setAttribute('width', VIEWBOX_WIDTH);

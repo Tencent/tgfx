@@ -17,8 +17,6 @@ class LayerUtils {
 
   static size_t CountLayers(const std::shared_ptr<tgfx::Layer>& layer);
 
-  static void SetTypeface(const std::shared_ptr<tgfx::Typeface>& typeface);
-
  private:
   static bool UpdateRect(tgfx::Layer* layer, const JsElement& element, std::string& errorMsg);
 
@@ -28,6 +26,4 @@ class LayerUtils {
 
   template <typename T>
   static std::shared_ptr<T> GetOrCreateLayer(tgfx::Layer* layer, const JsElement& element);
-
-  static std::shared_ptr<tgfx::Typeface> currentTypeface;
 };

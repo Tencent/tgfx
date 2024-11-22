@@ -14,7 +14,6 @@ class FigmaRenderer {
   void invalisize();
   void updateShape();
   void handMessage(std::string message);
-  void registerFonts(const emscripten::val& fontVal);
 
  private:
   void dispatchMessage(const JsMessage& message);
