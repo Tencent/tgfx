@@ -185,8 +185,10 @@ bool LayerUtils::UpdateCircle(tgfx::Layer* layer, const JsElement& element, std:
   return true;
 }
 
-const auto typeface = tgfx::Typeface::MakeFromPath(
-    ProjectPath::Absolute("../../resources/font/NotoSansSC-Regular.otf"));
+std::shared_ptr<tgfx::Typeface> LayerUtils::currentTypeface;
+void LayerUtils::SetTypeface(const std::shared_ptr<tgfx::Typeface> &typeface){
+  currentTypeface = typeface;
+}
 
 bool LayerUtils::UpdateText(tgfx::Layer* layer, const JsElement& element, std::string& errorMsg) {
   auto start = std::chrono::high_resolution_clock::now();  // 开始计时
@@ -201,7 +203,7 @@ bool LayerUtils::UpdateText(tgfx::Layer* layer, const JsElement& element, std::s
   textLayer->setText(textContent);
   textLayer->setTextColor(MakeColorFromHexString(element.fill));
 
-  const tgfx::Font font(typeface, fontSize);
+  const tgfx::Font font(currentTypeface, fontSize);
   textLayer->setFont(font);
 
   auto end = std::chrono::high_resolution_clock::now(); // 结束计时

@@ -22,13 +22,13 @@
 using namespace emscripten;
 
 EMSCRIPTEN_BINDINGS(figma_module) {
-    class_<FigmaRenderer>("FigmaRenderer")
-        .constructor<>()
-        .function("initialize", &FigmaRenderer::initialize)
-        .function("invalisize", &FigmaRenderer::invalisize)
-        .function("updateShape", &FigmaRenderer::updateShape)
-        .function("handMessage", &FigmaRenderer::handMessage)
-        ;
+  class_<FigmaRenderer>("FigmaRenderer")
+      .constructor<>()
+      .function("initialize", &FigmaRenderer::initialize)
+      .function("invalisize", &FigmaRenderer::invalisize)
+      .function("updateShape", &FigmaRenderer::updateShape)
+      .function("handMessage", &FigmaRenderer::handMessage)
+      .function("registerFonts", &FigmaRenderer::registerFonts);
 }
 
 int main(int, const char*[]) {

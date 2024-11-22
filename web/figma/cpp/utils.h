@@ -3,6 +3,28 @@
 #include <thread>
 #include <tgfx/core/Color.h>
 
+using namespace emscripten;
+
+
+inline std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
+  if (emscriptenData.isUndefined()) {
+    return nullptr;
+  }
+  unsigned int length = emscriptenData["length"].as<unsigned int>();
+  if (length == 0) {
+    return nullptr;
+  }
+  auto buffer = new (std::nothrow) uint8_t[length];
+  if (buffer) {
+    auto memory = val::module_property("HEAPU8")["buffer"];
+    auto memoryView =
+        emscriptenData["constructor"].new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
+    memoryView.call<void>("set", emscriptenData);
+    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+  }
+  return nullptr;
+}
+
 inline void printLayerBounds(tgfx::Layer* layer, const int indent) {
   if (layer == nullptr) return;
   const std::string indentation(static_cast<std::string::size_type>(indent * 2), ' ');  // 每层缩进2个空格

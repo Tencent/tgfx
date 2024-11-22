@@ -64,6 +64,7 @@ class App {
 
         // 初始化自定义事件监听
         this.initEventListeners();
+        this.initFont();
     }
 
     /**
@@ -108,6 +109,21 @@ class App {
         });
     }
 
+    async initFont():Promise<void> {
+        const fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+        console.log('fontPath:', fontPath); // 打印 fontPath
+        try {
+            const response = await fetch(fontPath);
+            console.log('fetch response status:', response.status); // 打印响应状态
+            const fontBuffer = await response.arrayBuffer();
+            console.log('fontBuffer length:', fontBuffer.byteLength); // 打印 fontBuffer 长度
+            const fontUIntArray = new Uint8Array(fontBuffer);
+            console.log('fontUIntArray length:', fontUIntArray.length); // 打印 fontUIntArray 长度
+            this.figmaRenderer.registerFonts(fontUIntArray);
+        } catch (error) {
+            console.error('加载字体时出错:', error);
+        }
+    }
     /**
      * 更新图形数量显示
      */
