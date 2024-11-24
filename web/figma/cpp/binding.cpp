@@ -27,7 +27,8 @@ EMSCRIPTEN_BINDINGS(figma_module) {
       .function("initialize", &FigmaRenderer::initialize)
       .function("invalisize", &FigmaRenderer::invalisize)
       .function("updateShape", &FigmaRenderer::updateShape)
-      .function("handMessage", &FigmaRenderer::handMessage);
+      .function("handMessage", &FigmaRenderer::handMessage)
+      .function("registerFonts", &FigmaRenderer::registerFonts);
 }
 
 int main(int, const char*[]) {

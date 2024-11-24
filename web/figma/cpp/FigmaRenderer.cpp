@@ -7,10 +7,51 @@
 #include "MessageParser.h"
 #include "utils.h"
 
+#include <fstream>
+
+
+void printFileInfo(const std::string& filePath) {
+
+
+    // 打开文件
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Error: Failed to open file " << filePath << std::endl;
+        return;
+    }
+    file.close();
+}
+
+
 void FigmaRenderer::initialize(std::string canvasID) {
   emscripten_log(EM_LOG_CONSOLE, "initialize called， canvasID is %s", canvasID.c_str());
   tgfx_window_ = tgfx::WebGLWindow::MakeFrom(canvasID);
   canvas_id_ = canvasID;
+}
+
+std::shared_ptr<tgfx::Data> getDataFromEmscripten(const emscripten::val& native_font) {
+  if (native_font.isUndefined()) {
+    return nullptr;
+  }
+  unsigned int length = native_font["length"].as<unsigned int>();
+  if (length == 0) {
+    return nullptr;
+  }
+  auto buffer = new (std::nothrow) uint8_t[length];
+  if (buffer) {
+    auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
+    auto memoryView = native_font["constructor"].new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
+    memoryView.call<void>("set", native_font);
+    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+  }
+  return nullptr;
+}
+
+void FigmaRenderer::registerFonts(const emscripten::val& native_text_font) {
+  auto text_font_data = getDataFromEmscripten(native_text_font);
+  if (text_font_data) {
+    this->demo_text_typeface_ = tgfx::Typeface::MakeFromData(text_font_data, 0);
+  }
 }
 
 void FigmaRenderer::invalisize() {
@@ -47,13 +88,19 @@ void FigmaRenderer::updateShape() {
   paint.setColor(tgfx::Color::Red());
   surface->getCanvas()->drawRect({490, 390, 510, 410}, paint);
 
-  std::string text = "HelloTGFX";
-  auto typeface = tgfx::Typeface::MakeFromPath("/assets/font/NotoColorEmoji.ttf");
+  // std::string filePath = "assets/font/NotoColorEmoji.ttf";
+  // printFileInfo(filePath);
+
   // auto typeface = tgfx::Typeface::MakeFromName("Arial", "Regular");
-  const tgfx::Font font(typeface, 48);
+  // auto typeface = tgfx::Typeface::MakeFromPath("assets/font/NotoColorEmoji.ttf");
+  // if (!typeface) {
+  //   std::cerr << "Error: Failed to load typeface from /assets/font/NotoColorEmoji.ttf" << std::endl;
+  // }
 
-  surface->getCanvas()->drawSimpleText(text, 0,0, font, paint);
+  std::string text = "🤡👻🐠🤩😃🤪🙈🙊🐒";
+  const tgfx::Font font(demo_text_typeface_, 48);
 
+  surface->getCanvas()->drawSimpleText(text, 100, 100, font, paint);
 
   context->flushAndSubmit();
   tgfx_window_->present(context);

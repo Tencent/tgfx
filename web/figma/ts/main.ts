@@ -5,7 +5,7 @@ import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
 import Figma from '../wasm/figma.js'; // 导入 FigmaRenderer
-import { TGFXBind } from '../../lib/tgfx.js';
+import {TGFXBind} from '../../lib/tgfx.js';
 import * as types from '../../types/types.d.js';
 
 
@@ -50,8 +50,7 @@ class App {
         // 实例化 FigmaRenderer
         this.figmaRenderer = new figma.FigmaRenderer();
         this.figmaRenderer.initialize('#realCanvas');
-        // 画个矩形测试
-        this.figmaRenderer.updateShape();
+
 
         this.backendManager = new BackendManager(this.figmaRenderer);
         this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);
@@ -67,6 +66,15 @@ class App {
 
         // 初始化自定义事件监听
         this.initEventListeners();
+
+        this.initFont().then(r => this.figmaRenderer.updateShape());
+    }
+
+    async initFont(): Promise<void> {
+        var emoji_font_path = "./assets/font/NotoColorEmoji.ttf";
+        const emoji_font_buffer = await fetch(emoji_font_path).then((response) => response.arrayBuffer());
+        const emoji_font_array = new Uint8Array(emoji_font_buffer);
+        this.figmaRenderer.registerFonts(emoji_font_array);
     }
 
     /**
@@ -135,20 +143,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 绑定 TGFX
     const figma = await Figma({
         locateFile: (file: string) => './wasm/' + file
-    })
-    .then((module: any) => {
+    }).then((module: any) => {
         TGFXBind(module);
         return module;
-    })
-    .catch((error: any) => {
+    }).catch((error: any) => {
         console.error(error);
         throw new Error("TGFX init failed. Please check the .wasm file path!.");
     });
-
 
     // 实例化应用并传入 FigmaModule
     new App(figma);
 });
 
 // 确保文件被视为 ES 模块
-export { };
+export {};
