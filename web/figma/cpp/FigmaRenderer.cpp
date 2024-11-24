@@ -51,6 +51,7 @@ void FigmaRenderer::registerFonts(const emscripten::val& native_text_font) {
   auto text_font_data = getDataFromEmscripten(native_text_font);
   if (text_font_data) {
     this->demo_text_typeface_ = tgfx::Typeface::MakeFromData(text_font_data, 0);
+    LayerUtils::SetTypeface(demo_text_typeface_);
   }
 }
 
@@ -97,7 +98,7 @@ void FigmaRenderer::updateShape() {
   //   std::cerr << "Error: Failed to load typeface from /assets/font/NotoColorEmoji.ttf" << std::endl;
   // }
 
-  std::string text = "🤡👻🐠🤩😃🤪🙈🙊🐒";
+  std::string text = " 啦啦啦啦啦啦 🤡👻🐠🤩😃🤪🙈🙊🐒";
   const tgfx::Font font(demo_text_typeface_, 48);
 
   surface->getCanvas()->drawSimpleText(text, 100, 100, font, paint);

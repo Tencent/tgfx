@@ -71,7 +71,7 @@ class App {
     }
 
     async initFont(): Promise<void> {
-        var emoji_font_path = "./assets/font/NotoColorEmoji.ttf";
+        var emoji_font_path = "./assets/font/NotoSansSC-Regular.otf";
         const emoji_font_buffer = await fetch(emoji_font_path).then((response) => response.arrayBuffer());
         const emoji_font_array = new Uint8Array(emoji_font_buffer);
         this.figmaRenderer.registerFonts(emoji_font_array);

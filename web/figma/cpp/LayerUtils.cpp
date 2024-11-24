@@ -1,4 +1,5 @@
 #include "LayerUtils.h"
+#include <tgfx/core/Typeface.h>
 #include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/TextLayer.h>
 #include <tgfx/layers/filters/BlurFilter.h>
@@ -6,7 +7,6 @@
 #include <iostream>
 #include "ProjectPath.h"
 #include "utils.h"
-#include <tgfx/core/Typeface.h>
 
 // 静态变量用于统计耗时和执行次数
 static double totalUpdateRectTime = 0.0;
@@ -185,7 +185,10 @@ bool LayerUtils::UpdateCircle(tgfx::Layer* layer, const JsElement& element, std:
 
   return true;
 }
-
+std::shared_ptr<tgfx::Typeface> LayerUtils::currentTypeface = nullptr;
+void LayerUtils::SetTypeface(const std::shared_ptr<tgfx::Typeface>& typeface) {
+  currentTypeface = typeface;
+}
 bool LayerUtils::UpdateText(tgfx::Layer* layer, const JsElement& element, std::string& errorMsg) {
   auto start = std::chrono::high_resolution_clock::now();  // 开始计时
 
@@ -198,8 +201,7 @@ bool LayerUtils::UpdateText(tgfx::Layer* layer, const JsElement& element, std::s
   textLayer->setMatrix(tgfx::Matrix::MakeTrans(x, y));
   textLayer->setText(textContent);
   textLayer->setTextColor(MakeColorFromHexString(element.fill));
-  auto typeface = tgfx::Typeface::MakeFromPath("/assets/font/NotoColorEmoji.ttf");
-  const tgfx::Font font(typeface, fontSize);
+  const tgfx::Font font(currentTypeface, fontSize);
   textLayer->setFont(font);
 
   auto end = std::chrono::high_resolution_clock::now(); // 结束计时
