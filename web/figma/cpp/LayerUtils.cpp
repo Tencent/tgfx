@@ -198,7 +198,7 @@ bool LayerUtils::UpdateText(tgfx::Layer* layer, const JsElement& element, std::s
   textLayer->setMatrix(tgfx::Matrix::MakeTrans(x, y));
   textLayer->setText(textContent);
   textLayer->setTextColor(MakeColorFromHexString(element.fill));
-  const auto typeface = tgfx::Typeface::MakeFromName("Arial", "");
+  auto typeface = tgfx::Typeface::MakeFromPath("/assets/font/NotoColorEmoji.ttf");
   const tgfx::Font font(typeface, fontSize);
   textLayer->setFont(font);
 

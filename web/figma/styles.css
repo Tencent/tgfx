@@ -260,3 +260,8 @@ svg {
     transform: translateX(-50%); /* 通过平移实现准确居中 */
     gap: 10px; /* 间距 */
 }
+.logo {
+    height: 24px;
+    /* 根据需要调整大小 */
+    margin-right: 10px;
+}

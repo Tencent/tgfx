@@ -47,6 +47,14 @@ void FigmaRenderer::updateShape() {
   paint.setColor(tgfx::Color::Red());
   surface->getCanvas()->drawRect({490, 390, 510, 410}, paint);
 
+  std::string text = "HelloTGFX";
+  auto typeface = tgfx::Typeface::MakeFromPath("/assets/font/NotoColorEmoji.ttf");
+  // auto typeface = tgfx::Typeface::MakeFromName("Arial", "Regular");
+  const tgfx::Font font(typeface, 48);
+
+  surface->getCanvas()->drawSimpleText(text, 0,0, font, paint);
+
+
   context->flushAndSubmit();
   tgfx_window_->present(context);
 
