@@ -4,7 +4,7 @@ import ElementManager from './models/ElementManager.js';
 import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
-import Figma from '../wasm/figma.js'; // 导入 FigmaRenderer
+import Figma from '../wasm-mt/figma.js'; // 导入 FigmaRenderer
 import {TGFXBind} from '../../lib/tgfx.js';
 import * as types from '../../types/types.d.js';
 
@@ -24,6 +24,9 @@ class App {
     figmaRenderer: any; // 修改类型为 any 或者适当的类型
 
     constructor(figma: any) { // 接受 FigmaModule 作为参数
+        self.addEventListener('error', (e) => {
+            console.error('Worker Error:', e.message, e.filename, e.lineno);
+        });
         // 获取DOM元素
         const svgCanvasElement = document.getElementById('canvas');
 
@@ -142,7 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 绑定 TGFX
     const figma = await Figma({
-        locateFile: (file: string) => './wasm/' + file
+        locateFile: (file: string) => './wasm-mt/' + file
     }).then((module: any) => {
         TGFXBind(module);
         return module;

@@ -18,7 +18,6 @@ app.get('/', (req, res) => {
 });
 
 const port = 8081;
-const args = process.argv.slice(2);
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
   console.log(`当前工作目录: ${process.cwd()}`);
