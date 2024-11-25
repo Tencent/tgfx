@@ -30,6 +30,7 @@
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGAttributeParser.h"
@@ -469,13 +470,22 @@ SVGDOM::SVGDOM(std::shared_ptr<SVGSVG> root, SVGIDMapper&& mapper,
     : _root(std::move(root)), _fontMgr(std::move(fontManager)), _nodeIDMapper(std::move(mapper)) {
 }
 
-void SVGDOM::render(Canvas* canvas) const {
+void SVGDOM::render(Canvas* canvas) {
   if (_root) {
-    SVGLengthContext lctx(_containerSize);
-    SkSVGPresentationContext pctx;
-    SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, _fontMgr, _nodeIDMapper,
-                               lctx, pctx, {nullptr, nullptr});
-    _root->render(renderCtx);
+    if (!_renderPicture) {
+      SVGLengthContext lctx(_containerSize);
+      SkSVGPresentationContext pctx;
+
+      Recorder recorder;
+      auto* drawCanvas = recorder.beginRecording();
+      {
+        SVGRenderContext renderCtx(canvas->getSurface()->getContext(), drawCanvas, _fontMgr,
+                                   _nodeIDMapper, lctx, pctx, {nullptr, nullptr});
+        _root->render(renderCtx);
+      }
+      _renderPicture = recorder.finishRecordingAsPicture();
+    }
+    canvas->drawPicture(_renderPicture);
   }
 }
 

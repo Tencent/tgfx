@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cuchar>
 #include <memory>
 #include <string>
 #include <tuple>

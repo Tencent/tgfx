@@ -96,7 +96,7 @@ class SVGFontManager {
   SVGFontManager() = default;
   ~SVGFontManager() = default;
 
-  void setDefaultTypeface(const std::shared_ptr<Typeface>& typeface);
+  bool setDefaultTypeface(const std::shared_ptr<Typeface>& typeface);
 
   void addFontStyle(const std::string& fontFamily, FontStyle style);
   void setTypeface(const std::string& fontFamily, FontStyle style,

@@ -403,7 +403,7 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   // if (!shaderImage) {
   //   return nullptr;
   // }
-  auto matrix = Matrix::MakeTrans(-maskBound.left, -maskBound.top);
+  auto matrix = _canvas->getMatrix() * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
   auto shaderImage = Image::MakeFrom(picture, static_cast<int>(bound.width()),
                                      static_cast<int>(bound.height()), &matrix);
   // {

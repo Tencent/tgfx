@@ -17,13 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGFontManager.h"
-#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 
-void SVGFontManager::setDefaultTypeface(const std::shared_ptr<Typeface>& typeface) {
-  _defaultTypeface = typeface;
-}
+bool SVGFontManager::setDefaultTypeface(const std::shared_ptr<Typeface>& typeface) {
+  if (typeface) {
+    _defaultTypeface = typeface;
+    return true;
+  }
+  return false;
+};
 
 void SVGFontManager::addFontStyle(const std::string& fontFamily, FontStyle style) {
   if (_typefaces.at(fontFamily).find(style) == _typefaces.at(fontFamily).end()) {

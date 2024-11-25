@@ -21,6 +21,7 @@
 #include <memory>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/svg/SVGFontManager.h"
 #include "tgfx/svg/SVGIDMapper.h"
@@ -98,7 +99,7 @@ class SVGDOM {
   // Returns the node with the given id, or nullptr if not found.
   std::shared_ptr<SVGNode> findNodeById(const std::string& id);
 
-  void render(Canvas*) const;
+  void render(Canvas*);
 
   /** Render the node with the given id as if it were the only child of the root. */
   void renderNode(Canvas*, SkSVGPresentationContext&, const char* id) const;
@@ -110,5 +111,7 @@ class SVGDOM {
   const std::shared_ptr<SVGFontManager> _fontMgr;
   const SVGIDMapper _nodeIDMapper;
   Size _containerSize;
+
+  std::shared_ptr<Picture> _renderPicture;
 };
 }  // namespace tgfx
