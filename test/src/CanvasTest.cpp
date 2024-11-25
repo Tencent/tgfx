@@ -70,6 +70,7 @@ TGFX_TEST(CanvasTest, clip) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
+
   device->unlock();
 }
 

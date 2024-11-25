@@ -22,6 +22,7 @@
 
 namespace tgfx {
 std::shared_ptr<SolidLayer> SolidLayer::Make() {
+  TRACE_EVENT;
   auto layer = std::shared_ptr<SolidLayer>(new SolidLayer());
   layer->weakThis = layer;
   return layer;

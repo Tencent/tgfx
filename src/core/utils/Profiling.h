@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,29 +15,35 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#pragma once
+#ifdef TGFX_ENABLE_PROFILING
+#define TRACY_ENABLE
 
-#include "TransformImage.h"
-#include "core/utils/Profiling.h"
+#include "public/common/TracySystem.hpp"
+#include "public/tracy/Tracy.hpp"
 
-namespace tgfx {
-TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {
-}
+#if defined(_MSC_VER)
+#define TRACE_FUNC __FUNCSIG__
+#else
+#define TRACE_FUNC __PRETTY_FUNCTION__
+#endif
 
-std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryHardware) const {
-  TRACE_EVENT;
-  auto newSource = source->onMakeDecoded(context, tryHardware);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  return onCloneWith(std::move(newSource));
-}
+#define TRACE_EVENT ZoneScopedN(TRACE_FUNC)
+#define TRACE_EVENT_COLOR(color) ZoneScopedNC(TRACE_FUNC, color)
 
-std::shared_ptr<Image> TransformImage::onMakeMipmapped(bool enabled) const {
-  TRACE_EVENT;
-  auto newSource = source->makeMipmapped(enabled);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  return onCloneWith(std::move(newSource));
-}
-}  // namespace tgfx
+#define FRAME_MARK FrameMark
+
+#define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
+
+#define TRACY_COLOR_YELLOW tracy::Color::ColorType::Yellow
+#define TRACY_COLOR_GREEN tracy::Color::ColorType::Green
+#define TRACY_COLOR_GREENYELLOW tracy::Color::ColorType::GreenYellow
+
+#else
+#define TRACE_EVENT
+#define TRACE_EVENT_COLOR(color)
+
+#define FRAME_MARK
+
+#define TRACE_THREAD_NAME(name)
+#endif

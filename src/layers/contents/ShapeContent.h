@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/layers/LayerContent.h"
 
@@ -27,6 +28,7 @@ class ShapeContent : public LayerContent {
   ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
 
   Rect getBounds() const override {
+    TRACE_EVENT;
     return shape->getBounds();
   }
 

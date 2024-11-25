@@ -18,6 +18,7 @@
 
 #include "RRectDrawOp.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
@@ -130,6 +131,7 @@ class RRectVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TRACE_EVENT;
     auto floatCount = rRectPaints.size() * 4 * 48;
     if (useScale) {
       floatCount += rRectPaints.size() * 4 * 4;
@@ -260,6 +262,7 @@ class RRectIndicesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
+    TRACE_EVENT;
     auto bufferSize = rRectPaints.size() * kIndicesPerFillRRect * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
@@ -279,6 +282,7 @@ class RRectIndicesProvider : public DataProvider {
 
 std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Color color, const RRect& rRect,
                                                const Matrix& viewMatrix) {
+  TRACE_EVENT;
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
     return nullptr;
@@ -314,6 +318,7 @@ static bool UseScale(Context* context) {
 }
 
 void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
+  TRACE_EVENT;
   auto indexProvider = std::make_shared<RRectIndicesProvider>(rRectPaints);
   indexBufferProxy =
       GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
@@ -329,6 +334,7 @@ void RRectDrawOp::prepare(Context* context, uint32_t renderFlags) {
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
+  TRACE_EVENT;
   if (indexBufferProxy == nullptr) {
     return;
   }

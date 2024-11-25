@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DataProvider.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 class DataWrapper : public DataProvider {

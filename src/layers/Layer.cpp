@@ -21,6 +21,7 @@
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Profiling.h"
 #include "layers/DrawArgs.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Recorder.h"
@@ -47,6 +48,7 @@ void Layer::SetDefaultAllowsGroupOpacity(bool value) {
 }
 
 std::shared_ptr<Layer> Layer::Make() {
+  TRACE_EVENT_COLOR(TRACY_COLOR_YELLOW);
   auto layer = std::shared_ptr<Layer>(new Layer());
   layer->weakThis = layer;
   return layer;
@@ -517,6 +519,7 @@ Matrix Layer::getMatrixWithScrollRect() const {
 }
 
 LayerContent* Layer::getContent() {
+  TRACE_EVENT;
   if (bitFields.contentDirty) {
     layerContent = onUpdateContent();
     bitFields.contentDirty = false;
@@ -613,6 +616,7 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
+  TRACE_EVENT;
   DEBUG_ASSERT(canvas != nullptr);
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
@@ -684,6 +688,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
+  TRACE_EVENT;
   if (auto content = getContent()) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
   }

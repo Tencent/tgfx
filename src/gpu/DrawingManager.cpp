@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -81,7 +82,9 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
 }
 
 bool DrawingManager::flush() {
+  TRACE_EVENT;
   if (resourceTasks.empty() && renderTasks.empty()) {
+    FRAME_MARK;
     return false;
   }
   if (activeOpsTask) {
@@ -107,6 +110,7 @@ bool DrawingManager::flush() {
     task->execute(context->gpu());
   }
   renderTasks = {};
+  FRAME_MARK;
   return true;
 }
 

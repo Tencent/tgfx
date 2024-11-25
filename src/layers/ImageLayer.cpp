@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ImageLayer.h"
+#include "core/utils/Profiling.h"
 #include "layers/contents/ImageContent.h"
 
 namespace tgfx {
 std::shared_ptr<ImageLayer> ImageLayer::Make() {
+  TRACE_EVENT;
   auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
   layer->weakThis = layer;
   return layer;

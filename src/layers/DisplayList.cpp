@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "core/utils/Profiling.h"
 #include "layers/DrawArgs.h"
 
 namespace tgfx {
@@ -30,6 +31,7 @@ Layer* DisplayList::root() const {
 }
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
+  TRACE_EVENT;
   if (!surface ||
       (replaceAll && surface->_uniqueID == surfaceID &&
        surface->contentVersion() == surfaceContentVersion && !_root->bitFields.childrenDirty)) {
