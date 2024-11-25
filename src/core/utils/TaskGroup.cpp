@@ -18,6 +18,7 @@
 
 #include "TaskGroup.h"
 #include <algorithm>
+#include <atomic>
 #include <cstdlib>
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
