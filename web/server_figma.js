@@ -10,14 +10,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/figma', express.static(path.join(__dirname, 'figma')));
-app.use('/', express.static(path.join(__dirname, '../')));
+app.use('', express.static(path.join('../')));
+app.use('', express.static(path.join('figma/')));
 
 app.get('/', (req, res) => {
   res.send('Hello, tgfx!');
 });
 
-const port = 8081;
+const port = 8091;
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
   console.log(`当前工作目录: ${process.cwd()}`);
@@ -28,7 +28,7 @@ app.listen(port, () => {
     }
     console.log('当前目录内容:', files);
   });
-  var url = `http://localhost:${port}/figma/index.html`;
+  var url = `http://localhost:${port}/index-mt.html`;
   var start = (process.platform === 'darwin' ? 'open' : 'start');
   require('child_process').exec(`${start} ${url}`);
 });

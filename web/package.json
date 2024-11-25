@@ -21,7 +21,7 @@
     "clean:figma-all": "rimraf figma/build* figma/wasm figma/.*.md5 figma/*.wasm figma/cmake-build-* figma/js",
     "build:figma-ts": "rollup -c ./script/rollup.figma.js --environment ARCH:wasm-mt",
     "build:figma-all": "npm run clean:figma-all && node script/cmake.figma.js -a wasm-mt && npm run build:tgfx && npm run build:figma-ts && cp figma/wasm-mt/figma.wasm figma/",
-    "build:figma-all:debug": "npm run clean:figma-all && node script/cmake.figma.js -a wasm-mt --debug && npm run build:tgfx && npm run build:figma-ts && cp figma/wasm-mt/figma.wasm figma/",
+    "build:figma-all:debug": "node script/cmake.figma.js -a wasm-mt --debug && npm run build:tgfx && rollup -c ./script/rollup.figma.js --environment ARCH:wasm-mt",
     "server:figma": "node server_figma.js wasm-mt"
   },
   "repository": {

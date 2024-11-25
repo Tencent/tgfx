@@ -24,6 +24,7 @@ const banner = `////////////////////////////////////////////////////////////////
 `;
 
 const arch = process.env.ARCH;
+var fileName = (arch === 'wasm-mt'? 'index-mt': 'index');
 
 const plugins = [
     esbuild({tsconfig: "tsconfig.json", minify: false}),
@@ -36,11 +37,10 @@ const inputFiles = glob.sync('figma/ts/*.ts');
 
 export default [
     {
-        input: inputFiles,
+        input: `figma/${fileName}.ts`,
         output: {
             banner,
-            // file: `figma/js/figma/ts/*.js`,
-            dir: `figma/js/figma/ts`,
+            file: `figma/${fileName}.js`,
             format: 'esm',
             sourcemap: true
         },

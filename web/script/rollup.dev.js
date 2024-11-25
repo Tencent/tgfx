@@ -32,19 +32,21 @@ const plugins = [
     commonJs(),
 ];
 
+const inputFiles = glob.sync('figma/ts/*.ts');
 export default [
     {
         input: 'src/binding.ts',
         output: {
             banner,
-            file: `demo/${fileName}.js`,
+            // file: `demo/${fileName}.js`,
+            dir: `figma/js/figma/ts`,
             format: 'esm',
             sourcemap: true
         },
         plugins: plugins,
     },
     {
-        input: `demo/${fileName}.ts`,
+        input: inputFiles,
         output: {
             banner,
             format: 'umd',
