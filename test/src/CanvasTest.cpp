@@ -233,13 +233,12 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
 
 TGFX_TEST(CanvasTest, textShape) {
   auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
   ASSERT_TRUE(serifTypeface != nullptr);
-  std::string text =
-      "T";
+  std::string text ="🥳";
   auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
 
-  float fontSize = 25.f;
+  float fontSize = 40.f;
   float lineHeight = fontSize * 1.2f;
   float height = 0;
   float width = 0;
