@@ -2,6 +2,22 @@
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
+        "Path_addArc1": "4802e56",
+        "Path_addArc2": "4802e56",
+        "Path_addArc3": "4802e56",
+        "Path_addArc4": "4802e56",
+        "Path_addArc5": "4802e56",
+        "Path_addArc6": "4802e56",
+        "Path_addArc7": "4802e56",
+        "Path_addArc8": "4802e56",
+        "Path_addArc_reversed1": "4802e56",
+        "Path_addArc_reversed2": "4802e56",
+        "Path_addArc_reversed3": "4802e56",
+        "Path_addArc_reversed4": "4802e56",
+        "Path_addArc_reversed5": "4802e56",
+        "Path_addArc_reversed6": "4802e56",
+        "Path_addArc_reversed7": "4802e56",
+        "Path_addArc_reversed8": "4802e56",
         "Picture": "d069eb4",
         "PictureImage": "8a2ac4d",
         "PictureImage_Path": "2212c4e",
@@ -24,7 +40,7 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "d069eb4",
+        "path": "2486bd8",
         "rasterized": "f55f586",
         "rasterized_mipmap": "f55f586",
         "rasterized_scale_up": "721c9e0",
@@ -67,7 +83,7 @@
         "Layer_hitTestPointNested": "0ee494a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "draw_shape": "d069eb4",
+        "draw_shape": "738fc92",
         "draw_solid": "b4a1231",
         "draw_text": "612c09e",
         "dropShadow": "43cd416",
@@ -167,6 +183,13 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "TextAlign": "d069eb4"
+        "FontFallbackTest": "110c3ee",
+        "SingleLineTextAlign": "7683ec5",
+        "TextAlign": "7683ec5",
+        "TextAlignBlankLineTest": "110c3ee",
+        "TextAlignSimulateVerticalTextLayout": "110c3ee",
+        "TextAlignWidth0Height0": "7683ec5",
+        "TextAlignWidth1Height10": "110c3ee",
+        "TruncateTextLineTest": "110c3ee"
     }
 }

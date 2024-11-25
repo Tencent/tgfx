@@ -420,10 +420,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 }
 
 void Layer::invalidate() {
-  if (bitFields.dirty) {
-    return;
-  }
-  bitFields.dirty = true;
   if (_parent) {
     _parent->invalidateChildren();
   }
@@ -626,9 +622,6 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   } else {
     // draw directly
     drawContents(args, canvas, alpha);
-  }
-  if (args.cleanDirtyFlags) {
-    bitFields.dirty = false;
   }
 }
 

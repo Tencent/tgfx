@@ -30,8 +30,9 @@ Layer* DisplayList::root() const {
 }
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
-  if (!surface || (replaceAll && surface->_uniqueID == surfaceID &&
-                   surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirty)) {
+  if (!surface ||
+      (replaceAll && surface->_uniqueID == surfaceID &&
+       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.childrenDirty)) {
     return false;
   }
   auto canvas = surface->getCanvas();

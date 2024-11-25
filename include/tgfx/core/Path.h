@@ -163,6 +163,16 @@ class Path {
   void cubicTo(const Point& control1, const Point& control2, const Point& point);
 
   /**
+   * Append a line and arc to the current path. This is the same as the PostScript call "arct".
+   */
+  void arcTo(float x1, float y1, float x2, float y2, float radius);
+
+  /**
+   * Append a line and arc to the current path. This is the same as the PostScript call "arct".
+   */
+  void arcTo(const Point& p1, const Point& p2, float radius);
+
+  /**
    * Appends an arc to the Path. The arc is represented by one or more conic sections that describe
    * part of an oval with radii (rx, ry) rotated by xAxisRotate degrees. The arc curves from the 
    * last point in the Path to (x, y), choosing one of four possible routes: clockwise or 
