@@ -43,6 +43,20 @@ class App {
         this.layersList = layersList;
         this.shapeCounter = shapeCounter;
 
+        // 监听 wasm 加载完成事件
+        document.addEventListener('wasmLoaded', (event: CustomEvent) => {
+            const figma = event.detail;
+            this.initializeWASM(figma);
+        });
+
+    }
+
+    initializeWASM(figma: any): void {
+        this.figmaRenderer = new figma.FigmaRenderer();
+        this.figmaRenderer.initialize('#realCanvas');
+        this.initFont().then(r => this.figmaRenderer.updateShape());
+
+
         this.elementManager = new ElementManager(this.svgCanvas);
         this.uiManager = new UIManager(this.propertiesPanel, this.layersList, (element, attr, value) => {
             this.eventManager.handlePropertyChange(element, attr, value);
@@ -63,18 +77,6 @@ class App {
 
         // 初始化自定义事件监听
         this.initEventListeners();
-
-        // 监听 wasm 加载完成事件
-        document.addEventListener('wasmLoaded', (event: CustomEvent) => {
-            const figma = event.detail;
-            this.initializeWASM(figma);
-        });
-    }
-
-    initializeWASM(figma: any): void {
-        this.figmaRenderer = new figma.FigmaRenderer();
-        this.figmaRenderer.initialize('#realCanvas');
-        this.initFont().then(r => this.figmaRenderer.updateShape());
     }
 
     async initFont(): Promise<void> {
