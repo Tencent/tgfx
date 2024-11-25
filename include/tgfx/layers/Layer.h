@@ -449,8 +449,6 @@ class Layer {
  protected:
   std::weak_ptr<Layer> weakThis;
 
-  Layer* maskOwner = nullptr;
-
   Layer();
 
   /**
@@ -537,6 +535,7 @@ class Layer {
   std::unique_ptr<Rect> _scrollRect = nullptr;
   Layer* _root = nullptr;
   Layer* _parent = nullptr;
+  Layer* maskOwner = nullptr;
   std::unique_ptr<LayerContent> layerContent = nullptr;
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
