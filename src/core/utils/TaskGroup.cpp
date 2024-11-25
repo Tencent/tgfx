@@ -28,6 +28,7 @@
 
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
+static constexpr uint32_t InvalidThreadNumber = 0;
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -45,11 +46,11 @@ int GetCPUCores() {
 }
 
 uint32_t GetThreadNumber() {
-  static std::atomic<uint32_t> threadNumber{1};
+  static std::atomic<uint32_t> nextID{1};
   uint32_t number;
   do {
-    number = threadNumber.fetch_add(1, std::memory_order_relaxed);
-  } while (number == 0);
+    number = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (number == InvalidThreadNumber);
   return number;
 }
 
