@@ -30,7 +30,7 @@
 namespace tgfx {
 std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shape> shape,
                                                const Matrix& viewMatrix) {
-  TRACE_EVENT("ShapeDrawOp::Make");
+  TRACE_EVENT;
   if (shape == nullptr) {
     return nullptr;
   }
@@ -62,7 +62,7 @@ bool ShapeDrawOp::onCombineIfPossible(Op*) {
 }
 
 void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  TRACE_EVENT("ShapeDrawOp::prepare");
+  TRACE_EVENT;
   auto matrix = viewMatrix;
   auto scales = viewMatrix.getAxisScales();
   if (scales.x == scales.y) {
@@ -115,7 +115,7 @@ static std::shared_ptr<Data> MakeAAVertexData(const Rect& rect) {
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
-  TRACE_EVENT("ShapeDrawOp::execute");
+  TRACE_EVENT;
   if (shapeProxy == nullptr) {
     return;
   }

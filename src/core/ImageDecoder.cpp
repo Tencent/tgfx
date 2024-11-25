@@ -41,7 +41,6 @@ class ImageBufferWrapper : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
-    TRACE_EVENT("ImageBufferWrapper::decode");
     return imageBuffer;
   }
 
@@ -68,7 +67,6 @@ class ImageGeneratorWrapper : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
-    TRACE_EVENT("ImageGeneratorWrapper::decode");
     return imageGenerator->makeBuffer(tryHardware);
   }
 

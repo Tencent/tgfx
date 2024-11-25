@@ -30,7 +30,7 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
 }
 
 void OpsRenderTask::prepare(Context* context) {
-  TRACE_EVENT_COLOR("OpsRenderTask::prepare", tracy::Color::ColorType::Green);
+  TRACE_EVENT_COLOR(tracy::Color::ColorType::Green);
   renderPass = context->gpu()->getRenderPass();
   for (auto& op : ops) {
     op->prepare(context, renderFlags);
@@ -38,7 +38,7 @@ void OpsRenderTask::prepare(Context* context) {
 }
 
 bool OpsRenderTask::execute(Gpu* gpu) {
-  TRACE_EVENT("OpsRenderTask::execute");
+  TRACE_EVENT;
   if (ops.empty()) {
     return false;
   }

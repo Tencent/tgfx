@@ -24,7 +24,7 @@
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  TRACE_EVENT("ShapeLayer::Make");
+  TRACE_EVENT;
   auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
   layer->weakThis = layer;
   return layer;

@@ -22,12 +22,12 @@
 
 namespace tgfx {
 Rect TextContent::getBounds() const {
-  TRACE_EVENT("TextContent::getBounds");
+  TRACE_EVENT;
   return textBlob->getBounds();
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT("TextContent::draw");
+  TRACE_EVENT;
   auto textPaint = paint;
   auto color = textColor;
   color.alpha *= paint.getAlpha();
@@ -36,7 +36,7 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TRACE_EVENT("TextContent::hitTestPoint");
+  TRACE_EVENT;
   if (pixelHitTest) {
     const auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
 

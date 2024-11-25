@@ -47,7 +47,7 @@ class RectCoverageVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACE_EVENT("RectCoverageVerticesProvider::getData");
+    TRACE_EVENT;
     auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 9 : 5);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
@@ -103,7 +103,7 @@ class RectNonCoverageVerticesProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACE_EVENT("RectNonCoverageVerticesProvider::getData");
+    TRACE_EVENT;
     auto floatCount = rectPaints.size() * 4 * (hasColor ? 8 : 4);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
@@ -138,7 +138,7 @@ class RectNonCoverageVerticesProvider : public DataProvider {
 
 std::unique_ptr<RectDrawOp> RectDrawOp::Make(std::optional<Color> color, const Rect& rect,
                                              const Matrix& viewMatrix, const Matrix* uvMatrix) {
-  TRACE_EVENT("RectDrawOp::Make");
+  TRACE_EVENT;
   return std::unique_ptr<RectDrawOp>(new RectDrawOp(color, rect, viewMatrix, uvMatrix));
 }
 
@@ -172,7 +172,7 @@ bool RectDrawOp::needsIndexBuffer() const {
 }
 
 void RectDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  TRACE_EVENT("RectDrawOp::prepare");
+  TRACE_EVENT;
   if (needsIndexBuffer()) {
     if (aa == AAType::Coverage) {
       indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
@@ -196,7 +196,7 @@ void RectDrawOp::prepare(Context* context, uint32_t renderFlags) {
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  TRACE_EVENT("RectDrawOp::execute");
+  TRACE_EVENT;
   std::shared_ptr<GpuBuffer> indexBuffer;
   if (needsIndexBuffer()) {
     if (indexBufferProxy == nullptr) {

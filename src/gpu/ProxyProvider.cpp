@@ -53,7 +53,6 @@ class AsyncDataProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACE_EVENT("AsyncDataProvider::getData");
     return task->wait();
   }
 
@@ -92,7 +91,6 @@ class ShapeRasterizerWrapper : public ShapeBufferProvider {
   }
 
   std::shared_ptr<ShapeBuffer> getBuffer() const override {
-    TRACE_EVENT("ShapeRasterizerWrapper::getBuffer");
     return rasterizer->makeRasterized();
   }
 
@@ -108,7 +106,6 @@ class AsyncShapeBufferProvider : public ShapeBufferProvider {
   }
 
   std::shared_ptr<ShapeBuffer> getBuffer() const override {
-    TRACE_EVENT("AsyncShapeBufferProvider::getBuffer");
     return task->wait();
   }
 

@@ -27,7 +27,7 @@
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
-  TRACE_EVENT_COLOR("Surface::Make", tracy::Color::ColorType::Yellow);
+  TRACE_EVENT_COLOR(tracy::Color::ColorType::Yellow);
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
               sampleCount, mipmapped, renderFlags);
 }

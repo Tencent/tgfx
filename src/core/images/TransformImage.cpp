@@ -24,7 +24,7 @@ TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move
 }
 
 std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryHardware) const {
-  TRACE_EVENT("TransformImage::onMakeDecoded");
+  TRACE_EVENT;
   auto newSource = source->onMakeDecoded(context, tryHardware);
   if (newSource == nullptr) {
     return nullptr;
@@ -33,7 +33,7 @@ std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryH
 }
 
 std::shared_ptr<Image> TransformImage::onMakeMipmapped(bool enabled) const {
-  TRACE_EVENT("TransformImage::onMakeMipmapped");
+  TRACE_EVENT;
   auto newSource = source->makeMipmapped(enabled);
   if (newSource == nullptr) {
     return nullptr;

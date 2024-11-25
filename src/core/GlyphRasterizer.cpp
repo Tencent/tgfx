@@ -35,7 +35,7 @@ GlyphRasterizer::~GlyphRasterizer() {
 }
 
 std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
-  TRACE_EVENT("GlyphRasterizer::onMakeBuffer");
+  TRACE_EVENT;
   auto mask = Mask::Make(width(), height(), tryHardware);
   if (!mask) {
     return nullptr;

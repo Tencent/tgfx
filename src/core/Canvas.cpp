@@ -167,7 +167,7 @@ static FillStyle CreateFillStyle(const Paint* paint) {
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawLine");
+  TRACE_EVENT;
   Path path = {};
   path.moveTo(x0, y0);
   path.lineTo(x1, y1);
@@ -177,7 +177,7 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawRect");
+  TRACE_EVENT;
   if (paint.getStroke()) {
     Path path = {};
     path.addRect(rect);
@@ -192,28 +192,28 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawOval");
+  TRACE_EVENT;
   RRect rRect = {};
   rRect.setOval(oval);
   drawRRect(rRect, paint);
 }
 
 void Canvas::drawCircle(float centerX, float centerY, float radius, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawCircle");
+  TRACE_EVENT;
   Rect rect =
       Rect::MakeLTRB(centerX - radius, centerY - radius, centerX + radius, centerY + radius);
   drawOval(rect, paint);
 }
 
 void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawRoundRect");
+  TRACE_EVENT;
   RRect rRect = {};
   rRect.setRectXY(rect, radiusX, radiusY);
   drawRRect(rRect, paint);
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawRRect");
+  TRACE_EVENT;
   if (rRect.radii.isZero()) {
     drawRect(rRect.rect, paint);
     return;
@@ -232,13 +232,13 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawPath");
+  TRACE_EVENT;
   auto shape = Shape::MakeFrom(path);
   drawShape(std::move(shape), paint);
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawShape");
+  TRACE_EVENT;
   if (shape == nullptr || paint.nothingToDraw()) {
     return;
   }
@@ -295,7 +295,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                        const Paint* paint, const Matrix* extraMatrix) {
-  TRACE_EVENT("Canvas::drawImage");
+  TRACE_EVENT;
   if (image == nullptr || (paint && paint->nothingToDraw())) {
     return;
   }
@@ -319,7 +319,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
                             const Paint& paint) {
-  TRACE_EVENT("Canvas::drawSimpleText");
+  TRACE_EVENT;
   if (text.empty()) {
     return;
   }
@@ -329,7 +329,7 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
-  TRACE_EVENT("Canvas::drawGlyphs");
+  TRACE_EVENT;
   if (glyphCount == 0 || paint.nothingToDraw()) {
     return;
   }
@@ -341,7 +341,7 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
 
 void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
                           const Paint& paint) {
-  TRACE_EVENT("Canvas::drawTextBlob");
+  TRACE_EVENT;
   if (textBlob == nullptr || paint.nothingToDraw()) {
     return;
   }
@@ -354,13 +354,13 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
-  TRACE_EVENT("Canvas::drawPicture");
+  TRACE_EVENT;
   drawContext->drawPicture(std::move(picture), *mcState);
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
                          const Paint* paint) {
-  TRACE_EVENT("Canvas::drawPictureWithMatrix");
+  TRACE_EVENT;
   if (picture == nullptr) {
     return;
   }
@@ -378,7 +378,7 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                        const FillStyle& style, std::shared_ptr<ImageFilter> imageFilter) {
-  TRACE_EVENT("Canvas::drawLayer");
+  TRACE_EVENT;
   if (imageFilter == nullptr && picture->records.size() == 1 && style.maskFilter == nullptr) {
     LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
@@ -392,7 +392,7 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                        const Color colors[], size_t count, const SamplingOptions& sampling,
                        const Paint* paint) {
-  TRACE_EVENT("Canvas::drawAtlas");
+  TRACE_EVENT;
   // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
   if (atlas == nullptr || count == 0 || (paint && paint->nothingToDraw())) {
     return;

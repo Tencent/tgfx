@@ -22,31 +22,23 @@
 #include "public/common/TracySystem.hpp"
 #include "public/tracy/Tracy.hpp"
 
-struct TracyENV {
-  TracyENV() {
-    setenv("TRACY_NO_INVARIANT_CHECK", "1", 1);
-  }
-};
+#if defined(_MSC_VER)
+#define TRACE_FUNC __FUNCSIG__
+#else
+#define TRACE_FUNC __PRETTY_FUNCTION__
+#endif
 
-static TracyENV tracyENV;
-
-#define TRACE_EVENT(name) ZoneScopedN(name)
-#define TRACE_EVENT_COLOR(name, color) ZoneScopedNC(name, color)
+#define TRACE_EVENT ZoneScopedN(TRACE_FUNC)
+#define TRACE_EVENT_COLOR(color) ZoneScopedNC(TRACE_FUNC, color)
 
 #define FRAME_MARK FrameMark
-#define FRAME_MARK_NAME(name) FrameMarkNamed(name)
-#define FRAME_MARK_START(name) FrameMarkStart(name)
-#define FRAME_MARK_END(name) FrameMarkEnd(name)
 
 #define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
 #else
-#define TRACE_EVENT(name)
-#define TRACE_EVENT_COLOR(name, color)
+#define TRACE_EVENT
+#define TRACE_EVENT_COLOR(color)
 
 #define FRAME_MARK
-#define FRAME_MARK_NAME(name)
-#define FRAME_MARK_START(name)
-#define FRAME_MARK_END(name)
 
 #define TRACE_THREAD_NAME(name)
 #endif

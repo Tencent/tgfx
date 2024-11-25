@@ -82,7 +82,7 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
 }
 
 bool DrawingManager::flush() {
-  TRACE_EVENT("DrawingManager::flush");
+  TRACE_EVENT;
   if (resourceTasks.empty() && renderTasks.empty()) {
     FRAME_MARK;
     return false;

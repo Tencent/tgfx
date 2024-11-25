@@ -44,13 +44,28 @@ int GetCPUCores() {
   return cpuCores;
 }
 
+uint32_t GetThreadNumber() {
+  static std::atomic<uint32_t> threadNumber{1};
+  uint32_t number;
+  do {
+    number = threadNumber.fetch_add(1, std::memory_order_relaxed);
+  } while (number == 0);
+  return number;
+}
+
+std::string GetThreadName() {
+  char threadName[10] = {'\0'};
+  snprintf(threadName, 10, "Thread_%d", GetThreadNumber());
+  return threadName;
+}
+
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACE_THREAD_NAME("Thread");
+  TRACE_THREAD_NAME(GetThreadName().c_str());
   while (true) {
     auto task = taskGroup->popTask();
     if (!task) {

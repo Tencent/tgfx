@@ -24,7 +24,7 @@ SolidContent::SolidContent(const RRect& rRect, const Color& color) : _rRect(rRec
 }
 
 void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT("SolidContent::draw");
+  TRACE_EVENT;
   auto solidPaint = paint;
   auto color = _color;
   color.alpha *= paint.getAlpha();
@@ -33,7 +33,7 @@ void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool SolidContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
-  TRACE_EVENT("SolidContent::hitTestPoint");
+  TRACE_EVENT;
   return _rRect.rect.contains(localX, localY);
 }
 

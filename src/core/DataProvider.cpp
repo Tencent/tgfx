@@ -26,7 +26,6 @@ class DataWrapper : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACE_EVENT("DataWrapper::getData");
     return data;
   }
 

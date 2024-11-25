@@ -31,7 +31,7 @@ Layer* DisplayList::root() const {
 }
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
-  TRACE_EVENT("DisplayList::render");
+  TRACE_EVENT;
   if (!surface ||
       (replaceAll && surface->_uniqueID == surfaceID &&
        surface->contentVersion() == surfaceContentVersion && !_root->bitFields.childrenDirty)) {
