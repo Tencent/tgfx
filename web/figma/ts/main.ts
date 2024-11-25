@@ -4,9 +4,6 @@ import ElementManager from './models/ElementManager.js';
 import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
-import Figma from '../wasm-mt/figma.js'; // 导入 FigmaRenderer
-import {TGFXBind} from '../../lib/tgfx.js';
-import * as types from '../../types/types.d.js';
 
 
 /**
@@ -23,7 +20,7 @@ class App {
     eventManager: EventManager;
     figmaRenderer: any; // 修改类型为 any 或者适当的类型
 
-    constructor(figma: any) { // 接受 FigmaModule 作为参数
+    constructor() { // 移除 figma 参数
         self.addEventListener('error', (e) => {
             console.error('Worker Error:', e.message, e.filename, e.lineno);
         });
@@ -50,9 +47,6 @@ class App {
         this.uiManager = new UIManager(this.propertiesPanel, this.layersList, (element, attr, value) => {
             this.eventManager.handlePropertyChange(element, attr, value);
         });
-        // 实例化 FigmaRenderer
-        this.figmaRenderer = new figma.FigmaRenderer();
-        this.figmaRenderer.initialize('#realCanvas');
 
 
         this.backendManager = new BackendManager(this.figmaRenderer);
@@ -70,6 +64,16 @@ class App {
         // 初始化自定义事件监听
         this.initEventListeners();
 
+        // 监听 wasm 加载完成事件
+        document.addEventListener('wasmLoaded', (event: CustomEvent) => {
+            const figma = event.detail;
+            this.initializeWASM(figma);
+        });
+    }
+
+    initializeWASM(figma: any): void {
+        this.figmaRenderer = new figma.FigmaRenderer();
+        this.figmaRenderer.initialize('#realCanvas');
         this.initFont().then(r => this.figmaRenderer.updateShape());
     }
 
@@ -139,23 +143,8 @@ class App {
 }
 
 // 启动应用
-document.addEventListener('DOMContentLoaded', async () => {
-    // 加载 WebAssembly 模块
-    // const figma = await Figma();
-
-    // 绑定 TGFX
-    const figma = await Figma({
-        locateFile: (file: string) => './wasm-mt/' + file
-    }).then((module: any) => {
-        TGFXBind(module);
-        return module;
-    }).catch((error: any) => {
-        console.error(error);
-        throw new Error("TGFX init failed. Please check the .wasm file path!.");
-    });
-
-    // 实例化应用并传入 FigmaModule
-    new App(figma);
+document.addEventListener('DOMContentLoaded', () => {
+    new App();
 });
 
 // 确保文件被视为 ES 模块

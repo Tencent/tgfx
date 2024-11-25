@@ -59,6 +59,9 @@
     <div id="fpsCounter" class="fps-counter">FPS: 0</div>
 </div>
 
+<!-- 引入新的非 ES 模块脚本，用于加载 WebAssembly -->
+<script src="./js/figma/ts/loadWasm.js"></script>
+
 <!-- 引入主脚本 -->
 <script type="module" src="./js/figma/ts/main.js"></script>
 <!-- 引入配置脚本 -->
@@ -71,5 +74,6 @@
     document.getElementById('realCanvas').setAttribute('width', VIEWBOX_WIDTH);
     document.getElementById('realCanvas').setAttribute('height', VIEWBOX_HEIGHT);
 </script>
+-->
 </body>
 </html>
