@@ -34,6 +34,11 @@
 #define FRAME_MARK FrameMark
 
 #define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
+
+#define TRACY_COLOR_YELLOW tracy::Color::ColorType::Yellow
+#define TRACY_COLOR_GREEN tracy::Color::ColorType::Green
+#define TRACY_COLOR_GREENYELLOW tracy::Color::ColorType::GreenYellow
+
 #else
 #define TRACE_EVENT
 #define TRACE_EVENT_COLOR(color)

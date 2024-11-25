@@ -30,7 +30,7 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
 }
 
 void OpsRenderTask::prepare(Context* context) {
-  TRACE_EVENT_COLOR(tracy::Color::ColorType::Green);
+  TRACE_EVENT_COLOR(TRACY_COLOR_GREEN);
   renderPass = context->gpu()->getRenderPass();
   for (auto& op : ops) {
     op->prepare(context, renderFlags);

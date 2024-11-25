@@ -15,6 +15,9 @@ jobs:
         with:
           lfs: true
 
+      - name: Set Environment
+        run: echo "TRACY_NO_INVARIANT_CHECK=1" >> $GITHUB_ENV
+
       - name: Get Environment Cache
         id: environment-cache
         uses: actions/cache/restore@v4
@@ -229,6 +232,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           lfs: true
+
+      - name: Set Environment
+        run: echo "TRACY_NO_INVARIANT_CHECK=1" >> $GITHUB_ENV
 
       - name: Get Third-Party Cache
         id: third-party-cache

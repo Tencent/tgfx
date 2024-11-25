@@ -33,7 +33,7 @@ Device::~Device() {
 }
 
 Context* Device::lockContext() {
-  TRACE_EVENT_COLOR(tracy::Color::ColorType::GreenYellow);
+  TRACE_EVENT_COLOR(TRACY_COLOR_GREENYELLOW);
   locker.lock();
   contextLocked = onLockContext();
   if (!contextLocked) {
