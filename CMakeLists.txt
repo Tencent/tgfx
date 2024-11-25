@@ -552,7 +552,3 @@ if (TGFX_BUILD_TESTS)
     target_link_options(TGFXFullTest PUBLIC ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(TGFXFullTest ${TGFX_TEST_LIBS})
 endif ()
-
-if (TGFX_ENABLE_PROFILING)
-    add_subdirectory(third_party/tracy/profiler)
-endif ()
