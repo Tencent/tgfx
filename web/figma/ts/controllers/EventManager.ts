@@ -22,6 +22,7 @@ export default class EventManager {
     isPerformanceTestRunning: boolean;
     animationFrameId: number | null;
     lastFrameTime: number | undefined;
+    isBackend: boolean;
 
     /**
      * 创建事件管理器
@@ -45,6 +46,7 @@ export default class EventManager {
         this.viewBox = {x: 0, y: 0, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT};
         this.isPerformanceTestRunning = false;
         this.animationFrameId = null;
+        this.isBackend = false;
         this.initEvents();
         this.initResizeListener(); /* 添加窗口调整大小监听 */
     }
@@ -78,13 +80,15 @@ export default class EventManager {
                     this.elementManager.selectElement(element);
                     this.uiManager.showProperties(element);
                     elementList.push(this.getElementData(element));
-                    if (this.isBackend()) {
+                    if (this.isBackend) {
                         element.element.style.opacity = '0';
                     }
                 }
             }
             this.updateLayers();
-            this.backendManager.sendUpdateMessage(elementList, this.getCanvasRect(), this.viewBox);
+            if (this.isBackend) {
+                this.backendManager.sendUpdateMessage(elementList, this.getCanvasRect(), this.viewBox);
+            }
             // 触发自定义事件以通知图形已添加
             const event = new CustomEvent('shapeAdded');
             document.dispatchEvent(event);
@@ -116,15 +120,18 @@ export default class EventManager {
             this.uiManager.showProperties(selectedEl); // selectedEl 可以是 BaseElement 或 null
             this.uiManager.updateLayersList(this.elementManager.getElements(), selectedEl);
         });
-
-        // 后端渲染切换
-        document.getElementById('backendToggle')?.addEventListener('change', (e) => {
-            const isBackend = (e.target as HTMLInputElement).checked;
-            if (isBackend) {
+        // 监听 modeToggle 的开关事件
+        const modeToggle = document.getElementById('modeToggle') as HTMLInputElement;
+        modeToggle.addEventListener('change', (e) => {
+            this.isBackend = (e.target as HTMLInputElement).checked;
+            if (this.isBackend) {
                 this.enableBackendRendering();
             } else {
+                // 关闭后端，先调用方法，再标记
                 this.disableBackendRendering();
             }
+            const toggleLabel = document.getElementById('toggleLabel');
+            toggleLabel.textContent = this.isBackend ? this.backendManager.backendName() : 'Web 渲染';
         });
     }
 
@@ -149,8 +156,10 @@ export default class EventManager {
             this.uiManager.showProperties(element);
             this.uiManager.showTooltip(tooltip, 50, 60);
             this.updateLayers();
-            this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
-            if (this.isBackend()) {
+            if (this.isBackend) {
+                this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
+            }
+            if (this.isBackend) {
                 element.element.style.opacity = '0';
             }
             // 触发自定义事件以通知图形已添加
@@ -246,10 +255,14 @@ export default class EventManager {
         if (this.isDragging && this.draggingElement) {
             const mousePos = this.getMousePosition(e);
             this.updateElementPosition(this.draggingElement, mousePos);
-            this.backendManager.sendUpdateMessage([this.getElementData(this.draggingElement)], this.getCanvasRect(), this.viewBox);
+            if (this.isBackend) {
+                this.backendManager.sendUpdateMessage([this.getElementData(this.draggingElement)], this.getCanvasRect(), this.viewBox);
+            }
         } else if (this.isCanvasDragging) {
             this.updateViewBox(e);
-            this.backendManager.sendCanvasPanMessage(this.getCanvasRect(), this.viewBox);
+            if (this.isBackend) {
+                this.backendManager.sendCanvasPanMessage(this.getCanvasRect(), this.viewBox);
+            }
         }
     }
 
@@ -326,7 +339,9 @@ export default class EventManager {
                 element.setAttribute(attribute, value);
             }
 
-            this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
+            if (this.isBackend) {
+                this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
+            }
         } catch (error) {
             console.error(`设置属性失败: ${attribute} = ${value}`, error);
         }
@@ -373,14 +388,6 @@ export default class EventManager {
         return filteredAttrs;
     }
 
-    /**
-     * 判断是否启用后端渲染
-     * @returns 是否启用
-     */
-    isBackend(): boolean {
-        const backendToggle = document.getElementById('backendToggle') as HTMLInputElement;
-        return backendToggle.checked;
-    }
 
     /**
      * 动画元素
@@ -507,7 +514,9 @@ export default class EventManager {
             elementInfoList.push(this.getElementData(element));
         });
 
-        this.backendManager.sendUpdateMessage(elementInfoList, this.getCanvasRect(), this.viewBox);
+        if (this.isBackend) {
+            this.backendManager.sendUpdateMessage(elementInfoList, this.getCanvasRect(), this.viewBox);
+        }
         // 使用 requestAnimationFrame 调度下一帧
         if (this.isPerformanceTestRunning) {
             this.animationFrameId = requestAnimationFrame(() => this.animateElements());

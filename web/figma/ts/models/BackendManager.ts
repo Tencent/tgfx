@@ -9,7 +9,6 @@ declare global {
 
 export default class BackendManager {
     figmaRenderer: any; // 修改类型为 any 或者适当的类型
-
     /**
      * 创建后端通信管理器
      */
@@ -22,13 +21,11 @@ export default class BackendManager {
      * 初始化后端通信（假设使用CEF的cefQuery）
      */
     initialize(): void {
-        if (window.cefQuery) {
-            // 假设后端会主动发送消息，可以在此设置监听
-            // 具体实现取决于后端如何与前端通信
-            // 例如，通过WebSockets或其他方式
-        } else {
-            console.warn('cefQuery 未定义,后端通信不可用');
-        }
+
+    }
+
+    backendName(): string {
+        return window.cefQuery ? 'CEF容器渲染' : 'WASM TGFX 渲染';
     }
 
     /**
@@ -56,9 +53,6 @@ export default class BackendManager {
 
 
     sendMoveMessage(elements: any[]): void {
-        if (!this.isBackend()) {
-            return;
-        }
         const messageObj = {
             action: 'move',
             elements: elements
@@ -71,9 +65,6 @@ export default class BackendManager {
      * @param elements - 元素数据
      */
     sendUpdateMessage(elements: any[], canvasRect: any, viewBox: any): void {
-        if (!this.isBackend()) {
-            return;
-        }
         const messageObj = {
             action: 'update',
             canvasRect: canvasRect,
@@ -87,9 +78,6 @@ export default class BackendManager {
      * 发送画布平移的消息到后端
      */
     sendCanvasPanMessage(canvasRect: any, viewBox: any): void {
-        if (!this.isBackend()) {
-            return;
-        }
         const messageObj = {
             action: 'canvasPan',
             canvasRect: canvasRect,
@@ -99,20 +87,15 @@ export default class BackendManager {
     }
 
     /**
-     * 判断是否启用后端渲染
-     * @returns 是否启用
-     */
-    isBackend(): boolean {
-        const backendToggle = document.getElementById('backendToggle') as HTMLInputElement;
-        return backendToggle.checked;
-    }
-
-    /**
      * 发送消息到后端
      * @param messageObj - 完整的消息对象
      */
-    send(messageObj: object): void {
-        this.sendToWASM(messageObj);
+    send(messageObj: any): void {
+        if (window.cefQuery) {
+            this.sendToCef(messageObj);
+        } else {
+            this.sendToWASM(messageObj);
+        }
     }
 
     private sendToWASM(messageObj: object) {

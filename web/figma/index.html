@@ -10,11 +10,11 @@
 <!-- 顶部操作菜单 -->
 <div class="top-menu">
     <img src="./assets/img/cocraft.png" alt="Logo" class="logo">
-    <label class="toggle-switch">
-        后端渲染
-        <input type="checkbox" id="backendToggle">
-        <div class="toggle-slider"></div>
-    </label>
+    <!-- 渲染模式切换开关 -->
+    <div class="toggle-switch">
+        <input type="checkbox" id="modeToggle">
+        <label for="modeToggle" id="toggleLabel">Web 渲染</label>
+    </div>
 </div>
 
 <div class="container">
@@ -74,6 +74,5 @@
     document.getElementById('realCanvas').setAttribute('width', VIEWBOX_WIDTH);
     document.getElementById('realCanvas').setAttribute('height', VIEWBOX_HEIGHT);
 </script>
--->
 </body>
 </html>
