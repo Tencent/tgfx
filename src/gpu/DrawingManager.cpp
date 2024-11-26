@@ -36,14 +36,14 @@ std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
 }
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
-                                        std::shared_ptr<TextureProxy> source,
+                                        std::vector<std::shared_ptr<TextureProxy>> inputs,
                                         std::shared_ptr<RuntimeEffect> effect,
                                         const Point& offset) {
-  if (target == nullptr || source == nullptr || effect == nullptr) {
+  if (target == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
   checkIfResolveNeeded(target);
-  auto task = std::make_shared<RuntimeDrawTask>(target, source, effect, offset);
+  auto task = std::make_shared<RuntimeDrawTask>(target, inputs, effect, offset);
   addRenderTask(std::move(task));
 }
 
