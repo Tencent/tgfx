@@ -25,33 +25,11 @@ body, html {
     padding: 0 20px;
 }
 
-.top-menu button, .top-menu label {
-    margin-right: 10px;
-    padding: 5px 10px;
-    border: none;
-    background-color: #007bff;
-    color: #fff;
-    cursor: pointer;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-}
-
 .top-menu button:disabled {
     background-color: #aaa;
     cursor: not-allowed;
 }
 
-/* Toggle Switch Style */
-.toggle-switch {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-}
-
-.toggle-switch input {
-    display: none;
-}
 
 .toggle-slider {
     width: 50px;
@@ -59,7 +37,7 @@ body, html {
     background-color: #ccc;
     border-radius: 12px;
     position: relative;
-    transition: background-color 0.3s;
+    transition: background-color 0.3s, box-shadow 0.3s;
     margin-left: 8px;
 }
 
@@ -73,15 +51,9 @@ body, html {
     top: 2px;
     left: 2px;
     transition: transform 0.3s;
+    transform: translateX(26px); /* 加大滑块位移 */
 }
 
-.toggle-switch input:checked + .toggle-slider {
-    background-color: #007bff;
-}
-
-.toggle-switch input:checked + .toggle-slider::before {
-    transform: translateX(26px);
-}
 
 /* 主布局 */
 .container {
@@ -264,4 +236,60 @@ svg {
     height: 24px;
     /* 根据需要调整大小 */
     margin-right: 10px;
+}
+
+.radio-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 20px; /* 根据需要调整间距 */
+}
+
+/* 隐藏原有的单选按钮 */
+.radio-group input[type="radio"] {
+    display: none;
+}
+
+/* 将标签样式化为按钮 */
+.radio-group label {
+    padding: 8px 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #f5f5f5;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* 选中状态的按钮样式 */
+.radio-group input[type="radio"]:checked + label {
+    background-color: #007bff;
+    color: #fff;
+    border-color: #007bff;
+}
+
+.radio-group input[type="radio"] {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background-color: #ccc;
+    border-radius: 50%;
+    position: relative;
+    cursor: pointer;
+}
+
+.radio-group input[type="radio"]:checked::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 8px;
+    height: 8px;
+    background-color: #007bff;
+    border-radius: 50%;
+}
+
+.radio-group label {
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
 }

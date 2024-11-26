@@ -4,7 +4,7 @@ import ElementManager from '../models/ElementManager.js';
 import UIManager from '../views/UIManager.js';
 import BackendManager from '../models/BackendManager.js';
 import BaseElement from '../models/BaseElement.js';
-import { VIEWBOX_WIDTH, VIEWBOX_HEIGHT } from '../config.js';
+import {VIEWBOX_WIDTH, VIEWBOX_HEIGHT} from '../config.js';
 
 export default class EventManager {
     elementManager: ElementManager;
@@ -120,18 +120,19 @@ export default class EventManager {
             this.uiManager.showProperties(selectedEl); // selectedEl 可以是 BaseElement 或 null
             this.uiManager.updateLayersList(this.elementManager.getElements(), selectedEl);
         });
-        // 监听 modeToggle 的开关事件
-        const modeToggle = document.getElementById('modeToggle') as HTMLInputElement;
-        modeToggle.addEventListener('change', (e) => {
-            this.isBackend = (e.target as HTMLInputElement).checked;
-            if (this.isBackend) {
-                this.enableBackendRendering();
-            } else {
-                // 关闭后端，先调用方法，再标记
-                this.disableBackendRendering();
-            }
-            const toggleLabel = document.getElementById('toggleLabel');
-            toggleLabel.textContent = this.isBackend ? this.backendManager.backendName() : 'Web 渲染';
+
+        // radio-group 的监听
+        const renderModeRadios = document.getElementsByName('renderMode') as NodeListOf<HTMLInputElement>;
+        renderModeRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const selectedValue = (e.target as HTMLInputElement).value;
+                this.isBackend = selectedValue === 'backend';
+                if (this.isBackend) {
+                    this.enableBackendRendering();
+                } else {
+                    this.disableBackendRendering();
+                }
+            });
         });
     }
 

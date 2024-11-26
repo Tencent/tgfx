@@ -21,11 +21,10 @@ export default class BackendManager {
      * 初始化后端通信（假设使用CEF的cefQuery）
      */
     initialize(): void {
-
-    }
-
-    backendName(): string {
-        return window.cefQuery ? 'CEF容器渲染' : 'WASM TGFX 渲染';
+        const backendLabel = document.getElementById('backendLabel');
+        if (backendLabel) {
+            backendLabel.textContent = window.cefQuery ? 'CEF 渲染' : 'WASM 渲染';
+        }
     }
 
     /**
