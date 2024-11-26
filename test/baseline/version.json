@@ -18,6 +18,7 @@
         "Path_addArc_reversed6": "4802e56",
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
+        "Path_decompose": "2bf38d0",
         "Picture": "d069eb4",
         "PictureImage": "8a2ac4d",
         "PictureImage_Path": "2212c4e",
@@ -49,8 +50,7 @@
         "text_shape": "74f94c4",
         "tile_mode_normal": "8cb853c",
         "tile_mode_rgbaaa": "8cb853c",
-        "tile_mode_subset": "8cb853c",
-        "Path_decompose": "2bf38d0"
+        "tile_mode_subset": "8cb853c"
     },
     "DrawersTest": {
         "ConicGradient": "5a1fb11",
