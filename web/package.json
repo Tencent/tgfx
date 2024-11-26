@@ -54,6 +54,7 @@
   "license": "BSD-3-Clause",
   "author": "Tencent",
   "dependencies": {
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "web-vitals": "^4.2.4"
   }
 }
