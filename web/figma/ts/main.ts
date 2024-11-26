@@ -68,7 +68,6 @@ class App {
         // 计算 Interaction to Next Paint (INP) 的功能
         const INPCounter = document.getElementById('INPCounter');
         const handleINP = (metric: Metric) => {
-            console.log(`INP: ${metric.value} ms`);
             if (INPCounter) {
                 INPCounter.textContent = `INP: ${metric.value} ms`;
             }
