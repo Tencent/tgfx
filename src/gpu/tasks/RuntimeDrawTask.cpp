@@ -29,17 +29,17 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 
 bool RuntimeDrawTask::execute(Gpu* gpu) {
   std::vector<BackendTexture> inputTextures;
+  inputTextures.reserve(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {
     std::shared_ptr<Texture> texture;
     if (inputs[i] != nullptr) {
       texture = inputs[i]->getTexture();
     }
     if (texture == nullptr) {
-      LOGI("RuntimeDrawTask::execute() Failed to get the input %d texture!", i);
-      inputTextures.push_back({});
-    } else {
-      inputTextures.push_back(texture->getBackendTexture());
+      LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture!", i);
+      return false;
     }
+    inputTextures.push_back(texture->getBackendTexture());
   }
 
   auto renderTarget = renderTargetProxy->getRenderTarget();
@@ -57,7 +57,7 @@ bool RuntimeDrawTask::execute(Gpu* gpu) {
       return false;
     }
   }
-  return effect->onDraw(program->getProgram(), inputTextures.data(),
+  return effect->onDraw(program->getProgram(), inputTextures,
                         renderTarget->getBackendRenderTarget(), offset);
 }
 }  // namespace tgfx

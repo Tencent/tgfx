@@ -45,6 +45,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(
     return nullptr;
   }
   std::vector<std::shared_ptr<TextureProxy>> textureProxies;
+  textureProxies.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
   TPArgs tpArgs(args.context, args.renderFlags, false);
@@ -53,8 +54,17 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(
     return nullptr;
   }
   textureProxies.push_back(textureProxy);
-  for (auto& input : effect->extraInputs) {
-    textureProxies.push_back(input->lockTextureProxy(tpArgs, sampling));
+  for (size_t i = 0; i < effect->extraInputs.size(); i++) {
+    const auto& input = effect->extraInputs[i];
+    if (input == nullptr) {
+      LOGE("RuntimeImageFilter::lockTextureProxy() extraInput %d is nullptr", i);
+      return nullptr;
+    }
+    textureProxy = input->lockTextureProxy(tpArgs, sampling);
+    if (textureProxy == nullptr) {
+      return nullptr;
+    }
+    textureProxies.push_back(textureProxy);
   }
   auto offset = Point::Make(-clipBounds.x(), -clipBounds.y());
   auto drawingManager = args.context->drawingManager();

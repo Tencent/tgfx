@@ -42,8 +42,8 @@ class RuntimeEffect {
    * by the effect to be cached and reused.
    * @param type The UniqueType of the effect. Must use the DEFINE_RUNTIME_EFFECT_TYPE macro to define it.
    * @param extraInputs Represents a collection of additional input images that will be used during rendering.
-   * When onDraw is called, these extraInputs will be transformed to inputTextures. The inputTextures[0] is the source of ImageFilter,
-   * and extraInputs correspond to inputTextures[1...n] in order.
+   * When onDraw is called, these extraInputs will be converted to inputTextures. The inputTextures[0] is
+   * the source of ImageFilter, and extraInputs correspond to inputTextures[1...n] in order.
    */
   explicit RuntimeEffect(UniqueType type,
                          const std::vector<std::shared_ptr<Image>>& extraInputs = {});
@@ -81,10 +81,11 @@ class RuntimeEffect {
   virtual std::unique_ptr<RuntimeProgram> onCreateProgram(Context* context) const = 0;
 
   /**
-   * Applies the effect to the input textures and draws the result to the target render target.
+   * Applies the effect to the input textures and draws the result to the specified render target.
    * The inputTextures[0] is the source of ImageFilter, and extraInputs correspond to inputTextures[1...n] in order.
    */
-  virtual bool onDraw(const RuntimeProgram* program, const BackendTexture* inputTextures,
+  virtual bool onDraw(const RuntimeProgram* program,
+                      const std::vector<BackendTexture>& inputTextures,
                       const BackendRenderTarget& target, const Point& offset) const = 0;
 
  private:
