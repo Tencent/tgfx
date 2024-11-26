@@ -1,4 +1,6 @@
-import {onINP, Metric} from 'web-vitals';
+import {onINP} from '../controllers/onINP.js';
+import {Metric} from "web-vitals";
+
 
 /**
  * WebVitalsHandler 类用于封装 onINP 的逻辑
@@ -42,16 +44,6 @@ export default class WebVitalsManager {
     constructor(callback: (metric: Metric) => void) {
         this.inpCallback = callback;
         this.vitalsHandler = new WebVitalsHandler(this.inpCallback);
-        this.init();
-    }
-
-    /**
-     * 初始化 INP 指标的监听
-     */
-    private init() {
-        onINP((metric) => {
-            this.inpCallback(metric);
-        }, {reportAllChanges: true, durationThreshold: 0});
     }
 
     /**
