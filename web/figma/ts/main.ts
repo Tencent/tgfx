@@ -4,7 +4,8 @@ import ElementManager from './models/ElementManager.js';
 import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
-import {onINP} from 'web-vitals';
+import {Metric} from "web-vitals";
+import WebVitalsManager from "./controllers/WebVitalsManager";
 
 
 /**
@@ -63,9 +64,17 @@ class App {
             this.eventManager.handlePropertyChange(element, attr, value);
         });
 
-
         this.backendManager = new BackendManager(this.figmaRenderer);
-        this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas);
+        // 计算 Interaction to Next Paint (INP) 的功能
+        const INPCounter = document.getElementById('INPCounter');
+        const handleINP = (metric: Metric) => {
+            console.log(`INP: ${metric.value} ms`);
+            if (INPCounter) {
+                INPCounter.textContent = `INP: ${metric.value} ms`;
+            }
+        };
+        const vitalsManager = new WebVitalsManager(handleINP);
+        this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas, vitalsManager);
 
         // 监听窗口大小变化
         window.onresize = () => {
@@ -117,16 +126,6 @@ class App {
         }
 
         requestAnimationFrame(updateFPS);
-
-        // 计算 Interaction to Next Paint (INP) 的功能
-        const INPCounter = document.getElementById('INPCounter');
-        onINP((metric) => {
-            console.log(`INP: ${metric.value} ms`);
-            if (INPCounter) {
-                INPCounter.textContent = `INP: ${metric.value} ms`;
-            }
-        }, {reportAllChanges: true, durationThreshold: 0});
-
 
     }
 

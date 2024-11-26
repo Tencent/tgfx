@@ -4,6 +4,8 @@ import ElementManager from '../models/ElementManager.js';
 import UIManager from '../views/UIManager.js';
 import BackendManager from '../models/BackendManager.js';
 import BaseElement from '../models/BaseElement.js';
+import WebVitalsManager from '../controllers/WebVitalsManager.js';
+
 import {VIEWBOX_WIDTH, VIEWBOX_HEIGHT} from '../config.js';
 
 export default class EventManager {
@@ -23,6 +25,7 @@ export default class EventManager {
     animationFrameId: number | null;
     lastFrameTime: number | undefined;
     isBackend: boolean;
+    private vitalsManager: WebVitalsManager;
 
     /**
      * 创建事件管理器
@@ -31,11 +34,12 @@ export default class EventManager {
      * @param backendManager - 后端管理器
      * @param svgCanvas - SVG画布元素
      */
-    constructor(elementManager: ElementManager, uiManager: UIManager, backendManager: BackendManager, svgCanvas: SVGElement) {
+    constructor(elementManager: ElementManager, uiManager: UIManager, backendManager: BackendManager, svgCanvas: SVGElement, vitalsManager: WebVitalsManager) {
         this.elementManager = elementManager;
         this.uiManager = uiManager;
         this.backendManager = backendManager;
         this.svgCanvas = svgCanvas;
+        this.vitalsManager = vitalsManager;
         this.isDragging = false;
         this.draggingElement = null;
         this.offsetX = 0;
@@ -127,6 +131,7 @@ export default class EventManager {
             radio.addEventListener('change', (e) => {
                 const selectedValue = (e.target as HTMLInputElement).value;
                 this.isBackend = selectedValue === 'backend';
+                this.vitalsManager.reset();
                 if (this.isBackend) {
                     this.enableBackendRendering();
                 } else {
