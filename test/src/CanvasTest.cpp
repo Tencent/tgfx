@@ -41,6 +41,21 @@
 #include "utils/common.h"
 
 namespace tgfx {
+class ExternalDataLoader : public DataLoader {
+  std::shared_ptr<Data> makeFromFile(const std::string& filePath) override {
+    auto stream = Stream::MakeFromFile(filePath);
+    if (stream == nullptr) {
+      return nullptr;
+    }
+    auto buffer = new (std::nothrow) uint8_t[stream->size()];
+    if (buffer == nullptr) {
+      return nullptr;
+    }
+    stream->read(buffer, stream->size());
+    return Data::MakeAdopted(buffer, stream->size(), Data::DeleteProc, nullptr);
+  }
+};
+
 TGFX_TEST(CanvasTest, clip) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -1044,8 +1059,10 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas->drawPath(path, paint);
   canvas->restore();
   canvas->translate(200, 350);
+  Data::RegisterExternalDataLoader(std::unique_ptr<DataLoader>(new ExternalDataLoader()));
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Data::RegisterExternalDataLoader(nullptr);
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   paint.setColor(Color::Red());

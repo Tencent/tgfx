@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXThreadsView.h"
+#include "DataLoaderImpl.h"
 
 using namespace emscripten;
 
@@ -42,9 +43,19 @@ std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
 
 TGFXThreadsView::TGFXThreadsView(std::string canvasID, const val& nativeImage)
     : TGFXBaseView(std::move(canvasID), nativeImage) {
+  auto dataLoader = std::unique_ptr<DataLoader>(new DataLoaderImpl());
+  tgfx::Data::RegisterExternalDataLoader(std::move(dataLoader));
 }
 
 void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal) {
+  std::string fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+  auto data = Data::MakeFromFile(fontPath.c_str());
+  if (data) {
+    auto typeface = tgfx::Typeface::MakeFromData(data, 0);
+    if (typeface) {
+      appHost->addTypeface("default", std::move(typeface));
+    }
+  }
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);

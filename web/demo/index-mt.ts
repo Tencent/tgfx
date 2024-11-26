@@ -23,6 +23,29 @@ import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./c
 
 let shareData: ShareData = new ShareData();
 
+class DataLoaderImpl {
+    async makeFromFile(filePath: string): Promise<ArrayBuffer | null> {
+        try {
+            const response = await fetch(filePath);
+            if (!response.ok) {
+                return null;
+            }
+            return await response.arrayBuffer();
+        } catch (error) {
+            console.error('Error loading file:', error);
+            return null;
+        }
+    }
+}
+
+const dataLoader = new DataLoaderImpl();
+
+async function makeFromFile(filePath: string): Promise<ArrayBuffer | null> {
+    return dataLoader.makeFromFile(filePath);
+}
+// Expose the function to the global scope
+// (window as any).makeFromFile = makeFromFile;
+
 if (typeof window !== 'undefined') {
     window.onload = async () => {
         shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm-mt/' + file})

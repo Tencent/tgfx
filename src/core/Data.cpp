@@ -18,10 +18,33 @@
 
 #include "tgfx/core/Data.h"
 #include <cstring>
+#include <mutex>
 #include "tgfx/core/Stream.h"
 
 namespace tgfx {
+static std::mutex loaderLocker = {};
+static std::unique_ptr<DataLoader> dataLoader = nullptr;
+
+void Data::RegisterExternalDataLoader(std::unique_ptr<DataLoader> loader) {
+  std::lock_guard<std::mutex> autoLock(loaderLocker);
+  dataLoader = std::move(loader);
+}
+
+bool Data::HasExternalDataLoader() {
+  std::lock_guard<std::mutex> autoLock(loaderLocker);
+  return dataLoader != nullptr;
+}
+
 std::shared_ptr<Data> Data::MakeFromFile(const std::string& filePath) {
+  std::shared_ptr<Data> loaderData = nullptr;
+  loaderLocker.lock();
+  if (dataLoader) {
+    loaderData = dataLoader->makeFromFile(filePath);
+  }
+  loaderLocker.unlock();
+  if (loaderData) {
+    return loaderData;
+  }
   auto stream = Stream::MakeFromFile(filePath);
   if (stream == nullptr) {
     return nullptr;
