@@ -35,6 +35,11 @@ import {INPMetric, MetricRatingThresholds, ReportOpts} from '../../../node_modul
 /** Thresholds for INP. See https://web.dev/articles/inp#what_is_a_good_inp_score */
 export const INPThresholds: MetricRatingThresholds = [200, 500];
 
+let metric: INPMetric;
+let report: ReturnType<typeof bindReporter>;
+let currentOnReport: (metric: INPMetric) => void;
+let currentOpts: ReportOpts | undefined;
+
 /**
  * Calculates the [INP](https://web.dev/articles/inp) value for the current
  * page and calls the `callback` function once the value is ready, along with
@@ -78,13 +83,21 @@ export const onINP = (
 
   // Set defaults
   opts = opts || {};
+  
+  currentOnReport = onReport;
+  currentOpts = opts;
 
   whenActivated(() => {
     // TODO(philipwalton): remove once the polyfill is no longer needed.
     initInteractionCountPolyfill();
 
-    let metric = initMetric('INP');
-    let report: ReturnType<typeof bindReporter>;
+    metric = initMetric('INP');
+    report = bindReporter(
+      currentOnReport,
+      metric,
+      INPThresholds,
+      currentOpts!.reportAllChanges,
+    );
 
     const handleEntries = (entries: INPMetric['entries']) => {
       // Queue the `handleEntries()` callback in the next idle task.
@@ -116,13 +129,6 @@ export const onINP = (
       durationThreshold: opts!.durationThreshold ?? DEFAULT_DURATION_THRESHOLD,
     });
 
-    report = bindReporter(
-      onReport,
-      metric,
-      INPThresholds,
-      opts!.reportAllChanges,
-    );
-
     if (po) {
       // Also observe entries of type `first-input`. This is useful in cases
       // where the first interaction is less than the `durationThreshold`.
@@ -137,15 +143,25 @@ export const onINP = (
       // successfully registered.
       onBFCacheRestore(() => {
         resetInteractions();
-
         metric = initMetric('INP');
         report = bindReporter(
-          onReport,
+          currentOnReport,
           metric,
           INPThresholds,
-          opts!.reportAllChanges,
+          currentOpts!.reportAllChanges,
         );
       });
     }
   });
+};
+
+export const resetINP = () => {
+  resetInteractions();
+  metric = initMetric('INP');
+  report = bindReporter(
+    currentOnReport,
+    metric,
+    INPThresholds,
+    currentOpts!.reportAllChanges,
+  );
 };
