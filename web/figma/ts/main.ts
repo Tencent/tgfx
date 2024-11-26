@@ -4,7 +4,7 @@ import ElementManager from './models/ElementManager.js';
 import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
-import { onINP } from 'web-vitals';
+import {onINP} from 'web-vitals';
 
 
 /**
@@ -119,14 +119,14 @@ class App {
         requestAnimationFrame(updateFPS);
 
         // 计算 Interaction to Next Paint (INP) 的功能
-        const observeInteraction = (event: Event) => {
-            onINP((metric) => {
-                console.log(`INP: ${metric.value}ms`);
-                console.log('Entry details:', metric.entries[0]);
-            }, { reportAllChanges: true });
-        };
+        const INPCounter = document.getElementById('INPCounter');
+        onINP((metric) => {
+            console.log(`INP: ${metric.value} ms`);
+            if (INPCounter) {
+                INPCounter.textContent = `INP: ${metric.value} ms`;
+            }
+        }, {reportAllChanges: true, durationThreshold: 0});
 
-        window.addEventListener('click', observeInteraction);
 
     }
 
