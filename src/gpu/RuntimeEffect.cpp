@@ -20,7 +20,9 @@
 #include "gpu/ResourceKey.h"
 
 namespace tgfx {
-RuntimeEffect::RuntimeEffect(UniqueType type) : uniqueType(std::move(type)) {
+RuntimeEffect::RuntimeEffect(UniqueType type,
+                             const std::vector<std::shared_ptr<Image>>& extraInputs)
+    : uniqueType(std::move(type)), extraInputs(extraInputs) {
   uniqueType.addStrong();
 }
 

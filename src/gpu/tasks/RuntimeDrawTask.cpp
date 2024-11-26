@@ -21,18 +21,27 @@
 
 namespace tgfx {
 RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
-                                 std::shared_ptr<TextureProxy> source,
+                                 std::vector<std::shared_ptr<TextureProxy>> inputs,
                                  std::shared_ptr<RuntimeEffect> effect, const Point& offset)
-    : RenderTask(std::move(target)), source(std::move(source)), effect(std::move(effect)),
+    : RenderTask(std::move(target)), inputs(std::move(inputs)), effect(std::move(effect)),
       offset(offset) {
 }
 
 bool RuntimeDrawTask::execute(Gpu* gpu) {
-  auto texture = source->getTexture();
-  if (texture == nullptr) {
-    LOGE("RuntimeDrawTask::execute() Failed to get the source texture!");
-    return false;
+  std::vector<BackendTexture> inputTextures;
+  for (size_t i = 0; i < inputs.size(); i++) {
+    std::shared_ptr<Texture> texture;
+    if (inputs[i] != nullptr) {
+      texture = inputs[i]->getTexture();
+    }
+    if (texture == nullptr) {
+      LOGI("RuntimeDrawTask::execute() Failed to get the input %d texture!", i);
+      inputTextures.push_back({});
+    } else {
+      inputTextures.push_back(texture->getBackendTexture());
+    }
   }
+
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RuntimeDrawTask::execute() Failed to get the render target!");
@@ -48,7 +57,7 @@ bool RuntimeDrawTask::execute(Gpu* gpu) {
       return false;
     }
   }
-  return effect->onDraw(program->getProgram(), texture->getBackendTexture(),
+  return effect->onDraw(program->getProgram(), inputTextures.data(),
                         renderTarget->getBackendRenderTarget(), offset);
 }
 }  // namespace tgfx

@@ -105,8 +105,11 @@ static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
   }
 }
 
-bool CornerPinEffect::onDraw(const RuntimeProgram* program, const BackendTexture& source,
+bool CornerPinEffect::onDraw(const RuntimeProgram* program, const BackendTexture* inputImages,
                              const BackendRenderTarget& target, const Point& offset) const {
+  if (!inputImages[0].isValid()) {
+    return false;
+  }
   auto context = program->getContext();
   // Clear the previously generated GLError
   CheckGLError(context);
@@ -125,10 +128,10 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program, const BackendTexture
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer.id);
   gl->viewport(0, 0, target.width(), target.height());
   GLTextureInfo sampler = {};
-  source.getGLTextureInfo(&sampler);
+  inputImages[0].getGLTextureInfo(&sampler);
   gl->activeTexture(GL_TEXTURE0);
   gl->bindTexture(sampler.target, sampler.id);
-  auto vertices = computeVertices(source, target, offset);
+  auto vertices = computeVertices(inputImages[0], target, offset);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);
   }
