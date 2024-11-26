@@ -21,9 +21,8 @@
 #include "core/utils/Profiling.h"
 
 namespace tgfx {
-Rect TextContent::getBounds() const {
-  TRACE_EVENT;
-  return textBlob->getBounds();
+TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor)
+    : bounds(textBlob->getBounds()), textBlob(std::move(textBlob)), textColor(textColor) {
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {
@@ -53,8 +52,7 @@ bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
     return false;
   }
 
-  const Rect textBounds = textBlob->getBounds();
-  return textBounds.contains(localX, localY);
+  return bounds.contains(localX, localY);
 }
 
 bool TextContent::hitTestPointInternal(float localX, float localY,

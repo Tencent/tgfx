@@ -40,10 +40,12 @@ class RuntimeEffect {
    * to define the UniqueType. The UniqueType should be static for each effect class, ensuring all
    * instances of the same class share the same UniqueType. This allows the RuntimeProgram created
    * by the effect to be cached and reused.
-   * @param type The UniqueType of the effect. Must use the DEFINE_RUNTIME_EFFECT_TYPE macro to define it.
-   * @param extraInputs Represents a collection of additional input images that will be used during rendering.
-   * When onDraw is called, these extraInputs will be converted to inputTextures. The inputTextures[0] is
-   * the source of ImageFilter, and extraInputs correspond to inputTextures[1...n] in order.
+   * @param type The UniqueType of the effect. Must use the DEFINE_RUNTIME_EFFECT_TYPE macro to
+   * define it.
+   * @param extraInputs A collection of additional input images used during rendering. When the
+   * onDraw() method is called, these extraInputs will be converted to inputTextures.
+   * inputTextures[0] represents the source image for the ImageFilter, and extraInputs correspond to
+   * inputTextures[1...n] in order.
    */
   explicit RuntimeEffect(UniqueType type,
                          const std::vector<std::shared_ptr<Image>>& extraInputs = {});
@@ -82,13 +84,16 @@ class RuntimeEffect {
 
   /**
    * Applies the effect to the input textures and draws the result to the specified render target.
-   * The inputTextures[0] is the source of ImageFilter, and extraInputs correspond to inputTextures[1...n] in order.
+   * inputTextures[0] represents the source image for the ImageFilter, and extraInputs correspond to
+   * inputTextures[1...n] in order.
    */
   virtual bool onDraw(const RuntimeProgram* program,
                       const std::vector<BackendTexture>& inputTextures,
                       const BackendRenderTarget& target, const Point& offset) const = 0;
 
  private:
+  // Each effect instance holds a valid reference to the UniqueType, so the corresponding
+  // RuntimeProgram will not be released.
   UniqueType uniqueType = {};
 
   std::vector<std::shared_ptr<Image>> extraInputs;
