@@ -538,8 +538,8 @@ void Path::decompose(const PathIterator& iterator, void* info) const {
       case SkPath::kConic_Verb:
         // approximate with 2^1=2 quads.
         SkPath::ConvertConicToQuads(points[0], points[1], points[2], iter.conicWeight(), quads, 1);
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads), info);
-        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads) + 2, info);
+        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads) + 1, info);
+        iterator(PathVerb::Quad, reinterpret_cast<Point*>(quads) + 3, info);
         break;
       case SkPath::kCubic_Verb:
         iterator(PathVerb::Cubic, reinterpret_cast<Point*>(points), info);

@@ -49,7 +49,8 @@
         "text_shape": "74f94c4",
         "tile_mode_normal": "8cb853c",
         "tile_mode_rgbaaa": "8cb853c",
-        "tile_mode_subset": "8cb853c"
+        "tile_mode_subset": "8cb853c",
+        "Path_decompose": "2bf38d0"
     },
     "DrawersTest": {
         "ConicGradient": "5a1fb11",

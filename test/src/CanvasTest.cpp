@@ -28,11 +28,16 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Recorder.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -1261,4 +1266,49 @@ TGFX_TEST(CanvasTest, Path_addArc) {
   }
   device->unlock();
 }
+
+TGFX_TEST(CanvasTest, Path_decompose) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto* context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 500);
+  auto* canvas = surface->getCanvas();
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(5);
+
+  Path path;
+  path.addOval(Rect::MakeXYWH(50, 50, 100, 100));
+  canvas->drawPath(path, paint);
+
+  Path fitPath;
+  auto pathIter = [&](PathVerb verb, const Point points[4], void*) -> void {
+    switch (verb) {
+      case PathVerb::Move:
+        fitPath.moveTo(points[0]);
+        break;
+      case PathVerb::Line:
+        fitPath.lineTo(points[0]);
+        break;
+      case PathVerb::Quad:
+        fitPath.quadTo(points[0], points[1]);
+        break;
+      case PathVerb::Cubic:
+        fitPath.cubicTo(points[0], points[1], points[2]);
+        break;
+      case PathVerb::Close:
+        fitPath.close();
+        break;
+    }
+  };
+  path.decompose(pathIter, nullptr);
+
+  canvas->translate(0.f, 200.f);
+  canvas->drawPath(fitPath, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_decompose"));
+}
+
 }  // namespace tgfx
