@@ -18,7 +18,7 @@ export default class WebVitalsManager {
 
     private init() {
         onINP((metric) => {
-            console.log(metric);
+            console.log(`INP: ${metric.value}, Delta: ${metric.delta}, Entries count: ${metric.entries.length}`);
             this.inpCallback(metric);
         }, {reportAllChanges: true, durationThreshold: 0});
     }
@@ -28,6 +28,7 @@ export default class WebVitalsManager {
      * 通过停止当前的回调处理，并允许重新启动
      */
     public reset() {
+        console.log('Resetting INP metrics');
         resetINP();
     }
 }

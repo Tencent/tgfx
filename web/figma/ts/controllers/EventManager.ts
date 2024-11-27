@@ -131,13 +131,22 @@ export default class EventManager {
             radio.addEventListener('change', (e) => {
                 const selectedValue = (e.target as HTMLInputElement).value;
                 this.isBackend = selectedValue === 'backend';
-                this.vitalsManager.reset();
                 if (this.isBackend) {
                     this.enableBackendRendering();
                 } else {
                     this.disableBackendRendering();
                 }
             });
+        });
+        // 监听 resetInp 的点击事件
+        document.getElementById('resetInp')?.addEventListener('click', () => {
+            setTimeout(() => {
+                const INPCounter = document.getElementById('INPCounter');
+                if (INPCounter) {
+                    INPCounter.textContent = `INP: 0 ms`;
+                }
+                this.vitalsManager.reset();
+            }, 300);
         });
     }
 
