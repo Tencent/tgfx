@@ -4,7 +4,7 @@ import ElementManager from '../models/ElementManager.js';
 import UIManager from '../views/UIManager.js';
 import BackendManager from '../models/BackendManager.js';
 import BaseElement from '../models/BaseElement.js';
-import WebVitalsManager from '../controllers/WebVitalsManager.js';
+import WebVitalsManager from '../models/WebVitalsManager.js';
 
 import {VIEWBOX_WIDTH, VIEWBOX_HEIGHT} from '../config.js';
 

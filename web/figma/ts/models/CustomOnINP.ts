@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+// 这个类是从 web-vitals 包中复制的，进行了一些修改，主要是为了提供一个resetINP方法，用于重置INP指标的处理；
+// 这样方便控制统计不同时间段内的INP指标，而不是全局的。
+// 如果升级了 web-vitals 包，需要对比新版本onINP.ts的代码，有修改要同步更新过来。
+
 import { onBFCacheRestore } from '../../../node_modules/web-vitals/dist/modules/lib/bfcache.js';
 import { bindReporter } from '../../../node_modules/web-vitals/dist/modules/lib/bindReporter.js';
 import { initMetric } from '../../../node_modules/web-vitals/dist/modules/lib/initMetric.js';
@@ -67,7 +71,7 @@ let currentOpts: ReportOpts | undefined;
  * hidden. As a result, the `callback` function might be called multiple times
  * during the same page load._
  */
-export const onINP = (
+export const customOnINP = (
   onReport: (metric: INPMetric) => void,
   opts?: ReportOpts,
 ) => {

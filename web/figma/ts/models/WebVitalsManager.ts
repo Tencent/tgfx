@@ -1,4 +1,5 @@
-import {onINP, resetINP} from '../controllers/onINP.js';
+
+import {customOnINP, resetINP} from './CustomOnINP.js';
 import {Metric} from "web-vitals";
 
 /**
@@ -17,7 +18,7 @@ export default class WebVitalsManager {
     }
 
     private init() {
-        onINP((metric) => {
+        customOnINP((metric) => {
             console.log(`INP: ${metric.value}, Delta: ${metric.delta}, Entries count: ${metric.entries.length}`);
             this.inpCallback(metric);
         }, {reportAllChanges: true, durationThreshold: 0});

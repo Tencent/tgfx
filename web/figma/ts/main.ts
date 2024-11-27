@@ -5,7 +5,7 @@ import BackendManager from './models/BackendManager.js';
 import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
 import {Metric} from "web-vitals";
-import WebVitalsManager from "./controllers/WebVitalsManager";
+import WebVitalsManager from "./models/WebVitalsManager";
 
 
 /**
