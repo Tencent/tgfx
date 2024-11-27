@@ -1,5 +1,6 @@
 import ElementManager from './ElementManager.js';
 import BackendManager from './BackendManager.js';
+import {settings} from "../config";
 
 export default class PerformanceManager {
     private readonly fpsCounter: HTMLElement | null;
@@ -25,28 +26,29 @@ export default class PerformanceManager {
 
 
     private updatePerformanceInfo(): void {
-        const fps = this.calculateFPS();
+        const { fps, frameTime } = this.calculateFPS();
         if (fps > 0) {
-            this.updateUI(fps);
+            this.updateUI(fps, frameTime);
         }
 
         requestAnimationFrame(this.updatePerformanceInfo);
     }
 
-    private calculateFPS(): number {
+    private calculateFPS(): { fps: number; frameTime: number } {
         const now = performance.now();
         this.frameCount++;
         const delta = now - this.lastFrameTime;
         if (delta >= 1000) {
             const fps = (this.frameCount / delta) * 1000;
+            const frameTime = delta / this.frameCount;
             this.frameCount = 0;
             this.lastFrameTime = now;
-            return Math.round(fps);
+            return { fps: Math.round(fps), frameTime };
         }
-        return 0;
+        return { fps: 0, frameTime: 0 };
     }
 
-    private updateUI(fps: number): void {
+    private updateUI(fps: number, frameTime: number): void {
         if (this.fpsCounter) {
             this.fpsCounter.textContent = `FPS: ${fps}`;
         }
@@ -57,7 +59,10 @@ export default class PerformanceManager {
         }
 
         if (this.renderCounter) {
-            const frameTime = this.backendManager.frameTimeCons();
+            if (settings.isBackend) {
+                // 使用后端渲染时，显示后端渲染耗时
+                frameTime = this.backendManager.frameTimeCons();
+            }
             this.renderCounter.textContent = `单帧耗时: ${frameTime.toFixed(2)} ms`;
         }
     }
