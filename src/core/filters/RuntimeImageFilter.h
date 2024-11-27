@@ -38,6 +38,10 @@ class RuntimeImageFilter : public ImageFilter {
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
+  bool requireFlatSource() const override {
+    return true;
+  }
+
  private:
   std::shared_ptr<RuntimeEffect> effect = nullptr;
 };

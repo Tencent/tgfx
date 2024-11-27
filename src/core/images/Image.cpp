@@ -19,11 +19,9 @@
 #include "tgfx/core/Image.h"
 #include "core/images/BufferImage.h"
 #include "core/images/FilterImage.h"
-#include "core/images/GeneratorImage.h"
+#include "core/images/FlattenImage.h"
 #include "core/images/OrientImage.h"
-#include "core/images/PictureImage.h"
 #include "core/images/RGBAAAImage.h"
-#include "core/images/RasterImage.h"
 #include "core/images/ScaleImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
@@ -43,6 +41,10 @@ class PixelDataConverter : public ImageGenerator {
 
   bool isAlphaOnly() const override {
     return info.isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return false;
   }
 
  protected:
@@ -149,14 +151,12 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   return TextureImage::Wrap(std::move(textureProxy));
 }
 
-BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
-  return {};
-}
-
-std::shared_ptr<Image> Image::makeRasterized(bool mipmapped,
-                                             const SamplingOptions& sampling) const {
+std::shared_ptr<Image> Image::makeFlattened(bool mipmapped, const SamplingOptions& sampling) const {
   TRACE_EVENT;
-  return RasterImage::MakeFrom(weakThis.lock(), mipmapped, sampling);
+  if (isFlat()) {
+    return weakThis.lock();
+  }
+  return FlattenImage::MakeFrom(weakThis.lock(), mipmapped, sampling);
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context,
@@ -164,6 +164,10 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context,
   TRACE_EVENT;
   TPArgs args(context, 0, hasMipmaps());
   return TextureImage::Wrap(lockTextureProxy(args, sampling));
+}
+
+BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
+  return {};
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
