@@ -20,100 +20,20 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
 #include "core/DrawContext.h"
 #include "core/FillStyle.h"
 #include "core/MCState.h"
 #include "svg/xml/XMLWriter.h"
-#include "tgfx/core/Color.h"
-#include "tgfx/core/ColorFilter.h"
-#include "tgfx/core/Font.h"
-#include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGParse.h"
 
 namespace tgfx {
 
-class SVGContext;
-
-struct Resources {
-  explicit Resources(const FillStyle& fill);
-  std::string fPaintServer;
-  std::string fColorFilter;
-};
-
-class ResourceBucket {
- public:
-  ResourceBucket() = default;
-
-  std::string addLinearGradient() {
-    return "gradient_" + std::to_string(_gradientCount++);
-  }
-
-  std::string addPath() {
-    return "path_" + std::to_string(_pathCount++);
-  }
-
-  std::string addImage() {
-    return "img_" + std::to_string(imageCount++);
-  }
-
-  std::string addColorFilter() {
-    return "cfilter_" + std::to_string(_colorFilterCount++);
-  }
-
-  std::string addPattern() {
-    return "pattern_" + std::to_string(_patternCount++);
-  }
-
- private:
-  uint32_t _gradientCount = 0;
-  uint32_t _pathCount = 0;
-  uint32_t imageCount = 0;
-  uint32_t _patternCount = 0;
-  uint32_t _colorFilterCount = 0;
-};
-
-class AutoElement {
- public:
-  AutoElement(const std::string& name, Context* GPUContext, XMLWriter* writer);
-  AutoElement(const std::string& name, Context* GPUContext,
-              const std::unique_ptr<XMLWriter>& writer);
-  AutoElement(const std::string& name, Context* GPUContext, SVGContext* svgContext,
-              ResourceBucket* bucket, const MCState& mc, const FillStyle& fill,
-              const Stroke* stroke = nullptr);
-  ~AutoElement();
-
-  void addAttribute(const std::string& name, const std::string& val);
-  void addAttribute(const std::string& name, int32_t val);
-  void addAttribute(const std::string& name, float val);
-  void addText(const std::string& text);
-
-  void addRectAttributes(const Rect&);
-  void addPathAttributes(const Path&, PathParse::PathEncoding);
-  void addTextAttributes(const Font&);
-
- private:
-  Resources addResources(const FillStyle& fill);
-  void addShaderResources(const std::shared_ptr<Shader>& shader, Resources* resources);
-  void addGradientShaderResources(const std::shared_ptr<Shader>& shader, Resources* resources);
-  void addColorFilterResources(const ColorFilter& colorFilter, Resources* resources);
-  void addImageShaderResources(const std::shared_ptr<Shader>&, Resources* resources);
-
-  // void addPatternDef(const SkBitmap& bm);
-
-  void addFillAndStroke(const FillStyle& fill, const Stroke* stroke, const Resources& resources);
-
-  std::string addLinearGradientDef(const GradientInfo& info);
-
-  Context* _context = nullptr;
-  XMLWriter* fWriter;
-  ResourceBucket* fResourceBucket;
-};
+class ResourceStore;
+class ElementWriter;
 
 class SVGContext : public DrawContext {
  public:
@@ -137,7 +57,7 @@ class SVGContext : public DrawContext {
                      const FillStyle& style) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList>, const MCState&, const FillStyle&,
-                        const Stroke*) override {};
+                        const Stroke*) override;
 
   void drawPicture(std::shared_ptr<Picture>, const MCState&) override;
 
@@ -157,20 +77,23 @@ class SVGContext : public DrawContext {
    */
   bool RequiresViewportReset(const FillStyle& fill);
 
+  void drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
+                       const FillStyle& style);
+
   PathParse::PathEncoding pathEncoding() const {
-    return PathParse::PathEncoding::Relative;
+    return PathParse::PathEncoding::Absolute;
   }
 
   ISize _size;
   Context* _context = nullptr;
   const std::unique_ptr<XMLWriter> _writer;
-  const std::unique_ptr<ResourceBucket> _resourceBucket;
+  const std::unique_ptr<ResourceStore> _resourceBucket;
   const uint32_t _flags;
-  std::unique_ptr<AutoElement> _rootElement;
+  std::unique_ptr<ElementWriter> _rootElement;
 
   struct ClipRecord {
     const MCState* clip;
-    std::unique_ptr<AutoElement> element;
+    std::unique_ptr<ElementWriter> element;
   };
 
   std::vector<ClipRecord> _clipStack;

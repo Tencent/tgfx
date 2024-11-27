@@ -18,6 +18,7 @@
 
 #include "tgfx/svg/SVGGenerator.h"
 #include <memory>
+#include "ElementWriter.h"
 #include "core/utils/Log.h"
 #include "svg/SVGContext.h"
 #include "svg/xml/XMLWriter.h"
@@ -26,15 +27,14 @@
 
 namespace tgfx {
 
-SVGGenerator::~SVGGenerator() {
-}
+SVGGenerator::~SVGGenerator() = default;
 
 Canvas* SVGGenerator::beginGenerate(Context* GPUContext, const ISize& size) {
   ASSERT(GPUContext)
   if (_canvas == nullptr) {
     auto writer = std::make_unique<XMLStreamWriter>(_svgStream, 0);
-    _svgContext = new SVGContext(GPUContext, size, std::move(writer), 0);
-    _canvas = new Canvas(_svgContext);
+    _context = new SVGContext(GPUContext, size, std::move(writer), 0);
+    _canvas = new Canvas(_context);
   }
 
   if (_actively) {
@@ -51,7 +51,7 @@ Canvas* SVGGenerator::getCanvas() const {
 };
 
 std::string SVGGenerator::finishGenerate() {
-  if (!_actively || _svgContext == nullptr) {
+  if (!_actively || _context == nullptr) {
     return "";
   }
   _actively = false;
@@ -59,8 +59,8 @@ std::string SVGGenerator::finishGenerate() {
   auto svgStr = _svgStream.str();
   delete _canvas;
   _canvas = nullptr;
-  delete _svgContext;
-  _svgContext = nullptr;
+  delete _context;
+  _context = nullptr;
   return _svgStream.str();
 };
 

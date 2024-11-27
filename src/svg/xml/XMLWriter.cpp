@@ -18,8 +18,10 @@
 
 #include "XMLWriter.h"
 #include <cstring>
+#include <string>
 #include "XMLParser.h"
 #include "core/utils/Log.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
@@ -54,7 +56,7 @@ void XMLWriter::addHexAttribute(const std::string& name, uint32_t value, uint32_
 }
 
 void XMLWriter::addScalarAttribute(const std::string& name, float value) {
-  this->addAttribute(name, std::to_string(value));
+  this->addAttribute(name, FloatToString(value));
 }
 
 void XMLWriter::addText(const std::string& text) {

@@ -266,6 +266,16 @@ std::unique_ptr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
   return MakeGradient(args.context, *this, ConicGradientLayout::Make(totalMatrix, bias, scale));
 }
 
+GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
+  if (info) {
+    info->colors = originalColors;
+    info->positions = originalPositions;
+    info->radiuses[0] = -bias;
+    info->radiuses[1] = 1.f / scale - bias;
+  }
+  return GradientType::Conic;
+}
+
 std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,
                                                    const std::vector<Color>& colors,
                                                    const std::vector<float>& positions) {

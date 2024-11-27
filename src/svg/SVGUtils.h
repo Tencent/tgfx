@@ -18,27 +18,41 @@
 
 #pragma once
 
-#include <sstream>
-#include "tgfx/core/Canvas.h"
+#include <string>
+#include "tgfx/core/Color.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class SVGContext;
 
-class SVGGenerator {
- public:
-  SVGGenerator() = default;
-  ~SVGGenerator();
+std::string SVGTransform(const Matrix& matrix);
 
-  Canvas* beginGenerate(Context* GPUContext, const ISize& size);
-  Canvas* getCanvas() const;
-  std::string finishGenerate();
+/*
+ * For maximum compatibility, do not convert colors to named colors, convert them to hex strings.
+*/
+std::string SVGColor(Color color);
 
- private:
-  bool _actively = false;
-  SVGContext* _context = nullptr;
-  Canvas* _canvas = nullptr;
-  std::stringstream _svgStream;
-};
+std::string SVGCap(LineCap cap);
+
+std::string SVGJoin(LineJoin join);
+
+std::string SVGBlendMode(BlendMode mode);
+
+/*
+ * Retain four decimal places and remove trailing zeros.
+*/
+std::string FloatToString(float value);
+
+void base64Encode(unsigned char const* bytes_to_encode, size_t in_len, char* ret);
+
+/*
+ * Returns data uri from bytes.
+ * it will use any cached data if available, otherwise will encode as png.
+*/
+std::shared_ptr<Data> AsDataUri(Context* GPUContext, const std::shared_ptr<Image>& image);
 
 }  // namespace tgfx

@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGParse.h"
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <string>
 #include "core/utils/Log.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Typeface.h"
@@ -421,38 +423,38 @@ std::string PathParse::ToSVGString(const Path& path, PathParse::PathEncoding enc
   const int relSelector = encoding == PathParse::PathEncoding::Relative ? 1 : 0;
 
   const auto appendCommand = [&](std::string& inputString, char commandChar, const Point points[],
-                                 size_t count) {
+                                 size_t offset, size_t count) {
     // Use lower case cmds for relative encoding.
     commandChar = static_cast<char>(commandChar + 32 * relSelector);
     inputString.push_back(commandChar);
     for (size_t i = 0; i < count; ++i) {
-      const auto pt = points[i] - currentPoint;
+      const auto pt = points[offset + i] - currentPoint;
       if (i > 0) {
         inputString.push_back(' ');
       }
-      inputString.append(std::to_string(pt.x) + " " + std::to_string(pt.y));
+      inputString.append(FloatToString(pt.x) + " " + FloatToString(pt.y));
     }
 
     ASSERT(count > 0);
     // For relative encoding, track the current point (otherwise == origin).
-    currentPoint = {points[count - 1].x * static_cast<float>(relSelector),
-                    points[count - 1].y * static_cast<float>(relSelector)};
+    currentPoint = {points[offset + count - 1].x * static_cast<float>(relSelector),
+                    points[offset + count - 1].y * static_cast<float>(relSelector)};
   };
 
   auto pathIter = [&](PathVerb verb, const Point points[4], void* info) -> void {
     auto* castedString = reinterpret_cast<std::string*>(info);
     switch (verb) {
       case PathVerb::Move:
-        appendCommand(*castedString, 'M', points, 1);
+        appendCommand(*castedString, 'M', points, 0, 1);
         break;
       case PathVerb::Line:
-        appendCommand(*castedString, 'L', points, 1);
+        appendCommand(*castedString, 'L', points, 1, 1);
         break;
       case PathVerb::Quad:
-        appendCommand(*castedString, 'Q', points, 2);
+        appendCommand(*castedString, 'Q', points, 1, 2);
         break;
       case PathVerb::Cubic:
-        appendCommand(*castedString, 'C', points, 3);
+        appendCommand(*castedString, 'C', points, 1, 3);
         break;
       case PathVerb::Close:
         castedString->push_back('Z');
