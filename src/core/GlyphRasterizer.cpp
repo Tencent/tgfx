@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphRasterizer.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Mask.h"
 
 namespace tgfx {
@@ -34,6 +35,7 @@ GlyphRasterizer::~GlyphRasterizer() {
 }
 
 std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
+  TRACE_EVENT;
   auto mask = Mask::Make(width(), height(), tryHardware);
   if (!mask) {
     return nullptr;

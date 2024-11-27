@@ -20,8 +20,17 @@
 #include "gpu/ResourceKey.h"
 
 namespace tgfx {
-RuntimeEffect::RuntimeEffect(UniqueType type) : uniqueType(std::move(type)) {
+RuntimeEffect::RuntimeEffect(UniqueType type, const std::vector<std::shared_ptr<Image>>& inputs)
+    : uniqueType(std::move(type)) {
   uniqueType.addStrong();
+  extraInputs.reserve(inputs.size());
+  for (auto input : extraInputs) {
+    if (input != nullptr) {
+      // RuntimeEffect requires all inputs to be flattened.
+      input = input->makeFlattened();
+    }
+    extraInputs.push_back(std::move(input));
+  }
 }
 
 RuntimeEffect::~RuntimeEffect() {

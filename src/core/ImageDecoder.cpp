@@ -18,6 +18,7 @@
 
 #include "ImageDecoder.h"
 #include "core/utils/DataTask.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 
@@ -37,6 +38,10 @@ class ImageBufferWrapper : public ImageDecoder {
 
   bool isAlphaOnly() const override {
     return imageBuffer->isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return imageBuffer->isYUV();
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
@@ -63,6 +68,10 @@ class ImageGeneratorWrapper : public ImageDecoder {
 
   bool isAlphaOnly() const override {
     return imageGenerator->isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return imageGenerator->isYUV();
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
@@ -92,6 +101,10 @@ class AsyncImageDecoder : public ImageDecoder {
 
   bool isAlphaOnly() const override {
     return imageGenerator->isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return imageGenerator->isYUV();
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {

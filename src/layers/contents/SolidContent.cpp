@@ -17,13 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SolidContent.h"
-#include <tgfx/layers/SolidLayer.h>
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 SolidContent::SolidContent(const RRect& rRect, const Color& color) : _rRect(rRect), _color(color) {
 }
 
 void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
+  TRACE_EVENT;
   auto solidPaint = paint;
   auto color = _color;
   color.alpha *= paint.getAlpha();
@@ -32,6 +33,7 @@ void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool SolidContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
+  TRACE_EVENT;
   return _rRect.rect.contains(localX, localY);
 }
 

@@ -41,6 +41,10 @@ class ImageReaderBuffer : public ImageBuffer {
     return imageReader->stream->isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return imageReader->stream->isYUV();
+  }
+
   bool expired() const override {
     return imageReader->checkExpired(contentVersion);
   }

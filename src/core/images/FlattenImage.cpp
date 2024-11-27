@@ -16,38 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterImage.h"
+#include "FlattenImage.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/DrawOp.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-std::shared_ptr<Image> RasterImage::MakeFrom(std::shared_ptr<Image> source, bool mipmapped,
-                                             const SamplingOptions& sampling) {
+std::shared_ptr<Image> FlattenImage::MakeFrom(std::shared_ptr<Image> source, bool mipmapped,
+                                              const SamplingOptions& sampling) {
   if (source == nullptr) {
     return nullptr;
   }
-  auto rasterImage =
-      std::shared_ptr<RasterImage>(new RasterImage(UniqueKey::Make(), std::move(source), sampling));
-  rasterImage->weakThis = rasterImage;
-  return mipmapped ? rasterImage->makeMipmapped(true) : rasterImage;
+  auto flattenImage = std::shared_ptr<FlattenImage>(
+      new FlattenImage(UniqueKey::Make(), std::move(source), sampling));
+  flattenImage->weakThis = flattenImage;
+  return mipmapped ? flattenImage->makeMipmapped(true) : flattenImage;
 }
 
-RasterImage::RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                         const SamplingOptions& sampling)
+FlattenImage::FlattenImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
+                           const SamplingOptions& sampling)
     : ResourceImage(std::move(uniqueKey)), source(std::move(source)), sampling(sampling) {
 }
 
-int RasterImage::width() const {
+int FlattenImage::width() const {
   return source->width();
 }
 
-int RasterImage::height() const {
+int FlattenImage::height() const {
   return source->height();
 }
 
-std::shared_ptr<Image> RasterImage::onMakeDecoded(Context* context, bool) const {
+std::shared_ptr<Image> FlattenImage::onMakeDecoded(Context* context, bool) const {
   // There is no need to pass tryHardware to the source image, as our texture proxy is not locked
   // from the source image.
   auto newSource = source->onMakeDecoded(context);
@@ -55,18 +55,19 @@ std::shared_ptr<Image> RasterImage::onMakeDecoded(Context* context, bool) const 
     return nullptr;
   }
   auto newImage =
-      std::shared_ptr<RasterImage>(new RasterImage(uniqueKey, std::move(newSource), sampling));
+      std::shared_ptr<FlattenImage>(new FlattenImage(uniqueKey, std::move(newSource), sampling));
   newImage->weakThis = newImage;
   return newImage;
 }
 
-std::shared_ptr<TextureProxy> RasterImage::onLockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> FlattenImage::onLockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(args.uniqueKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
   auto sourceArgs = args;
+  sourceArgs.flattened = true;
   sourceArgs.renderFlags |= RenderFlags::DisableCache;
   if (args.renderFlags & RenderFlags::DisableCache) {
     sourceArgs.uniqueKey = {};

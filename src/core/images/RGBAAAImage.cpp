@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAAImage.h"
+#include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/TPArgs.h"

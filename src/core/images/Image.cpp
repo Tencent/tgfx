@@ -19,14 +19,13 @@
 #include "tgfx/core/Image.h"
 #include "core/images/BufferImage.h"
 #include "core/images/FilterImage.h"
-#include "core/images/GeneratorImage.h"
+#include "core/images/FlattenImage.h"
 #include "core/images/OrientImage.h"
-#include "core/images/PictureImage.h"
 #include "core/images/RGBAAAImage.h"
-#include "core/images/RasterImage.h"
 #include "core/images/ScaleImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/Profiling.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -42,6 +41,10 @@ class PixelDataConverter : public ImageGenerator {
 
   bool isAlphaOnly() const override {
     return info.isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return false;
   }
 
  protected:
@@ -63,6 +66,7 @@ class PixelDataConverter : public ImageGenerator {
 };
 
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
+  TRACE_EVENT;
   auto codec = ImageCodec::MakeFrom(filePath);
   auto image = MakeFrom(codec);
   if (image == nullptr) {
@@ -72,6 +76,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
+  TRACE_EVENT;
   auto codec = ImageCodec::MakeFrom(std::move(encodedData));
   auto image = MakeFrom(codec);
   if (image == nullptr) {
@@ -81,6 +86,7 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
 }
 
 std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
+  TRACE_EVENT;
   auto codec = ImageCodec::MakeFrom(nativeImage);
   auto image = MakeFrom(codec);
   if (image == nullptr) {
@@ -90,6 +96,7 @@ std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
+  TRACE_EVENT;
   if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
     return nullptr;
   }
@@ -102,26 +109,31 @@ std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Da
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {
+  TRACE_EVENT;
   return MakeFrom(bitmap.makeBuffer());
 }
 
 std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace) {
+  TRACE_EVENT;
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
   return MakeFrom(std::move(buffer));
 }
 
 std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
+  TRACE_EVENT;
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));
 }
 
 std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
+  TRACE_EVENT;
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                        ImageOrigin origin) {
+  TRACE_EVENT;
   if (context == nullptr) {
     return nullptr;
   }
@@ -131,6 +143,7 @@ std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& b
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
                                           ImageOrigin origin) {
+  TRACE_EVENT;
   if (context == nullptr) {
     return nullptr;
   }
@@ -138,22 +151,27 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   return TextureImage::Wrap(std::move(textureProxy));
 }
 
-BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
-  return {};
-}
-
-std::shared_ptr<Image> Image::makeRasterized(bool mipmapped,
-                                             const SamplingOptions& sampling) const {
-  return RasterImage::MakeFrom(weakThis.lock(), mipmapped, sampling);
+std::shared_ptr<Image> Image::makeFlattened(bool mipmapped, const SamplingOptions& sampling) const {
+  TRACE_EVENT;
+  if (isFlat()) {
+    return weakThis.lock();
+  }
+  return FlattenImage::MakeFrom(weakThis.lock(), mipmapped, sampling);
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context,
                                                const SamplingOptions& sampling) const {
+  TRACE_EVENT;
   TPArgs args(context, 0, hasMipmaps());
   return TextureImage::Wrap(lockTextureProxy(args, sampling));
 }
 
+BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
+  return {};
+}
+
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
+  TRACE_EVENT;
   if (isFullyDecoded()) {
     return weakThis.lock();
   }
@@ -169,6 +187,7 @@ std::shared_ptr<Image> Image::onMakeDecoded(Context*, bool) const {
 }
 
 std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
+  TRACE_EVENT;
   if (hasMipmaps() == enabled) {
     return weakThis.lock();
   }
@@ -176,6 +195,7 @@ std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
 }
 
 std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
+  TRACE_EVENT;
   auto rect = subset;
   rect.round();
   auto bounds = Rect::MakeWH(width(), height());
@@ -189,6 +209,7 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> Image::makeScaled(float scaleX, float scaleY) const {
+  TRACE_EVENT;
   auto w = width();
   auto h = height();
   auto scaledWidth = ScaleImage::GetSize(w, scaleX);
@@ -200,10 +221,12 @@ std::shared_ptr<Image> Image::makeScaled(float scaleX, float scaleY) const {
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
+  TRACE_EVENT;
   return SubsetImage::MakeFrom(weakThis.lock(), subset);
 }
 
 std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
+  TRACE_EVENT;
   if (orientation == Orientation::TopLeft) {
     return weakThis.lock();
   }
@@ -211,25 +234,30 @@ std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
 }
 
 std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
+  TRACE_EVENT;
   return OrientImage::MakeFrom(weakThis.lock(), orientation);
 }
 
 std::shared_ptr<Image> Image::onMakeScaled(float scaleX, float scaleY) const {
+  TRACE_EVENT;
   return ScaleImage::MakeFrom(weakThis.lock(), Point::Make(scaleX, scaleY));
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                              const Rect* clipRect) const {
+  TRACE_EVENT;
   return onMakeWithFilter(std::move(filter), offset, clipRect);
 }
 
 std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                                const Rect* clipRect) const {
+  TRACE_EVENT;
   return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect);
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                          int alphaStartY) const {
+  TRACE_EVENT;
   if (alphaStartX == 0 && alphaStartY == 0) {
     return makeSubset(Rect::MakeWH(displayWidth, displayHeight));
   }

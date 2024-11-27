@@ -54,6 +54,11 @@ class ImageStream {
   virtual bool isAlphaOnly() const = 0;
 
   /**
+   * Returns true if pixels are in the YUV format.
+   */
+  virtual bool isYUV() const = 0;
+
+  /**
    * Returns true if the ImageStream is backed by a platform-specified hardware buffer. Hardware
    * buffers allow sharing memory across CPU and GPU, which can be used to speed up the texture
    * uploading.

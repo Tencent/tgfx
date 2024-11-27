@@ -37,6 +37,10 @@ class ExternalOESBuffer : public ImageBuffer {
     return false;
   }
 
+  bool isYUV() const override {
+    return true;
+  }
+
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 

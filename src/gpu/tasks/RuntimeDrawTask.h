@@ -24,13 +24,14 @@
 namespace tgfx {
 class RuntimeDrawTask : public RenderTask {
  public:
-  RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target, std::shared_ptr<TextureProxy> source,
+  RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
+                  std::vector<std::shared_ptr<TextureProxy>> inputs,
                   std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
   bool execute(Gpu* gpu) override;
 
  private:
-  std::shared_ptr<TextureProxy> source = nullptr;
+  std::vector<std::shared_ptr<TextureProxy>> inputs;
   std::shared_ptr<RuntimeEffect> effect = nullptr;
   Point offset = Point::Zero();
 };

@@ -19,6 +19,7 @@
 #include "OrientImage.h"
 #include "core/images/ScaleImage.h"
 #include "core/images/SubsetImage.h"
+#include "core/utils/AddressOf.h"
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
@@ -79,7 +80,7 @@ int OrientImage::height() const {
 }
 
 std::shared_ptr<Image> OrientImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return OrientImage::MakeFrom(std::move(newSource), orientation);
+  return MakeFrom(std::move(newSource), orientation);
 }
 
 std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) const {
@@ -87,7 +88,7 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
   if (newOrientation == Orientation::TopLeft) {
     return source;
   }
-  return OrientImage::MakeFrom(source, newOrientation);
+  return MakeFrom(source, newOrientation);
 }
 
 std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,

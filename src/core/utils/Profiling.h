@@ -15,27 +15,35 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#pragma once
+#ifdef TGFX_ENABLE_PROFILING
+#define TRACY_ENABLE
 
-#include "ShapeContent.h"
+#include "public/common/TracySystem.hpp"
+#include "public/tracy/Tracy.hpp"
 
-namespace tgfx {
-ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader)
-    : bounds(shape->getBounds()), shape(std::move(shape)), shader(std::move(shader)) {
-}
+#if defined(_MSC_VER)
+#define TRACE_FUNC __FUNCSIG__
+#else
+#define TRACE_FUNC __PRETTY_FUNCTION__
+#endif
 
-void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT;
-  auto shapePaint = paint;
-  shapePaint.setShader(shader);
-  canvas->drawShape(shape, shapePaint);
-}
+#define TRACE_EVENT ZoneScopedN(TRACE_FUNC)
+#define TRACE_EVENT_COLOR(color) ZoneScopedNC(TRACE_FUNC, color)
 
-bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TRACE_EVENT;
-  if (pixelHitTest) {
-    auto path = shape->getPath();
-    return path.contains(localX, localY);
-  }
-  return bounds.contains(localX, localY);
-}
-}  // namespace tgfx
+#define FRAME_MARK FrameMark
+
+#define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
+
+#define TRACY_COLOR_YELLOW tracy::Color::ColorType::Yellow
+#define TRACY_COLOR_GREEN tracy::Color::ColorType::Green
+#define TRACY_COLOR_GREENYELLOW tracy::Color::ColorType::GreenYellow
+
+#else
+#define TRACE_EVENT
+#define TRACE_EVENT_COLOR(color)
+
+#define FRAME_MARK
+
+#define TRACE_THREAD_NAME(name)
+#endif

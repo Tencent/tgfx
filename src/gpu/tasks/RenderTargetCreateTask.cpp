@@ -18,6 +18,7 @@
 
 #include "RenderTargetCreateTask.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/Texture.h"
 
@@ -39,6 +40,7 @@ RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey te
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* context) {
+  TRACE_EVENT;
   auto texture = Resource::Find<Texture>(context, textureKey);
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");

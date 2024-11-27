@@ -43,8 +43,12 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
-  bool isComplex() const override {
-    return true;
+  bool isYUV() const override {
+    return false;
+  }
+
+  bool isFlat() const override {
+    return false;
   }
 
  protected:

@@ -70,6 +70,7 @@ TGFX_TEST(CanvasTest, clip) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
+
   device->unlock();
 }
 
@@ -346,19 +347,19 @@ TGFX_TEST(CanvasTest, rasterized) {
   auto scaleImage = image->makeScaled(1.0f, 1.0f);
   EXPECT_TRUE(scaleImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
-  auto rasterImage = image->makeScaled(0.15f, 0.15f);
-  rasterImage = rasterImage->makeRasterized();
-  EXPECT_FALSE(rasterImage->hasMipmaps());
-  EXPECT_FALSE(rasterImage == image);
-  EXPECT_EQ(rasterImage->width(), 454);
-  EXPECT_EQ(rasterImage->height(), 605);
+  auto flatImage = image->makeScaled(0.15f, 0.15f);
+  flatImage = flatImage->makeFlattened();
+  EXPECT_FALSE(flatImage->hasMipmaps());
+  EXPECT_FALSE(flatImage == image);
+  EXPECT_EQ(flatImage->width(), 454);
+  EXPECT_EQ(flatImage->height(), 605);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, 1100, 1400);
   auto canvas = surface->getCanvas();
-  canvas->drawImage(rasterImage, 100, 100);
+  canvas->drawImage(flatImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
-  auto texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
+  auto flatImageUniqueKey = std::static_pointer_cast<ResourceImage>(flatImage)->uniqueKey;
+  auto texture = Resource::Find<Texture>(context, flatImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
@@ -371,25 +372,25 @@ TGFX_TEST(CanvasTest, rasterized) {
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
   image = image->makeScaled(0.15f, 0.15f);
-  rasterImage = image->makeRasterized(true, sampling);
-  EXPECT_TRUE(rasterImage->hasMipmaps());
-  canvas->drawImage(rasterImage, 100, 100);
+  flatImage = image->makeFlattened(true, sampling);
+  EXPECT_TRUE(flatImage->hasMipmaps());
+  canvas->drawImage(flatImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
-  texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
+  texture = Resource::Find<Texture>(context, flatImageUniqueKey);
   EXPECT_TRUE(texture == nullptr);
-  rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
-  texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
+  flatImageUniqueKey = std::static_pointer_cast<ResourceImage>(flatImage)->uniqueKey;
+  texture = Resource::Find<Texture>(context, flatImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();
-  rasterImage = image->makeMipmapped(false);
-  EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeScaled(2.0f, 2.0f);
-  rasterImage = rasterImage->makeRasterized(false, sampling);
-  EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeMipmapped(true);
-  EXPECT_EQ(rasterImage->width(), 907);
-  EXPECT_EQ(rasterImage->height(), 1210);
-  canvas->drawImage(rasterImage, 100, 100);
+  flatImage = image->makeMipmapped(false);
+  EXPECT_FALSE(flatImage->hasMipmaps());
+  flatImage = flatImage->makeScaled(2.0f, 2.0f);
+  flatImage = flatImage->makeFlattened(false, sampling);
+  EXPECT_FALSE(flatImage->hasMipmaps());
+  flatImage = flatImage->makeMipmapped(true);
+  EXPECT_EQ(flatImage->width(), 907);
+  EXPECT_EQ(flatImage->height(), 1210);
+  canvas->drawImage(flatImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
   context->setCacheLimit(defaultCacheLimit);
   device->unlock();
@@ -1091,17 +1092,17 @@ TGFX_TEST(CanvasTest, Picture) {
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 200, image->height() - 200, &matrix);
   ASSERT_TRUE(pictureImage != nullptr);
-  EXPECT_TRUE(pictureImage->isComplex());
+  EXPECT_FALSE(pictureImage->isFlat());
   auto subsetImage = std::static_pointer_cast<SubsetImage>(pictureImage);
   EXPECT_TRUE(subsetImage->source == image);
   EXPECT_EQ(singleImageRecord.use_count(), 1);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100, &matrix);
-  EXPECT_FALSE(pictureImage->isComplex());
+  EXPECT_TRUE(pictureImage->isFlat());
   EXPECT_EQ(singleImageRecord.use_count(), 2);
   EXPECT_FALSE(pictureImage == image);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100);
-  EXPECT_FALSE(pictureImage->isComplex());
+  EXPECT_TRUE(pictureImage->isFlat());
   EXPECT_FALSE(pictureImage == image);
   EXPECT_EQ(singleImageRecord.use_count(), 2);
 
@@ -1133,7 +1134,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
   EXPECT_EQ(textRecord.use_count(), 1);
   ASSERT_TRUE(textImage != nullptr);
-  EXPECT_FALSE(textImage->isComplex());
+  EXPECT_TRUE(textImage->isFlat());
 
   surface = Surface::Make(context, textImage->width(), textImage->height());
   canvas = surface->getCanvas();
@@ -1155,7 +1156,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
   EXPECT_EQ(patRecord.use_count(), 1);
   ASSERT_TRUE(pathImage != nullptr);
-  EXPECT_FALSE(pathImage->isComplex());
+  EXPECT_TRUE(pathImage->isFlat());
 
   surface = Surface::Make(context, pathImage->width(), pathImage->height());
   canvas = surface->getCanvas();

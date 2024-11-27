@@ -53,6 +53,10 @@ class SurfaceTexture : public ImageStream {
     return false;
   }
 
+  bool isYUV() const override {
+    return true;
+  }
+
   bool isHardwareBacked() const override {
     return false;
   }

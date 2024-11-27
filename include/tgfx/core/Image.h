@@ -178,8 +178,13 @@ class Image {
   virtual bool isAlphaOnly() const = 0;
 
   /**
+   * Returns true if the Image is in the YUV format.
+   */
+  virtual bool isYUV() const = 0;
+
+  /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,
-   * which may be ignored if the GPU or the associated image source does not support mipmaps.
+   * which may be ignored if the GPU or the associated image source doesn’t support mipmaps.
    */
   virtual bool hasMipmaps() const {
     return false;
@@ -202,39 +207,32 @@ class Image {
   }
 
   /**
-   * Returns true if the Image has complex transforms that can't be drawn as a single texture with a
-   * UV matrix. Complex transforms may include subsets, filters, and RGBAAA layouts. Returns false
-   * if the Image is rasterized or only has orientation and scale transforms.
+   * Returns true if the Image is guaranteed to produce a single-plane texture without extra
+   * transforms and can be cached for repeat drawing. Extra transforms may include orientation,
+   * scale, subsets, filters, or RGBAAA layouts. A YUV Image is also not flat since it has multiple
+   * planes.
    */
-  virtual bool isComplex() const = 0;
+  virtual bool isFlat() const = 0;
 
   /**
-   * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
-   * not backed by a Texture. If the origin is not nullptr, the origin of the backend texture is
-   * returned.
-   */
-  virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
-
-  /**
-   * Returns a rasterized Image with the same content as this Image, as if this Image were drawn to
-   * the returned Image. Unlike the makeTextureImage() method, this method does not perform a draw
+   * Returns a flattened Image with the same content as this Image, as if this Image were drawn to
+   * the returned Image. Unlike the makeTextureImage() method, this method doesn’t perform a draw
    * operation immediately. Instead, it defers the draw operation until it is actually required.
-   * A rasterized Image can be represented as a single GPU texture without any transforms and can be
-   * cached for repeated drawing. By default, an Image directly backed by an ImageBuffer, an
-   * ImageGenerator, or a GPU texture is rasterized. Other images are not rasterized unless this
-   * method explicitly creates them.
-   * For example, if you create a subset Image from a rasterized Image, the subset Image does not
-   * create its own GPU cache but uses the full resolution cache created by the original Image.
-   * If you want the subset Image to create its own GPU cache, you should call makeRasterized() on
-   * the subset Image.
-   * @param mipmapped Specifies whether the rasterized Image should have mipmaps. Ignored if the
-   * Image is already rasterized.
+   * The flattened Image is guaranteed to produce a single-plane texture without extra transforms
+   * and can be cached for repeat drawing. This method is useful for caching the drawing result of
+   * a complex Image for repeated use.
+   * For example, if you create a subset Image from a flat Image, the subset Image doesn’t create
+   * its own GPU cache but uses the full resolution cache created by the original Image. If you want
+   * the subset Image to create its own GPU cache, you should call makeFlattened() on the subset
+   * Image.
+   * @param mipmapped Specifies whether the flattened Image should have mipmaps. Ignored if the
+   * Image is already flat.
    * @param sampling The sampling options may be applied if the image has scaling transforms.
-   * Ignored if the Image is already rasterized.
-   * @return If the Image is already rasterized, the original Image is returned.
+   * Ignored if the Image is already flat.
+   * @return If the Image is already flat, the original Image is returned.
    */
-  virtual std::shared_ptr<Image> makeRasterized(bool mipmapped = false,
-                                                const SamplingOptions& sampling = {}) const;
+  std::shared_ptr<Image> makeFlattened(bool mipmapped = false,
+                                       const SamplingOptions& sampling = {}) const;
 
   /**
    * Returns an Image backed by a GPU texture associated with the given context. If a corresponding
@@ -246,6 +244,13 @@ class Image {
    */
   virtual std::shared_ptr<Image> makeTextureImage(Context* context,
                                                   const SamplingOptions& sampling = {}) const;
+
+  /**
+   * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
+   * not backed by a Texture. If the origin is not nullptr, the origin of the backend texture is
+   * returned.
+   */
+  virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
 
   /**
    * Returns a fully decoded Image from this Image. The returned Image shares the same GPU cache
@@ -322,10 +327,10 @@ class Image {
                                                   Point* offset, const Rect* clipRect) const;
 
   /**
-   * Returns a rasterized texture proxy for the entire Image.
+   * Returns a texture proxy for the entire Image.
    * @param args The TPArgs used to create the texture proxy.
    * @param sampling The sampling options applied when rasterizing the Image. This option
-   * may be ignored if the Image or its nested Images are already rasterized.
+   * may be ignored if the Image has no scaling transforms.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
                                                          const SamplingOptions& sampling) const;
@@ -348,7 +353,7 @@ class Image {
   friend class RuntimeImageFilter;
   friend class TransformImage;
   friend class RGBAAAImage;
-  friend class RasterImage;
+  friend class FlattenImage;
   friend class ImageShader;
 };
 }  // namespace tgfx

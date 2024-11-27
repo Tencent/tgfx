@@ -25,6 +25,17 @@
       }
     },
     {
+      "name": "tracy",
+      "cmake": {
+        "targets": [
+          "TracyClient"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ]
+      }
+    },
+    {
       "name": "zlib",
       "cmake": {
         "targets": [

@@ -449,8 +449,6 @@ class Layer {
  protected:
   std::weak_ptr<Layer> weakThis;
 
-  Layer* maskOwner = nullptr;
-
   Layer();
 
   /**
@@ -527,19 +525,6 @@ class Layer {
 
   bool hasValidMask() const;
 
-  std::string _name;
-  float _alpha = 1.0f;
-  BlendMode _blendMode = BlendMode::SrcOver;
-  Matrix _matrix = Matrix::I();
-  float _rasterizationScale = 1.0f;
-  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
-  std::shared_ptr<Layer> _mask = nullptr;
-  std::unique_ptr<Rect> _scrollRect = nullptr;
-  Layer* _root = nullptr;
-  Layer* _parent = nullptr;
-  std::unique_ptr<LayerContent> layerContent = nullptr;
-  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
-  std::vector<std::shared_ptr<Layer>> _children = {};
   struct {
     bool contentDirty : 1;   // need to update content
     bool childrenDirty : 1;  // need to redraw child layers
@@ -548,6 +533,20 @@ class Layer {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
   } bitFields = {};
+  std::string _name;
+  float _alpha = 1.0f;
+  BlendMode _blendMode = BlendMode::SrcOver;
+  Matrix _matrix = Matrix::I();
+  float _rasterizationScale = 1.0f;
+  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
+  std::shared_ptr<Layer> _mask = nullptr;
+  Layer* maskOwner = nullptr;
+  std::unique_ptr<Rect> _scrollRect = nullptr;
+  Layer* _root = nullptr;
+  Layer* _parent = nullptr;
+  std::unique_ptr<LayerContent> layerContent = nullptr;
+  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
+  std::vector<std::shared_ptr<Layer>> _children = {};
 
   friend class DisplayList;
   friend class LayerProperty;
