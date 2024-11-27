@@ -23,6 +23,16 @@ export default class PerformanceManager {
         requestAnimationFrame(this.updatePerformanceInfo);
     }
 
+
+    private updatePerformanceInfo(): void {
+        const fps = this.calculateFPS();
+        if (fps > 0) {
+            this.updateUI(fps);
+        }
+
+        requestAnimationFrame(this.updatePerformanceInfo);
+    }
+
     private calculateFPS(): number {
         const now = performance.now();
         this.frameCount++;
@@ -36,23 +46,20 @@ export default class PerformanceManager {
         return 0;
     }
 
-    private updatePerformanceInfo(): void {
-        const fps = this.calculateFPS();
-        if (fps > 0 && this.fpsCounter) {
+    private updateUI(fps: number): void {
+        if (this.fpsCounter) {
             this.fpsCounter.textContent = `FPS: ${fps}`;
         }
 
-        // 获取图形数量、显示
         if (this.shapeCounter) {
             const count = this.elementManager.getElements().length;
             this.shapeCounter.textContent = `图形数量: ${count}`;
         }
-        // 获取渲染时间、显示
+
         if (this.renderCounter) {
             const frameTime = this.backendManager.frameTimeCons();
             this.renderCounter.textContent = `单帧耗时: ${frameTime.toFixed(2)} ms`;
         }
-
-        requestAnimationFrame(this.updatePerformanceInfo);
     }
+
 }
