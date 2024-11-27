@@ -1,6 +1,8 @@
 // js/models/BackendManager.ts
 
 // 添加全局声明以扩展 Window 接口
+import {settings} from "../config";
+
 declare global {
     interface Window {
         cefQuery?: any;
@@ -10,6 +12,7 @@ declare global {
 export default class BackendManager {
     figmaRenderer: any;
     private cefFrameTimeCons: number = 0.0;
+
     /**
      * 创建后端通信管理器
      */
@@ -29,6 +32,7 @@ export default class BackendManager {
     }
 
     frameTimeCons(): number {
+        if (!settings.isBackend) return 0.0;
         if (window.cefQuery) {
             this.postGetCefFrameTimeCons();
             return this.cefFrameTimeCons;
@@ -73,6 +77,7 @@ export default class BackendManager {
 
 
     sendMoveMessage(elements: any[]): void {
+        if (!settings.isBackend) return;
         const messageObj = {
             action: 'move',
             elements: elements
@@ -85,6 +90,7 @@ export default class BackendManager {
      * @param elements - 元素数据
      */
     sendUpdateMessage(elements: any[], canvasRect: any, viewBox: any): void {
+        if (!settings.isBackend) return;
         const messageObj = {
             action: 'update',
             canvasRect: canvasRect,
@@ -98,6 +104,7 @@ export default class BackendManager {
      * 发送画布平移的消息到后端
      */
     sendCanvasPanMessage(canvasRect: any, viewBox: any): void {
+        if (!settings.isBackend) return;
         const messageObj = {
             action: 'canvasPan',
             canvasRect: canvasRect,

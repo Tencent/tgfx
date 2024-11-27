@@ -88,9 +88,8 @@ export default class EventManager {
                 }
             }
             this.updateLayers();
-            if (settings.isBackend) {
                 this.backendManager.sendUpdateMessage(elementList, this.getCanvasRect(), this.viewBox);
-            }
+
 
         });
 
@@ -167,8 +166,8 @@ export default class EventManager {
             this.uiManager.showProperties(element);
             this.uiManager.showTooltip(tooltip, 50, 60);
             this.updateLayers();
+            this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
             if (settings.isBackend) {
-                this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
                 element.element.style.opacity = '0';
             }
 
@@ -262,14 +261,12 @@ export default class EventManager {
         if (this.isDragging && this.draggingElement) {
             const mousePos = this.getMousePosition(e);
             this.updateElementPosition(this.draggingElement, mousePos);
-            if (settings.isBackend) {
                 this.backendManager.sendUpdateMessage([this.getElementData(this.draggingElement)], this.getCanvasRect(), this.viewBox);
-            }
+
         } else if (this.isCanvasDragging) {
             this.updateViewBox(e);
-            if (settings.isBackend) {
                 this.backendManager.sendCanvasPanMessage(this.getCanvasRect(), this.viewBox);
-            }
+
         }
     }
 
@@ -346,9 +343,8 @@ export default class EventManager {
                 element.setAttribute(attribute, value);
             }
 
-            if (settings.isBackend) {
                 this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
-            }
+
         } catch (error) {
             console.error(`设置属性失败: ${attribute} = ${value}`, error);
         }
@@ -521,9 +517,8 @@ export default class EventManager {
             elementInfoList.push(this.getElementData(element));
         });
 
-        if (settings.isBackend) {
             this.backendManager.sendUpdateMessage(elementInfoList, this.getCanvasRect(), this.viewBox);
-        }
+
         // 使用 requestAnimationFrame 调度下一帧
         if (this.isPerformanceTestRunning) {
             this.animationFrameId = requestAnimationFrame(() => this.animateElements());
