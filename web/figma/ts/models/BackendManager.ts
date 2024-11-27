@@ -9,6 +9,7 @@ declare global {
 
 export default class BackendManager {
     figmaRenderer: any; // 修改类型为 any 或者适当的类型
+    private cefFrameTimeCons: number = 0.0;
     /**
      * 创建后端通信管理器
      */
@@ -29,7 +30,15 @@ export default class BackendManager {
 
     frameTimeCons(): number {
         if (window.cefQuery) {
-            return 0.0;
+            (window as any).cefQuery({
+                request: 'frameTimeCons',
+                persistent: false,
+                onSuccess: (response: string) => {
+                    console.log('发送成功:', response);
+                     this.cefFrameTimeCons = parseFloat(response)
+                }
+            });
+            return this.cefFrameTimeCons;
         } else {
             return this.figmaRenderer.frameTimeCons();
         }
