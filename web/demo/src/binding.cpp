@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <emscripten/bind.h>
-#include "DataLoaderImpl.h"
 #include "TGFXThreadsView.h"
 #include "TGFXView.h"
 
@@ -51,11 +50,4 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                         return std::make_shared<TGFXThreadsView>(canvasID, nativeImage);
                       }))
       .function("registerFonts", &TGFXThreadsView::registerFonts);
-//
-//  class_<DataLoader>("DataLoader").function("makeFromFile", &tgfx::DataLoader::makeFromFile);
-//
-//  class_<DataLoaderImpl, base<DataLoader>>("DataLoaderImpl")
-//      .constructor<>()
-//      .function("makeFromFile", &DataLoaderImpl::makeFromFile);
-
 }

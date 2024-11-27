@@ -23,16 +23,11 @@ export class TGFXBaseView {
     public draw: (drawIndex: number) => void;
 }
 
-// export class DataLoaderImpl {
-//    public makeFromFile:(filePath: string) => Promise<Uint8Array | null>;
-// }
-
 export class ShareData {
     public Hello2DModule: types.TGFX = null;
     public tgfxBaseView: TGFXBaseView = null;
     public drawIndex: number = 0;
     public resized: boolean = false;
-    // public dataLoaderImpl: DataLoaderImpl = null;
 }
 
 export function updateSize(shareData: ShareData) {
@@ -75,24 +70,4 @@ export function loadImage(src: string) {
         img.src = src;
     })
 }
-
-// export function makeFromFile(filePath: string): Promise<Uint8Array | null> {
-//     return new Promise((resolve) => {
-//         fetch(filePath)
-//             .then(response => {
-//                 if (!response.ok) {
-//                     resolve(null);
-//                 }
-//                 let buffer =  response.arrayBuffer();
-//                 return new Uint8Array(buffer);
-//             })
-//             .then(data => {
-//                 resolve(data);
-//             })
-//             .catch(error => {
-//                 console.error('Error loading file:', error);
-//                 resolve(null);
-//             });
-//     });
-// }
 

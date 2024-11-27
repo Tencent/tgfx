@@ -27,8 +27,10 @@ using namespace emscripten;
 class DataLoaderImpl : public DataLoader {
  public:
   std::shared_ptr<Data> makeFromFile(const std::string& filePath) override {
-    val myClassInstance = val::global("myClassInstance");
-    val emscriptenData = myClassInstance.call<val>("makeFromFileFunc", filePath);
+    val global = val::global("window");
+    val makeFromFileFunc = global["MakeFromFile"];
+    val promise = makeFromFileFunc(filePath);
+    val emscriptenData = promise.await();
     if (emscriptenData.isUndefined()) {
       return nullptr;
     }
