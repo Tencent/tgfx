@@ -93,9 +93,7 @@ export default class EventManager {
             if (this.isBackend) {
                 this.backendManager.sendUpdateMessage(elementList, this.getCanvasRect(), this.viewBox);
             }
-            // 触发自定义事件以通知图形已添加
-            const event = new CustomEvent('shapeAdded');
-            document.dispatchEvent(event);
+
         });
 
         document.getElementById('performanceTest')?.addEventListener('click', () => {
@@ -177,9 +175,7 @@ export default class EventManager {
             if (this.isBackend) {
                 element.element.style.opacity = '0';
             }
-            // 触发自定义事件以通知图形已添加
-            const event = new CustomEvent('shapeAdded');
-            document.dispatchEvent(event);
+
         }
     }
 

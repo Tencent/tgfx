@@ -60,7 +60,7 @@ void FigmaRenderer::handMessage(std::string message) {
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> duration = end - start;
-  hand_message_duration_ += duration.count();
+  hand_message_duration_ = duration.count();
   logInfo("handMessage耗时: " + std::to_string(duration.count()) + " ms");
 }
 

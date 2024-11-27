@@ -28,6 +28,7 @@ EMSCRIPTEN_BINDINGS(figma_module) {
       .function("registerFonts", &FigmaRenderer::registerFonts)
       .function("invalisize", &FigmaRenderer::invalisize)
       .function("handMessage", &FigmaRenderer::handMessage)
+      .function("frameTimeCons", &FigmaRenderer::frameTimeCons)
       .function("test", &FigmaRenderer::test);
 }
 

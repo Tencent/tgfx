@@ -83,9 +83,6 @@ class App {
         // 初始化
         this.init();
         this.initViewBox(); /* 初始化 viewBox */
-
-        // 初始化自定义事件监听
-        this.initEventListeners();
     }
 
     async initFont(): Promise<void> {
@@ -102,14 +99,15 @@ class App {
         // 绑定图层管理更新
         this.uiManager.updateLayersList(this.elementManager.getElements(), this.elementManager.selectedElement);
 
-        this.updateShapeCount(); // 初始化图形数量显示
-
         // FPS 计算和显示
         const fpsCounter = document.getElementById('fpsCounter');
         let lastFrameTime = performance.now();
         let frameCount = 0;
 
-        function updateFPS() {
+
+        // 更新性能面板
+        const updatePerformanceInfo = () => {
+            // 计算fps、更新
             const now = performance.now();
             frameCount++;
             const delta = now - lastFrameTime;
@@ -121,29 +119,22 @@ class App {
                 frameCount = 0;
                 lastFrameTime = now;
             }
-            requestAnimationFrame(updateFPS);
-        }
+            // 获取图形数量、更新
+            const count = this.elementManager.getElements().length;
+            this.shapeCounter.textContent = `图形数量: ${count}`;
 
-        requestAnimationFrame(updateFPS);
+            // 获取单帧耗时、更新
+            const frameTime = this.figmaRenderer.frameTimeCons();
+            const renderCounter = document.getElementById('renderCounter');
+            if (renderCounter) {
+                renderCounter.textContent = `单帧耗时: ${frameTime.toFixed(2)} ms`;
+            }
 
-    }
+            requestAnimationFrame(updatePerformanceInfo);
+        };
 
-    /**
-     * 初始化自定义事件监听
-     */
-    initEventListeners(): void {
-        // 监听图形添加事件
-        document.addEventListener('shapeAdded', () => {
-            this.updateShapeCount();
-        });
-    }
+        requestAnimationFrame(updatePerformanceInfo);
 
-    /**
-     * 更新图形数量显示
-     */
-    updateShapeCount(): void {
-        const count = this.elementManager.getElements().length;
-        this.shapeCounter.textContent = `图形数量: ${count}`;
     }
 
     /**
