@@ -36,15 +36,18 @@ enum class ShaderType {
 
 /**
  *  Linear:
- *      points[0] and points[1] are the end-points of the gradient
+ *      points[0] and points[1] represent the start and end points of the gradient.
  *  Radial:
- *      points[0] and radiuses[0] are the center and radius
+ *      points[0] and radiuses[0] represent the center and radius of the gradient.
+ *  Conic:
+ *      points[0] represents the center, and radiuses[0] and radiuses[1] represent the start angle
+ *      and end angle of the gradient.
  */
 struct GradientInfo {
   std::vector<Color> colors;     // The colors in the gradient
   std::vector<float> positions;  // The positions of the colors in the gradient
   std::array<Point, 2> points;
-  std::array<float, 2> radiuses;  // Reserved second index field for conical gradient
+  std::array<float, 2> radiuses;
 };
 
 /**

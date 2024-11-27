@@ -30,7 +30,6 @@
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/core/TileMode.h"
 
 namespace tgfx {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to
@@ -233,7 +232,7 @@ static Matrix RadialToUnitMatrix(const Point& center, float radius) {
 }
 
 static std::tuple<Point, float> UnitMatrixToRadial(const Matrix& matrix) {
-  Matrix invertMatrix = Matrix::I();
+  auto invertMatrix = Matrix::I();
   matrix.invert(&invertMatrix);
   std::array<Point, 2> points{Point::Make(0, 0), Point::Make(1, 0)};
   invertMatrix.mapPoints(points.data(), 2);
@@ -284,9 +283,9 @@ GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
   if (info) {
     info->colors = originalColors;
     info->positions = originalPositions;
-    Point center = {0, 0};
+    auto center = Point::Zero();
     pointsToUnit.mapPoints(&center, 1);
-    info->points[0] = center * -1;
+    info->points[0] = center * -1.f;
     info->radiuses[0] = -bias * 360.f;
     info->radiuses[1] = (1.f / scale - bias) * 360.f;
   }

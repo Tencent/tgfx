@@ -149,6 +149,9 @@ class Shader {
     return GradientType::None;
   }
 
+  /**
+   * If this is an image shader, returns the image, and the tile modes for x and y.
+   */
   virtual std::tuple<std::shared_ptr<Image>, TileMode, TileMode> asImage() const {
     return {nullptr, TileMode::Clamp, TileMode::Clamp};
   }
