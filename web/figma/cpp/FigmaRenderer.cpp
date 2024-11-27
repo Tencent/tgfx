@@ -9,7 +9,7 @@
 #include "utils.h"
 
 void FigmaRenderer::initialize(std::string canvasID) {
-  emscripten_log(EM_LOG_CONSOLE, "initialize called， canvasID is %s", canvasID.c_str());
+  logInfo("initialize called， canvasID is " + canvasID);
   tgfx_window_ = tgfx::WebGLWindow::MakeFrom(canvasID);
   canvas_id_ = canvasID;
 }
@@ -23,7 +23,7 @@ void FigmaRenderer::registerFonts(const emscripten::val& native_text_font) {
 }
 
 void FigmaRenderer::invalisize() {
-  emscripten_log(EM_LOG_CONSOLE, "invalisize called");
+  logInfo("invalisize called");
   if (tgfx_window_ == nullptr) {
     return;
   }
@@ -31,24 +31,21 @@ void FigmaRenderer::invalisize() {
   int height = 0;
   emscripten_get_canvas_element_size(canvas_id_.c_str(), &width, &height);
   // 打印宽高
-  std::cout << "FigmaRenderer：：invalisize width is " << width << ", height is " << height
-            << std::endl;
+  logInfo("FigmaRenderer::invalisize width is " + std::to_string(width) + ", height is " +
+          std::to_string(height));
   tgfx_window_->invalidSize();
 }
 
 void FigmaRenderer::handMessage(std::string message) {
-  // 打印log
-  std::cout << "FigmaRenderer：：handMessage called, message is " << message << std::endl;
+  logInfo("FigmaRenderer::handMessage called, message is " + message);
 
   JsMessage jsMessage;
   if (MessageParser::parseMessage(message, jsMessage)) {
-    // 处理解析后的 jsMessage
-    std::cout << "FigmaRenderer：：handMessage jsMessage.action is " << jsMessage.action
-              << std::endl;
+    logInfo("FigmaRenderer::handMessage jsMessage.action is " + jsMessage.action);
     dispatchMessage(jsMessage);
     render();
   } else {
-    std::cerr << "FigmaRenderer：：handMessage 解析消息失败" << std::endl;
+    logError("FigmaRenderer::handMessage 解析消息失败");
   }
 }
 
@@ -70,20 +67,16 @@ void FigmaRenderer::dispatchMessage(const JsMessage& message) {
     getDrawingLayer()->setAlpha(0);
   } else if (action == "viewRectChanged") {
     if (tgfx_window_ != nullptr) {
-      // 打印log
-      std::cout << "FigmaRenderer：：dispatchMessage viewRectChanged" << std::endl;
+      logInfo("FigmaRenderer::dispatchMessage viewRectChanged");
       tgfx_window_->invalidSize();
     }
   } else {
-    // 打印log
-    std::cerr << "FigmaRenderer：：handMessage 未知操作：" << action << std::endl;
+    logError("FigmaRenderer::handMessage 未知操作：" + action);
   }
 }
 
-
 void FigmaRenderer::render() {
-  // 打印log
-  std::cout << "FigmaRenderer：：render calld " << std::endl;
+  logInfo("FigmaRenderer::render called");
   if (tgfx_window_ == nullptr) return;
   if (tgfx_device_ == nullptr) {
     tgfx_device_ = tgfx_window_->getDevice();
@@ -99,7 +92,7 @@ void FigmaRenderer::render() {
     return;
   }
 
-  std::cout << "FigmaRenderer：：render begin" << std::endl;
+  logInfo("FigmaRenderer::render begin");
 
   tgfx_display_list_->render(surface.get());
 
@@ -109,11 +102,10 @@ void FigmaRenderer::render() {
   context->flushAndSubmit();
   tgfx_window_->present(context);
 
-  std::cout << "FigmaRenderer：：render done" << std::endl;
+  logInfo("FigmaRenderer::render done");
 
   tgfx_device_->unlock();
 }
-
 
 tgfx::Layer* FigmaRenderer::getDrawingLayer() {
   if (layer == nullptr || tgfx_display_list_ == nullptr) {
@@ -125,9 +117,8 @@ tgfx::Layer* FigmaRenderer::getDrawingLayer() {
 }
 
 void FigmaRenderer::test() {
-  emscripten_log(EM_LOG_CONSOLE, "test called");
-  // 打印log
-  std::cout << "FigmaRenderer：：test begin " << std::endl;
+  logInfo("test called");
+  logInfo("FigmaRenderer::test begin");
   if (tgfx_window_ == nullptr) return;
   if (tgfx_device_ == nullptr) {
     tgfx_device_ = tgfx_window_->getDevice();
@@ -162,8 +153,20 @@ void FigmaRenderer::test() {
   context->flushAndSubmit();
   tgfx_window_->present(context);
 
-  std::cout << "FigmaRenderer：：test done" << std::endl;
+  logInfo("FigmaRenderer::test done");
 
   tgfx_device_->unlock();
+}
+
+void FigmaRenderer::logInfo(const std::string& message) const {
+  if (enable_info_logging_) {
+    std::cout << message << std::endl;
+  }
+}
+
+void FigmaRenderer::logError(const std::string& message)const {
+  if (enable_error_logging_) {
+    std::cerr << message << std::endl;
+  }
 }
 

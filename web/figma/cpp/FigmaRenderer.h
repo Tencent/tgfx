@@ -1,6 +1,6 @@
 #include <tgfx/layers/DisplayList.h>
-#include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/Layer.h>
+#include <tgfx/layers/ShapeLayer.h>
 #include <memory>
 #include <string>
 #include "Element.h"
@@ -20,6 +20,8 @@ class FigmaRenderer {
   void dispatchMessage(const JsMessage& message);
   void render();
   tgfx::Layer* getDrawingLayer();
+  void logInfo(const std::string& message) const;
+  void logError(const std::string& message) const;
 
   std::string canvas_id_;
   std::shared_ptr<tgfx::Typeface> demo_text_typeface_;
@@ -27,4 +29,8 @@ class FigmaRenderer {
   std::shared_ptr<tgfx::Device> tgfx_device_ = nullptr;
   std::shared_ptr<tgfx::DisplayList> tgfx_display_list_ = nullptr;
   std::shared_ptr<tgfx::Layer> layer = nullptr;
+
+  bool enable_info_logging_ = false;
+  bool enable_error_logging_ = true;
+
 };
