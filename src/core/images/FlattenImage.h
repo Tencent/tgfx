@@ -23,10 +23,9 @@
 
 namespace tgfx {
 /**
- * RasterImage takes an Image and rasterizes it to a new Image with a different scale and sampling
- * options.
+ * FlattenImage takes an Image and flattens it to a new Image with a single plane texture.
  */
-class RasterImage : public ResourceImage {
+class FlattenImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, bool mipmapped = false,
                                          const SamplingOptions& sampling = {});
@@ -39,8 +38,16 @@ class RasterImage : public ResourceImage {
     return source->isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return false;
+  }
+
   bool isFullyDecoded() const override {
     return source->isFullyDecoded();
+  }
+
+  bool isFlat() const override {
+    return true;
   }
 
  protected:
@@ -52,6 +59,6 @@ class RasterImage : public ResourceImage {
   std::shared_ptr<Image> source = nullptr;
   SamplingOptions sampling = {};
 
-  RasterImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, const SamplingOptions& sampling);
+  FlattenImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, const SamplingOptions& sampling);
 };
 }  // namespace tgfx

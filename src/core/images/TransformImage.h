@@ -40,6 +40,10 @@ class TransformImage : public Image {
     return source->isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return source->isYUV();
+  }
+
  protected:
   std::shared_ptr<Image> source = nullptr;
 

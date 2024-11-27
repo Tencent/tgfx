@@ -57,6 +57,11 @@ class ImageDecoder {
   virtual bool isAlphaOnly() const = 0;
 
   /**
+   * Returns true if the decoded image is in the YUV format.
+   */
+  virtual bool isYUV() const = 0;
+
+  /**
    * Returns the decoded ImageBuffer.
    */
   virtual std::shared_ptr<ImageBuffer> decode() const = 0;

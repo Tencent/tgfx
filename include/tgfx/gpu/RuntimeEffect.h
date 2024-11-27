@@ -96,7 +96,7 @@ class RuntimeEffect {
   // RuntimeProgram will not be released.
   UniqueType uniqueType = {};
 
-  std::vector<std::shared_ptr<Image>> extraInputs;
+  std::vector<std::shared_ptr<Image>> extraInputs = {};
 
   friend class RuntimeDrawTask;
   friend class RuntimeImageFilter;

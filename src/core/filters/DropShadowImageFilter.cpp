@@ -59,9 +59,9 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  if (source->isComplex()) {
+  if (!source->isFlat()) {
     auto needMipmaps = NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
-    source = source->makeRasterized(needMipmaps, sampling);
+    source = source->makeFlattened(needMipmaps, sampling);
   }
   std::unique_ptr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);

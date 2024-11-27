@@ -18,10 +18,10 @@
 
 #include "FilterImage.h"
 #include "SubsetImage.h"
+#include "core/utils/AddressOf.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/OpContext.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
@@ -47,6 +47,9 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
   if (offset != nullptr) {
     offset->x = bounds.left;
     offset->y = bounds.top;
+  }
+  if (filter->requireFlatSource()) {
+    source = source->makeFlattened();
   }
   return Wrap(std::move(source), bounds, std::move(filter));
 }

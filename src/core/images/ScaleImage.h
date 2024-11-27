@@ -35,8 +35,8 @@ class ScaleImage : public TransformImage {
 
   int height() const override;
 
-  bool isComplex() const override {
-    return source->isComplex();
+  bool isFlat() const override {
+    return false;
   }
 
  protected:
