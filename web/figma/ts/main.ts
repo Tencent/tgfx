@@ -6,6 +6,7 @@ import UIManager from './views/UIManager.js';
 import EventManager from './controllers/EventManager.js';
 import {Metric} from "web-vitals";
 import WebVitalsManager from "./models/WebVitalsManager";
+import PerformanceManager from './models/PerformanceManager';
 
 
 /**
@@ -20,6 +21,7 @@ class App {
     uiManager: UIManager;
     backendManager: BackendManager;
     eventManager: EventManager;
+    performanceManager: PerformanceManager; // 添加性能管理器
     figmaRenderer: any; // 修改类型为 any 或者适当的类型
 
     constructor() { // 移除 figma 参数
@@ -73,6 +75,7 @@ class App {
             }
         };
         const vitalsManager = new WebVitalsManager(handleINP);
+        this.performanceManager = new PerformanceManager(this.elementManager, this.backendManager); // 初始化性能管理器
         this.eventManager = new EventManager(this.elementManager, this.uiManager, this.backendManager, this.svgCanvas, vitalsManager);
 
         // 监听窗口大小变化
@@ -99,42 +102,7 @@ class App {
         // 绑定图层管理更新
         this.uiManager.updateLayersList(this.elementManager.getElements(), this.elementManager.selectedElement);
 
-        // FPS 计算和显示
-        const fpsCounter = document.getElementById('fpsCounter');
-        let lastFrameTime = performance.now();
-        let frameCount = 0;
-
-
-        // 更新性能面板
-        const updatePerformanceInfo = () => {
-            // 计算fps、更新
-            const now = performance.now();
-            frameCount++;
-            const delta = now - lastFrameTime;
-            if (delta >= 1000) {
-                const fps = (frameCount / delta) * 1000;
-                if (fpsCounter) {
-                    fpsCounter.textContent = `FPS: ${Math.round(fps)}`;
-                }
-                frameCount = 0;
-                lastFrameTime = now;
-            }
-            // 获取图形数量、更新
-            const count = this.elementManager.getElements().length;
-            this.shapeCounter.textContent = `图形数量: ${count}`;
-
-            // 获取单帧耗时、更新
-            const frameTime = this.backendManager.frameTimeCons();
-            const renderCounter = document.getElementById('renderCounter');
-            if (renderCounter) {
-                renderCounter.textContent = `单帧耗时: ${frameTime.toFixed(2)} ms`;
-            }
-
-            requestAnimationFrame(updatePerformanceInfo);
-        };
-
-        requestAnimationFrame(updatePerformanceInfo);
-
+        // 移除原有的性能统计代码
     }
 
     /**
