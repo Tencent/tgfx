@@ -55,6 +55,6 @@
   "author": "Tencent",
   "dependencies": {
     "express": "^4.21.1",
-    "web-vitals": "^4.2.4"
+    "web-vitals": "4.2.4"
   }
 }
