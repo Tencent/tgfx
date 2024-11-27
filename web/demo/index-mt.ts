@@ -19,9 +19,30 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm-mt/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
+import {
+    ShareData,
+    updateSize,
+    onresizeEvent,
+    onclickEvent,
+    loadImage,
+    DataLoaderImpl
+} from "./common";
 
 let shareData: ShareData = new ShareData();
+
+// export async function makeFromFile(filePath: string): Promise<Uint8Array | null> {
+//     try {
+//         const response = await fetch(filePath);
+//         if (!response.ok) {
+//             return null;
+//         }
+//         const buffer = await response.arrayBuffer();
+//         return new Uint8Array(buffer);
+//     } catch (error) {
+//         console.error('Error loading file:', error);
+//         return null;
+//     }
+// }
 
 class DataLoaderImpl {
     async makeFromFile(filePath: string): Promise<ArrayBuffer | null> {
@@ -30,7 +51,8 @@ class DataLoaderImpl {
             if (!response.ok) {
                 return null;
             }
-            return await response.arrayBuffer();
+            const buffer = await response.arrayBuffer();
+            return new Uint8Array(buffer);
         } catch (error) {
             console.error('Error loading file:', error);
             return null;
@@ -38,15 +60,8 @@ class DataLoaderImpl {
     }
 }
 
-const dataLoader = new DataLoaderImpl();
-
-async function makeFromFile(filePath: string): Promise<ArrayBuffer | null> {
-    return dataLoader.makeFromFile(filePath);
-}
-// Expose the function to the global scope
-// (window as any).makeFromFile = makeFromFile;
-
 if (typeof window !== 'undefined') {
+    (window as any).dataLoaderImpl = new DataLoaderImpl();
     window.onload = async () => {
         shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm-mt/' + file})
             .then((module: types.TGFX) => {
@@ -58,7 +73,10 @@ if (typeof window !== 'undefined') {
                 throw new Error("Hello2D init failed. Please check the .wasm file path!.");
             });
 
+
         let image = await loadImage('../../resources/assets/bridge.jpg');
+
+
         let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d', image);
 
         var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
@@ -82,4 +100,3 @@ if (typeof window !== 'undefined') {
         onclickEvent(shareData);
     };
 }
-

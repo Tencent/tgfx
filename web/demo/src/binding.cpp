@@ -51,10 +51,11 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                         return std::make_shared<TGFXThreadsView>(canvasID, nativeImage);
                       }))
       .function("registerFonts", &TGFXThreadsView::registerFonts);
+//
+//  class_<DataLoader>("DataLoader").function("makeFromFile", &tgfx::DataLoader::makeFromFile);
+//
+//  class_<DataLoaderImpl, base<DataLoader>>("DataLoaderImpl")
+//      .constructor<>()
+//      .function("makeFromFile", &DataLoaderImpl::makeFromFile);
 
-  class_<DataLoader>("DataLoader").function("makeFromFile", &tgfx::DataLoader::makeFromFile);
-
-  class_<DataLoaderImpl, base<DataLoader>>("DataLoaderImpl")
-      .constructor<>()
-      .function("makeFromFile", &DataLoaderImpl::makeFromFile);
 }

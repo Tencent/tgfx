@@ -22,6 +22,7 @@
 using namespace emscripten;
 
 namespace hello2d {
+
 std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   if (emscriptenData.isUndefined()) {
     return nullptr;
@@ -41,21 +42,40 @@ std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   return nullptr;
 }
 
+std::shared_ptr<tgfx::Data> GetData(const std::string& filePath) {
+  val dataLoaderImpl = val::global("dataLoaderImpl");
+  val promise = dataLoaderImpl.call<val>("makeFromFile", filePath);
+  val arrayBuffer = promise.await();
+  if (arrayBuffer.isNull() || arrayBuffer.isUndefined()) {
+    return nullptr;
+  }
+  return GetDataFromEmscripten(arrayBuffer);
+}
+
 TGFXThreadsView::TGFXThreadsView(std::string canvasID, const val& nativeImage)
     : TGFXBaseView(std::move(canvasID), nativeImage) {
-  auto dataLoader = std::unique_ptr<DataLoader>(new DataLoaderImpl());
-  tgfx::Data::RegisterExternalDataLoader(std::move(dataLoader));
+//  auto dataLoader = std::unique_ptr<DataLoader>(new DataLoaderImpl());
+//  tgfx::Data::RegisterExternalDataLoader(std::move(dataLoader));
+
+
 }
 
 void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  std::string fontPath = "../../resources/font/NotoSansSC-Regular.otf";
-  auto data = Data::MakeFromFile(fontPath.c_str());
-  if (data) {
-    auto typeface = tgfx::Typeface::MakeFromData(data, 0);
-    if (typeface) {
-      appHost->addTypeface("default", std::move(typeface));
-    }
-  }
+//  std::string fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+//  auto data = Data::MakeFromFile(fontPath.c_str());
+//  if (data) {
+//    auto typeface = tgfx::Typeface::MakeFromData(data, 0);
+//    if (typeface) {
+//      appHost->addTypeface("default", std::move(typeface));
+//    }
+//  }
+
+std::string fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+auto data = GetData(fontPath);
+if (data) {
+  printf("font data is not null, size:%ld \n", data->size());
+}
+
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {
     auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
@@ -70,5 +90,6 @@ void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal)
       appHost->addTypeface("emoji", std::move(typeface));
     }
   }
+
 }
 }  // namespace hello2d
