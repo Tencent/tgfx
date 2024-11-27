@@ -124,7 +124,7 @@ class App {
             this.shapeCounter.textContent = `图形数量: ${count}`;
 
             // 获取单帧耗时、更新
-            const frameTime = this.figmaRenderer.frameTimeCons();
+            const frameTime = this.backendManager.frameTimeCons();
             const renderCounter = document.getElementById('renderCounter');
             if (renderCounter) {
                 renderCounter.textContent = `单帧耗时: ${frameTime.toFixed(2)} ms`;

@@ -27,6 +27,14 @@ export default class BackendManager {
         }
     }
 
+    frameTimeCons(): number {
+        if (window.cefQuery) {
+            return 0.0;
+        } else {
+            return this.figmaRenderer.frameTimeCons();
+        }
+    }
+
     /**
      * 发送启用后端渲染的消息到后端
      */
@@ -119,4 +127,5 @@ export default class BackendManager {
             }
         });
     }
+
 }
