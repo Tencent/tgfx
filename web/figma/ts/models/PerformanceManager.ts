@@ -23,17 +23,23 @@ export default class PerformanceManager {
         requestAnimationFrame(this.updatePerformanceInfo);
     }
 
-    private updatePerformanceInfo(): void {
+    private calculateFPS(): number {
         const now = performance.now();
         this.frameCount++;
         const delta = now - this.lastFrameTime;
         if (delta >= 1000) {
             const fps = (this.frameCount / delta) * 1000;
-            if (this.fpsCounter) {
-                this.fpsCounter.textContent = `FPS: ${Math.round(fps)}`;
-            }
             this.frameCount = 0;
             this.lastFrameTime = now;
+            return Math.round(fps);
+        }
+        return 0;
+    }
+
+    private updatePerformanceInfo(): void {
+        const fps = this.calculateFPS();
+        if (fps > 0 && this.fpsCounter) {
+            this.fpsCounter.textContent = `FPS: ${fps}`;
         }
 
         // 获取图形数量、显示
