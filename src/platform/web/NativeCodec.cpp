@@ -28,6 +28,9 @@ using namespace emscripten;
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
+  if (Data::HasExternalDataLoader()) {
+    return MakeNativeCodec(Data::MakeFromFile(filePath));
+  }
   if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
     auto data = val::module_property("tgfx")
                     .call<val>("getBytesFromPath", val::module_property("module"), filePath)

@@ -23,7 +23,22 @@ import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./c
 
 let shareData: ShareData = new ShareData();
 
+async function MakeFromFile(filePath: string): Promise<Uint8Array | null> {
+    try {
+        const response = await fetch(filePath);
+        if (!response.ok) {
+            return null;
+        }
+        const buffer = await response.arrayBuffer();
+        return new Uint8Array(buffer);
+    } catch (error) {
+        console.error('Error loading file:', error);
+        return null;
+    }
+}
+
 if (typeof window !== 'undefined') {
+    (window as any).MakeFromFile = MakeFromFile;
     window.onload = async () => {
         shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm-mt/' + file})
             .then((module: types.TGFX) => {
@@ -34,17 +49,12 @@ if (typeof window !== 'undefined') {
                 console.error(error);
                 throw new Error("Hello2D init failed. Please check the .wasm file path!.");
             });
-
         let image = await loadImage('../../resources/assets/bridge.jpg');
         let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d', image);
 
         var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
-        const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
-        const fontUIntArray = new Uint8Array(fontBuffer);
         var emojiFontPath = "../../resources/font/NotoColorEmoji.ttf";
-        const emojiFontBuffer = await fetch(emojiFontPath).then((response) => response.arrayBuffer());
-        const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
-        tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
+        tgfxView.registerFonts(fontPath, emojiFontPath);
 
         shareData.tgfxBaseView = tgfxView;
         updateSize(shareData);
@@ -59,4 +69,3 @@ if (typeof window !== 'undefined') {
         onclickEvent(shareData);
     };
 }
-

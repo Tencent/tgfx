@@ -23,6 +23,9 @@
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> PngCodec::MakeFrom(const std::string& filePath) {
+  if (Data::HasExternalDataLoader()) {
+    return MakeFrom(Data::MakeFromFile(filePath));
+  }
   return MakeFromData(filePath, nullptr);
 }
 

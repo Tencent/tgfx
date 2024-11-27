@@ -68,6 +68,9 @@ struct my_error_mgr {
 };
 
 std::shared_ptr<ImageCodec> JpegCodec::MakeFrom(const std::string& filePath) {
+  if (Data::HasExternalDataLoader()) {
+    return MakeFrom(Data::MakeFromFile(filePath));
+  }
   return MakeFromData(filePath, nullptr);
 }
 

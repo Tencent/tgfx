@@ -17,47 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXThreadsView.h"
+#include "DataLoaderImpl.h"
 
 using namespace emscripten;
 
 namespace hello2d {
-std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
-  if (emscriptenData.isUndefined()) {
-    return nullptr;
-  }
-  unsigned int length = emscriptenData["length"].as<unsigned int>();
-  if (length == 0) {
-    return nullptr;
-  }
-  auto buffer = new (std::nothrow) uint8_t[length];
-  if (buffer) {
-    auto memory = val::module_property("HEAPU8")["buffer"];
-    auto memoryView =
-        emscriptenData["constructor"].new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
-    memoryView.call<void>("set", emscriptenData);
-    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
-  }
-  return nullptr;
-}
-
-TGFXThreadsView::TGFXThreadsView(std::string canvasID, const val& nativeImage)
+TGFXThreadsView::TGFXThreadsView(const std::string& canvasID, const val& nativeImage)
     : TGFXBaseView(std::move(canvasID), nativeImage) {
+  tgfx::Data::RegisterExternalDataLoader(std::unique_ptr<DataLoader>(new DataLoaderImpl()));
 }
 
-void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  auto fontData = GetDataFromEmscripten(fontVal);
-  if (fontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
-    if (typeface) {
-      appHost->addTypeface("default", std::move(typeface));
-    }
+void TGFXThreadsView::registerFonts(const std::string& fontPath, const std::string& emojiFontPath) {
+  auto typeface = tgfx::Typeface::MakeFromPath(fontPath.c_str(), 0);
+  if (typeface) {
+    appHost->addTypeface("default", std::move(typeface));
   }
-  auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
-  if (emojiFontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
-    if (typeface) {
-      appHost->addTypeface("emoji", std::move(typeface));
-    }
+  auto emojiTypeface = tgfx::Typeface::MakeFromPath(emojiFontPath.c_str(), 0);
+  if (emojiTypeface) {
+    appHost->addTypeface("emoji", std::move(emojiTypeface));
   }
 }
 }  // namespace hello2d
