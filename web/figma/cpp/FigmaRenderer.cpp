@@ -7,6 +7,7 @@
 #include "LayerUtils.h"
 #include "MessageParser.h"
 #include "utils.h"
+#include <chrono>
 
 void FigmaRenderer::initialize(std::string canvasID) {
   logInfo("initialize called， canvasID is " + canvasID);
@@ -39,17 +40,33 @@ void FigmaRenderer::invalisize() {
 void FigmaRenderer::handMessage(std::string message) {
   logInfo("FigmaRenderer::handMessage called, message is " + message);
 
+  auto start = std::chrono::high_resolution_clock::now();
+
   JsMessage jsMessage;
-  if (MessageParser::parseMessage(message, jsMessage)) {
+
+  // 开始计时 parseMessage
+  bool parse_success = MessageParser::parseMessage(message, jsMessage);
+  auto parse_end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> parse_duration = parse_end - start;
+  logInfo("parseMessage耗时: " + std::to_string(parse_duration.count()) + " ms");
+
+  if (parse_success) {
     logInfo("FigmaRenderer::handMessage jsMessage.action is " + jsMessage.action);
     dispatchMessage(jsMessage);
     render();
   } else {
     logError("FigmaRenderer::handMessage 解析消息失败");
   }
+
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> duration = end - start;
+  hand_message_duration_ += duration.count();
+  logInfo("handMessage耗时: " + std::to_string(duration.count()) + " ms");
 }
 
 void FigmaRenderer::dispatchMessage(const JsMessage& message) {
+  // 开始计时
+  auto start = std::chrono::high_resolution_clock::now();
 
   const auto [action, canvasRect, viewBox, elements] = message;
   if (action == "enableBackend") {
@@ -73,10 +90,17 @@ void FigmaRenderer::dispatchMessage(const JsMessage& message) {
   } else {
     logError("FigmaRenderer::handMessage 未知操作：" + action);
   }
+
+  // 结束计时并打印
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> duration = end - start;
+  logInfo("dispatchMessage耗时: " + std::to_string(duration.count()) + " ms");
 }
 
 void FigmaRenderer::render() {
-  logInfo("FigmaRenderer::render called");
+  auto start = std::chrono::high_resolution_clock::now();
+
+  // logInfo("FigmaRenderer::render called");
   if (tgfx_window_ == nullptr) return;
   if (tgfx_device_ == nullptr) {
     tgfx_device_ = tgfx_window_->getDevice();
@@ -92,7 +116,7 @@ void FigmaRenderer::render() {
     return;
   }
 
-  logInfo("FigmaRenderer::render begin");
+  // logInfo("FigmaRenderer::render begin");
 
   tgfx_display_list_->render(surface.get());
 
@@ -102,9 +126,13 @@ void FigmaRenderer::render() {
   context->flushAndSubmit();
   tgfx_window_->present(context);
 
-  logInfo("FigmaRenderer::render done");
+  // logInfo("FigmaRenderer::render done");
 
   tgfx_device_->unlock();
+
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> duration = end - start;
+  logInfo("render耗时: " + std::to_string(duration.count()) + " ms");
 }
 
 tgfx::Layer* FigmaRenderer::getDrawingLayer() {

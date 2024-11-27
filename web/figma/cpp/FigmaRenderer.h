@@ -15,6 +15,9 @@ class FigmaRenderer {
   void invalisize();
   void handMessage(std::string message);
   void test();
+  double frameTimeCons() const {
+    return hand_message_duration_;
+  }
 
  private:
   void dispatchMessage(const JsMessage& message);
@@ -32,5 +35,6 @@ class FigmaRenderer {
 
   bool enable_info_logging_ = false;
   bool enable_error_logging_ = true;
+  double hand_message_duration_ = 0.0;
 
 };
