@@ -8,7 +8,7 @@ declare global {
 }
 
 export default class BackendManager {
-    figmaRenderer: any; // 修改类型为 any 或者适当的类型
+    figmaRenderer: any;
     private cefFrameTimeCons: number = 0.0;
     /**
      * 创建后端通信管理器
@@ -30,18 +30,22 @@ export default class BackendManager {
 
     frameTimeCons(): number {
         if (window.cefQuery) {
-            (window as any).cefQuery({
-                request: 'frameTimeCons',
-                persistent: false,
-                onSuccess: (response: string) => {
-                    console.log('发送成功:', response);
-                     this.cefFrameTimeCons = parseFloat(response)
-                }
-            });
+            this.postGetCefFrameTimeCons();
             return this.cefFrameTimeCons;
         } else {
             return this.figmaRenderer.frameTimeCons();
         }
+    }
+
+    private postGetCefFrameTimeCons() {
+        (window as any).cefQuery({
+            request: 'frameTimeCons',
+            persistent: false,
+            onSuccess: (response: string) => {
+                console.log('发送成功:', response);
+                this.cefFrameTimeCons = parseFloat(response)
+            }
+        });
     }
 
     /**
@@ -119,21 +123,10 @@ export default class BackendManager {
     }
 
     private sendToCef(messageObj: object) {
-        if (!(window as any).cefQuery) {
-            console.error('cefQuery 未定义，无法发送消息到后端');
-            return;
-        }
-
         const message = JSON.stringify(messageObj);
         (window as any).cefQuery({
             request: message,
-            persistent: false,
-            onSuccess: (response: string) => {
-                console.log('发送成功:', response);
-            },
-            onFailure: (error_code: number, error_message: string) => {
-                console.error(`发送失败 (${error_code}): ${error_message}`);
-            }
+            persistent: false
         });
     }
 

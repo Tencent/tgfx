@@ -6,7 +6,7 @@ import BackendManager from '../models/BackendManager.js';
 import BaseElement from '../models/BaseElement.js';
 import WebVitalsManager from '../models/WebVitalsManager.js';
 
-import {VIEWBOX_WIDTH, VIEWBOX_HEIGHT} from '../config.js';
+import { VIEWBOX_WIDTH, VIEWBOX_HEIGHT, settings } from '../config.js';
 
 export default class EventManager {
     elementManager: ElementManager;
@@ -24,7 +24,6 @@ export default class EventManager {
     isPerformanceTestRunning: boolean;
     animationFrameId: number | null;
     lastFrameTime: number | undefined;
-    isBackend: boolean;
     private vitalsManager: WebVitalsManager;
 
     /**
@@ -50,7 +49,6 @@ export default class EventManager {
         this.viewBox = {x: 0, y: 0, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT};
         this.isPerformanceTestRunning = false;
         this.animationFrameId = null;
-        this.isBackend = false;
         this.initEvents();
         this.initResizeListener(); /* 添加窗口调整大小监听 */
     }
@@ -84,13 +82,13 @@ export default class EventManager {
                     this.elementManager.selectElement(element);
                     this.uiManager.showProperties(element);
                     elementList.push(this.getElementData(element));
-                    if (this.isBackend) {
+                    if (settings.isBackend) {
                         element.element.style.opacity = '0';
                     }
                 }
             }
             this.updateLayers();
-            if (this.isBackend) {
+            if (settings.isBackend) {
                 this.backendManager.sendUpdateMessage(elementList, this.getCanvasRect(), this.viewBox);
             }
 
@@ -128,8 +126,8 @@ export default class EventManager {
         renderModeRadios.forEach(radio => {
             radio.addEventListener('change', (e) => {
                 const selectedValue = (e.target as HTMLInputElement).value;
-                this.isBackend = selectedValue === 'backend';
-                if (this.isBackend) {
+                settings.isBackend = selectedValue === 'backend'; // 更新全局开关
+                if (settings.isBackend) {
                     this.enableBackendRendering();
                 } else {
                     this.disableBackendRendering();
@@ -169,10 +167,8 @@ export default class EventManager {
             this.uiManager.showProperties(element);
             this.uiManager.showTooltip(tooltip, 50, 60);
             this.updateLayers();
-            if (this.isBackend) {
+            if (settings.isBackend) {
                 this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
-            }
-            if (this.isBackend) {
                 element.element.style.opacity = '0';
             }
 
@@ -266,12 +262,12 @@ export default class EventManager {
         if (this.isDragging && this.draggingElement) {
             const mousePos = this.getMousePosition(e);
             this.updateElementPosition(this.draggingElement, mousePos);
-            if (this.isBackend) {
+            if (settings.isBackend) {
                 this.backendManager.sendUpdateMessage([this.getElementData(this.draggingElement)], this.getCanvasRect(), this.viewBox);
             }
         } else if (this.isCanvasDragging) {
             this.updateViewBox(e);
-            if (this.isBackend) {
+            if (settings.isBackend) {
                 this.backendManager.sendCanvasPanMessage(this.getCanvasRect(), this.viewBox);
             }
         }
@@ -350,7 +346,7 @@ export default class EventManager {
                 element.setAttribute(attribute, value);
             }
 
-            if (this.isBackend) {
+            if (settings.isBackend) {
                 this.backendManager.sendUpdateMessage([this.getElementData(element)], this.getCanvasRect(), this.viewBox);
             }
         } catch (error) {
@@ -525,7 +521,7 @@ export default class EventManager {
             elementInfoList.push(this.getElementData(element));
         });
 
-        if (this.isBackend) {
+        if (settings.isBackend) {
             this.backendManager.sendUpdateMessage(elementInfoList, this.getCanvasRect(), this.viewBox);
         }
         // 使用 requestAnimationFrame 调度下一帧
