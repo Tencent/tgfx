@@ -2,6 +2,40 @@
 #include <string>
 #include <thread>
 #include <tgfx/core/Color.h>
+#include <emscripten/console.h>
+
+#include <fstream>
+
+inline void printFileInfo(const std::string& filePath) {
+  // 打开文件
+  std::ifstream file(filePath, std::ios::binary);
+  if (!file.is_open()) {
+    std::cerr << "Error: Failed to open file " << filePath << std::endl;
+    return;
+  }
+  file.close();
+}
+
+
+inline std::shared_ptr<tgfx::Data> getDataFromEmscripten(const emscripten::val& native_font) {
+  if (native_font.isUndefined()) {
+    return nullptr;
+  }
+  unsigned int length = native_font["length"].as<unsigned int>();
+  if (length == 0) {
+    return nullptr;
+  }
+  auto buffer = new (std::nothrow) uint8_t[length];
+  if (buffer) {
+    auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
+    auto memoryView =
+        native_font["constructor"].new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
+    memoryView.call<void>("set", native_font);
+    return tgfx::Data::MakeAdopted(buffer, length, tgfx::Data::DeleteProc);
+  }
+  return nullptr;
+}
+
 
 inline void printLayerBounds(tgfx::Layer* layer, const int indent) {
   if (layer == nullptr) return;

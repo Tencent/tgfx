@@ -25,10 +25,10 @@ EMSCRIPTEN_BINDINGS(figma_module) {
   class_<FigmaRenderer>("FigmaRenderer")
       .constructor<>()
       .function("initialize", &FigmaRenderer::initialize)
+      .function("registerFonts", &FigmaRenderer::registerFonts)
       .function("invalisize", &FigmaRenderer::invalisize)
-      .function("updateShape", &FigmaRenderer::updateShape)
       .function("handMessage", &FigmaRenderer::handMessage)
-      .function("registerFonts", &FigmaRenderer::registerFonts);
+      .function("test", &FigmaRenderer::test);
 }
 
 int main(int, const char*[]) {

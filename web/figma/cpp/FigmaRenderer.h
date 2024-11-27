@@ -13,8 +13,8 @@ class FigmaRenderer {
   void initialize(std::string canvasID);
   void registerFonts(const emscripten::val& native_text_font);
   void invalisize();
-  void updateShape();
   void handMessage(std::string message);
+  void test();
 
  private:
   void dispatchMessage(const JsMessage& message);
