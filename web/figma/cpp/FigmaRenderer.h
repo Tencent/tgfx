@@ -1,6 +1,7 @@
 #include <tgfx/layers/DisplayList.h>
 #include <tgfx/layers/Layer.h>
 #include <tgfx/layers/ShapeLayer.h>
+#include <deque>
 #include <memory>
 #include <string>
 #include "Element.h"
@@ -15,9 +16,7 @@ class FigmaRenderer {
   void invalisize();
   void handMessage(std::string message);
   void test();
-  double frameTimeCons() const {
-    return hand_message_duration_;
-  }
+  double frameTimeCons() const;
 
  private:
   void dispatchMessage(const JsMessage& message);
@@ -25,6 +24,9 @@ class FigmaRenderer {
   tgfx::Layer* getDrawingLayer();
   void logInfo(const std::string& message) const;
   void logError(const std::string& message) const;
+
+  // 单帧平均耗时覆盖的最大帧数
+  static constexpr size_t kMaxHandMessageDurations = 30;
 
   std::string canvas_id_;
   std::shared_ptr<tgfx::Typeface> demo_text_typeface_;
@@ -35,6 +37,6 @@ class FigmaRenderer {
 
   bool enable_info_logging_ = false;
   bool enable_error_logging_ = true;
-  double hand_message_duration_ = 0.0;
+  std::deque<double> hand_message_durations_;
 
 };

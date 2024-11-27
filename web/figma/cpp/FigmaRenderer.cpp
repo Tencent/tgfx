@@ -1,5 +1,6 @@
 #include "FigmaRenderer.h"
 #include <emscripten/console.h>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -7,7 +8,6 @@
 #include "LayerUtils.h"
 #include "MessageParser.h"
 #include "utils.h"
-#include <chrono>
 
 void FigmaRenderer::initialize(std::string canvasID) {
   logInfo("initialize called， canvasID is " + canvasID);
@@ -37,6 +37,14 @@ void FigmaRenderer::invalisize() {
   tgfx_window_->invalidSize();
 }
 
+double FigmaRenderer::frameTimeCons() const {
+  double sum = 0.0;
+  for (const auto& duration : hand_message_durations_) {
+    sum += duration;
+  }
+  return hand_message_durations_.empty() ? 0.0 : sum / hand_message_durations_.size();
+}
+
 void FigmaRenderer::handMessage(std::string message) {
   logInfo("FigmaRenderer::handMessage called, message is " + message);
 
@@ -60,7 +68,13 @@ void FigmaRenderer::handMessage(std::string message) {
 
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> duration = end - start;
-  hand_message_duration_ = duration.count();
+
+  // 更新耗时记录
+  hand_message_durations_.push_back(duration.count());
+  if (hand_message_durations_.size() > kMaxHandMessageDurations) {
+    hand_message_durations_.pop_front();
+  }
+
   logInfo("handMessage耗时: " + std::to_string(duration.count()) + " ms");
 }
 
