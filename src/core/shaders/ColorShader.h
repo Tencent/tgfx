@@ -30,6 +30,10 @@ class ColorShader : public Shader {
 
   bool asColor(Color* color) const override;
 
+  ShaderType type() const override {
+    return ShaderType::Color;
+  }
+
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;

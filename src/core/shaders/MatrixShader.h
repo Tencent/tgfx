@@ -34,6 +34,10 @@ class MatrixShader final : public Shader {
     return source->asColor(color);
   }
 
+  ShaderType type() const override {
+    return ShaderType::Matrix;
+  }
+
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
  protected:
