@@ -54,6 +54,10 @@ struct GradientInfo {
  * Defines the type of gradient to be drawn.
  */
 enum class GradientType {
+  /*
+   * None is used to indicate that the gradient type is not defined.
+  */
+  None,
   /**
    * Linear gradients are defined by an axis, which is a line that the color gradient is aligned
    * with.
@@ -69,11 +73,6 @@ enum class GradientType {
    * from the start angle to the end angle, wrapping around the center point.
    */
   Conic,
-
-  /*
-   * None is used to indicate that the gradient type is not defined.
-  */
-  None,
 };
 
 }  // namespace tgfx
