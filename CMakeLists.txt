@@ -18,7 +18,7 @@ option(TGFX_BUILD_DRAWERS "Build the tgfx-drawers library" OFF)
 option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
+#    option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
 endif ()
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
@@ -451,7 +451,8 @@ if (TGFX_EXCLUDE_FILES)
     list(REMOVE_ITEM TGFX_FILES ${TGFX_EXCLUDE_FILES})
 endif ()
 
-add_library(tgfx STATIC ${TGFX_FILES})
+add_library(tgfx STATIC ${TGFX_FILES}
+        src/platform/web/WebStream.cpp)
 add_dependencies(tgfx tgfx-vendor)
 target_compile_definitions(tgfx PUBLIC ${TGFX_DEFINES})
 target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
@@ -528,7 +529,9 @@ if (TGFX_BUILD_TESTS)
     target_link_libraries(UpdateBaseline ${TGFX_TEST_LIBS})
 
     # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(GenerateImages ${TGFX_TEST_FILES})
+    add_executable(GenerateImages ${TGFX_TEST_FILES}
+            src/platform/web/WebStream.h
+            src/platform/web/WebStream.cpp)
     add_dependencies(GenerateImages test-vendor)
     target_include_directories(GenerateImages PUBLIC ${TGFX_TEST_INCLUDES})
     target_compile_definitions(GenerateImages PUBLIC ${TGFX_TEST_DEFINES} GENERATOR_BASELINE_IMAGES)

@@ -31,9 +31,6 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
-  if (Data::HasExternalDataLoader()) {
-    return MakeFromData(Data::MakeFromFile(fontPath), ttcIndex);
-  }
   return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
 }
 

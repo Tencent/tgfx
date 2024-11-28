@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXBaseView.h"
+#include "tgfx/core/Stream.h"
 
 using namespace emscripten;
 namespace hello2d {
@@ -43,6 +44,14 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
 }
 
 void TGFXBaseView::draw(int drawIndex) {
+  std::string fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+  auto stream = tgfx::Stream::MakeFromFile(fontPath);
+  if (stream) {
+    printf("-------Font file loaded-------\n");
+  } else {
+    printf("-------Font file loaded failed! ------\n");
+  }
+
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }

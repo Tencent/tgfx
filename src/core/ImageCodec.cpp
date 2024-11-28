@@ -42,9 +42,6 @@
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   TRACE_EVENT;
-  if (Data::HasExternalDataLoader()) {
-    return MakeFrom(Data::MakeFromFile(filePath));
-  }
   std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream == nullptr || stream->size() <= 14) {

@@ -29,9 +29,6 @@ bool WebpCodec::IsWebp(const std::shared_ptr<Data>& data) {
 }
 
 std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(const std::string& filePath) {
-  if (Data::HasExternalDataLoader()) {
-    return MakeFrom(Data::MakeFromFile(filePath));
-  }
   auto info = WebpUtility::getDecodeInfo(filePath);
   if (info.width == 0 || info.height == 0) {
     auto data = Data::MakeFromFile(filePath);

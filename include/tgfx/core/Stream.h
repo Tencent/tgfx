@@ -22,6 +22,21 @@
 #include <string>
 
 namespace tgfx {
+
+class Stream;
+/**
+ * StreamFactory creates instances of Stream and can be inherited externally to implement the
+ * loading of network files.
+ */
+class StreamFactory {
+public:
+ virtual ~StreamFactory() = default;
+ /**
+  * Creates a Stream instance for the specified file path.
+  */
+ virtual std::unique_ptr<Stream> createStream(const std::string& filePath) = 0;
+};
+
 /**
  * Stream represents a source of bytes. Subclasses can be backed by memory, or a file, or something
  * else. Stream is not thread safe.
@@ -29,6 +44,8 @@ namespace tgfx {
 class Stream {
  public:
   virtual ~Stream() = default;
+
+  static void RegisterStreamFactory(std::unique_ptr<StreamFactory> factory);
 
   /**
    * Attempts to open the specified file as a stream, returns nullptr on failure.

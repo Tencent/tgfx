@@ -22,35 +22,12 @@
 #include <string>
 
 namespace tgfx {
-class Data;
-/**
- * Base class for loading data via network or local path created externally to tgfx.
- */
-class DataLoader {
- public:
-  virtual ~DataLoader() = default;
-  /**
-   * Load a file from a network or local path, return null if the file does not exist.
-   */
-  virtual std::shared_ptr<Data> makeFromFile(const std::string& filePath) = 0;
-};
-
 /**
  * Data holds an immutable data buffer. Not only is the Data immutable, but the actual pointer
  * returned by data() or bytes() is guaranteed to always be the same for the life of this instance.
  */
 class Data {
  public:
-  /**
-   * Registers an external data loader, which can used to load data from a network or local path.
-   */
-  static void RegisterExternalDataLoader(std::unique_ptr<DataLoader> loader);
-
-  /**
-   * Returns true if an external data loader is registered.
-   */
-  static bool HasExternalDataLoader();
-
   /**
    * Creates a Data object from the specified file path.
    */

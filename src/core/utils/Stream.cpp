@@ -17,9 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Stream.h"
+#include <mutex>
 #include "core/utils/Log.h"
 
+#if defined(__EMSCRIPTEN__)
+#include "platform/web/WebStream.h"
+#endif
+
 namespace tgfx {
+static std::mutex locker = {};
+static std::unique_ptr<StreamFactory> streamFactory = nullptr;
 
 class FileStream : public Stream {
  public:
@@ -55,7 +62,26 @@ class FileStream : public Stream {
   size_t length = 0;
 };
 
+void Stream::RegisterStreamFactory(std::unique_ptr<StreamFactory> factory) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  streamFactory = std::move(factory);
+}
+
 std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
+  std::unique_ptr<Stream> stream = nullptr;
+  locker.lock();
+#if defined(__EMSCRIPTEN__)
+  if (streamFactory == nullptr) {
+    streamFactory = std::unique_ptr<StreamFactory>(new WebStreamFactory());
+  }
+#endif
+  if (streamFactory) {
+    stream = streamFactory->createStream(filePath);
+  }
+  locker.unlock();
+  if (stream) {
+    return stream;
+  }
   auto file = fopen(filePath.c_str(), "rb");
   if (file == nullptr) {
     LOGE("file open failed! filePath:%s \n", filePath.c_str());

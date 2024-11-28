@@ -16,24 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TGFXThreadsView.h"
+
+#pragma once
+
 #include "tgfx/core/Stream.h"
+#include <emscripten/val.h>
 
 using namespace emscripten;
 
-namespace hello2d {
-TGFXThreadsView::TGFXThreadsView(const std::string& canvasID, const val& nativeImage)
-    : TGFXBaseView(std::move(canvasID), nativeImage) {
-}
+namespace tgfx {
 
-void TGFXThreadsView::registerFonts(const std::string& fontPath, const std::string& emojiFontPath) {
-  auto typeface = tgfx::Typeface::MakeFromPath(fontPath.c_str(), 0);
-  if (typeface) {
-    appHost->addTypeface("default", std::move(typeface));
+class WebStream : public Stream {
+public:
+  static std::unique_ptr<Stream> Make(const std::string& filePath);
+
+  ~WebStream() override;
+
+  size_t size() const override;
+  bool seek(size_t position) override;
+  bool move(int offset) override;
+  size_t read(void* buffer, size_t size) override;
+  bool rewind() override;
+
+private:
+  WebStream(const val& fileStream, size_t length);
+  std::string filePath = "";
+  size_t length = 0;
+  size_t currentPosition = 0;
+  val fileStream;
+};
+
+class WebStreamFactory : public StreamFactory {
+public:
+  std::unique_ptr<Stream> createStream(const std::string& filePath) override {
+    return WebStream::Make(filePath);
   }
-  auto emojiTypeface = tgfx::Typeface::MakeFromPath(emojiFontPath.c_str(), 0);
-  if (emojiTypeface) {
-    appHost->addTypeface("emoji", std::move(emojiTypeface));
-  }
-}
-}  // namespace hello2d
+};
+
+}  // namespace tgfx
