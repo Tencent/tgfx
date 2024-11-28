@@ -19,13 +19,13 @@
 #pragma once
 
 #include <stack>
-#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -224,6 +224,11 @@ class Canvas {
   void drawPath(const Path& path, const Paint& paint);
 
   /**
+   * Draws a shape using the current clip, matrix, and specified paint.
+   */
+  void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
+
+  /**
    * Draws an image, with its top-left corner at (left, top), using current clip, matrix and
    * optional paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and
    * MipmapMode::Linear as the sampling options. Otherwise, it uses FilterMode::Linear and
@@ -321,7 +326,6 @@ class Canvas {
 
   explicit Canvas(DrawContext* drawContext);
   Canvas(DrawContext* drawContext, const Path& initClip);
-  bool drawSimplePath(const Path& path, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,

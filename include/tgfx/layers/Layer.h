@@ -502,14 +502,14 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
+  std::shared_ptr<ImageFilter> getLayerFilter(float contentScale);
+
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale);
-
-  std::shared_ptr<ImageFilter> getLayerFilter(float contentScale);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
@@ -519,21 +519,13 @@ class Layer {
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::string _name;
-  float _alpha = 1.0f;
-  BlendMode _blendMode = BlendMode::SrcOver;
-  Matrix _matrix = Matrix::I();
-  float _rasterizationScale = 1.0f;
-  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
-  std::shared_ptr<Layer> _mask = nullptr;
-  std::unique_ptr<Rect> _scrollRect = nullptr;
-  Layer* _root = nullptr;
-  Layer* _parent = nullptr;
-  std::unique_ptr<LayerContent> layerContent = nullptr;
-  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
-  std::vector<std::shared_ptr<Layer>> _children = {};
+  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
+
+  Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+
+  bool hasValidMask() const;
+
   struct {
-    bool dirty : 1;          // need to redraw the layer
     bool contentDirty : 1;   // need to update content
     bool childrenDirty : 1;  // need to redraw child layers
     bool visible : 1;
@@ -541,6 +533,20 @@ class Layer {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
   } bitFields = {};
+  std::string _name;
+  float _alpha = 1.0f;
+  BlendMode _blendMode = BlendMode::SrcOver;
+  Matrix _matrix = Matrix::I();
+  float _rasterizationScale = 1.0f;
+  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
+  std::shared_ptr<Layer> _mask = nullptr;
+  Layer* maskOwner = nullptr;
+  std::unique_ptr<Rect> _scrollRect = nullptr;
+  Layer* _root = nullptr;
+  Layer* _parent = nullptr;
+  std::unique_ptr<LayerContent> layerContent = nullptr;
+  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
+  std::vector<std::shared_ptr<Layer>> _children = {};
 
   friend class DisplayList;
   friend class LayerProperty;

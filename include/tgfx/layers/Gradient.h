@@ -20,8 +20,8 @@
 
 #include <vector>
 #include "tgfx/core/Color.h"
+#include "tgfx/core/GradientType.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/core/ShaderType.h"
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {

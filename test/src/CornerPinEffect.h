@@ -43,7 +43,7 @@ class CornerPinEffect : public RuntimeEffect {
 
   std::unique_ptr<RuntimeProgram> onCreateProgram(Context* context) const override;
 
-  bool onDraw(const RuntimeProgram* program, const BackendTexture& source,
+  bool onDraw(const RuntimeProgram* program, const std::vector<BackendTexture>& inputTextures,
               const BackendRenderTarget& target, const Point& offset) const override;
 
  private:

@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/gpu/Context.h"
 
@@ -32,6 +33,7 @@ Device::~Device() {
 }
 
 Context* Device::lockContext() {
+  TRACE_EVENT_COLOR(TRACY_COLOR_GREENYELLOW);
   locker.lock();
   contextLocked = onLockContext();
   if (!contextLocked) {

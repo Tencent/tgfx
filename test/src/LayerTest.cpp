@@ -19,8 +19,10 @@
 #include <math.h>
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -30,7 +32,9 @@
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
+#include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "utils/TestUtils.h"
+#include "utils/common.h"
 
 namespace tgfx {
 TGFX_TEST(LayerTest, LayerTree) {
@@ -185,6 +189,7 @@ TGFX_TEST(LayerTest, textLayer) {
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
   auto textLayer = TextLayer::Make();
+  textLayer->setName("text_layer1");
   layer->addChild(textLayer);
   layer->setMatrix(Matrix::MakeTrans(10, 10));
   textLayer->setText("Hello, World!");
@@ -197,11 +202,18 @@ TGFX_TEST(LayerTest, textLayer) {
   textLayer->setAlpha(0.5f);
   textLayer->setMatrix(Matrix::MakeRotate(30));
   auto textLayer2 = TextLayer::Make();
+  textLayer2->setName("text_layer2");
   layer->addChild(textLayer2);
   textLayer2->setText("Hello, World!");
-  color.alpha = 0.5;
   textLayer2->setFont(font);
   textLayer2->setBlendMode(BlendMode::Difference);
+  auto emojiTypeface = MakeTypeface("resources/font/NotoColorEmoji.ttf");
+  tgfx::Font emojiFont(emojiTypeface, 10);
+  auto emojiLayer = TextLayer::Make();
+  layer->addChild(emojiLayer);
+  emojiLayer->setText("🤡👻🐠🤩😃🤪");
+  emojiLayer->setFont(emojiFont);
+  emojiLayer->setMatrix(Matrix::MakeTrans(0, 20));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
   device->unlock();
@@ -356,9 +368,9 @@ TGFX_TEST(LayerTest, getbounds) {
   child->setFont(font);
   auto bounds = child->getBounds();
   EXPECT_FLOAT_EQ(bounds.left, 1);
-  EXPECT_FLOAT_EQ(bounds.top, 0.43000031f);
+  EXPECT_FLOAT_EQ(bounds.top, 11.959999f);
   EXPECT_FLOAT_EQ(bounds.right, 47);
-  EXPECT_FLOAT_EQ(bounds.bottom, 17.43f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 28.959999f);
 
   auto grandChild = ImageLayer::Make();
   grandChild->setMatrix(Matrix::MakeRotate(40, 55, 55));
@@ -430,33 +442,45 @@ TGFX_TEST(LayerTest, shapeLayer) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
-  auto surface = Surface::Make(context, 200, 100);
+  auto surface = Surface::Make(context, 200, 300);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
-  auto shaperLayer = ShapeLayer::Make();
-  auto rect = Rect::MakeXYWH(10, 10, 150, 80);
-  Path path = {};
-  path.addRect(rect);
-  shaperLayer->setPath(path);
-  auto filleStyle = SolidColor::Make(Color::Blue());
-  shaperLayer->setFillStyle(filleStyle);
-  // stroke style
-  shaperLayer->setLineWidth(10.0f);
-  shaperLayer->setLineCap(LineCap::Butt);
-  shaperLayer->setLineJoin(LineJoin::Miter);
-  shaperLayer->setMiterLimit(2.0f);
-  auto strokeStyle = SolidColor::Make(Color::Red());
-  shaperLayer->setStrokeStyle(strokeStyle);
-  std::vector<float> dashPattern = {10.0f, 10.0f};
-  shaperLayer->setLineDashPattern(dashPattern);
-  shaperLayer->setLineDashPhase(0.0f);
-
-  layer->addChild(shaperLayer);
-  auto shapeLayerRect = shaperLayer->getBounds();
-  auto bounds = Rect::MakeXYWH(5, 5, 160, 90);
-  ASSERT_TRUE(shapeLayerRect == bounds);
-
+  for (int i = 0; i < 3; i++) {
+    auto shaperLayer = ShapeLayer::Make();
+    auto rect = Rect::MakeXYWH(10, 10 + 100 * i, 140, 80);
+    Path path = {};
+    path.addRect(rect);
+    shaperLayer->setPath(path);
+    auto filleStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.bottom});
+    filleStyle->setColors({{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+    shaperLayer->setFillStyle(filleStyle);
+    // stroke style
+    shaperLayer->setLineWidth(10.0f);
+    shaperLayer->setLineCap(LineCap::Butt);
+    shaperLayer->setLineJoin(LineJoin::Miter);
+    auto strokeStyle = SolidColor::Make(Color::Red());
+    shaperLayer->setStrokeStyle(strokeStyle);
+    std::vector<float> dashPattern = {10.0f, 10.0f};
+    shaperLayer->setLineDashPattern(dashPattern);
+    shaperLayer->setLineDashPhase(5.0f);
+    shaperLayer->setStrokeAlign(static_cast<StrokeAlign>(i));
+    layer->addChild(shaperLayer);
+    auto shapeLayerRect = shaperLayer->getBounds();
+    switch (i) {
+      case 0:
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(5, 5, 155, 95));
+        break;
+      case 1:
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(0, 100, 160, 200));
+        break;
+      case 2:
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(0, 200, 160, 300));
+        break;
+      default:
+        break;
+    }
+  }
   displayList->render(surface.get());
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_shape"));
@@ -693,6 +717,355 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   device->unlock();
 }
 
+TGFX_TEST(LayerTest, imageMask) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  auto surface = Surface::Make(context, image->width(), static_cast<int>(image->height() * 1.5));
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+
+  auto maskImage = MakeImage("resources/apitest/test_timestretch.png");
+
+  // Original image
+  auto originalLayer = Layer::Make();
+  layer->addChild(originalLayer);
+  auto imageLayer0 = ImageLayer::Make();
+  originalLayer->addChild(imageLayer0);
+  imageLayer0->setImage(image);
+  imageLayer0->setMatrix(Matrix::MakeScale(0.5f));
+
+  auto scrollRect = Rect::MakeXYWH(200, 200, 2600, 3600);
+  imageLayer0->setScrollRect(scrollRect);
+
+  auto imageLayer = ImageLayer::Make();
+  originalLayer->addChild(imageLayer);
+  imageLayer->setImage(maskImage);
+  imageLayer->setAlpha(1.0f);
+  Matrix maskMatrix = Matrix::MakeAll(1.2f, 0, 0, 0, 1.2f, 500);
+  imageLayer->setMatrix(maskMatrix);
+
+  auto originalLayerBounds = originalLayer->getBounds();
+  EXPECT_TRUE(originalLayerBounds == Rect::MakeXYWH(0, 0, 1536, 1800));
+
+  // Alpha mask effect
+  auto alphaLayer = Layer::Make();
+  layer->addChild(alphaLayer);
+  auto imageLayer1 = ImageLayer::Make();
+  alphaLayer->addChild(imageLayer1);
+  imageLayer1->setImage(image);
+  auto image1Matrix =
+      Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f, 0);
+  imageLayer1->setMatrix(image1Matrix);
+  imageLayer1->setAlpha(1.0f);
+  imageLayer1->setScrollRect(scrollRect);
+
+  auto alphaMaskImageLayer = ImageLayer::Make();
+  alphaLayer->addChild(alphaMaskImageLayer);
+  alphaMaskImageLayer->setImage(maskImage);
+  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
+  alphaMaskImageLayer->setFilters({alphaFilter});
+  imageLayer1->setAlpha(0.5f);
+  Matrix alphaMaskMatrix =
+      Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0, 1.2f, 500);
+  alphaMaskImageLayer->setMatrix(alphaMaskMatrix);
+  imageLayer1->setMask(alphaMaskImageLayer);
+
+  auto alphaLayerBounds = alphaLayer->getBounds();
+  EXPECT_TRUE(alphaLayerBounds == Rect::MakeXYWH(1512, 500, 1300, 864));
+
+  // Vector mask effect
+  auto imageLayer2 = ImageLayer::Make();
+  layer->addChild(imageLayer2);
+  imageLayer2->setImage(image);
+  auto image2Matrix =
+      Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
+  imageLayer2->setMatrix(image2Matrix);
+  imageLayer2->setAlpha(1.0f);
+  imageLayer2->setScrollRect(scrollRect);
+
+  const std::array<float, 20> vectorColorMatrix = {0, 0, 0, 0, 0,  // red
+                                                   0, 0, 0, 0, 0,  // green
+                                                   0, 0, 0, 0, 0,  // blue
+                                                   0, 0, 0, 0, 1.0f};
+  auto vectorMaskImageLayer = ImageLayer::Make();
+  layer->addChild(vectorMaskImageLayer);
+  vectorMaskImageLayer->setImage(maskImage);
+  auto vectorFilter = ColorMatrixFilter::Make(vectorColorMatrix);
+  vectorMaskImageLayer->setFilters({vectorFilter});
+  imageLayer2->setMask(vectorMaskImageLayer);
+  imageLayer2->setAlpha(0.5f);
+  Matrix vectorMaskMatrix =
+      Matrix::MakeAll(1.2f, 0, 0, 0, 1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
+  vectorMaskImageLayer->setMatrix(vectorMaskMatrix);
+
+  // Luma mask Effect
+  auto imageLayer3 = ImageLayer::Make();
+  layer->addChild(imageLayer3);
+  imageLayer3->setImage(image);
+  auto image3Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()) * 0.5f);
+  imageLayer3->setMatrix(image3Matrix);
+  imageLayer3->setAlpha(1.0f);
+  imageLayer3->setScrollRect(scrollRect);
+
+  auto lumaMaskImageLayer = ImageLayer::Make();
+  layer->addChild(lumaMaskImageLayer);
+  lumaMaskImageLayer->setImage(maskImage);
+  auto filter = ColorMatrixFilter::Make(lumaColorMatrix);
+  lumaMaskImageLayer->setFilters({filter});
+  imageLayer3->setMask(lumaMaskImageLayer);
+  imageLayer3->setAlpha(0.5f);
+  Matrix lumaMaskMatrix = Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
+                                          1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
+  lumaMaskImageLayer->setMatrix(lumaMaskMatrix);
+
+  // The layer and its mask have no intersection.
+  auto imageLayer4 = ImageLayer::Make();
+  layer->addChild(imageLayer4);
+  imageLayer4->setImage(image);
+  auto image4Matrix = Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()));
+  imageLayer4->setMatrix(image4Matrix);
+
+  auto maskImageLayer4 = ImageLayer::Make();
+  layer->addChild(maskImageLayer4);
+  maskImageLayer4->setImage(maskImage);
+  maskImageLayer4->setMatrix(Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
+                                             1.2f, 500 + static_cast<float>(image->height())));
+  imageLayer4->setMask(maskImageLayer4);
+
+  // The Layer's scroll rect and its mask have no intersection
+  auto imageLayer5 = ImageLayer::Make();
+  layer->addChild(imageLayer5);
+  imageLayer5->setImage(image);
+  auto image5Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()));
+  imageLayer5->setMatrix(image5Matrix);
+  auto imageLayer5ScrollRect = Rect::MakeXYWH(100, 100, 1200, 1000);
+  imageLayer5->setScrollRect(imageLayer5ScrollRect);
+
+  auto maskImageLayer5 = ImageLayer::Make();
+  layer->addChild(maskImageLayer5);
+  maskImageLayer5->setImage(maskImage);
+  maskImageLayer5->setMatrix(Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
+                                             1.2f, 500 + static_cast<float>(image->height())));
+  imageLayer5->setMask(maskImageLayer5);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageMask"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, shapeMask) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+
+  auto rect = Rect::MakeXYWH(0, 0, 1000, 1000);
+  Path path = {};
+  path.addRoundRect(rect, 200, 200);
+
+  // Original image
+  auto imageLayer0 = ImageLayer::Make();
+  layer->addChild(imageLayer0);
+  imageLayer0->setImage(image);
+  imageLayer0->setMatrix(Matrix::MakeScale(0.5f));
+
+  auto shaperLayer = ShapeLayer::Make();
+  shaperLayer->setPath(path);
+  auto radialFilleStyle = Gradient::MakeRadial({500, 500}, 500);
+  radialFilleStyle->setColors({{1.f, 0.f, 0.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+  shaperLayer->setFillStyle(radialFilleStyle);
+  shaperLayer->setAlpha(0.5f);
+  layer->addChild(shaperLayer);
+  Matrix maskMatrix = Matrix::MakeAll(1.0f, 0, 300, 0, 1.0f, 300);
+  shaperLayer->setMatrix(maskMatrix);
+
+  // Alpha mask effect
+  auto imageLayer1 = ImageLayer::Make();
+  layer->addChild(imageLayer1);
+  imageLayer1->setImage(image);
+  auto image1Matrix =
+      Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f, 0);
+  imageLayer1->setMatrix(image1Matrix);
+  imageLayer1->setAlpha(1.0f);
+
+  auto alphaShaperLayer = ShapeLayer::Make();
+  alphaShaperLayer->setPath(path);
+  auto filleStyle = SolidColor::Make(Color::Red());
+  alphaShaperLayer->setFillStyle(filleStyle);
+  alphaShaperLayer->setAlpha(0.5f);
+  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
+  alphaShaperLayer->setFilters({alphaFilter});
+  layer->addChild(alphaShaperLayer);
+  Matrix alphaMaskMatrix =
+      Matrix::MakeAll(1.0f, 0, 300 + static_cast<float>(image->width()) * 0.5f, 0, 1.0f, 300);
+  alphaShaperLayer->setMatrix(alphaMaskMatrix);
+  imageLayer1->setMask(alphaShaperLayer);
+
+  // Vector mask effect
+  auto imageLayer2 = ImageLayer::Make();
+  layer->addChild(imageLayer2);
+  imageLayer2->setImage(image);
+  auto image2Matrix =
+      Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
+  imageLayer2->setMatrix(image2Matrix);
+  imageLayer2->setAlpha(1.0f);
+
+  auto vectorShaperLayer = ShapeLayer::Make();
+  vectorShaperLayer->setPath(path);
+  vectorShaperLayer->setFillStyle(filleStyle);
+  vectorShaperLayer->setAlpha(1.0f);
+  layer->addChild(vectorShaperLayer);
+  Matrix vectorMaskMatrix =
+      Matrix::MakeAll(1.0f, 0, 300, 0, 1.0f, 300 + static_cast<float>(image->height()) * 0.5f);
+  vectorShaperLayer->setMatrix(vectorMaskMatrix);
+  imageLayer2->setMask(vectorShaperLayer);
+
+  // Luma mask Effect
+  auto imageLayer3 = ImageLayer::Make();
+  layer->addChild(imageLayer3);
+  imageLayer3->setImage(image);
+  auto image3Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()) * 0.5f);
+  imageLayer3->setMatrix(image3Matrix);
+  imageLayer3->setAlpha(1.0f);
+
+  auto lumaShaperLayer = ShapeLayer::Make();
+  lumaShaperLayer->setPath(path);
+  lumaShaperLayer->setFillStyle(filleStyle);
+  lumaShaperLayer->setAlpha(0.5f);
+  auto lumaFilter = ColorMatrixFilter::Make(lumaColorMatrix);
+  lumaShaperLayer->setFilters({lumaFilter});
+  layer->addChild(lumaShaperLayer);
+  Matrix lumaMaskMatrix =
+      Matrix::MakeAll(1.0f, 0, 300 + static_cast<float>(image->width()) * 0.5f, 0, 1.0f,
+                      300 + static_cast<float>(image->height()) * 0.5f);
+  lumaShaperLayer->setMatrix(lumaMaskMatrix);
+  imageLayer3->setMask(lumaShaperLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/shapeMask"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, textMask) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  tgfx::Font font(typeface, 100);
+  auto textContent = "Hello, TGFX! \n Mask Test!";
+  auto color = Color::Red();
+
+  // Original image
+  auto originalLayer = Layer::Make();
+  layer->addChild(originalLayer);
+  auto imageLayer0 = ImageLayer::Make();
+  originalLayer->addChild(imageLayer0);
+  imageLayer0->setImage(image);
+  imageLayer0->setMatrix(Matrix::MakeScale(0.5f));
+
+  auto textLayer = TextLayer::Make();
+  originalLayer->addChild(textLayer);
+  textLayer->setText(textContent);
+  textLayer->setTextColor(color);
+  textLayer->setFont(font);
+  textLayer->setAlpha(1.0f);
+  auto textLayerMatrix = Matrix::MakeAll(1.5f, 0, 400, 0, 1.5f, 800);
+  textLayer->setMatrix(textLayerMatrix);
+
+  auto originalLayerBounds = originalLayer->getBounds();
+  EXPECT_TRUE(originalLayerBounds == Rect::MakeXYWH(0, 0, 1512, 2016));
+
+  // Alpha mask effect
+  auto alphaLayer = Layer::Make();
+  layer->addChild(alphaLayer);
+  auto imageLayer1 = ImageLayer::Make();
+  alphaLayer->addChild(imageLayer1);
+  imageLayer1->setImage(image);
+  auto image1Matrix =
+      Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f, 0);
+  imageLayer1->setMatrix(image1Matrix);
+  imageLayer1->setAlpha(1.0f);
+
+  auto alphaTextLayer = TextLayer::Make();
+  alphaLayer->addChild(alphaTextLayer);
+  alphaTextLayer->setText(textContent);
+  alphaTextLayer->setTextColor(color);
+  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
+  alphaTextLayer->setFilters({alphaFilter});
+  alphaTextLayer->setFont(font);
+  alphaTextLayer->setAlpha(1.0f);
+  auto alphaTextLayerMatrix =
+      Matrix::MakeAll(1.5f, 0, 400 + static_cast<float>(image->width()) * 0.5f, 0, 1.5f, 800);
+  alphaTextLayer->setMatrix(alphaTextLayerMatrix);
+  imageLayer1->setMask(alphaTextLayer);
+
+  auto alphaLayerBounds = alphaLayer->getBounds();
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeXYWH(1927.0f, 896.0f, 826.5f, 340.5f));
+
+  // Vector mask effect
+  auto imageLayer2 = ImageLayer::Make();
+  layer->addChild(imageLayer2);
+  imageLayer2->setImage(image);
+  auto image2Matrix =
+      Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
+  imageLayer2->setMatrix(image2Matrix);
+  imageLayer2->setAlpha(1.0f);
+
+  auto vectorTextLayer = TextLayer::Make();
+  layer->addChild(vectorTextLayer);
+  vectorTextLayer->setText(textContent);
+  vectorTextLayer->setTextColor(color);
+  vectorTextLayer->setFont(font);
+  vectorTextLayer->setAlpha(1.0f);
+  auto vectorTextLayerMatrix =
+      Matrix::MakeAll(1.5f, 0, 400, 0, 1.5f, 800 + static_cast<float>(image->height()) * 0.5f);
+  vectorTextLayer->setMatrix(vectorTextLayerMatrix);
+  imageLayer2->setMask(vectorTextLayer);
+
+  // Luma mask Effect
+  auto imageLayer3 = ImageLayer::Make();
+  layer->addChild(imageLayer3);
+  imageLayer3->setImage(image);
+  auto image3Matrix = Matrix::MakeAll(0.5f, 0, static_cast<float>(image->width()) * 0.5f, 0, 0.5f,
+                                      static_cast<float>(image->height()) * 0.5f);
+  imageLayer3->setMatrix(image3Matrix);
+  imageLayer3->setAlpha(1.0f);
+
+  auto lumaTextLayer = TextLayer::Make();
+  layer->addChild(lumaTextLayer);
+  lumaTextLayer->setText(textContent);
+  lumaTextLayer->setTextColor(color);
+  auto lumaFilter = ColorMatrixFilter::Make(lumaColorMatrix);
+  lumaTextLayer->setFilters({lumaFilter});
+  lumaTextLayer->setFont(font);
+  lumaTextLayer->setAlpha(1.0f);
+  auto lumaTextLayerMatrix =
+      Matrix::MakeAll(1.5f, 0, 400 + static_cast<float>(image->width()) * 0.5f, 0, 1.5f,
+                      800 + static_cast<float>(image->height()) * 0.5f);
+  lumaTextLayer->setMatrix(lumaTextLayerMatrix);
+  imageLayer3->setMask(lumaTextLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/textMask"));
+  device->unlock();
+}
+
 TGFX_TEST(LayerTest, ContentVersion) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -782,7 +1155,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto textLayer = TextLayer::Make();
   textLayer->setName("text_layer");
   textLayer->setText("Hello World!");
-  textLayer->setMatrix(Matrix::MakeTrans(50.0f, 50.0f) * Matrix::MakeScale(5.0f, 5.0f));
+  textLayer->setMatrix(Matrix::MakeTrans(50.0f, 0.0f) * Matrix::MakeScale(5.0f, 5.0f));
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
   tgfx::Font font(typeface, 20);
   textLayer->setFont(font);
@@ -970,7 +1343,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   EXPECT_EQ(layerNameJoin, "shaper_layer2|root_layer|");
 
   context->submit();
-  Baseline::Compare(surface, "LayerTest/getLayersUnderPoint");
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getLayersUnderPoint"));
   device->unlock();
 }
 
@@ -1136,10 +1509,15 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   EXPECT_EQ(true, shaperLayer2->hitTestPoint(q5.x, q5.y, true));
 
   context->submit();
-  Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint");
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint"));
   device->unlock();
 }
 
+/**
+ * The schematic diagram is as follows:
+ * https://www.geogebra.org/classic/nxwbmmrp
+ * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/hitTestPointNested.png
+ */
 TGFX_TEST(LayerTest, hitTestPointNested) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -1223,10 +1601,10 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   paint.setColor(Color::Green());
   canvas->drawRect(rootLayerBounds, paint);
 
-  // P0(340.0, 340.0)
+  // P0(320.0, 340.0)
   paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Fill);
-  Point p0 = {340.0f, 340.0f};
+  Point p0 = {320.0f, 340.0f};
   canvas->drawCircle(p0.x, p0.y, 2.0f, paint);
   EXPECT_EQ(true, textLayer->hitTestPoint(p0.x, p0.y));
   EXPECT_EQ(false, textLayer->hitTestPoint(p0.x, p0.y, true));
@@ -1243,10 +1621,10 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, rootLayer->hitTestPoint(p0.x, p0.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p0.x, p0.y, true));
 
-  // P1(320.0, 320.0)
+  // P1(280.0, 360.0)
   paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Fill);
-  Point p1 = {320.0f, 320.0f};
+  Point p1 = {280.0f, 360.0f};
   canvas->drawCircle(p1.x, p1.y, 2.0f, paint);
   EXPECT_EQ(true, textLayer->hitTestPoint(p1.x, p1.y));
   EXPECT_EQ(true, textLayer->hitTestPoint(p1.x, p1.y, true));
@@ -1263,10 +1641,10 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, rootLayer->hitTestPoint(p1.x, p1.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p1.x, p1.y, true));
 
-  // P2(180.0, 140.0)
+  // P2(150.0, 170.0)
   paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Fill);
-  Point p2 = {180.0f, 140.0f};
+  Point p2 = {150.0f, 170.0f};
   canvas->drawCircle(p2.x, p2.y, 2.0f, paint);
   EXPECT_EQ(true, textLayer->hitTestPoint(p2.x, p2.y));
   EXPECT_EQ(true, textLayer->hitTestPoint(p2.x, p2.y, true));
@@ -1304,7 +1682,99 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y, true));
 
   context->submit();
-  Baseline::Compare(surface, "LayerTest/Layer_hitTestPointNested");
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPointNested"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, InnerShadowFilter) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  Paint paint;
+  auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
+                               static_cast<int>(imageHeight * 2.f + padding * 3.f));
+  auto filter = BlurFilter::Make(15, 15);
+  auto layer = ImageLayer::Make();
+  layer->setImage(image);
+  layer->setMatrix(Matrix::MakeTrans(padding, padding));
+  layer->setFilters({filter});
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(layer);
+
+  auto layer2 = ImageLayer::Make();
+  layer2->setImage(image);
+  layer2->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, padding));
+  auto filter2 = InnerShadowFilter::Make(0, 0, 15, 15, Color::Black(), true);
+  layer2->setFilters({filter2});
+  displayList->root()->addChild(layer2);
+
+  auto layer3 = ImageLayer::Make();
+  layer3->setImage(image);
+  layer3->setMatrix(Matrix::MakeTrans(padding, imageWidth + padding * 2));
+  auto filter3 = InnerShadowFilter::Make(0, 0, 15, 15, Color::Black());
+  layer3->setFilters({filter3});
+  displayList->root()->addChild(layer3);
+
+  auto layer4 = ImageLayer::Make();
+  layer4->setImage(image);
+  layer4->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, imageWidth + padding * 2));
+  auto filter4 = InnerShadowFilter::Make(1, 1, 0, 0, Color::Black());
+  layer4->setFilters({filter4});
+  displayList->root()->addChild(layer4);
+
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/innerShadow"));
+  device->unlock();
+}
+
+TGFX_TEST(LayerTest, DirtyFlag) {
+  auto device = DevicePool::Make();
+  auto displayList = std::make_unique<DisplayList>();
+
+  EXPECT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  auto surface = Surface::Make(context, 100, 100);
+  auto child = ImageLayer::Make();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
+  child->setImage(image);
+  displayList->root()->addChild(child);
+
+  auto grandChild = ImageLayer::Make();
+  grandChild->setImage(image);
+  grandChild->setMatrix(Matrix::MakeTrans(10, 10));
+  grandChild->setVisible(false);
+  child->addChild(grandChild);
+
+  displayList->render(surface.get());
+
+  auto root = displayList->root();
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
+  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+
+  grandChild->setVisible(true);
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(child->bitFields.childrenDirty);
+  EXPECT_TRUE(root->bitFields.childrenDirty);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
+  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+
+  child->setVisible(false);
+  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
+  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
+  EXPECT_TRUE(root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+
   device->unlock();
 }
 }  // namespace tgfx

@@ -21,6 +21,7 @@
 #include "SVGContext.h"
 #include "SVGUtils.h"
 #include "core/MCState.h"
+#include "core/shaders/ShaderBase.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/BlendMode.h"
@@ -236,7 +237,7 @@ Resources ElementWriter::addResources(const FillStyle& fill) {
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader,
                                        Resources* resources) {
 
-  auto shaderType = shader->type();
+  auto shaderType = asShaderBase(shader)->type();
   if (shaderType == ShaderType::Color || shaderType == ShaderType::Gradient) {
     this->addGradientShaderResources(shader, resources);
   } else if (shaderType == ShaderType::Image) {
@@ -247,7 +248,7 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader,
 
 void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& shader,
                                                Resources* resources) {
-  if (shader->type() == ShaderType::Color) {
+  if (asShaderBase(shader)->type() == ShaderType::Color) {
     Color color;
     if (shader->asColor(&color)) {
       resources->_paintServer = SVGColor(color);
@@ -256,7 +257,7 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& sh
   }
 
   GradientInfo info;
-  auto type = shader->asGradient(&info);
+  auto type = asShaderBase(shader)->asGradient(&info);
 
   ASSERT(info.colors.size() == info.positions.size());
   if (type == GradientType::Linear) {
@@ -339,7 +340,7 @@ std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info) {
 
 void ElementWriter::addImageShaderResources(const std::shared_ptr<Shader>& shader,
                                             Resources* resources) {
-  auto [image, x, y] = shader->asImage();
+  auto [image, x, y] = asShaderBase(shader)->asImage();
   ASSERT(image);
 
   auto dataUri = AsDataUri(this->_context, image);
@@ -353,7 +354,6 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<Shader>& shade
     if (mode == TileMode::Repeat) {
       return std::to_string(length);
     } else {
-      // TODO(YGAurora): other tile modes
       return "100%";
     }
   };

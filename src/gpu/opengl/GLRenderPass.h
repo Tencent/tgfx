@@ -18,16 +18,10 @@
 
 #pragma once
 
-#include <optional>
-#include "GLBuffer.h"
-#include "GLProgram.h"
-#include "gpu/AAType.h"
-#include "gpu/Pipeline.h"
 #include "gpu/RenderPass.h"
+#include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLVertexArray.h"
 #include "gpu/ops/Op.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/GeometryProcessor.h"
-#include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
 
@@ -37,14 +31,13 @@ class GLRenderPass : public RenderPass {
 
  protected:
   bool onBindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds) override;
-  void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                     std::shared_ptr<GpuBuffer> vertexBuffer) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
   void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
   void onClear(const Rect& scissor, Color color) override;
 
  private:
-  ResourceHandle vertexArrayHandle = {};
+  std::shared_ptr<GLVertexArray> vertexArray = nullptr;
+  std::shared_ptr<GLBuffer> sharedVertexBuffer = nullptr;
 
   void draw(const std::function<void()>& func);
 };

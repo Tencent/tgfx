@@ -19,6 +19,13 @@
 #include "tgfx/core/RRect.h"
 
 namespace tgfx {
+bool RRect::isRect() const {
+  return radii.x == 0.0f && radii.y == 0.0f;
+}
+
+bool RRect::isOval() const {
+  return radii.x >= rect.width() * 0.5f && radii.y >= rect.height() * 0.5f;
+}
 
 void RRect::setRectXY(const Rect& r, float radiusX, float radiusY) {
   rect = r.makeSorted();

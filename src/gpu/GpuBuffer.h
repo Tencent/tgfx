@@ -28,8 +28,8 @@ enum class BufferType {
 
 class GpuBuffer : public Resource {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, const void* buffer, size_t size,
-                                         BufferType bufferType);
+  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
+                                         const void* buffer = nullptr, size_t size = 0);
 
   BufferType bufferType() const {
     return _bufferType;

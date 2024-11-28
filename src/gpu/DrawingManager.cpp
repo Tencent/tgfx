@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -26,23 +27,23 @@
 
 namespace tgfx {
 std::shared_ptr<OpsRenderTask> DrawingManager::addOpsTask(
-    std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
+    std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags) {
   checkIfResolveNeeded(renderTargetProxy);
-  auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy);
+  auto opsTask = std::make_shared<OpsRenderTask>(renderTargetProxy, renderFlags);
   addRenderTask(opsTask);
   activeOpsTask = opsTask;
   return opsTask;
 }
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
-                                        std::shared_ptr<TextureProxy> source,
+                                        std::vector<std::shared_ptr<TextureProxy>> inputs,
                                         std::shared_ptr<RuntimeEffect> effect,
                                         const Point& offset) {
-  if (target == nullptr || source == nullptr || effect == nullptr) {
+  if (target == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
   checkIfResolveNeeded(target);
-  auto task = std::make_shared<RuntimeDrawTask>(target, source, effect, offset);
+  auto task = std::make_shared<RuntimeDrawTask>(target, inputs, effect, offset);
   addRenderTask(std::move(task));
 }
 
@@ -72,17 +73,18 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
   if (resourceTask == nullptr) {
     return;
   }
+#ifdef DEBUG
   auto result = resourceTaskMap.find(resourceTask->uniqueKey);
-  if (result != resourceTaskMap.end()) {
-    // Remove the UniqueKey from the old task, so it will be skipped when the task is executed.
-    result->second->uniqueKey = {};
-  }
+  DEBUG_ASSERT(result == resourceTaskMap.end());
   resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
+#endif
   resourceTasks.push_back(std::move(resourceTask));
 }
 
 bool DrawingManager::flush() {
+  TRACE_EVENT;
   if (resourceTasks.empty() && renderTasks.empty()) {
+    FRAME_MARK;
     return false;
   }
   if (activeOpsTask) {
@@ -100,12 +102,15 @@ bool DrawingManager::flush() {
   for (auto& task : resourceTasks) {
     task->execute(context);
   }
+#ifdef DEBUG
   resourceTaskMap = {};
+#endif
   resourceTasks = {};
   for (auto& task : renderTasks) {
     task->execute(context->gpu());
   }
   renderTasks = {};
+  FRAME_MARK;
   return true;
 }
 

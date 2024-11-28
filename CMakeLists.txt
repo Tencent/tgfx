@@ -17,6 +17,9 @@ option(TGFX_BUILD_SVG "Allow build the svg module" OFF)
 option(TGFX_BUILD_DRAWERS "Build the tgfx-drawers library" OFF)
 option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
+endif ()
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
     option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)
@@ -72,6 +75,7 @@ message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
+message("TGFX_ENABLE_PROFILING: ${TGFX_ENABLE_PROFILING}")
 message("EMSCRIPTEN_PTHREADS: ${EMSCRIPTEN_PTHREADS}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
@@ -93,6 +97,7 @@ file(GLOB_RECURSE SRC_FILES
         src/core/filters/*.*
         src/core/images/*.*
         src/core/shaders/*.*
+        src/core/shapes/*.*
         src/core/utils/*.*
         src/gpu/ops/*.*
         src/gpu/processors/*.*
@@ -259,6 +264,12 @@ else ()
     set(TGFX_USE_NATIVE_GL ON)
 endif ()
 
+if (TGFX_ENABLE_PROFILING)
+    list(APPEND TGFX_STATIC_VENDORS tracy)
+    list(APPEND TGFX_INCLUDES third_party/tracy)
+    list(APPEND TGFX_DEFINES TGFX_ENABLE_PROFILING)
+endif ()
+
 list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)
 list(APPEND TGFX_STATIC_VENDORS skcms)
@@ -276,6 +287,7 @@ if (WEB)
         file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/webgl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
+    list(APPEND TGFX_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (OHOS)
     find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z)
     find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z)
@@ -455,6 +467,8 @@ if (TGFX_BUILD_DRAWERS)
     add_library(tgfx-drawers STATIC ${DRAWER_FILES})
     target_compile_options(tgfx-drawers PUBLIC ${TGFX_COMPILE_OPTIONS})
     set_target_properties(tgfx-drawers PROPERTIES PREFIX "")
+    target_compile_definitions(tgfx-drawers PUBLIC ${TGFX_DEFINES})
+    target_compile_options(tgfx-drawers PUBLIC ${TGFX_COMPILE_OPTIONS})
     target_include_directories(tgfx-drawers PUBLIC drawers/include PRIVATE include drawers/src)
     target_link_libraries(tgfx-drawers)
 endif ()
@@ -472,6 +486,10 @@ if (TGFX_BUILD_TESTS)
         if (HAS_DIFF)
             message(WARNING "The local md5 cache is out of date! Please run the 'update_baseline.sh' to regenerate the cache.")
         endif ()
+    endif ()
+
+    if (TGFX_ENABLE_PROFILING)
+        list(APPEND TGFX_TEST_INCLUDES third_party/tracy)
     endif ()
 
     file(GLOB_RECURSE TGFX_TEST_FILES test/src/*.*)

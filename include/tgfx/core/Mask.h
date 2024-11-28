@@ -60,6 +60,20 @@ class Mask {
   virtual bool isHardwareBacked() const = 0;
 
   /**
+   * Returns true if the Mask is anti-aliased. The default value is true.
+   */
+  bool isAntiAlias() const {
+    return antiAlias;
+  }
+
+  /**
+   * Sets whether the Mask should be anti-aliased. The default value is true.
+   */
+  void setAntiAlias(bool value) {
+    antiAlias = value;
+  }
+
+  /**
    * Returns the current total matrix.
    */
   Matrix getMatrix() const {
@@ -114,20 +128,22 @@ class Mask {
   virtual std::shared_ptr<ImageStream> getImageStream() const = 0;
 
   void onFillPath(const Path& path, const Matrix& m) {
-    onFillPath(path, m, false);
+    onFillPath(path, m, antiAlias, false);
   }
 
-  virtual void onFillPath(const Path& path, const Matrix& m, bool needsGammaCorrection) = 0;
+  virtual void onFillPath(const Path& path, const Matrix& m, bool antiAlias,
+                          bool needsGammaCorrection) = 0;
 
   virtual bool onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
-                          const Matrix& matrix);
+                          const Matrix& matrix, bool antiAlias);
 
  private:
   Matrix matrix = Matrix::I();
+  bool antiAlias = true;
 
   bool fillText(const GlyphRunList* glyphRunList, const Stroke* stroke = nullptr);
 
   friend class ImageReader;
-  friend class TextRasterizer;
+  friend class GlyphRasterizer;
 };
 }  // namespace tgfx

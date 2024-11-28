@@ -42,6 +42,10 @@ class NativeImageBuffer : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return false;
+  }
+
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 

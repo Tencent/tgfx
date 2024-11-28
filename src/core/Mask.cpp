@@ -19,7 +19,6 @@
 #include "tgfx/core/Mask.h"
 #include "core/GlyphRunList.h"
 #include "core/ImageStream.h"
-#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 void Mask::fillPath(const Path& path, const Stroke* stroke) {
@@ -49,18 +48,22 @@ bool Mask::fillText(const GlyphRunList* glyphRunList, const Stroke* stroke) {
   if (glyphRunList->hasColor()) {
     return false;
   }
-  if (onFillText(glyphRunList, stroke, matrix)) {
+  if (onFillText(glyphRunList, stroke, matrix, antiAlias)) {
     return true;
   }
   Path path = {};
-  if (!glyphRunList->getPath(&path, matrix, stroke)) {
+  if (!glyphRunList->getPath(&path, matrix.getMaxScale())) {
     return false;
   }
-  onFillPath(path, Matrix::I(), true);
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
+  path.transform(matrix);
+  onFillPath(path, Matrix::I(), antiAlias, true);
   return true;
 }
 
-bool Mask::onFillText(const GlyphRunList*, const Stroke*, const Matrix&) {
+bool Mask::onFillText(const GlyphRunList*, const Stroke*, const Matrix&, bool) {
   return false;
 }
 }  // namespace tgfx

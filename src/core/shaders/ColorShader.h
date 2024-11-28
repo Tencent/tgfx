@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "tgfx/core/Shader.h"
+#include "core/shaders/ShaderBase.h"
 
 namespace tgfx {
-class ColorShader : public Shader {
+class ColorShader : public ShaderBase {
  public:
   explicit ColorShader(Color color) : color(color) {
   }

@@ -29,15 +29,7 @@ class ModeColorFilter : public ColorFilter {
 
   bool isAlphaUnchanged() const override;
 
-  bool asColorMode(Color* color, BlendMode* mode) const override {
-    if (color) {
-      *color = this->color;
-    }
-    if (mode) {
-      *mode = this->mode;
-    }
-    return true;
-  }
+  bool asColorMode(Color* color, BlendMode* mode) const override;
 
  private:
   Color color;

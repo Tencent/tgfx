@@ -110,28 +110,21 @@ static Matrix GetMaskMatrix(const MCState& state, const Matrix* matrix) {
 
 static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record, int width,
                                                            int height, const Matrix* matrix) {
-  if (record->type() == RecordType::DrawPath) {
-    auto pathRecord = static_cast<const DrawPath*>(record);
-    if (!CheckStyleAndClip(pathRecord->style, pathRecord->state.clip, width, height, matrix)) {
+  if (record->type() == RecordType::DrawShape) {
+    auto shapeRecord = static_cast<const DrawShape*>(record);
+    if (!CheckStyleAndClip(shapeRecord->style, shapeRecord->state.clip, width, height, matrix)) {
       return nullptr;
     }
-    return Rasterizer::MakeFrom(pathRecord->path, ISize::Make(width, height),
-                                GetMaskMatrix(pathRecord->state, matrix));
-  }
-  if (record->type() == RecordType::StrokePath) {
-    auto strokeRecord = static_cast<const StrokePath*>(record);
-    if (!CheckStyleAndClip(strokeRecord->style, strokeRecord->state.clip, width, height, matrix)) {
-      return nullptr;
-    }
-    return Rasterizer::MakeFrom(strokeRecord->path, ISize::Make(width, height),
-                                GetMaskMatrix(strokeRecord->state, matrix), &strokeRecord->stroke);
+    auto shape = Shape::ApplyMatrix(shapeRecord->shape, GetMaskMatrix(shapeRecord->state, matrix));
+    return Rasterizer::MakeFrom(width, height, std::move(shape), shapeRecord->style.antiAlias);
   }
   if (record->type() == RecordType::DrawGlyphRunList) {
     auto glyphRecord = static_cast<const DrawGlyphRunList*>(record);
     if (!CheckStyleAndClip(glyphRecord->style, glyphRecord->state.clip, width, height, matrix)) {
       return nullptr;
     }
-    return Rasterizer::MakeFrom(glyphRecord->glyphRunList, ISize::Make(width, height),
+    return Rasterizer::MakeFrom(width, height, glyphRecord->glyphRunList,
+                                glyphRecord->style.antiAlias,
                                 GetMaskMatrix(glyphRecord->state, matrix));
   }
   if (record->type() == RecordType::StrokeGlyphRunList) {
@@ -140,9 +133,9 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
                            matrix)) {
       return nullptr;
     }
-    return Rasterizer::MakeFrom(strokeGlyphRecord->glyphRunList, ISize::Make(width, height),
-                                GetMaskMatrix(strokeGlyphRecord->state, matrix),
-                                &strokeGlyphRecord->stroke);
+    return Rasterizer::MakeFrom(
+        width, height, strokeGlyphRecord->glyphRunList, strokeGlyphRecord->style.antiAlias,
+        GetMaskMatrix(strokeGlyphRecord->state, matrix), &strokeGlyphRecord->stroke);
   }
   return nullptr;
 }

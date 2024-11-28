@@ -44,7 +44,7 @@ static SkPaint::Join ToSkLineJoin(LineJoin join) {
   }
 }
 
-bool Stroke::applyToPath(Path* path) const {
+bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   if (path == nullptr) {
     return false;
   }
@@ -59,7 +59,15 @@ bool Stroke::applyToPath(Path* path) const {
   paint.setStrokeJoin(ToSkLineJoin(join));
   paint.setStrokeMiter(miterLimit);
   auto& skPath = PathRef::WriteAccess(*path);
-  return paint.getFillPath(skPath, &skPath);
+  return paint.getFillPath(skPath, &skPath, nullptr, resolutionScale);
+}
+
+void Stroke::applyToBounds(Rect* bounds) const {
+  if (bounds == nullptr) {
+    return;
+  }
+  auto strokeWidth = ceilf(width * 0.5f);
+  bounds->outset(strokeWidth, strokeWidth);
 }
 
 }  // namespace tgfx

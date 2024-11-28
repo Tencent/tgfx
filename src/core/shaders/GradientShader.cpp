@@ -191,11 +191,18 @@ static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint)
   return matrix;
 }
 
+static std::array<Point, 2> UnitMatrixToPoints(const Matrix& matrix) {
+  Matrix invertMatrix = Matrix::I();
+  matrix.invert(&invertMatrix);
+  std::array<Point, 2> points{Point::Make(0, 0), Point::Make(1, 0)};
+  invertMatrix.mapPoints(points.data(), 2);
+  return points;
+}
+
 LinearGradientShader::LinearGradientShader(const Point& startPoint, const Point& endPoint,
                                            const std::vector<Color>& colors,
                                            const std::vector<float>& positions)
-    : GradientShader(colors, positions, PointsToUnitMatrix(startPoint, endPoint)),
-      _startPoint(startPoint), _endPoint(endPoint) {
+    : GradientShader(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
 }
 
 std::unique_ptr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
@@ -211,8 +218,7 @@ GradientType LinearGradientShader::asGradient(GradientInfo* info) const {
   if (info) {
     info->colors = originalColors;
     info->positions = originalPositions;
-    info->points[0] = _startPoint;
-    info->points[1] = _endPoint;
+    info->points = UnitMatrixToPoints(pointsToUnit);
   }
   return GradientType::Linear;
 }
@@ -224,11 +230,18 @@ static Matrix RadialToUnitMatrix(const Point& center, float radius) {
   return matrix;
 }
 
+static std::tuple<Point, float> UnitMatrixToRadial(const Matrix& matrix) {
+  auto invertMatrix = Matrix::I();
+  matrix.invert(&invertMatrix);
+  std::array<Point, 2> points{Point::Make(0, 0), Point::Make(1, 0)};
+  invertMatrix.mapPoints(points.data(), 2);
+  return {points[0], Point::Distance(points[0], points[1])};
+}
+
 RadialGradientShader::RadialGradientShader(const Point& center, float radius,
                                            const std::vector<Color>& colors,
                                            const std::vector<float>& positions)
-    : GradientShader(colors, positions, RadialToUnitMatrix(center, radius)), _center(center),
-      _radius(radius) {
+    : GradientShader(colors, positions, RadialToUnitMatrix(center, radius)) {
 }
 
 std::unique_ptr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
@@ -244,8 +257,7 @@ GradientType RadialGradientShader::asGradient(GradientInfo* info) const {
   if (info) {
     info->colors = originalColors;
     info->positions = originalPositions;
-    info->points[0] = _center;
-    info->radiuses[0] = _radius;
+    std::tie(info->points[0], info->radiuses[0]) = UnitMatrixToRadial(pointsToUnit);
   }
   return GradientType::Radial;
 }
@@ -270,8 +282,11 @@ GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
   if (info) {
     info->colors = originalColors;
     info->positions = originalPositions;
-    info->radiuses[0] = -bias;
-    info->radiuses[1] = 1.f / scale - bias;
+    auto center = Point::Zero();
+    pointsToUnit.mapPoints(&center, 1);
+    info->points[0] = center * -1.f;
+    info->radiuses[0] = -bias * 360.f;
+    info->radiuses[1] = (1.f / scale - bias) * 360.f;
   }
   return GradientType::Conic;
 }

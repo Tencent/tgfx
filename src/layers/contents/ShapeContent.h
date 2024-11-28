@@ -18,16 +18,17 @@
 
 #pragma once
 
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
 class ShapeContent : public LayerContent {
  public:
-  ShapeContent(Path path, std::shared_ptr<Shader> shader);
+  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader);
 
   Rect getBounds() const override {
-    return path.getBounds();
+    return bounds;
   }
 
   void draw(Canvas* canvas, const Paint& paint) const override;
@@ -35,7 +36,8 @@ class ShapeContent : public LayerContent {
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  private:
-  Path path = {};
+  Rect bounds = Rect::MakeEmpty();
+  std::shared_ptr<Shape> shape = nullptr;
   std::shared_ptr<Shader> shader = nullptr;
 };
 }  // namespace tgfx

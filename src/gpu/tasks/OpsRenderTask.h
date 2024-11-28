@@ -25,8 +25,8 @@
 namespace tgfx {
 class OpsRenderTask : public RenderTask {
  public:
-  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
-      : RenderTask(std::move(renderTargetProxy)) {
+  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags)
+      : RenderTask(std::move(renderTargetProxy)), renderFlags(renderFlags) {
   }
 
   void addOp(std::unique_ptr<Op> op);
@@ -45,6 +45,7 @@ class OpsRenderTask : public RenderTask {
 
  private:
   bool closed = false;
+  uint32_t renderFlags = 0;
   std::shared_ptr<RenderPass> renderPass = nullptr;
   std::vector<std::unique_ptr<Op>> ops = {};
 };

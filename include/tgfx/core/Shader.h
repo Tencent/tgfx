@@ -26,7 +26,6 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/core/ShaderType.h"
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
@@ -129,28 +128,11 @@ class Shader {
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
   /**
-   * Returns the type of this shader.
-   */
-  virtual ShaderType type() const = 0;
-
-  /**
    * If the shader has a constant color, this method returns true and updates the color parameter.
    * Otherwise, it returns false and leaves the color parameter unchanged.
    */
   virtual bool asColor(Color*) const {
     return false;
-  }
-
-  /**
-   * If this is a gradient shader, returns the valid type of gradient. If GradientInfo and Matrix
-   * are not null pointers, also returns the corresponding values.
-   */
-  virtual GradientType asGradient(GradientInfo*) const {
-    return GradientType::None;
-  }
-
-  virtual std::tuple<std::shared_ptr<Image>, TileMode, TileMode> asImage() const {
-    return {nullptr, TileMode::Clamp, TileMode::Clamp};
   }
 
  protected:

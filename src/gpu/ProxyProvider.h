@@ -21,9 +21,11 @@
 #include "core/DataProvider.h"
 #include "core/ImageDecoder.h"
 #include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
@@ -61,6 +63,13 @@ class ProxyProvider {
                                                        std::shared_ptr<DataProvider> provider,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
+
+  /**
+   * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to
+   * the GPU.
+   */
+  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     uint32_t renderFlags = 0);
 
   /*
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being
@@ -131,7 +140,7 @@ class ProxyProvider {
 
  private:
   Context* context = nullptr;
-  UniqueKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
+  ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
 
   static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 

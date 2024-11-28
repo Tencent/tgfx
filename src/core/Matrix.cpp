@@ -77,7 +77,7 @@ void Matrix::setTranslate(float tx, float ty) {
   }
 }
 
-static inline float sdot(float a, float b, float c, float d) {
+inline float sdot(float a, float b, float c, float d) {
   return a * b + c * d;
 }
 
@@ -364,9 +364,8 @@ bool Matrix::rectStaysRect() const {
   float m11 = values[SCALE_Y];
   if (m01 != 0 || m10 != 0) {
     return m00 == 0 && m11 == 0 && m10 != 0 && m01 != 0;
-  } else {
-    return m00 != 0 && m11 != 0;
   }
+  return m00 != 0 && m11 != 0;
 }
 
 void Matrix::mapRect(Rect* dst, const Rect& src) const {

@@ -49,13 +49,12 @@ void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const
   records.push_back(new DrawRRect(rRect, state, style));
 }
 
-void RecordingContext::drawPath(const Path& path, const MCState& state, const FillStyle& style,
-                                const Stroke* stroke) {
-  if (stroke) {
-    records.push_back(new StrokePath(path, state, style, *stroke));
-  } else {
-    records.push_back(new DrawPath(path, state, style));
+void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                                 const FillStyle& style) {
+  if (shape == nullptr) {
+    return;
   }
+  records.push_back(new DrawShape(std::move(shape), state, style));
 }
 
 void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

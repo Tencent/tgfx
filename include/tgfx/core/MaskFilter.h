@@ -29,13 +29,6 @@ namespace tgfx {
 class MaskFilter {
  public:
   /**
-   * Creates a mask filter whose effect is to first apply the inner filter and then apply the outer
-   * filter.
-   */
-  static std::shared_ptr<MaskFilter> Compose(std::shared_ptr<MaskFilter> inner,
-                                             std::shared_ptr<MaskFilter> outer);
-
-  /**
    * Creates a new MaskFilter that draws the mask using the alpha channel of the given shader.
    * If inverted is true, the mask is inverted before drawing.
    */
@@ -49,6 +42,5 @@ class MaskFilter {
                                                                  const Matrix* uvMatrix) const = 0;
 
   friend class RenderContext;
-  friend class ComposeMaskFilter;
 };
 }  // namespace tgfx

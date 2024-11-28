@@ -20,6 +20,7 @@
 
 #include <string>
 #include "core/FillStyle.h"
+#include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"

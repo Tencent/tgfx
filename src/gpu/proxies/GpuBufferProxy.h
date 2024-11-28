@@ -29,13 +29,13 @@ class GpuBufferProxy : public ResourceProxy {
    * Creates a GpuBufferProxy from the given data.
    */
   static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context, std::shared_ptr<Data> data,
-                                                  BufferType bufferType);
+                                                  BufferType bufferType, uint32_t renderFlags);
   /**
    * Creates a GpuBufferProxy from the given data provider.
    */
   static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context,
                                                   std::shared_ptr<DataProvider> dataProvider,
-                                                  BufferType bufferType);
+                                                  BufferType bufferType, uint32_t renderFlags);
 
   /**
    * Returns the type of the buffer.
@@ -51,7 +51,6 @@ class GpuBufferProxy : public ResourceProxy {
 
  private:
   BufferType _bufferType = BufferType::Vertex;
-  size_t _size = 0;
 
   GpuBufferProxy(UniqueKey uniqueKey, BufferType bufferType);
 

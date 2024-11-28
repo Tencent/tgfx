@@ -23,6 +23,7 @@
 #include <iostream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
+#include "core/utils/Profiling.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
@@ -112,6 +113,7 @@ bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::stri
 }
 
 bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string& key) {
+  TRACE_EVENT;
   if (surface == nullptr) {
     return false;
   }
@@ -243,9 +245,8 @@ void Baseline::TearDown() {
     outMD5File << std::setw(4) << OutputMD5 << std::endl;
     outMD5File.close();
     CreateFolder(CACHE_VERSION_PATH);
-    std::ofstream outVersionFile(CACHE_VERSION_PATH);
-    outVersionFile << std::setw(4) << BaselineVersion << std::endl;
-    outVersionFile.close();
+    std::filesystem::copy(BASELINE_VERSION_PATH, CACHE_VERSION_PATH,
+                          std::filesystem::copy_options::overwrite_existing);
   }
 #else
   std::filesystem::remove(OUT_MD5_PATH);

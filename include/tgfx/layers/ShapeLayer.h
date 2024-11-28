@@ -19,13 +19,29 @@
 #pragma once
 
 #include "SolidColor.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Stroke.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/PathProvider.h"
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
+/**
+ * The alignment of the stroke relative to the boundaries of the shape.
+ */
+enum class StrokeAlign {
+  /**
+  * Draw a stroke centered along the shape boundary.
+  */
+  Center,
+  /**
+  * Draw a stroke inside the shape boundary.
+  */
+  Inside,
+  /**
+  * Draw a stroke outside the shape boundary.
+  */
+  Outside
+};
+
 /**
  * ShapeLayer represents a layer that draws a shape.
  */
@@ -41,30 +57,26 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Returns the path defining the shape to be rendered.
+   * Returns the Path object defining the shape to be rendered.
    */
-  Path path() const {
-    return _path;
-  }
+  Path path() const;
 
   /**
-   * Sets the path defining the shape to be rendered. If the path provider is set, the path will be
-   * set to an empty Path.
+   * Sets the Path object defining the shape to be rendered.
    */
   void setPath(Path path);
 
   /**
-   * Returns the path provider that generates the shape's path.
+   * Returns the Shape object defining the shape to be rendered.
    */
-  std::shared_ptr<PathProvider> pathProvider() const {
-    return _pathProvider;
+  std::shared_ptr<Shape> shape() const {
+    return _shape;
   }
 
   /**
-   * Sets the path provider that generates the shape's path. If the path is set directly using
-   * setPath(), the path provider will be set to nullptr.
+   * Sets the Shape object defining the shape to be rendered.
    */
-  void setPathProvider(std::shared_ptr<PathProvider> provider);
+  void setShape(std::shared_ptr<Shape> shape);
 
   /**
    * Returns the style used to fill the shape's path, which can be a solid color, gradient, or image
@@ -213,6 +225,18 @@ class ShapeLayer : public Layer {
    */
   void setStrokeEnd(float end);
 
+  /**
+ * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
+ */
+  StrokeAlign strokeAlign() const {
+    return _strokeAlign;
+  }
+
+  /**
+ * Sets the stroke alignment applied to the shape’s path when stroked.
+ */
+  void setStrokeAlign(StrokeAlign align);
+
   ~ShapeLayer() override;
 
  protected:
@@ -221,8 +245,7 @@ class ShapeLayer : public Layer {
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
  private:
-  Path _path = {};
-  std::shared_ptr<PathProvider> _pathProvider = nullptr;
+  std::shared_ptr<Shape> _shape = nullptr;
   std::shared_ptr<ShapeStyle> _fillStyle = SolidColor::Make();
   std::shared_ptr<ShapeStyle> _strokeStyle = nullptr;
   Stroke stroke = {};
@@ -230,5 +253,6 @@ class ShapeLayer : public Layer {
   float _lineDashPhase = 0.0f;
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
+  StrokeAlign _strokeAlign = StrokeAlign::Center;
 };
 }  // namespace tgfx

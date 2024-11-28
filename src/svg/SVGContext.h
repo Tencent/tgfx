@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include "core/DrawContext.h"
 #include "core/FillStyle.h"
@@ -47,7 +48,7 @@ class SVGContext : public DrawContext {
 
   void drawRRect(const RRect&, const MCState&, const FillStyle&) override;
 
-  void drawPath(const Path&, const MCState&, const FillStyle&, const Stroke*) override;
+  void drawShape(std::shared_ptr<Shape>, const MCState&, const FillStyle&) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const FillStyle& style) override;
@@ -79,6 +80,10 @@ class SVGContext : public DrawContext {
 
   void drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                        const FillStyle& style);
+
+  using WriterConstructor = std::function<std::unique_ptr<ElementWriter>(const std::string)>;
+
+  void WritePath(const Path& path, const WriterConstructor& constructor, bool isFill = true);
 
   PathParse::PathEncoding pathEncoding() const {
     return PathParse::PathEncoding::Absolute;

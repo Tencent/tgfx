@@ -58,7 +58,7 @@ WebTypeface::WebTypeface(std::string name, std::string style)
   if (!this->style.empty()) {
     webFontFamily += " " + this->style;
   }
-  auto emojiName = name;
+  auto emojiName = this->name;
   std::transform(emojiName.begin(), emojiName.end(), emojiName.begin(), ::tolower);
   _hasColor = emojiName.find("emoji") != std::string::npos;
 }

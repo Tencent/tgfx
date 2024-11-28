@@ -27,7 +27,7 @@ namespace tgfx {
  *                       Indicates if the data is little endian
  *                       Is unaffected on false returns
  */
-static inline bool is_valid_endian_marker(const uint8_t* data, bool* isLittleEndian) {
+inline bool is_valid_endian_marker(const uint8_t* data, bool* isLittleEndian) {
   // II indicates Intel (little endian) and MM indicates motorola (big endian).
   if (('I' != data[0] || 'I' != data[1]) && ('M' != data[0] || 'M' != data[1])) {
     return false;
@@ -37,7 +37,7 @@ static inline bool is_valid_endian_marker(const uint8_t* data, bool* isLittleEnd
   return true;
 }
 
-static inline uint32_t get_endian_int(const uint8_t* data, bool littleEndian) {
+inline uint32_t get_endian_int(const uint8_t* data, bool littleEndian) {
   if (littleEndian) {
     return static_cast<uint32_t>((data[3] << 24) | (data[2] << 16) | (data[1] << 8) | (data[0]));
   }

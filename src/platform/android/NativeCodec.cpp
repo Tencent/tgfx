@@ -20,11 +20,16 @@
 #include <android/bitmap.h>
 #include "NativeImageBuffer.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "platform/android/AHardwareBufferFunctions.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
 
 namespace tgfx {
+static Global<jclass> ColorSpaceClass;
+static jmethodID ColorSpace_get;
+static Global<jclass> ColorSpaceNamedClass;
+static jfieldID ColorSpaceNamed_SRGB;
 static Global<jclass> BitmapFactoryOptionsClass;
 static jmethodID BitmapFactoryOptions_Constructor;
 static jfieldID BitmapFactoryOptions_inJustDecodeBounds;
@@ -32,6 +37,7 @@ static jfieldID BitmapFactoryOptions_inPreferredConfig;
 static jfieldID BitmapFactoryOptions_inPremultiplied;
 static jfieldID BitmapFactoryOptions_outWidth;
 static jfieldID BitmapFactoryOptions_outHeight;
+static jfieldID BitmapFactoryOptions_inPreferredColorSpace;
 static Global<jclass> BitmapFactoryClass;
 static jmethodID BitmapFactory_decodeFile;
 static jmethodID BitmapFactory_decodeByteArray;
@@ -68,6 +74,22 @@ void NativeCodec::JNIInit(JNIEnv* env) {
   BitmapFactoryOptions_outWidth = env->GetFieldID(BitmapFactoryOptionsClass.get(), "outWidth", "I");
   BitmapFactoryOptions_outHeight =
       env->GetFieldID(BitmapFactoryOptionsClass.get(), "outHeight", "I");
+  // for color space conversion (API level 26+)
+  ColorSpaceClass = env->FindClass("android/graphics/ColorSpace");
+  if (ColorSpaceClass.get() != nullptr) {
+    ColorSpace_get = env->GetStaticMethodID(
+        ColorSpaceClass.get(), "get",
+        "(Landroid/graphics/ColorSpace$Named;)Landroid/graphics/ColorSpace;");
+    ColorSpaceNamedClass = env->FindClass("android/graphics/ColorSpace$Named");
+    ColorSpaceNamed_SRGB = env->GetStaticFieldID(ColorSpaceNamedClass.get(), "SRGB",
+                                                 "Landroid/graphics/ColorSpace$Named;");
+    BitmapFactoryOptions_inPreferredColorSpace = env->GetFieldID(
+        BitmapFactoryOptionsClass.get(), "inPreferredColorSpace", "Landroid/graphics/ColorSpace;");
+  }
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    BitmapFactoryOptions_inPreferredColorSpace = nullptr;
+  }
   ByteArrayInputStreamClass = env->FindClass("java/io/ByteArrayInputStream");
   ByteArrayInputStream_Constructor =
       env->GetMethodID(ByteArrayInputStreamClass.get(), "<init>", "([B)V");
@@ -300,6 +322,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
+  TRACE_EVENT;
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -350,6 +373,13 @@ jobject NativeCodec::decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType al
   env->SetObjectField(options, BitmapFactoryOptions_inPreferredConfig, config);
   if (alphaType == AlphaType::Unpremultiplied) {
     env->SetBooleanField(options, BitmapFactoryOptions_inPremultiplied, false);
+  }
+
+  if (BitmapFactoryOptions_inPreferredColorSpace != nullptr) {
+    auto sRGBObj = env->GetStaticObjectField(ColorSpaceNamedClass.get(), ColorSpaceNamed_SRGB);
+    auto colorSpaceObject =
+        env->CallStaticObjectMethod(ColorSpaceClass.get(), ColorSpace_get, sRGBObj);
+    env->SetObjectField(options, BitmapFactoryOptions_inPreferredColorSpace, colorSpaceObject);
   }
 
   if (!imagePath.empty()) {

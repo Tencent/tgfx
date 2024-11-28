@@ -52,25 +52,28 @@ ResourceKey::ResourceKey(ResourceKey&& key) noexcept : data(key.data), count(key
   key.count = 0;
 }
 
-bool ResourceKey::equal(const ResourceKey& that) const {
+ResourceKey& ResourceKey::operator=(const ResourceKey& that) {
+  if (this == &that) {
+    return *this;
+  }
+  delete[] data;
+  data = CopyData(that.data, that.count);
+  count = that.count;
+  return *this;
+}
+
+bool ResourceKey::operator==(const ResourceKey& that) const {
   if (count != that.count) {
     return false;
   }
   return memcmp(data, that.data, count * sizeof(uint32_t)) == 0;
 }
 
-void ResourceKey::copy(const ResourceKey& that) {
-  if (data == that.data) {
-    return;
-  }
-  data = CopyData(that.data, that.count);
-  count = that.count;
-}
-
 ScratchKey::ScratchKey(uint32_t* data, size_t count) : ResourceKey(data, count) {
 }
 
 ScratchKey& ScratchKey::operator=(const BytesKey& that) {
+  delete[] data;
   data = CopyData(that.data(), that.size(), 1);
   if (data != nullptr) {
     data[0] = HashRange(that.data(), that.size());
@@ -85,27 +88,27 @@ UniqueKey UniqueKey::Make() {
   return UniqueKey(new UniqueDomain());
 }
 
-UniqueKey UniqueKey::Combine(const UniqueKey& uniqueKey, const BytesKey& bytesKey) {
+UniqueKey UniqueKey::Append(const UniqueKey& uniqueKey, const uint32_t* data, size_t count) {
   if (uniqueKey.empty()) {
     return {};
   }
-  if (bytesKey.size() == 0) {
+  if (count == 0) {
     return uniqueKey;
   }
   auto offset = std::max(uniqueKey.count, static_cast<size_t>(2));
-  auto data = CopyData(bytesKey.data(), bytesKey.size(), offset);
-  if (data == nullptr) {
+  auto newData = CopyData(data, count, offset);
+  if (newData == nullptr) {
     return uniqueKey;
   }
   if (uniqueKey.count > 2) {
-    memcpy(data + 2, uniqueKey.data + 2, uniqueKey.count - 2);
+    memcpy(newData + 2, uniqueKey.data + 2, (uniqueKey.count - 2) * sizeof(uint32_t));
   }
-  auto count = bytesKey.size() + offset;
+  auto newCount = count + offset;
   auto domain = uniqueKey.uniqueDomain;
-  data[1] = domain->uniqueID();
-  data[0] = HashRange(data + 1, count - 1);
+  newData[1] = domain->uniqueID();
+  newData[0] = HashRange(newData + 1, newCount - 1);
   domain->addReference();
-  return {data, count, domain};
+  return {newData, newCount, domain};
 }
 
 static uint32_t* MakeDomainData(UniqueDomain* uniqueDomain) {
@@ -141,7 +144,7 @@ UniqueKey::UniqueKey(const UniqueType& type)
   }
 }
 
-UniqueKey::UniqueKey(tgfx::UniqueType&& type) noexcept
+UniqueKey::UniqueKey(UniqueType&& type) noexcept
     : ResourceKey(MakeDomainData(type.domain), 1), uniqueDomain(type.domain) {
   type.domain = nullptr;
 }
@@ -175,7 +178,7 @@ UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
   if (uniqueDomain != nullptr) {
     uniqueDomain->addReference();
   }
-  copy(key);
+  ResourceKey::operator=(key);
   return *this;
 }
 

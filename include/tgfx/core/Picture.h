@@ -40,8 +40,8 @@ class Picture {
 
   /**
    * Returns the bounding box of the Picture when drawn with the given Matrix. Since the Picture
-   * may contain text drawing commands, and text outlines can change with different scale factors,
-   * it's best to use the final drawing matrix for calculating the bounds to ensure accuracy.
+   * may contain shape and text drawing commands whose outlines can change with different scale
+   * factors, it's best to use the final drawing matrix to calculate the bounds for accuracy.
    */
   Rect getBounds(const Matrix* matrix = nullptr) const;
 

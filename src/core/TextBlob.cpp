@@ -26,8 +26,8 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
   const char* textStop = textStart + text.size();
   GlyphRun glyphRun = {};
   glyphRun.font = font;
-  auto emptyGlyphID = font.getGlyphID(" ");
-  auto emptyAdvance = font.getAdvance(emptyGlyphID);
+  // Use half the font size as width for spaces
+  auto emptyAdvance = font.getSize() / 2.0f;
   float xOffset = 0;
   while (textStart < textStop) {
     auto unichar = UTF::NextUTF8(&textStart, textStop);
@@ -114,11 +114,10 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(std::vector<GlyphRun> glyphRuns) {
   return std::shared_ptr<TextBlob>(new TextBlob(std::move(runLists)));
 }
 
-Rect TextBlob::getBounds(const Matrix* matrix) const {
+Rect TextBlob::getBounds(float resolutionScale) const {
   auto bounds = Rect::MakeEmpty();
-  auto& glyphMatrix = matrix ? *matrix : Matrix::I();
   for (auto& runList : glyphRunLists) {
-    bounds.join(runList->getBounds(glyphMatrix));
+    bounds.join(runList->getBounds(resolutionScale));
   }
   return bounds;
 }

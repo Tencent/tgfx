@@ -21,7 +21,6 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/TextAlign.h"
-#include "tgfx/layers/VerticalAlign.h"
 
 namespace tgfx {
 /**
@@ -93,8 +92,8 @@ class TextLayer : public Layer {
   void setWidth(float width);
 
   /**
-   * Returns the layout height of the text, used for vertical alignment. The default value is 0,
-   * meaning the text will be rendered without any vertical alignment.
+   * Returns the layout height of the text. Any text that exceeds this height will be truncated (not
+   * displayed). The default value is 0, meaning the text will be rendered without any truncation.
    */
   float height() const {
     return _height;
@@ -117,19 +116,6 @@ class TextLayer : public Layer {
    * Sets how the text should be horizontally aligned within the layout width.
    */
   void setTextAlign(TextAlign align);
-
-  /**
-   * Specifies how the text should be vertically aligned within the layout height. The default is
-   * VerticalAlign::Top. This setting is ignored if the layout height is 0.
-   */
-  VerticalAlign verticalAlign() const {
-    return _verticalAlign;
-  }
-
-  /**
-   * Sets how the text should be vertically aligned within the layout height.
-   */
-  void setVerticalAlign(VerticalAlign align);
 
   /**
    * Returns whether the text should be wrapped to fit within the text width. The default value is
@@ -156,7 +142,77 @@ class TextLayer : public Layer {
   float _width = 0;
   float _height = 0;
   TextAlign _textAlign = TextAlign::Left;
-  VerticalAlign _verticalAlign = VerticalAlign::Top;
   bool _autoWrap = false;
+
+  class GlyphInfo final {
+   public:
+    GlyphInfo(Unichar unichar, GlyphID glyphID, std::shared_ptr<Typeface> typeface)
+        : _unichar(unichar), _glyphID(glyphID), _typeface(std::move(typeface)) {
+    }
+
+    Unichar getUnichar() const {
+      return _unichar;
+    }
+
+    GlyphID getGlyphID() const {
+      return _glyphID;
+    }
+
+    std::shared_ptr<Typeface> getTypeface() const {
+      return _typeface;
+    }
+
+   private:
+    Unichar _unichar = 0;
+    GlyphID _glyphID = 0;
+    std::shared_ptr<Typeface> _typeface = nullptr;
+  };
+
+  class GlyphLine final {
+   public:
+    GlyphLine() = default;
+
+    void append(const std::shared_ptr<GlyphInfo>& glyphInfo, const float advance) {
+      _glyphInfosAndAdvance.emplace_back(std::move(glyphInfo), advance);
+    }
+
+    size_t getGlyphCount() const {
+      return _glyphInfosAndAdvance.size();
+    }
+
+    std::shared_ptr<GlyphInfo> getGlyphInfo(const size_t index) const {
+      return _glyphInfosAndAdvance[index].first;
+    }
+
+    float getAdvance(const size_t index) const {
+      return _glyphInfosAndAdvance[index].second;
+    }
+
+    float getLineWidth() const {
+      float lineWidth = 0.0f;
+      for (const auto& glyphInfoAndAdvance : _glyphInfosAndAdvance) {
+        lineWidth += glyphInfoAndAdvance.second;
+      }
+      return lineWidth;
+    }
+
+   private:
+    std::vector<std::pair<std::shared_ptr<GlyphInfo>, float>> _glyphInfosAndAdvance = {};
+  };
+
+  static std::string PreprocessNewLines(const std::string& text);
+  static std::vector<std::shared_ptr<GlyphInfo>> ShapeText(
+      const std::string& text, const std::shared_ptr<Typeface>& typeface);
+
+  float calcAdvance(const std::shared_ptr<GlyphInfo>& glyphInfo, float emptyAdvance) const;
+  float getLineHeight(const std::shared_ptr<GlyphLine>& glyphLine) const;
+  void TruncateGlyphLines(std::vector<std::shared_ptr<GlyphLine>>& glyphLines) const;
+  void resolveTextAlignment(const std::vector<std::shared_ptr<GlyphLine>>& glyphLines,
+                            float emptyAdvance,
+                            std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphInfos,
+                            std::vector<Point>& positions) const;
+  void buildGlyphRunList(const std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphs,
+                         const std::vector<Point>& positions,
+                         std::vector<GlyphRun>& glyphRunList) const;
 };
 }  // namespace tgfx

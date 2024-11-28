@@ -20,7 +20,7 @@
 
 #include "core/GlyphRunList.h"
 #include "tgfx/core/ImageGenerator.h"
-#include "tgfx/core/Mask.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
@@ -30,35 +30,36 @@ namespace tgfx {
 class Rasterizer : public ImageGenerator {
  public:
   /**
-   * Creates a Rasterizer from a TextBlob.
+   * Creates a Rasterizer from a GlyphRunList.
    */
-  static std::shared_ptr<Rasterizer> MakeFrom(std::shared_ptr<GlyphRunList> glyphRunList,
-                                              const ISize& clipSize, const Matrix& matrix,
+  static std::shared_ptr<Rasterizer> MakeFrom(int width, int height,
+                                              std::shared_ptr<GlyphRunList> glyphRunList,
+                                              bool antiAlias, const Matrix& matrix,
                                               const Stroke* stroke = nullptr);
-
   /**
    * Creates a Rasterizer from a Path.
    */
-  static std::shared_ptr<Rasterizer> MakeFrom(Path path, const ISize& clipSize,
+  static std::shared_ptr<Rasterizer> MakeFrom(int width, int height, Path path, bool antiAlias,
                                               const Matrix& matrix, const Stroke* stroke = nullptr);
 
-  virtual ~Rasterizer();
+  /**
+   * Creates a Rasterizer from a Shape.
+   */
+  static std::shared_ptr<Rasterizer> MakeFrom(int width, int height, std::shared_ptr<Shape> shape,
+                                              bool antiAlias);
 
   bool isAlphaOnly() const override {
     return true;
   }
 
+  bool isYUV() const override {
+    return false;
+  }
+
   bool asyncSupport() const override;
 
  protected:
-  Rasterizer(const ISize& clipSize, const Matrix& matrix, const Stroke* stroke);
-
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
-  virtual void onRasterize(Mask* mask, const Stroke* stroke) const = 0;
-
- private:
-  Matrix matrix = Matrix::I();
-  Stroke* stroke = nullptr;
+  Rasterizer(int width, int height) : ImageGenerator(width, height) {
+  }
 };
 }  // namespace tgfx

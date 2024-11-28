@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "b5a0cc72d0507df5c13251d16a1312288460e0b5",
+        "commit": "b3125b9cf13bcc70e63212de1d0ed95e7beaa2a9",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "a03c6d8bc779bca102587d912b72d8d972af8324",
+        "commit": "3a2d34b8e1465f264067f4e8c535c0fecfb98f9c",
         "dir": "third_party/pathkit"
       },
       {
@@ -64,6 +64,11 @@
         "url": "https://github.com/libexpat/libexpat.git",
         "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
         "dir": "third_party/expat"
+      },
+      {
+        "url": "https://github.com/libpag/tracy.git",
+        "commit": "93fdee0238f74b95fdf18b7cc712e423c71497a3",
+        "dir": "third_party/tracy"
       }
     ]
   },

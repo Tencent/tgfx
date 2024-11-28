@@ -63,6 +63,8 @@ jobs:
         run: |
           chmod +x autotest.sh
           ./autotest.sh
+        env:
+          TRACY_NO_INVARIANT_CHECK: 1
 
       - name: Run Codecov
         run: |

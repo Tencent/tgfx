@@ -18,12 +18,12 @@
 
 #pragma once
 
+#include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
-class GradientShader : public Shader {
+class GradientShader : public ShaderBase {
  public:
   GradientShader(const std::vector<Color>& colors, const std::vector<float>& positions,
                  const Matrix& pointsToUnit);
@@ -54,10 +54,6 @@ class LinearGradientShader : public GradientShader {
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
-
- private:
-  const Point _startPoint;
-  const Point _endPoint;
 };
 
 class RadialGradientShader : public GradientShader {
@@ -70,10 +66,6 @@ class RadialGradientShader : public GradientShader {
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
-
- private:
-  const Point _center;
-  const float _radius;
 };
 
 class ConicGradientShader : public GradientShader {

@@ -17,32 +17,44 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "core/utils/Profiling.h"
 #include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
+  TRACE_EVENT;
   auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
   layer->weakThis = layer;
   return layer;
 }
 
+Path ShapeLayer::path() const {
+  if (_shape == nullptr) {
+    return {};
+  }
+  Path path = {};
+  if (_shape->isSimplePath(&path)) {
+    return path;
+  }
+  return {};
+}
+
 void ShapeLayer::setPath(Path path) {
-  if (_path == path) {
+  Path oldPath = {};
+  if (_shape && _shape->isSimplePath(&oldPath) && oldPath == path) {
     return;
   }
-  _path = std::move(path);
-  _pathProvider = nullptr;
+  _shape = Shape::MakeFrom(std::move(path));
   invalidateContent();
 }
 
-void ShapeLayer::setPathProvider(std::shared_ptr<PathProvider> value) {
-  if (_pathProvider == value) {
+void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
+  if (_shape == value) {
     return;
   }
-  _pathProvider = std::move(value);
-  _path.reset();
+  _shape = std::move(value);
   invalidateContent();
 }
 
@@ -143,6 +155,14 @@ void ShapeLayer::setStrokeEnd(float end) {
   invalidateContent();
 }
 
+void ShapeLayer::setStrokeAlign(StrokeAlign align) {
+  if (_strokeAlign == align) {
+    return;
+  }
+  _strokeAlign = align;
+  invalidateContent();
+}
+
 ShapeLayer::~ShapeLayer() {
   detachProperty(_strokeStyle.get());
   detachProperty(_fillStyle.get());
@@ -150,25 +170,18 @@ ShapeLayer::~ShapeLayer() {
 
 std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
   std::vector<std::unique_ptr<LayerContent>> contents = {};
-  if (_path.isEmpty() && _pathProvider == nullptr) {
+  if (_shape == nullptr) {
     return nullptr;
   }
-  auto path = _path.isEmpty() ? _pathProvider->getPath() : _path;
   if (_fillStyle) {
-    auto content = std::make_unique<ShapeContent>(path, _fillStyle->getShader());
+    auto content = std::make_unique<ShapeContent>(_shape, _fillStyle->getShader());
     contents.push_back(std::move(content));
   }
   if (stroke.width > 0 && _strokeStyle) {
-    auto strokedPath = path;
+    auto strokeShape = _shape;
     if ((_strokeStart != 0 || _strokeEnd != 1)) {
-      auto pathMeasure = PathMeasure::MakeFrom(path);
-      auto length = pathMeasure->getLength();
-      auto start = _strokeStart * length;
-      auto end = _strokeEnd * length;
-      Path tempPath = {};
-      if (pathMeasure->getSegment(start, end, &tempPath)) {
-        strokedPath = tempPath;
-      }
+      auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
+      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
     }
     if (!_lineDashPattern.empty()) {
       auto dashes = _lineDashPattern;
@@ -177,10 +190,22 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
       }
       auto pathEffect =
           PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
-      pathEffect->filterPath(&strokedPath);
+      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
     }
-    stroke.applyToPath(&strokedPath);
-    auto content = std::make_unique<ShapeContent>(strokedPath, _strokeStyle->getShader());
+    if (_strokeAlign != StrokeAlign::Center) {
+      auto tempStroke = stroke;
+      tempStroke.width *= 2;
+      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
+      if (_strokeAlign == StrokeAlign::Inside) {
+        strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
+      } else {
+        strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
+      }
+    } else {
+      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
+    }
+    auto content =
+        std::make_unique<ShapeContent>(std::move(strokeShape), _strokeStyle->getShader());
     contents.push_back(std::move(content));
   }
   return LayerContent::Compose(std::move(contents));

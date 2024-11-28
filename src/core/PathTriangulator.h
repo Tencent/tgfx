@@ -28,6 +28,12 @@ namespace tgfx {
 class PathTriangulator {
  public:
   /**
+   * Determines if the path should be triangulated instead of rasterized as an image, based on the
+   * shape's complexity. This aims to balance performance and memory usage.
+   */
+  static bool ShouldTriangulatePath(const Path& path);
+
+  /**
    * Returns the number of triangles based on the buffer size of the vertices.
    */
   static size_t GetTriangleCount(size_t bufferSize);
