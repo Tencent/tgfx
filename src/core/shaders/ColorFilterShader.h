@@ -18,13 +18,17 @@
 
 #pragma once
 
-#include "tgfx/core/Shader.h"
+#include "core/shaders/ShaderBase.h"
 
 namespace tgfx {
-class ColorFilterShader : public Shader {
+class ColorFilterShader : public ShaderBase {
  public:
   ColorFilterShader(std::shared_ptr<Shader> shader, std::shared_ptr<ColorFilter> colorFilter)
       : shader(std::move(shader)), colorFilter(std::move(colorFilter)) {
+  }
+
+  ShaderType type() const override {
+    return ShaderType::ColorFilter;
   }
 
  protected:

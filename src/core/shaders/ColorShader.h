@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "tgfx/core/Shader.h"
+#include "core/shaders/ShaderBase.h"
 
 namespace tgfx {
-class ColorShader : public Shader {
+class ColorShader : public ShaderBase {
  public:
   explicit ColorShader(Color color) : color(color) {
   }
@@ -29,6 +29,10 @@ class ColorShader : public Shader {
   bool isOpaque() const override;
 
   bool asColor(Color* color) const override;
+
+  ShaderType type() const override {
+    return ShaderType::Color;
+  }
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
