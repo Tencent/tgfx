@@ -116,6 +116,14 @@ class Shader {
   }
 
   /**
+   * If the shader has a constant color, this method returns true and updates the color parameter.
+   * Otherwise, it returns false and leaves the color parameter unchanged.
+   */
+  virtual bool asColor(Color*) const {
+    return false;
+  }
+
+  /**
    * Returns a shader that will apply the specified viewMatrix to this shader when drawing. The
    * specified matrix will be applied after any matrix associated with this shader.
    */
@@ -126,14 +134,6 @@ class Shader {
    * the ColorFilter.
    */
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
-
-  /**
-   * If the shader has a constant color, this method returns true and updates the color parameter.
-   * Otherwise, it returns false and leaves the color parameter unchanged.
-   */
-  virtual bool asColor(Color*) const {
-    return false;
-  }
 
  protected:
   std::weak_ptr<Shader> weakThis;

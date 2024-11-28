@@ -27,8 +27,6 @@
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
-#include "tgfx/core/Point.h"
-#include "tgfx/core/TileMode.h"
 
 namespace tgfx {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to
