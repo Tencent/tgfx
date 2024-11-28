@@ -32,9 +32,9 @@ const std::string text =
     "x!";
 
 TGFX_TEST(TextAlignTest, TextAlign) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1000, 800);
   auto displayList = std::make_unique<DisplayList>();
 
@@ -96,16 +96,13 @@ TGFX_TEST(TextAlignTest, TextAlign) {
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlign"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, TextAlignWidth0Height0) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 800);
   auto displayList = std::make_unique<DisplayList>();
 
@@ -180,16 +177,13 @@ TGFX_TEST(TextAlignTest, TextAlignWidth0Height0) {
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignWidth0Height0"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 600);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -288,16 +282,13 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   canvas->drawRect(textLayer5Bounds, paint);
   paint.setColor(Color::Green());
   canvas->drawLine(textLayerBounds.left - 1.0f, 0.0f, textLayerBounds.left, 600.0f, paint);
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignWidth1Height10"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 600, 800);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -438,16 +429,13 @@ TGFX_TEST(TextAlignTest, TextAlignSimulateVerticalTextLayout) {
   canvas->drawRect(textLayer6Bounds, paint);
   canvas->drawRect(textLayer7Bounds, paint);
   canvas->drawRect(textLayer8Bounds, paint);
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignSimulateVerticalTextLayout"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 600, 400);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -529,16 +517,13 @@ TGFX_TEST(TextAlignTest, SingleLineTextAlign) {
   canvas->drawRect(textLayer2Bounds, paint);
   canvas->drawRect(textLayer3Bounds, paint);
   canvas->drawRect(textLayer4Bounds, paint);
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/SingleLineTextAlign"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, TruncateTextLineTest) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 800);
   auto displayList = std::make_unique<DisplayList>();
 
@@ -601,16 +586,13 @@ TGFX_TEST(TextAlignTest, TruncateTextLineTest) {
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TruncateTextLineTest"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, FontFallbackTest) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 800);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -714,16 +696,13 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   canvas->drawRect(textLayerBounds3, paint);
   canvas->drawRect(textLayerBounds4, paint);
   canvas->drawRect(textLayerBounds5, paint);
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/FontFallbackTest"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 800);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -777,10 +756,7 @@ TGFX_TEST(TextAlignTest, TextAlignBlankLineTest) {
                    textLayerBounds.top - 1.0f, paint);
   canvas->drawLine(textLayerBounds.left, textLayerBounds.bottom + 1.0f, 250.0f,
                    textLayerBounds.bottom + 1.0f, paint);
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "TextAlignTest/TextAlignBlankLineTest"));
-  device->unlock();
 }
 
 TGFX_TEST(TextAlignTest, TextAlignPrint) {

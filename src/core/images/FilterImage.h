@@ -47,10 +47,6 @@ class FilterImage : public SubsetImage {
     return false;
   }
 
-  bool isFlat() const override {
-    return false;
-  }
-
  protected:
   FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
               std::shared_ptr<ImageFilter> filter);
@@ -62,8 +58,7 @@ class FilterImage : public SubsetImage {
   std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                           const Rect* clipRect) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
-                                                 const SamplingOptions& sampling) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,

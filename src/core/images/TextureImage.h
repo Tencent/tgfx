@@ -61,8 +61,7 @@ class TextureImage : public ResourceImage {
 
   BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const override;
 
-  std::shared_ptr<Image> makeTextureImage(Context* context,
-                                          const SamplingOptions& sampling = {}) const override;
+  std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
  protected:
   std::shared_ptr<Image> onMakeMipmapped(bool) const override {

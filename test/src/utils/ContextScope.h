@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BufferImage.h"
-#include "gpu/ProxyProvider.h"
+#pragma once
+
+#include "DevicePool.h"
 
 namespace tgfx {
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
-  TRACE_EVENT;
-  if (buffer == nullptr) {
-    return nullptr;
+class ContextScope {
+ public:
+  explicit ContextScope() : device(DevicePool::Make()) {
+    if (device != nullptr) {
+      context = device->lockContext();
+    }
   }
-  auto image = std::make_shared<BufferImage>(UniqueKey::Make(), std::move(buffer));
-  image->weakThis = image;
-  return image;
-}
 
-BufferImage::BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer)
-    : ResourceImage(std::move(uniqueKey)), imageBuffer(std::move(buffer)) {
-}
+  ~ContextScope() {
+    if (context) {
+      device->unlock();
+    }
+  }
 
-std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args) const {
-  TRACE_EVENT;
-  return args.context->proxyProvider()->createTextureProxy(args.uniqueKey, imageBuffer,
-                                                           args.mipmapped, args.renderFlags);
-}
+  Context* getContext() const {
+    return context;
+  }
+
+ private:
+  std::shared_ptr<Device> device = nullptr;
+  Context* context = nullptr;
+};
 }  // namespace tgfx

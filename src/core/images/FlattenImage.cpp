@@ -23,20 +23,26 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-std::shared_ptr<Image> FlattenImage::MakeFrom(std::shared_ptr<Image> source, bool mipmapped,
-                                              const SamplingOptions& sampling) {
+std::shared_ptr<Image> FlattenImage::MakeFrom(std::shared_ptr<Image> source) {
+  TRACE_EVENT;
   if (source == nullptr) {
     return nullptr;
   }
-  auto flattenImage = std::shared_ptr<FlattenImage>(
-      new FlattenImage(UniqueKey::Make(), std::move(source), sampling));
+  auto mipmapped = source->hasMipmaps();
+  if (mipmapped) {
+    auto newSource = source->makeMipmapped(false);
+    if (newSource != nullptr) {
+      source = std::move(newSource);
+    }
+  }
+  auto flattenImage =
+      std::shared_ptr<FlattenImage>(new FlattenImage(UniqueKey::Make(), std::move(source)));
   flattenImage->weakThis = flattenImage;
   return mipmapped ? flattenImage->makeMipmapped(true) : flattenImage;
 }
 
-FlattenImage::FlattenImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                           const SamplingOptions& sampling)
-    : ResourceImage(std::move(uniqueKey)), source(std::move(source)), sampling(sampling) {
+FlattenImage::FlattenImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
 }
 
 int FlattenImage::width() const {
@@ -48,19 +54,20 @@ int FlattenImage::height() const {
 }
 
 std::shared_ptr<Image> FlattenImage::onMakeDecoded(Context* context, bool) const {
-  // There is no need to pass tryHardware to the source image, as our texture proxy is not locked
-  // from the source image.
+  TRACE_EVENT;
+  // There is no need to pass tryHardware (disabled) to the source image, as our texture proxy is
+  // not locked from the source image.
   auto newSource = source->onMakeDecoded(context);
   if (newSource == nullptr) {
     return nullptr;
   }
-  auto newImage =
-      std::shared_ptr<FlattenImage>(new FlattenImage(uniqueKey, std::move(newSource), sampling));
+  auto newImage = std::shared_ptr<FlattenImage>(new FlattenImage(uniqueKey, std::move(newSource)));
   newImage->weakThis = newImage;
   return newImage;
 }
 
 std::shared_ptr<TextureProxy> FlattenImage::onLockTextureProxy(const TPArgs& args) const {
+  TRACE_EVENT;
   auto proxyProvider = args.context->proxyProvider();
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(args.uniqueKey);
   if (textureProxy != nullptr) {
@@ -72,7 +79,7 @@ std::shared_ptr<TextureProxy> FlattenImage::onLockTextureProxy(const TPArgs& arg
   if (args.renderFlags & RenderFlags::DisableCache) {
     sourceArgs.uniqueKey = {};
   }
-  textureProxy = source->lockTextureProxy(sourceArgs, sampling);
+  textureProxy = source->lockTextureProxy(sourceArgs);
   if (args.renderFlags & RenderFlags::DisableCache) {
     proxyProvider->changeProxyKey(textureProxy, args.uniqueKey);
   }
