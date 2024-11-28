@@ -30,6 +30,7 @@
 
 namespace tgfx {
 class FragmentProcessor;
+
 /**
  * Shaders specify the source color(s) for what is being drawn. If a paint has no shader, then the
  * paint's color is used. If the paint has a shader, then the shader's color(s) are used instead,
