@@ -29,8 +29,9 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, UniqueKey uniqueKey = {})
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped),
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, bool flattened = false,
+         UniqueKey uniqueKey = {})
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), flattened(flattened),
         uniqueKey(std::move(uniqueKey)) {
   }
 
@@ -49,6 +50,11 @@ class TPArgs {
    * image already has preset mipmaps.
    */
   bool mipmapped = false;
+
+  /**
+   * Specifies whether the texture proxy should be flattened.
+   */
+  bool flattened = false;
 
   /**
    * The unique key assigned to the texture proxy. This may be ignored if the associated image

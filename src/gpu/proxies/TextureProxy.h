@@ -64,6 +64,13 @@ class TextureProxy : public ResourceProxy {
   }
 
   /**
+   * Returns true if the texture is in the YUV format.
+   */
+  bool isYUV() const {
+    return _isYUV;
+  }
+
+  /**
    * Returns true if the backend texture is externally owned.
    */
   bool externallyOwned() const {
@@ -80,11 +87,12 @@ class TextureProxy : public ResourceProxy {
   int _height = 0;
   bool mipmapped = false;
   bool _isAlphaOnly = false;
+  bool _isYUV = false;
   ImageOrigin _origin = ImageOrigin::TopLeft;
   bool _externallyOwned = false;
 
   TextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
-               ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
+               bool isYUV, ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
 
   friend class ProxyProvider;
 };

@@ -40,6 +40,10 @@ class ImageBufferWrapper : public ImageDecoder {
     return imageBuffer->isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return imageBuffer->isYUV();
+  }
+
   std::shared_ptr<ImageBuffer> decode() const override {
     return imageBuffer;
   }
@@ -64,6 +68,10 @@ class ImageGeneratorWrapper : public ImageDecoder {
 
   bool isAlphaOnly() const override {
     return imageGenerator->isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return imageGenerator->isYUV();
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
@@ -93,6 +101,10 @@ class AsyncImageDecoder : public ImageDecoder {
 
   bool isAlphaOnly() const override {
     return imageGenerator->isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return imageGenerator->isYUV();
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {

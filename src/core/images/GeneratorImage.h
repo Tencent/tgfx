@@ -40,8 +40,16 @@ class GeneratorImage : public ResourceImage {
     return generator->isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return generator->isYUV();
+  }
+
   bool isFullyDecoded() const override {
     return false;
+  }
+
+  bool isFlat() const override {
+    return !generator->isYUV();
   }
 
  protected:

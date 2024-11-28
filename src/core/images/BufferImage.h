@@ -40,6 +40,14 @@ class BufferImage : public ResourceImage {
     return imageBuffer->isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return imageBuffer->isYUV();
+  }
+
+  bool isFlat() const override {
+    return !imageBuffer->isYUV();
+  }
+
  protected:
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
 

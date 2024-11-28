@@ -31,13 +31,6 @@ class ResourceImage : public Image {
  public:
   explicit ResourceImage(UniqueKey uniqueKey);
 
-  bool isComplex() const override {
-    return false;
-  }
-
-  std::shared_ptr<Image> makeRasterized(bool mipmapped = false,
-                                        const SamplingOptions& sampling = {}) const override;
-
  protected:
   UniqueKey uniqueKey = {};
 
