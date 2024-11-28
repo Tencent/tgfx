@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformImage.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {

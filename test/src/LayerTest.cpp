@@ -181,9 +181,8 @@ TGFX_TEST(LayerTest, LayerTreeCircle) {
 }
 
 TGFX_TEST(LayerTest, textLayer) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   auto surface = Surface::Make(context, 200, 100);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
@@ -216,13 +215,12 @@ TGFX_TEST(LayerTest, textLayer) {
   emojiLayer->setMatrix(Matrix::MakeTrans(0, 20));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_text"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, imageLayer) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/image_as_mask.png");
   auto surface = Surface::Make(context, image->width() * 5, image->height() * 5);
   auto displayList = std::make_unique<DisplayList>();
@@ -236,7 +234,6 @@ TGFX_TEST(LayerTest, imageLayer) {
   imageLayer->setMatrix(Matrix::MakeScale(5.0f));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
@@ -425,23 +422,21 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
   EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
 
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto rootBounds = root->getBounds();
   auto width = static_cast<int>(rootBounds.width());
   auto height = static_cast<int>(rootBounds.height());
   auto surface = Surface::Make(context, width, height);
   displayList->render(surface.get());
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getBounds"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, shapeLayer) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 300);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
@@ -482,15 +477,13 @@ TGFX_TEST(LayerTest, shapeLayer) {
     }
   }
   displayList->render(surface.get());
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_shape"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, solidLayer) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 100);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
@@ -507,9 +500,7 @@ TGFX_TEST(LayerTest, solidLayer) {
   EXPECT_TRUE(solidLayerRect == bounds);
 
   displayList->render(surface.get());
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_solid"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, FilterTest) {
@@ -517,8 +508,9 @@ TGFX_TEST(LayerTest, FilterTest) {
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
   auto filter3 = BlurFilter::Make(40, 40);
   auto image = MakeImage("resources/apitest/rotation.jpg");
-  auto device = DevicePool::Make();
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto displayList = std::make_unique<DisplayList>();
   auto layer = ImageLayer::Make();
@@ -532,15 +524,15 @@ TGFX_TEST(LayerTest, FilterTest) {
   auto bounds = displayList->root()->getBounds();
   EXPECT_EQ(Rect::MakeLTRB(126.5f, 126.5f, 1725.5f, 2229.5f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, filterClip) {
   auto filter = DropShadowFilter::Make(-10, -10, 0, 0, Color::Black());
 
   auto image = MakeImage("resources/apitest/rotation.jpg");
-  auto device = DevicePool::Make();
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = ImageLayer::Make();
@@ -554,13 +546,11 @@ TGFX_TEST(LayerTest, filterClip) {
   auto bounds = displayList->root()->getBounds();
   EXPECT_EQ(Rect::MakeLTRB(45.f, 45.f, 1562.f, 2066.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterClip"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, dropshadowLayerFilter) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
@@ -602,7 +592,6 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/dropShadow"));
-  device->unlock();
 
   auto src = Rect::MakeXYWH(10, 10, 10, 10);
   auto bounds = filter4->getImageFilter(1.0f)->filterBounds(src);
@@ -612,9 +601,9 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
 }
 
 TGFX_TEST(LayerTest, colorBlendLayerFilter) {
-
-  auto device = DevicePool::Make();
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width() / 4, image->height() / 4);
@@ -629,14 +618,11 @@ TGFX_TEST(LayerTest, colorBlendLayerFilter) {
   layer->setMatrix(Matrix::MakeScale(0.25f));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ModeColorFilter"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, colorMatrixLayerFilter) {
-
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
@@ -659,7 +645,6 @@ TGFX_TEST(LayerTest, colorMatrixLayerFilter) {
   filter->setMatrix(greyColorMatrix);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/greyColorMatrix"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, blurLayerFilter) {
@@ -681,9 +666,8 @@ TGFX_TEST(LayerTest, blurLayerFilter) {
 }
 
 TGFX_TEST(LayerTest, PassthroughAndNormal) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto surface = Surface::Make(context, 800, 400);
@@ -714,13 +698,12 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   root->setShouldRasterize(false);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, imageMask) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   auto surface = Surface::Make(context, image->width(), static_cast<int>(image->height() * 1.5));
   auto displayList = std::make_unique<DisplayList>();
@@ -855,13 +838,12 @@ TGFX_TEST(LayerTest, imageMask) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageMask"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, shapeMask) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   auto surface = Surface::Make(context, image->width(), image->height());
   auto displayList = std::make_unique<DisplayList>();
@@ -953,13 +935,12 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/shapeMask"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, textMask) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   auto surface = Surface::Make(context, image->width(), image->height());
   auto displayList = std::make_unique<DisplayList>();
@@ -1063,13 +1044,11 @@ TGFX_TEST(LayerTest, textMask) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/textMask"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, ContentVersion) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto surface = Surface::Make(context, 100, 100);
@@ -1102,7 +1081,6 @@ TGFX_TEST(LayerTest, ContentVersion) {
   EXPECT_NE(surface2->contentVersion(), 1u);
   displayList.render(surface.get());
   EXPECT_NE(surface->contentVersion(), contentVersion);
-  device->unlock();
 }
 
 /**
@@ -1111,9 +1089,9 @@ TGFX_TEST(LayerTest, ContentVersion) {
  * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/getLayersUnderPoint.png
  */
 TGFX_TEST(LayerTest, getLayersUnderPoint) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 800);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -1341,10 +1319,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   printf("\n");
   EXPECT_EQ(static_cast<int>(layers.size()), 2);
   EXPECT_EQ(layerNameJoin, "shaper_layer2|root_layer|");
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getLayersUnderPoint"));
-  device->unlock();
 }
 
 /**
@@ -1354,9 +1329,9 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
  * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/Layer_hitTestPoint.png
  */
 TGFX_TEST(LayerTest, hitTestPoint) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 800);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -1507,10 +1482,7 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   EXPECT_EQ(false, shaperLayer1->hitTestPoint(q5.x, q5.y, true));
   EXPECT_EQ(true, shaperLayer2->hitTestPoint(q5.x, q5.y));
   EXPECT_EQ(true, shaperLayer2->hitTestPoint(q5.x, q5.y, true));
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint"));
-  device->unlock();
 }
 
 /**
@@ -1519,9 +1491,9 @@ TGFX_TEST(LayerTest, hitTestPoint) {
  * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/hitTestPointNested.png
  */
 TGFX_TEST(LayerTest, hitTestPointNested) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 800, 800);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -1680,16 +1652,12 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y, true));
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPointNested"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, InnerShadowFilter) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -1731,15 +1699,13 @@ TGFX_TEST(LayerTest, InnerShadowFilter) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/innerShadow"));
-  device->unlock();
 }
 
 TGFX_TEST(LayerTest, DirtyFlag) {
-  auto device = DevicePool::Make();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto displayList = std::make_unique<DisplayList>();
-
-  EXPECT_TRUE(device != nullptr);
-  auto context = device->lockContext();
   auto surface = Surface::Make(context, 100, 100);
   auto child = ImageLayer::Make();
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -1774,7 +1740,5 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
   EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
   EXPECT_TRUE(root->bitFields.childrenDirty && !root->bitFields.contentDirty);
-
-  device->unlock();
 }
 }  // namespace tgfx

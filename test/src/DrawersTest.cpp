@@ -27,9 +27,8 @@ TGFX_TEST(DrawersTest, Compare) {
   appHost.addTypeface("default", MakeTypeface("resources/font/NotoSansSC-Regular.otf"));
   appHost.addTypeface("emoji", MakeTypeface("resources/font/NotoColorEmoji.ttf"));
 
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
@@ -46,6 +45,5 @@ TGFX_TEST(DrawersTest, Compare) {
       LOGI("Baseline::Compare failed for %s", key.c_str());
     }
   }
-  device->unlock();
 }
 }  // namespace tgfx

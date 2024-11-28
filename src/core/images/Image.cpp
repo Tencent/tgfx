@@ -151,19 +151,18 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   return TextureImage::Wrap(std::move(textureProxy));
 }
 
-std::shared_ptr<Image> Image::makeFlattened(bool mipmapped, const SamplingOptions& sampling) const {
+std::shared_ptr<Image> Image::makeFlattened() const {
   TRACE_EVENT;
   if (isFlat()) {
     return weakThis.lock();
   }
-  return FlattenImage::MakeFrom(weakThis.lock(), mipmapped, sampling);
+  return FlattenImage::MakeFrom(weakThis.lock());
 }
 
-std::shared_ptr<Image> Image::makeTextureImage(Context* context,
-                                               const SamplingOptions& sampling) const {
+std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   TRACE_EVENT;
   TPArgs args(context, 0, hasMipmaps());
-  return TextureImage::Wrap(lockTextureProxy(args, sampling));
+  return TextureImage::Wrap(lockTextureProxy(args));
 }
 
 BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
@@ -208,16 +207,9 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeScaled(float scaleX, float scaleY) const {
+std::shared_ptr<Image> Image::makeScaled(float scale, const SamplingOptions& sampling) const {
   TRACE_EVENT;
-  auto w = width();
-  auto h = height();
-  auto scaledWidth = ScaleImage::GetSize(w, scaleX);
-  auto scaledHeight = ScaleImage::GetSize(h, scaleY);
-  if (scaledWidth == w && scaledHeight == h) {
-    return weakThis.lock();
-  }
-  return onMakeScaled(scaleX, scaleY);
+  return ScaleImage::MakeFrom(weakThis.lock(), scale, sampling);
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
@@ -236,11 +228,6 @@ std::shared_ptr<Image> Image::makeOriented(Orientation orientation) const {
 std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
   TRACE_EVENT;
   return OrientImage::MakeFrom(weakThis.lock(), orientation);
-}
-
-std::shared_ptr<Image> Image::onMakeScaled(float scaleX, float scaleY) const {
-  TRACE_EVENT;
-  return ScaleImage::MakeFrom(weakThis.lock(), Point::Make(scaleX, scaleY));
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
@@ -265,8 +252,7 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
                                alphaStartY);
 }
 
-std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
-                                                      const SamplingOptions& sampling) const {
+std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
   auto context = args.context;
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
@@ -281,7 +267,8 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
   }
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
-  auto processor = asFragmentProcessor(fpArgs, TileMode::Clamp, TileMode::Clamp, sampling, nullptr);
+  // There is no scaling for the image, so we can use the default sampling options.
+  auto processor = asFragmentProcessor(fpArgs, TileMode::Clamp, TileMode::Clamp, {}, nullptr);
   if (processor == nullptr) {
     return nullptr;
   }

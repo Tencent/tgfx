@@ -45,11 +45,7 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  if (!source->isFlat()) {
-    auto needMipmaps = NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
-    source = source->makeFlattened(needMipmaps, sampling);
-  }
-
+  source = source->makeFlattened();
   // get inverted shadow mask
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix != nullptr) {

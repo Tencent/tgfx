@@ -27,8 +27,7 @@ namespace tgfx {
  */
 class FlattenImage : public ResourceImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, bool mipmapped = false,
-                                         const SamplingOptions& sampling = {});
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source);
 
   int width() const override;
 
@@ -57,8 +56,7 @@ class FlattenImage : public ResourceImage {
 
  private:
   std::shared_ptr<Image> source = nullptr;
-  SamplingOptions sampling = {};
 
-  FlattenImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, const SamplingOptions& sampling);
+  FlattenImage(UniqueKey uniqueKey, std::shared_ptr<Image> source);
 };
 }  // namespace tgfx

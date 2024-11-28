@@ -18,7 +18,6 @@
 
 #include "ResourceImage.h"
 #include "core/images/MipmapImage.h"
-#include "core/utils/Profiling.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -26,15 +25,13 @@ namespace tgfx {
 ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
-std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(
-    const TPArgs& args, const SamplingOptions& sampling) const {
+std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
   TRACE_EVENT;
   if (args.flattened && !isFlat()) {
-    return Image::lockTextureProxy(args, sampling);
+    return Image::lockTextureProxy(args);
   }
-  // The passed-in TPArgs and sampling options are ignored because all resource images are already
-  // rasterized and have a preset mipmap state.
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), false, uniqueKey);
+  // Some options in TPArgs are ignored for ResourceImage because it has preset properties.
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), args.flattened, uniqueKey);
   return onLockTextureProxy(tpArgs);
 }
 

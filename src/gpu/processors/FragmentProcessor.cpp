@@ -35,8 +35,8 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
-                                                           const tgfx::FPArgs& args,
-                                                           TileMode tileModeX, TileMode tileModeY,
+                                                           const FPArgs& args, TileMode tileModeX,
+                                                           TileMode tileModeY,
                                                            const SamplingOptions& sampling,
                                                            const Matrix* uvMatrix) {
   if (image == nullptr) {
