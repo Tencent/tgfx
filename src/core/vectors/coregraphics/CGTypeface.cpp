@@ -93,7 +93,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int
     return nullptr;
   }
   auto cfData =
-      CFDataCreateWithBytesNoCopy(kCFAllocatorNull, static_cast<const UInt8*>(data->data()),
+      CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, static_cast<const UInt8*>(data->data()),
                                   static_cast<CFIndex>(data->size()), kCFAllocatorNull);
   if (cfData == nullptr) {
     return nullptr;
