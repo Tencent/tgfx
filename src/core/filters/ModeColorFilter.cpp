@@ -48,6 +48,16 @@ std::shared_ptr<ColorFilter> ColorFilter::Blend(Color color, BlendMode mode) {
   return std::make_shared<ModeColorFilter>(color, mode);
 }
 
+bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
+  if (color) {
+    *color = this->color;
+  }
+  if (mode) {
+    *mode = this->mode;
+  }
+  return true;
+}
+
 std::unique_ptr<FragmentProcessor> ModeColorFilter::asFragmentProcessor() const {
   return XfermodeFragmentProcessor::MakeFromSrcProcessor(
       ConstColorProcessor::Make(color.premultiply(), InputMode::Ignore), mode);

@@ -18,11 +18,11 @@
 
 #pragma once
 
+#include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class MatrixShader final : public Shader {
+class MatrixShader final : public ShaderBase {
  public:
   static std::shared_ptr<Shader> MakeFrom(std::shared_ptr<Shader> source, const Matrix& viewMatrix);
 
@@ -32,6 +32,10 @@ class MatrixShader final : public Shader {
 
   bool asColor(Color* color) const override {
     return source->asColor(color);
+  }
+
+  ShaderType type() const override {
+    return ShaderType::Matrix;
   }
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
