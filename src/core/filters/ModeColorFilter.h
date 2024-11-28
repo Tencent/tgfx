@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "core/filters/ColorFilterBase.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
-class ModeColorFilter : public ColorFilterBase {
+class ModeColorFilter : public ColorFilter {
  public:
   ModeColorFilter(Color color, BlendMode mode) : color(color), mode(mode) {
   }

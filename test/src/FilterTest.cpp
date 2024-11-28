@@ -18,7 +18,6 @@
 
 #include <vector>
 #include "CornerPinEffect.h"
-#include "core/filters/ColorFilterBase.h"
 #include "core/shaders/ShaderBase.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "gpu/opengl/GLUtil.h"
@@ -374,17 +373,17 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   auto modeColorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
   Color color;
   BlendMode mode;
-  bool ret = asColorFilterBase(modeColorFilter)->asColorMode(&color, &mode);
+  bool ret = modeColorFilter->asColorMode(&color, &mode);
   EXPECT_TRUE(ret);
   EXPECT_EQ(color, Color::Red());
   EXPECT_EQ(mode, BlendMode::Multiply);
 
   auto lumaFilter = ColorFilter::Matrix(lumaColorMatrix);
-  ret = asColorFilterBase(lumaFilter)->asColorMode(nullptr, nullptr);
+  ret = lumaFilter->asColorMode(nullptr, nullptr);
   EXPECT_FALSE(ret);
 
   auto filter = ColorFilter::Compose(modeColorFilter, lumaFilter);
-  ret = asColorFilterBase(filter)->asColorMode(nullptr, nullptr);
+  ret = filter->asColorMode(nullptr, nullptr);
   EXPECT_FALSE(ret);
 }
 
