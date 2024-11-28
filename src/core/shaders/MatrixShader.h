@@ -20,7 +20,6 @@
 
 #include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 class MatrixShader final : public ShaderBase {

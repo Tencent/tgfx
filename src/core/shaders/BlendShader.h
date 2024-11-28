@@ -19,7 +19,6 @@
 #pragma once
 
 #include "core/shaders/ShaderBase.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 class BlendShader : public ShaderBase {

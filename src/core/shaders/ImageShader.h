@@ -21,7 +21,6 @@
 #include "core/shaders/ShaderBase.h"
 #include "gpu/Texture.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 class ImageShader : public ShaderBase {

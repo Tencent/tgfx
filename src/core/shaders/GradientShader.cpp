@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientShader.h"
-#include <tuple>
 #include "core/utils/MathExtra.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -28,8 +27,6 @@
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Point.h"
 
 namespace tgfx {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to

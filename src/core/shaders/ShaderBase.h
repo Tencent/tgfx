@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "tgfx/core/GradientType.h"
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {

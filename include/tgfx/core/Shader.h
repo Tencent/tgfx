@@ -22,7 +22,6 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
-#include "tgfx/core/GradientType.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
@@ -31,6 +30,7 @@
 
 namespace tgfx {
 class FragmentProcessor;
+
 /**
  * Shaders specify the source color(s) for what is being drawn. If a paint has no shader, then the
  * paint's color is used. If the paint has a shader, then the shader's color(s) are used instead,

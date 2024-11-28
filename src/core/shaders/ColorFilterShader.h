@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/shaders/ShaderBase.h"
+
 namespace tgfx {
 class ColorFilterShader : public ShaderBase {
  public:
