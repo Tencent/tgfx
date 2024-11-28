@@ -20,7 +20,7 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
-TGFX_TEST(SVGTest, PathSVGRender) {
+TGFX_TEST(SVGRenderTest, PathSVG) {
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/path.svg"));
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
@@ -43,7 +43,7 @@ TGFX_TEST(SVGTest, PathSVGRender) {
   device->unlock();
 }
 
-TGFX_TEST(SVGTest, PNGImageSVGRender) {
+TGFX_TEST(SVGRenderTest, PNGImageSVG) {
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/png.svg"));
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
@@ -66,7 +66,7 @@ TGFX_TEST(SVGTest, PNGImageSVGRender) {
   device->unlock();
 }
 
-TGFX_TEST(SVGTest, JPGImageSVGRender) {
+TGFX_TEST(SVGRenderTest, JPGImageSVG) {
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/jpg.svg"));
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
@@ -89,7 +89,7 @@ TGFX_TEST(SVGTest, JPGImageSVGRender) {
   device->unlock();
 }
 
-TGFX_TEST(SVGTest, MaskSVGRender) {
+TGFX_TEST(SVGRenderTest, MaskSVG) {
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/mask.svg"));
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
@@ -112,7 +112,7 @@ TGFX_TEST(SVGTest, MaskSVGRender) {
   device->unlock();
 }
 
-TGFX_TEST(SVGTest, GradientSVGRender) {
+TGFX_TEST(SVGRenderTest, GradientSVG) {
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/radialGradient.svg"));
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
@@ -135,7 +135,7 @@ TGFX_TEST(SVGTest, GradientSVGRender) {
   device->unlock();
 }
 
-TGFX_TEST(SVGTest, BlurSVGRender) {
+TGFX_TEST(SVGRenderTest, BlurSVG) {
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/blur.svg"));
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
@@ -158,7 +158,7 @@ TGFX_TEST(SVGTest, BlurSVGRender) {
   device->unlock();
 }
 
-TGFX_TEST(SVGTest, TextSVGRender) {
+TGFX_TEST(SVGRenderTest, TextSVG) {
   auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/text.svg"));
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
