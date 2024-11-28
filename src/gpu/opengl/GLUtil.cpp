@@ -107,6 +107,8 @@ unsigned CreateGLProgram(Context* context, const std::string& vertex, const std:
     char infoLog[512];
     gl->getProgramInfoLog(programHandle, 512, nullptr, infoLog);
     gl->deleteProgram(programHandle);
+    programHandle = 0;
+    LOGE("CreateGLProgram failed:%s", infoLog);
   }
   gl->deleteShader(vertexShader);
   gl->deleteShader(fragmentShader);
