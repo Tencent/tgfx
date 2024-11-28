@@ -103,11 +103,12 @@ void SVGContext::drawRRect(const RRect& roundRect, const MCState& state, const F
 
 void SVGContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                            const FillStyle& style) {
-  auto constructor = [&](const std::string& name) -> std::unique_ptr<ElementWriter> {
-    return std::make_unique<ElementWriter>(name, _context, this, _resourceBucket.get(), state,
-                                           style);
-  };
-  this->WritePath(shape->getPath(), constructor);
+  auto path = shape->getPath();
+  ElementWriter pathElement("path", _context, this, _resourceBucket.get(), state, style);
+  pathElement.addPathAttributes(path, this->pathEncoding());
+  if (path.getFillType() == PathFillType::EvenOdd) {
+    pathElement.addAttribute("fill-rule", "evenodd");
+  }
 }
 
 void SVGContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -169,11 +170,11 @@ void SVGContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, co
     return;
   }
   if (Path path; glyphRunList->getPath(&path)) {
-    auto constructor = [&](const std::string& name) -> std::unique_ptr<ElementWriter> {
-      return std::make_unique<ElementWriter>(name, _context, this, _resourceBucket.get(), state,
-                                             style, stroke);
-    };
-    this->WritePath(path, constructor);
+    ElementWriter pathElement("path", _context, this, _resourceBucket.get(), state, style, stroke);
+    pathElement.addPathAttributes(path, this->pathEncoding());
+    if (path.getFillType() == PathFillType::EvenOdd) {
+      pathElement.addAttribute("fill-rule", "evenodd");
+    }
   }
 }
 
@@ -206,31 +207,6 @@ void SVGContext::drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunLi
   //     SVGContext::drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
   //   }
   // }
-}
-
-void SVGContext::WritePath(const Path& path, const WriterConstructor& constructor, bool isFill) {
-  std::unique_ptr<ElementWriter> element;
-  if (Rect rect; path.isRect(&rect)) {
-    element = constructor("rect");
-    element->addRectAttributes(rect);
-  } else if (RRect rrect; path.isRRect(&rrect)) {
-    element = constructor("rect");
-    element->addRoundRectAttributes(rrect);
-  } else if (Rect bound; path.isOval(&bound)) {
-    if (FloatNearlyEqual(bound.width(), bound.height())) {
-      element = constructor("circle");
-      element->addCircleAttributes(bound);
-    } else {
-      element = constructor("ellipse");
-      element->addEllipseAttributes(bound);
-    }
-  } else {
-    element = constructor("path");
-    element->addPathAttributes(path, this->pathEncoding());
-    if (path.getFillType() == PathFillType::EvenOdd) {
-      element->addAttribute(isFill ? "fill-rule" : "clip-rule", "evenodd");
-    }
-  }
 }
 
 void SVGContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -280,10 +256,28 @@ void SVGContext::syncClipStack(const MCState& mc) {
     clipPath.addAttribute("id", clipID);
     {
       auto clipPath = mc.clip;
-      auto constructor = [&](const std::string& name) -> std::unique_ptr<ElementWriter> {
-        return std::make_unique<ElementWriter>(name, _context, _writer);
-      };
-      this->WritePath(clipPath, constructor, false);
+      std::unique_ptr<ElementWriter> element;
+      if (Rect rect; clipPath.isRect(&rect)) {
+        element = std::make_unique<ElementWriter>("rect", _context, _writer);
+        element->addRectAttributes(rect);
+      } else if (RRect rrect; clipPath.isRRect(&rrect)) {
+        element = std::make_unique<ElementWriter>("rect", _context, _writer);
+        element->addRoundRectAttributes(rrect);
+      } else if (Rect bound; clipPath.isOval(&bound)) {
+        if (FloatNearlyEqual(bound.width(), bound.height())) {
+          element = std::make_unique<ElementWriter>("circle", _context, _writer);
+          element->addCircleAttributes(bound);
+        } else {
+          element = std::make_unique<ElementWriter>("ellipse", _context, _writer);
+          element->addEllipseAttributes(bound);
+        }
+      } else {
+        element = std::make_unique<ElementWriter>("path", _context, _writer);
+        element->addPathAttributes(clipPath, this->pathEncoding());
+        if (clipPath.getFillType() == PathFillType::EvenOdd) {
+          element->addAttribute("clip-rule", "evenodd");
+        }
+      }
     }
     return clipID;
   };

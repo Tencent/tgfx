@@ -81,10 +81,6 @@ class SVGContext : public DrawContext {
   void drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                        const FillStyle& style);
 
-  using WriterConstructor = std::function<std::unique_ptr<ElementWriter>(const std::string)>;
-
-  void WritePath(const Path& path, const WriterConstructor& constructor, bool isFill = true);
-
   PathParse::PathEncoding pathEncoding() const {
     return PathParse::PathEncoding::Absolute;
   }
