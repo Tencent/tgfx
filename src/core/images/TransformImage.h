@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
@@ -38,6 +39,14 @@ class TransformImage : public Image {
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
+  }
+
+  bool isYUV() const override {
+    return source->isYUV();
+  }
+
+  bool isFlat() const override {
+    return false;
   }
 
  protected:

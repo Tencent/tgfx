@@ -25,30 +25,27 @@ namespace tgfx {
 ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
-std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args,
-                                                              const SamplingOptions&) const {
-  if (args.context == nullptr) {
-    return nullptr;
+std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
+  TRACE_EVENT;
+  if (args.flattened && !isFlat()) {
+    return Image::lockTextureProxy(args);
   }
-  // The passed-in TPArgs and sampling options are ignored because all resource images are already
-  // rasterized and have a preset mipmap state.
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), uniqueKey);
+  // Some options in TPArgs are ignored for ResourceImage because it has preset properties.
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), args.flattened, uniqueKey);
   return onLockTextureProxy(tpArgs);
 }
 
 std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
+  TRACE_EVENT;
   auto source = std::static_pointer_cast<ResourceImage>(weakThis.lock());
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
-}
-
-std::shared_ptr<Image> ResourceImage::makeRasterized(bool, const SamplingOptions&) const {
-  return weakThis.lock();
 }
 
 std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
     const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), uniqueKey);
+  TRACE_EVENT;
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), false, uniqueKey);
   auto proxy = onLockTextureProxy(tpArgs);
   return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,
                                   isAlphaOnly());

@@ -36,7 +36,7 @@ class DrawingManager {
                                             uint32_t renderFlags);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
-                          std::shared_ptr<TextureProxy> source,
+                          std::vector<std::shared_ptr<TextureProxy>> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);

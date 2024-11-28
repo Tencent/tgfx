@@ -18,39 +18,42 @@
 
 #pragma once
 
-#include "core/images/TransformImage.h"
+#include "core/images/OffscreenImage.h"
 
 namespace tgfx {
-
 /**
- * Scales the source image by the given factors.
+ * ScaleImage is an image that scales another image.
  */
-class ScaleImage : public TransformImage {
+class ScaleImage : public OffscreenImage {
  public:
-  static int GetSize(int size, float scale);
-
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, const Point& scale);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, float scale,
+                                         const SamplingOptions& sampling);
 
   int width() const override;
 
   int height() const override;
 
-  bool isComplex() const override {
-    return source->isComplex();
+  bool isAlphaOnly() const override {
+    return source->isAlphaOnly();
   }
 
+  bool isFullyDecoded() const override {
+    return source->isFullyDecoded();
+  }
+
+  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling) const override;
+
  protected:
-  Point scale = Point::Make(1.0f, 1.0f);
+  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  ScaleImage(std::shared_ptr<Image> source, const Point& scale);
+  bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
 
-  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
+ private:
+  std::shared_ptr<Image> source = nullptr;
+  float scale = 1.0f;
+  SamplingOptions sampling = {};
 
-  std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const override;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
-                                                         TileMode tileModeY,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
+  ScaleImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, float scale,
+             const SamplingOptions& sampling);
 };
 }  // namespace tgfx

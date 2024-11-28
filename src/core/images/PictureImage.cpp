@@ -22,11 +22,11 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
-#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 static std::shared_ptr<Image> GetEquivalentImage(const Record* record, int width, int height,
                                                  bool alphaOnly, const Matrix* matrix) {
+  TRACE_EVENT;
   if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
     return nullptr;
   }
@@ -81,6 +81,7 @@ static std::shared_ptr<Image> GetEquivalentImage(const Record* record, int width
 
 static bool CheckStyleAndClip(const FillStyle& style, const Path& clip, int width, int height,
                               const Matrix* matrix) {
+  TRACE_EVENT;
   if (!style.isOpaque()) {
     return false;
   }
@@ -110,6 +111,7 @@ static Matrix GetMaskMatrix(const MCState& state, const Matrix* matrix) {
 
 static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record, int width,
                                                            int height, const Matrix* matrix) {
+  TRACE_EVENT;
   if (record->type() == RecordType::DrawShape) {
     auto shapeRecord = static_cast<const DrawShape*>(record);
     if (!CheckStyleAndClip(shapeRecord->style, shapeRecord->state.clip, width, height, matrix)) {
@@ -142,6 +144,7 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
                                        const Matrix* matrix, bool alphaOnly) {
+  TRACE_EVENT;
   if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -169,7 +172,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
 
 PictureImage::PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width,
                            int height, const Matrix* matrix, bool alphaOnly)
-    : ResourceImage(std::move(uniqueKey)), picture(std::move(picture)), _width(width),
+    : OffscreenImage(std::move(uniqueKey)), picture(std::move(picture)), _width(width),
       _height(height), alphaOnly(alphaOnly) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
@@ -180,27 +183,14 @@ PictureImage::~PictureImage() {
   delete matrix;
 }
 
-std::shared_ptr<TextureProxy> PictureImage::onLockTextureProxy(const TPArgs& args) const {
-  auto proxyProvider = args.context->proxyProvider();
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(args.uniqueKey);
-  if (textureProxy != nullptr) {
-    return textureProxy;
-  }
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  textureProxy =
-      proxyProvider->createTextureProxy(args.uniqueKey, _width, _height, format, args.mipmapped,
-                                        ImageOrigin::TopLeft, args.renderFlags);
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format, 1, true);
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  auto renderFlags = args.renderFlags | RenderFlags::DisableCache;
+bool PictureImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
+                          uint32_t renderFlags) const {
+  TRACE_EVENT;
   RenderContext renderContext(renderTarget, renderFlags);
   MCState replayState(matrix ? *matrix : Matrix::I());
   picture->playback(&renderContext, replayState);
-  auto drawingManager = args.context->drawingManager();
+  auto drawingManager = renderTarget->getContext()->drawingManager();
   drawingManager->addTextureResolveTask(renderTarget);
-  return textureProxy;
+  return true;
 }
 }  // namespace tgfx

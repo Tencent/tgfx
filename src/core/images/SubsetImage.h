@@ -20,7 +20,6 @@
 
 #include <optional>
 #include "core/images/TransformImage.h"
-#include "core/utils/AddressOf.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -37,10 +36,6 @@ class SubsetImage : public TransformImage {
 
   int height() const override {
     return static_cast<int>(bounds.height());
-  }
-
-  bool isComplex() const override {
-    return true;
   }
 
  protected:

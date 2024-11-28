@@ -18,18 +18,22 @@
 
 #pragma once
 
+#include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
-class GradientShader : public Shader {
+class GradientShader : public ShaderBase {
  public:
   GradientShader(const std::vector<Color>& colors, const std::vector<float>& positions,
                  const Matrix& pointsToUnit);
 
   bool isOpaque() const override {
     return colorsAreOpaque;
+  }
+
+  ShaderType type() const override {
+    return ShaderType::Gradient;
   }
 
   std::vector<Color> originalColors = {};
@@ -45,6 +49,8 @@ class LinearGradientShader : public GradientShader {
   LinearGradientShader(const Point& startPoint, const Point& endPoint,
                        const std::vector<Color>& colors, const std::vector<float>& positions);
 
+  GradientType asGradient(GradientInfo*) const override;
+
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
@@ -55,6 +61,8 @@ class RadialGradientShader : public GradientShader {
   RadialGradientShader(const Point& center, float radius, const std::vector<Color>& colors,
                        const std::vector<float>& positions);
 
+  GradientType asGradient(GradientInfo*) const override;
+
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
@@ -64,6 +72,8 @@ class ConicGradientShader : public GradientShader {
  public:
   ConicGradientShader(const Point& center, float t0, float t1, const std::vector<Color>& colors,
                       const std::vector<float>& positions);
+
+  GradientType asGradient(GradientInfo*) const override;
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,

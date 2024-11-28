@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
@@ -27,6 +28,8 @@ class ModeColorFilter : public ColorFilter {
   }
 
   bool isAlphaUnchanged() const override;
+
+  bool asColorMode(Color* color, BlendMode* mode) const override;
 
  private:
   Color color;

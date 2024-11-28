@@ -18,9 +18,7 @@
 
 #pragma once
 
-#include <optional>
 #include "core/images/TransformImage.h"
-#include "core/utils/AddressOf.h"
 
 namespace tgfx {
 /**
@@ -33,10 +31,6 @@ class OrientImage : public TransformImage {
   int width() const override;
 
   int height() const override;
-
-  bool isComplex() const override {
-    return source->isComplex();
-  }
 
  protected:
   Orientation orientation = Orientation::TopLeft;

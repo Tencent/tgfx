@@ -42,6 +42,14 @@ class DecoderImage : public ResourceImage {
     return decoder->isAlphaOnly();
   }
 
+  bool isYUV() const override {
+    return decoder->isYUV();
+  }
+
+  bool isFlat() const override {
+    return !decoder->isYUV();
+  }
+
  protected:
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
 

@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
+#include "core/utils/AddressOf.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 std::shared_ptr<Image> SubsetImage::MakeFrom(std::shared_ptr<Image> source, const Rect& bounds) {
+  TRACE_EVENT;
   if (source == nullptr || bounds.isEmpty()) {
     return nullptr;
   }
@@ -36,10 +38,12 @@ SubsetImage::SubsetImage(std::shared_ptr<Image> source, const Rect& bounds)
 }
 
 std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<Image> newSource) const {
+  TRACE_EVENT;
   return SubsetImage::MakeFrom(std::move(newSource), bounds);
 }
 
 std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
+  TRACE_EVENT;
   auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
   return SubsetImage::MakeFrom(source, newBounds);
 }
@@ -49,6 +53,7 @@ std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
+  TRACE_EVENT;
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
@@ -59,7 +64,7 @@ std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs
   }
   auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto textureProxy = lockTextureProxy(tpArgs, sampling);
+  auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -68,6 +73,7 @@ std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
+  TRACE_EVENT;
   std::optional<Matrix> matrix = std::nullopt;
   if (bounds.x() != 0 || bounds.y() != 0) {
     matrix = Matrix::MakeTrans(bounds.x(), bounds.y());

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
 
@@ -29,6 +30,7 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
 }
 
 void OpsRenderTask::prepare(Context* context) {
+  TRACE_EVENT_COLOR(TRACY_COLOR_GREEN);
   renderPass = context->gpu()->getRenderPass();
   for (auto& op : ops) {
     op->prepare(context, renderFlags);
@@ -36,6 +38,7 @@ void OpsRenderTask::prepare(Context* context) {
 }
 
 bool OpsRenderTask::execute(Gpu* gpu) {
+  TRACE_EVENT;
   if (ops.empty()) {
     return false;
   }

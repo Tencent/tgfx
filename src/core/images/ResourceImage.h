@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/Profiling.h"
 #include "gpu/Resource.h"
 #include "gpu/TPArgs.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -31,20 +32,12 @@ class ResourceImage : public Image {
  public:
   explicit ResourceImage(UniqueKey uniqueKey);
 
-  bool isComplex() const override {
-    return false;
-  }
-
-  std::shared_ptr<Image> makeRasterized(bool mipmapped = false,
-                                        const SamplingOptions& sampling = {}) const override;
-
  protected:
   UniqueKey uniqueKey = {};
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(
-      const TPArgs& args, const SamplingOptions& sampling) const override final;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override final;
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const = 0;
 

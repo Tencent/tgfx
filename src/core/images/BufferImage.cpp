@@ -21,6 +21,7 @@
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
+  TRACE_EVENT;
   if (buffer == nullptr) {
     return nullptr;
   }
@@ -34,6 +35,7 @@ BufferImage::BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffe
 }
 
 std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args) const {
+  TRACE_EVENT;
   return args.context->proxyProvider()->createTextureProxy(args.uniqueKey, imageBuffer,
                                                            args.mipmapped, args.renderFlags);
 }

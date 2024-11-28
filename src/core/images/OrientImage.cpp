@@ -19,6 +19,7 @@
 #include "OrientImage.h"
 #include "core/images/ScaleImage.h"
 #include "core/images/SubsetImage.h"
+#include "core/utils/AddressOf.h"
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
@@ -32,6 +33,7 @@ static const auto RightBottomMatrix = Matrix::MakeAll(0, -1, 1, -1, 0, 1);
 static const auto LeftBottomMatrix = Matrix::MakeAll(0, 1, 0, -1, 0, 1);
 
 static Matrix OrientationToMatrix(Orientation orientation) {
+  TRACE_EVENT;
   switch (orientation) {
     case Orientation::TopRight:
       return TopRightMatrix;
@@ -55,6 +57,7 @@ static Matrix OrientationToMatrix(Orientation orientation) {
 
 std::shared_ptr<Image> OrientImage::MakeFrom(std::shared_ptr<Image> source,
                                              Orientation orientation) {
+  TRACE_EVENT;
   if (source == nullptr) {
     return nullptr;
   }
@@ -79,15 +82,17 @@ int OrientImage::height() const {
 }
 
 std::shared_ptr<Image> OrientImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return OrientImage::MakeFrom(std::move(newSource), orientation);
+  TRACE_EVENT;
+  return MakeFrom(std::move(newSource), orientation);
 }
 
 std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) const {
+  TRACE_EVENT;
   newOrientation = concatOrientation(newOrientation);
   if (newOrientation == Orientation::TopLeft) {
     return source;
   }
-  return OrientImage::MakeFrom(source, newOrientation);
+  return MakeFrom(source, newOrientation);
 }
 
 std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,
@@ -95,6 +100,7 @@ std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
+  TRACE_EVENT;
   std::optional<Matrix> matrix = std::nullopt;
   if (orientation != Orientation::TopLeft) {
     matrix = OrientationToMatrix(orientation, source->width(), source->height());
@@ -114,6 +120,7 @@ std::unique_ptr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs
 }
 
 Orientation OrientImage::concatOrientation(Orientation newOrientation) const {
+  TRACE_EVENT;
   auto oldMatrix = OrientationToMatrix(orientation);
   auto newMatrix = OrientationToMatrix(newOrientation);
   oldMatrix.postConcat(newMatrix);

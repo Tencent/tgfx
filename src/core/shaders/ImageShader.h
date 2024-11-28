@@ -18,15 +18,23 @@
 
 #pragma once
 
+#include "core/shaders/ShaderBase.h"
 #include "gpu/Texture.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class ImageShader : public Shader {
+class ImageShader : public ShaderBase {
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
+
+  ShaderType type() const override {
+    return ShaderType::Image;
+  }
+
+  std::tuple<std::shared_ptr<Image>, TileMode, TileMode> asImage() const override {
+    return {image, tileModeX, tileModeY};
+  }
 
  private:
   ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
