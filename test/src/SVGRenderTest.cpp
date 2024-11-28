@@ -27,7 +27,8 @@ TGFX_TEST(SVGRenderTest, XMLParse) {
 
   std::string xml = R"(
     <svg width="100" height="100">
-      <rect x="10" y="10" width="80" height="80" fill="red" />
+      <rect width="100%" height="100%" fill="red" />
+      <circle cx="150" cy="100" r="80" fill="green" />
     </svg>
   )";
 
@@ -39,28 +40,41 @@ TGFX_TEST(SVGRenderTest, XMLParse) {
   auto rootNode = xmlDOM->getRootNode();
   EXPECT_TRUE(rootNode != nullptr);
   EXPECT_EQ(rootNode->name, "svg");
-
   EXPECT_EQ(static_cast<int>(rootNode->attributes.size()), 2);
   EXPECT_EQ(rootNode->attributes[0].name, "width");
   EXPECT_EQ(rootNode->attributes[0].value, "100");
   EXPECT_EQ(rootNode->attributes[1].name, "height");
   EXPECT_EQ(rootNode->attributes[1].value, "100");
 
+  EXPECT_EQ(rootNode->countChildren(), 2);
   auto rectNode = rootNode->getFirstChild("");
   EXPECT_TRUE(rectNode != nullptr);
   EXPECT_EQ(rectNode->name, "rect");
+  EXPECT_EQ(static_cast<int>(rectNode->attributes.size()), 3);
+  EXPECT_EQ(rectNode->attributes[0].name, "width");
+  EXPECT_EQ(rectNode->attributes[0].value, "100%");
+  EXPECT_EQ(rectNode->attributes[1].name, "height");
+  EXPECT_EQ(rectNode->attributes[1].value, "100%");
+  EXPECT_EQ(rectNode->attributes[2].name, "fill");
+  EXPECT_EQ(rectNode->attributes[2].value, "red");
 
-  EXPECT_EQ(static_cast<int>(rectNode->attributes.size()), 5);
-  EXPECT_EQ(rectNode->attributes[0].name, "x");
-  EXPECT_EQ(rectNode->attributes[0].value, "10");
-  EXPECT_EQ(rectNode->attributes[1].name, "y");
-  EXPECT_EQ(rectNode->attributes[1].value, "10");
-  EXPECT_EQ(rectNode->attributes[2].name, "width");
-  EXPECT_EQ(rectNode->attributes[2].value, "80");
-  EXPECT_EQ(rectNode->attributes[3].name, "height");
-  EXPECT_EQ(rectNode->attributes[3].value, "80");
-  EXPECT_EQ(rectNode->attributes[4].name, "fill");
-  EXPECT_EQ(rectNode->attributes[4].value, "red");
+  auto circleNode = rectNode->getNextSibling("");
+  EXPECT_TRUE(circleNode != nullptr);
+  bool isGood = false;
+  std::string value;
+  std::tie(isGood, value) = circleNode->findAttribute("cx");
+  EXPECT_TRUE(isGood);
+  EXPECT_EQ(value, "150");
+  std::tie(isGood, value) = circleNode->findAttribute("cy");
+  EXPECT_TRUE(isGood);
+  EXPECT_EQ(value, "100");
+  std::tie(isGood, value) = circleNode->findAttribute("round");
+  EXPECT_FALSE(isGood);
+
+  auto copyDOM = DOM::copy(xmlDOM);
+  EXPECT_TRUE(copyDOM != nullptr);
+  EXPECT_TRUE(copyDOM.get() != xmlDOM.get());
+  EXPECT_EQ(copyDOM->getRootNode()->name, xmlDOM->getRootNode()->name);
 }
 
 }  // namespace tgfx
