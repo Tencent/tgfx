@@ -22,11 +22,11 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/GradientType.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/core/ShaderType.h"
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
@@ -117,6 +117,14 @@ class Shader {
   }
 
   /**
+   * If the shader has a constant color, this method returns true and updates the color parameter.
+   * Otherwise, it returns false and leaves the color parameter unchanged.
+   */
+  virtual bool asColor(Color*) const {
+    return false;
+  }
+
+  /**
    * Returns a shader that will apply the specified viewMatrix to this shader when drawing. The
    * specified matrix will be applied after any matrix associated with this shader.
    */
@@ -127,34 +135,6 @@ class Shader {
    * the ColorFilter.
    */
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
-
-  /**
-   * Returns the type of this shader.
-   */
-  virtual ShaderType type() const = 0;
-
-  /**
-   * If the shader has a constant color, this method returns true and updates the color parameter.
-   * Otherwise, it returns false and leaves the color parameter unchanged.
-   */
-  virtual bool asColor(Color*) const {
-    return false;
-  }
-
-  /**
-   * If this is a gradient shader, returns the valid type of gradient. If GradientInfo and Matrix
-   * are not null pointers, also returns the corresponding values.
-   */
-  virtual GradientType asGradient(GradientInfo*) const {
-    return GradientType::None;
-  }
-
-  /**
-   * If this is an image shader, returns the image, and the tile modes for x and y.
-   */
-  virtual std::tuple<std::shared_ptr<Image>, TileMode, TileMode> asImage() const {
-    return {nullptr, TileMode::Clamp, TileMode::Clamp};
-  }
 
  protected:
   std::weak_ptr<Shader> weakThis;

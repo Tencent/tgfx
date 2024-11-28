@@ -18,10 +18,8 @@
 
 #pragma once
 
-#include <array>
-#include <vector>
-#include "tgfx/core/Color.h"
-#include "tgfx/core/Point.h"
+#include <memory>
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
@@ -50,29 +48,31 @@ struct GradientInfo {
   std::array<float, 2> radiuses;
 };
 
-/**
- * Defines the type of gradient to be drawn.
- */
-enum class GradientType {
-  /*
-   * None is used to indicate that the gradient type is not defined.
-  */
-  None,
+class ShaderBase : public Shader {
+ public:
   /**
-   * Linear gradients are defined by an axis, which is a line that the color gradient is aligned
-   * with.
+   * Returns the type of this shader.
    */
-  Linear,
+  virtual ShaderType type() const = 0;
+
   /**
-   * Radial gradients are defined by a center point and a radius. The color gradient is drawn from
-   * the center point to the edge of the radius.
+   * If this is a gradient shader, returns the valid type of gradient. If GradientInfo and Matrix
+   * are not null pointers, also returns the corresponding values.
    */
-  Radial,
+  virtual GradientType asGradient(GradientInfo*) const {
+    return GradientType::None;
+  }
+
   /**
-   * Conic gradients are defined by a center point and an angular range. The color gradient is drawn
-   * from the start angle to the end angle, wrapping around the center point.
+   * If this is an image shader, returns the image, and the tile modes for x and y.
    */
-  Conic,
+  virtual std::tuple<std::shared_ptr<Image>, TileMode, TileMode> asImage() const {
+    return {nullptr, TileMode::Clamp, TileMode::Clamp};
+  }
 };
+
+inline const ShaderBase* asShaderBase(const std::shared_ptr<Shader>& shader) {
+  return static_cast<ShaderBase*>(shader.get());
+}
 
 }  // namespace tgfx

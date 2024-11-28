@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,30 @@
 
 #pragma once
 
-#include "core/shaders/ShaderBase.h"
-#include "tgfx/core/Shader.h"
-
 namespace tgfx {
-class ColorShader : public ShaderBase {
- public:
-  explicit ColorShader(Color color) : color(color) {
-  }
-
-  bool isOpaque() const override;
-
-  bool asColor(Color* color) const override;
-
-  ShaderType type() const override {
-    return ShaderType::Color;
-  }
-
- protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* uvMatrix) const override;
-
- private:
-  Color color;
+/**
+ * Defines the type of gradient to be drawn.
+ */
+enum class GradientType {
+  /*
+   * None is used to indicate that the gradient type is not defined.
+  */
+  None,
+  /**
+   * Linear gradients are defined by an axis, which is a line that the color gradient is aligned
+   * with.
+   */
+  Linear,
+  /**
+   * Radial gradients are defined by a center point and a radius. The color gradient is drawn from
+   * the center point to the edge of the radius.
+   */
+  Radial,
+  /**
+   * Conic gradients are defined by a center point and an angular range. The color gradient is drawn
+   * from the start angle to the end angle, wrapping around the center point.
+   */
+  Conic,
 };
+
 }  // namespace tgfx

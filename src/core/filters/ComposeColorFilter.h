@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "tgfx/core/ColorFilter.h"
+#include "core/filters/ColorFilterBase.h"
 
 namespace tgfx {
-class ComposeColorFilter : public ColorFilter {
+class ComposeColorFilter : public ColorFilterBase {
  public:
   explicit ComposeColorFilter(std::shared_ptr<ColorFilter> inner,
                               std::shared_ptr<ColorFilter> outer);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,23 @@
 
 #pragma once
 
-#include "core/shaders/ShaderBase.h"
-#include "tgfx/core/Shader.h"
-
+#include <memory>
+#include "tgfx/core/ColorFilter.h"
 namespace tgfx {
-class ColorShader : public ShaderBase {
+
+class ColorFilterBase : public ColorFilter {
  public:
-  explicit ColorShader(Color color) : color(color) {
+  /** 
+   * If the filter can be represented by a source color plus Mode, this returns true, and sets (if
+   * not NULL) the color and mode appropriately.If not, this returns false and ignores the
+   * parameters.
+   */
+  virtual bool asColorMode(Color*, BlendMode*) const {
+    return false;
   }
-
-  bool isOpaque() const override;
-
-  bool asColor(Color* color) const override;
-
-  ShaderType type() const override {
-    return ShaderType::Color;
-  }
-
- protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* uvMatrix) const override;
-
- private:
-  Color color;
 };
+
+inline const ColorFilterBase* asColorFilterBase(const std::shared_ptr<ColorFilter>& filter) {
+  return static_cast<const ColorFilterBase*>(filter.get());
+}
 }  // namespace tgfx

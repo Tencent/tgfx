@@ -18,12 +18,13 @@
 
 #pragma once
 
+#include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
-class GradientShader : public Shader {
+class GradientShader : public ShaderBase {
  public:
   GradientShader(const std::vector<Color>& colors, const std::vector<float>& positions,
                  const Matrix& pointsToUnit);

@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "tgfx/core/ColorFilter.h"
+#include "core/filters/ColorFilterBase.h"
 
 namespace tgfx {
-class MatrixColorFilter : public ColorFilter {
+class MatrixColorFilter : public ColorFilterBase {
  public:
   explicit MatrixColorFilter(const std::array<float, 20>& matrix);
 

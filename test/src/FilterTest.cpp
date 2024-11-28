@@ -18,17 +18,19 @@
 
 #include <vector>
 #include "CornerPinEffect.h"
+#include "core/filters/ColorFilterBase.h"
+#include "core/shaders/ShaderBase.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/GradientType.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/ShaderType.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/RuntimeEffect.h"
@@ -372,17 +374,17 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   auto modeColorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
   Color color;
   BlendMode mode;
-  bool ret = modeColorFilter->asColorMode(&color, &mode);
+  bool ret = asColorFilterBase(modeColorFilter)->asColorMode(&color, &mode);
   EXPECT_TRUE(ret);
   EXPECT_EQ(color, Color::Red());
   EXPECT_EQ(mode, BlendMode::Multiply);
 
   auto lumaFilter = ColorFilter::Matrix(lumaColorMatrix);
-  ret = lumaFilter->asColorMode(nullptr, nullptr);
+  ret = asColorFilterBase(lumaFilter)->asColorMode(nullptr, nullptr);
   EXPECT_FALSE(ret);
 
   auto filter = ColorFilter::Compose(modeColorFilter, lumaFilter);
-  ret = filter->asColorMode(nullptr, nullptr);
+  ret = asColorFilterBase(filter)->asColorMode(nullptr, nullptr);
   EXPECT_FALSE(ret);
 }
 
@@ -390,17 +392,17 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   auto colorShader = Shader::MakeColorShader(Color::Red());
   ASSERT_TRUE(colorShader != nullptr);
   {
-    EXPECT_TRUE(colorShader->type() == ShaderType::Color);
+    EXPECT_TRUE(asShaderBase(colorShader)->type() == ShaderType::Color);
 
     Color color = Color::White();
     bool ret = colorShader->asColor(&color);
     EXPECT_TRUE(ret);
     EXPECT_EQ(color, Color::Red());
 
-    auto gradientType = colorShader->asGradient(nullptr);
+    auto gradientType = asShaderBase(colorShader)->asGradient(nullptr);
     EXPECT_EQ(gradientType, GradientType::None);
 
-    auto [image, tileModeX, tileModeY] = colorShader->asImage();
+    auto [image, tileModeX, tileModeY] = asShaderBase(colorShader)->asImage();
     EXPECT_EQ(image, nullptr);
     EXPECT_EQ(tileModeX, TileMode::Clamp);
     EXPECT_EQ(tileModeY, TileMode::Clamp);
@@ -411,15 +413,15 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   auto imageShader = Shader::MakeImageShader(image, TileMode::Mirror, TileMode::Repeat);
   ASSERT_TRUE(imageShader != nullptr);
   {
-    EXPECT_EQ(imageShader->type(), ShaderType::Image);
+    EXPECT_EQ(asShaderBase(imageShader)->type(), ShaderType::Image);
 
     bool ret = imageShader->asColor(nullptr);
     EXPECT_FALSE(ret);
 
-    auto gradientType = imageShader->asGradient(nullptr);
+    auto gradientType = asShaderBase(imageShader)->asGradient(nullptr);
     EXPECT_EQ(gradientType, GradientType::None);
 
-    auto [image, tileModeX, tileModeY] = imageShader->asImage();
+    auto [image, tileModeX, tileModeY] = asShaderBase(imageShader)->asImage();
     EXPECT_EQ(image, image);
     EXPECT_EQ(tileModeX, TileMode::Mirror);
     EXPECT_EQ(tileModeY, TileMode::Repeat);
@@ -428,15 +430,15 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   auto blendShader = Shader::MakeBlend(BlendMode::SrcOut, imageShader, colorShader);
   ASSERT_TRUE(blendShader != nullptr);
   {
-    EXPECT_EQ(blendShader->type(), ShaderType::Blend);
+    EXPECT_EQ(asShaderBase(blendShader)->type(), ShaderType::Blend);
 
     bool ret = blendShader->asColor(nullptr);
     EXPECT_FALSE(ret);
 
-    auto gradientType = blendShader->asGradient(nullptr);
+    auto gradientType = asShaderBase(blendShader)->asGradient(nullptr);
     EXPECT_EQ(gradientType, GradientType::None);
 
-    auto [image, tileModeX, tileModeY] = blendShader->asImage();
+    auto [image, tileModeX, tileModeY] = asShaderBase(blendShader)->asImage();
     EXPECT_EQ(image, nullptr);
     EXPECT_EQ(tileModeX, TileMode::Clamp);
     EXPECT_EQ(tileModeY, TileMode::Clamp);
@@ -450,20 +452,20 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   auto linearGradientShader = Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
   ASSERT_TRUE(linearGradientShader != nullptr);
   {
-    EXPECT_EQ(linearGradientShader->type(), ShaderType::Gradient);
+    EXPECT_EQ(asShaderBase(linearGradientShader)->type(), ShaderType::Gradient);
 
     bool ret = linearGradientShader->asColor(nullptr);
     EXPECT_FALSE(ret);
 
     GradientInfo info;
-    auto gradientType = linearGradientShader->asGradient(&info);
+    auto gradientType = asShaderBase(linearGradientShader)->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Linear);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], startPoint);
     EXPECT_EQ(info.points[1], endPoint);
 
-    auto [image, tileModeX, tileModeY] = linearGradientShader->asImage();
+    auto [image, tileModeX, tileModeY] = asShaderBase(linearGradientShader)->asImage();
     EXPECT_EQ(image, nullptr);
     EXPECT_EQ(tileModeX, TileMode::Clamp);
     EXPECT_EQ(tileModeY, TileMode::Clamp);
@@ -474,20 +476,20 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   auto radialGradientShader = Shader::MakeRadialGradient(center, radius, colors, positions);
   ASSERT_TRUE(radialGradientShader != nullptr);
   {
-    EXPECT_EQ(radialGradientShader->type(), ShaderType::Gradient);
+    EXPECT_EQ(asShaderBase(radialGradientShader)->type(), ShaderType::Gradient);
 
     bool ret = radialGradientShader->asColor(nullptr);
     EXPECT_FALSE(ret);
 
     GradientInfo info;
-    auto gradientType = radialGradientShader->asGradient(&info);
+    auto gradientType = asShaderBase(radialGradientShader)->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Radial);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], center);
     EXPECT_EQ(info.radiuses[0], radius);
 
-    auto [image, tileModeX, tileModeY] = radialGradientShader->asImage();
+    auto [image, tileModeX, tileModeY] = asShaderBase(radialGradientShader)->asImage();
     EXPECT_EQ(image, nullptr);
     EXPECT_EQ(tileModeX, TileMode::Clamp);
     EXPECT_EQ(tileModeY, TileMode::Clamp);
@@ -499,13 +501,13 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
       Shader::MakeConicGradient(center, startAngle, endAngle, colors, positions);
   ASSERT_TRUE(conicGradientShader != nullptr);
   {
-    EXPECT_EQ(conicGradientShader->type(), ShaderType::Gradient);
+    EXPECT_EQ(asShaderBase(conicGradientShader)->type(), ShaderType::Gradient);
 
     bool ret = conicGradientShader->asColor(nullptr);
     EXPECT_FALSE(ret);
 
     GradientInfo info;
-    auto gradientType = conicGradientShader->asGradient(&info);
+    auto gradientType = asShaderBase(conicGradientShader)->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Conic);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
@@ -513,7 +515,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     EXPECT_EQ(info.radiuses[0], startAngle);
     EXPECT_EQ(info.radiuses[1], endAngle);
 
-    auto [image, tileModeX, tileModeY] = conicGradientShader->asImage();
+    auto [image, tileModeX, tileModeY] = asShaderBase(conicGradientShader)->asImage();
     EXPECT_EQ(image, nullptr);
     EXPECT_EQ(tileModeX, TileMode::Clamp);
     EXPECT_EQ(tileModeY, TileMode::Clamp);

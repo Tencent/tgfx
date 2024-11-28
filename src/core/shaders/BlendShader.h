@@ -18,10 +18,11 @@
 
 #pragma once
 
+#include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class BlendShader : public Shader {
+class BlendShader : public ShaderBase {
  public:
   BlendShader(BlendMode mode, std::shared_ptr<Shader> dst, std::shared_ptr<Shader> src)
       : mode(mode), dst(std::move(dst)), src(std::move(src)) {
