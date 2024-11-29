@@ -29,19 +29,10 @@ using namespace emscripten;
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
   if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
-    auto data = val::module_property("tgfx")
-                    .call<val>("getBytesFromPath", val::module_property("module"), filePath)
-                    .await();
-    if (!data.as<bool>()) {
-      return nullptr;
-    }
-    auto byteOffset = reinterpret_cast<void*>(data["byteOffset"].as<int>());
-    auto length = data["length"].as<size_t>();
-    Buffer imageBuffer(length);
-    memcpy(imageBuffer.data(), byteOffset, length);
-    data.call<void>("free");
-    auto imageData = imageBuffer.release();
-    return ImageCodec::MakeNativeCodec(imageData);
+    auto image = val::module_property("tgfx")
+                     .call<val>("getImageFromPath", val::module_property("module"), filePath)
+                     .await();
+    return ImageCodec::MakeFrom(image);
   } else {
     auto imageStream = Stream::MakeFromFile(filePath);
     if (imageStream == nullptr || imageStream->size() <= 14) {
