@@ -20,7 +20,7 @@
 #include <mutex>
 #include "core/utils/Log.h"
 
-#if defined(__EMSCRIPTEN__)
+#ifdef __EMSCRIPTEN__
 #include "platform/web/WebStream.h"
 #endif
 
@@ -68,33 +68,36 @@ void Stream::RegisterStreamFactory(std::unique_ptr<StreamFactory> factory) {
 }
 
 std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
-  std::unique_ptr<Stream> stream = nullptr;
-  locker.lock();
-#if defined(__EMSCRIPTEN__)
-  if (streamFactory == nullptr) {
-    streamFactory = std::unique_ptr<StreamFactory>(new WebStreamFactory());
-  }
+  if (filePath.find("http://") == 0 || filePath.find("https://") == 0 ||
+      filePath.find("assets://")) {
+    std::unique_ptr<Stream> stream = nullptr;
+    locker.lock();
+#ifdef __EMSCRIPTEN__
+    if (streamFactory == nullptr) {
+      streamFactory = std::unique_ptr<StreamFactory>(new WebStreamFactory());
+    }
 #endif
-  if (streamFactory) {
-    stream = streamFactory->createStream(filePath);
+    if (streamFactory) {
+      stream = streamFactory->createStream(filePath);
+    }
+    locker.unlock();
+    if (stream) {
+      return stream;
+    }
   }
-  locker.unlock();
-  if (stream) {
-    return stream;
+    auto file = fopen(filePath.c_str(), "rb");
+    if (file == nullptr) {
+      LOGE("file open failed! filePath:%s \n", filePath.c_str());
+      return nullptr;
+    }
+    fseek(file, 0, SEEK_END);
+    auto length = ftell(file);
+    if (length <= 0) {
+      fclose(file);
+      return nullptr;
+    }
+    fseek(file, 0, SEEK_SET);
+    return std::make_unique<FileStream>(file, length);
   }
-  auto file = fopen(filePath.c_str(), "rb");
-  if (file == nullptr) {
-    LOGE("file open failed! filePath:%s \n", filePath.c_str());
-    return nullptr;
-  }
-  fseek(file, 0, SEEK_END);
-  auto length = ftell(file);
-  if (length <= 0) {
-    fclose(file);
-    return nullptr;
-  }
-  fseek(file, 0, SEEK_SET);
-  return std::make_unique<FileStream>(file, length);
-}
 
 }  // namespace tgfx

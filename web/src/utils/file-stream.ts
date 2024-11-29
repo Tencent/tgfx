@@ -25,6 +25,9 @@ export class FileStream {
     public async read(start: number, length: number): Promise<Uint8Array> {
         try {
             const blob = await this.fetchFile();
+            if (blob == null) {
+                return new Uint8Array(0);
+            }
             const reader = this.createFileReader();
 
             return new Promise<Uint8Array>((resolve, reject) => {
@@ -42,7 +45,7 @@ export class FileStream {
                 reader.readAsArrayBuffer(blob.slice(start, end));
             });
         } catch (error) {
-            throw new Error(`Fetch error: ${error}`);
+            return new Uint8Array(0);
         }
     }
 

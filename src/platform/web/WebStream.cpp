@@ -46,7 +46,7 @@ size_t WebStream::size() const {
 }
 
 bool WebStream::seek(size_t position) {
-  if (position > length) {
+  if (position >= length) {
     return false;
   }
   currentPosition = position;
@@ -65,6 +65,9 @@ bool WebStream::move(int offset) {
 size_t WebStream::read(void* buffer, size_t size) {
   if (currentPosition + size >= length) {
     size = length - currentPosition;
+  }
+  if (size <= 0) {
+    return 0;
   }
   val readPromise = fileStream.call<val>("read", currentPosition, size);
   val emscriptenData = readPromise.await();

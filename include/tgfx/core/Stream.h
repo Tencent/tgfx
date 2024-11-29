@@ -26,13 +26,15 @@ namespace tgfx {
 class Stream;
 /**
  * StreamFactory creates instances of Stream and can be inherited externally to implement the
- * loading of network files.
+ * loading of network files and resources without local paths.
  */
 class StreamFactory {
 public:
  virtual ~StreamFactory() = default;
  /**
-  * Creates a Stream instance for the specified file path.
+  * Creates a Stream instance for the specified file path. The path needs to start with "http://"、
+  * "https://" or "assets://". Loading of local cache paths can directly use tgfx's internal
+  * interfaces and does not need to be handled here.
   */
  virtual std::unique_ptr<Stream> createStream(const std::string& filePath) = 0;
 };
