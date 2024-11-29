@@ -25,18 +25,18 @@ namespace tgfx {
 OffscreenImage::OffscreenImage(UniqueKey uniqueKey) : ResourceImage(std::move(uniqueKey)) {
 }
 
-std::shared_ptr<TextureProxy> OffscreenImage::onLockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> OffscreenImage::onLockTextureProxy(const TPArgs& args,
+                                                                 const UniqueKey& key) const {
   TRACE_EVENT;
   auto proxyProvider = args.context->proxyProvider();
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(args.uniqueKey);
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(key);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  textureProxy =
-      proxyProvider->createTextureProxy(args.uniqueKey, width(), height(), format, args.mipmapped,
-                                        ImageOrigin::TopLeft, args.renderFlags);
+  textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, args.mipmapped,
+                                                   ImageOrigin::TopLeft, args.renderFlags);
   auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format, 1, true);
   if (renderTarget == nullptr) {
     return nullptr;

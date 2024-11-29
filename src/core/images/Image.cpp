@@ -49,6 +49,7 @@ class PixelDataConverter : public ImageGenerator {
 
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
+    TRACE_EVENT;
     Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);
     if (bitmap.isEmpty()) {
       return nullptr;
@@ -253,15 +254,9 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 }
 
 std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
-  auto context = args.context;
-  auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto proxyProvider = context->proxyProvider();
-  // Don't pass args.renderFlags to this method. It's meant for creating the fragment processor.
-  // The caller should decide whether to disable the cache by setting args.uniqueKey.
-  auto textureProxy =
-      proxyProvider->createTextureProxy(args.uniqueKey, width(), height(), format, args.mipmapped);
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
+  TRACE_EVENT;
+  auto renderTarget = RenderTargetProxy::MakeFallback(args.context, width(), height(),
+                                                      isAlphaOnly(), 1, args.mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -274,6 +269,6 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const 
   }
   OpContext opContext(renderTarget, args.renderFlags);
   opContext.fillWithFP(std::move(processor), Matrix::I(), true);
-  return textureProxy;
+  return renderTarget->getTextureProxy();
 }
 }  // namespace tgfx

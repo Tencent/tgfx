@@ -52,7 +52,8 @@ class FlattenImage : public ResourceImage {
  protected:
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
+                                                   const UniqueKey& key) const override;
 
  private:
   std::shared_ptr<Image> source = nullptr;

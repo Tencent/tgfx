@@ -54,7 +54,8 @@ std::shared_ptr<Image> MipmapImage::onMakeMipmapped(bool enabled) const {
   return enabled ? weakThis.lock() : source;
 }
 
-std::shared_ptr<TextureProxy> MipmapImage::onLockTextureProxy(const TPArgs& args) const {
-  return source->onLockTextureProxy(args);
+std::shared_ptr<TextureProxy> MipmapImage::onLockTextureProxy(const TPArgs& args,
+                                                              const UniqueKey& key) const {
+  return source->onLockTextureProxy(args, key);
 }
 }  // namespace tgfx

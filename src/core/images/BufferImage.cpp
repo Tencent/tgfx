@@ -34,9 +34,10 @@ BufferImage::BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffe
     : ResourceImage(std::move(uniqueKey)), imageBuffer(std::move(buffer)) {
 }
 
-std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args,
+                                                              const UniqueKey& key) const {
   TRACE_EVENT;
-  return args.context->proxyProvider()->createTextureProxy(args.uniqueKey, imageBuffer,
-                                                           args.mipmapped, args.renderFlags);
+  return args.context->proxyProvider()->createTextureProxy(key, imageBuffer, args.mipmapped,
+                                                           args.renderFlags);
 }
 }  // namespace tgfx

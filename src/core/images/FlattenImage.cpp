@@ -20,6 +20,7 @@
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/DrawOp.h"
+#include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -66,23 +67,32 @@ std::shared_ptr<Image> FlattenImage::onMakeDecoded(Context* context, bool) const
   return newImage;
 }
 
-std::shared_ptr<TextureProxy> FlattenImage::onLockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> FlattenImage::onLockTextureProxy(const TPArgs& args,
+                                                               const UniqueKey& key) const {
   TRACE_EVENT;
   auto proxyProvider = args.context->proxyProvider();
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(args.uniqueKey);
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(key);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
   auto sourceArgs = args;
-  sourceArgs.flattened = true;
   sourceArgs.renderFlags |= RenderFlags::DisableCache;
-  if (args.renderFlags & RenderFlags::DisableCache) {
-    sourceArgs.uniqueKey = {};
-  }
   textureProxy = source->lockTextureProxy(sourceArgs);
-  if (args.renderFlags & RenderFlags::DisableCache) {
-    proxyProvider->changeProxyKey(textureProxy, args.uniqueKey);
+  if (textureProxy && textureProxy->isYUV()) {
+    auto renderTarget = RenderTargetProxy::MakeFallback(args.context, width(), height(),
+                                                        isAlphaOnly(), 1, args.mipmapped);
+    if (renderTarget == nullptr) {
+      return nullptr;
+    }
+    auto processor = TextureEffect::Make(std::move(textureProxy));
+    if (processor == nullptr) {
+      return nullptr;
+    }
+    OpContext opContext(renderTarget, args.renderFlags);
+    opContext.fillWithFP(std::move(processor), Matrix::I(), true);
+    textureProxy = renderTarget->getTextureProxy();
   }
+  proxyProvider->changeUniqueKey(textureProxy, key, args.renderFlags);
   return textureProxy;
 }
 
