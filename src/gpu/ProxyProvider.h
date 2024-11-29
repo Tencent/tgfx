@@ -127,14 +127,6 @@ class ProxyProvider {
   std::shared_ptr<RenderTargetProxy> wrapBackendRenderTarget(
       const BackendRenderTarget& backendRenderTarget, ImageOrigin origin = ImageOrigin::TopLeft);
 
-  /**
-   * Changes the UniqueKey of the given proxy to the new UniqueKey. So that the proxy can be found
-   * with the new key. This also updates the UniqueKey of the target resource if it has been
-   * instantiated, otherwise it updates the UniqueKey of associated resource task.
-   */
-  void changeUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey,
-                       uint32_t renderFlags);
-
   /*
    * Purges all unreferenced proxies.
    */

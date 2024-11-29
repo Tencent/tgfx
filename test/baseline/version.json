@@ -31,7 +31,6 @@
         "drawShape": "fb9a840",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
-        "flattenImage": "2028a1b",
         "hardware_render_target_blend": "d010fb8",
         "merge_draw_call_rect": "d010fb8",
         "merge_draw_call_rrect": "d010fb8",

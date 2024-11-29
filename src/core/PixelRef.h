@@ -66,10 +66,6 @@ class PixelRef : public ImageStream {
     return pixelBuffer->isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return pixelBuffer->isYUV();
-  }
-
   bool isHardwareBacked() const override {
     return pixelBuffer->isHardwareBacked();
   }

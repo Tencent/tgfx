@@ -53,10 +53,6 @@ class WebImageBuffer : public ImageBuffer {
     return false;
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 

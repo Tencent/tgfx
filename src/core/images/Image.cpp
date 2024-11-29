@@ -19,7 +19,6 @@
 #include "tgfx/core/Image.h"
 #include "core/images/BufferImage.h"
 #include "core/images/FilterImage.h"
-#include "core/images/FlattenImage.h"
 #include "core/images/OrientImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/ScaleImage.h"
@@ -41,10 +40,6 @@ class PixelDataConverter : public ImageGenerator {
 
   bool isAlphaOnly() const override {
     return info.isAlphaOnly();
-  }
-
-  bool isYUV() const override {
-    return false;
   }
 
  protected:
@@ -150,14 +145,6 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   }
   auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, true);
   return TextureImage::Wrap(std::move(textureProxy));
-}
-
-std::shared_ptr<Image> Image::makeFlattened() const {
-  TRACE_EVENT;
-  if (isFlat()) {
-    return weakThis.lock();
-  }
-  return FlattenImage::MakeFrom(weakThis.lock());
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {

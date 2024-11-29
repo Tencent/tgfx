@@ -42,10 +42,6 @@ class PixelData : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override {
     switch (info.colorType()) {
@@ -87,10 +83,6 @@ class YUVBuffer : public ImageBuffer {
 
   bool isAlphaOnly() const final {
     return false;
-  }
-
-  bool isYUV() const override {
-    return true;
   }
 
  protected:
