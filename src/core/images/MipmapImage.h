@@ -37,16 +37,8 @@ class MipmapImage : public ResourceImage {
     return source->isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return source->isYUV();
-  }
-
   bool hasMipmaps() const override {
     return true;
-  }
-
-  bool isFlat() const override {
-    return source->isFlat();
   }
 
  protected:

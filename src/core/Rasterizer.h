@@ -52,10 +52,6 @@ class Rasterizer : public ImageGenerator {
     return true;
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
   bool asyncSupport() const override;
 
  protected:

@@ -49,9 +49,6 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
     offset->x = bounds.left;
     offset->y = bounds.top;
   }
-  if (filter->requireFlatSource()) {
-    source = source->makeFlattened();
-  }
   return Wrap(std::move(source), bounds, std::move(filter));
 }
 

@@ -47,10 +47,6 @@ class WebImageStream : public ImageStream {
     return alphaOnly;
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
   bool isHardwareBacked() const override {
     return false;
   }

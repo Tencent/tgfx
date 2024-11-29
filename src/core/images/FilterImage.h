@@ -43,10 +43,6 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
  protected:
   FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
               std::shared_ptr<ImageFilter> filter);
