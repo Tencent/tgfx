@@ -47,7 +47,7 @@ if (typeof window !== 'undefined') {
             let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
             var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
-            await tgfxView.setImagePath(imagePath); // Ensure this is awaited
+            await tgfxView.setImagePath(imagePath);
 
             var fontPath = "http://localhost:8081/../../resources/font/NotoSansSC-Regular.otf";
             var emojiFontPath = "http://localhost:8081/../../resources/font/NotoColorEmoji.ttf";
