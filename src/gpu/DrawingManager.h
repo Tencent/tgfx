@@ -46,6 +46,8 @@ class DrawingManager {
 
   void addResourceTask(std::shared_ptr<ResourceTask> resourceTask);
 
+  bool changeResourceTaskKey(const UniqueKey& oldKey, const UniqueKey& newKey);
+
   /**
    * Returns true if any render tasks were executed.
    */
@@ -57,9 +59,7 @@ class DrawingManager {
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
   std::shared_ptr<OpsRenderTask> activeOpsTask = nullptr;
-#ifdef DEBUG
   ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
-#endif
 
   void addRenderTask(std::shared_ptr<RenderTask> renderTask);
   void checkIfResolveNeeded(std::shared_ptr<RenderTargetProxy> renderTargetProxy);

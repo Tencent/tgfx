@@ -128,10 +128,12 @@ class ProxyProvider {
       const BackendRenderTarget& backendRenderTarget, ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
-   * Changes the key of the given proxy to the new key. So that the proxy can be found with the new
-   * key. This does not change the key of the resource that the proxy wraps.
+   * Changes the UniqueKey of the given proxy to the new UniqueKey. So that the proxy can be found
+   * with the new key. This also updates the UniqueKey of the target resource if it has been
+   * instantiated, otherwise it updates the UniqueKey of associated resource task.
    */
-  void changeProxyKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey);
+  void changeUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey,
+                       uint32_t renderFlags);
 
   /*
    * Purges all unreferenced proxies.

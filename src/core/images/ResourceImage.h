@@ -39,7 +39,8 @@ class ResourceImage : public Image {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override final;
 
-  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const = 0;
+  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
+                                                           const UniqueKey& key) const = 0;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
                                                          TileMode tileModeY,

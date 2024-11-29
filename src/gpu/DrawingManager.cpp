@@ -73,12 +73,21 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
   if (resourceTask == nullptr) {
     return;
   }
-#ifdef DEBUG
-  auto result = resourceTaskMap.find(resourceTask->uniqueKey);
-  DEBUG_ASSERT(result == resourceTaskMap.end());
+  DEBUG_ASSERT(resourceTaskMap.find(resourceTask->uniqueKey) == resourceTaskMap.end());
   resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
-#endif
   resourceTasks.push_back(std::move(resourceTask));
+}
+
+bool DrawingManager::changeResourceTaskKey(const UniqueKey& oldKey, const UniqueKey& newKey) {
+  auto result = resourceTaskMap.find(oldKey);
+  if (result == resourceTaskMap.end()) {
+    return false;
+  }
+  auto task = result->second;
+  resourceTaskMap.erase(oldKey);
+  task->uniqueKey = newKey;
+  resourceTaskMap[newKey] = task;
+  return true;
 }
 
 bool DrawingManager::flush() {

@@ -60,7 +60,8 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
-std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(const TPArgs& args,
+                                                               const UniqueKey&) const {
   TRACE_EVENT;
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;

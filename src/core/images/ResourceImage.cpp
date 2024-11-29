@@ -27,12 +27,10 @@ ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKe
 
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
   TRACE_EVENT;
-  if (args.flattened && !isFlat()) {
-    return Image::lockTextureProxy(args);
-  }
-  // Some options in TPArgs are ignored for ResourceImage because it has preset properties.
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), args.flattened, uniqueKey);
-  return onLockTextureProxy(tpArgs);
+  auto newArgs = args;
+  // ResourceImage has preset mipmaps.
+  newArgs.mipmapped = hasMipmaps();
+  return onLockTextureProxy(newArgs, uniqueKey);
 }
 
 std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
@@ -45,8 +43,8 @@ std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
     const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   TRACE_EVENT;
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), false, uniqueKey);
-  auto proxy = onLockTextureProxy(tpArgs);
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
+  auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,
                                   isAlphaOnly());
 }

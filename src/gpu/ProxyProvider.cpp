@@ -262,8 +262,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto uniqueKey = UniqueKey::Make();
-  auto task = RenderTargetCreateTask::MakeFrom(uniqueKey, textureProxy->getUniqueKey(), format,
-                                               sampleCount, clearAll);
+  auto task =
+      RenderTargetCreateTask::MakeFrom(uniqueKey, textureProxy, format, sampleCount, clearAll);
   if (task == nullptr) {
     return nullptr;
   }
@@ -290,9 +290,24 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::wrapBackendRenderTarget(
   return proxy;
 }
 
-void ProxyProvider::changeProxyKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey) {
-  if (proxy != nullptr && !newKey.empty()) {
-    proxyMap[newKey] = proxy;
+void ProxyProvider::changeUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey,
+                                    uint32_t renderFlags) {
+  if (proxy == nullptr || newKey.empty()) {
+    return;
+  }
+  auto oldKey = proxy->getUniqueKey();
+  proxyMap.erase(oldKey);
+  proxyMap[newKey] = proxy;
+  if (renderFlags & RenderFlags::DisableCache) {
+    return;
+  }
+  proxy->handle = newKey;
+  if (context->drawingManager()->changeResourceTaskKey(oldKey, newKey)) {
+    return;
+  }
+  auto resource = Resource::Find<Resource>(context, oldKey);
+  if (resource != nullptr) {
+    resource->assignUniqueKey(newKey);
   }
 }
 
