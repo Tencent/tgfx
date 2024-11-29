@@ -55,7 +55,7 @@ std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
 }
 
 bool Rasterizer::asyncSupport() const {
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(TGFX_USE_FREETYPE)
+#if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
   return false;
 #else
   return true;

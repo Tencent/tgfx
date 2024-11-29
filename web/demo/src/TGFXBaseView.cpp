@@ -21,7 +21,7 @@
 using namespace emscripten;
 namespace hello2d {
 
-TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(std::move(canvasID)) {
+TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   appHost = std::make_shared<drawers::AppHost>();
 }
 

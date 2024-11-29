@@ -34,9 +34,13 @@ if (typeof window !== 'undefined') {
             var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
             await tgfxView.setImagePath(imagePath);
 
-            var fontPath = "http://localhost:8081/../../resources/font/NotoSansSC-Regular.otf";
-            var emojiFontPath = "http://localhost:8081/../../resources/font/NotoColorEmoji.ttf";
-            await tgfxView.registerFonts(fontPath, emojiFontPath);
+            var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+            const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
+            const fontUIntArray = new Uint8Array(fontBuffer);
+            var emojiFontPath = "../../resources/font/NotoColorEmoji.ttf";
+            const emojiFontBuffer = await fetch(emojiFontPath).then((response) => response.arrayBuffer());
+            const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
+            tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
             updateSize(shareData);
         } catch (error) {
             console.error(error);

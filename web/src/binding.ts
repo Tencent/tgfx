@@ -22,7 +22,6 @@ import * as tgfx from './tgfx'
 import {Matrix} from './core/matrix'
 import {ScalerContext} from './core/scaler-context';
 import {WebMask} from './core/web-mask';
-import {FileStream} from "./utils/file-stream";
 
 export const TGFXBind = (module: TGFX) => {
     setTGFXModule(module)
@@ -30,6 +29,5 @@ export const TGFXBind = (module: TGFX) => {
     module.ScalerContext = ScalerContext
     module.WebMask = WebMask
     module.Matrix = Matrix
-    module.FileStream = FileStream
     module.tgfx = {...tgfx};
 }

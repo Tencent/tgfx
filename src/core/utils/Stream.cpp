@@ -20,13 +20,10 @@
 #include <mutex>
 #include "core/utils/Log.h"
 
-#ifdef __EMSCRIPTEN__
-#include "platform/web/WebStream.h"
-#endif
-
 namespace tgfx {
 static std::mutex locker = {};
 static std::unique_ptr<StreamFactory> streamFactory = nullptr;
+static std::string registerCustomProtocol = "";
 
 class FileStream : public Stream {
  public:
@@ -62,21 +59,10 @@ class FileStream : public Stream {
   size_t length = 0;
 };
 
-void Stream::RegisterStreamFactory(std::unique_ptr<StreamFactory> factory) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  streamFactory = std::move(factory);
-}
-
 std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
-  if (filePath.find("http://") == 0 || filePath.find("https://") == 0 ||
-      filePath.find("assets://") == 0) {
-    std::unique_ptr<Stream> stream = nullptr;
-    locker.lock();
-#ifdef __EMSCRIPTEN__
-    if (streamFactory == nullptr) {
-      streamFactory = std::unique_ptr<StreamFactory>(new WebStreamFactory());
-    }
-#endif
+  std::unique_ptr<Stream> stream = nullptr;
+  locker.lock();
+  if (filePath.find(registerCustomProtocol) == 0) {
     if (streamFactory) {
       stream = streamFactory->createStream(filePath);
     }
@@ -98,4 +84,10 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   return std::make_unique<FileStream>(file, length);
 }
 
+void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,
+                                           std::unique_ptr<StreamFactory> factory) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  registerCustomProtocol = customProtocol;
+  streamFactory = std::move(factory);
+}
 }  // namespace tgfx

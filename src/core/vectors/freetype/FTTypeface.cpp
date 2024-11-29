@@ -31,11 +31,6 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
-  if (fontPath.find("http://") == 0 || fontPath.find("https://") == 0 ||
-      fontPath.find("assets://") == 0) {
-    // TODO(kevingpqi): Further optimization can be done here by bridging the Stream and FT_Stream.
-    return MakeFromData(Data::MakeFromFile(fontPath), ttcIndex);
-  }
   return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
 }
 

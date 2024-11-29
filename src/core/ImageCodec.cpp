@@ -42,43 +42,34 @@
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   TRACE_EVENT;
-  auto stream = Stream::MakeFromFile(filePath);
-  if (stream == nullptr || stream->size() <= 14) {
-    return nullptr;
-  }
-  Buffer buffer(14);
-  if (stream->read(buffer.data(), 14) < 14) {
-    return nullptr;
-  }
-  auto data = buffer.release();
   std::shared_ptr<ImageCodec> codec = nullptr;
-#ifdef __EMSCRIPTEN__
-  codec = MakeNativeCodec(filePath);
-#endif
-
+  auto stream = Stream::MakeFromFile(filePath);
+  if (stream && stream->size() > 14) {
+    Buffer buffer(14);
+    if (stream->read(buffer.data(), 14) == 14) {
+      auto data = buffer.release();
 #ifdef TGFX_USE_WEBP_DECODE
-  if (!codec && WebpCodec::IsWebp(data)) {
-    codec = WebpCodec::MakeFrom(filePath);
-  }
+      if (WebpCodec::IsWebp(data)) {
+        codec = WebpCodec::MakeFrom(filePath);
+      }
 #endif
 
 #ifdef TGFX_USE_PNG_DECODE
-  if (!codec && PngCodec::IsPng(data)) {
-    codec = PngCodec::MakeFrom(filePath);
-  }
+      if (codec == nullptr && PngCodec::IsPng(data)) {
+        codec = PngCodec::MakeFrom(filePath);
+      }
 #endif
 
 #ifdef TGFX_USE_JPEG_DECODE
-  if (!codec && JpegCodec::IsJpeg(data)) {
-    codec = JpegCodec::MakeFrom(filePath);
-  }
+      if (codec == nullptr && JpegCodec::IsJpeg(data)) {
+        codec = JpegCodec::MakeFrom(filePath);
+      }
 #endif
-
-#ifndef __EMSCRIPTEN__
+    }
+  }
   if (codec == nullptr) {
     codec = MakeNativeCodec(filePath);
   }
-#endif
 
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;
