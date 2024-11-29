@@ -23,6 +23,6 @@
 namespace hello2d {
 class TGFXView : public TGFXBaseView {
  public:
-  TGFXView(std::string canvasID);
+  TGFXView(const std::string& canvasID);
 };
 }  // namespace hello2d

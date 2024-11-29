@@ -26,7 +26,7 @@ namespace hello2d {
 
 class TGFXBaseView {
  public:
-  TGFXBaseView(std::string canvasID);
+  TGFXBaseView(const std::string& canvasID);
 
   void setImagePath(const std::string& imagePath);
 

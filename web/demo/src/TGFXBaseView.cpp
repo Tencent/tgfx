@@ -17,14 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXBaseView.h"
-#include "tgfx/core/Buffer.h"
-#include "tgfx/core/DataView.h"
-#include "tgfx/core/Stream.h"
 
 using namespace emscripten;
 namespace hello2d {
 
-TGFXBaseView::TGFXBaseView(std::string canvasID) : canvasID(std::move(canvasID)) {
+TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(std::move(canvasID)) {
   appHost = std::make_shared<drawers::AppHost>();
 }
 
