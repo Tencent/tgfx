@@ -18,17 +18,15 @@
 
 #include "TGFXBaseView.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/DataView.h"
 
 using namespace emscripten;
 namespace hello2d {
 
-TGFXBaseView::TGFXBaseView(std::string canvasID, const val& nativeImage)
+TGFXBaseView::TGFXBaseView(std::string canvasID)
     : canvasID(std::move(canvasID)) {
   appHost = std::make_shared<drawers::AppHost>();
-  auto image = tgfx::Image::MakeFrom(nativeImage);
-  if (image) {
-    appHost->addImage("bridge", std::move(image));
-  }
 }
 
 void TGFXBaseView::updateSize(float devicePixelRatio) {
@@ -43,14 +41,30 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
   }
 }
 
-void TGFXBaseView::draw(int drawIndex) {
-  std::string fontPath = "../../resources/font/NotoSansSC-Regular.otf";
-  auto stream = tgfx::Stream::MakeFromFile(fontPath);
-  if (stream) {
-    printf("-------Font file loaded-------\n");
-  } else {
-    printf("-------Font file loaded failed! ------\n");
+void TGFXBaseView::setImagePath(const std::string& imagePath) {
+  auto image = tgfx::Image::MakeFromFile(imagePath.c_str());
+  if (image) {
+    appHost->addImage("bridge", std::move(image));
   }
+}
+
+void TGFXBaseView::draw(int drawIndex) {
+//  std::string fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+//  auto stream = tgfx::Stream::MakeFromFile(fontPath);
+//  if (stream) {
+//    printf("-------Font file loaded-------\n");
+//    tgfx::Buffer buffer(100);
+//    stream->seek(1000);
+//    stream->read(buffer.data(), 100);
+//    auto data = tgfx::DataView(buffer.bytes(), buffer.size());
+//    auto secondByte = data.getUint8(1);
+//    auto thirdByte = data.getUint8(2);
+//    auto fourthByte = data.getUint8(3);
+//    printf("---secondByte:%d, thirdByte:%d, fourthByte:%d \n", secondByte, thirdByte, fourthByte);
+//
+//  } else {
+//    printf("-------Font file loaded failed! ------\n");
+//  }
 
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;

@@ -40,24 +40,23 @@ async function MakeFromFile(filePath: string): Promise<Uint8Array | null> {
 if (typeof window !== 'undefined') {
     (window as any).MakeFromFile = MakeFromFile;
     window.onload = async () => {
-        shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm-mt/' + file})
-            .then((module: types.TGFX) => {
-                TGFXBind(module);
-                return module;
-            })
-            .catch((error: any) => {
-                console.error(error);
-                throw new Error("Hello2D init failed. Please check the .wasm file path!.");
-            });
-        let image = await loadImage('../../resources/assets/bridge.jpg');
-        let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d', image);
+        try {
+            shareData.Hello2DModule = await Hello2D({ locateFile: (file: string) => './wasm-mt/' + file });
+            TGFXBind(shareData.Hello2DModule);
 
-        var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
-        var emojiFontPath = "../../resources/font/NotoColorEmoji.ttf";
-        tgfxView.registerFonts(fontPath, emojiFontPath);
+            let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
+            shareData.tgfxBaseView = tgfxView;
+            var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
+            await tgfxView.setImagePath(imagePath); // Ensure this is awaited
 
-        shareData.tgfxBaseView = tgfxView;
-        updateSize(shareData);
+            var fontPath = "http://localhost:8081/../../resources/font/NotoSansSC-Regular.otf";
+            var emojiFontPath = "http://localhost:8081/../../resources/font/NotoColorEmoji.ttf";
+            await tgfxView.registerFonts(fontPath, emojiFontPath);
+            updateSize(shareData);
+        } catch (error) {
+            console.error(error);
+            throw new Error("Hello2D init failed. Please check the .wasm file path!.");
+        }
     };
 
     window.onresize = () => {

@@ -31,6 +31,11 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
+#if defined(__EMSCRIPTEN__)
+  if (fontPath.find("http://") == 0 || fontPath.find("https://") == 0) {
+    return MakeFromData(Data::MakeFromFile(fontPath), ttcIndex);
+  }
+#endif
   return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
 }
 

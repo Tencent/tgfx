@@ -24,7 +24,7 @@ namespace hello2d {
 
 class TGFXThreadsView : public TGFXBaseView {
  public:
-  TGFXThreadsView(const std::string& canvasID, const emscripten::val& nativeImage);
+  TGFXThreadsView(const std::string& canvasID);
 
   void registerFonts(const std::string& fontPath, const std::string& emojiFontPath);
 };

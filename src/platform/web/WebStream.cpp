@@ -22,13 +22,15 @@
 namespace tgfx {
 
 std::unique_ptr<Stream> WebStream::Make(const std::string& filePath) {
-  val fileStreamInstance = val::global("fileStream");
-  if (fileStreamInstance.isNull() || fileStreamInstance.isUndefined()) {
+  val fileStreamClass = val::module_property("FileStream");
+  if (!fileStreamClass.as<bool>()) {
     return nullptr;
   }
-  fileStreamInstance.call<void>("setPath", filePath);
-  val promise = fileStreamInstance.call<val>("length");
-  size_t length = promise.as<size_t>();
+  auto fileStreamInstance = fileStreamClass.new_(filePath);
+  if (!fileStreamInstance.as<bool>()) {
+    return nullptr;
+  }
+  size_t length = fileStreamInstance.call<val>("length").await().as<size_t>();
   if (length == 0) {
     return nullptr;
   }

@@ -3,9 +3,7 @@ export class FileStream {
     blob: Blob | null = null;
     reader: FileReader | null = null;
 
-    public constructor() {}
-
-    public setPath(filePath: string) {
+    public constructor(filePath: string) {
         this.filePath = filePath;
     }
 
@@ -50,9 +48,9 @@ export class FileStream {
 
     public async length(): Promise<number> {
         const blob = await this.fetchFile();
-        return blob.size;
+        if (blob) {
+            return blob.size;
+        }
+        return 0;
     }
 }
-
-// Make fileStream available in the global scope
-(window as any).fileStream = new FileStream();

@@ -22,8 +22,8 @@
 using namespace emscripten;
 
 namespace hello2d {
-TGFXThreadsView::TGFXThreadsView(const std::string& canvasID, const val& nativeImage)
-    : TGFXBaseView(std::move(canvasID), nativeImage) {
+TGFXThreadsView::TGFXThreadsView(const std::string& canvasID)
+    : TGFXBaseView(std::move(canvasID)) {
 }
 
 void TGFXThreadsView::registerFonts(const std::string& fontPath, const std::string& emojiFontPath) {
