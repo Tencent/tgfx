@@ -62,11 +62,12 @@ class FileStream : public Stream {
 std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   std::unique_ptr<Stream> stream = nullptr;
   locker.lock();
-  if (filePath.find(registerCustomProtocol) == 0) {
-    if (streamFactory) {
-      stream = streamFactory->createStream(filePath);
-    }
-    locker.unlock();
+  if (streamFactory && !registerCustomProtocol.empty() &&
+      filePath.find(registerCustomProtocol) == 0) {
+    stream = streamFactory->createStream(filePath);
+  }
+  locker.unlock();
+  if (stream) {
     return stream;
   }
   auto file = fopen(filePath.c_str(), "rb");
