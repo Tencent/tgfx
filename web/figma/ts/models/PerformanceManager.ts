@@ -67,6 +67,10 @@ export default class PerformanceManager {
 
     private updateUI(fps: number, frameTime: number): void {
         if (this.fpsCounter) {
+            const backendFps = this.backendManager.fps();
+            if (backendFps > 0) {
+                fps = backendFps;
+            }
             this.fpsCounter.textContent = `FPS: ${fps}`;
         }
 

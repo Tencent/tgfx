@@ -31,6 +31,7 @@ declare global {
 export default class BackendManager {
     figmaRenderer: any;
     private cefFrameTimeCons: number = 0.0;
+    private cefFPS: number = 0.0;
 
     /**
      * 创建后端通信管理器
@@ -67,6 +68,25 @@ export default class BackendManager {
             onSuccess: (response: string) => {
                 console.log('发送成功:', response);
                 this.cefFrameTimeCons = parseFloat(response)
+            }
+        });
+    }
+
+    fps(): number {
+        if (!settings.isBackend || !window.cefQuery) return 0.0;
+        if (window.cefQuery) {
+            this.postGetCefFPS();
+            return this.cefFPS;
+        }
+    }
+
+    private postGetCefFPS() {
+        (window as any).cefQuery({
+            request: 'fps',
+            persistent: false,
+            onSuccess: (response: string) => {
+                console.log('发送成功:', response);
+                this.cefFPS = parseInt(response)
             }
         });
     }
