@@ -33,8 +33,8 @@ bool SkSVGFeGaussianBlur::parseAndSetAttribute(const char* name, const char* val
 std::shared_ptr<ImageFilter> SkSVGFeGaussianBlur::onMakeImageFilter(
     const SVGRenderContext& ctx, const SkSVGFilterContext& fctx) const {
   auto scale = ctx.transformForCurrentOBB(fctx.primitiveUnits()).scale;
-  const auto sigmaX = fStdDeviation.fX * scale.x * 2;
-  const auto sigmaY = fStdDeviation.fY * scale.y * 2;
+  const auto sigmaX = fStdDeviation.fX * scale.x * 4;
+  const auto sigmaY = fStdDeviation.fY * scale.y * 4;
   return ImageFilter::Blur(sigmaX, sigmaY);
 }
 #endif
