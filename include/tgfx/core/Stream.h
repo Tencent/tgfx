@@ -75,8 +75,8 @@ class Stream {
 class StreamFactory {
  public:
   /**
-  * Registers a custom protocol with the specified factory. The factory will create streams for
-  * paths that start with the specified protocol. customProtocol can use protocol headers like
+  * Registers custom protocols with the specified factory. The factory will create streams for
+  * paths that start with the specified protocol. Custom protocol can use protocol headers like
   * "assets://".
   */
   static void RegisterCustomProtocol(const std::unordered_set<std::string>& customProtocols,

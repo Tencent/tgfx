@@ -47,7 +47,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     return ImageCodec::MakeNativeCodec(imageData);
   } else {
     auto imageStream = Stream::MakeFromFile(filePath);
-    if (imageStream == nullptr || imageStream->size() <= 40) {
+    if (imageStream == nullptr || imageStream->size() <= IMAGE_HEADER_SIZE) {
       return nullptr;
     }
     Buffer imageBuffer(imageStream->size());

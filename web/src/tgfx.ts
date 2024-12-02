@@ -119,7 +119,7 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
 
 export const getBytesFromPath = async (module: TGFX, path: string) => {
     const buffer = await fetch(path).then((res) => res.arrayBuffer());
-    return new Uint8Array(buffer)
+    return new Uint8Array(buffer);
 };
 
 export const getImageFromPath = async (module: TGFX, path: string) => {
