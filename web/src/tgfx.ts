@@ -41,7 +41,8 @@ export const createImage = (source: string) => {
 };
 
 export const createImageFromBytes = (bytes: ArrayBuffer) => {
-    const blob = new Blob([bytes], {type: 'image/*'});
+    const uint8Array = new Uint8Array(bytes);
+    const blob = new Blob([uint8Array], {type: 'image/*'});
     return createImage(URL.createObjectURL(blob));
 };
 
@@ -118,7 +119,7 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
 
 export const getBytesFromPath = async (module: TGFX, path: string) => {
     const buffer = await fetch(path).then((res) => res.arrayBuffer());
-    return writeBufferToWasm(module, buffer);
+    return new Uint8Array(buffer)
 };
 
 export const getImageFromPath = async (module: TGFX, path: string) => {

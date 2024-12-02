@@ -23,11 +23,12 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/DataView.h"
 #include "tgfx/core/Size.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 class WebImageInfo {
  public:
-  static ISize GetSize(std::shared_ptr<Data> imageBytes);
+  static ISize GetSize(std::shared_ptr<Data> imageBytes, Stream* stream = nullptr);
 };
 
 }  // namespace tgfx

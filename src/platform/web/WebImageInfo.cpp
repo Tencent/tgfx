@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebImageInfo.h"
+#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
@@ -60,7 +61,7 @@ static bool IsPng(std::shared_ptr<Data> imageBytes, int& width, int& height) {
   return false;
 }
 
-static bool IsJpeg(std::shared_ptr<Data> imageBytes, int& width, int& height) {
+static bool IsJpeg(std::shared_ptr<Data> imageBytes, int& width, int& height, Stream* stream) {
   DataView dataView(imageBytes->bytes(), imageBytes->size(), ByteOrder::BigEndian);
   if (dataView.size() < 2) {
     return false;
@@ -69,11 +70,29 @@ static bool IsJpeg(std::shared_ptr<Data> imageBytes, int& width, int& height) {
     return false;
   }
   size_t offset = 2;
-  while (offset + 9 <= dataView.size()) {
-    uint16_t sectionSize = dataView.getUint16(offset + 2);
-    if (CompareAnyOf(dataView, offset, 2, {"\xFF\xC0", "\xFF\xC1", "\xFF\xC2"})) {
-      height = dataView.getUint16(offset + 5);
-      width = dataView.getUint16(offset + 7);
+  size_t minReadDataSize = 9;
+  size_t dataSize = imageBytes->size();
+  if (stream) {
+    dataSize = std::max(dataSize, stream->size());
+  }
+  while (offset + minReadDataSize <= dataSize) {
+    size_t internalOffset = offset;
+    std::shared_ptr<Data> imageData = nullptr;
+    if (offset + minReadDataSize > imageBytes->size()) {
+      Buffer imageBuffer(minReadDataSize);
+      stream->seek(offset);
+      if (stream->read(imageBuffer.data(), minReadDataSize) != minReadDataSize) {
+        return false;
+      }
+      imageData = imageBuffer.release();
+      dataView.reset(imageData->bytes(), imageData->size());
+      internalOffset = 0;
+    }
+
+    uint16_t sectionSize = dataView.getUint16(internalOffset + 2);
+    if (CompareAnyOf(dataView, internalOffset, 2, {"\xFF\xC0", "\xFF\xC1", "\xFF\xC2"})) {
+      height = dataView.getUint16(internalOffset + 5);
+      width = dataView.getUint16(internalOffset + 7);
       return true;
     }
     offset += sectionSize + 2;
@@ -116,13 +135,13 @@ static bool CheckWebpSupport() {
   return val::module_property("tgfx").call<val>("hasWebpSupport").as<bool>();
 }
 
-ISize WebImageInfo::GetSize(std::shared_ptr<Data> imageBytes) {
+ISize WebImageInfo::GetSize(std::shared_ptr<Data> imageBytes, Stream* stream) {
   static const bool hasWebpSupport = CheckWebpSupport();
   auto imageSize = ISize::MakeEmpty();
   if (IsPng(imageBytes, imageSize.width, imageSize.height)) {
     return imageSize;
   }
-  if (IsJpeg(imageBytes, imageSize.width, imageSize.height)) {
+  if (IsJpeg(imageBytes, imageSize.width, imageSize.height, stream)) {
     return imageSize;
   }
   if (hasWebpSupport && IsWebp(imageBytes, imageSize.width, imageSize.height)) {

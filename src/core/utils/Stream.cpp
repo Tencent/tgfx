@@ -23,7 +23,7 @@
 namespace tgfx {
 static std::mutex locker = {};
 static std::unique_ptr<StreamFactory> streamFactory = nullptr;
-static std::string registerCustomProtocol = "";
+static std::unordered_set<std::string> registerCustomProtocols = {};
 
 class FileStream : public Stream {
  public:
@@ -59,11 +59,22 @@ class FileStream : public Stream {
   size_t length = 0;
 };
 
+bool HasCustomProtocol(const std::string& filePath) {
+  for (const auto& protocol : registerCustomProtocols) {
+    if (!protocol.empty() && filePath.find(protocol) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
+  if (filePath.empty()) {
+    return nullptr;
+  }
   std::unique_ptr<Stream> stream = nullptr;
   locker.lock();
-  if (streamFactory && !registerCustomProtocol.empty() &&
-      filePath.find(registerCustomProtocol) == 0) {
+  if (streamFactory && HasCustomProtocol(filePath)) {
     stream = streamFactory->createStream(filePath);
   }
   locker.unlock();
@@ -85,10 +96,10 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   return std::make_unique<FileStream>(file, length);
 }
 
-void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,
+void StreamFactory::RegisterCustomProtocol(const std::unordered_set<std::string>& customProtocols,
                                            std::unique_ptr<StreamFactory> factory) {
   std::lock_guard<std::mutex> autoLock(locker);
-  registerCustomProtocol = customProtocol;
+  registerCustomProtocols.insert(customProtocols.begin(), customProtocols.end());
   streamFactory = std::move(factory);
 }
 }  // namespace tgfx

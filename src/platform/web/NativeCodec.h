@@ -20,6 +20,7 @@
 
 #include <emscripten/val.h>
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 class NativeCodec : public ImageCodec {
@@ -34,10 +35,14 @@ class NativeCodec : public ImageCodec {
  private:
   std::shared_ptr<Data> imageBytes = nullptr;
   emscripten::val nativeImage = emscripten::val::null();
+  std::unique_ptr<Stream> stream = nullptr;
 
-  NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes);
+  NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes,
+              std::unique_ptr<Stream> stream = nullptr);
 
   NativeCodec(int width, int height, emscripten::val nativeImage);
+
+  emscripten::val createImage() const;
 
   friend class ImageCodec;
 };

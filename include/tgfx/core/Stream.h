@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 namespace tgfx {
 /**
@@ -78,7 +79,7 @@ class StreamFactory {
   * paths that start with the specified protocol. customProtocol can use protocol headers like
   * "assets://".
   */
-  static void RegisterCustomProtocol(const std::string& customProtocol,
+  static void RegisterCustomProtocol(const std::unordered_set<std::string>& customProtocols,
                                      std::unique_ptr<StreamFactory> factory);
 
   virtual ~StreamFactory() = default;
