@@ -75,22 +75,28 @@ static const unsigned gXfermodeCoeff2Blend[] = {
 
 static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
   auto gl = GLFunctions::Get(context);
-  if (blendFactors != nullptr) {
+  auto caps = GLCaps::Get(context);
+  if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
+    if (blendFactors == nullptr) {
+      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
+    } else {
+      gl->disable(GL_FETCH_PER_SAMPLE_ARM);
+    }
+  }
+  if (blendFactors == nullptr || (blendFactors->srcBlend == BlendModeCoeff::One &&
+                                  blendFactors->dstBlend == BlendModeCoeff::Zero)) {
+    // There is no need to enable blending if the blend mode is src.
+    gl->disable(GL_BLEND);
+  } else {
     gl->enable(GL_BLEND);
     gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcBlend)],
                   gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstBlend)]);
     gl->blendEquation(GL_FUNC_ADD);
-  } else {
-    gl->disable(GL_BLEND);
-    auto caps = GLCaps::Get(context);
-    if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
-      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
-    }
   }
 }
 
 bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                               const Rect& drawBounds) {
+                                               const Rect& scissorRect) {
   _program = static_cast<GLProgram*>(context->programCache()->getProgram(programInfo));
   if (_program == nullptr) {
     return false;
@@ -102,7 +108,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   gl->useProgram(program->programID());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
-  UpdateScissor(context, drawBounds);
+  UpdateScissor(context, scissorRect);
   UpdateBlend(context, programInfo->blendInfo());
   if (programInfo->requiresBarrier()) {
     gl->textureBarrier();

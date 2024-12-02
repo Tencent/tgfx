@@ -88,7 +88,7 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
     if (wrap != Wrap::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
       return false;
     }
-    if (texture->getSampler()->type() != TextureType::TwoD &&
+    if (texture->getSampler()->type() != SamplerType::TwoD &&
         !(wrap == Wrap::Clamp || wrap == Wrap::ClampToBorder)) {
       return false;
     }

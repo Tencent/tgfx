@@ -18,15 +18,12 @@
 
 #pragma once
 
-#include <optional>
-#include "Blend.h"
 #include "Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
 
@@ -55,9 +52,9 @@ class RenderPass {
     return _renderTargetTexture;
   }
 
-  bool begin(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  bool begin(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> renderTexture);
   void end();
-  void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds);
+  void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& scissorRect);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<Data> vertexData);
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);

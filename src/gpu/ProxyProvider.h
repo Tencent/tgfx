@@ -106,6 +106,11 @@ class ProxyProvider {
                                                    uint32_t renderFlags = 0);
 
   /**
+   * Creates a flattened TextureProxy for the given TextureProxy.
+   */
+  std::shared_ptr<TextureProxy> flattenTextureProxy(std::shared_ptr<TextureProxy> source);
+
+  /**
    * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend
    * texture will be destroyed at a later point after the proxy is released.
    */

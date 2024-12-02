@@ -19,15 +19,13 @@
 #include "RenderPass.h"
 
 namespace tgfx {
-bool RenderPass::begin(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
-  if (renderTargetProxy == nullptr) {
+bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
+                       std::shared_ptr<Texture> renderTexture) {
+  if (renderTarget == nullptr) {
     return false;
   }
-  _renderTarget = renderTargetProxy->getRenderTarget();
-  if (_renderTarget == nullptr) {
-    return false;
-  }
-  _renderTargetTexture = renderTargetProxy->getTexture();
+  _renderTarget = std::move(renderTarget);
+  _renderTargetTexture = std::move(renderTexture);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   return true;
 }
@@ -44,9 +42,10 @@ void RenderPass::resetActiveBuffers() {
   _vertexBuffer = nullptr;
 }
 
-void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds) {
+void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                           const Rect& scissorRect) {
   resetActiveBuffers();
-  if (!onBindProgramAndScissorClip(programInfo, drawBounds)) {
+  if (!onBindProgramAndScissorClip(programInfo, scissorRect)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
     return;
   }
