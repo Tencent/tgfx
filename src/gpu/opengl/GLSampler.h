@@ -37,7 +37,7 @@ class GLSampler : public TextureSampler {
    */
   unsigned target = GL_TEXTURE_2D;
 
-  TextureType type() const override;
+  SamplerType type() const override;
 
   BackendTexture getBackendTexture(int width, int height) const override;
 

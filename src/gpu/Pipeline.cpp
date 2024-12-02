@@ -24,11 +24,11 @@
 namespace tgfx {
 Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
                    std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-                   size_t numColorProcessors, BlendMode blendMode,
-                   const DstTextureInfo& dstTextureInfo, const Swizzle* outputSwizzle)
+                   size_t numColorProcessors, BlendMode blendMode, DstTextureInfo dstTextureInfo,
+                   const Swizzle* outputSwizzle)
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      dstTextureInfo(dstTextureInfo), _outputSwizzle(outputSwizzle) {
+      dstTextureInfo(std::move(dstTextureInfo)), _outputSwizzle(outputSwizzle) {
   if (!BlendModeAsCoeff(blendMode, &_blendInfo)) {
     xferProcessor = PorterDuffXferProcessor::Make(blendMode);
   }

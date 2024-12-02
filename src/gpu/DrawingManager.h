@@ -24,6 +24,7 @@
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
+#include "gpu/tasks/TextureFlattenTask.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -38,6 +39,8 @@ class DrawingManager {
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
+
+  void addTextureFlattenTask(std::shared_ptr<TextureFlattenTask> flattenTask);
 
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
@@ -55,6 +58,7 @@ class DrawingManager {
   Context* context = nullptr;
   std::unordered_set<std::shared_ptr<RenderTargetProxy>> needResolveTargets = {};
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
+  std::vector<std::shared_ptr<TextureFlattenTask>> flattenTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
   std::shared_ptr<OpsRenderTask> activeOpsTask = nullptr;
 #ifdef DEBUG
