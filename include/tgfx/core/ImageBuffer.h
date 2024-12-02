@@ -93,11 +93,6 @@ class ImageBuffer {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the ImageBuffer is in the YUV format.
-   */
-  virtual bool isYUV() const = 0;
-
-  /**
    * Returns true if the ImageBuffer is expired, indicating that it cannot create any new textures.
    * However, you can still safely access all of its properties across threads.
    */

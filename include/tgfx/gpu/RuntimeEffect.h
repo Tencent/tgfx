@@ -23,10 +23,10 @@
 #include "tgfx/gpu/UniqueType.h"
 
 namespace tgfx {
-#define DEFINE_RUNTIME_EFFECT_TYPE         \
-  static auto Type() {                     \
-    static auto type = UniqueType::Next(); \
-    return type;                           \
+#define DEFINE_RUNTIME_EFFECT_TYPE               \
+  static auto Type() {                           \
+    static auto type = tgfx::UniqueType::Next(); \
+    return type;                                 \
   }
 
 /**

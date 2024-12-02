@@ -178,11 +178,6 @@ class Image {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the Image is in the YUV format.
-   */
-  virtual bool isYUV() const = 0;
-
-  /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,
    * which may be ignored if the GPU or the associated image source doesn’t support mipmaps.
    */
@@ -205,28 +200,6 @@ class Image {
   virtual bool isTextureBacked() const {
     return false;
   }
-
-  /**
-   * Returns true if the Image is guaranteed to produce a single-plane texture without extra
-   * transforms and can be cached for repeat drawing. Extra transforms may include orientation,
-   * subsets, filters, or RGBAAA layouts. A YUV Image is also not flat since it has multiple planes.
-   */
-  virtual bool isFlat() const = 0;
-
-  /**
-   * Returns a flattened Image with the same content as this Image, as if this Image were drawn to
-   * the returned Image. Unlike the makeTextureImage() method, this method doesn’t perform a draw
-   * operation immediately. Instead, it defers the draw operation until it is actually required.
-   * The flattened Image is guaranteed to produce a single-plane texture without extra transforms
-   * and can be cached for repeat drawing. This method is useful for caching the drawing result of
-   * a complex Image for repeated use.
-   * For example, if you create a subset Image from a flat Image, the subset Image doesn’t create
-   * its own GPU cache but uses the full resolution cache created by the original Image. If you want
-   * the subset Image to create its own GPU cache, you should call makeFlattened() on the subset
-   * Image.
-   * @return If the Image is already flat, the original Image is returned.
-   */
-  std::shared_ptr<Image> makeFlattened() const;
 
   /**
    * Returns an Image backed by a GPU texture associated with the given context. If a corresponding
@@ -348,7 +321,6 @@ class Image {
   friend class RuntimeImageFilter;
   friend class TransformImage;
   friend class RGBAAAImage;
-  friend class FlattenImage;
   friend class ScaleImage;
   friend class ImageShader;
 };

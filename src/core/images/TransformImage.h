@@ -41,14 +41,6 @@ class TransformImage : public Image {
     return source->isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return source->isYUV();
-  }
-
-  bool isFlat() const override {
-    return false;
-  }
-
  protected:
   std::shared_ptr<Image> source = nullptr;
 

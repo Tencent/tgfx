@@ -49,8 +49,6 @@ class GLGpu : public Gpu {
 
   bool submitToGpu(bool syncCpu) override;
 
-  void submit(RenderPass* renderPass) override;
-
  private:
   std::shared_ptr<RenderPass> renderPass = nullptr;
 

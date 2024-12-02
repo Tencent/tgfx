@@ -158,13 +158,6 @@ class ImageFilter {
     return false;
   }
 
-  /**
-   * Returns true if this filter requires the source image to be flattened.
-   */
-  virtual bool requireFlatSource() const {
-    return false;
-  }
-
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
   std::unique_ptr<FragmentProcessor> makeFPFromTextureProxy(std::shared_ptr<Image> source,

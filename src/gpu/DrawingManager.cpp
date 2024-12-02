@@ -47,6 +47,13 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> targe
   addRenderTask(std::move(task));
 }
 
+void DrawingManager::addTextureFlattenTask(std::shared_ptr<TextureFlattenTask> flattenTask) {
+  if (flattenTask == nullptr) {
+    return;
+  }
+  flattenTasks.push_back(std::move(flattenTask));
+}
+
 void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   auto textureProxy = renderTargetProxy->getTextureProxy();
   if (textureProxy == nullptr ||
@@ -73,21 +80,12 @@ void DrawingManager::addResourceTask(std::shared_ptr<ResourceTask> resourceTask)
   if (resourceTask == nullptr) {
     return;
   }
-  DEBUG_ASSERT(resourceTaskMap.find(resourceTask->uniqueKey) == resourceTaskMap.end());
+#ifdef DEBUG
+  auto result = resourceTaskMap.find(resourceTask->uniqueKey);
+  DEBUG_ASSERT(result == resourceTaskMap.end());
   resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
+#endif
   resourceTasks.push_back(std::move(resourceTask));
-}
-
-bool DrawingManager::changeResourceTaskKey(const UniqueKey& oldKey, const UniqueKey& newKey) {
-  auto result = resourceTaskMap.find(oldKey);
-  if (result == resourceTaskMap.end()) {
-    return false;
-  }
-  auto task = result->second;
-  resourceTaskMap.erase(oldKey);
-  task->uniqueKey = newKey;
-  resourceTaskMap[newKey] = task;
-  return true;
 }
 
 bool DrawingManager::flush() {
@@ -100,21 +98,35 @@ bool DrawingManager::flush() {
     activeOpsTask->makeClosed();
     activeOpsTask = nullptr;
   }
-  for (auto& renderTarget : needResolveTargets) {
-    auto task = std::make_shared<TextureResolveTask>(renderTarget);
-    renderTasks.push_back(std::move(task));
-  }
-  needResolveTargets = {};
+
   for (auto& task : renderTasks) {
     task->prepare(context);
   }
   for (auto& task : resourceTasks) {
     task->execute(context);
   }
+  resourceTasks = {};
 #ifdef DEBUG
   resourceTaskMap = {};
 #endif
-  resourceTasks = {};
+
+  std::vector<std::shared_ptr<TextureFlattenTask>> validFlattenTasks = {};
+  for (auto& task : flattenTasks) {
+    if (task->prepare(context)) {
+      validFlattenTasks.push_back(task);
+    }
+  }
+  for (auto& task : validFlattenTasks) {
+    task->execute(context);
+  }
+  flattenTasks = {};
+
+  for (auto& renderTarget : needResolveTargets) {
+    auto task = std::make_shared<TextureResolveTask>(renderTarget);
+    renderTasks.push_back(std::move(task));
+  }
+  needResolveTargets = {};
+
   for (auto& task : renderTasks) {
     task->execute(context->gpu());
   }

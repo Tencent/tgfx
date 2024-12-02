@@ -72,10 +72,6 @@ class ImageCodec : public ImageGenerator {
     return false;
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
   /**
    * Decodes the image with the specified image info into the given pixels. Returns true if the
    * decoding was successful. Note that we do not recommend calling this method due to performance

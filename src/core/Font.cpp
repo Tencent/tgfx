@@ -32,10 +32,6 @@ class GlyphImageGenerator : public ImageGenerator {
     return !scalerContext->hasColor();
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
     return scalerContext->generateImage(glyphID, tryHardware);

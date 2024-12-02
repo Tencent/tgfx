@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,39 +18,51 @@
 
 #pragma once
 
-#include "JNIUtil.h"
-#include "core/PixelBuffer.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class NativeImageBuffer : public ImageBuffer {
+class DefaultTextureProxy : public TextureProxy {
  public:
-  /**
-   * Creates a ImageBuffer from the specified Android Bitmap object. Returns nullptr if the bitmap
-   * is null, has an unpremultiplied alpha type, or its color type is neither RGBA_8888 nor ALPHA_8.
-   */
-  static std::shared_ptr<ImageBuffer> MakeFrom(JNIEnv* env, jobject bitmap);
-
   int width() const override {
-    return info.width();
+    return _width;
   }
 
   int height() const override {
-    return info.height();
+    return _height;
+  }
+
+  ImageOrigin origin() const override {
+    return bitFields.origin;
+  }
+
+  bool hasMipmaps() const override {
+    return bitFields.mipmapped;
   }
 
   bool isAlphaOnly() const override {
-    return info.isAlphaOnly();
+    return bitFields.isAlphaOnly;
   }
 
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
+  bool externallyOwned() const override {
+    return bitFields.externallyOwned;
+  }
+
+  std::shared_ptr<Texture> getTexture() const override;
 
  private:
-  ImageInfo info = {};
-  Global<jobject> bitmap = {};
+  int _width = 0;
+  int _height = 0;
 
-  explicit NativeImageBuffer(const ImageInfo& info) : info(info) {
-  }
+  struct {
+    ImageOrigin origin : 2;
+    bool mipmapped : 1;
+    bool isAlphaOnly : 1;
+    bool externallyOwned : 1;
+  } bitFields = {};
+
+  DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
+                      ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
+
+  friend class ProxyProvider;
 };
-
 }  // namespace tgfx

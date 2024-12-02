@@ -59,8 +59,6 @@ class Gpu {
 
   virtual bool submitToGpu(bool syncCpu) = 0;
 
-  virtual void submit(RenderPass* renderPass) = 0;
-
   void regenerateMipmapLevels(const TextureSampler* sampler);
 
  protected:

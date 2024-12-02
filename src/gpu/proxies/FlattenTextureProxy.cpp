@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,35 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#import <CoreVideo/CoreVideo.h>
-#include "tgfx/core/ImageBuffer.h"
+#include "FlattenTextureProxy.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-class NV12HardwareBuffer : public ImageBuffer {
- public:
-  static std::shared_ptr<NV12HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                      YUVColorSpace colorSpace);
+FlattenTextureProxy::FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source)
+    : TextureProxy(std::move(uniqueKey)), source(std::move(source)) {
+}
 
-  ~NV12HardwareBuffer() override;
-
-  int width() const override;
-
-  int height() const override;
-
-  bool isAlphaOnly() const final {
-    return false;
-  }
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
-
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
-
-  NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
-};
-
+std::shared_ptr<Texture> FlattenTextureProxy::getTexture() const {
+  auto texture = Resource::Find<Texture>(context, handle.key());
+  return texture ? texture : source->getTexture();
+}
 }  // namespace tgfx

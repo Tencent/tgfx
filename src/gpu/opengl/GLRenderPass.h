@@ -30,7 +30,8 @@ class GLRenderPass : public RenderPass {
   explicit GLRenderPass(Context* context);
 
  protected:
-  bool onBindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& drawBounds) override;
+  bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                   const Rect& scissorRect) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
   void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
   void onClear(const Rect& scissor, Color color) override;

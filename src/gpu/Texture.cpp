@@ -42,7 +42,7 @@ bool Texture::hasMipmaps() const {
 }
 
 Point Texture::getTextureCoord(float x, float y) const {
-  if (getSampler()->type() == TextureType::Rectangle) {
+  if (getSampler()->type() == SamplerType::Rectangle) {
     return {x, y};
   }
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};

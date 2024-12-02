@@ -19,6 +19,7 @@
 #include "RuntimeImageFilter.h"
 #include "core/images/ResourceImage.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -44,12 +45,14 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   if (renderTarget == nullptr) {
     return nullptr;
   }
+  auto proxyProvider = args.context->proxyProvider();
   std::vector<std::shared_ptr<TextureProxy>> textureProxies;
   textureProxies.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
   TPArgs tpArgs(args.context, args.renderFlags, false);
   auto textureProxy = source->lockTextureProxy(tpArgs);
+  textureProxy = proxyProvider->flattenTextureProxy(std::move(textureProxy));
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -61,6 +64,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
       return nullptr;
     }
     textureProxy = input->lockTextureProxy(tpArgs);
+    textureProxy = proxyProvider->flattenTextureProxy(std::move(textureProxy));
     if (textureProxy == nullptr) {
       return nullptr;
     }

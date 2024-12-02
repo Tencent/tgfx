@@ -799,37 +799,6 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
 }
 
-TGFX_TEST(CanvasTest, flattenImage) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 964, 472);
-  auto canvas = surface->getCanvas();
-  auto image = MakeImage("resources/apitest/rgbaaa.png");
-  EXPECT_EQ(image->width(), 1024);
-  EXPECT_EQ(image->height(), 512);
-  image = image->makeOriented(Orientation::RightTop);
-  EXPECT_EQ(image->width(), 512);
-  EXPECT_EQ(image->height(), 1024);
-  image = image->makeSubset(Rect::MakeXYWH(100, 100, 412, 924));
-  EXPECT_EQ(image->width(), 412);
-  EXPECT_EQ(image->height(), 924);
-  image = image->makeOriented(Orientation::RightTop);
-  EXPECT_EQ(image->width(), 924);
-  EXPECT_EQ(image->height(), 412);
-  image = image->makeMipmapped(true);
-  EXPECT_TRUE(image->hasMipmaps());
-  auto flattenImage = image->makeFlattened();
-  EXPECT_TRUE(flattenImage->hasMipmaps());
-  canvas->drawImage(flattenImage, 20, 30);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/flattenImage"));
-  auto flattenImageUniqueKey = std::static_pointer_cast<ResourceImage>(flattenImage)->uniqueKey;
-  auto texture = Resource::Find<Texture>(context, flattenImageUniqueKey);
-  ASSERT_TRUE(texture != nullptr);
-  EXPECT_EQ(texture->width(), 924);
-  EXPECT_EQ(texture->height(), 412);
-}
-
 TGFX_TEST(CanvasTest, atlas) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1047,17 +1016,14 @@ TGFX_TEST(CanvasTest, Picture) {
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 200, image->height() - 200, &matrix);
   ASSERT_TRUE(pictureImage != nullptr);
-  EXPECT_FALSE(pictureImage->isFlat());
   auto subsetImage = std::static_pointer_cast<SubsetImage>(pictureImage);
   EXPECT_TRUE(subsetImage->source == image);
   EXPECT_EQ(singleImageRecord.use_count(), 1);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100, &matrix);
-  EXPECT_TRUE(pictureImage->isFlat());
   EXPECT_EQ(singleImageRecord.use_count(), 2);
   EXPECT_FALSE(pictureImage == image);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100);
-  EXPECT_TRUE(pictureImage->isFlat());
   EXPECT_FALSE(pictureImage == image);
   EXPECT_EQ(singleImageRecord.use_count(), 2);
 
@@ -1089,7 +1055,6 @@ TGFX_TEST(CanvasTest, Picture) {
   auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
   EXPECT_EQ(textRecord.use_count(), 1);
   ASSERT_TRUE(textImage != nullptr);
-  EXPECT_TRUE(textImage->isFlat());
 
   surface = Surface::Make(context, textImage->width(), textImage->height());
   canvas = surface->getCanvas();
@@ -1111,7 +1076,6 @@ TGFX_TEST(CanvasTest, Picture) {
   auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
   EXPECT_EQ(patRecord.use_count(), 1);
   ASSERT_TRUE(pathImage != nullptr);
-  EXPECT_TRUE(pathImage->isFlat());
 
   surface = Surface::Make(context, pathImage->width(), pathImage->height());
   canvas = surface->getCanvas();

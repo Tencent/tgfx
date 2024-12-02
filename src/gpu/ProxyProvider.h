@@ -106,6 +106,11 @@ class ProxyProvider {
                                                    uint32_t renderFlags = 0);
 
   /**
+   * Creates a flattened TextureProxy for the given TextureProxy.
+   */
+  std::shared_ptr<TextureProxy> flattenTextureProxy(std::shared_ptr<TextureProxy> source);
+
+  /**
    * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend
    * texture will be destroyed at a later point after the proxy is released.
    */
@@ -126,14 +131,6 @@ class ProxyProvider {
    */
   std::shared_ptr<RenderTargetProxy> wrapBackendRenderTarget(
       const BackendRenderTarget& backendRenderTarget, ImageOrigin origin = ImageOrigin::TopLeft);
-
-  /**
-   * Changes the UniqueKey of the given proxy to the new UniqueKey. So that the proxy can be found
-   * with the new key. This also updates the UniqueKey of the target resource if it has been
-   * instantiated, otherwise it updates the UniqueKey of associated resource task.
-   */
-  void changeUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey,
-                       uint32_t renderFlags);
 
   /*
    * Purges all unreferenced proxies.
