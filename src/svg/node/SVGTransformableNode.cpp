@@ -42,6 +42,7 @@ bool SkSVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
     }
     ctx->saveOnce();
     ctx->canvas()->concat(transform);
+    ctx->concat(transform);
   }
 
   return this->INHERITED::onPrepareToRender(ctx);

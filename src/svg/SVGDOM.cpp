@@ -480,7 +480,8 @@ void SVGDOM::render(Canvas* canvas) {
       auto* drawCanvas = recorder.beginRecording();
       {
         SVGRenderContext renderCtx(canvas->getSurface()->getContext(), drawCanvas, _fontMgr,
-                                   _nodeIDMapper, lctx, pctx, {nullptr, nullptr});
+                                   _nodeIDMapper, lctx, pctx, {nullptr, nullptr},
+                                   canvas->getMatrix());
         _root->render(renderCtx);
       }
       _renderPicture = recorder.finishRecordingAsPicture();
@@ -493,7 +494,7 @@ void SVGDOM::renderNode(Canvas* canvas, SkSVGPresentationContext& pctx, const ch
   if (_root) {
     SVGLengthContext lctx(_containerSize);
     SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, _fontMgr, _nodeIDMapper,
-                               lctx, pctx, {nullptr, nullptr});
+                               lctx, pctx, {nullptr, nullptr}, canvas->getMatrix());
     _root->renderNode(renderCtx, SVGIRI(SVGIRI::Type::kLocal, SVGStringType(id)));
   }
 }

@@ -180,36 +180,40 @@ SkSVGPresentationContext::SkSVGPresentationContext()
 SVGRenderContext::SVGRenderContext(Context* device, Canvas* canvas,
                                    const std::shared_ptr<SVGFontManager>& fontManager,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lctx,
-                                   const SkSVGPresentationContext& pctx, const OBBScope& obbs)
+                                   const SkSVGPresentationContext& pctx, const OBBScope& obbs,
+                                   const Matrix& matrix)
     : _fontMgr(fontManager), _nodeIDMapper(mapper), _lengthContext(lctx),
       _presentationContext(pctx), _renderCanvas(canvas), _recorder(),
-      _canvas(_recorder.beginRecording()), _scope(obbs), _deviceContext(device) {
+      _canvas(_recorder.beginRecording()), _scope(obbs), _deviceContext(device), _matrix(matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
     : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, other._scope) {
+                       *other._lengthContext, *other._presentationContext, other._scope,
+                       other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
     : SVGRenderContext(other._deviceContext, canvas, other._fontMgr, other._nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, other._scope) {
+                       *other._lengthContext, *other._presentationContext, other._scope,
+                       other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGLengthContext& lengthCtx)
     : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
-                       lengthCtx, *other._presentationContext, other._scope) {
+                       lengthCtx, *other._presentationContext, other._scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
                                    const SVGLengthContext& lengthCtx)
     : SVGRenderContext(other._deviceContext, canvas, other._fontMgr, other._nodeIDMapper, lengthCtx,
-                       *other._presentationContext, other._scope) {
+                       *other._presentationContext, other._scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
     : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, OBBScope{node, this}) {
+                       *other._lengthContext, *other._presentationContext, OBBScope{node, this},
+                       other._matrix) {
 }
 
 SVGRenderContext::~SVGRenderContext() {
@@ -403,9 +407,10 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   // if (!shaderImage) {
   //   return nullptr;
   // }
-  auto matrix = _canvas->getMatrix() * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
-  auto shaderImage = Image::MakeFrom(picture, static_cast<int>(bound.width()),
-                                     static_cast<int>(bound.height()), &matrix);
+  auto matrix = _matrix * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
+  auto shaderImage =
+      Image::MakeFrom(picture, static_cast<int>(bound.width() * matrix.getScaleX()),
+                      static_cast<int>(bound.height() * matrix.getScaleY()), &matrix);
   // {
   //   auto tempSurface = Surface::Make(_deviceContext, static_cast<int>(bound.width()) * 2,
   //                                    static_cast<int>(bound.height()) * 2);
@@ -460,7 +465,7 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selecto
       SkSVGPresentationContext pctx;
       pctx._namedColors = _presentationContext->_namedColors;
       SVGRenderContext local_ctx(_deviceContext, _canvas, _fontMgr, _nodeIDMapper, *_lengthContext,
-                                 pctx, _scope);
+                                 pctx, _scope, Matrix::I());
 
       const auto node = this->findNodeById(paint_selector.iri());
       if (!node || !node->asPaint(local_ctx, &(p.value()))) {

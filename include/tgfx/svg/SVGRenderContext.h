@@ -167,7 +167,8 @@ class SVGRenderContext {
   };
 
   SVGRenderContext(Context*, Canvas*, const std::shared_ptr<SVGFontManager>&, const SVGIDMapper&,
-                   const SVGLengthContext&, const SkSVGPresentationContext&, const OBBScope&);
+                   const SVGLengthContext&, const SkSVGPresentationContext&, const OBBScope&,
+                   const Matrix& matrix);
   SVGRenderContext(const SVGRenderContext&);
   SVGRenderContext(const SVGRenderContext&, Canvas*);
   SVGRenderContext(const SVGRenderContext&, const SVGLengthContext&);
@@ -197,6 +198,10 @@ class SVGRenderContext {
     return _canvas;
   }
   void saveOnce();
+
+  void concat(const Matrix& matrix) {
+    _matrix.preConcat(matrix);
+  }
 
   enum ApplyFlags {
     kLeaf = 1 << 0,  // the target node doesn't have descendants
@@ -271,5 +276,7 @@ class SVGRenderContext {
 
   Context* _deviceContext;
   Paint _picturePaint;
+
+  Matrix _matrix = Matrix::I();
 };
 }  // namespace tgfx
