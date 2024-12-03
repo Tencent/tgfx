@@ -122,13 +122,4 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
-export const getImageFromPath = async (module: TGFX, path: string) => {
-    return new Promise((resolve, reject) => {
-        let img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = path;
-    });
-};
-
 export {getCanvas2D as createCanvas2D};

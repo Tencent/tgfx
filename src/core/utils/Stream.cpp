@@ -19,6 +19,7 @@
 #include "tgfx/core/Stream.h"
 #include <mutex>
 #include <regex>
+#include <unordered_map>
 #include "core/utils/Log.h"
 
 namespace tgfx {
