@@ -23,7 +23,7 @@
 
 namespace tgfx {
 static std::mutex locker = {};
-static std::unordered_map<std::string, std::shared_ptr<StreamFactory>> customProtocolsMaps = {};
+static std::unordered_map<std::string, std::shared_ptr<StreamFactory>> customProtocolsMap = {};
 
 class FileStream : public Stream {
  public:
@@ -76,7 +76,7 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   if (!protocol.empty()) {
     std::unique_ptr<Stream> stream = nullptr;
     locker.lock();
-    auto streamFactory = customProtocolsMaps[protocol];
+    auto streamFactory = customProtocolsMap[protocol];
     if (streamFactory) {
       stream = streamFactory->createStream(filePath);
     }
@@ -106,6 +106,6 @@ void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,
     return;
   }
   std::lock_guard<std::mutex> autoLock(locker);
-  customProtocolsMaps[customProtocol] = factory;
+  customProtocolsMap[customProtocol] = factory;
 }
 }  // namespace tgfx
