@@ -24,7 +24,8 @@
 
 namespace tgfx {
 static std::mutex locker = {};
-static std::unordered_map<std::string, std::shared_ptr<StreamFactory>> customProtocolsMap = {};
+static std::unordered_map<std::string, std::shared_ptr<StreamFactory>>* customProtocolsMap =
+    new std::unordered_map<std::string, std::shared_ptr<StreamFactory>>();
 
 class FileStream : public Stream {
  public:
@@ -61,10 +62,9 @@ class FileStream : public Stream {
 };
 
 std::string GetProtocolFromPath(const std::string& path) {
-  std::regex protocolRegex(R"((^[a-zA-Z]+:\/\/))");
-  std::smatch match;
-  if (std::regex_search(path, match, protocolRegex) && match.size() > 1) {
-    return match.str(1);
+  size_t pos = path.find("://");
+  if (pos != std::string::npos) {
+    return path.substr(0, pos + 3);
   }
   return "";
 }
@@ -77,14 +77,17 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   if (!protocol.empty()) {
     std::unique_ptr<Stream> stream = nullptr;
     locker.lock();
-    auto streamFactory = customProtocolsMap[protocol];
+    auto streamFactory = (*customProtocolsMap)[protocol];
+    locker.unlock();
     if (streamFactory) {
       stream = streamFactory->createStream(filePath);
     }
-    locker.unlock();
     if (stream) {
       return stream;
     }
+  }
+  if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
+    return nullptr;
   }
   auto file = fopen(filePath.c_str(), "rb");
   if (file == nullptr) {
@@ -107,6 +110,15 @@ void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,
     return;
   }
   std::lock_guard<std::mutex> autoLock(locker);
-  customProtocolsMap[customProtocol] = factory;
+  (*customProtocolsMap)[customProtocol] = factory;
 }
+
+void StreamFactory::UnRegisterCustomProtocol(const std::string& customProtocol) {
+  if (customProtocol.empty()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(locker);
+  customProtocolsMap->erase(customProtocol);
+}
+
 }  // namespace tgfx

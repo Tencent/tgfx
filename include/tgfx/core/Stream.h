@@ -74,11 +74,16 @@ class Stream {
 class StreamFactory {
  public:
   /**
-  * Registers custom protocol with the specified factory. The factory will create streams for paths
-  * that start with the specified protocol, such as "assets://".
-  */
+   * Registers custom protocol with the specified factory. The factory will create streams for paths
+   * that start with the specified protocol, such as "assets://".
+   */
   static void RegisterCustomProtocol(const std::string& customProtocol,
                                      std::shared_ptr<StreamFactory> factory);
+
+  /**
+   * Unregisters the custom protocol.
+   */
+  static void UnRegisterCustomProtocol(const std::string& customProtocol);
 
   virtual ~StreamFactory() = default;
   /**
