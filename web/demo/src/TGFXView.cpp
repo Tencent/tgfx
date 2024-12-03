@@ -18,11 +18,9 @@
 
 #include "TGFXView.h"
 
-using namespace emscripten;
 namespace hello2d {
 
-TGFXView::TGFXView(std::string canvasID, const val& nativeImage)
-    : TGFXBaseView(std::move(canvasID), nativeImage) {
+TGFXView::TGFXView(const std::string& canvasID) : TGFXBaseView(canvasID) {
   // To utilize a custom typeface, you can load it directly into the browser and access it using
   // tgfx::Typeface::MakeFromName().
   auto typeface = tgfx::Typeface::MakeFromName("Arial", "Regular");

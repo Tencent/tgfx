@@ -44,34 +44,33 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   TRACE_EVENT;
   std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
-  if (stream == nullptr || stream->size() <= 14) {
-    return nullptr;
-  }
-  Buffer buffer(14);
-  if (stream->read(buffer.data(), 14) < 14) {
-    return nullptr;
-  }
-  auto data = buffer.release();
+  if (stream && stream->size() > 14) {
+    Buffer buffer(14);
+    if (stream->read(buffer.data(), 14) == 14) {
+      auto data = buffer.release();
 #ifdef TGFX_USE_WEBP_DECODE
-  if (WebpCodec::IsWebp(data)) {
-    codec = WebpCodec::MakeFrom(filePath);
-  }
+      if (WebpCodec::IsWebp(data)) {
+        codec = WebpCodec::MakeFrom(filePath);
+      }
 #endif
 
 #ifdef TGFX_USE_PNG_DECODE
-  if (PngCodec::IsPng(data)) {
-    codec = PngCodec::MakeFrom(filePath);
-  }
+      if (codec == nullptr && PngCodec::IsPng(data)) {
+        codec = PngCodec::MakeFrom(filePath);
+      }
 #endif
 
 #ifdef TGFX_USE_JPEG_DECODE
-  if (JpegCodec::IsJpeg(data)) {
-    codec = JpegCodec::MakeFrom(filePath);
-  }
+      if (codec == nullptr && JpegCodec::IsJpeg(data)) {
+        codec = JpegCodec::MakeFrom(filePath);
+      }
 #endif
+    }
+  }
   if (codec == nullptr) {
     codec = MakeNativeCodec(filePath);
   }
+
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;
   }

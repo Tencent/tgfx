@@ -20,13 +20,14 @@
 
 #include "TGFXBaseView.h"
 
+using namespace emscripten;
 namespace hello2d {
 
 class TGFXThreadsView : public TGFXBaseView {
  public:
-  TGFXThreadsView(std::string canvasID, const emscripten::val& nativeImage);
+  TGFXThreadsView(const std::string& canvasID);
 
-  void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
+  void registerFonts(const val& fontVal, const val& emojiFontVal);
 };
 
 }  // namespace hello2d

@@ -26,7 +26,9 @@ namespace hello2d {
 
 class TGFXBaseView {
  public:
-  TGFXBaseView(std::string canvasID, const emscripten::val& nativeImage);
+  TGFXBaseView(const std::string& canvasID);
+
+  void setImagePath(const std::string& imagePath);
 
   void updateSize(float devicePixelRatio);
 
@@ -36,8 +38,8 @@ class TGFXBaseView {
   std::shared_ptr<drawers::AppHost> appHost;
 
  private:
-  std::string canvasID;
-  std::shared_ptr<tgfx::Window> window;
+  std::string canvasID = "";
+  std::shared_ptr<tgfx::Window> window = nullptr;
 };
 
 }  // namespace hello2d
