@@ -28,7 +28,7 @@ using namespace emscripten;
 
 namespace tgfx {
 
-std::shared_ptr<Buffer> GetBufferFromEmscripten(const val& emscriptenData) {
+std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData) {
   if (!emscriptenData.as<bool>()) {
     return nullptr;
   }
@@ -36,16 +36,15 @@ std::shared_ptr<Buffer> GetBufferFromEmscripten(const val& emscriptenData) {
   if (length == 0) {
     return nullptr;
   }
-  auto imageBuffer = new Buffer(length);
-  if (imageBuffer->isEmpty()) {
-    delete imageBuffer;
+  Buffer imageBuffer(length);
+  if (imageBuffer.isEmpty()) {
     return nullptr;
   }
   auto memory = val::module_property("HEAPU8")["buffer"];
   auto memoryView = val::global("Uint8Array")
-                        .new_(memory, reinterpret_cast<uintptr_t>(imageBuffer->data()), length);
+                        .new_(memory, reinterpret_cast<uintptr_t>(imageBuffer.data()), length);
   memoryView.call<void>("set", emscriptenData);
-  return std::shared_ptr<Buffer>(imageBuffer);
+  return imageBuffer.release();
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
@@ -53,11 +52,10 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     auto data = val::module_property("tgfx")
                     .call<val>("getBytesFromPath", val::module_property("module"), filePath)
                     .await();
-    auto imageBuffer = GetBufferFromEmscripten(data);
-    if (imageBuffer == nullptr) {
+    auto imageData = CopyDataFromUint8Array(data);
+    if (imageData == nullptr) {
       return nullptr;
     }
-    auto imageData = imageBuffer->release();
     return ImageCodec::MakeNativeCodec(imageData);
   } else {
     auto imageStream = Stream::MakeFromFile(filePath);
@@ -119,12 +117,12 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 
   auto data = val::module_property("tgfx").call<val>(
       "readImagePixels", val::module_property("module"), image, dstInfo.width(), dstInfo.height());
-  auto imageBuffer = GetBufferFromEmscripten(data);
-  if (imageBuffer == nullptr) {
+  auto imageData = CopyDataFromUint8Array(data);
+  if (imageData == nullptr) {
     return false;
   }
   auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-  Pixmap pixmap(info, imageBuffer->data());
+  Pixmap pixmap(info, imageData->data());
   auto result = pixmap.readPixels(dstInfo, dstPixels);
   return result;
 }
