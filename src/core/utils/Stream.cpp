@@ -75,15 +75,14 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   }
   auto protocol = GetProtocolFromPath(filePath);
   if (!protocol.empty()) {
-    std::unique_ptr<Stream> stream = nullptr;
     locker.lock();
     auto streamFactory = (*customProtocolsMap)[protocol];
     locker.unlock();
     if (streamFactory) {
-      stream = streamFactory->createStream(filePath);
-    }
-    if (stream) {
-      return stream;
+      auto stream = streamFactory->createStream(filePath);
+      if (stream) {
+        return stream;
+      }
     }
   }
   if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
