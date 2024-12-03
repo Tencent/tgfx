@@ -23,9 +23,9 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-static std::mutex locker = {};
-static std::unordered_map<std::string, std::shared_ptr<StreamFactory>>* customProtocolsMap =
-    new std::unordered_map<std::string, std::shared_ptr<StreamFactory>>();
+static std::mutex& locker = *new std::mutex;
+static std::unordered_map<std::string, std::shared_ptr<StreamFactory>>& customProtocolsMap =
+    *new std::unordered_map<std::string, std::shared_ptr<StreamFactory>>();
 
 class FileStream : public Stream {
  public:
@@ -76,7 +76,7 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   auto protocol = GetProtocolFromPath(filePath);
   if (!protocol.empty()) {
     locker.lock();
-    auto streamFactory = (*customProtocolsMap)[protocol];
+    auto streamFactory = customProtocolsMap[protocol];
     locker.unlock();
     if (streamFactory) {
       auto stream = streamFactory->createStream(filePath);
@@ -85,12 +85,8 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
       }
     }
   }
-  if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
-    return nullptr;
-  }
   auto file = fopen(filePath.c_str(), "rb");
   if (file == nullptr) {
-    LOGE("file open failed! filePath:%s \n", filePath.c_str());
     return nullptr;
   }
   fseek(file, 0, SEEK_END);
@@ -109,7 +105,7 @@ void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,
     return;
   }
   std::lock_guard<std::mutex> autoLock(locker);
-  (*customProtocolsMap)[customProtocol] = factory;
+  customProtocolsMap[customProtocol] = factory;
 }
 
 void StreamFactory::UnRegisterCustomProtocol(const std::string& customProtocol) {
@@ -117,7 +113,7 @@ void StreamFactory::UnRegisterCustomProtocol(const std::string& customProtocol) 
     return;
   }
   std::lock_guard<std::mutex> autoLock(locker);
-  customProtocolsMap->erase(customProtocol);
+  customProtocolsMap.erase(customProtocol);
 }
 
 }  // namespace tgfx

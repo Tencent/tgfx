@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import {getCanvas2D, releaseCanvas2D, isCanvas} from './utils/canvas';
-import {writeBufferToWasm} from './utils/buffer';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
@@ -61,7 +60,7 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
     if (data.length === 0) {
         return null;
     }
-    return writeBufferToWasm(module, data);
+    return new Uint8Array(data);
 };
 
 export const hasWebpSupport = () => {
