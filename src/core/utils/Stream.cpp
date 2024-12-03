@@ -18,12 +18,12 @@
 
 #include "tgfx/core/Stream.h"
 #include <mutex>
+#include <regex>
 #include "core/utils/Log.h"
 
 namespace tgfx {
 static std::mutex locker = {};
-static std::unique_ptr<StreamFactory> streamFactory = nullptr;
-static std::unordered_set<std::string> registerCustomProtocols = {};
+static std::unordered_map<std::string, std::shared_ptr<StreamFactory>> customProtocolsMaps = {};
 
 class FileStream : public Stream {
  public:
@@ -59,27 +59,31 @@ class FileStream : public Stream {
   size_t length = 0;
 };
 
-bool HasCustomProtocol(const std::string& filePath) {
-  for (const auto& protocol : registerCustomProtocols) {
-    if (!protocol.empty() && filePath.find(protocol) == 0) {
-      return true;
-    }
+std::string GetProtocolFromPath(const std::string& path) {
+  std::regex protocolRegex(R"((^[a-zA-Z]+:\/\/))");
+  std::smatch match;
+  if (std::regex_search(path, match, protocolRegex) && match.size() > 1) {
+    return match.str(1);
   }
-  return false;
+  return "";
 }
 
 std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   if (filePath.empty()) {
     return nullptr;
   }
-  std::unique_ptr<Stream> stream = nullptr;
-  locker.lock();
-  if (streamFactory && HasCustomProtocol(filePath)) {
-    stream = streamFactory->createStream(filePath);
-  }
-  locker.unlock();
-  if (stream) {
-    return stream;
+  auto protocol = GetProtocolFromPath(filePath);
+  if (!protocol.empty()) {
+    std::unique_ptr<Stream> stream = nullptr;
+    locker.lock();
+    auto streamFactory = customProtocolsMaps[protocol];
+    if (streamFactory) {
+      stream = streamFactory->createStream(filePath);
+    }
+    locker.unlock();
+    if (stream) {
+      return stream;
+    }
   }
   auto file = fopen(filePath.c_str(), "rb");
   if (file == nullptr) {
@@ -96,10 +100,12 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   return std::make_unique<FileStream>(file, length);
 }
 
-void StreamFactory::RegisterCustomProtocol(const std::unordered_set<std::string>& customProtocols,
-                                           std::unique_ptr<StreamFactory> factory) {
+void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,
+                                           std::shared_ptr<StreamFactory> factory) {
+  if (customProtocol.empty() || factory == nullptr) {
+    return;
+  }
   std::lock_guard<std::mutex> autoLock(locker);
-  registerCustomProtocols.insert(customProtocols.begin(), customProtocols.end());
-  streamFactory = std::move(factory);
+  customProtocolsMaps[customProtocol] = factory;
 }
 }  // namespace tgfx
