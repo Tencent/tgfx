@@ -39,7 +39,6 @@ Canvas* SVGGenerator::beginGenerate(Context* GPUContext, const ISize& size) {
 
   if (_actively) {
     _canvas->resetMCState();
-    // _svgContext->clear();  //will clear the svgStream
   } else {
     _actively = true;
   }

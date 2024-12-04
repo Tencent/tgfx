@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
-#include <unordered_set>
 #include "SVGContext.h"
 #include "SVGUtils.h"
 #include "core/MCState.h"
@@ -32,7 +31,7 @@
 namespace tgfx {
 
 Resources::Resources(const FillStyle& fill) {
-  _paintColor = SVGColor(fill.color);
+  _paintColor = ToSVGColor(fill.color);
 }
 
 ElementWriter::ElementWriter(const std::string& name, Context* GPUContext, XMLWriter* writer)
@@ -64,7 +63,7 @@ ElementWriter::ElementWriter(const std::string& name, Context* GPUContext, SVGCo
   this->addFillAndStroke(fill, stroke, res);
 
   if (!state.matrix.isIdentity()) {
-    this->addAttribute("transform", SVGTransform(state.matrix));
+    this->addAttribute("transform", ToSVGTransform(state.matrix));
   }
 }
 
@@ -97,11 +96,11 @@ void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const
     }
     this->addAttribute("stroke-width", strokeWidth);
 
-    if (auto cap = SVGCap(stroke->cap); !cap.empty()) {
+    if (auto cap = ToSVGCap(stroke->cap); !cap.empty()) {
       this->addAttribute("stroke-linecap", cap);
     }
 
-    if (auto join = SVGJoin(stroke->join); !join.empty()) {
+    if (auto join = ToSVGJoin(stroke->join); !join.empty()) {
       this->addAttribute("stroke-linejoin", join);
     }
 
@@ -115,7 +114,7 @@ void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const
   }
 
   if (fill.blendMode != BlendMode::SrcOver) {
-    this->addAttribute("style", SVGBlendMode(fill.blendMode));
+    this->addAttribute("style", ToSVGBlendMode(fill.blendMode));
   }
 
   if (!resources._filter.empty()) {
@@ -174,56 +173,12 @@ void ElementWriter::addEllipseAttributes(const Rect& bound) {
   this->addAttribute("ry", bound.height() * 0.5f);
 }
 
-void ElementWriter::addPathAttributes(const Path& path, PathParse::PathEncoding encoding) {
-  this->addAttribute("d", PathParse::ToSVGString(path, encoding));
+void ElementWriter::addPathAttributes(const Path& path, PathEncoding encoding) {
+  this->addAttribute("d", ToSVGString(path, encoding));
 }
 
-void ElementWriter::addTextAttributes(const Font& font) {
-  //TODO(YGAurora): add font attributes
-  this->addAttribute("font-size", font.getSize());
-
-  std::string familyName;
-  std::unordered_set<std::string> familySet;
-  auto typeFace = font.getTypeface();
-
-  ASSERT(typeFace);
-  // auto style = typeFace->fontStyle();
-  this->addAttribute("font-style", font.isFauxItalic() ? "italic" : "oblique");
-
-  this->addAttribute("font-weight", font.isFauxBold() ? "normal" : "bold");
-  // int weightIndex = (SkTPin(style.weight(), 100, 900) - 50) / 100;
-  // if (weightIndex != 3) {
-  //   static constexpr const char* weights[] = {"100", "200", "300",  "normal", "400",
-  //                                             "500", "600", "bold", "800",    "900"};
-  //   this->addAttribute("font-weight", weights[weightIndex]);
-  // }
-
-  // int stretchIndex = style.width() - 1;
-  // if (stretchIndex != 4) {
-  //   static constexpr const char* stretches[] = {
-  //       "ultra-condensed", "extra-condensed", "condensed",      "semi-condensed", "normal",
-  //       "semi-expanded",   "expanded",        "extra-expanded", "ultra-expanded"};
-  //   this->addAttribute("font-stretch", stretches[stretchIndex]);
-  // }
-
-  // sk_sp<SkTypeface::LocalizedStrings> familyNameIter(tface->createFamilyNameIterator());
-  // SkTypeface::LocalizedString familyString;
-  // if (familyNameIter) {
-  //   while (familyNameIter->next(&familyString)) {
-  //     if (familySet.contains(familyString.fString)) {
-  //       continue;
-  //     }
-  //     familySet.add(familyString.fString);
-  //     familyName.appendf((familyName.isEmpty() ? "%s" : ", %s"), familyString.fString.c_str());
-  //   }
-  // }
-  // if (!familyName.isEmpty()) {
-  //   this->addAttribute("font-family", familyName);
-  // }
-}
-
-void ElementWriter::addImageFilterAttributes(const std::shared_ptr<ImageFilter>& imageFilter,
-                                             const Rect& bound, Resources& resources) {
+Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
+                                                const Rect& bound) {
   std::string filterID = _resourceStore->addFilter();
   {
 
@@ -251,7 +206,9 @@ void ElementWriter::addImageFilterAttributes(const std::shared_ptr<ImageFilter>&
       addInnerShadowImageFilter(filterInfo);
     }
   }
+  Resources resources;
   resources._filter = "url(#" + filterID + ")";
+  return resources;
 }
 
 void ElementWriter::addBlurImageFilter(const ImageFilterInfo& info) {
@@ -368,7 +325,7 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader,
   } else if (shaderType == ShaderType::Image) {
     this->addImageShaderResources(shader, resources);
   }
-  // TODO(YGAurora): other shader types?
+  // TODO(YGAurora): other shader types
 }
 
 void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& shader,
@@ -376,7 +333,7 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& sh
   if (asShaderBase(shader)->type() == ShaderType::Color) {
     Color color;
     if (shader->asColor(&color)) {
-      resources->_paintColor = SVGColor(color);
+      resources->_paintColor = ToSVGColor(color);
       return;
     }
   }
@@ -398,7 +355,7 @@ void ElementWriter::addGradientColors(const GradientInfo& info) {
   ASSERT(info.colors.size() >= 2);
   for (uint32_t i = 0; i < info.colors.size(); ++i) {
     auto color = info.colors[i];
-    auto colorStr = SVGColor(color);
+    auto colorStr = ToSVGColor(color);
 
     ElementWriter stop("stop", _context, _writer);
     stop.addAttribute("offset", info.positions[i]);
@@ -528,7 +485,7 @@ void ElementWriter::addColorFilterResources(const ColorFilter& colorFilter, Reso
     {
       // first flood with filter color
       ElementWriter floodElement("feFlood", _context, _writer);
-      floodElement.addAttribute("flood-color", SVGColor(filterColor));
+      floodElement.addAttribute("flood-color", ToSVGColor(filterColor));
       floodElement.addAttribute("flood-opacity", filterColor.alpha);
       floodElement.addAttribute("result", "flood");
     }

@@ -23,12 +23,11 @@
 #include "core/FillStyle.h"
 #include "core/filters/ImageFilterBase.h"
 #include "core/shaders/ShaderBase.h"
-#include "tgfx/core/Font.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/SVGParse.h"
 #include "xml/XMLWriter.h"
 
 namespace tgfx {
@@ -87,16 +86,16 @@ class ElementWriter {
   void addAttribute(const std::string& name, const std::string& val);
   void addAttribute(const std::string& name, int32_t val);
   void addAttribute(const std::string& name, float val);
+
   void addText(const std::string& text);
+  void addRectAttributes(const Rect& rect);
+  void addRoundRectAttributes(const RRect& roundRect);
+  void addCircleAttributes(const Rect& bound);
+  void addEllipseAttributes(const Rect& bound);
+  void addPathAttributes(const Path& path, PathEncoding encoding);
 
-  void addRectAttributes(const Rect&);
-  void addRoundRectAttributes(const RRect&);
-  void addCircleAttributes(const Rect&);
-  void addEllipseAttributes(const Rect&);
-  void addPathAttributes(const Path&, PathParse::PathEncoding);
-  void addTextAttributes(const Font&);
-
-  void addImageFilterAttributes(const std::shared_ptr<ImageFilter>&, const Rect&, Resources&);
+  Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
+                                   const Rect& bound);
 
  private:
   Resources addResources(const FillStyle& fill);

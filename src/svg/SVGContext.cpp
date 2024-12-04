@@ -203,7 +203,7 @@ void SVGContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& stat
     ElementWriter defs("defs", _context, _writer, _resourceBucket.get());
     auto bound = picture->getBounds();
     bound = imageFilter->filterBounds(bound);
-    defs.addImageFilterAttributes(imageFilter, bound, resources);
+    resources = defs.addImageFilterResource(imageFilter, bound);
   }
   {
     auto groupElement =

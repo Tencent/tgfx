@@ -28,7 +28,7 @@
 
 namespace tgfx {
 
-std::string SVGTransform(const Matrix& matrix) {
+std::string ToSVGTransform(const Matrix& matrix) {
   ASSERT(!matrix.isIdentity());
 
   std::stringstream strStream;
@@ -44,7 +44,7 @@ std::string SVGTransform(const Matrix& matrix) {
 }
 
 // For maximum compatibility, do not convert colors to named colors, convert them to hex strings.
-std::string SVGColor(Color color) {
+std::string ToSVGColor(Color color) {
   auto r = static_cast<uint8_t>(color.red * 255);
   auto g = static_cast<uint8_t>(color.green * 255);
   auto b = static_cast<uint8_t>(color.blue * 255);
@@ -67,7 +67,7 @@ std::string SVGColor(Color color) {
   return std::string(buffer);
 }
 
-std::string SVGCap(LineCap cap) {
+std::string ToSVGCap(LineCap cap) {
   static const std::array<std::string, 3> capMap = {
       "",       // Butt_Cap (default)
       "round",  // Round_Cap
@@ -79,7 +79,7 @@ std::string SVGCap(LineCap cap) {
   return capMap[index];
 }
 
-std::string SVGJoin(LineJoin join) {
+std::string ToSVGJoin(LineJoin join) {
   static const std::array<std::string, 3> join_map = {
       "",       // Miter_Join (default)
       "round",  // Round_Join
@@ -91,7 +91,9 @@ std::string SVGJoin(LineJoin join) {
   return join_map[index];
 }
 
-std::string SVGBlendMode(BlendMode mode) {
+std::string ToSVGBlendMode(BlendMode mode) {
+  // Not all blend modes have corresponding SVG properties. Use an empty string for those,
+  // which will later be converted to "normal".
   constexpr size_t blendModeCount = static_cast<size_t>(BlendMode::Last) + 1;
   static const std::array<std::string, blendModeCount> blendModeMap = {
       "",              // Clear
@@ -134,6 +136,55 @@ std::string SVGBlendMode(BlendMode mode) {
   return "mix-blend-mode:" + blendStr;
 }
 
+std::string ToSVGString(const Path& path, PathEncoding encoding) {
+  Point currentPoint = Point::Zero();
+  const int relSelector = encoding == PathEncoding::Relative ? 1 : 0;
+
+  const auto appendCommand = [&](std::string& inputString, char commandChar, const Point points[],
+                                 size_t offset, size_t count) {
+    // Use lower case cmds for relative encoding.
+    commandChar = static_cast<char>(commandChar + 32 * relSelector);
+    inputString.push_back(commandChar);
+    for (size_t i = 0; i < count; ++i) {
+      const auto pt = points[offset + i] - currentPoint;
+      if (i > 0) {
+        inputString.push_back(' ');
+      }
+      inputString.append(FloatToString(pt.x) + " " + FloatToString(pt.y));
+    }
+
+    ASSERT(count > 0);
+    // For relative encoding, track the current point (otherwise == origin).
+    currentPoint = {points[offset + count - 1].x * static_cast<float>(relSelector),
+                    points[offset + count - 1].y * static_cast<float>(relSelector)};
+  };
+
+  auto pathIter = [&](PathVerb verb, const Point points[4], void* info) -> void {
+    auto* castedString = reinterpret_cast<std::string*>(info);
+    switch (verb) {
+      case PathVerb::Move:
+        appendCommand(*castedString, 'M', points, 0, 1);
+        break;
+      case PathVerb::Line:
+        appendCommand(*castedString, 'L', points, 1, 1);
+        break;
+      case PathVerb::Quad:
+        appendCommand(*castedString, 'Q', points, 1, 2);
+        break;
+      case PathVerb::Cubic:
+        appendCommand(*castedString, 'C', points, 1, 3);
+        break;
+      case PathVerb::Close:
+        castedString->push_back('Z');
+        break;
+    }
+  };
+
+  std::string svgString;
+  path.decompose(pathIter, &svgString);
+  return svgString;
+}
+
 std::string FloatToString(float value) {
   std::ostringstream out;
   out << std::fixed << std::setprecision(4) << value;
@@ -145,7 +196,7 @@ std::string FloatToString(float value) {
   return result;
 }
 
-void base64Encode(unsigned char const* bytes_to_encode, size_t in_len, char* ret) {
+void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret) {
   static const std::string base64_chars =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
       "abcdefghijklmnopqrstuvwxyz"
@@ -155,8 +206,8 @@ void base64Encode(unsigned char const* bytes_to_encode, size_t in_len, char* ret
   unsigned char char_array_3[3];
   unsigned char char_array_4[4];
 
-  while (in_len--) {
-    char_array_3[i++] = *(bytes_to_encode++);
+  while (length--) {
+    char_array_3[i++] = *(bytesToEncode++);
     if (i == 3) {
       char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
       char_array_4[1] = static_cast<unsigned char>(((char_array_3[0] & 0x03) << 4) +
@@ -173,7 +224,9 @@ void base64Encode(unsigned char const* bytes_to_encode, size_t in_len, char* ret
   }
 
   if (i) {
-    for (j = i; j < 3; j++) char_array_3[j] = '\0';
+    for (j = i; j < 3; j++) {
+      char_array_3[j] = '\0';
+    }
 
     char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
     char_array_4[1] = static_cast<unsigned char>(((char_array_3[0] & 0x03) << 4) +
@@ -182,7 +235,9 @@ void base64Encode(unsigned char const* bytes_to_encode, size_t in_len, char* ret
                                                  ((char_array_3[2] & 0xc0) >> 6));
     char_array_4[3] = char_array_3[2] & 0x3f;
 
-    for (j = 0; (j < i + 1); j++) ret += base64_chars[char_array_4[j]];
+    for (j = 0; (j < i + 1); j++) {
+      ret += base64_chars[char_array_4[j]];
+    }
 
     while ((i++ < 3)) {
       *ret++ = '=';
@@ -205,9 +260,7 @@ std::shared_ptr<Data> AsDataUri(Context* GPUContext, const std::shared_ptr<Image
 
   Bitmap bitmap(surface->width(), surface->height(), false, false);
   Pixmap pixmap(bitmap);
-  // bitmap.lockPixels();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-  // bitmap.unlockPixels();
   if (!result) {
     return nullptr;
   }
@@ -216,21 +269,11 @@ std::shared_ptr<Data> AsDataUri(Context* GPUContext, const std::shared_ptr<Image
     return nullptr;
   }
 
-  // tgfx::Bitmap bitmap = {};
-  // bitmap.allocPixels(surface->width(), surface->height());
-  // auto* pixels = bitmap.lockPixels();
-  // auto success = surface->readPixels(bitmap.info(), pixels);
-  // bitmap.unlockPixels();
-  // if (!success) {
-  //   return nullptr;
-  // }
-  // auto imageData = bitmap.encode(EncodedFormat::PNG, 100);
-
   size_t base64Size = ((imageData->size() + 2) / 3) * 4;
   auto bufferSize = prefixLength + base64Size;
   auto* dest = static_cast<char*>(malloc(bufferSize));
   memcpy(dest, pngPrefix, prefixLength);
-  base64Encode(imageData->bytes(), base64Size, dest + prefixLength);
+  Base64Encode(imageData->bytes(), base64Size, dest + prefixLength);
   dest[bufferSize - 1] = 0;
   auto dataUri = Data::MakeAdopted(dest, bufferSize, Data::FreeProc);
   return dataUri;

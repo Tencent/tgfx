@@ -19,17 +19,15 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include "core/DrawContext.h"
 #include "core/FillStyle.h"
 #include "core/MCState.h"
+#include "svg/SVGUtils.h"
 #include "svg/xml/XMLWriter.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/SVGParse.h"
 
 namespace tgfx {
 
@@ -81,8 +79,8 @@ class SVGContext : public DrawContext {
   void drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                        const FillStyle& style);
 
-  PathParse::PathEncoding pathEncoding() const {
-    return PathParse::PathEncoding::Absolute;
+  PathEncoding pathEncoding() const {
+    return PathEncoding::Absolute;
   }
 
   ISize _size;

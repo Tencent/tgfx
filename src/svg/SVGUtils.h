@@ -29,25 +29,42 @@
 
 namespace tgfx {
 
-std::string SVGTransform(const Matrix& matrix);
+/*
+ * Two ways to describe paths in SVG
+*/
+enum class PathEncoding {
+  /*
+   * Each step's point is an absolute coordinate, and the step letter is uppercase
+  */
+  Absolute,
+  /*
+   * Each step's point is a relative coordinate to the previous point, and the step letter is
+   *lowercase
+  */
+  Relative,
+};
+
+std::string ToSVGString(const Path& path, PathEncoding = PathEncoding::Absolute);
+
+std::string ToSVGTransform(const Matrix& matrix);
 
 /*
  * For maximum compatibility, do not convert colors to named colors, convert them to hex strings.
 */
-std::string SVGColor(Color color);
+std::string ToSVGColor(Color color);
 
-std::string SVGCap(LineCap cap);
+std::string ToSVGCap(LineCap cap);
 
-std::string SVGJoin(LineJoin join);
+std::string ToSVGJoin(LineJoin join);
 
-std::string SVGBlendMode(BlendMode mode);
+std::string ToSVGBlendMode(BlendMode mode);
 
 /*
- * Retain four decimal places and remove trailing zeros.
+ * Retain 4 decimal places and remove trailing zeros.
 */
 std::string FloatToString(float value);
 
-void base64Encode(unsigned char const* bytes_to_encode, size_t in_len, char* ret);
+void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret);
 
 /*
  * Returns data uri from bytes.
