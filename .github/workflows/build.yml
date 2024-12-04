@@ -247,7 +247,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -s ./win Hello2D -o ./out/release/win -a x64 -b
+          node build_tgfx -s ./win Hello2D -o ./out/release/win -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
