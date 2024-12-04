@@ -26,27 +26,26 @@ using namespace emscripten;
 EMSCRIPTEN_BINDINGS(TGFXDemo) {
 
   class_<TGFXBaseView>("TGFXBaseView")
+      .function("setImagePath", &TGFXBaseView::setImagePath)
       .function("updateSize", &TGFXBaseView::updateSize)
       .function("draw", &TGFXBaseView::draw);
 
   class_<TGFXView, base<TGFXBaseView>>("TGFXView")
       .smart_ptr<std::shared_ptr<TGFXView>>("TGFXView")
-      .class_function("MakeFrom",
-                      optional_override([](const std::string& canvasID, const val& nativeImage) {
+      .class_function("MakeFrom", optional_override([](const std::string& canvasID) {
                         if (canvasID.empty()) {
                           return std::shared_ptr<TGFXView>(nullptr);
                         }
-                        return std::make_shared<TGFXView>(canvasID, nativeImage);
+                        return std::make_shared<TGFXView>(canvasID);
                       }));
 
   class_<TGFXThreadsView, base<TGFXBaseView>>("TGFXThreadsView")
       .smart_ptr<std::shared_ptr<TGFXThreadsView>>("TGFXThreadsView")
-      .class_function("MakeFrom",
-                      optional_override([](const std::string& canvasID, const val& nativeImage) {
+      .class_function("MakeFrom", optional_override([](const std::string& canvasID) {
                         if (canvasID.empty()) {
                           return std::shared_ptr<TGFXThreadsView>(nullptr);
                         }
-                        return std::make_shared<TGFXThreadsView>(canvasID, nativeImage);
+                        return std::make_shared<TGFXThreadsView>(canvasID);
                       }))
       .function("registerFonts", &TGFXThreadsView::registerFonts);
 }

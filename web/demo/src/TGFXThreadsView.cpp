@@ -18,8 +18,6 @@
 
 #include "TGFXThreadsView.h"
 
-using namespace emscripten;
-
 namespace hello2d {
 std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   if (emscriptenData.isUndefined()) {
@@ -40,8 +38,7 @@ std::shared_ptr<tgfx::Data> GetDataFromEmscripten(const val& emscriptenData) {
   return nullptr;
 }
 
-TGFXThreadsView::TGFXThreadsView(std::string canvasID, const val& nativeImage)
-    : TGFXBaseView(std::move(canvasID), nativeImage) {
+TGFXThreadsView::TGFXThreadsView(const std::string& canvasID) : TGFXBaseView(canvasID) {
 }
 
 void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal) {
@@ -60,4 +57,5 @@ void TGFXThreadsView::registerFonts(const val& fontVal, const val& emojiFontVal)
     }
   }
 }
+
 }  // namespace hello2d

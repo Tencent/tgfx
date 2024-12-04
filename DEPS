@@ -67,7 +67,7 @@
       },
       {
         "url": "https://github.com/libpag/tracy.git",
-        "commit": "93fdee0238f74b95fdf18b7cc712e423c71497a3",
+        "commit": "3e416aba1e4eb4d90314ee0ff93424f4d9609d97",
         "dir": "third_party/tracy"
       }
     ]

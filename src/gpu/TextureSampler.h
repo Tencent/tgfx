@@ -23,7 +23,12 @@
 #include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
-enum class TextureType { Unknown, TwoD, Rectangle, External };
+/**
+ * The type of texture sampler. While only the 2D value is used by non-GL backends, the type must
+ * still be known at the API-neutral layer to determine the legality of mipmapped, renderable, and
+ * sampling parameters for proxies instantiated with wrapped textures.
+ */
+enum class SamplerType { None, TwoD, Rectangle, External };
 
 /**
  * TextureSampler stores the sampling parameters for a backend texture uint.
@@ -43,13 +48,17 @@ class TextureSampler {
    * The pixel format of the sampler.
    */
   PixelFormat format = PixelFormat::RGBA_8888;
+
+  /**
+   * The maximum mipmap level of the sampler.
+   */
   int maxMipmapLevel = 0;
 
   /**
-   * Returns the TextureType of TextureSampler.
+   * The texture type of the sampler.
    */
-  virtual TextureType type() const {
-    return TextureType::TwoD;
+  virtual SamplerType type() const {
+    return SamplerType::TwoD;
   }
 
   /**

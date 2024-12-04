@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,30 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
+#include "FlattenTextureProxy.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-class Quad {
- public:
-  static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
+FlattenTextureProxy::FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source)
+    : TextureProxy(std::move(uniqueKey)), source(std::move(source)) {
+}
 
-  const Point& point(size_t i) const {
-    return points[i];
-  }
-
-  /**
-   * Returns the basic vertex data of the quad as triangle strips.
-   */
-  std::shared_ptr<Data> toTriangleStrips() const;
-
- private:
-  explicit Quad(std::vector<Point> points) : points(std::move(points)) {
-  }
-
-  std::vector<Point> points = {};
-};
+std::shared_ptr<Texture> FlattenTextureProxy::getTexture() const {
+  auto texture = Resource::Find<Texture>(context, handle.key());
+  return texture ? texture : source->getTexture();
+}
 }  // namespace tgfx

@@ -31,7 +31,6 @@ void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
 
 void OpsRenderTask::prepare(Context* context) {
   TRACE_EVENT_COLOR(TRACY_COLOR_GREEN);
-  renderPass = context->gpu()->getRenderPass();
   for (auto& op : ops) {
     op->prepare(context, renderFlags);
   }
@@ -39,10 +38,11 @@ void OpsRenderTask::prepare(Context* context) {
 
 bool OpsRenderTask::execute(Gpu* gpu) {
   TRACE_EVENT;
-  if (ops.empty()) {
+  if (ops.empty() || renderTargetProxy == nullptr) {
     return false;
   }
-  if (!renderPass->begin(renderTargetProxy)) {
+  auto renderPass = gpu->getRenderPass();
+  if (!renderPass->begin(renderTargetProxy->getRenderTarget(), renderTargetProxy->getTexture())) {
     LOGE("OpsTask::execute() Failed to initialize the render pass!");
     return false;
   }
@@ -50,7 +50,6 @@ bool OpsRenderTask::execute(Gpu* gpu) {
   for (auto& op : tempOps) {
     op->execute(renderPass.get());
   }
-  gpu->submit(renderPass.get());
   renderPass->end();
   return true;
 }

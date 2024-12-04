@@ -38,15 +38,15 @@ class ProgramInfo {
   virtual ~ProgramInfo() = default;
 
   /**
-   * Returns true if the draw requires a texture barrier.
-   */
-  virtual bool requiresBarrier() const = 0;
-
-  /**
    * Returns the blend info for the draw. A nullptr is returned if the draw does not require
    * blending.
    */
   virtual const BlendInfo* blendInfo() const = 0;
+
+  /**
+   * Returns true if the draw requires a texture barrier.
+   */
+  virtual bool requiresBarrier() const = 0;
 
   /**
    * Collects uniform data for the draw.

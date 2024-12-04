@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,29 @@
 
 #pragma once
 
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class Quad {
+class TextureFlattenTask {
  public:
-  static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
-
-  const Point& point(size_t i) const {
-    return points[i];
-  }
+  /**
+   * Prepares the task for execution. Returns false if the task can be skipped.
+   */
+  bool prepare(Context* context);
 
   /**
-   * Returns the basic vertex data of the quad as triangle strips.
+   * Executes the task to flatten the texture.
    */
-  std::shared_ptr<Data> toTriangleStrips() const;
+  bool execute(Context* context);
 
  private:
-  explicit Quad(std::vector<Point> points) : points(std::move(points)) {
-  }
+  UniqueKey uniqueKey = {};
+  std::shared_ptr<TextureProxy> sourceTextureProxy = nullptr;
+  std::shared_ptr<Texture> flatTexture = nullptr;
+  std::shared_ptr<RenderTarget> renderTarget = nullptr;
 
-  std::vector<Point> points = {};
+  TextureFlattenTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy);
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

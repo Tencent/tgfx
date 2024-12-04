@@ -41,7 +41,7 @@ class Pipeline : public ProgramInfo {
  public:
   Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
            std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-           size_t numColorProcessors, BlendMode blendMode, const DstTextureInfo& dstTextureInfo,
+           size_t numColorProcessors, BlendMode blendMode, DstTextureInfo dstTextureInfo,
            const Swizzle* outputSwizzle);
 
   size_t numColorFragmentProcessors() const {
@@ -104,7 +104,7 @@ class Pipeline : public ProgramInfo {
   std::unordered_map<const Processor*, int> processorIndices = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
-  std::unique_ptr<XferProcessor> xferProcessor;
+  std::unique_ptr<XferProcessor> xferProcessor = nullptr;
   BlendInfo _blendInfo = {};
   DstTextureInfo dstTextureInfo = {};
   const Swizzle* _outputSwizzle = nullptr;

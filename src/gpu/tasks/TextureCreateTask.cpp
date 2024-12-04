@@ -24,6 +24,7 @@ namespace tgfx {
 std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(UniqueKey uniqueKey, int width,
                                                                int height, PixelFormat format,
                                                                bool mipmapped, ImageOrigin origin) {
+  TRACE_EVENT;
   if (width <= 0 || height <= 0) {
     return nullptr;
   }

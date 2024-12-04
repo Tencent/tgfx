@@ -31,61 +31,50 @@ class TextureProxy : public ResourceProxy {
   /**
    * Returns the width of the texture.
    */
-  int width() const {
-    return _width;
-  }
+  virtual int width() const = 0;
 
   /**
    * Returns the height of the texture.
    */
-  int height() const {
-    return _height;
-  }
-
-  /**
-   * Return the mipmap state of the texture.
-   */
-  bool hasMipmaps() const {
-    return mipmapped;
-  }
+  virtual int height() const = 0;
 
   /**
    * Returns the origin of the texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
-  ImageOrigin origin() const {
-    return _origin;
-  }
+  virtual ImageOrigin origin() const = 0;
+
+  /**
+   * Return the mipmap state of the texture.
+   */
+  virtual bool hasMipmaps() const = 0;
 
   /**
    * Returns true if the texture represents transparency only.
    */
-  bool isAlphaOnly() const {
-    return _isAlphaOnly;
-  }
+  virtual bool isAlphaOnly() const = 0;
 
   /**
    * Returns true if the backend texture is externally owned.
    */
-  bool externallyOwned() const {
-    return _externallyOwned;
+  virtual bool externallyOwned() const = 0;
+
+  /**
+   * Returns true if it is a flatten texture proxy.
+   */
+  virtual bool isFlatten() const {
+    return false;
   }
 
   /**
    * Returns the associated Texture instance.
    */
-  std::shared_ptr<Texture> getTexture() const;
+  virtual std::shared_ptr<Texture> getTexture() const = 0;
+
+ protected:
+  explicit TextureProxy(UniqueKey uniqueKey) : ResourceProxy(std::move(uniqueKey)) {
+  }
 
  private:
-  int _width = 0;
-  int _height = 0;
-  bool mipmapped = false;
-  bool _isAlphaOnly = false;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-  bool _externallyOwned = false;
-
-  TextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
-               ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
-
   friend class ProxyProvider;
 };
 }  // namespace tgfx

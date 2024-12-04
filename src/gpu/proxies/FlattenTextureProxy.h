@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,47 @@
 
 #pragma once
 
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class Quad {
- public:
-  static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
 
-  const Point& point(size_t i) const {
-    return points[i];
+class FlattenTextureProxy : public TextureProxy {
+ public:
+  int width() const override {
+    return source->width();
   }
 
-  /**
-   * Returns the basic vertex data of the quad as triangle strips.
-   */
-  std::shared_ptr<Data> toTriangleStrips() const;
+  int height() const override {
+    return source->height();
+  }
+
+  ImageOrigin origin() const override {
+    return ImageOrigin::TopLeft;
+  }
+
+  bool hasMipmaps() const override {
+    return source->hasMipmaps();
+  }
+
+  bool isAlphaOnly() const override {
+    return source->isAlphaOnly();
+  }
+
+  bool externallyOwned() const override {
+    return source->externallyOwned();
+  }
+
+  bool isFlatten() const override {
+    return true;
+  }
+
+  std::shared_ptr<Texture> getTexture() const override;
 
  private:
-  explicit Quad(std::vector<Point> points) : points(std::move(points)) {
-  }
+  std::shared_ptr<TextureProxy> source = nullptr;
 
-  std::vector<Point> points = {};
+  FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source);
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx
