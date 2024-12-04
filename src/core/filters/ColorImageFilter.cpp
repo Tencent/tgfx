@@ -17,8 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorImageFilter.h"
+#include "core/filters/ImageFilterBase.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
@@ -30,6 +33,18 @@ std::shared_ptr<ImageFilter> ImageFilter::ColorFilter(
 
 ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
     : filter(std::move(filter)) {
+}
+
+ImageFilterType ColorImageFilter::asImageFilterInfo(ImageFilterInfo* info) const {
+  if (info) {
+    Color color;
+    BlendMode blendMode;
+    if (filter->asColorMode(&color, &blendMode)) {
+      info->color = color;
+      info->blendMode = blendMode;
+    }
+  }
+  return ImageFilterType::Color;
 }
 
 std::unique_ptr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(

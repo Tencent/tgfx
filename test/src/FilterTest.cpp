@@ -18,6 +18,7 @@
 
 #include <vector>
 #include "CornerPinEffect.h"
+#include "core/filters/ImageFilterBase.h"
 #include "core/shaders/ShaderBase.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "gpu/opengl/GLUtil.h"
@@ -26,6 +27,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/GradientType.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Point.h"
@@ -364,6 +366,94 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   auto filter = ColorFilter::Compose(modeColorFilter, lumaFilter);
   ret = filter->asColorMode(nullptr, nullptr);
   EXPECT_FALSE(ret);
+
+  {
+    auto imageFilter = ImageFilter::Blur(20, 30);
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::Blur);
+    EXPECT_NE(info.blurrinessX, 8.88889);
+    EXPECT_NE(info.blurrinessY, 17.7778);
+  }
+
+  {
+    auto imageFilter = ImageFilter::DropShadow(15.f, 15.f, 20.f, 30.f, Color::White());
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::DropShadow);
+    EXPECT_NE(info.blurrinessX, 8.88889);
+    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_EQ(info.offset.x, 15.f);
+    EXPECT_EQ(info.offset.y, 15.f);
+    EXPECT_EQ(info.color, Color::White());
+    EXPECT_EQ(info.onlyShadow, false);
+  }
+
+  {
+    auto imageFilter = ImageFilter::DropShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::DropShadow);
+    EXPECT_NE(info.blurrinessX, 8.88889);
+    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_EQ(info.offset.x, 15.f);
+    EXPECT_EQ(info.offset.y, 15.f);
+    EXPECT_EQ(info.color, Color::White());
+    EXPECT_EQ(info.onlyShadow, true);
+  }
+
+  {
+    auto imageFilter = ImageFilter::InnerShadow(15.f, 15.f, 20.f, 30.f, Color::White());
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::InnerShadow);
+    EXPECT_NE(info.blurrinessX, 8.88889);
+    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_EQ(info.offset.x, 15.f);
+    EXPECT_EQ(info.offset.y, 15.f);
+    EXPECT_EQ(info.color, Color::White());
+    EXPECT_EQ(info.onlyShadow, false);
+  }
+
+  {
+    auto imageFilter = ImageFilter::InnerShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::InnerShadow);
+    EXPECT_NE(info.blurrinessX, 8.88889);
+    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_EQ(info.offset.x, 15.f);
+    EXPECT_EQ(info.offset.y, 15.f);
+    EXPECT_EQ(info.color, Color::White());
+    EXPECT_EQ(info.onlyShadow, true);
+  }
+
+  {
+    auto imageFilter = ImageFilter::ColorFilter(modeColorFilter);
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::Color);
+    EXPECT_EQ(info.color, Color::Red());
+    EXPECT_EQ(info.blendMode, BlendMode::Multiply);
+  }
+
+  {
+    auto blueFilter = ImageFilter::DropShadow(100, 100, 0, 0, Color::Blue());
+    auto greenFilter = ImageFilter::DropShadow(-100, -100, 0, 0, Color::Green());
+    auto blackFilter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
+    auto composeFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(composeFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::Compose);
+  }
+
+  {
+    auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+    auto imageFilter = ImageFilter::Runtime(std::move(effect));
+    ImageFilterInfo info;
+    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
+    EXPECT_EQ(type, ImageFilterType::Runtime);
+  }
 }
 
 TGFX_TEST(FilterTest, GetShaderProperties) {

@@ -18,13 +18,18 @@
 
 #pragma once
 
+#include "core/filters/ImageFilterBase.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class RuntimeImageFilter : public ImageFilter {
+class RuntimeImageFilter : public ImageFilterBase {
  public:
   explicit RuntimeImageFilter(std::shared_ptr<RuntimeEffect> effect) : effect(std::move(effect)) {
   }
+
+  ImageFilterType asImageFilterInfo(ImageFilterInfo*) const override {
+    return ImageFilterType::Runtime;
+  };
 
  protected:
   Rect onFilterBounds(const Rect& srcRect) const override;

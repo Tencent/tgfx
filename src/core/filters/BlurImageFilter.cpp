@@ -50,10 +50,10 @@ static const float BLUR_STABLE = 10.0f;
 static std::tuple<int, float, float> Get(float blurriness) {
   blurriness = blurriness < BLUR_LEVEL_MAX_LIMIT ? blurriness : BLUR_LEVEL_MAX_LIMIT;
   if (blurriness < BLUR_LEVEL_1_LIMIT) {
-    return {BLUR_LEVEL_1_DEPTH, BLUR_LEVEL_1_SCALE, blurriness / BLUR_LEVEL_1_LIMIT * 2.0};
+    return {BLUR_LEVEL_1_DEPTH, BLUR_LEVEL_1_SCALE, blurriness / BLUR_LEVEL_1_LIMIT * 1.2};
   } else if (blurriness < BLUR_LEVEL_2_LIMIT) {
     return {BLUR_LEVEL_2_DEPTH, BLUR_LEVEL_2_SCALE,
-            (blurriness - BLUR_STABLE) / (BLUR_LEVEL_2_LIMIT - BLUR_STABLE) * 3.0};
+            0.48 + (blurriness - BLUR_STABLE) / (BLUR_LEVEL_2_LIMIT - BLUR_STABLE) * 0.4};
   } else if (blurriness < BLUR_LEVEL_3_LIMIT) {
     return {BLUR_LEVEL_3_DEPTH, BLUR_LEVEL_3_SCALE,
             (blurriness - BLUR_STABLE) / (BLUR_LEVEL_3_LIMIT - BLUR_STABLE) * 5.0};
@@ -72,16 +72,25 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
-  auto x = Get(blurrinessX);
-  auto y = Get(blurrinessY);
-  return std::make_shared<BlurImageFilter>(Point::Make(std::get<2>(x), std::get<2>(y)),
-                                           std::max(std::get<1>(x), std::get<1>(y)),
-                                           std::max(std::get<0>(x), std::get<0>(y)), tileMode);
+  auto [iterationX, downScalingX, offsetX] = Get(blurrinessX);
+  auto [iterationY, downScalingY, offsetY] = Get(blurrinessY);
+  return std::make_shared<BlurImageFilter>(Point::Make(offsetX, offsetY),
+                                           std::max(downScalingX, downScalingY),
+                                           std::max(iterationX, iterationY), tileMode);
 }
 
 BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iteration,
                                  TileMode tileMode)
     : blurOffset(blurOffset), downScaling(downScaling), iteration(iteration), tileMode(tileMode) {
+}
+
+ImageFilterType BlurImageFilter::asImageFilterInfo(ImageFilterInfo* filterInfo) const {
+  if (filterInfo) {
+    auto rect = onFilterBounds(Rect::MakeWH(0, 0));
+    filterInfo->blurrinessX = rect.width() / 2.0f;
+    filterInfo->blurrinessY = rect.height() / 2.0f;
+  }
+  return ImageFilterType::Blur;
 }
 
 void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,

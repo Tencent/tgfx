@@ -18,13 +18,15 @@
 
 #pragma once
 
+#include "core/filters/ImageFilterBase.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class BlurImageFilter : public ImageFilter {
+class BlurImageFilter : public ImageFilterBase {
  public:
   BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
+
+  ImageFilterType asImageFilterInfo(ImageFilterInfo* filterInfo) const override;
 
  protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
