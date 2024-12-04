@@ -271,7 +271,8 @@ Size CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
     matrix->setTranslate(static_cast<float>(cgBounds.origin.x), static_cast<float>(-cgBounds.origin.y - cgBounds.size.height);
   }
   return Size::Make(static_cast<float>(cgBounds.size.width),
-                              static_cast<float>(cgBounds.size.height));;
+                    static_cast<float>(cgBounds.size.height));
+  ;
 }
 
 std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID,
