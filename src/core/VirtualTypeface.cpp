@@ -62,7 +62,8 @@ Size VirtualTypeface::GetImageTransform(const std::shared_ptr<Typeface>& typefac
   return provider->getImageTransform(typeface, glyphID, matrixOut);
 }
 
-Rect VirtualTypeface::GetBounds(const std::shared_ptr<Typeface>& typeface, GlyphID glyphID, bool fauxBold, bool fauxItalic) {
+Rect VirtualTypeface::GetBounds(const std::shared_ptr<Typeface>& typeface, GlyphID glyphID,
+                                bool fauxBold, bool fauxItalic) {
   const auto& provider = TypefaceProviderManager::GetInstance()->getProvider();
   if (provider == nullptr) {
     return Rect::MakeEmpty();

@@ -181,5 +181,8 @@
         "TextAlignWidth0Height0": "7683ec5",
         "TextAlignWidth1Height10": "110c3ee",
         "TruncateTextLineTest": "110c3ee"
+    },
+    "VirtualTypefaceTest": {
+        "DrawTextWihtVirtualTypeface": "f7ceed1"
     }
 }

@@ -78,6 +78,8 @@ class Typeface {
 
   /**
    * Creates a new virtual typeface. Returns nullptr if the typeface can't be created.
+   * hasColor is true if the typeface has color glyphs, for example, color emojis.
+   * Otherwise, the hasColor is false.
    */
   static std::shared_ptr<Typeface> MakeVirtual(bool hasColor);
 

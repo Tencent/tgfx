@@ -553,7 +553,8 @@ Size FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
                          -static_cast<float>(face->glyph->bitmap_top));
     matrix->postScale(extraScale.x, extraScale.y);
   }
-  return Size::Make(static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
+  return Size::Make(static_cast<float>(face->glyph->bitmap.width),
+                    static_cast<float>(face->glyph->bitmap.rows));
 }
 
 std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID,

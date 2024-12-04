@@ -23,7 +23,8 @@ TypefaceProviderManager* TypefaceProviderManager::GetInstance() {
   return &manager;
 }
 
-void TypefaceProviderManager::registerProvider(const std::shared_ptr<TypefaceProvider>& provider) {
+void TypefaceProviderManager::registerProvider(std::shared_ptr<TypefaceProvider> provider) {
+  std::lock_guard<std::mutex> autoLock(locker);
   _provider = provider;
 }
 }  // namespace tgfx

@@ -28,8 +28,7 @@ FontMetrics VirtualScalerContext::getFontMetrics() const {
   return FontMetrics();
 }
 
-Rect VirtualScalerContext::getBounds(GlyphID glyphID, bool fauxBold,
-                                     bool fauxItalic) const {
+Rect VirtualScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
   return ConvertTypeface(typeface)->GetBounds(typeface, glyphID, fauxBold, fauxItalic);
 }
 
@@ -50,7 +49,8 @@ Size VirtualScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) co
   return ConvertTypeface(typeface)->GetImageTransform(typeface, glyphID, matrix);
 }
 
-std::shared_ptr<ImageBuffer> VirtualScalerContext::generateImage(GlyphID glyphID, bool tryHardware) const {
+std::shared_ptr<ImageBuffer> VirtualScalerContext::generateImage(GlyphID glyphID,
+                                                                 bool tryHardware) const {
   return ConvertTypeface(typeface)->GetImage(typeface, glyphID, tryHardware);
 }
 
