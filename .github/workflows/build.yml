@@ -291,7 +291,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -s ./linux Hello2D -o ./out/release/linux -a x64
+          node build_tgfx -s ./linux Hello2D -o ./out/release/linux -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
