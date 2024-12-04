@@ -25,13 +25,30 @@
 namespace tgfx {
 class SVGContext;
 
+/**
+ * SVGGenerator is a class used to generate SVG text, converting drawing commands in the Canvas to
+ * SVG text.
+ */
 class SVGGenerator {
  public:
   SVGGenerator() = default;
   ~SVGGenerator();
 
+  /**
+   * Begin generating SVG text and return a Canvas object for drawing SVG graphics. The input
+   * GPUContext is used to convert some rendering commands into image data. The size sets the size
+   * of the SVG, and content that exceeds the display area in the SVG will be clipped.
+   */
   Canvas* beginGenerate(Context* GPUContext, const ISize& size);
+
+  /**
+   * Returns the recording canvas if one is active, or nullptr if recording is not active.
+   */
   Canvas* getCanvas() const;
+
+  /**
+   * Finish generating SVG text and return the generated SVG text. If no recording is active.
+   */
   std::string finishGenerate();
 
  private:

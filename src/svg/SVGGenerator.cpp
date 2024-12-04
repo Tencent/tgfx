@@ -27,7 +27,10 @@
 
 namespace tgfx {
 
-SVGGenerator::~SVGGenerator() = default;
+SVGGenerator::~SVGGenerator() {
+  delete _canvas;
+  delete _context;
+};
 
 Canvas* SVGGenerator::beginGenerate(Context* GPUContext, const ISize& size) {
   ASSERT(GPUContext)
@@ -35,6 +38,7 @@ Canvas* SVGGenerator::beginGenerate(Context* GPUContext, const ISize& size) {
     auto writer = std::make_unique<XMLStreamWriter>(_svgStream, 0);
     _context = new SVGContext(GPUContext, size, std::move(writer), 0);
     _canvas = new Canvas(_context);
+    _context->setCanvas(_canvas);
   }
 
   if (_actively) {

@@ -63,12 +63,17 @@ class ResourceStore {
     return "pattern_" + std::to_string(_patternCount++);
   }
 
+  std::string addClip() {
+    return "clip_" + std::to_string(_clipCount++);
+  }
+
  private:
   uint32_t _gradientCount = 0;
   uint32_t _pathCount = 0;
   uint32_t _imageCount = 0;
   uint32_t _patternCount = 0;
   uint32_t _filterCount = 0;
+  uint32_t _clipCount = 0;
 };
 
 class ElementWriter {

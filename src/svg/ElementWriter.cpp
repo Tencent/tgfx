@@ -55,7 +55,7 @@ ElementWriter::ElementWriter(const std::string& name, Context* GPUContext, SVGCo
                              const Stroke* stroke)
     : _context(GPUContext), _writer(svgContext->getWriter()), _resourceStore(bucket) {
 
-  svgContext->syncClipStack(state);
+  svgContext->syncMCState(state);
   Resources res = this->addResources(fill);
 
   _writer->startElement(name);

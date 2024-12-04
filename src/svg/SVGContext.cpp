@@ -227,35 +227,25 @@ bool SVGContext::RequiresViewportReset(const FillStyle& fill) {
   return tileX == TileMode::Repeat || tileY == TileMode::Repeat;
 }
 
-void SVGContext::syncClipStack(const MCState& mc) {
-  uint32_t equalIndex = 0;
-  if (!_clipStack.empty()) {
-    for (auto i = _clipStack.size() - 1; i >= 0; i--) {
-      if (_clipStack[i].clip == &mc) {
-        break;
+void SVGContext::syncMCState(const MCState& state) {
+  auto saveCount = _canvas->getSaveCount();
+  if (!_stateStack.empty()) {
+    if (_stateStack.top().first >= saveCount) {
+      while (_stateStack.top().first > saveCount) {
+        _stateStack.pop();
       }
-      equalIndex++;
+      return;
+    } else if (state.clip.isEmpty()) {
+      return;
     }
   }
 
-  //the clip is in the stack, pop all the clips above it
-  if (equalIndex != _clipStack.size()) {
-    for (uint32_t i = 0; i < equalIndex; i++) {
-      _clipStack.pop_back();
-    }
-    return;
-  }
-
-  auto defineClip = [this](const MCState& mc) -> std::string {
-    if (mc.clip.isEmpty()) {
-      return "";
-    }
-
-    std::string clipID = "clip_" + std::to_string(_clipAttributeCount++);
+  auto defineClip = [this](const MCState& insertState) -> std::string {
+    std::string clipID = "clip_" + _resourceBucket->addClip();
     ElementWriter clipPath("clipPath", _context, _writer);
     clipPath.addAttribute("id", clipID);
     {
-      auto clipPath = mc.clip;
+      auto clipPath = insertState.clip;
       std::unique_ptr<ElementWriter> element;
       if (Rect rect; clipPath.isRect(&rect)) {
         element = std::make_unique<ElementWriter>("rect", _context, _writer);
@@ -282,14 +272,10 @@ void SVGContext::syncClipStack(const MCState& mc) {
     return clipID;
   };
 
-  auto clipID = defineClip(mc);
-  if (clipID.empty()) {
-    _clipStack.push_back({&mc, nullptr});
-  } else {
-    auto clipElement = std::make_unique<ElementWriter>("g", _context, _writer);
-    clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
-    _clipStack.push_back({&mc, std::move(clipElement)});
-  }
+  auto clipID = defineClip(state);
+  auto clipElement = std::make_unique<ElementWriter>("g", _context, _writer);
+  clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+  _stateStack.emplace(saveCount, std::move(clipElement));
 }
 
 }  // namespace tgfx

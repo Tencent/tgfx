@@ -18,13 +18,16 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include "core/DrawContext.h"
 #include "core/FillStyle.h"
 #include "core/MCState.h"
 #include "svg/SVGUtils.h"
 #include "svg/xml/XMLWriter.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
@@ -39,6 +42,10 @@ class SVGContext : public DrawContext {
   SVGContext(Context* GPUContext, const ISize& size, std::unique_ptr<XMLWriter> writer,
              uint32_t flags);
   ~SVGContext() override = default;
+
+  void setCanvas(Canvas* canvas) {
+    _canvas = canvas;
+  }
 
   void clear() override;
 
@@ -63,7 +70,7 @@ class SVGContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture>, const MCState&, const FillStyle&,
                  std::shared_ptr<ImageFilter>) override;
 
-  void syncClipStack(const MCState& mc);
+  void syncMCState(const MCState& state);
 
   XMLWriter* getWriter() const {
     return _writer.get();
@@ -74,7 +81,7 @@ class SVGContext : public DrawContext {
    * Determine if the paint requires us to reset the viewport.Currently, we do this whenever the
    * paint shader calls for a repeating image.
    */
-  bool RequiresViewportReset(const FillStyle& fill);
+  static bool RequiresViewportReset(const FillStyle& fill);
 
   void drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                        const FillStyle& style);
@@ -85,17 +92,11 @@ class SVGContext : public DrawContext {
 
   ISize _size;
   Context* _context = nullptr;
+  Canvas* _canvas = nullptr;
   const std::unique_ptr<XMLWriter> _writer;
   const std::unique_ptr<ResourceStore> _resourceBucket;
   const uint32_t _flags;
   std::unique_ptr<ElementWriter> _rootElement;
-
-  struct ClipRecord {
-    const MCState* clip;
-    std::unique_ptr<ElementWriter> element;
-  };
-
-  std::vector<ClipRecord> _clipStack;
-  int _clipAttributeCount = 0;
+  std::stack<std::pair<size_t, std::unique_ptr<ElementWriter>>> _stateStack;
 };
 }  // namespace tgfx
