@@ -193,7 +193,7 @@ jobs:
         run: |
           cd web
           emsdk/emsdk_env
-          npm run build
+          npm run build:mt:debug
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -247,7 +247,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -s ./win Hello2D -o ./out/release/win -a x64
+          node build_tgfx -s ./win Hello2D -o ./out/release/win -a x64 -b
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
