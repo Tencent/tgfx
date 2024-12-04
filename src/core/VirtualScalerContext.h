@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,20 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <memory>
-#include "ft2build.h"
-#include FT_FREETYPE_H
-#include "FTTypeface.h"
-#include "core/PixelBuffer.h"
-#include "core/ScalerContext.h"
+#include "ScalerContext.h"
+#include "tgfx/core/VirtualTypeface.h"
 
 namespace tgfx {
-class FTScalerContext : public ScalerContext {
+class VirtualScalerContext : public ScalerContext {
  public:
-  FTScalerContext(std::shared_ptr<Typeface> typeFace, float textSize);
-
-  ~FTScalerContext() override;
+  explicit VirtualScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
   FontMetrics getFontMetrics() const override;
 
@@ -47,26 +40,7 @@ class FTScalerContext : public ScalerContext {
   std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const override;
 
  private:
-  int setupSize(bool fauxItalic) const;
-
-  void getFontMetricsInternal(FontMetrics* metrics) const;
-
-  float getAdvanceInternal(GlyphID glyphID, bool verticalText = false) const;
-
-  bool getCBoxForLetter(char letter, FT_BBox* bbox) const;
-
-  void getBBoxForCurrentGlyph(FT_BBox* bbox) const;
-
-  bool loadBitmapGlyph(GlyphID glyphID, FT_Int32 glyphFlags) const;
-
-  Matrix getExtraMatrix(bool fauxItalic) const;
-
-  FTTypeface* ftTypeface() const;
-
-  float textScale = 1.0f;
-  Point extraScale = Point::Make(1.f, 1.f);
-  FT_Size ftSize = nullptr;
-  FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
-  FT_Int32 loadGlyphFlags = 0;
+  static std::shared_ptr<VirtualTypeface> ConvertTypeface(
+      const std::shared_ptr<Typeface>& typeface);
 };
 }  // namespace tgfx

@@ -134,15 +134,15 @@ std::shared_ptr<Image> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
-  auto bounds = scalerContext->getImageTransform(glyphID, matrix);
-  if (bounds.isEmpty()) {
+  auto imageSize = scalerContext->getImageTransform(glyphID, matrix);
+  if (imageSize.isEmpty()) {
     return nullptr;
   }
   if (matrix && fauxItalic) {
     matrix->postSkew(ITALIC_SKEW, 0);
   }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = static_cast<int>(ceilf(imageSize.width));
+  auto height = static_cast<int>(ceilf(imageSize.height));
   auto generator = std::make_shared<GlyphImageGenerator>(width, height, scalerContext, glyphID);
   return Image::MakeFrom(std::move(generator));
 }

@@ -165,4 +165,9 @@ std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
   }
   return Data::MakeAdopted(tableData, tableLength);
 }
+
+std::shared_ptr<ScalerContext> FTTypeface::createScalerContext(float size) const {
+  return std::make_shared<FTScalerContext>(weakThis.lock(), size);
+}
+
 }  // namespace tgfx

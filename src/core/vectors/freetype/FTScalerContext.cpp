@@ -47,12 +47,6 @@ static FT_Fixed FloatToFTFixed(float x) {
   return static_cast<FT_Fixed>(x * (1 << 16));
 }
 
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  return std::make_shared<FTScalerContext>(std::move(typeface), size);
-}
-
 static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_Int32 glyphFlags) {
   switch (glyph->format) {
     case FT_GLYPH_FORMAT_OUTLINE:
@@ -546,12 +540,12 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
   }
 }
 
-Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+Size FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
   if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-    return Rect::MakeEmpty();
+    return Size::MakeEmpty();
   }
   auto face = ftTypeface()->face;
   if (matrix) {
@@ -559,9 +553,7 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
                          -static_cast<float>(face->glyph->bitmap_top));
     matrix->postScale(extraScale.x, extraScale.y);
   }
-  return Rect::MakeXYWH(
-      static_cast<float>(face->glyph->bitmap_left), -static_cast<float>(face->glyph->bitmap_top),
-      static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
+  return Size::Make(static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
 }
 
 std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID,

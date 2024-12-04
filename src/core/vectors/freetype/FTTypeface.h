@@ -22,7 +22,6 @@
 #include "ft2build.h"
 #include FT_FREETYPE_H
 #include "FTFontData.h"
-#include "tgfx/core/Font.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -54,11 +53,12 @@ class FTTypeface : public Typeface {
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
+  std::shared_ptr<ScalerContext> createScalerContext(float size) const override;
+
  private:
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
-  std::weak_ptr<FTTypeface> weakThis;
 
   FTTypeface(FTFontData data, FT_Face face);
 

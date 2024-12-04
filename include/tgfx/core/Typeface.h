@@ -37,6 +37,8 @@ typedef uint32_t FontTableTag;
 
 class ScalerContext;
 
+class TypefaceProvider;
+
 /**
  * A set of character glyphs and layout information for drawing text.
  */
@@ -73,6 +75,11 @@ class Typeface {
    * can't be created.
    */
   static std::shared_ptr<Typeface> MakeFromData(std::shared_ptr<Data> data, int ttcIndex = 0);
+
+  /**
+   * Creates a new virtual typeface. Returns nullptr if the typeface can't be created.
+   */
+  static std::shared_ptr<Typeface> MakeVirtual(bool hasColor);
 
   virtual ~Typeface() = default;
 
@@ -130,8 +137,11 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
+  virtual std::shared_ptr<ScalerContext> createScalerContext(float size) const = 0;
+
  protected:
   mutable std::mutex locker = {};
+  std::weak_ptr<Typeface> weakThis;
 
  private:
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};

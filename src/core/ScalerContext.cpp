@@ -44,8 +44,8 @@ class EmptyScalerContext : public ScalerContext {
     return false;
   }
 
-  Rect getImageTransform(GlyphID, Matrix*) const override {
-    return Rect::MakeEmpty();
+  Size getImageTransform(GlyphID, Matrix*) const override {
+    return Size::MakeEmpty();
   }
 
   std::shared_ptr<ImageBuffer> generateImage(GlyphID, bool) const override {
@@ -77,7 +77,8 @@ std::shared_ptr<ScalerContext> ScalerContext::Make(std::shared_ptr<Typeface> typ
       return context;
     }
   }
-  auto context = ScalerContext::CreateNew(std::move(typeface), size);
+
+  auto context = typeface->createScalerContext(size);
   if (context == nullptr) {
     return MakeEmpty(size);
   }

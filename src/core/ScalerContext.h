@@ -60,7 +60,7 @@ class ScalerContext {
 
   virtual bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const = 0;
 
-  virtual Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
+  virtual Size getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
 
   virtual std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const = 0;
 
@@ -72,8 +72,6 @@ class ScalerContext {
   ScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
  private:
-  static std::shared_ptr<ScalerContext> CreateNew(std::shared_ptr<Typeface> typeface, float size);
-
   friend class Font;
 };
 }  // namespace tgfx

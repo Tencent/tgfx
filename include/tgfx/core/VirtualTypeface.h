@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,14 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Typeface.h"
-#include "ScalerContext.h"
+#pragma once
+#include <MacTypes.h>
 #include "core/utils/UniqueID.h"
-#include "tgfx/core/UTF.h"
+#include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class EmptyTypeface : public Typeface {
+class VirtualTypeface final : public Typeface {
  public:
+  explicit VirtualTypeface(bool hasColor);
+
   uint32_t uniqueID() const override {
     return _uniqueID;
   }
@@ -37,7 +41,7 @@ class EmptyTypeface : public Typeface {
   }
 
   size_t glyphsCount() const override {
-    return 0;
+    return UINT16_MAX;
   }
 
   int unitsPerEm() const override {
@@ -45,14 +49,14 @@ class EmptyTypeface : public Typeface {
   }
 
   bool hasColor() const override {
-    return false;
+    return _hasColor;
   }
 
   bool hasOutlines() const override {
     return false;
   }
 
-  GlyphID getGlyphID(Unichar) const override {
+  GlyphID getGlyphID(Unichar /*unichar*/) const override {
     return 0;
   }
 
@@ -60,34 +64,25 @@ class EmptyTypeface : public Typeface {
     return nullptr;
   }
 
-  std::shared_ptr<Data> copyTableData(FontTableTag) const override {
+  std::shared_ptr<Data> copyTableData(FontTableTag /*tag*/) const override {
     return nullptr;
   }
 
-  std::shared_ptr<ScalerContext> createScalerContext(float size) const override {
-    return ScalerContext::MakeEmpty(size);
-  }
+  std::shared_ptr<ScalerContext> createScalerContext(float size) const override;
 
  private:
-  uint32_t _uniqueID = UniqueID::Next();
+  uint32_t _uniqueID = 0;
+  bool _hasColor = false;
+
+  static bool GetPath(const std::shared_ptr<Typeface>& typeface, GlyphID glyphID, bool fauxBold,
+                      bool fauxItalic, Path* path);
+  static std::shared_ptr<ImageBuffer> GetImage(const std::shared_ptr<Typeface>& typeface,
+                                               GlyphID glyphID, bool tryHardware);
+  static Size GetImageTransform(const std::shared_ptr<Typeface>& typeface, GlyphID glyphID,
+                                Matrix* matrixOut);
+  static Rect GetBounds(const std::shared_ptr<Typeface>& typeface, GlyphID glyphID, bool fauxBold,
+                        bool fauxItalic);
+
+  friend class VirtualScalerContext;
 };
-
-std::shared_ptr<Typeface> Typeface::MakeEmpty() {
-  static auto emptyTypeface = std::make_shared<EmptyTypeface>();
-  emptyTypeface->weakThis = emptyTypeface;
-  return emptyTypeface;
-}
-
-GlyphID Typeface::getGlyphID(const std::string& name) const {
-  if (name.empty()) {
-    return 0;
-  }
-  auto count = UTF::CountUTF8(name.c_str(), name.size());
-  if (count <= 0) {
-    return 0;
-  }
-  const char* start = name.data();
-  auto unichar = UTF::NextUTF8(&start, start + name.size());
-  return getGlyphID(unichar);
-}
 }  // namespace tgfx
