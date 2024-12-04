@@ -60,6 +60,8 @@ class CGTypeface : public Typeface {
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
+  std::shared_ptr<ScalerContext> createScalerContext(float size) const override;
+
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
 

@@ -260,22 +260,18 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+Size CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   if (CGRectIsEmpty(cgBounds)) {
-    return Rect::MakeEmpty();
+    return Size::MakeEmpty();
   }
   // Convert cgBounds to Glyph units (pixels, y down).
-  auto bounds = Rect::MakeXYWH(static_cast<float>(cgBounds.origin.x),
-                               static_cast<float>(-cgBounds.origin.y - cgBounds.size.height),
-                               static_cast<float>(cgBounds.size.width),
-                               static_cast<float>(cgBounds.size.height));
-  bounds.roundOut();
   if (matrix) {
-    matrix->setTranslate(bounds.left, bounds.top);
+    matrix->setTranslate(static_cast<float>(cgBounds.origin.x), static_cast<float>(-cgBounds.origin.y - cgBounds.size.height);
   }
-  return bounds;
+  return Size::Make(static_cast<float>(cgBounds.size.width),
+                              static_cast<float>(cgBounds.size.height));;
 }
 
 std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID,
