@@ -39,8 +39,7 @@ class ElementWriter;
 
 class SVGContext : public DrawContext {
  public:
-  SVGContext(Context* GPUContext, const ISize& size, std::unique_ptr<XMLWriter> writer,
-             uint32_t flags);
+  SVGContext(Context* GPUContext, const ISize& size, std::unique_ptr<XMLWriter> writer);
   ~SVGContext() override = default;
 
   void setCanvas(Canvas* canvas) {
@@ -95,7 +94,6 @@ class SVGContext : public DrawContext {
   Canvas* _canvas = nullptr;
   const std::unique_ptr<XMLWriter> _writer;
   const std::unique_ptr<ResourceStore> _resourceBucket;
-  const uint32_t _flags;
   std::unique_ptr<ElementWriter> _rootElement;
   std::stack<std::pair<size_t, std::unique_ptr<ElementWriter>>> _stateStack;
 };

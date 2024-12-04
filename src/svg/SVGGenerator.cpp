@@ -32,11 +32,12 @@ SVGGenerator::~SVGGenerator() {
   delete _context;
 };
 
-Canvas* SVGGenerator::beginGenerate(Context* GPUContext, const ISize& size) {
+Canvas* SVGGenerator::beginGenerate(Context* GPUContext, const ISize& size, bool isPretty) {
   ASSERT(GPUContext)
   if (_canvas == nullptr) {
-    auto writer = std::make_unique<XMLStreamWriter>(_svgStream, 0);
-    _context = new SVGContext(GPUContext, size, std::move(writer), 0);
+    auto writer = std::make_unique<XMLStreamWriter>(_svgStream,
+                                                    isPretty ? 0 : XMLStreamWriter::NoPretty_Flag);
+    _context = new SVGContext(GPUContext, size, std::move(writer));
     _canvas = new Canvas(_context);
     _context->setCanvas(_canvas);
   }

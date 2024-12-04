@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGContext.h"
-#include <QtGui/qopenglversionfunctions.h>
-#include <sys/_types/_u_int32_t.h>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
@@ -44,14 +42,13 @@
 namespace tgfx {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-SVGContext::SVGContext(Context* GPUContext, const ISize& size, std::unique_ptr<XMLWriter> writer,
-                       uint32_t flags)
+SVGContext::SVGContext(Context* GPUContext, const ISize& size, std::unique_ptr<XMLWriter> writer)
     : _size(size), _context(GPUContext), _writer(std::move(writer)),
-      _resourceBucket(new ResourceStore), _flags(flags) {
+      _resourceBucket(new ResourceStore) {
   ASSERT(_writer);
   _writer->writeHeader();
 
-  if (_flags || size.width == 0) {
+  if (size.width == 0 || size.height == 0) {
     return;
   }
 
@@ -97,8 +94,19 @@ void SVGContext::drawRect(const Rect& rect, const MCState& mc, const FillStyle& 
 }
 
 void SVGContext::drawRRect(const RRect& roundRect, const MCState& state, const FillStyle& fill) {
-  ElementWriter rrectElement("rect", _context, this, _resourceBucket.get(), state, fill);
-  rrectElement.addRoundRectAttributes(roundRect);
+  if (roundRect.isOval()) {
+    if (roundRect.rect.width() == roundRect.rect.height()) {
+      ElementWriter circleElement("circle", _context, this, _resourceBucket.get(), state, fill);
+      circleElement.addCircleAttributes(roundRect.rect);
+      return;
+    } else {
+      ElementWriter ovalElement("ellipse", _context, this, _resourceBucket.get(), state, fill);
+      ovalElement.addEllipseAttributes(roundRect.rect);
+    }
+  } else {
+    ElementWriter rrectElement("rect", _context, this, _resourceBucket.get(), state, fill);
+    rrectElement.addRoundRectAttributes(roundRect);
+  }
 }
 
 void SVGContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
@@ -235,9 +243,11 @@ void SVGContext::syncMCState(const MCState& state) {
         _stateStack.pop();
       }
       return;
-    } else if (state.clip.isEmpty()) {
-      return;
     }
+  }
+
+  if (state.clip.isEmpty()) {
+    return;
   }
 
   auto defineClip = [this](const MCState& insertState) -> std::string {

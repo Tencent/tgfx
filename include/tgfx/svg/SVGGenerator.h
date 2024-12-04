@@ -35,11 +35,15 @@ class SVGGenerator {
   ~SVGGenerator();
 
   /**
-   * Begin generating SVG text and return a Canvas object for drawing SVG graphics. The input
-   * GPUContext is used to convert some rendering commands into image data. The size sets the size
-   * of the SVG, and content that exceeds the display area in the SVG will be clipped.
+   * Begin generating SVG text and return a Canvas object for drawing SVG graphics.
+   *
+   * @param GPUContext used to convert some rendering commands into image data.
+   * @param size The size sets the size of the SVG, and content that exceeds the display area in the
+   * SVG will be clipped.
+   * @param isPretty Whether to format the generated SVG text with "/n"、"/t"".
+   * @return Canvas* 
    */
-  Canvas* beginGenerate(Context* GPUContext, const ISize& size);
+  Canvas* beginGenerate(Context* GPUContext, const ISize& size, bool isPretty = true);
 
   /**
    * Returns the recording canvas if one is active, or nullptr if recording is not active.
