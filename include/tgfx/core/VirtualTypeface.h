@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <MacTypes.h>
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Path.h"
