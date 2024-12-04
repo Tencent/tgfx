@@ -18,10 +18,14 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include "core/FillStyle.h"
+#include "core/filters/ImageFilterBase.h"
 #include "core/shaders/ShaderBase.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGParse.h"
@@ -30,9 +34,10 @@
 namespace tgfx {
 
 struct Resources {
+  Resources() = default;
   explicit Resources(const FillStyle& fill);
-  std::string _paintServer;
-  std::string _colorFilter;
+  std::string _paintColor;
+  std::string _filter;
 };
 
 class ResourceStore {
@@ -51,8 +56,8 @@ class ResourceStore {
     return "img_" + std::to_string(_imageCount++);
   }
 
-  std::string addColorFilter() {
-    return "cfilter_" + std::to_string(_colorFilterCount++);
+  std::string addFilter() {
+    return "filter_" + std::to_string(_filterCount++);
   }
 
   std::string addPattern() {
@@ -64,7 +69,7 @@ class ResourceStore {
   uint32_t _pathCount = 0;
   uint32_t _imageCount = 0;
   uint32_t _patternCount = 0;
-  uint32_t _colorFilterCount = 0;
+  uint32_t _filterCount = 0;
 };
 
 class ElementWriter {
@@ -72,6 +77,8 @@ class ElementWriter {
   ElementWriter(const std::string& name, Context* GPUContext, XMLWriter* writer);
   ElementWriter(const std::string& name, Context* GPUContext,
                 const std::unique_ptr<XMLWriter>& writer);
+  ElementWriter(const std::string& name, Context* GPUContext,
+                const std::unique_ptr<XMLWriter>& writer, ResourceStore* bucket);
   ElementWriter(const std::string& name, Context* GPUContext, SVGContext* svgContext,
                 ResourceStore* bucket, const MCState& state, const FillStyle& fill,
                 const Stroke* stroke = nullptr);
@@ -89,6 +96,8 @@ class ElementWriter {
   void addPathAttributes(const Path&, PathParse::PathEncoding);
   void addTextAttributes(const Font&);
 
+  void addImageFilterAttributes(const std::shared_ptr<ImageFilter>&, const Rect&, Resources&);
+
  private:
   Resources addResources(const FillStyle& fill);
   void addShaderResources(const std::shared_ptr<Shader>& shader, Resources* resources);
@@ -102,6 +111,10 @@ class ElementWriter {
   std::string addLinearGradientDef(const GradientInfo& info);
   std::string addRadialGradientDef(const GradientInfo& info);
   std::string addUnsupportedGradientDef(const GradientInfo& info);
+
+  void addBlurImageFilter(const ImageFilterInfo& info);
+  void addDropShadowImageFilter(const ImageFilterInfo& info);
+  void addInnerShadowImageFilter(const ImageFilterInfo& info);
 
   Context* _context = nullptr;
   XMLWriter* _writer = nullptr;

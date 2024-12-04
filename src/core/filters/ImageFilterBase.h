@@ -18,28 +18,39 @@
 
 #pragma once
 
-#include "core/filters/ImageFilterBase.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
-class InnerShadowImageFilter : public ImageFilterBase {
- public:
-  InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
-                         const Color& color, bool shadowOnly);
 
-  ImageFilterType asImageFilterInfo(ImageFilterInfo* filterInfo) const override;
-
- protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
-
- private:
-  float dx = 0.0f;
-  float dy = 0.0f;
-  std::shared_ptr<ImageFilter> blurFilter = nullptr;
-  Color color = Color::Black();
-  bool shadowOnly = false;
+enum class ImageFilterType {
+  None,
+  Blur,
+  DropShadow,
+  InnerShadow,
+  Color,
+  Compose,
+  Runtime,
 };
+
+struct ImageFilterInfo {
+  bool onlyShadow = true;
+  float blurrinessX = 0.f;
+  float blurrinessY = 0.f;
+  Point offset = Point::Zero();
+  Color color = Color::Black();
+};
+
+class ImageFilterBase : public ImageFilter {
+ public:
+  virtual ImageFilterType asImageFilterInfo(ImageFilterInfo*) const {
+    return ImageFilterType::None;
+  };
+};
+
+inline const ImageFilterBase* asImageFilterBase(const std::shared_ptr<ImageFilter>& filter) {
+  return static_cast<ImageFilterBase*>(filter.get());
+}
+
 }  // namespace tgfx

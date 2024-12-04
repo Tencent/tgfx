@@ -63,7 +63,7 @@ class SVGContext : public DrawContext {
   void drawPicture(std::shared_ptr<Picture>, const MCState&) override;
 
   void drawLayer(std::shared_ptr<Picture>, const MCState&, const FillStyle&,
-                 std::shared_ptr<ImageFilter>) override {};
+                 std::shared_ptr<ImageFilter>) override;
 
   void syncClipStack(const MCState& mc);
 

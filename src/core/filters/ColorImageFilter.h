@@ -18,12 +18,16 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
+#include "core/filters/ImageFilterBase.h"
 
 namespace tgfx {
-class ColorImageFilter : public ImageFilter {
+class ColorImageFilter : public ImageFilterBase {
  public:
   explicit ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter);
+
+  ImageFilterType asImageFilterInfo(ImageFilterInfo*) const override {
+    return ImageFilterType::Color;
+  }
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,

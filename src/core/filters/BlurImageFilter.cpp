@@ -23,6 +23,8 @@
 #include "gpu/processors/DualBlurFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 static const float BLUR_LEVEL_1_LIMIT = 10.0f;
@@ -82,6 +84,15 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
 BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iteration,
                                  TileMode tileMode)
     : blurOffset(blurOffset), downScaling(downScaling), iteration(iteration), tileMode(tileMode) {
+}
+
+ImageFilterType BlurImageFilter::asImageFilterInfo(ImageFilterInfo* filterInfo) const {
+  if (filterInfo) {
+    auto rect = onFilterBounds(Rect::MakeWH(0, 0));
+    filterInfo->blurrinessX = rect.width() / 2.0f;
+    filterInfo->blurrinessY = rect.height() / 2.0f;
+  }
+  return ImageFilterType::Blur;
 }
 
 void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DropShadowImageFilter.h"
+#include "core/filters/ImageFilterBase.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/OpContext.h"
@@ -42,6 +43,21 @@ DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrines
                                              float blurrinessY, const Color& color, bool shadowOnly)
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
       shadowOnly(shadowOnly) {
+}
+
+ImageFilterType DropShadowImageFilter::asImageFilterInfo(ImageFilterInfo* filterInfo) const {
+  if (filterInfo) {
+    filterInfo->onlyShadow = shadowOnly;
+    ImageFilterInfo blurInfo;
+    if (blurFilter &&
+        asImageFilterBase(blurFilter)->asImageFilterInfo(&blurInfo) == ImageFilterType::Blur) {
+      filterInfo->blurrinessX = blurInfo.blurrinessX;
+      filterInfo->blurrinessY = blurInfo.blurrinessY;
+    }
+    filterInfo->offset = Point::Make(dx, dy);
+    filterInfo->color = color;
+  }
+  return ImageFilterType::DropShadow;
 }
 
 Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {

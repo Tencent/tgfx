@@ -21,6 +21,7 @@
 #include "SVGContext.h"
 #include "SVGUtils.h"
 #include "core/MCState.h"
+#include "core/filters/ImageFilterBase.h"
 #include "core/shaders/ShaderBase.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -31,7 +32,7 @@
 namespace tgfx {
 
 Resources::Resources(const FillStyle& fill) {
-  _paintServer = SVGColor(fill.color);
+  _paintColor = SVGColor(fill.color);
 }
 
 ElementWriter::ElementWriter(const std::string& name, Context* GPUContext, XMLWriter* writer)
@@ -42,6 +43,12 @@ ElementWriter::ElementWriter(const std::string& name, Context* GPUContext, XMLWr
 ElementWriter::ElementWriter(const std::string& name, Context* GPUContext,
                              const std::unique_ptr<XMLWriter>& writer)
     : ElementWriter(name, GPUContext, writer.get()) {
+}
+
+ElementWriter::ElementWriter(const std::string& name, Context* GPUContext,
+                             const std::unique_ptr<XMLWriter>& writer, ResourceStore* bucket)
+    : _context(GPUContext), _writer(writer.get()), _resourceStore(bucket) {
+  _writer->startElement(name);
 }
 
 ElementWriter::ElementWriter(const std::string& name, Context* GPUContext, SVGContext* svgContext,
@@ -71,8 +78,8 @@ void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const
                                                     const Resources& resources) {
   if (!stroke) {  //fill draw
     static const std::string defaultFill = "black";
-    if (resources._paintServer != defaultFill) {
-      this->addAttribute("fill", resources._paintServer);
+    if (resources._paintColor != defaultFill) {
+      this->addAttribute("fill", resources._paintColor);
     }
     if (!fill.isOpaque()) {
       this->addAttribute("fill-opacity", fill.color.alpha);
@@ -80,7 +87,7 @@ void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const
   } else {  //stroke draw
     this->addAttribute("fill", "none");
 
-    this->addAttribute("stroke", resources._paintServer);
+    this->addAttribute("stroke", resources._paintColor);
 
     float strokeWidth = stroke->width;
     if (strokeWidth == 0) {
@@ -111,8 +118,8 @@ void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const
     this->addAttribute("style", SVGBlendMode(fill.blendMode));
   }
 
-  if (!resources._colorFilter.empty()) {
-    this->addAttribute("filter", resources._colorFilter);
+  if (!resources._filter.empty()) {
+    this->addAttribute("filter", resources._filter);
   }
 }
 
@@ -215,6 +222,124 @@ void ElementWriter::addTextAttributes(const Font& font) {
   // }
 }
 
+void ElementWriter::addImageFilterAttributes(const std::shared_ptr<ImageFilter>& imageFilter,
+                                             const Rect& bound, Resources& resources) {
+  std::string filterID = _resourceStore->addFilter();
+  {
+
+    ImageFilterInfo filterInfo;
+    auto filterType = asImageFilterBase(imageFilter)->asImageFilterInfo(&filterInfo);
+
+    ElementWriter filterElement("filter", _context, _writer);
+    filterElement.addAttribute("id", filterID);
+    filterElement.addAttribute("x", bound.x());
+    filterElement.addAttribute("y", bound.y());
+    if (filterType == ImageFilterType::InnerShadow) {
+      filterElement.addAttribute("width", bound.width() + filterInfo.offset.x);
+      filterElement.addAttribute("height", bound.height() + filterInfo.offset.y);
+    } else {
+      filterElement.addAttribute("width", bound.width());
+      filterElement.addAttribute("height", bound.height());
+    }
+    filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+
+    if (filterType == ImageFilterType::Blur) {
+      addBlurImageFilter(filterInfo);
+    } else if (filterType == ImageFilterType::DropShadow) {
+      addDropShadowImageFilter(filterInfo);
+    } else if (filterType == ImageFilterType::InnerShadow) {
+      addInnerShadowImageFilter(filterInfo);
+    }
+  }
+  resources._filter = "url(#" + filterID + ")";
+}
+
+void ElementWriter::addBlurImageFilter(const ImageFilterInfo& info) {
+  ElementWriter blurElement("feGaussianBlur", _context, _writer);
+  blurElement.addAttribute("stdDeviation", std::max(info.blurrinessX, info.blurrinessY));
+  blurElement.addAttribute("result", "blur");
+}
+
+void ElementWriter::addDropShadowImageFilter(const ImageFilterInfo& info) {
+  {
+    ElementWriter offsetElement("feOffset", _context, _writer);
+    offsetElement.addAttribute("dx", info.offset.x);
+    offsetElement.addAttribute("dy", info.offset.y);
+  }
+  {
+    ElementWriter blurElement("feGaussianBlur", _context, _writer);
+    blurElement.addAttribute("stdDeviation", std::max(info.blurrinessX, info.blurrinessY));
+    blurElement.addAttribute("result", "blur");
+  }
+  {
+    ElementWriter colorMatrixElement("feColorMatrix", _context, _writer);
+    colorMatrixElement.addAttribute("type", "matrix");
+    auto color = info.color;
+    colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
+                                                  FloatToString(color.green) + " 0 0 0 0 " +
+                                                  FloatToString(color.blue) + " 0 0 0 " +
+                                                  FloatToString(color.alpha) + " 0");
+  }
+  if (!info.onlyShadow) {
+    ElementWriter blendElement("feBlend", _context, _writer);
+    blendElement.addAttribute("mode", "normal");
+    blendElement.addAttribute("in", "SourceGraphic");
+  }
+}
+void ElementWriter::addInnerShadowImageFilter(const ImageFilterInfo& info) {
+  {
+    ElementWriter colorMatrixElement("feColorMatrix", _context, _writer);
+    colorMatrixElement.addAttribute("in", "SourceAlpha");
+    colorMatrixElement.addAttribute("type", "matrix");
+    colorMatrixElement.addAttribute("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0");
+    colorMatrixElement.addAttribute("result", "hardAlpha");
+  }
+  if (!info.onlyShadow) {
+    {
+      ElementWriter floodElement("feFlood", _context, _writer);
+      floodElement.addAttribute("flood-opacity", "0");
+      floodElement.addAttribute("result", "BackgroundImageFix");
+    }
+    {
+      ElementWriter blendElement("feBlend", _context, _writer);
+      blendElement.addAttribute("mode", "normal");
+      blendElement.addAttribute("in", "SourceGraphic");
+      blendElement.addAttribute("in2", "BackgroundImageFix");
+      blendElement.addAttribute("result", "shape");
+    }
+  }
+  {
+    ElementWriter offsetElement("feOffset", _context, _writer);
+    offsetElement.addAttribute("dx", info.offset.x);
+    offsetElement.addAttribute("dy", info.offset.y);
+  }
+  {
+    ElementWriter blurElement("feGaussianBlur", _context, _writer);
+    blurElement.addAttribute("stdDeviation", std::max(info.blurrinessX, info.blurrinessY));
+  }
+  {
+    ElementWriter compositeElement("feComposite", _context, _writer);
+    compositeElement.addAttribute("in2", "hardAlpha");
+    compositeElement.addAttribute("operator", "arithmetic");
+    compositeElement.addAttribute("k2", "-1");
+    compositeElement.addAttribute("k3", "1");
+  }
+  {
+    ElementWriter colorMatrixElement("feColorMatrix", _context, _writer);
+    colorMatrixElement.addAttribute("type", "matrix");
+    auto color = info.color;
+    colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
+                                                  FloatToString(color.green) + " 0 0 0 0 " +
+                                                  FloatToString(color.blue) + " 0 0 0 " +
+                                                  FloatToString(color.alpha) + " 0");
+  }
+  if (!info.onlyShadow) {
+    ElementWriter blendElement("feBlend", _context, _writer);
+    blendElement.addAttribute("mode", "normal");
+    blendElement.addAttribute("in2", "shape");
+  }
+}
+
 Resources ElementWriter::addResources(const FillStyle& fill) {
   Resources resources(fill);
 
@@ -251,7 +376,7 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& sh
   if (asShaderBase(shader)->type() == ShaderType::Color) {
     Color color;
     if (shader->asColor(&color)) {
-      resources->_paintServer = SVGColor(color);
+      resources->_paintColor = SVGColor(color);
       return;
     }
   }
@@ -261,11 +386,11 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& sh
 
   ASSERT(info.colors.size() == info.positions.size());
   if (type == GradientType::Linear) {
-    resources->_paintServer = "url(#" + addLinearGradientDef(info) + ")";
+    resources->_paintColor = "url(#" + addLinearGradientDef(info) + ")";
   } else if (type == GradientType::Radial) {
-    resources->_paintServer = "url(#" + addRadialGradientDef(info) + ")";
+    resources->_paintColor = "url(#" + addRadialGradientDef(info) + ")";
   } else {
-    resources->_paintServer = "url(#" + addUnsupportedGradientDef(info) + ")";
+    resources->_paintColor = "url(#" + addUnsupportedGradientDef(info) + ")";
   }
 }
 
@@ -382,14 +507,14 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<Shader>& shade
       imageTag.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
     }
   }
-  resources->_paintServer = "url(#" + patternID + ")";
+  resources->_paintColor = "url(#" + patternID + ")";
 }
 
 void ElementWriter::addColorFilterResources(const ColorFilter& colorFilter, Resources* resources) {
-  std::string colorFilterID = _resourceStore->addColorFilter();
+  std::string filterID = _resourceStore->addFilter();
   {
     ElementWriter filterElement("filter", _context, _writer);
-    filterElement.addAttribute("id", colorFilterID);
+    filterElement.addAttribute("id", filterID);
     filterElement.addAttribute("x", "0%");
     filterElement.addAttribute("y", "0%");
     filterElement.addAttribute("width", "100%");
@@ -415,6 +540,6 @@ void ElementWriter::addColorFilterResources(const ColorFilter& colorFilter, Reso
       compositeElement.addAttribute("operator", "in");
     }
   }
-  resources->_colorFilter = "url(#" + colorFilterID + ")";
+  resources->_filter = "url(#" + filterID + ")";
 }
 }  // namespace tgfx

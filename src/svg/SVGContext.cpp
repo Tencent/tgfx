@@ -184,33 +184,33 @@ void SVGContext::drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunLi
   SVGContext::drawRect(bound, state, style);
 
   //TODO (YGAurora): Implement emoji export
-  // auto viewMatrix = state.matrix;
-  // auto scale = viewMatrix.getMaxScale();
-  // viewMatrix.preScale(1.0f / scale, 1.0f / scale);
-  // for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-  //   auto font = glyphRun.font;
-  //   font = font.makeWithSize(font.getSize() * scale);
-  //   const auto& glyphIDs = glyphRun.glyphs;
-  //   auto glyphCount = glyphIDs.size();
-  //   const auto& positions = glyphRun.positions;
-  //   auto glyphState = state;
-  //   for (size_t i = 0; i < glyphCount; ++i) {
-  //     const auto& glyphID = glyphIDs[i];
-  //     const auto& position = positions[i];
-  //     auto glyphImage = font.getImage(glyphID, &glyphState.matrix);
-  //     if (glyphImage == nullptr) {
-  //       continue;
-  //     }
-  //     glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
-  //     glyphState.matrix.postConcat(viewMatrix);
-  //     auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-  //     SVGContext::drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
-  //   }
-  // }
 }
 
 void SVGContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   if (picture != nullptr) {
+    picture->playback(this, state);
+  }
+}
+
+void SVGContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle&,
+                           std::shared_ptr<ImageFilter> imageFilter) {
+  if (picture == nullptr) {
+    return;
+  }
+
+  Resources resources;
+  if (imageFilter) {
+    ElementWriter defs("defs", _context, _writer, _resourceBucket.get());
+    auto bound = picture->getBounds();
+    bound = imageFilter->filterBounds(bound);
+    defs.addImageFilterAttributes(imageFilter, bound, resources);
+  }
+  {
+    auto groupElement =
+        std::make_unique<ElementWriter>("g", _context, _writer, _resourceBucket.get());
+    if (imageFilter) {
+      groupElement->addAttribute("filter", resources._filter);
+    }
     picture->playback(this, state);
   }
 }

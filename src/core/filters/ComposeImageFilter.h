@@ -18,12 +18,16 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
+#include "core/filters/ImageFilterBase.h"
 
 namespace tgfx {
-class ComposeImageFilter : public ImageFilter {
+class ComposeImageFilter : public ImageFilterBase {
  public:
   explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
+
+  ImageFilterType asImageFilterInfo(ImageFilterInfo*) const override {
+    return ImageFilterType::Compose;
+  }
 
  protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
