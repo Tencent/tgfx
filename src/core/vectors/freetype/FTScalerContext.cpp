@@ -172,6 +172,9 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
     // However, in FreeType 2.5.1 color bitmap-only fonts do not ignore this flag.
     // Force this flag off for bitmap-only fonts.
     loadGlyphFlags &= ~FT_LOAD_NO_BITMAP;
+
+    // Color bitmaps are supported.
+    loadGlyphFlags |= FT_LOAD_COLOR;
   }
 }
 
@@ -446,10 +449,10 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
   FT_Outline_Get_CBox(&face->glyph->outline, bbox);
 
   // outset the box to integral boundaries
-  bbox->xMin &= ~63;
-  bbox->yMin &= ~63;
-  bbox->xMax = (bbox->xMax + 63) & ~63;
-  bbox->yMax = (bbox->yMax + 63) & ~63;
+  // bbox->xMin &= ~63;
+  // bbox->yMin &= ~63;
+  // bbox->xMax = (bbox->xMax + 63) & ~63;
+  // bbox->yMax = (bbox->yMax + 63) & ~63;
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
@@ -476,19 +479,8 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
     } else {
       rect = {0, 0, 0, 0};
     }
-    // Round out, no longer dot6.
-    rect.xMin = FDot6Floor(rect.xMin);
-    rect.yMin = FDot6Floor(rect.yMin);
-    rect.xMax = FDot6Ceil(rect.xMax);
-    rect.yMax = FDot6Ceil(rect.yMax);
-
-    FT_Pos width = rect.xMax - rect.xMin;
-    FT_Pos height = rect.yMax - rect.yMin;
-    FT_Pos top = -rect.yMax;  // Freetype y-up, We y-down.
-    FT_Pos left = rect.xMin;
-
-    bounds.setXYWH(static_cast<float>(left), static_cast<float>(top), static_cast<float>(width),
-                   static_cast<float>(height));
+    bounds.setLTRB(FDot6ToFloat(rect.xMin), -FDot6ToFloat(rect.yMax), FDot6ToFloat(rect.xMax),
+                   -FDot6ToFloat(rect.yMin));
   } else if (face->glyph->format == FT_GLYPH_FORMAT_BITMAP) {
     bounds.setXYWH(static_cast<float>(face->glyph->bitmap_left),
                    -static_cast<float>(face->glyph->bitmap_top),
