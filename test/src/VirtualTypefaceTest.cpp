@@ -135,11 +135,12 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.1\n");
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.2\n");
-#if 0
+
   auto paint = Paint();
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.3\n");
   paint.setColor(Color::Red());
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.4\n");
+#if 0
   canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.5\n");
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 6\n");
