@@ -18,8 +18,6 @@
 #include "core/codecs/png/PngCodec.h"
 #include "tgfx/core/TypefaceProvider.h"
 #include "tgfx/core/VirtualTypeface.h"
-#include "tgfx/layers/DisplayList.h"
-#include "tgfx/layers/Layer.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -88,8 +86,11 @@ class CustomTypefaceProvider : public TypefaceProvider {
 };
 
 TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface a\n");
   ContextScope scope;
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface b\n");
   auto context = scope.getContext();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 0\n");
   ASSERT_TRUE(context != nullptr);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
   auto surface = Surface::Make(context, 400, 200);
