@@ -93,14 +93,6 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWihtVirtualTypeface) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto rootLayer = Layer::Make();
-  rootLayer->setName("root_layer");
-
-  auto parentLayer = Layer::Make();
-  parentLayer->setName("parent_layer");
-  rootLayer->addChild(parentLayer);
 
   const auto virtualTypeface1 = Typeface::MakeVirtual(false);
   Font font1(virtualTypeface1, 20);
@@ -136,7 +128,6 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWihtVirtualTypeface) {
   paint.setColor(Color::Red());
   canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
 
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWihtVirtualTypeface"));
 }
 }  // namespace tgfx
