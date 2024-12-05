@@ -95,7 +95,7 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
   auto surface = Surface::Make(context, 400, 200);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.1\n");
-  //auto canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.2\n");
 
   const auto virtualTypeface1 = Typeface::MakeVirtual(false);
@@ -131,11 +131,17 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   glyphRunList.push_back(glyphRun1);
   glyphRunList.push_back(glyphRun2);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5\n");
-#if 0
+
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.1\n");
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.2\n");
   auto paint = Paint();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.3\n");
   paint.setColor(Color::Red());
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.4\n");
   canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.5\n");
+#if 0
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 6\n");
   EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWithVirtualTypeface"));
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 7\n");
