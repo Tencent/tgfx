@@ -55,50 +55,58 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
 EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
 }
 
+ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
+  ISize size = {0, 0};
+#if defined(__ANDROID__) || defined(ANDROID)
+  size.width = ANativeWindow_getWidth(nativeWindow);
+  size.height = ANativeWindow_getHeight(nativeWindow);
+#elif defined(__OHOS__)
+  OH_NativeWindow_NativeWindowHandleOpt(reinterpret_cast<OHNativeWindow*>(nativeWindow),
+                                        GET_BUFFER_GEOMETRY, &size.height, &size.width);
+#elif defined(_WIN32)
+  RECT rect = {};
+  GetClientRect(nativeWindow, &rect);
+  size.width = static_cast<int>(rect.right - rect.left);
+  size.height = static_cast<int>(rect.bottom - rect.top);
+#endif
+  return size;
+}
+
 void EGLWindow::onInvalidSize() {
+#if defined(_WIN32)
   if (nativeWindow == nullptr) {
     return;
   }
-  int width = 0;
-  int height = 0;
-#if defined(__ANDROID__) || defined(ANDROID)
-  width = ANativeWindow_getWidth(nativeWindow);
-  height = ANativeWindow_getHeight(nativeWindow);
-#elif defined(__OHOS__)
-  OH_NativeWindow_NativeWindowHandleOpt(reinterpret_cast<OHNativeWindow*>(nativeWindow),
-                                        GET_BUFFER_GEOMETRY, &height, &width);
-#elif defined(_WIN32)
-  RECT rect;
-  GetClientRect(nativeWindow, &rect);
-  width = static_cast<int>(rect.right - rect.left);
-  height = static_cast<int>(rect.bottom - rect.top);
-#else
-  return;
-#endif
+  auto size = GetNativeWindowSize(nativeWindow);
   EGLint surfaceWidth = 0;
   EGLint surfaceHeight = 0;
   auto eglDevice = static_cast<EGLDevice*>(device.get());
   eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &surfaceWidth);
   eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &surfaceHeight);
-
-  if (surfaceWidth != width || surfaceHeight != height) {
+  if (surfaceWidth != size.width || surfaceHeight != size.height) {
     eglDevice->sizeInvalidWindow = nativeWindow;
   }
+#endif
 }
 
 std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
-  EGLint width = 0;
-  EGLint height = 0;
-  auto eglDevice = static_cast<EGLDevice*>(device.get());
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
-  if (width <= 0 || height <= 0) {
+  ISize size = {0, 0};
+  if (nativeWindow) {
+    // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
+    size = GetNativeWindowSize(nativeWindow);
+  }
+  if (size.width <= 0 || size.height <= 0) {
+    auto eglDevice = static_cast<EGLDevice*>(device.get());
+    eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &size.width);
+    eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &size.height);
+  }
+  if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
-  BackendRenderTarget renderTarget = {frameBuffer, width, height};
+  BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 

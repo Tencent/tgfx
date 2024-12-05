@@ -38,6 +38,28 @@ static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
   return eglContext;
 }
 
+#if defined(_WIN32)
+// Create a fixed-size window surface for ANGLE, as ANGLE can only detect resizes during a swap.
+// https://groups.google.com/g/angleproject/c/j3SF7nVIpD8
+static EGLSurface CreateFixedSizeSurfaceForAngle(EGLNativeWindowType nativeWindow,
+                                                 const EGLGlobals* eglGlobals) {
+  if (nativeWindow == nullptr) {
+    return nullptr;
+  }
+  RECT rect;
+  GetClientRect(nativeWindow, &rect);
+  auto width = static_cast<int>(rect.right - rect.left);
+  auto height = static_cast<int>(rect.bottom - rect.top);
+  std::vector<EGLint> attributes = {
+      EGL_FIXED_SIZE_ANGLE, EGL_TRUE, EGL_WIDTH, width, EGL_HEIGHT, height, EGL_NONE,
+  };
+  attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
+                    eglGlobals->windowSurfaceAttributes.end());
+  return eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
+                                attributes.data());
+}
+#endif
+
 void* GLDevice::CurrentNativeHandle() {
   return eglGetCurrentContext();
 }
@@ -51,7 +73,6 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
 
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   auto eglGlobals = EGLGlobals::Get();
-  auto eglContext = EGL_NO_CONTEXT;
   auto eglSurface = eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig,
                                             eglGlobals->pbufferSurfaceAttributes.data());
   if (eglSurface == nullptr) {
@@ -59,7 +80,7 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
     return nullptr;
   }
   auto eglShareContext = reinterpret_cast<EGLContext>(sharedContext);
-  eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig);
+  auto eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig);
   if (eglContext == nullptr) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
@@ -81,9 +102,13 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLDisplay eglDisplay, EGLSurface
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext) {
   auto eglGlobals = EGLGlobals::Get();
+#if defined(_WIN32)
+  auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
+#else
   auto eglSurface =
       eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
                              eglGlobals->windowSurfaceAttributes.data());
+#endif
   if (eglSurface == nullptr) {
     LOGE("EGLDevice::MakeFrom() eglCreateWindowSurface error=%d", eglGetError());
     return nullptr;
@@ -170,17 +195,17 @@ bool EGLDevice::onMakeCurrent() {
     // The read/draw surface may be different.
     return true;
   }
+#if defined(_WIN32)
   if (sizeInvalidWindow != nullptr) {
     eglDestroySurface(eglDisplay, eglSurface);
-    auto eglGlobals = EGLGlobals::Get();
-    eglSurface = eglCreateWindowSurface(eglDisplay, eglGlobals->windowConfig, sizeInvalidWindow,
-                                        eglGlobals->windowSurfaceAttributes.data());
+    eglSurface = CreateFixedSizeSurfaceForAngle(sizeInvalidWindow, EGLGlobals::Get());
     if (eglSurface == nullptr) {
-      LOGE("EGLDevice::onMakeCurrent() eglCreateWindowSurface error=%d", eglGetError());
+      LOGE("EGLDevice::onMakeCurrent() CreateFixedSizeSurfaceForAngle error=%d", eglGetError());
       return false;
     }
     sizeInvalidWindow = nullptr;
   }
+#endif
   auto result = eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
   if (!result) {
     LOGE("EGLDevice::onMakeCurrent() failure result = %d error= %d", result, eglGetError());
