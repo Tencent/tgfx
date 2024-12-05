@@ -85,7 +85,7 @@ class CustomTypefaceProvider : public TypefaceProvider {
   }
 };
 
- TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
+TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface a\n");
    ContextScope scope;
    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface b\n");
