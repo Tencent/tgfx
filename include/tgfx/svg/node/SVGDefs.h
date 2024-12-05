@@ -30,7 +30,7 @@ class SkSVGDefs : public SVGHiddenContainer {
   }
 
  private:
-  SkSVGDefs() : INHERITED(SVGTag::kDefs) {
+  SkSVGDefs() : INHERITED(SVGTag::Defs) {
   }
 
   using INHERITED = SVGHiddenContainer;

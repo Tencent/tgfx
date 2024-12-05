@@ -72,7 +72,7 @@ class SkSVGImage final : public SkSVGTransformableNode {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGImage() : INHERITED(SVGTag::kImage) {
+  SkSVGImage() : INHERITED(SVGTag::Image) {
   }
 
   using INHERITED = SkSVGTransformableNode;

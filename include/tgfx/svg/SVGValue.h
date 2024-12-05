@@ -25,33 +25,33 @@ namespace tgfx {
 class SVGValue {
  public:
   enum class Type {
-    kColor,
-    kFilter,
-    kLength,
-    kNumber,
-    kObjectBoundingBoxUnits,
-    kPreserveAspectRatio,
-    kStopColor,
-    kString,
-    kTransform,
-    kViewBox,
+    Color,
+    Filter,
+    Length,
+    Number,
+    ObjectBoundingBoxUnits,
+    PreserveAspectRatio,
+    StopColor,
+    String,
+    Transform,
+    ViewBox,
   };
 
   Type type() const {
-    return fType;
+    return _type;
   }
 
   template <typename T>
   const T* as() const {
-    return fType == T::_type ? static_cast<const T*>(this) : nullptr;
+    return _type == T::_type ? static_cast<const T*>(this) : nullptr;
   }
 
  protected:
-  explicit SVGValue(Type t) : fType(t) {
+  explicit SVGValue(Type t) : _type(t) {
   }
 
  private:
-  Type fType;
+  Type _type;
 };
 
 template <typename T, SVGValue::Type ValueType>
@@ -83,17 +83,15 @@ class SVGWrapperValue final : public SVGValue {
   using INHERITED = SVGValue;
 };
 
-using SVGColorValue = SVGWrapperValue<SVGColorType, SVGValue::Type::kColor>;
-using SVGLengthValue = SVGWrapperValue<SVGLength, SVGValue::Type::kLength>;
-using SVGTransformValue = SVGWrapperValue<SVGTransformType, SVGValue::Type::kTransform>;
-using SVGViewBoxValue = SVGWrapperValue<SVGViewBoxType, SVGValue::Type::kViewBox>;
-using SVGNumberValue = SVGWrapperValue<SVGNumberType, SVGValue::Type::kNumber>;
-using SVGStringValue = SVGWrapperValue<SVGStringType, SVGValue::Type::kString>;
-using SVGStopColorValue = SVGWrapperValue<SVGStopColor, SVGValue::Type::kStopColor>;
-
+using SVGColorValue = SVGWrapperValue<SVGColorType, SVGValue::Type::Color>;
+using SVGLengthValue = SVGWrapperValue<SVGLength, SVGValue::Type::Length>;
+using SVGTransformValue = SVGWrapperValue<SVGTransformType, SVGValue::Type::Transform>;
+using SVGViewBoxValue = SVGWrapperValue<SVGViewBoxType, SVGValue::Type::ViewBox>;
+using SVGNumberValue = SVGWrapperValue<SVGNumberType, SVGValue::Type::Number>;
+using SVGStringValue = SVGWrapperValue<SVGStringType, SVGValue::Type::String>;
+using SVGStopColorValue = SVGWrapperValue<SVGStopColor, SVGValue::Type::StopColor>;
 using SVGPreserveAspectRatioValue =
-    SVGWrapperValue<SVGPreserveAspectRatio, SVGValue::Type::kPreserveAspectRatio>;
-
+    SVGWrapperValue<SVGPreserveAspectRatio, SVGValue::Type::PreserveAspectRatio>;
 using SVGObjectBoundingBoxUnitsValue =
-    SVGWrapperValue<SVGObjectBoundingBoxUnits, SVGValue::Type::kObjectBoundingBoxUnits>;
+    SVGWrapperValue<SVGObjectBoundingBoxUnits, SVGValue::Type::ObjectBoundingBoxUnits>;
 }  // namespace tgfx

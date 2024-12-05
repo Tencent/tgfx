@@ -47,7 +47,7 @@ class SkSVGFilter final : public SVGHiddenContainer {
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse))
 
  private:
-  SkSVGFilter() : INHERITED(SVGTag::kFilter) {
+  SkSVGFilter() : INHERITED(SVGTag::Filter) {
   }
 
   bool parseAndSetAttribute(const char*, const char*) override;

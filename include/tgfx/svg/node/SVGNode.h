@@ -32,51 +32,51 @@ namespace tgfx {
 class SVGValue;
 
 enum class SVGTag {
-  kCircle,
-  kClipPath,
-  kDefs,
-  kEllipse,
-  kFeBlend,
-  kFeColorMatrix,
-  kFeComponentTransfer,
-  kFeComposite,
-  kFeDiffuseLighting,
-  kFeDisplacementMap,
-  kFeDistantLight,
-  kFeFlood,
-  kFeFuncA,
-  kFeFuncR,
-  kFeFuncG,
-  kFeFuncB,
-  kFeGaussianBlur,
-  kFeImage,
-  kFeMerge,
-  kFeMergeNode,
-  kFeMorphology,
-  kFeOffset,
-  kFePointLight,
-  kFeSpecularLighting,
-  kFeSpotLight,
-  kFeTurbulence,
-  kFilter,
-  kG,
-  kImage,
-  kLine,
-  kLinearGradient,
-  kMask,
-  kPath,
-  kPattern,
-  kPolygon,
-  kPolyline,
-  kRadialGradient,
-  kRect,
-  kStop,
-  kSvg,
-  kText,
-  kTextLiteral,
-  kTextPath,
-  kTSpan,
-  kUse
+  Circle,
+  ClipPath,
+  Defs,
+  Ellipse,
+  FeBlend,
+  FeColorMatrix,
+  FeComponentTransfer,
+  FeComposite,
+  FeDiffuseLighting,
+  FeDisplacementMap,
+  FeDistantLight,
+  FeFlood,
+  FeFuncA,
+  FeFuncR,
+  FeFuncG,
+  FeFuncB,
+  FeGaussianBlur,
+  FeImage,
+  FeMerge,
+  FeMergeNode,
+  FeMorphology,
+  FeOffset,
+  FePointLight,
+  FeSpecularLighting,
+  FeSpotLight,
+  FeTurbulence,
+  Filter,
+  G,
+  Image,
+  Line,
+  LinearGradient,
+  Mask,
+  Path,
+  Pattern,
+  Polygon,
+  Polyline,
+  RadialGradient,
+  Rect,
+  Stop,
+  Svg,
+  Text,
+  TextLiteral,
+  TextPath,
+  TSpan,
+  Use
 };
 
 #define SVG_PRES_ATTR(attr_name, attr_type, attr_inherited)                             \
@@ -91,24 +91,24 @@ enum class SVGTag {
                                                                                         \
  public:                                                                                \
   const SVGProperty<attr_type, attr_inherited>& get##attr_name() const {                \
-    return fPresentationAttributes.f##attr_name;                                        \
+    return _presentationAttributes.f##attr_name;                                        \
   }                                                                                     \
   void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {                \
-    auto* dest = &fPresentationAttributes.f##attr_name;                                 \
+    auto* dest = &_presentationAttributes.f##attr_name;                                 \
     if (!dest->isInheritable() || v.isValue()) {                                        \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                     \
       *dest = v;                                                                        \
     } else {                                                                            \
-      dest->set(SVGPropertyState::kInherit);                                            \
+      dest->set(SVGPropertyState::Inherit);                                             \
     }                                                                                   \
   }                                                                                     \
   void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                     \
-    auto* dest = &fPresentationAttributes.f##attr_name;                                 \
+    auto* dest = &_presentationAttributes.f##attr_name;                                 \
     if (!dest->isInheritable() || v.isValue()) {                                        \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                     \
       *dest = std::move(v);                                                             \
     } else {                                                                            \
-      dest->set(SVGPropertyState::kInherit);                                            \
+      dest->set(SVGPropertyState::Inherit);                                             \
     }                                                                                   \
   }
 
@@ -117,11 +117,11 @@ class SVGNode {
   virtual ~SVGNode();
 
   SVGTag tag() const {
-    return fTag;
+    return _tag;
   }
 
   const SVGPresentationAttributes* presentationAttributes() const {
-    return &fPresentationAttributes;
+    return &_presentationAttributes;
   }
 
   virtual void appendChild(std::shared_ptr<SVGNode>) = 0;
@@ -208,10 +208,10 @@ class SVGNode {
 #endif
 
  private:
-  SVGTag fTag;
+  SVGTag _tag;
 
   // FIXME: this should be sparse
-  SVGPresentationAttributes fPresentationAttributes;
+  SVGPresentationAttributes _presentationAttributes;
 };
 
 //NOLINTBEGIN

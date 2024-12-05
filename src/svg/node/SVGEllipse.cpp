@@ -23,7 +23,7 @@
 
 namespace tgfx {
 
-SkSVGEllipse::SkSVGEllipse() : INHERITED(SVGTag::kEllipse) {
+SkSVGEllipse::SkSVGEllipse() : INHERITED(SVGTag::Ellipse) {
 }
 
 bool SkSVGEllipse::parseAndSetAttribute(const char* n, const char* v) {

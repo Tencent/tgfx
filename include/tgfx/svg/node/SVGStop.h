@@ -27,7 +27,7 @@ namespace tgfx {
 
 class SkSVGStop : public SVGHiddenContainer {
  public:
-  static constexpr SVGTag tag = SVGTag::kStop;
+  static constexpr SVGTag tag = SVGTag::Stop;
 
   static std::shared_ptr<SkSVGStop> Make() {
     return std::shared_ptr<SkSVGStop>(new SkSVGStop());

@@ -42,9 +42,9 @@ using SVGTransformType = Matrix;
 using SVGPointsType = std::vector<Point>;
 
 enum class SVGPropertyState {
-  kUnspecified,
-  kInherit,
-  kValue,
+  Unspecified,
+  Inherit,
+  Value,
 };
 
 // https://www.w3.org/TR/SVG11/intro.html#TermProperty
@@ -53,24 +53,24 @@ class SVGProperty {
  public:
   using ValueT = T;
 
-  SVGProperty() : fState(SVGPropertyState::kUnspecified) {
+  SVGProperty() : _state(SVGPropertyState::Unspecified) {
   }
 
-  explicit SVGProperty(SVGPropertyState state) : fState(state) {
+  explicit SVGProperty(SVGPropertyState state) : _state(state) {
   }
 
-  explicit SVGProperty(const T& value) : fState(SVGPropertyState::kValue) {
-    fValue = value;
+  explicit SVGProperty(const T& value) : _state(SVGPropertyState::Value) {
+    _value = value;
   }
 
-  explicit SVGProperty(T&& value) : fState(SVGPropertyState::kValue) {
-    fValue = std::move(value);
+  explicit SVGProperty(T&& value) : _state(SVGPropertyState::Value) {
+    _value = std::move(value);
   }
 
   template <typename... Args>
   void init(Args&&... args) {
-    fState = SVGPropertyState::kValue;
-    fValue.emplace(std::forward<Args>(args)...);
+    _state = SVGPropertyState::Value;
+    _value.emplace(std::forward<Args>(args)...);
   }
 
   constexpr bool isInheritable() const {
@@ -78,57 +78,57 @@ class SVGProperty {
   }
 
   bool isValue() const {
-    return fState == SVGPropertyState::kValue;
+    return _state == SVGPropertyState::Value;
   }
 
   T* getMaybeNull() const {
-    return fValue.has_value() ? &fValue.value() : nullptr;
+    return _value.has_value() ? &_value.value() : nullptr;
   }
 
   void set(SVGPropertyState state) {
-    fState = state;
-    if (fState != SVGPropertyState::kValue) {
-      fValue.reset();
+    _state = state;
+    if (_state != SVGPropertyState::Value) {
+      _value.reset();
     }
   }
 
   void set(const T& value) {
-    fState = SVGPropertyState::kValue;
-    fValue = value;
+    _state = SVGPropertyState::Value;
+    _value = value;
   }
 
   void set(T&& value) {
-    fState = SVGPropertyState::kValue;
-    fValue = std::move(value);
+    _state = SVGPropertyState::Value;
+    _value = std::move(value);
   }
 
   T* operator->() {
     // ASSERT(fState == SVGPropertyState::kValue);
     // ASSERT(fValue.has_value());
-    return &fValue.value();
+    return &_value.value();
   }
 
   const T* operator->() const {
     // ASSERT(fState == SVGPropertyState::kValue);
     // ASSERT(fValue.has_value());
-    return &fValue.value();
+    return &_value.value();
   }
 
   T& operator*() {
     // ASSERT(fState == SVGPropertyState::kValue);
     // ASSERT(fValue.has_value());
-    return *fValue;
+    return *_value;
   }
 
   const T& operator*() const {
     // ASSERT(fState == SVGPropertyState::kValue);
     // ASSERT(fValue.has_value());
-    return *fValue;
+    return *_value;
   }
 
  private:
-  SVGPropertyState fState;
-  std::optional<T> fValue;
+  SVGPropertyState _state;
+  std::optional<T> _value;
 };
 
 class SVGLength {
@@ -147,30 +147,30 @@ class SVGLength {
     kPC,
   };
 
-  constexpr SVGLength() : fValue(0), fUnit(Unit::kUnknown) {
+  constexpr SVGLength() : _value(0), _unit(Unit::kUnknown) {
   }
-  explicit constexpr SVGLength(float v, Unit u = Unit::kNumber) : fValue(v), fUnit(u) {
+  explicit constexpr SVGLength(float v, Unit u = Unit::kNumber) : _value(v), _unit(u) {
   }
   SVGLength(const SVGLength&) = default;
   SVGLength& operator=(const SVGLength&) = default;
 
   bool operator==(const SVGLength& other) const {
-    return fUnit == other.fUnit && fValue == other.fValue;
+    return _unit == other._unit && _value == other._value;
   }
   bool operator!=(const SVGLength& other) const {
     return !(*this == other);
   }
 
   const float& value() const {
-    return fValue;
+    return _value;
   }
   const Unit& unit() const {
-    return fUnit;
+    return _unit;
   }
 
  private:
-  float fValue;
-  Unit fUnit;
+  float _value;
+  Unit _unit;
 };
 
 // https://www.w3.org/TR/SVG11/linking.html#IRIReference

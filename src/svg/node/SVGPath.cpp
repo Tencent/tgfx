@@ -26,7 +26,7 @@
 
 namespace tgfx {
 
-SkSVGPath::SkSVGPath() : INHERITED(SVGTag::kPath) {
+SkSVGPath::SkSVGPath() : INHERITED(SVGTag::Path) {
 }
 
 bool SkSVGPath::parseAndSetAttribute(const char* n, const char* v) {

@@ -33,7 +33,7 @@ namespace tgfx {
 // https://www.w3.org/TR/SVG11/filters.html#feMergeNodeElement
 class SkSVGFeMergeNode : public SVGHiddenContainer {
  public:
-  static constexpr SVGTag tag = SVGTag::kFeMergeNode;
+  static constexpr SVGTag tag = SVGTag::FeMergeNode;
 
   static std::shared_ptr<SkSVGFeMergeNode> Make() {
     return std::shared_ptr<SkSVGFeMergeNode>(new SkSVGFeMergeNode());
@@ -67,7 +67,7 @@ class SkSVGFeMerge : public SkSVGFe {
   std::vector<SVGFeInputType> getInputs() const override;
 
  private:
-  SkSVGFeMerge() : INHERITED(SVGTag::kFeMerge) {
+  SkSVGFeMerge() : INHERITED(SVGTag::FeMerge) {
   }
 
   using INHERITED = SkSVGFe;

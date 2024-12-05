@@ -51,7 +51,7 @@ class SkSVGFeTurbulence : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeTurbulence() : INHERITED(SVGTag::kFeTurbulence) {
+  SkSVGFeTurbulence() : INHERITED(SVGTag::FeTurbulence) {
   }
 
   using INHERITED = SkSVGFe;

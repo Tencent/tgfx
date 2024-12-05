@@ -32,11 +32,11 @@ namespace tgfx {
 class SkSVGPoly final : public SVGShape {
  public:
   static std::shared_ptr<SkSVGPoly> MakePolygon() {
-    return std::shared_ptr<SkSVGPoly>(new SkSVGPoly(SVGTag::kPolygon));
+    return std::shared_ptr<SkSVGPoly>(new SkSVGPoly(SVGTag::Polygon));
   }
 
   static std::shared_ptr<SkSVGPoly> MakePolyline() {
-    return std::shared_ptr<SkSVGPoly>(new SkSVGPoly(SVGTag::kPolyline));
+    return std::shared_ptr<SkSVGPoly>(new SkSVGPoly(SVGTag::Polyline));
   }
 
   SVG_ATTR(Points, SVGPointsType, SVGPointsType())

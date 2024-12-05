@@ -48,7 +48,7 @@ class SkSVGFeComposite final : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeComposite() : INHERITED(SVGTag::kFeComposite) {
+  SkSVGFeComposite() : INHERITED(SVGTag::FeComposite) {
   }
 
   using INHERITED = SkSVGFe;

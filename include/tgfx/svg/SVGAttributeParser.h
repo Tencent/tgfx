@@ -74,7 +74,7 @@ class SVGAttributeParser {
     }
 
     if (!strcmp(value, "inherit")) {
-      PropertyT result(SVGPropertyState::kInherit);
+      PropertyT result(SVGPropertyState::Inherit);
       return ParseResult<PropertyT>(result);
     }
 

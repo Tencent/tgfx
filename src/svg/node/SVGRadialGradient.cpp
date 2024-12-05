@@ -26,7 +26,7 @@
 
 namespace tgfx {
 
-SkSVGRadialGradient::SkSVGRadialGradient() : INHERITED(SVGTag::kRadialGradient) {
+SkSVGRadialGradient::SkSVGRadialGradient() : INHERITED(SVGTag::RadialGradient) {
 }
 
 bool SkSVGRadialGradient::parseAndSetAttribute(const char* name, const char* value) {

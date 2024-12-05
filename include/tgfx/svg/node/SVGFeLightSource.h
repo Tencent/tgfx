@@ -50,7 +50,7 @@ class SkSVGFeDistantLight final : public SkSVGFeLightSource {
   SVG_ATTR(Elevation, SVGNumberType, 0)
 
  private:
-  SkSVGFeDistantLight() : INHERITED(SVGTag::kFeDistantLight) {
+  SkSVGFeDistantLight() : INHERITED(SVGTag::FeDistantLight) {
   }
 
   bool parseAndSetAttribute(const char*, const char*) override;
@@ -69,7 +69,7 @@ class SkSVGFePointLight final : public SkSVGFeLightSource {
   SVG_ATTR(Z, SVGNumberType, 0)
 
  private:
-  SkSVGFePointLight() : INHERITED(SVGTag::kFePointLight) {
+  SkSVGFePointLight() : INHERITED(SVGTag::FePointLight) {
   }
 
   bool parseAndSetAttribute(const char*, const char*) override;
@@ -94,7 +94,7 @@ class SkSVGFeSpotLight final : public SkSVGFeLightSource {
   SVG_OPTIONAL_ATTR(LimitingConeAngle, SVGNumberType)
 
  private:
-  SkSVGFeSpotLight() : INHERITED(SVGTag::kFeSpotLight) {
+  SkSVGFeSpotLight() : INHERITED(SVGTag::FeSpotLight) {
   }
 
   bool parseAndSetAttribute(const char*, const char*) override;

@@ -24,7 +24,7 @@
 
 namespace tgfx {
 
-SkSVGLine::SkSVGLine() : INHERITED(SVGTag::kLine) {
+SkSVGLine::SkSVGLine() : INHERITED(SVGTag::Line) {
 }
 
 bool SkSVGLine::parseAndSetAttribute(const char* n, const char* v) {

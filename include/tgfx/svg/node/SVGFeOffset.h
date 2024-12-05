@@ -52,7 +52,7 @@ class SkSVGFeOffset : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeOffset() : INHERITED(SVGTag::kFeOffset) {
+  SkSVGFeOffset() : INHERITED(SVGTag::FeOffset) {
   }
 
   using INHERITED = SkSVGFe;

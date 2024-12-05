@@ -29,7 +29,7 @@ class SkSVGG : public SkSVGContainer {
   }
 
  private:
-  SkSVGG() : INHERITED(SVGTag::kG) {
+  SkSVGG() : INHERITED(SVGTag::G) {
   }
 
   using INHERITED = SkSVGContainer;

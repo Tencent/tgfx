@@ -26,7 +26,7 @@
 
 namespace tgfx {
 
-SkSVGUse::SkSVGUse() : INHERITED(SVGTag::kUse) {
+SkSVGUse::SkSVGUse() : INHERITED(SVGTag::Use) {
 }
 
 bool SkSVGUse::parseAndSetAttribute(const char* n, const char* v) {

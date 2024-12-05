@@ -55,7 +55,7 @@ class SkSVGFeGaussianBlur : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeGaussianBlur() : INHERITED(SVGTag::kFeGaussianBlur) {
+  SkSVGFeGaussianBlur() : INHERITED(SVGTag::FeGaussianBlur) {
   }
 
   using INHERITED = SkSVGFe;

@@ -25,7 +25,7 @@
 
 namespace tgfx {
 
-SVGCircle::SVGCircle() : INHERITED(SVGTag::kCircle) {
+SVGCircle::SVGCircle() : INHERITED(SVGTag::Circle) {
 }
 
 bool SVGCircle::parseAndSetAttribute(const char* n, const char* v) {

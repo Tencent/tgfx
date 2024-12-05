@@ -29,7 +29,7 @@
 
 namespace tgfx {
 
-SkSVGRect::SkSVGRect() : INHERITED(SVGTag::kRect) {
+SkSVGRect::SkSVGRect() : INHERITED(SVGTag::Rect) {
 }
 
 bool SkSVGRect::parseAndSetAttribute(const char* n, const char* v) {

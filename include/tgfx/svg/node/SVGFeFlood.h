@@ -51,7 +51,7 @@ class SkSVGFeFlood : public SkSVGFe {
   }
 
  private:
-  SkSVGFeFlood() : INHERITED(SVGTag::kFeFlood) {
+  SkSVGFeFlood() : INHERITED(SVGTag::FeFlood) {
   }
 #ifdef RENDER_SVG
   SkColor resolveFloodColor(const SVGRenderContext&) const;

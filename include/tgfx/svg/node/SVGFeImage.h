@@ -51,7 +51,7 @@ class SkSVGFeImage : public SkSVGFe {
   }
 
  private:
-  SkSVGFeImage() : INHERITED(SVGTag::kFeImage) {
+  SkSVGFeImage() : INHERITED(SVGTag::FeImage) {
   }
 
   using INHERITED = SkSVGFe;

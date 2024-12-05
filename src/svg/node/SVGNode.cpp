@@ -32,13 +32,13 @@
 
 namespace tgfx {
 
-SVGNode::SVGNode(SVGTag t) : fTag(t) {
+SVGNode::SVGNode(SVGTag t) : _tag(t) {
   // Uninherited presentation attributes need a non-null default value.
-  fPresentationAttributes.fStopColor.set(SVGColor(Color::Black()));
-  fPresentationAttributes.fStopOpacity.set(static_cast<SVGNumberType>(1.0f));
-  fPresentationAttributes.fFloodColor.set(SVGColor(Color::Black()));
-  fPresentationAttributes.fFloodOpacity.set(static_cast<SVGNumberType>(1.0f));
-  fPresentationAttributes.fLightingColor.set(SVGColor(Color::White()));
+  _presentationAttributes.fStopColor.set(SVGColor(Color::Black()));
+  _presentationAttributes.fStopOpacity.set(static_cast<SVGNumberType>(1.0f));
+  _presentationAttributes.fFloodColor.set(SVGColor(Color::Black()));
+  _presentationAttributes.fFloodOpacity.set(static_cast<SVGNumberType>(1.0f));
+  _presentationAttributes.fLightingColor.set(SVGColor(Color::White()));
 }
 
 SVGNode::~SVGNode() {
@@ -80,14 +80,14 @@ Rect SVGNode::objectBoundingBox(const SVGRenderContext& ctx) const {
 }
 
 bool SVGNode::onPrepareToRender(SVGRenderContext* ctx) const {
-  ctx->applyPresentationAttributes(fPresentationAttributes,
+  ctx->applyPresentationAttributes(_presentationAttributes,
                                    this->hasChildren() ? 0 : SVGRenderContext::kLeaf);
 
   // visibility:hidden and display:none disable rendering.
   // TODO: if display is not a value (true when display="inherit"), we currently
   //   ignore it. Eventually we should be able to add SkASSERT(display.isValue()).
   const auto visibility = ctx->presentationContext()._inherited.fVisibility->type();
-  const auto display = fPresentationAttributes.fDisplay;  // display is uninherited
+  const auto display = _presentationAttributes.fDisplay;  // display is uninherited
   return visibility != SVGVisibility::Type::kHidden &&
          (!display.isValue() || *display != SVGDisplay::kNone);
 }
@@ -111,7 +111,7 @@ void SetInheritedByDefault(std::optional<T>& presentation_attribute, const T& va
 bool SVGNode::parseAndSetAttribute(const char* n, const char* v) {
 #define PARSE_AND_SET(svgName, attrName)                                                           \
   this->set##attrName(                                                                             \
-      SVGAttributeParser::parseProperty<decltype(fPresentationAttributes.f##attrName)>(svgName, n, \
+      SVGAttributeParser::parseProperty<decltype(_presentationAttributes.f##attrName)>(svgName, n, \
                                                                                        v))
 
   return PARSE_AND_SET("clip-path", ClipPath) || PARSE_AND_SET("clip-rule", ClipRule) ||

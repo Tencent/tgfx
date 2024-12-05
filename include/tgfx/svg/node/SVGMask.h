@@ -44,7 +44,7 @@ class SkSVGMask final : public SVGHiddenContainer {
  private:
   friend class SVGRenderContext;
 
-  SkSVGMask() : INHERITED(SVGTag::kMask) {
+  SkSVGMask() : INHERITED(SVGTag::Mask) {
   }
 
   bool parseAndSetAttribute(const char*, const char*) override;

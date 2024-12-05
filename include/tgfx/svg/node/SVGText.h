@@ -87,7 +87,7 @@ class SkSVGText final : public SkSVGTextContainer {
   }
 
  private:
-  SkSVGText() : INHERITED(SVGTag::kText) {
+  SkSVGText() : INHERITED(SVGTag::Text) {
   }
 
   void onRender(const SVGRenderContext&) const override;
@@ -104,7 +104,7 @@ class SkSVGTSpan final : public SkSVGTextContainer {
   }
 
  private:
-  SkSVGTSpan() : INHERITED(SVGTag::kTSpan) {
+  SkSVGTSpan() : INHERITED(SVGTag::TSpan) {
   }
 
   using INHERITED = SkSVGTextContainer;
@@ -119,7 +119,7 @@ class SkSVGTextLiteral final : public SkSVGTextFragment {
   SVG_ATTR(Text, SVGStringType, SVGStringType())
 
  private:
-  SkSVGTextLiteral() : INHERITED(SVGTag::kTextLiteral) {
+  SkSVGTextLiteral() : INHERITED(SVGTag::TextLiteral) {
   }
 
   void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;
@@ -140,7 +140,7 @@ class SkSVGTextPath final : public SkSVGTextContainer {
   SVG_ATTR(StartOffset, SVGLength, SVGLength(0))
 
  private:
-  SkSVGTextPath() : INHERITED(SVGTag::kTextPath) {
+  SkSVGTextPath() : INHERITED(SVGTag::TextPath) {
   }
 
   void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;

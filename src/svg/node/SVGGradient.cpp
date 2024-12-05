@@ -55,7 +55,7 @@ void SkSVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<C
 
   if (positions.empty() && !fHref.iri().empty()) {
     const auto ref = ctx.findNodeById(fHref);
-    if (ref && (ref->tag() == SVGTag::kLinearGradient || ref->tag() == SVGTag::kRadialGradient)) {
+    if (ref && (ref->tag() == SVGTag::LinearGradient || ref->tag() == SVGTag::RadialGradient)) {
       static_cast<const SkSVGGradient*>(ref.get())->collectColorStops(ctx, colors, positions);
     }
   }

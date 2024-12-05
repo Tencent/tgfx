@@ -61,7 +61,7 @@ class SkSVGFeMorphology : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeMorphology() : INHERITED(SVGTag::kFeMorphology) {
+  SkSVGFeMorphology() : INHERITED(SVGTag::FeMorphology) {
   }
 
   using INHERITED = SkSVGFe;

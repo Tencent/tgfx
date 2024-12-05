@@ -52,7 +52,7 @@ class SkSVGFeColorMatrix final : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeColorMatrix() : INHERITED(SVGTag::kFeColorMatrix) {
+  SkSVGFeColorMatrix() : INHERITED(SVGTag::FeColorMatrix) {
   }
 
 #ifndef RENDER_SVG

@@ -448,7 +448,7 @@ std::shared_ptr<SVGDOM> SVGDOM::Builder::make(Data& data,
   ConstructionContext ctx(&mapper);
 
   auto root = construct_svg_node(ctx, xmlDom->getRootNode().get());
-  if (!root || root->tag() != SVGTag::kSvg) {
+  if (!root || root->tag() != SVGTag::Svg) {
     return nullptr;
   }
 

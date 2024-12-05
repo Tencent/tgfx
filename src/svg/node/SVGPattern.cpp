@@ -31,7 +31,7 @@
 
 namespace tgfx {
 
-SkSVGPattern::SkSVGPattern() : INHERITED(SVGTag::kPattern) {
+SkSVGPattern::SkSVGPattern() : INHERITED(SVGTag::Pattern) {
 }
 
 bool SkSVGPattern::parseAndSetAttribute(const char* name, const char* value) {
@@ -56,7 +56,7 @@ const SkSVGPattern* SkSVGPattern::hrefTarget(const SVGRenderContext& ctx) const 
   }
 
   const auto href = ctx.findNodeById(fHref);
-  if (!href || href->tag() != SVGTag::kPattern) {
+  if (!href || href->tag() != SVGTag::Pattern) {
     return nullptr;
   }
 

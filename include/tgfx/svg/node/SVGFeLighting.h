@@ -104,7 +104,7 @@ class SkSVGFeSpecularLighting final : public SkSVGFeLighting {
 #endif
 
  private:
-  SkSVGFeSpecularLighting() : INHERITED(SVGTag::kFeSpecularLighting) {
+  SkSVGFeSpecularLighting() : INHERITED(SVGTag::FeSpecularLighting) {
   }
 
   using INHERITED = SkSVGFeLighting;
@@ -132,7 +132,7 @@ class SkSVGFeDiffuseLighting final : public SkSVGFeLighting {
                                      const SkSVGFeSpotLight*) const final;
 #endif
  private:
-  SkSVGFeDiffuseLighting() : INHERITED(SVGTag::kFeDiffuseLighting) {
+  SkSVGFeDiffuseLighting() : INHERITED(SVGTag::FeDiffuseLighting) {
   }
 
   using INHERITED = SkSVGFeLighting;

@@ -50,7 +50,7 @@ class SkSVGFeDisplacementMap : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeDisplacementMap() : INHERITED(SVGTag::kFeDisplacementMap) {
+  SkSVGFeDisplacementMap() : INHERITED(SVGTag::FeDisplacementMap) {
   }
 
   using INHERITED = SkSVGFe;

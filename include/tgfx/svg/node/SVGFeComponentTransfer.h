@@ -35,19 +35,19 @@ namespace tgfx {
 class SkSVGFeFunc final : public SVGHiddenContainer {
  public:
   static std::shared_ptr<SkSVGFeFunc> MakeFuncA() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::kFeFuncA));
+    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncA));
   }
 
   static std::shared_ptr<SkSVGFeFunc> MakeFuncR() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::kFeFuncR));
+    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncR));
   }
 
   static std::shared_ptr<SkSVGFeFunc> MakeFuncG() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::kFeFuncG));
+    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncG));
   }
 
   static std::shared_ptr<SkSVGFeFunc> MakeFuncB() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::kFeFuncB));
+    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncB));
   }
 
   SVG_ATTR(Amplitude, SVGNumberType, 1)
@@ -88,7 +88,7 @@ class SkSVGFeComponentTransfer final : public SkSVGFe {
   }
 
  private:
-  SkSVGFeComponentTransfer() : INHERITED(SVGTag::kFeComponentTransfer) {
+  SkSVGFeComponentTransfer() : INHERITED(SVGTag::FeComponentTransfer) {
   }
 
   using INHERITED = SkSVGFe;

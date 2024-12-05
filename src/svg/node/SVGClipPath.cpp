@@ -23,7 +23,7 @@
 
 namespace tgfx {
 
-SVGClipPath::SVGClipPath() : INHERITED(SVGTag::kClipPath) {
+SVGClipPath::SVGClipPath() : INHERITED(SVGTag::ClipPath) {
 }
 
 bool SVGClipPath::parseAndSetAttribute(const char* n, const char* v) {

@@ -131,9 +131,9 @@ float ComputeAlignmentFactor(const SkSVGPresentationContext& context) {
 void SkSVGTextContainer::appendChild(std::shared_ptr<SVGNode> child) {
   // Only allow text content child nodes.
   switch (child->tag()) {
-    case SVGTag::kTextLiteral:
-    case SVGTag::kTextPath:
-    case SVGTag::kTSpan:
+    case SVGTag::TextLiteral:
+    case SVGTag::TextPath:
+    case SVGTag::TSpan:
       fChildren.push_back(std::static_pointer_cast<SkSVGTextFragment>(child));
       break;
     default:

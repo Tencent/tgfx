@@ -332,7 +332,7 @@ std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& fil
   }
 
   const auto node = this->findNodeById(filter.iri());
-  if (!node || node->tag() != SVGTag::kFilter) {
+  if (!node || node->tag() != SVGTag::Filter) {
     return nullptr;
   }
 
@@ -350,7 +350,7 @@ Path SVGRenderContext::applyClip(const SVGFuncIRI& clip) {
   }
 
   const auto clipNode = this->findNodeById(clip.iri());
-  if (!clipNode || clipNode->tag() != SVGTag::kClipPath) {
+  if (!clipNode || clipNode->tag() != SVGTag::ClipPath) {
     return Path();
   }
 
@@ -363,7 +363,7 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   }
 
   const auto node = this->findNodeById(mask.iri());
-  if (!node || node->tag() != SVGTag::kMask) {
+  if (!node || node->tag() != SVGTag::Mask) {
     return nullptr;
   }
 

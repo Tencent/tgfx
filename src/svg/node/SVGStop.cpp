@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-SkSVGStop::SkSVGStop() : INHERITED(SVGTag::kStop) {
+SkSVGStop::SkSVGStop() : INHERITED(SVGTag::Stop) {
 }
 
 bool SkSVGStop::parseAndSetAttribute(const char* n, const char* v) {

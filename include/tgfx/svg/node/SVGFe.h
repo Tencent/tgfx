@@ -36,20 +36,20 @@ class SkSVGFe : public SVGHiddenContainer {
  public:
   static bool IsFilterEffect(const std::shared_ptr<SVGNode>& node) {
     switch (node->tag()) {
-      case SVGTag::kFeBlend:
-      case SVGTag::kFeColorMatrix:
-      case SVGTag::kFeComponentTransfer:
-      case SVGTag::kFeComposite:
-      case SVGTag::kFeDiffuseLighting:
-      case SVGTag::kFeDisplacementMap:
-      case SVGTag::kFeFlood:
-      case SVGTag::kFeGaussianBlur:
-      case SVGTag::kFeImage:
-      case SVGTag::kFeMerge:
-      case SVGTag::kFeMorphology:
-      case SVGTag::kFeOffset:
-      case SVGTag::kFeSpecularLighting:
-      case SVGTag::kFeTurbulence:
+      case SVGTag::FeBlend:
+      case SVGTag::FeColorMatrix:
+      case SVGTag::FeComponentTransfer:
+      case SVGTag::FeComposite:
+      case SVGTag::FeDiffuseLighting:
+      case SVGTag::FeDisplacementMap:
+      case SVGTag::FeFlood:
+      case SVGTag::FeGaussianBlur:
+      case SVGTag::FeImage:
+      case SVGTag::FeMerge:
+      case SVGTag::FeMorphology:
+      case SVGTag::FeOffset:
+      case SVGTag::FeSpecularLighting:
+      case SVGTag::FeTurbulence:
         return true;
       default:
         return false;

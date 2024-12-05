@@ -59,7 +59,7 @@ class SkSVGFeBlend : public SkSVGFe {
   bool parseAndSetAttribute(const char*, const char*) override;
 
  private:
-  SkSVGFeBlend() : INHERITED(SVGTag::kFeBlend) {
+  SkSVGFeBlend() : INHERITED(SVGTag::FeBlend) {
   }
 
   using INHERITED = SkSVGFe;
