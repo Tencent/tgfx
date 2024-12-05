@@ -22,7 +22,7 @@
 
 namespace tgfx {
 /**
- * Texture with a single plane.
+ * Texture that has a single 2D texture sampler.
  */
 class PlainTexture : public Texture {
  public:

@@ -25,29 +25,27 @@ let shareData: ShareData = new ShareData();
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
-        shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm-mt/' + file})
-            .then((module: types.TGFX) => {
-                TGFXBind(module);
-                return module;
-            })
-            .catch((error: any) => {
-                console.error(error);
-                throw new Error("Hello2D init failed. Please check the .wasm file path!.");
-            });
+        try {
+            shareData.Hello2DModule = await Hello2D({ locateFile: (file: string) => './wasm-mt/' + file });
+            TGFXBind(shareData.Hello2DModule);
 
-        let image = await loadImage('../../resources/assets/bridge.jpg');
-        let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d', image);
+            let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
+            shareData.tgfxBaseView = tgfxView;
+            var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
+            await tgfxView.setImagePath(imagePath);
 
-        var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
-        const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
-        const fontUIntArray = new Uint8Array(fontBuffer);
-        var emojiFontPath = "../../resources/font/NotoColorEmoji.ttf";
-        const emojiFontBuffer = await fetch(emojiFontPath).then((response) => response.arrayBuffer());
-        const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
-        tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
-
-        shareData.tgfxBaseView = tgfxView;
-        updateSize(shareData);
+            var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
+            const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
+            const fontUIntArray = new Uint8Array(fontBuffer);
+            var emojiFontPath = "../../resources/font/NotoColorEmoji.ttf";
+            const emojiFontBuffer = await fetch(emojiFontPath).then((response) => response.arrayBuffer());
+            const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
+            tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
+            updateSize(shareData);
+        } catch (error) {
+            console.error(error);
+            throw new Error("Hello2D init failed. Please check the .wasm file path!.");
+        }
     };
 
     window.onresize = () => {
@@ -59,4 +57,3 @@ if (typeof window !== 'undefined') {
         onclickEvent(shareData);
     };
 }
-

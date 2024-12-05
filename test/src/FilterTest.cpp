@@ -40,9 +40,8 @@
 namespace tgfx {
 
 TGFX_TEST(FilterTest, ColorMatrixFilter) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
@@ -61,13 +60,11 @@ TGFX_TEST(FilterTest, ColorMatrixFilter) {
   paint.setColorFilter(ColorFilter::Matrix(greyColorMatrix));
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/greyColorMatrix"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, ModeColorFilter) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
@@ -79,13 +76,11 @@ TGFX_TEST(FilterTest, ModeColorFilter) {
   paint.setColorFilter(modeColorFilter);
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ModeColorFilter"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, ComposeColorFilter) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
@@ -102,13 +97,11 @@ TGFX_TEST(FilterTest, ComposeColorFilter) {
   paint.setColorFilter(std::move(composeFilter));
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeColorFilter"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, ShaderMaskFilter) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto mask = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(mask != nullptr);
@@ -121,8 +114,7 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   image = image->makeOriented(Orientation::LeftBottom);
   image = image->makeMipmapped(true);
-  image = image->makeScaled(0.25f, 0.25f);
-  image = image->makeFlattened();
+  image = image->makeScaled(0.25f);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -130,13 +122,11 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   paint.setMaskFilter(maskFilter);
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/shaderMaskFilter"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, Blur) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
@@ -207,13 +197,11 @@ TGFX_TEST(FilterTest, Blur) {
   canvas->drawPath(path, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/blur"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, DropShadow) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
@@ -242,7 +230,6 @@ TGFX_TEST(FilterTest, DropShadow) {
   canvas->drawImage(image, &paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/dropShadow"));
-  device->unlock();
 
   auto src = Rect::MakeXYWH(10, 10, 10, 10);
   auto bounds = filter->filterBounds(src);
@@ -252,9 +239,8 @@ TGFX_TEST(FilterTest, DropShadow) {
 }
 
 TGFX_TEST(FilterTest, ImageFilterShader) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
@@ -274,13 +260,11 @@ TGFX_TEST(FilterTest, ImageFilterShader) {
   paint.setShader(std::move(shader));
   canvas->drawRect(Rect::MakeWH(720, 720), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ImageFilterShader"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, ComposeImageFilter) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
@@ -311,33 +295,29 @@ TGFX_TEST(FilterTest, ComposeImageFilter) {
   canvas->translate(200, 200);
   canvas->drawImage(filterImage);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ComposeImageFilter2"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, RuntimeEffect) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  image = image->makeScaled(0.5f, 0.5f);
-  image = image->makeFlattened(true, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
+  image = image->makeScaled(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
+  image = image->makeMipmapped(true);
   auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter = ImageFilter::Runtime(std::move(effect));
   image = image->makeWithFilter(std::move(filter));
   canvas->drawImage(image, 200, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, InnerShadow) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -366,7 +346,6 @@ TGFX_TEST(FilterTest, InnerShadow) {
   canvas->drawImage(image, &paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/innerShadow"));
-  device->unlock();
 }
 
 TGFX_TEST(FilterTest, GetFilterProperties) {

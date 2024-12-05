@@ -25,18 +25,19 @@ let shareData: ShareData = new ShareData();
 
 if (typeof window !== 'undefined') {
     window.onload = async () => {
-        shareData.Hello2DModule = await Hello2D({locateFile: (file: string) => './wasm/' + file})
-            .then((module: types.TGFX) => {
-                TGFXBind(module);
-                return module;
-            })
-            .catch((error: any) => {
-                console.error(error);
-                throw new Error("Hello2D init failed. Please check the .wasm file path!.");
-            });
-        let image = await loadImage('../../resources/assets/bridge.jpg');
-        shareData.tgfxBaseView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d', image);
-        updateSize(shareData);
+        try {
+            shareData.Hello2DModule = await Hello2D({ locateFile: (file: string) => './wasm/' + file });
+            TGFXBind(shareData.Hello2DModule);
+
+            let tgfxView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d');
+            shareData.tgfxBaseView = tgfxView;
+            var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
+            await tgfxView.setImagePath(imagePath);
+            updateSize(shareData);
+        } catch (error) {
+            console.error(error);
+            throw new Error("Hello2D init failed. Please check the .wasm file path!.");
+        }
     };
 
     window.onresize = () => {

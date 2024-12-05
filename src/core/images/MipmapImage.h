@@ -37,16 +37,8 @@ class MipmapImage : public ResourceImage {
     return source->isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return source->isYUV();
-  }
-
   bool hasMipmaps() const override {
     return true;
-  }
-
-  bool isFlat() const override {
-    return source->isFlat();
   }
 
  protected:
@@ -54,7 +46,8 @@ class MipmapImage : public ResourceImage {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
+                                                   const UniqueKey& key) const override;
 
  private:
   std::shared_ptr<ResourceImage> source = nullptr;

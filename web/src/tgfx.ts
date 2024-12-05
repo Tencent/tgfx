@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import {getCanvas2D, releaseCanvas2D, isCanvas} from './utils/canvas';
-import {writeBufferToWasm} from './utils/buffer';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
@@ -41,7 +40,8 @@ export const createImage = (source: string) => {
 };
 
 export const createImageFromBytes = (bytes: ArrayBuffer) => {
-    const blob = new Blob([bytes], {type: 'image/*'});
+    const uint8Array = new Uint8Array(bytes);
+    const blob = new Blob([uint8Array], {type: 'image/*'});
     return createImage(URL.createObjectURL(blob));
 };
 
@@ -60,7 +60,7 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
     if (data.length === 0) {
         return null;
     }
-    return writeBufferToWasm(module, data);
+    return new Uint8Array(data);
 };
 
 export const hasWebpSupport = () => {
@@ -118,7 +118,7 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
 
 export const getBytesFromPath = async (module: TGFX, path: string) => {
     const buffer = await fetch(path).then((res) => res.arrayBuffer());
-    return writeBufferToWasm(module, buffer);
+    return new Uint8Array(buffer);
 };
 
 export {getCanvas2D as createCanvas2D};

@@ -65,4 +65,32 @@ class Stream {
    */
   virtual bool rewind() = 0;
 };
+
+/**
+ * StreamFactory creates Stream instances and can be implemented externally to load cache files that
+ * do not have local paths, such as binary data in a database or asset resources on the Android
+ * platform.
+ */
+class StreamFactory {
+ public:
+  /**
+   * Registers custom protocol with the specified factory. The factory will create streams for paths
+   * that start with the specified protocol, such as "assets://".
+   */
+  static void RegisterCustomProtocol(const std::string& customProtocol,
+                                     std::shared_ptr<StreamFactory> factory);
+
+  /**
+   * Unregisters the custom protocol.
+   */
+  static void UnRegisterCustomProtocol(const std::string& customProtocol);
+
+  virtual ~StreamFactory() = default;
+  /**
+   * Creates a Stream instance for the specified file path. The path needs to start with
+   * customProtocol.
+   */
+  virtual std::unique_ptr<Stream> createStream(const std::string& filePath) = 0;
+};
+
 }  // namespace tgfx

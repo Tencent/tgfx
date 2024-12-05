@@ -32,10 +32,6 @@ class OrientImage : public TransformImage {
 
   int height() const override;
 
-  bool isFlat() const override {
-    return false;
-  }
-
  protected:
   Orientation orientation = Orientation::TopLeft;
 

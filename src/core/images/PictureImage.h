@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include "core/images/OffscreenImage.h"
 
 namespace tgfx {
 /**
  * PictureImage is an image that draws a Picture.
  */
-class PictureImage : public ResourceImage {
+class PictureImage : public OffscreenImage {
  public:
   PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width, int height,
                const Matrix* matrix = nullptr, bool alphaOnly = false);
@@ -43,16 +43,8 @@ class PictureImage : public ResourceImage {
     return alphaOnly;
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
-  bool isFlat() const override {
-    return true;
-  }
-
  protected:
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
 
  private:
   std::shared_ptr<Picture> picture = nullptr;
