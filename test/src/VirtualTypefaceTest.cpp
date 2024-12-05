@@ -85,14 +85,14 @@ class CustomTypefaceProvider : public TypefaceProvider {
   }
 };
 
-// TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
-//   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface a\n");
-//   ContextScope scope;
-//   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface b\n");
-//   auto context = scope.getContext();
-//   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 0\n");
-//   ASSERT_TRUE(context != nullptr);
-//   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
+ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
+   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface a\n");
+   ContextScope scope;
+   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface b\n");
+   auto context = scope.getContext();
+   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 0\n");
+   ASSERT_TRUE(context != nullptr);
+   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
 //   auto surface = Surface::Make(context, 400, 200);
 //   auto canvas = surface->getCanvas();
 //
@@ -132,5 +132,5 @@ class CustomTypefaceProvider : public TypefaceProvider {
 //   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 6\n");
 //   EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWithVirtualTypeface"));
 //   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 7\n");
-// }
+ }
 }  // namespace tgfx
