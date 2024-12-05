@@ -18,15 +18,29 @@
 
 #pragma once
 
-#include "core/filters/ImageFilterBase.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class DropShadowImageFilter : public ImageFilterBase {
+class DropShadowImageFilter : public ImageFilter {
  public:
   DropShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                         const Color& color, bool shadowOnly);
 
-  ImageFilterType asImageFilterInfo(ImageFilterInfo* filterInfo) const override;
+  Type type() const override {
+    return Type::DropShadow;
+  };
+
+  bool isShadowOnly() const {
+    return shadowOnly;
+  }
+
+  Color shadowColor() const {
+    return color;
+  }
+
+  Point offset() const;
+
+  Size blurSize() const;
 
  protected:
   Rect onFilterBounds(const Rect& srcRect) const override;

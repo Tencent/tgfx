@@ -18,7 +18,10 @@
 
 #include <vector>
 #include "CornerPinEffect.h"
-#include "core/filters/ImageFilterBase.h"
+#include "core/filters/BlurImageFilter.h"
+#include "core/filters/ColorImageFilter.h"
+#include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/InnerShadowImageFilter.h"
 #include "core/shaders/ShaderBase.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "gpu/opengl/GLUtil.h"
@@ -32,6 +35,7 @@
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/RuntimeEffect.h"
@@ -369,90 +373,87 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
 
   {
     auto imageFilter = ImageFilter::Blur(20, 30);
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::Blur);
-    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
-    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
+    auto blurFilter = std::static_pointer_cast<BlurImageFilter>(imageFilter);
+    Size blurSize = blurFilter->blurSize();
+    EXPECT_NEAR(blurSize.width, 17.7777786, 1E-4);
+    EXPECT_NEAR(blurSize.height, 35.5555573, 1E-4);
   }
 
   {
     auto imageFilter = ImageFilter::DropShadow(15.f, 15.f, 20.f, 30.f, Color::White());
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::DropShadow);
-    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
-    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
-    EXPECT_EQ(info.offset.x, 15.f);
-    EXPECT_EQ(info.offset.y, 15.f);
-    EXPECT_EQ(info.color, Color::White());
-    EXPECT_EQ(info.onlyShadow, false);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
+    auto dropShadowFilter = std::static_pointer_cast<DropShadowImageFilter>(imageFilter);
+    Size blurSize = dropShadowFilter->blurSize();
+    EXPECT_NEAR(blurSize.width, 17.7777786, 1E-6);
+    EXPECT_NEAR(blurSize.height, 35.5555573, 1E-6);
+    Point offset = dropShadowFilter->offset();
+    EXPECT_EQ(offset.x, 15.f);
+    EXPECT_EQ(offset.y, 15.f);
+    EXPECT_EQ(dropShadowFilter->shadowColor(), Color::White());
+    EXPECT_EQ(dropShadowFilter->isShadowOnly(), false);
   }
 
   {
     auto imageFilter = ImageFilter::DropShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::DropShadow);
-    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
-    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
-    EXPECT_EQ(info.offset.x, 15.f);
-    EXPECT_EQ(info.offset.y, 15.f);
-    EXPECT_EQ(info.color, Color::White());
-    EXPECT_EQ(info.onlyShadow, true);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
+    auto dropShadowFilter = std::static_pointer_cast<DropShadowImageFilter>(imageFilter);
+    Size blurSize = dropShadowFilter->blurSize();
+    EXPECT_NEAR(blurSize.width, 17.7777786, 1E-6);
+    EXPECT_NEAR(blurSize.height, 35.5555573, 1E-6);
+    Point offset = dropShadowFilter->offset();
+    EXPECT_EQ(offset.x, 15.f);
+    EXPECT_EQ(offset.y, 15.f);
+    EXPECT_EQ(dropShadowFilter->shadowColor(), Color::White());
+    EXPECT_EQ(dropShadowFilter->isShadowOnly(), true);
   }
 
   {
     auto imageFilter = ImageFilter::InnerShadow(15.f, 15.f, 20.f, 30.f, Color::White());
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::InnerShadow);
-    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
-    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
-    EXPECT_EQ(info.offset.x, 15.f);
-    EXPECT_EQ(info.offset.y, 15.f);
-    EXPECT_EQ(info.color, Color::White());
-    EXPECT_EQ(info.onlyShadow, false);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
+    auto dropShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
+    Size blurSize = dropShadowFilter->blurSize();
+    EXPECT_NEAR(blurSize.width, 17.7777786, 1E-6);
+    EXPECT_NEAR(blurSize.height, 35.5555573, 1E-6);
+    Point offset = dropShadowFilter->offset();
+    EXPECT_EQ(offset.x, 15.f);
+    EXPECT_EQ(offset.y, 15.f);
+    EXPECT_EQ(dropShadowFilter->shadowColor(), Color::White());
+    EXPECT_EQ(dropShadowFilter->isShadowOnly(), false);
   }
 
   {
     auto imageFilter = ImageFilter::InnerShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::InnerShadow);
-    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
-    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
-    EXPECT_EQ(info.offset.x, 15.f);
-    EXPECT_EQ(info.offset.y, 15.f);
-    EXPECT_EQ(info.color, Color::White());
-    EXPECT_EQ(info.onlyShadow, true);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
+    auto dropShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
+    Size blurSize = dropShadowFilter->blurSize();
+    EXPECT_NEAR(blurSize.width, 17.7777786, 1E-6);
+    EXPECT_NEAR(blurSize.height, 35.5555573, 1E-6);
+    Point offset = dropShadowFilter->offset();
+    EXPECT_EQ(offset.x, 15.f);
+    EXPECT_EQ(offset.y, 15.f);
+    EXPECT_EQ(dropShadowFilter->shadowColor(), Color::White());
+    EXPECT_EQ(dropShadowFilter->isShadowOnly(), true);
   }
 
   {
     auto imageFilter = ImageFilter::ColorFilter(modeColorFilter);
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::Color);
-    EXPECT_EQ(info.color, Color::Red());
-    EXPECT_EQ(info.blendMode, BlendMode::Multiply);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Color);
+    auto colorFilter = std::static_pointer_cast<ColorImageFilter>(imageFilter);
   }
 
   {
     auto blueFilter = ImageFilter::DropShadow(100, 100, 0, 0, Color::Blue());
     auto greenFilter = ImageFilter::DropShadow(-100, -100, 0, 0, Color::Green());
     auto blackFilter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
-    auto composeFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(composeFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::Compose);
+    auto imageFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Compose);
   }
 
   {
     auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
     auto imageFilter = ImageFilter::Runtime(std::move(effect));
-    ImageFilterInfo info;
-    auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
-    EXPECT_EQ(type, ImageFilterType::Runtime);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Runtime);
   }
 }
 

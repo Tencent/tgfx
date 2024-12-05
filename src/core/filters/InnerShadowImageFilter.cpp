@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "InnerShadowImageFilter.h"
+#include "core/filters/BlurImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -42,19 +43,16 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
       shadowOnly(shadowOnly) {
 }
 
-ImageFilterType InnerShadowImageFilter::asImageFilterInfo(ImageFilterInfo* filterInfo) const {
-  if (filterInfo) {
-    filterInfo->onlyShadow = shadowOnly;
-    ImageFilterInfo blurInfo;
-    if (blurFilter &&
-        asImageFilterBase(blurFilter)->asImageFilterInfo(&blurInfo) == ImageFilterType::Blur) {
-      filterInfo->blurWidth = blurInfo.blurWidth;
-      filterInfo->blurHeight = blurInfo.blurHeight;
-    }
-    filterInfo->offset = Point::Make(dx, dy);
-    filterInfo->color = color;
+Point InnerShadowImageFilter::offset() const {
+  return Point::Make(dx, dy);
+}
+
+Size InnerShadowImageFilter::blurSize() const {
+  if (!blurFilter || blurFilter->type() != Type::Blur) {
+    return Size::MakeEmpty();
   }
-  return ImageFilterType::InnerShadow;
+  auto blur = std::static_pointer_cast<BlurImageFilter>(blurFilter);
+  return blur->blurSize();
 }
 
 std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(

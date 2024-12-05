@@ -18,15 +18,32 @@
 
 #pragma once
 
-#include "core/filters/ImageFilterBase.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
-class InnerShadowImageFilter : public ImageFilterBase {
+class InnerShadowImageFilter : public ImageFilter {
  public:
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                          const Color& color, bool shadowOnly);
 
-  ImageFilterType asImageFilterInfo(ImageFilterInfo* filterInfo) const override;
+  Type type() const override {
+    return Type::InnerShadow;
+  };
+
+  bool isShadowOnly() const {
+    return shadowOnly;
+  }
+
+  Color shadowColor() const {
+    return color;
+  }
+
+  Point offset() const;
+
+  Size blurSize() const;
 
  protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,

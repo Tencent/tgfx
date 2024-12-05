@@ -125,6 +125,13 @@ class ImageFilter {
    */
   Rect filterBounds(const Rect& rect) const;
 
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+
+  /**
+   * Returns the type of this image filter.
+   */
+  virtual Type type() const = 0;
+
  protected:
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
@@ -150,13 +157,6 @@ class ImageFilter {
                                                                  const FPArgs& args,
                                                                  const SamplingOptions& sampling,
                                                                  const Matrix* uvMatrix) const = 0;
-
-  /**
-   * Returns true if this filter is a ComposeImageFilter.
-   */
-  virtual bool isComposeFilter() const {
-    return false;
-  }
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
