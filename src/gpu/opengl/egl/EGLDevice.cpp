@@ -50,7 +50,7 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
 }
 
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
-  static auto eglGlobals = EGLGlobals::Get();
+  auto eglGlobals = EGLGlobals::Get();
   auto eglContext = EGL_NO_CONTEXT;
   auto eglSurface = eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig,
                                             eglGlobals->pbufferSurfaceAttributes.data());
@@ -80,7 +80,7 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLDisplay eglDisplay, EGLSurface
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext) {
-  static auto eglGlobals = EGLGlobals::Get();
+  auto eglGlobals = EGLGlobals::Get();
   auto eglSurface =
       eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
                              eglGlobals->windowSurfaceAttributes.data());
@@ -169,6 +169,17 @@ bool EGLDevice::onMakeCurrent() {
     // If the current context is already set by external, we don't need to switch it again.
     // The read/draw surface may be different.
     return true;
+  }
+  if (sizeInvalidWindow != nullptr) {
+    eglDestroySurface(eglDisplay, eglSurface);
+    auto eglGlobals = EGLGlobals::Get();
+    eglSurface = eglCreateWindowSurface(eglDisplay, eglGlobals->windowConfig, sizeInvalidWindow,
+                                        eglGlobals->windowSurfaceAttributes.data());
+    if (eglSurface == nullptr) {
+      LOGE("EGLDevice::onMakeCurrent() eglCreateWindowSurface error=%d", eglGetError());
+      return false;
+    }
+    sizeInvalidWindow = nullptr;
   }
   auto result = eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
   if (!result) {

@@ -55,6 +55,7 @@ class EGLDevice : public GLDevice {
   EGLSurface eglSurface = nullptr;
   EGLContext eglContext = nullptr;
   EGLContext shareContext = nullptr;
+  EGLNativeWindowType sizeInvalidWindow = nullptr;
 
   EGLDisplay oldEglDisplay = nullptr;
   EGLContext oldEglContext = nullptr;

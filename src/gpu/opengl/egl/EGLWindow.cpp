@@ -55,36 +55,46 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
 EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
 }
 
+void EGLWindow::onInvalidSize() {
+  if (nativeWindow == nullptr) {
+    return;
+  }
+  int width = 0;
+  int height = 0;
+#if defined(__ANDROID__) || defined(ANDROID)
+  width = ANativeWindow_getWidth(nativeWindow);
+  height = ANativeWindow_getHeight(nativeWindow);
+#elif defined(__OHOS__)
+  OH_NativeWindow_NativeWindowHandleOpt(reinterpret_cast<OHNativeWindow*>(nativeWindow),
+                                        GET_BUFFER_GEOMETRY, &height, &width);
+#elif defined(_WIN32)
+  RECT rect;
+  GetClientRect(nativeWindow, &rect);
+  width = static_cast<int>(rect.right - rect.left);
+  height = static_cast<int>(rect.bottom - rect.top);
+#else
+  return;
+#endif
+  EGLint surfaceWidth = 0;
+  EGLint surfaceHeight = 0;
+  auto eglDevice = static_cast<EGLDevice*>(device.get());
+  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &surfaceWidth);
+  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &surfaceHeight);
+
+  if (surfaceWidth != width || surfaceHeight != height) {
+    eglDevice->sizeInvalidWindow = nativeWindow;
+  }
+}
+
 std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   EGLint width = 0;
   EGLint height = 0;
-
-  if (nativeWindow) {
-    // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
-#if defined(__ANDROID__) || defined(ANDROID)
-    width = ANativeWindow_getWidth(nativeWindow);
-    height = ANativeWindow_getHeight(nativeWindow);
-#elif defined(__OHOS__)
-    OH_NativeWindow_NativeWindowHandleOpt(reinterpret_cast<OHNativeWindow*>(nativeWindow),
-                                          GET_BUFFER_GEOMETRY, &height, &width);
-#elif defined(_WIN32)
-    RECT rect;
-    GetClientRect(nativeWindow, &rect);
-    width = static_cast<int>(rect.right - rect.left);
-    height = static_cast<int>(rect.bottom - rect.top);
-#endif
-  }
-
-  if (width <= 0 || height <= 0) {
-    auto eglDevice = static_cast<EGLDevice*>(device.get());
-    eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
-    eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
-  }
-
+  auto eglDevice = static_cast<EGLDevice*>(device.get());
+  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
+  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
