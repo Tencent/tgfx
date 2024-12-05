@@ -109,7 +109,7 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.5\n");
   TypefaceProviderManager::GetInstance()->registerProvider(virtualTypefaceProvider);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 2\n");
-#if 0
+
   std::vector<GlyphRun> glyphRunList;
   GlyphRun glyphRun1(font1, {}, {});
   glyphRun1.glyphs.push_back(1);
@@ -119,6 +119,7 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   glyphRun1.positions.push_back(Point::Make(50.0f, 0.0f));
   glyphRun1.positions.push_back(Point::Make(100.0f, 0.0f));
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 3\n");
+
   GlyphRun glyphRun2(font2, {}, {});
   glyphRun2.glyphs.push_back(4);
   glyphRun2.glyphs.push_back(5);
@@ -130,6 +131,7 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   glyphRunList.push_back(glyphRun1);
   glyphRunList.push_back(glyphRun2);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5\n");
+#if 0
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
   auto paint = Paint();
   paint.setColor(Color::Red());
