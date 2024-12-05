@@ -97,13 +97,14 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.1\n");
   //auto canvas = surface->getCanvas();
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.2\n");
-#if 0
+
   const auto virtualTypeface1 = Typeface::MakeVirtual(false);
   Font font1(virtualTypeface1, 20);
-
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.3\n");
   const auto virtualTypeface2 = Typeface::MakeVirtual(true);
   Font font2(virtualTypeface2, 20);
-
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.4\n");
+#if 0
   const auto virtualTypefaceProvider = std::make_shared<CustomTypefaceProvider>();
   TypefaceProviderManager::GetInstance()->registerProvider(virtualTypefaceProvider);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 2\n");
