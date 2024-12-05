@@ -88,9 +88,9 @@ class CustomTypefaceProvider : public TypefaceProvider {
 };
 
 TGFX_TEST(VirtualTypefaceTest, DrawTextWihtVirtualTypeface) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
@@ -138,6 +138,5 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWihtVirtualTypeface) {
 
   context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWihtVirtualTypeface"));
-  device->unlock();
 }
 }  // namespace tgfx
