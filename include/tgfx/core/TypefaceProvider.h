@@ -70,7 +70,7 @@ class TypefaceProviderManager final {
  public:
   static TypefaceProviderManager* GetInstance();
 
-  void registerProvider(std::shared_ptr<TypefaceProvider> provider);
+  void registerProvider(const std::shared_ptr<TypefaceProvider>& provider);
 
   const std::shared_ptr<TypefaceProvider>& getProvider() const {
     return _provider;
