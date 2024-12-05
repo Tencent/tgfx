@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "core/shaders/ShaderBase.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class ColorShader : public ShaderBase {
+class ColorShader : public Shader {
  public:
   explicit ColorShader(Color color) : color(color) {
   }
@@ -30,8 +30,8 @@ class ColorShader : public ShaderBase {
 
   bool asColor(Color* color) const override;
 
-  ShaderType type() const override {
-    return ShaderType::Color;
+  Type type() const override {
+    return Type::Color;
   }
 
  protected:

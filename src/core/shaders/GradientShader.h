@@ -18,12 +18,29 @@
 
 #pragma once
 
-#include "core/shaders/ShaderBase.h"
+#include "tgfx/core/GradientType.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
-class GradientShader : public ShaderBase {
+/**
+ *  Linear:
+ *      points[0] and points[1] represent the start and end points of the gradient.
+ *  Radial:
+ *      points[0] and radiuses[0] represent the center and radius of the gradient.
+ *  Conic:
+ *      points[0] represents the center, and radiuses[0] and radiuses[1] represent the start angle
+ *      and end angle of the gradient.
+ */
+struct GradientInfo {
+  std::vector<Color> colors;     // The colors in the gradient
+  std::vector<float> positions;  // The positions of the colors in the gradient
+  std::array<Point, 2> points;
+  std::array<float, 2> radiuses;
+};
+
+class GradientShader : public Shader {
  public:
   GradientShader(const std::vector<Color>& colors, const std::vector<float>& positions,
                  const Matrix& pointsToUnit);
@@ -32,9 +49,11 @@ class GradientShader : public ShaderBase {
     return colorsAreOpaque;
   }
 
-  ShaderType type() const override {
-    return ShaderType::Gradient;
+  Type type() const override {
+    return Type::Gradient;
   }
+
+  virtual GradientType asGradient(GradientInfo*) const = 0;
 
   std::vector<Color> originalColors = {};
   std::vector<float> originalPositions = {};

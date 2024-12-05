@@ -16,13 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <memory>
 #include <vector>
 #include "CornerPinEffect.h"
 #include "core/filters/BlurImageFilter.h"
 #include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
-#include "core/shaders/ShaderBase.h"
+#include "core/shaders/GradientShader.h"
+#include "core/shaders/ImageShader.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
@@ -458,136 +460,96 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
 }
 
 TGFX_TEST(FilterTest, GetShaderProperties) {
-  auto colorShader = Shader::MakeColorShader(Color::Red());
-  ASSERT_TRUE(colorShader != nullptr);
+
   {
-    EXPECT_TRUE(asShaderBase(colorShader)->type() == ShaderType::Color);
+    auto colorShader = Shader::MakeColorShader(Color::Red());
+    ASSERT_TRUE(colorShader != nullptr);
+    EXPECT_EQ(colorShader->type(), Shader::Type::Color);
 
     Color color = Color::White();
     bool ret = colorShader->asColor(&color);
     EXPECT_TRUE(ret);
     EXPECT_EQ(color, Color::Red());
-
-    auto gradientType = asShaderBase(colorShader)->asGradient(nullptr);
-    EXPECT_EQ(gradientType, GradientType::None);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(colorShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
 
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  auto imageShader = Shader::MakeImageShader(image, TileMode::Mirror, TileMode::Repeat);
-  ASSERT_TRUE(imageShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(imageShader)->type(), ShaderType::Image);
+    auto inputImage = MakeImage("resources/apitest/imageReplacement.png");
+    ASSERT_TRUE(inputImage != nullptr);
+    auto shader = Shader::MakeImageShader(inputImage, TileMode::Mirror, TileMode::Repeat);
+    ASSERT_TRUE(shader != nullptr);
 
-    bool ret = imageShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    EXPECT_EQ(shader->type(), Shader::Type::Image);
 
-    auto gradientType = asShaderBase(imageShader)->asGradient(nullptr);
-    EXPECT_EQ(gradientType, GradientType::None);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(imageShader)->asImage();
+    auto imageShader = std::static_pointer_cast<ImageShader>(shader);
+    auto [image, tileModeX, tileModeY] = imageShader->getImage();
     EXPECT_EQ(image, image);
     EXPECT_EQ(tileModeX, TileMode::Mirror);
     EXPECT_EQ(tileModeY, TileMode::Repeat);
   }
 
-  auto blendShader = Shader::MakeBlend(BlendMode::SrcOut, imageShader, colorShader);
-  ASSERT_TRUE(blendShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(blendShader)->type(), ShaderType::Blend);
-
-    bool ret = blendShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
-
-    auto gradientType = asShaderBase(blendShader)->asGradient(nullptr);
-    EXPECT_EQ(gradientType, GradientType::None);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(blendShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
+    auto redShader = Shader::MakeColorShader(Color::Red());
+    auto greenShader = Shader::MakeColorShader(Color::Green());
+    auto blendShader = Shader::MakeBlend(BlendMode::SrcOut, redShader, greenShader);
+    ASSERT_TRUE(blendShader != nullptr);
+    EXPECT_EQ(blendShader->type(), Shader::Type::Blend);
   }
 
   std::vector<Color> colors = {Color::Red(), Color::Green(), Color::Blue()};
   std::vector<float> positions = {0.f, 0.5f, 1.f};
-
   auto startPoint = Point::Make(0, 0);
   auto endPoint = Point::Make(100, 100);
-  auto linearGradientShader = Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
-  ASSERT_TRUE(linearGradientShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(linearGradientShader)->type(), ShaderType::Gradient);
+    auto shader = Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
+    ASSERT_TRUE(shader != nullptr);
+    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
 
-    bool ret = linearGradientShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
     GradientInfo info;
-    auto gradientType = asShaderBase(linearGradientShader)->asGradient(&info);
+    auto gradientType = gradientShader->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Linear);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], startPoint);
     EXPECT_EQ(info.points[1], endPoint);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(linearGradientShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
 
   auto center = Point::Make(50, 50);
   float radius = 50;
-  auto radialGradientShader = Shader::MakeRadialGradient(center, radius, colors, positions);
-  ASSERT_TRUE(radialGradientShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(radialGradientShader)->type(), ShaderType::Gradient);
+    auto shader = Shader::MakeRadialGradient(center, radius, colors, positions);
+    ASSERT_TRUE(shader != nullptr);
+    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
 
-    bool ret = radialGradientShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
     GradientInfo info;
-    auto gradientType = asShaderBase(radialGradientShader)->asGradient(&info);
+    auto gradientType = gradientShader->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Radial);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], center);
     EXPECT_EQ(info.radiuses[0], radius);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(radialGradientShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
 
-  float startAngle = 0.f;
-  float endAngle = 360.f;
-  auto conicGradientShader =
-      Shader::MakeConicGradient(center, startAngle, endAngle, colors, positions);
-  ASSERT_TRUE(conicGradientShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(conicGradientShader)->type(), ShaderType::Gradient);
+    float startAngle = 0.f;
+    float endAngle = 360.f;
+    auto shader = Shader::MakeConicGradient(center, startAngle, endAngle, colors, positions);
+    ASSERT_TRUE(shader != nullptr);
+    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
 
-    bool ret = conicGradientShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
     GradientInfo info;
-    auto gradientType = asShaderBase(conicGradientShader)->asGradient(&info);
+    auto gradientType = gradientShader->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Conic);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], center);
     EXPECT_EQ(info.radiuses[0], startAngle);
     EXPECT_EQ(info.radiuses[1], endAngle);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(conicGradientShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
 }
 }  // namespace tgfx

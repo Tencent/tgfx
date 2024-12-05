@@ -18,17 +18,17 @@
 
 #pragma once
 
-#include "core/shaders/ShaderBase.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
-class BlendShader : public ShaderBase {
+class BlendShader : public Shader {
  public:
   BlendShader(BlendMode mode, std::shared_ptr<Shader> dst, std::shared_ptr<Shader> src)
       : mode(mode), dst(std::move(dst)), src(std::move(src)) {
   }
 
-  ShaderType type() const override {
-    return ShaderType::Blend;
+  Type type() const override {
+    return Type::Blend;
   }
 
  protected:

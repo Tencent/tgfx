@@ -107,6 +107,13 @@ class Shader {
 
   virtual ~Shader() = default;
 
+  enum class Type { Color, ColorFilter, Image, Blend, Matrix, Gradient };
+
+  /**
+   * Returns the type of this shader.
+   */
+  virtual Type type() const = 0;
+
   /**
    * Returns true if the shader is guaranteed to produce only opaque colors, subject to the Paint
    * using the shader to apply an opaque alpha value. Subclasses should override this to allow some
