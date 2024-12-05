@@ -50,8 +50,8 @@ ImageFilterType DropShadowImageFilter::asImageFilterInfo(ImageFilterInfo* filter
     ImageFilterInfo blurInfo;
     if (blurFilter &&
         asImageFilterBase(blurFilter)->asImageFilterInfo(&blurInfo) == ImageFilterType::Blur) {
-      filterInfo->blurrinessX = blurInfo.blurrinessX;
-      filterInfo->blurrinessY = blurInfo.blurrinessY;
+      filterInfo->blurWidth = blurInfo.blurWidth;
+      filterInfo->blurHeight = blurInfo.blurHeight;
     }
     filterInfo->offset = Point::Make(dx, dy);
     filterInfo->color = color;

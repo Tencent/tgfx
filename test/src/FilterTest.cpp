@@ -372,8 +372,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     ImageFilterInfo info;
     auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
     EXPECT_EQ(type, ImageFilterType::Blur);
-    EXPECT_NE(info.blurrinessX, 8.88889);
-    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
+    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
   }
 
   {
@@ -381,8 +381,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     ImageFilterInfo info;
     auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
     EXPECT_EQ(type, ImageFilterType::DropShadow);
-    EXPECT_NE(info.blurrinessX, 8.88889);
-    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
+    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
     EXPECT_EQ(info.offset.x, 15.f);
     EXPECT_EQ(info.offset.y, 15.f);
     EXPECT_EQ(info.color, Color::White());
@@ -394,8 +394,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     ImageFilterInfo info;
     auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
     EXPECT_EQ(type, ImageFilterType::DropShadow);
-    EXPECT_NE(info.blurrinessX, 8.88889);
-    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
+    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
     EXPECT_EQ(info.offset.x, 15.f);
     EXPECT_EQ(info.offset.y, 15.f);
     EXPECT_EQ(info.color, Color::White());
@@ -407,8 +407,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     ImageFilterInfo info;
     auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
     EXPECT_EQ(type, ImageFilterType::InnerShadow);
-    EXPECT_NE(info.blurrinessX, 8.88889);
-    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
+    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
     EXPECT_EQ(info.offset.x, 15.f);
     EXPECT_EQ(info.offset.y, 15.f);
     EXPECT_EQ(info.color, Color::White());
@@ -420,8 +420,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     ImageFilterInfo info;
     auto type = asImageFilterBase(imageFilter)->asImageFilterInfo(&info);
     EXPECT_EQ(type, ImageFilterType::InnerShadow);
-    EXPECT_NE(info.blurrinessX, 8.88889);
-    EXPECT_NE(info.blurrinessY, 17.7778);
+    EXPECT_NEAR(info.blurWidth, 17.7777786, 1E-6);
+    EXPECT_NEAR(info.blurHeight, 35.5555573, 1E-6);
     EXPECT_EQ(info.offset.x, 15.f);
     EXPECT_EQ(info.offset.y, 15.f);
     EXPECT_EQ(info.color, Color::White());

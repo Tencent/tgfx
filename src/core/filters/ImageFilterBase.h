@@ -37,8 +37,8 @@ enum class ImageFilterType {
 
 struct ImageFilterInfo {
   bool onlyShadow = true;
-  float blurrinessX = 0.f;
-  float blurrinessY = 0.f;
+  float blurWidth = 0.f;
+  float blurHeight = 0.f;
   Point offset = Point::Zero();
   Color color = Color::Black();
   BlendMode blendMode = BlendMode::SrcOver;

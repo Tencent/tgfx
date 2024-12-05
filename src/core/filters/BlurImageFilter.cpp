@@ -87,8 +87,8 @@ BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iterat
 ImageFilterType BlurImageFilter::asImageFilterInfo(ImageFilterInfo* filterInfo) const {
   if (filterInfo) {
     auto rect = onFilterBounds(Rect::MakeWH(0, 0));
-    filterInfo->blurrinessX = rect.width() / 2.0f;
-    filterInfo->blurrinessY = rect.height() / 2.0f;
+    filterInfo->blurWidth = rect.width();
+    filterInfo->blurHeight = rect.height();
   }
   return ImageFilterType::Blur;
 }
