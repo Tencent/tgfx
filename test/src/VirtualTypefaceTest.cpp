@@ -104,10 +104,12 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   const auto virtualTypeface2 = Typeface::MakeVirtual(true);
   Font font2(virtualTypeface2, 20);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.4\n");
-#if 0
+
   const auto virtualTypefaceProvider = std::make_shared<CustomTypefaceProvider>();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.5\n");
   TypefaceProviderManager::GetInstance()->registerProvider(virtualTypefaceProvider);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 2\n");
+#if 0
   std::vector<GlyphRun> glyphRunList;
   GlyphRun glyphRun1(font1, {}, {});
   glyphRun1.glyphs.push_back(1);
