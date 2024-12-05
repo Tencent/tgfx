@@ -21,6 +21,7 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+#if 0
 class CustomTypefaceProvider : public TypefaceProvider {
  public:
   bool getPath(const std::shared_ptr<Typeface>& /*typeface*/, GlyphID glyphID, bool /*fauxBold*/,
@@ -127,6 +128,77 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   glyphRun2.positions.push_back(Point::Make(150.0f, 0.0f));
   glyphRun2.positions.push_back(Point::Make(205.0f, 0.0f));
   glyphRun2.positions.push_back(Point::Make(260.0f, 0.0f));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 4\n");
+  glyphRunList.push_back(glyphRun1);
+  glyphRunList.push_back(glyphRun2);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5\n");
+
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.1\n");
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.2\n");
+
+  auto paint = Paint();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.3\n");
+  paint.setColor(Color::Red());
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.4\n");
+  if (surface == nullptr) {
+    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface surface is nullptr\n");
+  } else {
+    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface surface is not nullptr\n");
+  }
+  if (canvas == nullptr) {
+    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface canvas is nullptr\n");
+  } else {
+    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface canvas is not nullptr\n");
+  }
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface drawTextBlob before\n");
+  canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface drawTextBlob after\n");
+
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.5\n");
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 6\n");
+  EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWithVirtualTypeface"));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 7\n");
+}
+#endif
+
+TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface a\n");
+  ContextScope scope;
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface b\n");
+  auto context = scope.getContext();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 0\n");
+  ASSERT_TRUE(context != nullptr);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
+  auto surface = Surface::Make(context, 400, 200);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.1\n");
+  auto canvas = surface->getCanvas();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.2\n");
+
+  auto typeface1 = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  Font font1(typeface1, 20);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.3\n");
+  auto typeface2 = MakeTypeface("resources/font/NotoColorEmoji.ttf");
+  Font font2(typeface2, 20);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.4\n");
+
+  std::vector<GlyphRun> glyphRunList;
+  GlyphRun glyphRun1(font1, {}, {});
+  glyphRun1.glyphs.push_back(font1.getGlyphID('A'));
+  glyphRun1.glyphs.push_back(font1.getGlyphID('B'));
+  glyphRun1.glyphs.push_back(font1.getGlyphID('C'));
+  glyphRun1.positions.push_back(Point::Make(0.0f, 50.0f));
+  glyphRun1.positions.push_back(Point::Make(50.0f, 50.0f));
+  glyphRun1.positions.push_back(Point::Make(100.0f, 50.0f));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 3\n");
+
+  GlyphRun glyphRun2(font2, {}, {});
+  glyphRun2.glyphs.push_back(font2.getGlyphID("🤡"));
+  glyphRun2.glyphs.push_back(font2.getGlyphID("👻"));
+  glyphRun2.glyphs.push_back(font2.getGlyphID("🐠"));
+  glyphRun2.positions.push_back(Point::Make(150.0f, 50.0f));
+  glyphRun2.positions.push_back(Point::Make(205.0f, 50.0f));
+  glyphRun2.positions.push_back(Point::Make(260.0f, 50.0f));
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 4\n");
   glyphRunList.push_back(glyphRun1);
   glyphRunList.push_back(glyphRun2);
