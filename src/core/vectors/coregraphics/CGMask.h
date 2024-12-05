@@ -19,12 +19,15 @@
 #pragma once
 
 #include "core/PixelRefMask.h"
+#include "CGTypeface.h"
 
 namespace tgfx {
 class CGMask : public PixelRefMask {
  public:
   explicit CGMask(std::shared_ptr<PixelRef> pixelRef) : PixelRefMask(std::move(pixelRef)) {
   }
+
+  static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix);
 
  protected:
   void onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,

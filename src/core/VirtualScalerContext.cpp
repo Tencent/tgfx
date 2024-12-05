@@ -56,6 +56,6 @@ std::shared_ptr<ImageBuffer> VirtualScalerContext::generateImage(GlyphID glyphID
 
 std::shared_ptr<VirtualTypeface> VirtualScalerContext::ConvertTypeface(
     const std::shared_ptr<Typeface>& typeface) {
-  return std::dynamic_pointer_cast<VirtualTypeface>(typeface);
+  return std::static_pointer_cast<VirtualTypeface>(typeface);
 }
 }  // namespace tgfx

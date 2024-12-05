@@ -25,20 +25,6 @@ using namespace emscripten;
 
 namespace tgfx {
 
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  auto scalerContextClass = val::module_property("ScalerContext");
-  if (!scalerContextClass.as<bool>()) {
-    return nullptr;
-  }
-  auto scalerContext = scalerContextClass.new_(typeface->fontFamily(), typeface->fontStyle(), size);
-  if (!scalerContext.as<bool>()) {
-    return nullptr;
-  }
-  return std::make_shared<WebScalerContext>(std::move(typeface), size, std::move(scalerContext));
-}
-
 WebScalerContext::WebScalerContext(std::shared_ptr<Typeface> typeface, float size,
                                    val scalerContext)
     : ScalerContext(std::move(typeface), size), scalerContext(std::move(scalerContext)) {
@@ -66,7 +52,7 @@ bool WebScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;
 }
 
-Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+Size WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
   if (bounds.isEmpty()) {
     return {};
@@ -74,7 +60,7 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const 
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
   }
-  return bounds;
+  return Size::Make(bounds.width(), bounds.height());
 }
 
 std::shared_ptr<ImageBuffer> WebScalerContext::generateImage(GlyphID glyphID, bool) const {

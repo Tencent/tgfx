@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathEffect.h"
+#include "CGMask.h"
 
 namespace tgfx {
 static constexpr float StdFakeBoldInterpKeys[] = {
@@ -72,12 +73,6 @@ static CGAffineTransform GetTransform(bool fauxItalic) {
       CGAffineTransformMake(1, 0, -static_cast<CGFloat>(ITALIC_SKEW), 1, 0, 0);
   static auto identityTransform = CGAffineTransformMake(1, 0, 0, 1, 0, 0);
   return fauxItalic ? italicTransform : identityTransform;
-}
-
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  return std::make_shared<CGScalerContext>(std::move(typeface), size);
 }
 
 CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
@@ -268,7 +263,7 @@ Size CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   }
   // Convert cgBounds to Glyph units (pixels, y down).
   if (matrix) {
-    matrix->setTranslate(static_cast<float>(cgBounds.origin.x), static_cast<float>(-cgBounds.origin.y - cgBounds.size.height);
+    matrix->setTranslate(static_cast<float>(cgBounds.origin.x), static_cast<float>(-cgBounds.origin.y - cgBounds.size.height));
   }
   return Size::Make(static_cast<float>(cgBounds.size.width),
                     static_cast<float>(cgBounds.size.height));
@@ -277,11 +272,12 @@ Size CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
 
 std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID,
                                                             bool tryHardware) const {
-  auto bounds = getImageTransform(glyphID, nullptr);
+  Matrix matrix = Matrix::I();
+  auto imageSize = getImageTransform(glyphID, &matrix);
   CTFontSymbolicTraits traits = CTFontGetSymbolicTraits(ctFont);
   auto hasColor = static_cast<bool>(traits & kCTFontTraitColorGlyphs);
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
+  auto width = static_cast<int>(imageSize.width);
+  auto height = static_cast<int>(imageSize.height);
   auto pixelBuffer = PixelBuffer::Make(width, height, !hasColor, tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;
@@ -292,12 +288,13 @@ std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID,
     pixelBuffer->unlockPixels();
     return nullptr;
   }
-  CGContextClearRect(cgContext, CGRectMake(0, 0, bounds.width(), bounds.height()));
+  CGContextClearRect(cgContext, CGRectMake(0, 0, imageSize.width, imageSize.height));
   CGContextSetBlendMode(cgContext, kCGBlendModeCopy);
   CGContextSetTextDrawingMode(cgContext, kCGTextFill);
   CGContextSetShouldAntialias(cgContext, true);
   CGContextSetShouldSmoothFonts(cgContext, true);
-  auto point = CGPointMake(-bounds.left, bounds.bottom);
+  CGContextSetTextMatrix(cgContext, CGMask::MatrixToCGAffineTransform(matrix));
+  auto point = CGPointMake(0.0f, 0.0f);
   CTFontDrawGlyphs(ctFont, &glyphID, &point, 1, cgContext);
   CGContextRelease(cgContext);
   pixelBuffer->unlockPixels();

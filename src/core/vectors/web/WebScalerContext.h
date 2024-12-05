@@ -35,7 +35,7 @@ class WebScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
+  Size getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
 
   std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const override;
 

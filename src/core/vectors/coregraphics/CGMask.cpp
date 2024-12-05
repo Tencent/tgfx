@@ -174,7 +174,7 @@ void CGMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
   CGImageRelease(image);
 }
 
-static CGAffineTransform MatrixToCGAffineTransform(const Matrix& matrix) {
+CGAffineTransform CGMask::MatrixToCGAffineTransform(const Matrix& matrix) {
   return CGAffineTransformMake(
       static_cast<CGFloat>(matrix.getScaleX()), -static_cast<CGFloat>(matrix.getSkewY()),
       -static_cast<CGFloat>(matrix.getSkewX()), static_cast<CGFloat>(matrix.getScaleY()),

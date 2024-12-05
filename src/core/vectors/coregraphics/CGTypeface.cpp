@@ -223,6 +223,6 @@ std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {
 }
 
 std::shared_ptr<ScalerContext> CGTypeface::createScalerContext(float size) const {
-  return ScalerContext::Make(std::static_pointer_cast<Typeface>(weakThis.lock()), size);
+  return std::make_shared<CGScalerContext>(weakThis.lock(), size);
 }
 }  // namespace tgfx

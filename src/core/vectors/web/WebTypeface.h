@@ -67,6 +67,8 @@ class WebTypeface : public Typeface {
     return nullptr;
   }
 
+  std::shared_ptr<ScalerContext> createScalerContext(float size) const override;
+
  private:
   explicit WebTypeface(std::string name, std::string style);
 

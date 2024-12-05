@@ -21,6 +21,8 @@
 #include "core/utils/UniqueID.h"
 #include "platform/web/WebImageBuffer.h"
 #include "tgfx/core/UTF.h"
+#include "core/utils/Log.h"
+#include "WebScalerContext.h"
 
 using namespace emscripten;
 
@@ -48,6 +50,7 @@ std::shared_ptr<WebTypeface> WebTypeface::Make(const std::string& name, const st
     return nullptr;
   }
   auto webTypeface = std::shared_ptr<WebTypeface>(new WebTypeface(name, style));
+  webTypeface->weakThis = webTypeface;
   webTypeface->scalerContextClass = scalerContextClass;
   return webTypeface;
 }
@@ -100,5 +103,19 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   }
   auto unichar = glyphs.at(glyphID - 1);
   return UTF::ToUTF8(unichar);
+}
+
+std::shared_ptr<ScalerContext> WebTypeface::createScalerContext(float size) const {
+  std::shared_ptr<Typeface> typeface = weakThis.lock();
+  DEBUG_ASSERT(typeface != nullptr);
+  auto scalerContextClass = val::module_property("ScalerContext");
+  if (!scalerContextClass.as<bool>()) {
+    return nullptr;
+  }
+  auto scalerContext = scalerContextClass.new_(typeface->fontFamily(), typeface->fontStyle(), size);
+  if (!scalerContext.as<bool>()) {
+    return nullptr;
+  }
+  return std::make_shared<WebScalerContext>(std::move(typeface), size, std::move(scalerContext));
 }
 }  // namespace tgfx
