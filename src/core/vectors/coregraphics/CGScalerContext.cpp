@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/vectors/coregraphics/CGScalerContext.h"
+#include "CGMask.h"
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathEffect.h"
-#include "CGMask.h"
 
 namespace tgfx {
 static constexpr float StdFakeBoldInterpKeys[] = {
@@ -263,7 +263,8 @@ Size CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   }
   // Convert cgBounds to Glyph units (pixels, y down).
   if (matrix) {
-    matrix->setTranslate(static_cast<float>(cgBounds.origin.x), static_cast<float>(-cgBounds.origin.y - cgBounds.size.height));
+    matrix->setTranslate(static_cast<float>(cgBounds.origin.x),
+                         static_cast<float>(-cgBounds.origin.y - cgBounds.size.height));
   }
   return Size::Make(static_cast<float>(cgBounds.size.width),
                     static_cast<float>(cgBounds.size.height));

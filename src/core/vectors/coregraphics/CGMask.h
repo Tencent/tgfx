@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/PixelRefMask.h"
 #include "CGTypeface.h"
+#include "core/PixelRefMask.h"
 
 namespace tgfx {
 class CGMask : public PixelRefMask {

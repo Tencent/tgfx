@@ -18,11 +18,11 @@
 
 #include "WebTypeface.h"
 #include <vector>
+#include "WebScalerContext.h"
+#include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 #include "platform/web/WebImageBuffer.h"
 #include "tgfx/core/UTF.h"
-#include "core/utils/Log.h"
-#include "WebScalerContext.h"
 
 using namespace emscripten;
 
