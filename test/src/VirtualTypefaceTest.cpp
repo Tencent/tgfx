@@ -87,7 +87,7 @@ class CustomTypefaceProvider : public TypefaceProvider {
   }
 };
 
-TGFX_TEST(VirtualTypefaceTest, DrawTextWihtVirtualTypeface) {
+TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -128,6 +128,6 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWihtVirtualTypeface) {
   paint.setColor(Color::Red());
   canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWihtVirtualTypeface"));
+  EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWithVirtualTypeface"));
 }
 }  // namespace tgfx
