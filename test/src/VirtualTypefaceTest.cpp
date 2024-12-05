@@ -86,51 +86,51 @@ class CustomTypefaceProvider : public TypefaceProvider {
 };
 
 TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface a\n");
-   ContextScope scope;
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface b\n");
-   auto context = scope.getContext();
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 0\n");
-   ASSERT_TRUE(context != nullptr);
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
-   auto surface = Surface::Make(context, 400, 200);
-   auto canvas = surface->getCanvas();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface a\n");
+  ContextScope scope;
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface b\n");
+  auto context = scope.getContext();
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 0\n");
+  ASSERT_TRUE(context != nullptr);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
 
-   const auto virtualTypeface1 = Typeface::MakeVirtual(false);
-   Font font1(virtualTypeface1, 20);
+  const auto virtualTypeface1 = Typeface::MakeVirtual(false);
+  Font font1(virtualTypeface1, 20);
 
-   const auto virtualTypeface2 = Typeface::MakeVirtual(true);
-   Font font2(virtualTypeface2, 20);
+  const auto virtualTypeface2 = Typeface::MakeVirtual(true);
+  Font font2(virtualTypeface2, 20);
 
-   const auto virtualTypefaceProvider = std::make_shared<CustomTypefaceProvider>();
-   TypefaceProviderManager::GetInstance()->registerProvider(virtualTypefaceProvider);
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 2\n");
-   std::vector<GlyphRun> glyphRunList;
-   GlyphRun glyphRun1(font1, {}, {});
-   glyphRun1.glyphs.push_back(1);
-   glyphRun1.glyphs.push_back(2);
-   glyphRun1.glyphs.push_back(3);
-   glyphRun1.positions.push_back(Point::Make(0.0f, 0.0f));
-   glyphRun1.positions.push_back(Point::Make(50.0f, 0.0f));
-   glyphRun1.positions.push_back(Point::Make(100.0f, 0.0f));
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 3\n");
-   GlyphRun glyphRun2(font2, {}, {});
-   glyphRun2.glyphs.push_back(4);
-   glyphRun2.glyphs.push_back(5);
-   glyphRun2.glyphs.push_back(6);
-   glyphRun2.positions.push_back(Point::Make(150.0f, 0.0f));
-   glyphRun2.positions.push_back(Point::Make(205.0f, 0.0f));
-   glyphRun2.positions.push_back(Point::Make(260.0f, 0.0f));
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 4\n");
-   glyphRunList.push_back(glyphRun1);
-   glyphRunList.push_back(glyphRun2);
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5\n");
-   auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
-   auto paint = Paint();
-   paint.setColor(Color::Red());
-   canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 6\n");
-   EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWithVirtualTypeface"));
-   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 7\n");
- }
+  const auto virtualTypefaceProvider = std::make_shared<CustomTypefaceProvider>();
+  TypefaceProviderManager::GetInstance()->registerProvider(virtualTypefaceProvider);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 2\n");
+  std::vector<GlyphRun> glyphRunList;
+  GlyphRun glyphRun1(font1, {}, {});
+  glyphRun1.glyphs.push_back(1);
+  glyphRun1.glyphs.push_back(2);
+  glyphRun1.glyphs.push_back(3);
+  glyphRun1.positions.push_back(Point::Make(0.0f, 0.0f));
+  glyphRun1.positions.push_back(Point::Make(50.0f, 0.0f));
+  glyphRun1.positions.push_back(Point::Make(100.0f, 0.0f));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 3\n");
+  GlyphRun glyphRun2(font2, {}, {});
+  glyphRun2.glyphs.push_back(4);
+  glyphRun2.glyphs.push_back(5);
+  glyphRun2.glyphs.push_back(6);
+  glyphRun2.positions.push_back(Point::Make(150.0f, 0.0f));
+  glyphRun2.positions.push_back(Point::Make(205.0f, 0.0f));
+  glyphRun2.positions.push_back(Point::Make(260.0f, 0.0f));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 4\n");
+  glyphRunList.push_back(glyphRun1);
+  glyphRunList.push_back(glyphRun2);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5\n");
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
+  auto paint = Paint();
+  paint.setColor(Color::Red());
+  canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 6\n");
+  EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWithVirtualTypeface"));
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 7\n");
+}
 }  // namespace tgfx
