@@ -95,7 +95,7 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1\n");
   auto surface = Surface::Make(context, 400, 200);
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.1\n");
-  auto canvas = surface->getCanvas();
+  //auto canvas = surface->getCanvas();
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 1.2\n");
 #if 0
   const auto virtualTypeface1 = Typeface::MakeVirtual(false);
