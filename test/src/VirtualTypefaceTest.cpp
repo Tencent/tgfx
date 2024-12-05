@@ -142,12 +142,18 @@ TGFX_TEST(VirtualTypefaceTest, DrawTextWithVirtualTypeface) {
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.4\n");
   if (surface == nullptr) {
     printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface surface is nullptr\n");
+  } else {
+    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface surface is not nullptr\n");
   }
   if (canvas == nullptr) {
     printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface canvas is nullptr\n");
+  } else {
+    printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface canvas is not nullptr\n");
   }
-#if 0
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface drawTextBlob before\n");
   canvas->drawTextBlob(textBlob, 0.0f, 0.0f, paint);
+  printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface drawTextBlob after\n");
+#if 0
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 5.5\n");
   printf("VirtualTypefaceTest::DrawTextWithVirtualTypeface 6\n");
   EXPECT_TRUE(Baseline::Compare(surface, "VirtualTypefaceTest/DrawTextWithVirtualTypeface"));
