@@ -45,18 +45,6 @@ DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrines
       shadowOnly(shadowOnly) {
 }
 
-Point DropShadowImageFilter::offset() const {
-  return Point::Make(dx, dy);
-}
-
-Size DropShadowImageFilter::blurSize() const {
-  if (!blurFilter || blurFilter->type() != Type::Blur) {
-    return Size::MakeEmpty();
-  }
-  auto blur = std::static_pointer_cast<BlurImageFilter>(blurFilter);
-  return blur->blurSize();
-}
-
 Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
   auto bounds = srcRect;
   bounds.offset(dx, dy);

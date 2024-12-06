@@ -34,13 +34,13 @@ class MatrixShader final : public Shader {
     return source->asColor(color);
   }
 
+  std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
+
+ protected:
   Type type() const override {
     return Type::Matrix;
   }
 
-  std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
-
- protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
 

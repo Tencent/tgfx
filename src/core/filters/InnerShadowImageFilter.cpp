@@ -43,18 +43,6 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
       shadowOnly(shadowOnly) {
 }
 
-Point InnerShadowImageFilter::offset() const {
-  return Point::Make(dx, dy);
-}
-
-Size InnerShadowImageFilter::blurSize() const {
-  if (!blurFilter || blurFilter->type() != Type::Blur) {
-    return Size::MakeEmpty();
-  }
-  auto blur = std::static_pointer_cast<BlurImageFilter>(blurFilter);
-  return blur->blurSize();
-}
-
 std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {

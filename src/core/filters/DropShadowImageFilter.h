@@ -26,23 +26,11 @@ class DropShadowImageFilter : public ImageFilter {
   DropShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                         const Color& color, bool shadowOnly);
 
+ protected:
   Type type() const override {
     return Type::DropShadow;
   };
 
-  bool isShadowOnly() const {
-    return shadowOnly;
-  }
-
-  Color shadowColor() const {
-    return color;
-  }
-
-  Point offset() const;
-
-  Size blurSize() const;
-
- protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
@@ -50,7 +38,7 @@ class DropShadowImageFilter : public ImageFilter {
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
- private:
+ public:
   float dx = 0;
   float dy = 0;
   std::shared_ptr<ImageFilter> blurFilter = nullptr;

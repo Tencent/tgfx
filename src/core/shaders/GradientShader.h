@@ -49,16 +49,16 @@ class GradientShader : public Shader {
     return colorsAreOpaque;
   }
 
-  Type type() const override {
-    return Type::Gradient;
-  }
-
   virtual GradientType asGradient(GradientInfo*) const = 0;
 
   std::vector<Color> originalColors = {};
   std::vector<float> originalPositions = {};
 
  protected:
+  Type type() const override {
+    return Type::Gradient;
+  }
+
   const Matrix pointsToUnit;
   bool colorsAreOpaque = false;
 };

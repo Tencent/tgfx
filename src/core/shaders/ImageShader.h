@@ -25,15 +25,15 @@
 namespace tgfx {
 class ImageShader : public Shader {
  public:
-  Type type() const override {
-    return Type::Image;
-  }
-
   std::tuple<std::shared_ptr<Image>, TileMode, TileMode> getImage() const {
     return {image, tileModeX, tileModeY};
   }
 
  protected:
+  Type type() const override {
+    return Type::Image;
+  }
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
 

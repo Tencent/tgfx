@@ -29,29 +29,17 @@ class InnerShadowImageFilter : public ImageFilter {
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                          const Color& color, bool shadowOnly);
 
+ protected:
   Type type() const override {
     return Type::InnerShadow;
   };
 
-  bool isShadowOnly() const {
-    return shadowOnly;
-  }
-
-  Color shadowColor() const {
-    return color;
-  }
-
-  Point offset() const;
-
-  Size blurSize() const;
-
- protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
- private:
+ public:
   float dx = 0.0f;
   float dy = 0.0f;
   std::shared_ptr<ImageFilter> blurFilter = nullptr;

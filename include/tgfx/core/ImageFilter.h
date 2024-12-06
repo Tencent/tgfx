@@ -125,6 +125,7 @@ class ImageFilter {
    */
   Rect filterBounds(const Rect& rect) const;
 
+ protected:
   enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
 
   /**
@@ -132,7 +133,6 @@ class ImageFilter {
    */
   virtual Type type() const = 0;
 
- protected:
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.

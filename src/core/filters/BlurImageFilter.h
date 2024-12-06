@@ -27,13 +27,13 @@ class BlurImageFilter : public ImageFilter {
  public:
   BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
 
+  Size blurSize() const;
+
+ protected:
   Type type() const override {
     return Type::Blur;
   };
 
-  Size blurSize() const;
-
- protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
@@ -49,7 +49,7 @@ class BlurImageFilter : public ImageFilter {
             std::unique_ptr<FragmentProcessor> imageProcessor, const Rect& imageBounds, bool isDown,
             uint32_t renderFlags) const;
 
- private:
+ public:
   Point blurOffset;
   float downScaling;
   int iteration;

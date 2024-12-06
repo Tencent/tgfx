@@ -25,11 +25,11 @@ class ComposeImageFilter : public ImageFilter {
  public:
   explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
 
+ protected:
   Type type() const override {
     return Type::Compose;
   }
 
- protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
@@ -37,7 +37,7 @@ class ComposeImageFilter : public ImageFilter {
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
- private:
+ public:
   std::vector<std::shared_ptr<ImageFilter>> filters = {};
 
   friend class ImageFilter;

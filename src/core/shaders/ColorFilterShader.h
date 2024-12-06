@@ -27,11 +27,11 @@ class ColorFilterShader : public Shader {
       : shader(std::move(shader)), colorFilter(std::move(colorFilter)) {
   }
 
+ protected:
   Type type() const override {
     return Type::ColorFilter;
   }
 
- protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
 

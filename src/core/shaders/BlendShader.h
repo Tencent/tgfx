@@ -27,11 +27,11 @@ class BlendShader : public Shader {
       : mode(mode), dst(std::move(dst)), src(std::move(src)) {
   }
 
+ protected:
   Type type() const override {
     return Type::Blend;
   }
 
- protected:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
 
