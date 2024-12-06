@@ -44,7 +44,7 @@ enum class PathEncoding {
   Relative,
 };
 
-std::string ToSVGString(const Path& path, PathEncoding = PathEncoding::Absolute);
+std::string ToSVGPath(const Path& path, PathEncoding = PathEncoding::Absolute);
 
 std::string ToSVGTransform(const Matrix& matrix);
 

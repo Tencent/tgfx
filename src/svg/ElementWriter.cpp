@@ -174,7 +174,7 @@ void ElementWriter::addEllipseAttributes(const Rect& bound) {
 }
 
 void ElementWriter::addPathAttributes(const Path& path, PathEncoding encoding) {
-  this->addAttribute("d", ToSVGString(path, encoding));
+  this->addAttribute("d", ToSVGPath(path, encoding));
 }
 
 Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
