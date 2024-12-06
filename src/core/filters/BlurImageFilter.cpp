@@ -23,8 +23,6 @@
 #include "gpu/processors/DualBlurFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/Point.h"
-#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 static const float BLUR_LEVEL_1_LIMIT = 10.0f;

@@ -143,6 +143,6 @@ enum class BlendMode {
    * A variation of PlusLighter. It adds the colors together but subtracts 1 from the final values,
    * making any values below 0 black.
    */
-  PlusDarker,
+  PlusDarker
 };
 }  // namespace tgfx
