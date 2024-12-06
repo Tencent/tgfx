@@ -19,8 +19,6 @@
 #include "ColorImageFilter.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
