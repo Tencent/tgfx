@@ -20,11 +20,11 @@
 
 #include <stack>
 #include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Picture.h"
-#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"

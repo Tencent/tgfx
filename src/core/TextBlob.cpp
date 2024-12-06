@@ -54,7 +54,8 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Poi
   if (glyphCount == 0) {
     return nullptr;
   }
-  GlyphRun glyphRun(std::make_shared<FontGlyphFace>(font), {glyphIDs, glyphIDs + glyphCount}, {positions, positions + glyphCount});
+  GlyphRun glyphRun(std::make_shared<FontGlyphFace>(font), {glyphIDs, glyphIDs + glyphCount},
+                    {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   return std::shared_ptr<TextBlob>(new TextBlob({glyphRunList}));
 }

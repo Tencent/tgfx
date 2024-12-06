@@ -1226,8 +1226,7 @@ class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<Custo
   float _scale = 1.0f;
 };
 
-class CustomImageGlyphFace : public GlyphFace,
-                              std::enable_shared_from_this<CustomImageGlyphFace> {
+class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<CustomImageGlyphFace> {
  public:
   bool hasColor() const override {
     return true;

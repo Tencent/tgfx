@@ -67,7 +67,8 @@ std::unique_ptr<tgfx::LayerContent> CustomLayer::onUpdateContent() {
       xOffset += emptyAdvance;
     }
   }
-  tgfx::GlyphRun glyphRun(std::make_shared<tgfx::FontGlyphFace>(_font), std::move(glyphs), std::move(positions));
+  tgfx::GlyphRun glyphRun(std::make_shared<tgfx::FontGlyphFace>(_font), std::move(glyphs),
+                          std::move(positions));
   auto textBlob = tgfx::TextBlob::MakeFrom(std::move(glyphRun));
   if (textBlob == nullptr) {
     return nullptr;

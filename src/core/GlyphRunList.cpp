@@ -39,13 +39,12 @@ GlyphRunList::GlyphRunList(GlyphRun glyphRun) {
 GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
   DEBUG_ASSERT(!_glyphRuns.empty());
   DEBUG_ASSERT(_glyphRuns[0].glyphFace != nullptr);
-  DEBUG_ASSERT(std::all_of(_glyphRuns.begin(), _glyphRuns.end(),
-                           [hasColor = _glyphRuns[0].glyphFace->hasColor()](const GlyphRun& glyphRun) {
-                             return !glyphRun.glyphs.empty() &&
-                                    glyphRun.glyphs.size() == glyphRun.positions.size() &&
-                                    glyphRun.glyphFace != nullptr &&
-                                    glyphRun.glyphFace->hasColor() == hasColor;
-                           }));
+  DEBUG_ASSERT(std::all_of(
+      _glyphRuns.begin(), _glyphRuns.end(),
+      [hasColor = _glyphRuns[0].glyphFace->hasColor()](const GlyphRun& glyphRun) {
+        return !glyphRun.glyphs.empty() && glyphRun.glyphs.size() == glyphRun.positions.size() &&
+               glyphRun.glyphFace != nullptr && glyphRun.glyphFace->hasColor() == hasColor;
+      }));
 }
 
 Rect GlyphRunList::getBounds(float resolutionScale) const {

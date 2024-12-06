@@ -39,6 +39,6 @@ class TextContent : public LayerContent {
   Color textColor = Color::White();
 
   static bool HitTestPointInternal(float localX, float localY,
-                            const std::shared_ptr<GlyphRunList>& glyphRunList);
+                                   const std::shared_ptr<GlyphRunList>& glyphRunList);
 };
 }  // namespace tgfx

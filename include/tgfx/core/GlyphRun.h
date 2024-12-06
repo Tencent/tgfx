@@ -34,7 +34,8 @@ struct GlyphRun {
   /**
    * Constructs a GlyphRun using a GlyphFace, a list of glyph IDs, and their positions.
    */
-  GlyphRun(std::shared_ptr<GlyphFace> glyphFace, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
+  GlyphRun(std::shared_ptr<GlyphFace> glyphFace, std::vector<GlyphID> glyphIDs,
+           std::vector<Point> positions)
       : glyphFace(glyphFace), glyphs(glyphIDs), positions(positions) {
   }
 
