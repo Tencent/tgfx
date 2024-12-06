@@ -37,9 +37,9 @@ class SkSVGMask final : public SVGHiddenContainer {
   SVG_OPTIONAL_ATTR(Height, SVGLength)
 
   SVG_ATTR(MaskUnits, SVGObjectBoundingBoxUnits,
-           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox))
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox))
   SVG_ATTR(MaskContentUnits, SVGObjectBoundingBoxUnits,
-           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse))
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse))
 
  private:
   friend class SVGRenderContext;

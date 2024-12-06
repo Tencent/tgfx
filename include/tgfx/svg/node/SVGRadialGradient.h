@@ -33,9 +33,9 @@ class SkSVGRadialGradient final : public SkSVGGradient {
     return std::shared_ptr<SkSVGRadialGradient>(new SkSVGRadialGradient());
   }
 
-  SVG_ATTR(Cx, SVGLength, SVGLength(50, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Cy, SVGLength, SVGLength(50, SVGLength::Unit::kPercentage))
-  SVG_ATTR(R, SVGLength, SVGLength(50, SVGLength::Unit::kPercentage))
+  SVG_ATTR(Cx, SVGLength, SVGLength(50, SVGLength::Unit::Percentage))
+  SVG_ATTR(Cy, SVGLength, SVGLength(50, SVGLength::Unit::Percentage))
+  SVG_ATTR(R, SVGLength, SVGLength(50, SVGLength::Unit::Percentage))
   SVG_OPTIONAL_ATTR(Fx, SVGLength)
   SVG_OPTIONAL_ATTR(Fy, SVGLength)
 

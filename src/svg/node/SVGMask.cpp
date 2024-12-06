@@ -47,8 +47,8 @@ Rect SkSVGMask::bounds(const SVGRenderContext& context) const {
   lengthContext.setPatternUnits(fMaskUnits);
   SVGRenderContext resolveContext(context, lengthContext);
   if (fWidth.has_value() && fHeight.has_value()) {
-    return resolveContext.resolveOBBRect(fX.value_or(SVGLength(0, SVGLength::Unit::kNumber)),
-                                         fY.value_or(SVGLength(0, SVGLength::Unit::kNumber)),
+    return resolveContext.resolveOBBRect(fX.value_or(SVGLength(0, SVGLength::Unit::Number)),
+                                         fY.value_or(SVGLength(0, SVGLength::Unit::Number)),
                                          fWidth.value(), fHeight.value(), fMaskUnits);
   }
   return Rect::MakeEmpty();

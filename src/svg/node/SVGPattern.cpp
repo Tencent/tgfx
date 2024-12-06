@@ -111,19 +111,19 @@ const SkSVGPattern* SkSVGPattern::resolveHref(const SVGRenderContext& ctx,
 
   // To unify with Chrome and macOS preview, the width and height attributes here need to be
   // converted to percentages, direct numbers are not supported.
-  if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse) {
-    if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::kPercentage) {
-      attrs->fWidth = SVGLength(attrs->fWidth->value() / 100.f, SVGLength::Unit::kNumber);
+  if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
+    if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::Percentage) {
+      attrs->fWidth = SVGLength(attrs->fWidth->value() / 100.f, SVGLength::Unit::Number);
     }
-    if (attrs->fHeight.has_value() && attrs->fHeight->unit() == SVGLength::Unit::kPercentage) {
-      attrs->fHeight = SVGLength(attrs->fHeight->value() / 100.f, SVGLength::Unit::kNumber);
+    if (attrs->fHeight.has_value() && attrs->fHeight->unit() == SVGLength::Unit::Percentage) {
+      attrs->fHeight = SVGLength(attrs->fHeight->value() / 100.f, SVGLength::Unit::Number);
     }
-  } else if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox) {
-    if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::kNumber) {
-      attrs->fWidth = SVGLength(attrs->fWidth->value() * 100.f, SVGLength::Unit::kPercentage);
+  } else if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+    if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::Number) {
+      attrs->fWidth = SVGLength(attrs->fWidth->value() * 100.f, SVGLength::Unit::Percentage);
     }
-    if (attrs->fHeight.has_value() && attrs->fHeight->unit() == SVGLength::Unit::kNumber) {
-      attrs->fHeight = SVGLength(attrs->fHeight->value() * 100.f, SVGLength::Unit::kPercentage);
+    if (attrs->fHeight.has_value() && attrs->fHeight->unit() == SVGLength::Unit::Number) {
+      attrs->fHeight = SVGLength(attrs->fHeight->value() * 100.f, SVGLength::Unit::Percentage);
     }
   }
 

@@ -35,10 +35,10 @@ std::shared_ptr<ImageFilter> SkSVGFe::makeImageFilter(
 
 Rect SkSVGFe::resolveBoundaries(const SVGRenderContext& ctx,
                                 const SkSVGFilterContext& filterContext) const {
-  const auto x = fX.has_value() ? *fX : SVGLength(0, SVGLength::Unit::kPercentage);
-  const auto y = fY.has_value() ? *fY : SVGLength(0, SVGLength::Unit::kPercentage);
-  const auto w = fWidth.has_value() ? *fWidth : SVGLength(100, SVGLength::Unit::kPercentage);
-  const auto h = fHeight.has_value() ? *fHeight : SVGLength(100, SVGLength::Unit::kPercentage);
+  const auto x = fX.has_value() ? *fX : SVGLength(0, SVGLength::Unit::Percentage);
+  const auto y = fY.has_value() ? *fY : SVGLength(0, SVGLength::Unit::Percentage);
+  const auto w = fWidth.has_value() ? *fWidth : SVGLength(100, SVGLength::Unit::Percentage);
+  const auto h = fHeight.has_value() ? *fHeight : SVGLength(100, SVGLength::Unit::Percentage);
 
   return ctx.resolveOBBRect(x, y, w, h, filterContext.primitiveUnits());
 }

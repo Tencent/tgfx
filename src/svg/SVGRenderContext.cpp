@@ -76,9 +76,9 @@ constexpr float kCMMultiplier = kMMMultiplier * 10;
 
 float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
   switch (l.unit()) {
-    case SVGLength::Unit::kNumber: {
+    case SVGLength::Unit::Number: {
       if (_patternUnit.has_value()) {
-        if (_patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox) {
+        if (_patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
           return l.value() * length_size_for_type(_viewport, t);
         } else {
           return l.value();
@@ -87,19 +87,19 @@ float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
         return l.value();
       }
     }
-    case SVGLength::Unit::kPX:
+    case SVGLength::Unit::PX:
       return l.value();
-    case SVGLength::Unit::kPercentage:
+    case SVGLength::Unit::Percentage:
       return l.value() * length_size_for_type(_viewport, t) / 100;
-    case SVGLength::Unit::kCM:
+    case SVGLength::Unit::CM:
       return l.value() * _dpi * kCMMultiplier;
-    case SVGLength::Unit::kMM:
+    case SVGLength::Unit::MM:
       return l.value() * _dpi * kMMMultiplier;
-    case SVGLength::Unit::kIN:
+    case SVGLength::Unit::IN:
       return l.value() * _dpi * kINMultiplier;
-    case SVGLength::Unit::kPT:
+    case SVGLength::Unit::PT:
       return l.value() * _dpi * kPTMultiplier;
-    case SVGLength::Unit::kPC:
+    case SVGLength::Unit::PC:
       return l.value() * _dpi * kPCMultiplier;
     default:
       //unsupported unit type
@@ -120,22 +120,22 @@ namespace {
 
 LineCap toSkCap(const SVGLineCap& cap) {
   switch (cap) {
-    case SVGLineCap::kButt:
+    case SVGLineCap::Butt:
       return LineCap::Butt;
-    case SVGLineCap::kRound:
+    case SVGLineCap::Round:
       return LineCap::Round;
-    case SVGLineCap::kSquare:
+    case SVGLineCap::Square:
       return LineCap::Square;
   }
 }
 
 LineJoin toSkJoin(const SVGLineJoin& join) {
   switch (join.type()) {
-    case SVGLineJoin::Type::kMiter:
+    case SVGLineJoin::Type::Miter:
       return LineJoin::Miter;
-    case SVGLineJoin::Type::kRound:
+    case SVGLineJoin::Type::Round:
       return LineJoin::Round;
-    case SVGLineJoin::Type::kBevel:
+    case SVGLineJoin::Type::Bevel:
       return LineJoin::Bevel;
     default:
       ASSERT(false);
@@ -145,7 +145,7 @@ LineJoin toSkJoin(const SVGLineJoin& join) {
 
 std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
                                         const SVGLengthContext& lctx) {
-  if (props.fStrokeDashArray->type() != SVGDashArray::Type::kDashArray) {
+  if (props.fStrokeDashArray->type() != SVGDashArray::Type::DashArray) {
     return nullptr;
   }
 
@@ -240,7 +240,7 @@ SVGRenderContext SVGRenderContext::CopyForPaint(const SVGRenderContext& context,
 }
 
 std::shared_ptr<SVGNode> SVGRenderContext::findNodeById(const SVGIRI& iri) const {
-  if (iri.type() != SVGIRI::Type::kLocal) {
+  if (iri.type() != SVGIRI::Type::Local) {
     return nullptr;
   }
   auto p = _nodeIDMapper.find(iri.iri())->second;
@@ -309,8 +309,8 @@ void SVGRenderContext::applyPresentationAttributes(const SVGPresentationAttribut
 float SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilter) {
   opacity = std::clamp(opacity, 0.0f, 1.0f);
   const auto& props = _presentationContext->_inherited;
-  const bool hasFill = props.fFill->type() != SVGPaint::Type::kNone;
-  const bool hasStroke = props.fStroke->type() != SVGPaint::Type::kNone;
+  const bool hasFill = props.fFill->type() != SVGPaint::Type::None;
+  const bool hasStroke = props.fStroke->type() != SVGPaint::Type::None;
 
   // We can apply the opacity as paint alpha if it only affects one atomic draw.
   // For now, this means all of the following must be true:
@@ -327,7 +327,7 @@ float SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilt
 }
 
 std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& filter) {
-  if (filter.type() != SVGFuncIRI::Type::kIRI) {
+  if (filter.type() != SVGFuncIRI::Type::IRI) {
     return nullptr;
   }
 
@@ -345,7 +345,7 @@ void SVGRenderContext::saveOnce() {
 }
 
 Path SVGRenderContext::applyClip(const SVGFuncIRI& clip) {
-  if (clip.type() != SVGFuncIRI::Type::kIRI) {
+  if (clip.type() != SVGFuncIRI::Type::IRI) {
     return Path();
   }
 
@@ -358,7 +358,7 @@ Path SVGRenderContext::applyClip(const SVGFuncIRI& clip) {
 }
 
 std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) {
-  if (mask.type() != SVGFuncIRI::Type::kIRI) {
+  if (mask.type() != SVGFuncIRI::Type::IRI) {
     return nullptr;
   }
 
@@ -444,16 +444,16 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
 
 std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selector,
                                                    float paint_opacity) const {
-  if (paint_selector.type() == SVGPaint::Type::kNone) {
+  if (paint_selector.type() == SVGPaint::Type::None) {
     return std::optional<Paint>();
   }
 
   std::optional<Paint> p = Paint();
   switch (paint_selector.type()) {
-    case SVGPaint::Type::kColor:
+    case SVGPaint::Type::Color:
       p->setColor(this->resolveSvgColor(paint_selector.color()));
       break;
-    case SVGPaint::Type::kIRI: {
+    case SVGPaint::Type::IRI: {
       // Our property inheritance is borked as it follows the render path and not the tree
       // hierarchy.  To avoid gross transgressions like leaf node presentation attributes
       // leaking into the paint server context, use a pristine presentation context when
@@ -529,18 +529,18 @@ SVGColorType SVGRenderContext::resolveSvgColor(const SVGColor& color) const {
     }
   }
   switch (color.type()) {
-    case SVGColor::Type::kColor:
+    case SVGColor::Type::Color:
       return color.color();
-    case SVGColor::Type::kCurrentColor:
+    case SVGColor::Type::CurrentColor:
       return *_presentationContext->_inherited.fColor;
-    case SVGColor::Type::kICCColor:
+    case SVGColor::Type::ICCColor:
       return Color::Black();
   }
 }
 
 SVGRenderContext::OBBTransform SVGRenderContext::transformForCurrentOBB(
     SVGObjectBoundingBoxUnits u) const {
-  if (!_scope.node || u.type() == SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse) {
+  if (!_scope.node || u.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
     return {{0, 0}, {1, 1}};
   }
   ASSERT(_scope.context);
@@ -553,7 +553,7 @@ Rect SVGRenderContext::resolveOBBRect(const SVGLength& x, const SVGLength& y, co
                                       const SVGLength& h, SVGObjectBoundingBoxUnits obbu) const {
   CopyOnWrite<SVGLengthContext> lctx(_lengthContext);
 
-  if (obbu.type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox) {
+  if (obbu.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
     *lctx.writable() = SVGLengthContext({1, 1});
   }
 

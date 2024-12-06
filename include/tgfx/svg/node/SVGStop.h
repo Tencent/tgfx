@@ -33,7 +33,7 @@ class SkSVGStop : public SVGHiddenContainer {
     return std::shared_ptr<SkSVGStop>(new SkSVGStop());
   }
 
-  SVG_ATTR(Offset, SVGLength, SVGLength(0, SVGLength::Unit::kPercentage))
+  SVG_ATTR(Offset, SVGLength, SVGLength(0, SVGLength::Unit::Percentage))
 
  protected:
   bool parseAndSetAttribute(const char*, const char*) override;

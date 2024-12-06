@@ -35,7 +35,7 @@ class SVGClipPath final : public SVGHiddenContainer {
   }
 
   SVG_ATTR(ClipPathUnits, SVGObjectBoundingBoxUnits,
-           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse))
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse))
 
  private:
   friend class SVGRenderContext;

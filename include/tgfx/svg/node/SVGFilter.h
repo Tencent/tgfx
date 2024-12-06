@@ -37,14 +37,14 @@ class SkSVGFilter final : public SVGHiddenContainer {
 
   std::shared_ptr<ImageFilter> buildFilterDAG(const SVGRenderContext&) const;
 
-  SVG_ATTR(X, SVGLength, SVGLength(-10, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Y, SVGLength, SVGLength(-10, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Width, SVGLength, SVGLength(120, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Height, SVGLength, SVGLength(120, SVGLength::Unit::kPercentage))
+  SVG_ATTR(X, SVGLength, SVGLength(-10, SVGLength::Unit::Percentage))
+  SVG_ATTR(Y, SVGLength, SVGLength(-10, SVGLength::Unit::Percentage))
+  SVG_ATTR(Width, SVGLength, SVGLength(120, SVGLength::Unit::Percentage))
+  SVG_ATTR(Height, SVGLength, SVGLength(120, SVGLength::Unit::Percentage))
   SVG_ATTR(FilterUnits, SVGObjectBoundingBoxUnits,
-           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox))
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox))
   SVG_ATTR(PrimitiveUnits, SVGObjectBoundingBoxUnits,
-           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse))
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse))
 
  private:
   SkSVGFilter() : INHERITED(SVGTag::Filter) {

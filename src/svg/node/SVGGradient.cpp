@@ -86,11 +86,11 @@ bool SkSVGGradient::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   //       * href attribute inheritance (not just color stops)
   //       * objectBoundingBox units support
 
-  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::kPad) == TileMode::Clamp,
+  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::Pad) == TileMode::Clamp,
                 "SkSVGSpreadMethod::Type is out of sync");
-  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::kRepeat) == TileMode::Repeat,
+  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::Repeat) == TileMode::Repeat,
                 "SkSVGSpreadMethod::Type is out of sync");
-  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::kReflect) == TileMode::Mirror,
+  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::Reflect) == TileMode::Mirror,
                 "SkSVGSpreadMethod::Type is out of sync");
   const auto tileMode = static_cast<TileMode>(fSpreadMethod.type());
 
@@ -111,9 +111,9 @@ bool SVGAttributeParser::parse(SVGSpreadMethod* spread) {
     const char* fName;
   };
   static const TileInfo spreadInfoSet[] = {
-      {SVGSpreadMethod::Type::kPad, "pad"},
-      {SVGSpreadMethod::Type::kReflect, "reflect"},
-      {SVGSpreadMethod::Type::kRepeat, "repeat"},
+      {SVGSpreadMethod::Type::Pad, "pad"},
+      {SVGSpreadMethod::Type::Reflect, "reflect"},
+      {SVGSpreadMethod::Type::Repeat, "repeat"},
   };
 
   bool parsedValue = false;

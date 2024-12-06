@@ -88,7 +88,7 @@ bool SVGNode::onPrepareToRender(SVGRenderContext* ctx) const {
   //   ignore it. Eventually we should be able to add SkASSERT(display.isValue()).
   const auto visibility = ctx->presentationContext()._inherited.fVisibility->type();
   const auto display = _presentationAttributes.fDisplay;  // display is uninherited
-  return visibility != SVGVisibility::Type::kHidden &&
+  return visibility != SVGVisibility::Type::Hidden &&
          (!display.isValue() || *display != SVGDisplay::kNone);
 }
 #endif
@@ -150,14 +150,13 @@ Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
     const auto sx = viewPort.width() / viewBox.width();
     const auto sy = viewPort.height() / viewBox.height();
 
-    if (par.fAlign == SVGPreserveAspectRatio::kNone) {
+    if (par.align == SVGPreserveAspectRatio::None) {
       // none -> anisotropic scaling, regardless of fScale
       return {sx, sy};
     }
 
     // isotropic scaling
-    const auto s =
-        par.fScale == SVGPreserveAspectRatio::kMeet ? std::min(sx, sy) : std::max(sx, sy);
+    const auto s = par.fScale == SVGPreserveAspectRatio::Meet ? std::min(sx, sy) : std::max(sx, sy);
     return {s, s};
   };
 
@@ -168,8 +167,8 @@ Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
         1.0f   // Max
     };
 
-    const size_t x_coeff = par.fAlign >> 0 & 0x03;
-    const size_t y_coeff = par.fAlign >> 2 & 0x03;
+    const size_t x_coeff = par.align >> 0 & 0x03;
+    const size_t y_coeff = par.align >> 2 & 0x03;
 
     const auto tx = -viewBox.x() * scale.x;
     const auto ty = -viewBox.y() * scale.y;

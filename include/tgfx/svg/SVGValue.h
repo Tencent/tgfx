@@ -73,11 +73,11 @@ class SVGWrapperValue final : public SVGValue {
     return &_wrappedValue;
   }
 
- private:
   // Stack-only
   void* operator new(size_t) = delete;
   void* operator new(size_t, void*) = delete;
 
+ private:
   const T& _wrappedValue;
 
   using INHERITED = SVGValue;

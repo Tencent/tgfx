@@ -32,10 +32,10 @@ class SkSVGLinearGradient final : public SkSVGGradient {
     return std::shared_ptr<SkSVGLinearGradient>(new SkSVGLinearGradient());
   }
 
-  SVG_ATTR(X1, SVGLength, SVGLength(0, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Y1, SVGLength, SVGLength(0, SVGLength::Unit::kPercentage))
-  SVG_ATTR(X2, SVGLength, SVGLength(100, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Y2, SVGLength, SVGLength(0, SVGLength::Unit::kPercentage))
+  SVG_ATTR(X1, SVGLength, SVGLength(0, SVGLength::Unit::Percentage))
+  SVG_ATTR(Y1, SVGLength, SVGLength(0, SVGLength::Unit::Percentage))
+  SVG_ATTR(X2, SVGLength, SVGLength(100, SVGLength::Unit::Percentage))
+  SVG_ATTR(Y2, SVGLength, SVGLength(0, SVGLength::Unit::Percentage))
 
  protected:
   bool parseAndSetAttribute(const char*, const char*) override;

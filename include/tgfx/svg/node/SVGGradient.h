@@ -34,9 +34,9 @@ class SkSVGGradient : public SVGHiddenContainer {
  public:
   SVG_ATTR(Href, SVGIRI, SVGIRI())
   SVG_ATTR(GradientTransform, SVGTransformType, SVGTransformType(Matrix::I()))
-  SVG_ATTR(SpreadMethod, SVGSpreadMethod, SVGSpreadMethod(SVGSpreadMethod::Type::kPad))
+  SVG_ATTR(SpreadMethod, SVGSpreadMethod, SVGSpreadMethod(SVGSpreadMethod::Type::Pad))
   SVG_ATTR(GradientUnits, SVGObjectBoundingBoxUnits,
-           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox))
+           SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox))
 
  protected:
   explicit SkSVGGradient(SVGTag t) : INHERITED(t) {

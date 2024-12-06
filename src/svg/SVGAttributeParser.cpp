@@ -241,11 +241,11 @@ bool SVGAttributeParser::parseLengthUnitToken(SVGLength::Unit& unit) {
   };
 
   static const std::array<Unit, 9> unitInfo = {
-      Unit("%", SVGLength::Unit::kPercentage), Unit("em", SVGLength::Unit::kEMS),
-      Unit("ex", SVGLength::Unit::kEXS),       Unit("px", SVGLength::Unit::kPX),
-      Unit("cm", SVGLength::Unit::kCM),        Unit("mm", SVGLength::Unit::kMM),
-      Unit("in", SVGLength::Unit::kIN),        Unit("pt", SVGLength::Unit::kPT),
-      Unit("pc", SVGLength::Unit::kPC),
+      Unit("%", SVGLength::Unit::Percentage), Unit("em", SVGLength::Unit::EMS),
+      Unit("ex", SVGLength::Unit::EXS),       Unit("px", SVGLength::Unit::PX),
+      Unit("cm", SVGLength::Unit::CM),        Unit("mm", SVGLength::Unit::MM),
+      Unit("in", SVGLength::Unit::IN),        Unit("pt", SVGLength::Unit::PT),
+      Unit("pc", SVGLength::Unit::PC),
   };
 
   return std::any_of(unitInfo.begin(), unitInfo.end(), [&](const Unit& item) {
@@ -424,7 +424,7 @@ bool SVGAttributeParser::parseSVGColor(SVGColor* color, SVGColor::Vars&& vars) {
     return true;
   }
   if (this->parseExpectedStringToken("currentColor")) {
-    *color = SVGColor(SVGColor::Type::kCurrentColor, std::move(vars));
+    *color = SVGColor(SVGColor::Type::CurrentColor, std::move(vars));
     return true;
   }
   // https://drafts.csswg.org/css-variables/#using-variables
@@ -475,11 +475,11 @@ bool SVGAttributeParser::parse(SVGIRI* iri) {
 
   SVGIRI::Type iriType;
   if (this->parseExpectedStringToken("#")) {
-    iriType = SVGIRI::Type::kLocal;
+    iriType = SVGIRI::Type::Local;
   } else if (this->matchStringToken("data:")) {
-    iriType = SVGIRI::Type::kDataURI;
+    iriType = SVGIRI::Type::DataURI;
   } else {
-    iriType = SVGIRI::Type::kNonlocal;
+    iriType = SVGIRI::Type::Nonlocal;
   }
 
   const auto* start = fCurPos;
@@ -555,7 +555,7 @@ bool SVGAttributeParser::parseInteger(SVGIntegerType* number) {
 template <>
 bool SVGAttributeParser::parse(SVGLength* length) {
   float s;
-  SVGLength::Unit u = SVGLength::Unit::kNumber;
+  SVGLength::Unit u = SVGLength::Unit::Number;
 
   if (this->parseScalarToken(&s) &&
       (this->parseLengthUnitToken(u) || this->parseSepToken() || this->parseEOSToken())) {
@@ -763,7 +763,7 @@ bool SVGAttributeParser::parse(SVGPaint* paint) {
     *paint = SVGPaint(std::move(c));
     parsedValue = true;
   } else if (this->parseExpectedStringToken("none")) {
-    *paint = SVGPaint(SVGPaint::Type::kNone);
+    *paint = SVGPaint(SVGPaint::Type::None);
     parsedValue = true;
   } else if (this->parseFuncIRI(&iri)) {
     // optional fallback color
@@ -801,9 +801,9 @@ bool SVGAttributeParser::parse(SVGLineCap* cap) {
     SVGLineCap fType;
     const char* fName;
   } gCapInfo[] = {
-      {SVGLineCap::kButt, "butt"},
-      {SVGLineCap::kRound, "round"},
-      {SVGLineCap::kSquare, "square"},
+      {SVGLineCap::Butt, "butt"},
+      {SVGLineCap::Round, "round"},
+      {SVGLineCap::Square, "square"},
   };
 
   bool parsedValue = false;
@@ -825,10 +825,10 @@ bool SVGAttributeParser::parse(SVGLineJoin* join) {
     SVGLineJoin::Type fType;
     const char* fName;
   } gJoinInfo[] = {
-      {SVGLineJoin::Type::kMiter, "miter"},
-      {SVGLineJoin::Type::kRound, "round"},
-      {SVGLineJoin::Type::kBevel, "bevel"},
-      {SVGLineJoin::Type::kInherit, "inherit"},
+      {SVGLineJoin::Type::Miter, "miter"},
+      {SVGLineJoin::Type::Round, "round"},
+      {SVGLineJoin::Type::Bevel, "bevel"},
+      {SVGLineJoin::Type::Inherit, "inherit"},
   };
 
   bool parsedValue = false;
@@ -849,11 +849,11 @@ bool SVGAttributeParser::parse(SVGObjectBoundingBoxUnits* objectBoundingBoxUnits
   bool parsedValue = false;
   if (this->parseExpectedStringToken("userSpaceOnUse")) {
     *objectBoundingBoxUnits =
-        SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kUserSpaceOnUse);
+        SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse);
     parsedValue = true;
   } else if (this->parseExpectedStringToken("objectBoundingBox")) {
     *objectBoundingBoxUnits =
-        SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox);
+        SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox);
     parsedValue = true;
   }
   return parsedValue && this->parseEOSToken();
@@ -915,15 +915,15 @@ bool SVGAttributeParser::parse(SVGFillRule* fillRule) {
     SVGFillRule::Type fType;
     const char* fName;
   } gFillRuleInfo[] = {
-      {SVGFillRule::Type::kNonZero, "nonzero"},
-      {SVGFillRule::Type::kEvenOdd, "evenodd"},
-      {SVGFillRule::Type::kInherit, "inherit"},
+      {SVGFillRule::Type::NonZero, "nonzero"},
+      {SVGFillRule::Type::EvenOdd, "evenodd"},
+      {SVGFillRule::Type::Inherit, "inherit"},
   };
 
   bool parsedValue = false;
-  for (size_t i = 0; i < std::size(gFillRuleInfo); ++i) {
-    if (this->parseExpectedStringToken(gFillRuleInfo[i].fName)) {
-      *fillRule = SVGFillRule(gFillRuleInfo[i].fType);
+  for (auto i : gFillRuleInfo) {
+    if (this->parseExpectedStringToken(i.fName)) {
+      *fillRule = SVGFillRule(i.fType);
       parsedValue = true;
       break;
     }
@@ -939,10 +939,10 @@ bool SVGAttributeParser::parse(SVGVisibility* visibility) {
     SVGVisibility::Type fType;
     const char* fName;
   } gVisibilityInfo[] = {
-      {SVGVisibility::Type::kVisible, "visible"},
-      {SVGVisibility::Type::kHidden, "hidden"},
-      {SVGVisibility::Type::kCollapse, "collapse"},
-      {SVGVisibility::Type::kInherit, "inherit"},
+      {SVGVisibility::Type::Visible, "visible"},
+      {SVGVisibility::Type::Hidden, "hidden"},
+      {SVGVisibility::Type::Collapse, "collapse"},
+      {SVGVisibility::Type::Inherit, "inherit"},
   };
 
   bool parsedValue = false;
@@ -962,10 +962,10 @@ template <>
 bool SVGAttributeParser::parse(SVGDashArray* dashArray) {
   bool parsedValue = false;
   if (this->parseExpectedStringToken("none")) {
-    *dashArray = SVGDashArray(SVGDashArray::Type::kNone);
+    *dashArray = SVGDashArray(SVGDashArray::Type::None);
     parsedValue = true;
   } else if (this->parseExpectedStringToken("inherit")) {
-    *dashArray = SVGDashArray(SVGDashArray::Type::kInherit);
+    *dashArray = SVGDashArray(SVGDashArray::Type::Inherit);
     parsedValue = true;
   } else {
     std::vector<SVGLength> dashes;
@@ -1031,10 +1031,10 @@ bool SVGAttributeParser::parse(SVGFontSize* size) {
 template <>
 bool SVGAttributeParser::parse(SVGFontStyle* style) {
   static constexpr std::tuple<const char*, SVGFontStyle::Type> gStyleMap[] = {
-      {"normal", SVGFontStyle::Type::kNormal},
-      {"italic", SVGFontStyle::Type::kItalic},
-      {"oblique", SVGFontStyle::Type::kOblique},
-      {"inherit", SVGFontStyle::Type::kInherit},
+      {"normal", SVGFontStyle::Type::Normal},
+      {"italic", SVGFontStyle::Type::Italic},
+      {"oblique", SVGFontStyle::Type::Oblique},
+      {"inherit", SVGFontStyle::Type::Inherit},
   };
 
   bool parsedValue = false;
@@ -1052,13 +1052,13 @@ bool SVGAttributeParser::parse(SVGFontStyle* style) {
 template <>
 bool SVGAttributeParser::parse(SVGFontWeight* weight) {
   static constexpr std::tuple<const char*, SVGFontWeight::Type> gWeightMap[] = {
-      {"normal", SVGFontWeight::Type::kNormal}, {"bold", SVGFontWeight::Type::kBold},
-      {"bolder", SVGFontWeight::Type::kBolder}, {"lighter", SVGFontWeight::Type::kLighter},
-      {"100", SVGFontWeight::Type::k100},       {"200", SVGFontWeight::Type::k200},
-      {"300", SVGFontWeight::Type::k300},       {"400", SVGFontWeight::Type::k400},
-      {"500", SVGFontWeight::Type::k500},       {"600", SVGFontWeight::Type::k600},
-      {"700", SVGFontWeight::Type::k700},       {"800", SVGFontWeight::Type::k800},
-      {"900", SVGFontWeight::Type::k900},       {"inherit", SVGFontWeight::Type::kInherit},
+      {"normal", SVGFontWeight::Type::Normal}, {"bold", SVGFontWeight::Type::Bold},
+      {"bolder", SVGFontWeight::Type::Bolder}, {"lighter", SVGFontWeight::Type::Lighter},
+      {"100", SVGFontWeight::Type::W100},      {"200", SVGFontWeight::Type::W200},
+      {"300", SVGFontWeight::Type::W300},      {"400", SVGFontWeight::Type::W400},
+      {"500", SVGFontWeight::Type::W500},      {"600", SVGFontWeight::Type::W600},
+      {"700", SVGFontWeight::Type::W700},      {"800", SVGFontWeight::Type::W800},
+      {"900", SVGFontWeight::Type::W900},      {"inherit", SVGFontWeight::Type::Inherit},
   };
 
   bool parsedValue = false;
@@ -1096,21 +1096,21 @@ bool SVGAttributeParser::parse(SVGTextAnchor* anchor) {
 // https://www.w3.org/TR/SVG11/coords.html#PreserveAspectRatioAttribute
 bool SVGAttributeParser::parsePreserveAspectRatio(SVGPreserveAspectRatio* par) {
   static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Align> gAlignMap[] = {
-      {"none", SVGPreserveAspectRatio::kNone},
-      {"xMinYMin", SVGPreserveAspectRatio::kXMinYMin},
-      {"xMidYMin", SVGPreserveAspectRatio::kXMidYMin},
-      {"xMaxYMin", SVGPreserveAspectRatio::kXMaxYMin},
-      {"xMinYMid", SVGPreserveAspectRatio::kXMinYMid},
-      {"xMidYMid", SVGPreserveAspectRatio::kXMidYMid},
-      {"xMaxYMid", SVGPreserveAspectRatio::kXMaxYMid},
-      {"xMinYMax", SVGPreserveAspectRatio::kXMinYMax},
-      {"xMidYMax", SVGPreserveAspectRatio::kXMidYMax},
-      {"xMaxYMax", SVGPreserveAspectRatio::kXMaxYMax},
+      {"none", SVGPreserveAspectRatio::None},
+      {"xMinYMin", SVGPreserveAspectRatio::XMinYMin},
+      {"xMidYMin", SVGPreserveAspectRatio::XMidYMin},
+      {"xMaxYMin", SVGPreserveAspectRatio::XMaxYMin},
+      {"xMinYMid", SVGPreserveAspectRatio::XMinYMid},
+      {"xMidYMid", SVGPreserveAspectRatio::XMidYMid},
+      {"xMaxYMid", SVGPreserveAspectRatio::XMaxYMid},
+      {"xMinYMax", SVGPreserveAspectRatio::XMinYMax},
+      {"xMidYMax", SVGPreserveAspectRatio::XMidYMax},
+      {"xMaxYMax", SVGPreserveAspectRatio::XMaxYMax},
   };
 
   static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Scale> gScaleMap[] = {
-      {"meet", SVGPreserveAspectRatio::kMeet},
-      {"slice", SVGPreserveAspectRatio::kSlice},
+      {"meet", SVGPreserveAspectRatio::Meet},
+      {"slice", SVGPreserveAspectRatio::Slice},
   };
 
   bool parsedValue = false;
@@ -1119,12 +1119,12 @@ bool SVGAttributeParser::parsePreserveAspectRatio(SVGPreserveAspectRatio* par) {
   this->parseExpectedStringToken("defer");
   this->parseWSToken();
 
-  if (this->parseEnumMap(gAlignMap, &par->fAlign)) {
+  if (this->parseEnumMap(gAlignMap, &par->align)) {
     parsedValue = true;
 
     // optional scaling selector
     this->parseWSToken();
-    this->parseEnumMap(gScaleMap, &par->fScale);
+    this->parseEnumMap(gScaleMap, &par->scale);
   }
 
   return parsedValue && this->parseEOSToken();

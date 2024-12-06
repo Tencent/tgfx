@@ -39,8 +39,8 @@ class SVGSVG : public SkSVGContainer {
 
   SVG_ATTR(X, SVGLength, SVGLength(0))
   SVG_ATTR(Y, SVGLength, SVGLength(0))
-  SVG_ATTR(Width, SVGLength, SVGLength(100, SVGLength::Unit::kPercentage))
-  SVG_ATTR(Height, SVGLength, SVGLength(100, SVGLength::Unit::kPercentage))
+  SVG_ATTR(Width, SVGLength, SVGLength(100, SVGLength::Unit::Percentage))
+  SVG_ATTR(Height, SVGLength, SVGLength(100, SVGLength::Unit::Percentage))
   SVG_ATTR(PreserveAspectRatio, SVGPreserveAspectRatio, SVGPreserveAspectRatio())
 
   SVG_OPTIONAL_ATTR(ViewBox, SVGViewBoxType)

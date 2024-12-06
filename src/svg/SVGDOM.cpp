@@ -495,7 +495,7 @@ void SVGDOM::renderNode(Canvas* canvas, SkSVGPresentationContext& pctx, const ch
     SVGLengthContext lctx(_containerSize);
     SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, _fontMgr, _nodeIDMapper,
                                lctx, pctx, {nullptr, nullptr}, canvas->getMatrix());
-    _root->renderNode(renderCtx, SVGIRI(SVGIRI::Type::kLocal, SVGStringType(id)));
+    _root->renderNode(renderCtx, SVGIRI(SVGIRI::Type::Local, SVGStringType(id)));
   }
 }
 

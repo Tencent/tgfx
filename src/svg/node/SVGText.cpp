@@ -33,33 +33,33 @@ namespace {
 std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
   auto weight = [](const SVGFontWeight& w) {
     switch (w.type()) {
-      case SVGFontWeight::Type::k100:
+      case SVGFontWeight::Type::W100:
         return FontStyle::Weight::kThin_Weight;
-      case SVGFontWeight::Type::k200:
+      case SVGFontWeight::Type::W200:
         return FontStyle::Weight::kExtraLight_Weight;
-      case SVGFontWeight::Type::k300:
+      case SVGFontWeight::Type::W300:
         return FontStyle::Weight::kLight_Weight;
-      case SVGFontWeight::Type::k400:
+      case SVGFontWeight::Type::W400:
         return FontStyle::Weight::kNormal_Weight;
-      case SVGFontWeight::Type::k500:
+      case SVGFontWeight::Type::W500:
         return FontStyle::Weight::kMedium_Weight;
-      case SVGFontWeight::Type::k600:
+      case SVGFontWeight::Type::W600:
         return FontStyle::Weight::kSemiBold_Weight;
-      case SVGFontWeight::Type::k700:
+      case SVGFontWeight::Type::W700:
         return FontStyle::Weight::kBold_Weight;
-      case SVGFontWeight::Type::k800:
+      case SVGFontWeight::Type::W800:
         return FontStyle::Weight::kExtraBold_Weight;
-      case SVGFontWeight::Type::k900:
+      case SVGFontWeight::Type::W900:
         return FontStyle::Weight::kBlack_Weight;
-      case SVGFontWeight::Type::kNormal:
+      case SVGFontWeight::Type::Normal:
         return FontStyle::Weight::kNormal_Weight;
-      case SVGFontWeight::Type::kBold:
+      case SVGFontWeight::Type::Bold:
         return FontStyle::Weight::kBold_Weight;
-      case SVGFontWeight::Type::kBolder:
+      case SVGFontWeight::Type::Bolder:
         return FontStyle::Weight::kExtraBold_Weight;
-      case SVGFontWeight::Type::kLighter:
+      case SVGFontWeight::Type::Lighter:
         return FontStyle::Weight::kLight_Weight;
-      case SVGFontWeight::Type::kInherit: {
+      case SVGFontWeight::Type::Inherit: {
         ASSERT(false);
         return FontStyle::Weight::kNormal_Weight;
       }
@@ -68,13 +68,13 @@ std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
 
   auto slant = [](const SVGFontStyle& style) {
     switch (style.type()) {
-      case SVGFontStyle::Type::kNormal:
+      case SVGFontStyle::Type::Normal:
         return FontStyle::Slant::kUpright_Slant;
-      case SVGFontStyle::Type::kItalic:
+      case SVGFontStyle::Type::Italic:
         return FontStyle::Slant::kItalic_Slant;
-      case SVGFontStyle::Type::kOblique:
+      case SVGFontStyle::Type::Oblique:
         return FontStyle::Slant::kOblique_Slant;
-      case SVGFontStyle::Type::kInherit: {
+      case SVGFontStyle::Type::Inherit: {
         ASSERT(false);
         return FontStyle::Slant::kUpright_Slant;
       }

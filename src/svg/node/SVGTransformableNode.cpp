@@ -36,7 +36,7 @@ bool SkSVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
     auto transform = fTransform;
     if (auto unit = ctx->lengthContext().getPatternUnits();
         unit.has_value() &&
-        unit.value().type() == SVGObjectBoundingBoxUnits::Type::kObjectBoundingBox) {
+        unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
       transform.postScale(ctx->lengthContext().viewPort().width,
                           ctx->lengthContext().viewPort().height);
     }

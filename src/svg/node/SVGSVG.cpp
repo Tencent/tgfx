@@ -79,8 +79,8 @@ bool SVGSVG::onPrepareToRender(SVGRenderContext* ctx) const {
 // https://www.w3.org/TR/SVG11/coords.html#IntrinsicSizing
 Size SVGSVG::intrinsicSize(const SVGLengthContext& lctx) const {
   // Percentage values do not provide an intrinsic size.
-  if (fWidth.unit() == SVGLength::Unit::kPercentage ||
-      fHeight.unit() == SVGLength::Unit::kPercentage) {
+  if (fWidth.unit() == SVGLength::Unit::Percentage ||
+      fHeight.unit() == SVGLength::Unit::Percentage) {
     return Size::Make(0, 0);
   }
 
