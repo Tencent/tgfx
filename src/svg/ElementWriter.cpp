@@ -69,7 +69,6 @@ ElementWriter::ElementWriter(const std::string& name, Context* GPUContext, SVGCo
 
 ElementWriter::~ElementWriter() {
   _writer->endElement();
-  /////////////////////////////////////////////////
   _resourceStore = nullptr;
 }
 
@@ -181,7 +180,6 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
                                                 const Rect& bound) {
   std::string filterID = _resourceStore->addFilter();
   {
-
     ImageFilterInfo filterInfo;
     auto filterType = asImageFilterBase(imageFilter)->asImageFilterInfo(&filterInfo);
 
@@ -320,7 +318,9 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader,
                                        Resources* resources) {
 
   auto shaderType = asShaderBase(shader)->type();
-  if (shaderType == ShaderType::Color || shaderType == ShaderType::Gradient) {
+  if (shaderType == ShaderType::Color) {
+    this->addColorShaderResources(shader, resources);
+  } else if (shaderType == ShaderType::Gradient) {
     this->addGradientShaderResources(shader, resources);
   } else if (shaderType == ShaderType::Image) {
     this->addImageShaderResources(shader, resources);
@@ -328,16 +328,17 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader,
   // TODO(YGAurora): other shader types
 }
 
+void ElementWriter::addColorShaderResources(const std::shared_ptr<Shader>& shader,
+                                            Resources* resources) {
+  Color color;
+  if (shader->asColor(&color)) {
+    resources->_paintColor = ToSVGColor(color);
+    return;
+  }
+}
+
 void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& shader,
                                                Resources* resources) {
-  if (asShaderBase(shader)->type() == ShaderType::Color) {
-    Color color;
-    if (shader->asColor(&color)) {
-      resources->_paintColor = ToSVGColor(color);
-      return;
-    }
-  }
-
   GradientInfo info;
   auto type = asShaderBase(shader)->asGradient(&info);
 

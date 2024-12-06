@@ -39,6 +39,7 @@ struct Resources {
   std::string _filter;
 };
 
+// TODO(YGAurora)  The resource store implements the feature to reuse resources
 class ResourceStore {
  public:
   ResourceStore() = default;
@@ -105,9 +106,10 @@ class ElementWriter {
  private:
   Resources addResources(const FillStyle& fill);
   void addShaderResources(const std::shared_ptr<Shader>& shader, Resources* resources);
+  void addColorShaderResources(const std::shared_ptr<Shader>& shader, Resources* resources);
   void addGradientShaderResources(const std::shared_ptr<Shader>& shader, Resources* resources);
-  void addColorFilterResources(const ColorFilter& colorFilter, Resources* resources);
   void addImageShaderResources(const std::shared_ptr<Shader>&, Resources* resources);
+  void addColorFilterResources(const ColorFilter& colorFilter, Resources* resources);
 
   void addFillAndStroke(const FillStyle& fill, const Stroke* stroke, const Resources& resources);
 

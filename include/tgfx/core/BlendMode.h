@@ -144,7 +144,5 @@ enum class BlendMode {
    * making any values below 0 black.
    */
   PlusDarker,
-
-  Last = PlusDarker
 };
 }  // namespace tgfx

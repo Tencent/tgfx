@@ -80,21 +80,21 @@ std::string ToSVGCap(LineCap cap) {
 }
 
 std::string ToSVGJoin(LineJoin join) {
-  static const std::array<std::string, 3> join_map = {
+  static const std::array<std::string, 3> joinMap = {
       "",       // Miter_Join (default)
       "round",  // Round_Join
       "bevel"   // Bevel_Join
   };
 
   auto index = static_cast<size_t>(join);
-  ASSERT(index < join_map.size());
-  return join_map[index];
+  ASSERT(index < joinMap.size());
+  return joinMap[index];
 }
 
 std::string ToSVGBlendMode(BlendMode mode) {
   // Not all blend modes have corresponding SVG properties. Use an empty string for those,
   // which will later be converted to "normal".
-  constexpr size_t blendModeCount = static_cast<size_t>(BlendMode::Last) + 1;
+  constexpr size_t blendModeCount = static_cast<size_t>(BlendMode::PlusDarker) + 1;
   static const std::array<std::string, blendModeCount> blendModeMap = {
       "",              // Clear
       "",              // Src
@@ -255,8 +255,8 @@ std::shared_ptr<Data> AsDataUri(Context* GPUContext, const std::shared_ptr<Image
   auto surface = Surface::Make(GPUContext, image->width(), image->height());
   auto* canvas = surface->getCanvas();
   canvas->clear();
-  image->makeTextureImage(GPUContext);
-  canvas->drawImage(image, 0, 0);
+  auto textureImage = image->makeTextureImage(GPUContext);
+  canvas->drawImage(textureImage);
 
   Bitmap bitmap(surface->width(), surface->height(), false, false);
   Pixmap pixmap(bitmap);
