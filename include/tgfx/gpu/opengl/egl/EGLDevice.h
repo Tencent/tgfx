@@ -20,6 +20,7 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#include <atomic>
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 #ifdef None
