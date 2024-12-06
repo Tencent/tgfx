@@ -25,12 +25,12 @@
 
 namespace tgfx {
 /**
-* RenderFont is a content provider for glyphs. It provides the glyph path, image, and bounds, etc.
+* GlyphFace is a provider for glyphs. It provides the glyph path, image, and bounds, etc.
 */
-class RenderFont {
+class GlyphFace {
  public:
-  RenderFont() = default;
-  virtual ~RenderFont() = default;
+  GlyphFace() = default;
+  virtual ~GlyphFace() = default;
 
   /**
    * Returns true if the font has color glyphs, for example, color emojis.
@@ -43,9 +43,9 @@ class RenderFont {
   virtual bool hasOutlines() const = 0;
 
   /**
-   * Returns a new RenderFont with the same attributes of this font, but with the specified scale.
+   * Returns a new GlyphFace with the same attributes of this font, but with the specified scale.
    */
-  virtual std::shared_ptr<RenderFont> makeScaled(float scale) = 0;
+  virtual std::shared_ptr<GlyphFace> makeScaled(float scale) = 0;
 
   /**
    * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path

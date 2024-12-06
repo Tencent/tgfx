@@ -38,13 +38,13 @@ GlyphRunList::GlyphRunList(GlyphRun glyphRun) {
 
 GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
   DEBUG_ASSERT(!_glyphRuns.empty());
-  DEBUG_ASSERT(_glyphRuns[0].renderFont != nullptr);
+  DEBUG_ASSERT(_glyphRuns[0].glyphFace != nullptr);
   DEBUG_ASSERT(std::all_of(_glyphRuns.begin(), _glyphRuns.end(),
-                           [hasColor = _glyphRuns[0].renderFont->hasColor()](const GlyphRun& glyphRun) {
+                           [hasColor = _glyphRuns[0].glyphFace->hasColor()](const GlyphRun& glyphRun) {
                              return !glyphRun.glyphs.empty() &&
                                     glyphRun.glyphs.size() == glyphRun.positions.size() &&
-                                    glyphRun.renderFont != nullptr &&
-                                    glyphRun.renderFont->hasColor() == hasColor;
+                                    glyphRun.glyphFace != nullptr &&
+                                    glyphRun.glyphFace->hasColor() == hasColor;
                            }));
 }
 
@@ -55,18 +55,18 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto totalBounds = Rect::MakeEmpty();
   for (auto& run : _glyphRuns) {
-    auto renderFont = run.renderFont;
-    if (renderFont == nullptr) {
+    auto glyphFace = run.glyphFace;
+    if (glyphFace == nullptr) {
       continue;
     }
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-      renderFont = renderFont->makeScaled(resolutionScale);
+      glyphFace = glyphFace->makeScaled(resolutionScale);
     }
     size_t index = 0;
     auto& positions = run.positions;
     for (auto& glyphID : run.glyphs) {
-      auto bounds = renderFont->getBounds(glyphID);
+      auto bounds = glyphFace->getBounds(glyphID);
       auto& position = positions[index];
       bounds.offset(position.x * resolutionScale, position.y * resolutionScale);
       totalBounds.join(bounds);
@@ -86,19 +86,19 @@ bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   Path totalPath = {};
   for (auto& run : _glyphRuns) {
-    auto renderFont = run.renderFont;
-    if (renderFont == nullptr) {
+    auto glyphFace = run.glyphFace;
+    if (glyphFace == nullptr) {
       continue;
     }
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-      renderFont = renderFont->makeScaled(resolutionScale);
+      glyphFace = glyphFace->makeScaled(resolutionScale);
     }
     size_t index = 0;
     auto& positions = run.positions;
     for (auto& glyphID : run.glyphs) {
       Path glyphPath = {};
-      if (renderFont->getPath(glyphID, &glyphPath)) {
+      if (glyphFace->getPath(glyphID, &glyphPath)) {
         auto& position = positions[index];
         auto glyphMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
         glyphMatrix.postTranslate(position.x, position.y);

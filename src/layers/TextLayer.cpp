@@ -20,7 +20,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
 #include "layers/contents/TextContent.h"
-#include "tgfx/core/FontWrapper.h"
+#include "tgfx/core/FontGlyphFace.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -423,7 +423,7 @@ void TextLayer::buildGlyphRunList(const std::vector<std::shared_ptr<GlyphInfo>>&
     if (glyphRunMap.find(typefaceID) == glyphRunMap.end()) {
       auto font = _font;
       font.setTypeface(typeface);
-      glyphRunMap[typefaceID] = GlyphRun(std::make_shared<FontWrapper>(font), {}, {});
+      glyphRunMap[typefaceID] = GlyphRun(std::make_shared<FontGlyphFace>(font), {}, {});
     }
     auto& fontGlyphRun = glyphRunMap[typefaceID];
     fontGlyphRun.glyphs.emplace_back(glyphInfo->getGlyphID());

@@ -1173,7 +1173,7 @@ TGFX_TEST(CanvasTest, Path_addArc) {
   }
 }
 
-class CustomPathRenderFont : public RenderFont, std::enable_shared_from_this<CustomPathRenderFont> {
+class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<CustomPathGlyphFace> {
  public:
   bool hasColor() const override {
     return false;
@@ -1181,7 +1181,7 @@ class CustomPathRenderFont : public RenderFont, std::enable_shared_from_this<Cus
   bool hasOutlines() const override {
     return false;
   }
-  std::shared_ptr<RenderFont> makeScaled(float scale) override {
+  std::shared_ptr<GlyphFace> makeScaled(float scale) override {
     _scale = scale;
     return shared_from_this();
   }
@@ -1226,8 +1226,8 @@ class CustomPathRenderFont : public RenderFont, std::enable_shared_from_this<Cus
   float _scale = 1.0f;
 };
 
-class CustomImageRenderFont : public RenderFont,
-                              std::enable_shared_from_this<CustomImageRenderFont> {
+class CustomImageGlyphFace : public GlyphFace,
+                              std::enable_shared_from_this<CustomImageGlyphFace> {
  public:
   bool hasColor() const override {
     return true;
@@ -1235,7 +1235,7 @@ class CustomImageRenderFont : public RenderFont,
   bool hasOutlines() const override {
     return false;
   }
-  std::shared_ptr<RenderFont> makeScaled(float scale) override {
+  std::shared_ptr<GlyphFace> makeScaled(float scale) override {
     if (FloatNearlyZero(scale)) {
       return nullptr;
     }
@@ -1279,7 +1279,7 @@ class CustomImageRenderFont : public RenderFont,
   float _scale = 1.0f;
 };
 
-TGFX_TEST(CanvasTest, RenderFontTest) {
+TGFX_TEST(CanvasTest, GlyphFaceTest) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1294,15 +1294,15 @@ TGFX_TEST(CanvasTest, RenderFontTest) {
   positions1.push_back(Point::Make(0.0f, 0.0f));
   positions1.push_back(Point::Make(50.0f, 0.0f));
   positions1.push_back(Point::Make(100.0f, 0.0f));
-  canvas->drawGlyphs(glyphIDs1, positions1, std::make_shared<CustomPathRenderFont>(), paint);
+  canvas->drawGlyphs(glyphIDs1, positions1, std::make_shared<CustomPathGlyphFace>(), paint);
 
   std::vector<GlyphID> glyphIDs2 = {4, 5, 6};
   std::vector<Point> positions2 = {};
   positions2.push_back(Point::Make(150.0f, 0.0f));
   positions2.push_back(Point::Make(205.0f, 0.0f));
   positions2.push_back(Point::Make(260.0f, 0.0f));
-  canvas->drawGlyphs(glyphIDs2, positions2, std::make_shared<CustomImageRenderFont>(), paint);
+  canvas->drawGlyphs(glyphIDs2, positions2, std::make_shared<CustomImageGlyphFace>(), paint);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RenderFontTest"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/GlyphFaceTest"));
 }
 }  // namespace tgfx

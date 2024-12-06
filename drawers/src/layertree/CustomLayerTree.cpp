@@ -19,7 +19,7 @@
 #include "CustomLayer.h"
 #include "base/LayerTreeDrawers.h"
 #include "drawers/AppHost.h"
-#include "tgfx/core/FontWrapper.h"
+#include "tgfx/core/FontGlyphFace.h"
 #include "tgfx/core/UTF.h"
 
 namespace drawers {
@@ -67,7 +67,7 @@ std::unique_ptr<tgfx::LayerContent> CustomLayer::onUpdateContent() {
       xOffset += emptyAdvance;
     }
   }
-  tgfx::GlyphRun glyphRun(std::make_shared<tgfx::FontWrapper>(_font), std::move(glyphs), std::move(positions));
+  tgfx::GlyphRun glyphRun(std::make_shared<tgfx::FontGlyphFace>(_font), std::move(glyphs), std::move(positions));
   auto textBlob = tgfx::TextBlob::MakeFrom(std::move(glyphRun));
   if (textBlob == nullptr) {
     return nullptr;

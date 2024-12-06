@@ -21,7 +21,7 @@
 #include "core/LayerUnrollContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
-#include "tgfx/core/FontWrapper.h"
+#include "tgfx/core/FontGlyphFace.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -332,14 +332,14 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0 || paint.nothingToDraw()) {
     return;
   }
-  GlyphRun glyphRun(std::make_shared<FontWrapper>(font), {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  GlyphRun glyphRun(std::make_shared<FontGlyphFace>(font), {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
 }
 
 void Canvas::drawGlyphs(const std::vector<GlyphID>& glyphIDs, const std::vector<Point>& positions,
-                        std::shared_ptr<RenderFont> renderFont, const Paint& paint) const {
+                        std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) const {
   TRACE_EVENT;
   if (glyphIDs.empty() || positions.empty() || paint.nothingToDraw()) {
     return;
@@ -350,7 +350,7 @@ void Canvas::drawGlyphs(const std::vector<GlyphID>& glyphIDs, const std::vector<
     return;
   }
 
-  GlyphRun glyphRun(renderFont, glyphIDs, positions);
+  GlyphRun glyphRun(glyphFace, glyphIDs, positions);
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   const auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());

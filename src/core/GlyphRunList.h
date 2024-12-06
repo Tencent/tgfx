@@ -54,8 +54,8 @@ class GlyphRunList {
     if (_glyphRuns.empty()) {
       return false;
     }
-    const auto& renderFont = _glyphRuns[0].renderFont;
-    return renderFont ? renderFont->hasColor() : false;
+    const auto& glyphFace = _glyphRuns[0].glyphFace;
+    return glyphFace ? glyphFace->hasColor() : false;
   }
 
   /**
@@ -65,8 +65,8 @@ class GlyphRunList {
     if (_glyphRuns.empty()) {
       return false;
     }
-    const auto& renderFont = _glyphRuns[0].renderFont;
-    return renderFont ? renderFont->hasOutlines() : false;
+    const auto& glyphFace = _glyphRuns[0].glyphFace;
+    return glyphFace ? glyphFace->hasOutlines() : false;
   }
 
   /**

@@ -18,19 +18,19 @@
 
 #pragma once
 #include "tgfx/core/Font.h"
-#include "tgfx/core/RenderFont.h"
+#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
-class FontWrapper final : public RenderFont {
+class FontGlyphFace final : public GlyphFace {
  public:
-  explicit FontWrapper(const Font& font) : _font(font) {
+  explicit FontGlyphFace(const Font& font) : _font(font) {
   }
 
   bool hasColor() const override;
 
   bool hasOutlines() const override;
 
-  std::shared_ptr<RenderFont> makeScaled(float scale) override;
+  std::shared_ptr<GlyphFace> makeScaled(float scale) override;
 
   bool getPath(GlyphID glyphID, Path* path) const override;
 

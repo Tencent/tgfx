@@ -24,7 +24,7 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Picture.h"
-#include "tgfx/core/RenderFont.h"
+#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
@@ -281,16 +281,16 @@ class Canvas {
                   const Font& font, const Paint& paint);
 
   /**
-   * Draws an array of glyphIDs using RenderFont, with paths and images provided by RenderFont and
+   * Draws an array of glyphIDs using GlyphFace, with paths and images provided by GlyphFace and
    * positions specified by positions.
    * @param glyphIDs The array of GlyphID to draw.
    * @param positions Where to draw each glyph.
-   * @param renderFont Custom RenderFont used for rendering glyphs.
+   * @param glyphFace Custom GlyphFace used for rendering glyphs.
    * @param paint Blend, color, and so on, used to draw.
    * @note The lengths of `glyphIDs` and `positions` must be the same.
    */
   void drawGlyphs(const std::vector<GlyphID>& glyphIDs, const std::vector<Point>& positions,
-                  std::shared_ptr<RenderFont> renderFont, const Paint& paint) const;
+                  std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) const;
 
   /**
    * Draws a TextBlob at (x, y) using clip, matrix, and paint.

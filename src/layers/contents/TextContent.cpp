@@ -59,8 +59,8 @@ bool TextContent::HitTestPointInternal(float localX, float localY,
                                        const std::shared_ptr<GlyphRunList>& glyphRunList) {
   const auto& glyphRuns = glyphRunList->glyphRuns();
   for (const auto& glyphRun : glyphRuns) {
-    const auto& renderFont = glyphRun.renderFont;
-    if (renderFont == nullptr) {
+    const auto& glyphFace = glyphRun.glyphFace;
+    if (glyphFace == nullptr) {
       continue;
     }
     const auto& positions = glyphRun.positions;
@@ -68,15 +68,15 @@ bool TextContent::HitTestPointInternal(float localX, float localY,
 
     for (const auto& glyphID : glyphRun.glyphs) {
       const auto& position = positions[index];
-      if (renderFont->hasColor()) {
-        auto bounds = renderFont->getBounds(glyphID);
+      if (glyphFace->hasColor()) {
+        auto bounds = glyphFace->getBounds(glyphID);
         bounds.offset(position.x, position.y);
         if (bounds.contains(localX, localY)) {
           return true;
         }
       } else {
         Path glyphPath = {};
-        if (renderFont->getPath(glyphID, &glyphPath)) {
+        if (glyphFace->getPath(glyphID, &glyphPath)) {
           if (glyphPath.contains(localX - position.x, localY - position.y)) {
             return true;
           }

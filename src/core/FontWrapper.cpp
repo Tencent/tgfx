@@ -16,35 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/FontWrapper.h"
+#include "tgfx/core/FontGlyphFace.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-bool FontWrapper::hasColor() const {
+bool FontGlyphFace::hasColor() const {
   return _font.hasColor();
 }
 
-bool FontWrapper::hasOutlines() const {
+bool FontGlyphFace::hasOutlines() const {
   return _font.hasOutlines();
 }
 
-std::shared_ptr<RenderFont> FontWrapper::makeScaled(float scale) {
+std::shared_ptr<GlyphFace> FontGlyphFace::makeScaled(float scale) {
   if (FloatNearlyZero(scale)) {
     return nullptr;
   }
   auto size = _font.getSize() * scale;
-  return std::make_shared<FontWrapper>(_font.makeWithSize(size));
+  return std::make_shared<FontGlyphFace>(_font.makeWithSize(size));
 }
 
-bool FontWrapper::getPath(GlyphID glyphID, Path* path) const {
+bool FontGlyphFace::getPath(GlyphID glyphID, Path* path) const {
   return _font.getPath(glyphID, path);
 }
 
-std::shared_ptr<Image> FontWrapper::getImage(GlyphID glyphID, Matrix* matrix) const {
+std::shared_ptr<Image> FontGlyphFace::getImage(GlyphID glyphID, Matrix* matrix) const {
   return _font.getImage(glyphID, matrix);
 }
 
-Rect FontWrapper::getBounds(GlyphID glyphID) const {
+Rect FontGlyphFace::getBounds(GlyphID glyphID) const {
   return _font.getBounds(glyphID);
 }
 }  // namespace tgfx
