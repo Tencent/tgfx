@@ -196,14 +196,14 @@ bool EGLDevice::onMakeCurrent() {
     return true;
   }
 #if defined(_WIN32)
-  if (sizeInvalidWindow != nullptr) {
+  auto nativeWindow = sizeInvalidWindow.exchange(nullptr, std::memory_order_relaxed);
+  if (nativeWindow != nullptr) {
     eglDestroySurface(eglDisplay, eglSurface);
-    eglSurface = CreateFixedSizeSurfaceForAngle(sizeInvalidWindow, EGLGlobals::Get());
+    eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, EGLGlobals::Get());
     if (eglSurface == nullptr) {
       LOGE("EGLDevice::onMakeCurrent() CreateFixedSizeSurfaceForAngle error=%d", eglGetError());
       return false;
     }
-    sizeInvalidWindow = nullptr;
   }
 #endif
   auto result = eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);

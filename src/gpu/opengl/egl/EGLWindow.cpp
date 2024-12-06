@@ -84,7 +84,7 @@ void EGLWindow::onInvalidSize() {
   eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &surfaceWidth);
   eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &surfaceHeight);
   if (surfaceWidth != size.width || surfaceHeight != size.height) {
-    eglDevice->sizeInvalidWindow = nativeWindow;
+    eglDevice->sizeInvalidWindow.store(nativeWindow, std::memory_order_relaxed);
   }
 #endif
 }

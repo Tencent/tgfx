@@ -34,7 +34,8 @@ class EGLGlobals {
   static const EGLGlobals* Get();
 
   /**
-   * Sets the EGLGlobals instance to user-defined value.
+   * Sets the EGLGlobals instance to user-defined value. The caller is responsible for managing the
+   * lifetime of the EGLGlobals instance.
    */
   static void Set(const EGLGlobals* globals);
 
