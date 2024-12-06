@@ -182,7 +182,8 @@ void XMLWriter::writeDOM(const std::shared_ptr<DOM>& DOM, bool skipRoot) {
   }
 }
 
-void XMLWriter::clear() {};
+void XMLWriter::clear() {
+}
 
 void XMLWriter::writeHeader() {
 }
