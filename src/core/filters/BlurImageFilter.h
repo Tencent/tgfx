@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "core/filters/ImageFilterBase.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class BlurImageFilter : public ImageFilterBase {
+class BlurImageFilter : public ImageFilter {
  public:
   BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
 

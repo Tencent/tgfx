@@ -85,9 +85,7 @@ class SVGContext : public DrawContext {
   void drawColorGlyphs(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                        const FillStyle& style);
 
-  static PathEncoding PathEncoding() {
-    return PathEncoding::Absolute;
-  }
+  static PathEncoding PathEncoding();
 
   ISize _size;
   Context* _context = nullptr;

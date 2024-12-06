@@ -18,11 +18,10 @@
 
 #pragma once
 
-#include "core/filters/ImageFilterBase.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class InnerShadowImageFilter : public ImageFilterBase {
+class InnerShadowImageFilter : public ImageFilter {
  public:
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                          const Color& color, bool shadowOnly);

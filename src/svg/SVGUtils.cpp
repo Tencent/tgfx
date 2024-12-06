@@ -136,7 +136,7 @@ std::string ToSVGBlendMode(BlendMode mode) {
   return "mix-blend-mode:" + blendStr;
 }
 
-std::string ToSVGString(const Path& path, PathEncoding encoding) {
+std::string ToSVGPath(const Path& path, PathEncoding encoding) {
   Point currentPoint = Point::Zero();
   const int relSelector = encoding == PathEncoding::Relative ? 1 : 0;
 

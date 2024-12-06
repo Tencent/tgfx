@@ -17,15 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
+#include "Caster.h"
 #include "SVGContext.h"
 #include "SVGUtils.h"
 #include "core/MCState.h"
-#include "core/filters/ImageFilterBase.h"
-#include "core/shaders/ShaderBase.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/GradientType.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -177,31 +178,40 @@ void ElementWriter::addPathAttributes(const Path& path, PathEncoding encoding) {
 }
 
 Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
-                                                const Rect& bound) {
+                                                Rect bound) {
   std::string filterID = _resourceStore->addFilter();
   {
-    ImageFilterInfo filterInfo;
-    auto filterType = asImageFilterBase(imageFilter)->asImageFilterInfo(&filterInfo);
+    // ImageFilterInfo filterInfo;
+    // auto filterType = asImageFilterBase(imageFilter)->asImageFilterInfo(&filterInfo);
 
     ElementWriter filterElement("filter", _context, _writer);
     filterElement.addAttribute("id", filterID);
-    filterElement.addAttribute("x", bound.x());
-    filterElement.addAttribute("y", bound.y());
-    if (filterType == ImageFilterType::InnerShadow) {
-      filterElement.addAttribute("width", bound.width() + filterInfo.offset.x);
-      filterElement.addAttribute("height", bound.height() + filterInfo.offset.y);
-    } else {
+    if (auto blurFilter = ImageFilterCaster::CastToBlurImageFilter(imageFilter)) {
+      bound = blurFilter->filterBounds(bound);
+      filterElement.addAttribute("x", bound.x());
+      filterElement.addAttribute("y", bound.y());
       filterElement.addAttribute("width", bound.width());
       filterElement.addAttribute("height", bound.height());
-    }
-    filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-
-    if (filterType == ImageFilterType::Blur) {
-      addBlurImageFilter(filterInfo);
-    } else if (filterType == ImageFilterType::DropShadow) {
-      addDropShadowImageFilter(filterInfo);
-    } else if (filterType == ImageFilterType::InnerShadow) {
-      addInnerShadowImageFilter(filterInfo);
+      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      addBlurImageFilter(blurFilter);
+    } else if (auto dropShadowFilter =
+                   ImageFilterCaster::CastToDropShadowImageFilter(imageFilter)) {
+      bound = blurFilter->filterBounds(bound);
+      filterElement.addAttribute("x", bound.x());
+      filterElement.addAttribute("y", bound.y());
+      filterElement.addAttribute("width", bound.width());
+      filterElement.addAttribute("height", bound.height());
+      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      addDropShadowImageFilter(dropShadowFilter);
+    } else if (auto innerShadowFilter =
+                   ImageFilterCaster::CastToInnerShadowImageFilter(imageFilter)) {
+      bound = blurFilter->filterBounds(bound);
+      filterElement.addAttribute("x", bound.x());
+      filterElement.addAttribute("y", bound.y());
+      filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
+      filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
+      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      addInnerShadowImageFilter(innerShadowFilter);
     }
   }
   Resources resources;
@@ -209,39 +219,49 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
   return resources;
 }
 
-void ElementWriter::addBlurImageFilter(const ImageFilterInfo& info) {
+void ElementWriter::addBlurImageFilter(const std::shared_ptr<const BlurImageFilter>& filter) {
   ElementWriter blurElement("feGaussianBlur", _context, _writer);
-  blurElement.addAttribute("stdDeviation", std::max(info.blurrinessX, info.blurrinessY));
+  auto blurSize = filter->filterBounds(Rect::MakeEmpty()).size();
+  blurElement.addAttribute("stdDeviation", std::max(blurSize.width / 4.f, blurSize.height / 4.f));
   blurElement.addAttribute("result", "blur");
 }
 
-void ElementWriter::addDropShadowImageFilter(const ImageFilterInfo& info) {
+void ElementWriter::addDropShadowImageFilter(
+    const std::shared_ptr<const DropShadowImageFilter>& filter) {
+  if (!filter->blurFilter) {
+    return;
+  }
   {
     ElementWriter offsetElement("feOffset", _context, _writer);
-    offsetElement.addAttribute("dx", info.offset.x);
-    offsetElement.addAttribute("dy", info.offset.y);
+    offsetElement.addAttribute("dx", filter->dx);
+    offsetElement.addAttribute("dy", filter->dy);
   }
   {
     ElementWriter blurElement("feGaussianBlur", _context, _writer);
-    blurElement.addAttribute("stdDeviation", std::max(info.blurrinessX, info.blurrinessY));
+    auto blurSize = filter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    blurElement.addAttribute("stdDeviation", std::max(blurSize.width / 4.f, blurSize.height / 4.f));
     blurElement.addAttribute("result", "blur");
   }
   {
     ElementWriter colorMatrixElement("feColorMatrix", _context, _writer);
     colorMatrixElement.addAttribute("type", "matrix");
-    auto color = info.color;
+    auto color = filter->color;
     colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
                                                   FloatToString(color.green) + " 0 0 0 0 " +
                                                   FloatToString(color.blue) + " 0 0 0 " +
                                                   FloatToString(color.alpha) + " 0");
   }
-  if (!info.onlyShadow) {
+  if (!filter->shadowOnly) {
     ElementWriter blendElement("feBlend", _context, _writer);
     blendElement.addAttribute("mode", "normal");
     blendElement.addAttribute("in", "SourceGraphic");
   }
 }
-void ElementWriter::addInnerShadowImageFilter(const ImageFilterInfo& info) {
+void ElementWriter::addInnerShadowImageFilter(
+    const std::shared_ptr<const InnerShadowImageFilter>& filter) {
+  if (!filter->blurFilter) {
+    return;
+  }
   {
     ElementWriter colorMatrixElement("feColorMatrix", _context, _writer);
     colorMatrixElement.addAttribute("in", "SourceAlpha");
@@ -249,7 +269,7 @@ void ElementWriter::addInnerShadowImageFilter(const ImageFilterInfo& info) {
     colorMatrixElement.addAttribute("values", "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0");
     colorMatrixElement.addAttribute("result", "hardAlpha");
   }
-  if (!info.onlyShadow) {
+  if (!filter->shadowOnly) {
     {
       ElementWriter floodElement("feFlood", _context, _writer);
       floodElement.addAttribute("flood-opacity", "0");
@@ -265,12 +285,13 @@ void ElementWriter::addInnerShadowImageFilter(const ImageFilterInfo& info) {
   }
   {
     ElementWriter offsetElement("feOffset", _context, _writer);
-    offsetElement.addAttribute("dx", info.offset.x);
-    offsetElement.addAttribute("dy", info.offset.y);
+    offsetElement.addAttribute("dx", filter->dx);
+    offsetElement.addAttribute("dy", filter->dy);
   }
   {
     ElementWriter blurElement("feGaussianBlur", _context, _writer);
-    blurElement.addAttribute("stdDeviation", std::max(info.blurrinessX, info.blurrinessY));
+    auto blurSize = filter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    blurElement.addAttribute("stdDeviation", std::max(blurSize.width / 4.f, blurSize.height / 4.f));
   }
   {
     ElementWriter compositeElement("feComposite", _context, _writer);
@@ -282,13 +303,13 @@ void ElementWriter::addInnerShadowImageFilter(const ImageFilterInfo& info) {
   {
     ElementWriter colorMatrixElement("feColorMatrix", _context, _writer);
     colorMatrixElement.addAttribute("type", "matrix");
-    auto color = info.color;
+    auto color = filter->color;
     colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
                                                   FloatToString(color.green) + " 0 0 0 0 " +
                                                   FloatToString(color.blue) + " 0 0 0 " +
                                                   FloatToString(color.alpha) + " 0");
   }
-  if (!info.onlyShadow) {
+  if (!filter->shadowOnly) {
     ElementWriter blendElement("feBlend", _context, _writer);
     blendElement.addAttribute("mode", "normal");
     blendElement.addAttribute("in2", "shape");
@@ -316,31 +337,28 @@ Resources ElementWriter::addResources(const FillStyle& fill) {
 
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader,
                                        Resources* resources) {
-
-  auto shaderType = asShaderBase(shader)->type();
-  if (shaderType == ShaderType::Color) {
-    this->addColorShaderResources(shader, resources);
-  } else if (shaderType == ShaderType::Gradient) {
-    this->addGradientShaderResources(shader, resources);
-  } else if (shaderType == ShaderType::Image) {
-    this->addImageShaderResources(shader, resources);
+  if (auto colorShader = ShaderCaster::CastToColorShader(shader)) {
+    this->addColorShaderResources(colorShader, resources);
+  } else if (auto gradientShader = ShaderCaster::CastToGradientShader(shader)) {
+    this->addGradientShaderResources(gradientShader, resources);
+  } else if (auto imageShader = ShaderCaster::CastToImageShader(shader)) {
+    this->addImageShaderResources(imageShader, resources);
   }
   // TODO(YGAurora): other shader types
 }
 
-void ElementWriter::addColorShaderResources(const std::shared_ptr<Shader>& shader,
+void ElementWriter::addColorShaderResources(const std::shared_ptr<const ColorShader>& shader,
                                             Resources* resources) {
   Color color;
   if (shader->asColor(&color)) {
     resources->_paintColor = ToSVGColor(color);
-    return;
   }
 }
 
-void ElementWriter::addGradientShaderResources(const std::shared_ptr<Shader>& shader,
+void ElementWriter::addGradientShaderResources(const std::shared_ptr<const GradientShader>& shader,
                                                Resources* resources) {
   GradientInfo info;
-  auto type = asShaderBase(shader)->asGradient(&info);
+  GradientType type = shader->asGradient(&info);
 
   ASSERT(info.colors.size() == info.positions.size());
   if (type == GradientType::Linear) {
@@ -421,10 +439,10 @@ std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info) {
   return id;
 };
 
-void ElementWriter::addImageShaderResources(const std::shared_ptr<Shader>& shader,
+void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageShader>& shader,
                                             Resources* resources) {
-  auto [image, x, y] = asShaderBase(shader)->asImage();
-  ASSERT(image);
+  auto image = shader->image;
+  ASSERT(shader->image);
 
   auto dataUri = AsDataUri(this->_context, image);
   if (!dataUri) {
@@ -440,8 +458,8 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<Shader>& shade
       return "100%";
     }
   };
-  std::string widthValue = transDimension(x, imageWidth);
-  std::string heightValue = transDimension(y, imageHeight);
+  std::string widthValue = transDimension(shader->tileModeX, imageWidth);
+  std::string heightValue = transDimension(shader->tileModeY, imageHeight);
 
   std::string patternID = _resourceStore->addPattern();
   {

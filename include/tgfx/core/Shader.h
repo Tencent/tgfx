@@ -151,5 +151,6 @@ class Shader {
 
   friend class FragmentProcessor;
   friend class Canvas;
+  friend class ShaderCaster;
 };
 }  // namespace tgfx

@@ -25,9 +25,9 @@
 #include "SVGUtils.h"
 #include "core/FillStyle.h"
 #include "core/MCState.h"
-#include "core/shaders/ShaderBase.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "svg/Caster.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
@@ -113,7 +113,7 @@ void SVGContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                            const FillStyle& style) {
   auto path = shape->getPath();
   ElementWriter pathElement("path", _context, this, _resourceBucket.get(), state, style);
-  pathElement.addPathAttributes(path, this->pathEncoding());
+  pathElement.addPathAttributes(path, tgfx::SVGContext::PathEncoding());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
   }
@@ -179,7 +179,7 @@ void SVGContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, co
   }
   if (Path path; glyphRunList->getPath(&path)) {
     ElementWriter pathElement("path", _context, this, _resourceBucket.get(), state, style, stroke);
-    pathElement.addPathAttributes(path, this->pathEncoding());
+    pathElement.addPathAttributes(path, tgfx::SVGContext::PathEncoding());
     if (path.getFillType() == PathFillType::EvenOdd) {
       pathElement.addAttribute("fill-rule", "evenodd");
     }
@@ -210,7 +210,6 @@ void SVGContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& stat
   if (imageFilter) {
     ElementWriter defs("defs", _context, _writer, _resourceBucket.get());
     auto bound = picture->getBounds();
-    bound = imageFilter->filterBounds(bound);
     resources = defs.addImageFilterResource(imageFilter, bound);
   }
   {
@@ -228,11 +227,15 @@ bool SVGContext::RequiresViewportReset(const FillStyle& fill) {
   if (!shader) {
     return false;
   }
-  auto [image, tileX, tileY] = asShaderBase(shader)->asImage();
-  if (!image) {
-    return false;
+
+  if (auto imageShader = ShaderCaster::CastToImageShader(shader)) {
+    return imageShader->tileModeX == TileMode::Repeat || imageShader->tileModeY == TileMode::Repeat;
   }
-  return tileX == TileMode::Repeat || tileY == TileMode::Repeat;
+  return false;
+}
+
+PathEncoding SVGContext::PathEncoding() {
+  return PathEncoding::Absolute;
 }
 
 void SVGContext::syncMCState(const MCState& state) {
@@ -273,7 +276,7 @@ void SVGContext::syncMCState(const MCState& state) {
         }
       } else {
         element = std::make_unique<ElementWriter>("path", _context, _writer);
-        element->addPathAttributes(clipPath, this->pathEncoding());
+        element->addPathAttributes(clipPath, tgfx::SVGContext::PathEncoding());
         if (clipPath.getFillType() == PathFillType::EvenOdd) {
           element->addAttribute("clip-rule", "evenodd");
         }

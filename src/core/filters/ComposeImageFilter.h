@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "core/filters/ImageFilterBase.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class ComposeImageFilter : public ImageFilterBase {
+class ComposeImageFilter : public ImageFilter {
  public:
   explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
 
