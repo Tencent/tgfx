@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXWindow.h"
-#include <shellscalingapi.h>
 #include <filesystem>
+#if WINVER >= 0x0603  // Windows 8.1
+#include <shellscalingapi.h>
+#endif
 
 namespace hello2d {
 static constexpr LPCWSTR ClassName = L"TGFXWindow";
@@ -82,9 +84,13 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       destroy();
       PostQuitMessage(0);
       break;
-    case WM_PAINT:
+    case WM_PAINT: {
+      PAINTSTRUCT ps;
+      BeginPaint(windowHandle, &ps);
       draw();
+      EndPaint(windowHandle, &ps);
       break;
+    }
     case WM_LBUTTONDOWN:
       lastDrawIndex++;
       ::InvalidateRect(windowHandle, nullptr, TRUE);
@@ -162,17 +168,20 @@ void TGFXWindow::centerAndShow() {
 }
 
 float TGFXWindow::getPixelRatio() {
-  UINT dpi = 96;
+#if WINVER >= 0x0603  // Windows 8.1
+  HMONITOR monitor = nullptr;
   if (windowHandle != nullptr) {
-    auto monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
-    UINT dpiX = 96;
-    UINT dpiY = 96;
-    GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
-    dpi = dpiX;
+    monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
   } else {
-    dpi = GetDpiForSystem();
+    monitor = ::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
   }
-  return static_cast<float>(dpi) / 96.0f;
+  UINT dpiX = 96;
+  UINT dpiY = 96;
+  GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
+  return static_cast<float>(dpiX) / 96.0f;
+#else
+  return 1.0f;
+#endif
 }
 
 void TGFXWindow::createAppHost() {
@@ -184,7 +193,8 @@ void TGFXWindow::createAppHost() {
   appHost->addImage("bridge", image);
   auto typeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
   appHost->addTypeface("default", typeface);
-  typeface = tgfx::Typeface::MakeFromName("Segoe UI Emoji", "");
+  auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
+  typeface = tgfx::Typeface::MakeFromPath(emojiPath);
   appHost->addTypeface("emoji", typeface);
 }
 

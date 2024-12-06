@@ -298,10 +298,11 @@ the `linux/` directory in CLion and building the demo project directly in the ID
 
 ### Windows
 
-To start, open the `win/` directory in CLion.  Next, open the `File->Setting` panel and navigate to 
-`Build, Execution, Deployment->ToolChains`. Set the toolchain of CLion to `Visual Studio` with either
-`amd64` (Recommended) or `x86` architecture. Once done, you'll be able to build and run the `Hello2D`
-target.
+To get started, open the `win/` directory in CLion. Then, go to `File->Settings` and navigate to 
+`Build, Execution, Deployment->ToolChains`. Set the toolchain to `Visual Studio` with either `amd64`
+(recommended) or `x86` architecture. It's also recommended to use the `Ninja` generator for CMake to
+speed up the build process. You can set this in `Build, Execution, Deployment->CMake` by choosing 
+`Ninja` in the `Generator` row. Once done, you'll be able to build and run the `Hello2D` target.
 
 If you prefer to use the VS Studio IDE, you can open the `x64 Native Tools Command Prompt for VS 2019` 
 and execute the following command in the `win/` directory:

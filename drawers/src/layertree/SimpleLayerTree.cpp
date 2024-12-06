@@ -29,7 +29,7 @@ namespace drawers {
 static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto progressBar = tgfx::Layer::Make();
   progressBar->setMatrix(tgfx::Matrix::MakeTrans(24, 670));
-  progressBar->setBlendMode(tgfx::BlendMode::PlusDarker);
+  progressBar->setBlendMode(tgfx::BlendMode::PlusLighter);
   auto backLineLayer = tgfx::ShapeLayer::Make();
   auto backLinePath = tgfx::Path();
   backLinePath.lineTo(327, 0);
@@ -121,21 +121,8 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
   root->addChild(textLayer);
 
   // progress shape
-  progressBar = CreateProgressBar();
+  auto progressBar = CreateProgressBar();
   root->addChild(progressBar);
   return root;
 }
-
-void SimpleLayerTree::prepare(const AppHost*) {
-  changeMode();
-}
-
-void SimpleLayerTree::changeMode() {
-  if (progressBar->blendMode() == tgfx::BlendMode::PlusDarker) {
-    progressBar->setBlendMode(tgfx::BlendMode::PlusLighter);
-  } else {
-    progressBar->setBlendMode(tgfx::BlendMode::PlusDarker);
-  }
-}
-
 }  // namespace drawers
