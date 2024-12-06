@@ -25,6 +25,8 @@ class ComposeImageFilter : public ImageFilter {
  public:
   explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
 
+  std::vector<std::shared_ptr<ImageFilter>> filters = {};
+
  protected:
   Type type() const override {
     return Type::Compose;
@@ -36,9 +38,6 @@ class ComposeImageFilter : public ImageFilter {
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
-
- public:
-  std::vector<std::shared_ptr<ImageFilter>> filters = {};
 
   friend class ImageFilter;
 };

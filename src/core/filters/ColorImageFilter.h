@@ -25,6 +25,8 @@ class ColorImageFilter : public ImageFilter {
  public:
   explicit ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter);
 
+  std::shared_ptr<tgfx::ColorFilter> filter;
+
  protected:
   Type type() const override {
     return Type::Color;
@@ -34,8 +36,5 @@ class ColorImageFilter : public ImageFilter {
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
-
- public:
-  std::shared_ptr<tgfx::ColorFilter> filter;
 };
 }  // namespace tgfx
