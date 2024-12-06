@@ -378,9 +378,9 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     auto imageFilter = ImageFilter::Blur(20, 30);
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
     auto blurFilter = std::static_pointer_cast<BlurImageFilter>(imageFilter);
-    Size blurSize = blurFilter->blurSize();
-    EXPECT_NEAR(blurSize.width, 17.7777786, 1E-4);
-    EXPECT_NEAR(blurSize.height, 35.5555573, 1E-4);
+    Size blurSize = blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    EXPECT_EQ(blurSize.width, 18);
+    EXPECT_EQ(blurSize.height, 36);
   }
 
   {
@@ -484,10 +484,9 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     EXPECT_EQ(shader->type(), Shader::Type::Image);
 
     auto imageShader = std::static_pointer_cast<ImageShader>(shader);
-    auto [image, tileModeX, tileModeY] = imageShader->getImage();
-    EXPECT_EQ(image, image);
-    EXPECT_EQ(tileModeX, TileMode::Mirror);
-    EXPECT_EQ(tileModeY, TileMode::Repeat);
+    EXPECT_TRUE(imageShader != nullptr);
+    EXPECT_EQ(imageShader->tileModeX, TileMode::Mirror);
+    EXPECT_EQ(imageShader->tileModeY, TileMode::Repeat);
   }
 
   {

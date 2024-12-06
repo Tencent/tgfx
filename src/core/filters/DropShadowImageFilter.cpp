@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DropShadowImageFilter.h"
-#include "core/filters/BlurImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/NeedMipmaps.h"
 #include "gpu/OpContext.h"

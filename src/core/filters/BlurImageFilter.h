@@ -20,14 +20,11 @@
 
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/Size.h"
 
 namespace tgfx {
 class BlurImageFilter : public ImageFilter {
  public:
   BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
-
-  Size blurSize() const;
 
  protected:
   Type type() const override {

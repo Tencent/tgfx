@@ -24,11 +24,6 @@
 
 namespace tgfx {
 class ImageShader : public Shader {
- public:
-  std::tuple<std::shared_ptr<Image>, TileMode, TileMode> getImage() const {
-    return {image, tileModeX, tileModeY};
-  }
-
  protected:
   Type type() const override {
     return Type::Image;
@@ -43,6 +38,7 @@ class ImageShader : public Shader {
       : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
   }
 
+ public:
   std::shared_ptr<Image> image = nullptr;
   TileMode tileModeX = TileMode::Clamp;
   TileMode tileModeY = TileMode::Clamp;

@@ -18,10 +18,7 @@
 
 #pragma once
 
-#include "tgfx/core/Color.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/Point.h"
-#include "tgfx/core/Size.h"
 
 namespace tgfx {
 class InnerShadowImageFilter : public ImageFilter {

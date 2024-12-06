@@ -85,10 +85,6 @@ BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iterat
     : blurOffset(blurOffset), downScaling(downScaling), iteration(iteration), tileMode(tileMode) {
 }
 
-Size BlurImageFilter::blurSize() const {
-  return onFilterBounds(Rect::MakeEmpty()).size();
-}
-
 void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
                            std::unique_ptr<FragmentProcessor> imageProcessor,
                            const Rect& imageBounds, bool isDown, uint32_t renderFlags) const {
