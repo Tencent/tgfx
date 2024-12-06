@@ -46,7 +46,7 @@ class SVGGenerator {
   Canvas* beginGenerate(Context* GPUContext, const ISize& size, bool isPretty = true);
 
   /**
-   * Returns the recording canvas if one is active, or nullptr if recording is not active.
+   * Returns the recording canvas if it is active, or nullptr.
    */
   Canvas* getCanvas() const;
 

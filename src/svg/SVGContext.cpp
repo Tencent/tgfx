@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGContext.h"
-#include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -41,7 +40,6 @@
 
 namespace tgfx {
 
-/////////////////////////////////////////////////////////////////////////////////////////////////
 SVGContext::SVGContext(Context* GPUContext, const ISize& size, std::unique_ptr<XMLWriter> writer)
     : _size(size), _context(GPUContext), _writer(std::move(writer)),
       _resourceBucket(new ResourceStore) {
