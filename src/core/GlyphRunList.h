@@ -51,14 +51,22 @@ class GlyphRunList {
    * Returns true if the GlyphRunList has color.
    */
   bool hasColor() const {
-    return _glyphRuns[0].font.hasColor();
+    if (_glyphRuns.empty()) {
+      return false;
+    }
+    const auto& renderFont = _glyphRuns[0].renderFont;
+    return renderFont ? renderFont->hasColor() : false;
   }
 
   /**
    * Returns true if the GlyphRunList has outlines.
    */
   bool hasOutlines() const {
-    return _glyphRuns[0].font.hasOutlines();
+    if (_glyphRuns.empty()) {
+      return false;
+    }
+    const auto& renderFont = _glyphRuns[0].renderFont;
+    return renderFont ? renderFont->hasOutlines() : false;
   }
 
   /**

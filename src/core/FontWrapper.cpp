@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,29 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/core/FontWrapper.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
-class TextContent : public LayerContent {
- public:
-  TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor);
+bool FontWrapper::hasColor() const {
+  return _font.hasColor();
+}
 
-  Rect getBounds() const override {
-    return bounds;
+bool FontWrapper::hasOutlines() const {
+  return _font.hasOutlines();
+}
+
+std::shared_ptr<RenderFont> FontWrapper::makeScaled(float scale) {
+  if (FloatNearlyZero(scale)) {
+    return nullptr;
   }
+  auto size = _font.getSize() * scale;
+  return std::make_shared<FontWrapper>(_font.makeWithSize(size));
+}
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
+bool FontWrapper::getPath(GlyphID glyphID, Path* path) const {
+  return _font.getPath(glyphID, path);
+}
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+std::shared_ptr<Image> FontWrapper::getImage(GlyphID glyphID, Matrix* matrix) const {
+  return _font.getImage(glyphID, matrix);
+}
 
- private:
-  Rect bounds = Rect::MakeEmpty();
-  std::shared_ptr<TextBlob> textBlob = nullptr;
-  Color textColor = Color::White();
-
-  static bool HitTestPointInternal(float localX, float localY,
-                            const std::shared_ptr<GlyphRunList>& glyphRunList);
-};
+Rect FontWrapper::getBounds(GlyphID glyphID) const {
+  return _font.getBounds(glyphID);
+}
 }  // namespace tgfx

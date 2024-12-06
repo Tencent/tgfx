@@ -19,10 +19,9 @@
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
 #include "core/LayerUnrollContext.h"
-#include "core/Records.h"
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
-#include "tgfx/core/PathEffect.h"
+#include "tgfx/core/FontWrapper.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -333,9 +332,27 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0 || paint.nothingToDraw()) {
     return;
   }
-  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  GlyphRun glyphRun(std::make_shared<FontWrapper>(font), {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
+  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
+}
+
+void Canvas::drawGlyphs(const std::vector<GlyphID>& glyphIDs, const std::vector<Point>& positions,
+                        std::shared_ptr<RenderFont> renderFont, const Paint& paint) const {
+  TRACE_EVENT;
+  if (glyphIDs.empty() || positions.empty() || paint.nothingToDraw()) {
+    return;
+  }
+
+  if (glyphIDs.size() != positions.size()) {
+    LOGE("Canvas::drawGlyphs() glyphs and positions size mismatch!");
+    return;
+  }
+
+  GlyphRun glyphRun(renderFont, glyphIDs, positions);
+  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
+  const auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
 }
 

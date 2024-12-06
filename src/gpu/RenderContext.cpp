@@ -264,8 +264,11 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
   auto scale = viewMatrix.getMaxScale();
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto font = glyphRun.font;
-    font = font.makeWithSize(font.getSize() * scale);
+    auto renderFont = glyphRun.renderFont;
+    if (renderFont == nullptr) {
+      continue;
+    }
+    renderFont = renderFont->makeScaled(scale);
     auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
     auto& positions = glyphRun.positions;
@@ -273,7 +276,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = font.getImage(glyphID, &glyphState.matrix);
+      auto glyphImage = renderFont->getImage(glyphID, &glyphState.matrix);
       if (glyphImage == nullptr) {
         continue;
       }

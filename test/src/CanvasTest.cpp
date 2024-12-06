@@ -20,6 +20,7 @@
 #include "core/images/ResourceImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Texture.h"
 #include "gpu/opengl/GLCaps.h"
@@ -1170,5 +1171,138 @@ TGFX_TEST(CanvasTest, Path_addArc) {
     canvas->drawPath(path, paint);
     EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc_reversed" + std::to_string(i)));
   }
+}
+
+class CustomPathRenderFont : public RenderFont, std::enable_shared_from_this<CustomPathRenderFont> {
+ public:
+  bool hasColor() const override {
+    return false;
+  }
+  bool hasOutlines() const override {
+    return false;
+  }
+  std::shared_ptr<RenderFont> makeScaled(float scale) override {
+    _scale = scale;
+    return shared_from_this();
+  }
+
+  bool getPath(GlyphID glyphID, Path* path) const override {
+    switch (glyphID) {
+      case 1:
+        path->moveTo(25.0f, 5.0f);
+        path->lineTo(45.0f, 45.0f);
+        path->lineTo(5.0f, 45.0f);
+        path->close();
+        return true;
+      case 2:
+        path->moveTo(5.0f, 5.0f);
+        path->lineTo(45.0f, 5.0f);
+        path->lineTo(45.0f, 45.0f);
+        path->lineTo(5.0f, 45.0f);
+        path->close();
+        return true;
+      case 3:
+        path->addOval(Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f));
+        path->close();
+        return true;
+      default:
+        return false;
+    }
+    return false;
+  }
+
+  std::shared_ptr<Image> getImage(GlyphID /*glyphID*/, Matrix* /*matrix*/) const override {
+    return nullptr;
+  }
+
+  Rect getBounds(GlyphID glyphID) const override {
+    if (glyphID < 1 || glyphID > 3) {
+      return Rect::MakeEmpty();
+    }
+    return Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
+  }
+
+ private:
+  float _scale = 1.0f;
+};
+
+class CustomImageRenderFont : public RenderFont,
+                              std::enable_shared_from_this<CustomImageRenderFont> {
+ public:
+  bool hasColor() const override {
+    return true;
+  }
+  bool hasOutlines() const override {
+    return false;
+  }
+  std::shared_ptr<RenderFont> makeScaled(float scale) override {
+    if (FloatNearlyZero(scale)) {
+      return nullptr;
+    }
+    _scale = scale;
+    return shared_from_this();
+  }
+
+  bool getPath(GlyphID /*glyphID*/, Path* /*path*/) const override {
+    return false;
+  }
+
+  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override {
+    std::string imagePath;
+    switch (glyphID) {
+      case 4:
+        imagePath = "resources/assets/image1.png";
+        break;
+      case 5:
+        imagePath = "resources/assets/image2.png";
+        break;
+      case 6:
+        imagePath = "resources/assets/image3.png";
+        break;
+      default:
+        return nullptr;
+    }
+
+    matrix->setScale(0.25f, 0.25f);
+    return Image::MakeFromFile(ProjectPath::Absolute(imagePath));
+    ;
+  }
+
+  Rect getBounds(GlyphID glyphID) const override {
+    if (glyphID < 3 || glyphID > 6) {
+      return Rect::MakeEmpty();
+    }
+    return Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
+  }
+
+ private:
+  float _scale = 1.0f;
+};
+
+TGFX_TEST(CanvasTest, RenderFontTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+
+  auto paint = Paint();
+  paint.setColor(Color::Red());
+
+  std::vector<GlyphID> glyphIDs1 = {1, 2, 3};
+  std::vector<Point> positions1 = {};
+  positions1.push_back(Point::Make(0.0f, 0.0f));
+  positions1.push_back(Point::Make(50.0f, 0.0f));
+  positions1.push_back(Point::Make(100.0f, 0.0f));
+  canvas->drawGlyphs(glyphIDs1, positions1, std::make_shared<CustomPathRenderFont>(), paint);
+
+  std::vector<GlyphID> glyphIDs2 = {4, 5, 6};
+  std::vector<Point> positions2 = {};
+  positions2.push_back(Point::Make(150.0f, 0.0f));
+  positions2.push_back(Point::Make(205.0f, 0.0f));
+  positions2.push_back(Point::Make(260.0f, 0.0f));
+  canvas->drawGlyphs(glyphIDs2, positions2, std::make_shared<CustomImageRenderFont>(), paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RenderFontTest"));
 }
 }  // namespace tgfx

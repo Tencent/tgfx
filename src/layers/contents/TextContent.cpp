@@ -44,7 +44,7 @@ bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
     }
 
     for (const auto& glyphRunList : *glyphRunLists) {
-      if (hitTestPointInternal(localX, localY, glyphRunList)) {
+      if (HitTestPointInternal(localX, localY, glyphRunList)) {
         return true;
       }
     }
@@ -55,25 +55,28 @@ bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
   return bounds.contains(localX, localY);
 }
 
-bool TextContent::hitTestPointInternal(float localX, float localY,
+bool TextContent::HitTestPointInternal(float localX, float localY,
                                        const std::shared_ptr<GlyphRunList>& glyphRunList) {
   const auto& glyphRuns = glyphRunList->glyphRuns();
   for (const auto& glyphRun : glyphRuns) {
-    const auto& font = glyphRun.font;
+    const auto& renderFont = glyphRun.renderFont;
+    if (renderFont == nullptr) {
+      continue;
+    }
     const auto& positions = glyphRun.positions;
     size_t index = 0;
 
     for (const auto& glyphID : glyphRun.glyphs) {
       const auto& position = positions[index];
-      if (font.hasColor()) {
-        auto bounds = font.getBounds(glyphID);
+      if (renderFont->hasColor()) {
+        auto bounds = renderFont->getBounds(glyphID);
         bounds.offset(position.x, position.y);
         if (bounds.contains(localX, localY)) {
           return true;
         }
       } else {
         Path glyphPath = {};
-        if (font.getPath(glyphID, &glyphPath)) {
+        if (renderFont->getPath(glyphID, &glyphPath)) {
           if (glyphPath.contains(localX - position.x, localY - position.y)) {
             return true;
           }

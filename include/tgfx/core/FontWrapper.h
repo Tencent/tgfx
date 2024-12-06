@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,40 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
 #include "tgfx/core/Font.h"
 #include "tgfx/core/RenderFont.h"
 
 namespace tgfx {
-/**
- * GlyphRun represents a sequence of glyphs from a single font, along with their positions.
- */
-struct GlyphRun {
-  /**
-   * Constructs an empty GlyphRun.
-   */
-  GlyphRun() = default;
-
-  /**
-   * Constructs a GlyphRun using a RenderFont, a list of glyph IDs, and their positions.
-   */
-  GlyphRun(std::shared_ptr<RenderFont> renderFont, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
-      : renderFont(renderFont), glyphs(glyphIDs), positions(positions) {
+class FontWrapper final : public RenderFont {
+ public:
+  explicit FontWrapper(const Font& font) : _font(font) {
   }
 
-  /**
-   * Returns the RenderFont used to render the glyphs in this run.
-   */
-  std::shared_ptr<RenderFont> renderFont = nullptr;
+  bool hasColor() const override;
 
-  /**
-   * Returns the sequence of glyph IDs in this run.
-   */
-  std::vector<GlyphID> glyphs = {};
+  bool hasOutlines() const override;
 
-  /**
-   * Returns the sequence of positions for each glyph in this run.
-   */
-  std::vector<Point> positions = {};
+  std::shared_ptr<RenderFont> makeScaled(float scale) override;
+
+  bool getPath(GlyphID glyphID, Path* path) const override;
+
+  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
+
+  Rect getBounds(GlyphID glyphID) const override;
+
+ private:
+  Font _font = {};
 };
 }  // namespace tgfx
