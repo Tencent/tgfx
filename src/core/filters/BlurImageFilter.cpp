@@ -116,9 +116,9 @@ Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
 }
 
-std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(
-    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args,
-    const SamplingOptions& sampling) const {
+std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
+                                                                const Rect& clipBounds,
+                                                                const TPArgs& args) const {
   auto isAlphaOnly = source->isAlphaOnly();
   auto lastRenderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
@@ -128,7 +128,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(
   }
   auto drawRect = Rect::MakeWH(lastRenderTarget->width(), lastRenderTarget->height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
-  auto processor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling);
+  auto processor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {});
   auto imageBounds = clipBounds;
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   for (int i = 0; i < iteration; ++i) {

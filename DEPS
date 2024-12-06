@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "b3125b9cf13bcc70e63212de1d0ed95e7beaa2a9",
+        "commit": "effcc0d22be03e55fab5c42ae82815ee7d76f74f",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -67,7 +67,7 @@
       },
       {
         "url": "https://github.com/libpag/tracy.git",
-        "commit": "93fdee0238f74b95fdf18b7cc712e423c71497a3",
+        "commit": "1444b3e0546089181144c97ef5b3d0e798ddbe1c",
         "dir": "third_party/tracy"
       }
     ]

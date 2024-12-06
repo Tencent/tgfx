@@ -28,9 +28,8 @@
 namespace tgfx {
 
 TGFX_TEST(ImageReaderTest, updateMask) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto mask = Mask::Make(100, 50, false);
   auto surface = Surface::Make(context, mask->width(), mask->height());
@@ -62,13 +61,11 @@ TGFX_TEST(ImageReaderTest, updateMask) {
   EXPECT_TRUE(buffer->expired());
 
   EXPECT_TRUE(Baseline::Compare(surface, "ImageReaderTest/update_mask"));
-  device->unlock();
 }
 
 TGFX_TEST(ImageReaderTest, updateBitmap) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   Bitmap bitmap(300, 150);
   bitmap.clear();
@@ -114,7 +111,6 @@ TGFX_TEST(ImageReaderTest, updateBitmap) {
   EXPECT_TRUE(buffer->expired());
 
   EXPECT_TRUE(Baseline::Compare(surface, "ImageReaderTest/update_bitmap"));
-  device->unlock();
 }
 
 }  // namespace tgfx

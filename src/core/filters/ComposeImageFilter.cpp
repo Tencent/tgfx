@@ -33,13 +33,13 @@ std::shared_ptr<ImageFilter> ImageFilter::Compose(std::shared_ptr<ImageFilter> i
     return outer;
   }
   std::vector<std::shared_ptr<ImageFilter>> filters = {};
-  if (inner->isComposeFilter()) {
+  if (inner->type() == Type::Compose) {
     auto innerFilters = static_cast<ComposeImageFilter*>(inner.get())->filters;
     filters = innerFilters;
   } else {
     filters.push_back(std::move(inner));
   }
-  if (outer->isComposeFilter()) {
+  if (outer->type() == Type::Compose) {
     auto outerFilters = static_cast<ComposeImageFilter*>(outer.get())->filters;
     filters.insert(filters.end(), outerFilters.begin(), outerFilters.end());
   } else {

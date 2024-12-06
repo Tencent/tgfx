@@ -42,9 +42,8 @@
 
 namespace tgfx {
 TGFX_TEST(CanvasTest, clip) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto width = 1080;
   auto height = 1776;
@@ -70,14 +69,11 @@ TGFX_TEST(CanvasTest, clip) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
-
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, TileMode) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   image = image->makeMipmapped(true);
@@ -108,13 +104,11 @@ TGFX_TEST(CanvasTest, TileMode) {
   paint.setShader(shader);
   canvas->drawRect(drawRect, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_rgbaaa"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, merge_draw_call_rect) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
   int height = 72;
@@ -146,13 +140,11 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   EXPECT_EQ(static_cast<RectDrawOp*>(task->ops[1].get())->rectPaints.size(), drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
   int height = 72;
@@ -187,13 +179,11 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops[1].get())->rRectPaints.size(), drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, merge_draw_clear_op) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   int width = 72;
   int height = 72;
@@ -229,7 +219,6 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_clear_op"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, textShape) {
@@ -289,9 +278,8 @@ TGFX_TEST(CanvasTest, textShape) {
   }
   height += lineHeight;
 
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface =
       Surface::Make(context, static_cast<int>(ceil(width)), static_cast<int>(ceil(height)));
@@ -313,13 +301,11 @@ TGFX_TEST(CanvasTest, textShape) {
   }
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, filterMode) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -333,33 +319,30 @@ TGFX_TEST(CanvasTest, filterMode) {
   canvas->clear();
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_linear"));
-  device->unlock();
 }
 
-TGFX_TEST(CanvasTest, rasterized) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+TGFX_TEST(CanvasTest, scaleImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto defaultCacheLimit = context->cacheLimit();
   context->setCacheLimit(0);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto scaleImage = image->makeScaled(1.0f, 1.0f);
+  auto scaleImage = image->makeScaled(1.0f);
   EXPECT_TRUE(scaleImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
-  auto flatImage = image->makeScaled(0.15f, 0.15f);
-  flatImage = flatImage->makeFlattened();
-  EXPECT_FALSE(flatImage->hasMipmaps());
-  EXPECT_FALSE(flatImage == image);
-  EXPECT_EQ(flatImage->width(), 454);
-  EXPECT_EQ(flatImage->height(), 605);
+  auto scaledImage = image->makeScaled(0.15f);
+  EXPECT_FALSE(scaledImage->hasMipmaps());
+  EXPECT_FALSE(scaledImage == image);
+  EXPECT_EQ(scaledImage->width(), 454);
+  EXPECT_EQ(scaledImage->height(), 605);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, 1100, 1400);
   auto canvas = surface->getCanvas();
-  canvas->drawImage(flatImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto flatImageUniqueKey = std::static_pointer_cast<ResourceImage>(flatImage)->uniqueKey;
-  auto texture = Resource::Find<Texture>(context, flatImageUniqueKey);
+  canvas->drawImage(scaledImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
+  auto scaleImageUniqueKey = std::static_pointer_cast<ResourceImage>(scaledImage)->uniqueKey;
+  auto texture = Resource::Find<Texture>(context, scaleImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
@@ -371,35 +354,32 @@ TGFX_TEST(CanvasTest, rasterized) {
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  image = image->makeScaled(0.15f, 0.15f);
-  flatImage = image->makeFlattened(true, sampling);
-  EXPECT_TRUE(flatImage->hasMipmaps());
-  canvas->drawImage(flatImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
-  texture = Resource::Find<Texture>(context, flatImageUniqueKey);
+  image = image->makeScaled(0.15f, sampling);
+  scaledImage = image->makeMipmapped(true);
+  EXPECT_TRUE(scaledImage->hasMipmaps());
+  canvas->drawImage(scaledImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage_mipmap"));
+  texture = Resource::Find<Texture>(context, scaleImageUniqueKey);
   EXPECT_TRUE(texture == nullptr);
-  flatImageUniqueKey = std::static_pointer_cast<ResourceImage>(flatImage)->uniqueKey;
-  texture = Resource::Find<Texture>(context, flatImageUniqueKey);
+  scaleImageUniqueKey = std::static_pointer_cast<ResourceImage>(scaledImage)->uniqueKey;
+  texture = Resource::Find<Texture>(context, scaleImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();
-  flatImage = image->makeMipmapped(false);
-  EXPECT_FALSE(flatImage->hasMipmaps());
-  flatImage = flatImage->makeScaled(2.0f, 2.0f);
-  flatImage = flatImage->makeFlattened(false, sampling);
-  EXPECT_FALSE(flatImage->hasMipmaps());
-  flatImage = flatImage->makeMipmapped(true);
-  EXPECT_EQ(flatImage->width(), 907);
-  EXPECT_EQ(flatImage->height(), 1210);
-  canvas->drawImage(flatImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
+  scaledImage = image->makeMipmapped(false);
+  EXPECT_FALSE(scaledImage->hasMipmaps());
+  scaledImage = scaledImage->makeScaled(2.0f, sampling);
+  EXPECT_FALSE(scaledImage->hasMipmaps());
+  scaledImage = scaledImage->makeMipmapped(true);
+  EXPECT_EQ(scaledImage->width(), 907);
+  EXPECT_EQ(scaledImage->height(), 1210);
+  canvas->drawImage(scaledImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage_scale_up"));
   context->setCacheLimit(defaultCacheLimit);
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, mipmap) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
@@ -442,13 +422,11 @@ TGFX_TEST(CanvasTest, mipmap) {
                       ->makeWithMatrix(imageMatrix));
   canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_texture_effect"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, TileModeFallback) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto caps = (Caps*)context->caps();
   caps->npotTextureTileSupport = false;
@@ -468,13 +446,11 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
   canvas->drawRect(drawRect, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TileModeFallback"));
   caps->npotTextureTileSupport = true;
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, hardwareMipmap) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
@@ -499,13 +475,11 @@ TGFX_TEST(CanvasTest, hardwareMipmap) {
   canvas->setMatrix(imageMatrix);
   canvas->drawImage(imageMipmapped, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_hardware"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, path) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 600, 500);
   auto canvas = surface->getCanvas();
@@ -630,13 +604,11 @@ TGFX_TEST(CanvasTest, path) {
   canvas->drawPath(path, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, shape) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto width = 400;
   auto height = 500;
@@ -662,13 +634,11 @@ TGFX_TEST(CanvasTest, shape) {
   canvas->rotate(45, radius, radius);
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, drawShape) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto width = 300;
   auto height = 200;
@@ -716,14 +686,11 @@ TGFX_TEST(CanvasTest, drawShape) {
   canvas->setMatrix(matrix);
   canvas->drawShape(textShape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawShape"));
-
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, image) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 500, false, 1, false, RenderFlags::DisableCache);
   auto canvas = surface->getCanvas();
@@ -830,45 +797,11 @@ TGFX_TEST(CanvasTest, image) {
   matrix.postTranslate(110, -75);
   canvas->drawImage(rgbAAA, matrix);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
-  device->unlock();
-}
-
-TGFX_TEST(CanvasTest, scaleImage) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1286, 558, false, 1, false, RenderFlags::DisableCache);
-  auto canvas = surface->getCanvas();
-  auto image = MakeImage("resources/apitest/rgbaaa.png");
-  EXPECT_EQ(image->width(), 1024);
-  EXPECT_EQ(image->height(), 512);
-  image = image->makeScaled(0.5f, 0.5f);
-  image = image->makeOriented(Orientation::RightTop);
-  EXPECT_EQ(image->width(), 256);
-  EXPECT_EQ(image->height(), 512);
-  image = image->makeSubset(Rect::MakeXYWH(50, 50, 206, 462));
-  EXPECT_EQ(image->width(), 206);
-  EXPECT_EQ(image->height(), 462);
-  image = image->makeScaled(3.0f, 3.0f);
-  EXPECT_EQ(image->width(), 618);
-  EXPECT_EQ(image->height(), 1386);
-  image = image->makeSubset(Rect::MakeXYWH(60, 100, 558, 1286));
-  image = image->makeOriented(Orientation::RightTop);
-  image = image->makeScaled(0.25f, 0.25f);
-  EXPECT_EQ(image->width(), 322);
-  EXPECT_EQ(image->height(), 140);
-  auto matrix = Matrix::MakeScale(2.f);
-  matrix.postTranslate(20, 30);
-  canvas->drawImage(image, matrix);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, atlas) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1300, 740, false, 1, false, RenderFlags::DisableCache);
   auto canvas = surface->getCanvas();
@@ -894,7 +827,6 @@ TGFX_TEST(CanvasTest, atlas) {
                   Rect::MakeXYWH(0, 360, 640, 360), Rect::MakeXYWH(640, 360, 640, 360)};
   canvas->drawAtlas(std::move(image), matrix, rect, nullptr, 4);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/altas"));
-  device->unlock();
 }
 
 static GLTextureInfo CreateRectangleTexture(Context* context, int width, int heigh) {
@@ -917,9 +849,8 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
 }
 
 TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto sampler = CreateRectangleTexture(context, 110, 110);
   ASSERT_TRUE(sampler.id > 0);
@@ -937,7 +868,6 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
   GLFunctions::Get(context)->deleteTextures(1, &(sampler.id));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, YUVImage) {
@@ -958,9 +888,8 @@ TGFX_TEST(CanvasTest, YUVImage) {
   ASSERT_TRUE(yuvData != nullptr);
   auto image = Image::MakeI420(std::move(yuvData));
   ASSERT_TRUE(image != nullptr);
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   ASSERT_TRUE(surface != nullptr);
@@ -973,13 +902,11 @@ TGFX_TEST(CanvasTest, YUVImage) {
   canvas->setMatrix(Matrix::MakeTrans(static_cast<float>(width / 4), 0.f));
   canvas->drawImage(rgbaa);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/YUVImage_RGBAA"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, NothingToDraw) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
@@ -991,15 +918,12 @@ TGFX_TEST(CanvasTest, NothingToDraw) {
   paint.setColor(Color::FromRGBA(0, 0, 0, 127));
   canvas->drawRect(Rect::MakeXYWH(20, 20, 20, 20), paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NothingToDraw"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, Picture) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-
   Recorder recorder = {};
   auto canvas = recorder.beginRecording();
   EXPECT_TRUE(recorder.getRecordingCanvas() != nullptr);
@@ -1092,17 +1016,14 @@ TGFX_TEST(CanvasTest, Picture) {
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 200, image->height() - 200, &matrix);
   ASSERT_TRUE(pictureImage != nullptr);
-  EXPECT_FALSE(pictureImage->isFlat());
   auto subsetImage = std::static_pointer_cast<SubsetImage>(pictureImage);
   EXPECT_TRUE(subsetImage->source == image);
   EXPECT_EQ(singleImageRecord.use_count(), 1);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100, &matrix);
-  EXPECT_TRUE(pictureImage->isFlat());
   EXPECT_EQ(singleImageRecord.use_count(), 2);
   EXPECT_FALSE(pictureImage == image);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width() - 100, image->height() - 100);
-  EXPECT_TRUE(pictureImage->isFlat());
   EXPECT_FALSE(pictureImage == image);
   EXPECT_EQ(singleImageRecord.use_count(), 2);
 
@@ -1134,7 +1055,6 @@ TGFX_TEST(CanvasTest, Picture) {
   auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
   EXPECT_EQ(textRecord.use_count(), 1);
   ASSERT_TRUE(textImage != nullptr);
-  EXPECT_TRUE(textImage->isFlat());
 
   surface = Surface::Make(context, textImage->width(), textImage->height());
   canvas = surface->getCanvas();
@@ -1156,22 +1076,17 @@ TGFX_TEST(CanvasTest, Picture) {
   auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
   EXPECT_EQ(patRecord.use_count(), 1);
   ASSERT_TRUE(pathImage != nullptr);
-  EXPECT_TRUE(pathImage->isFlat());
 
   surface = Surface::Make(context, pathImage->width(), pathImage->height());
   canvas = surface->getCanvas();
   canvas->drawImage(pathImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
-
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, BlendModeTest) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   auto padding = 30;
   auto scale = 1.f;
@@ -1228,16 +1143,12 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
                         static_cast<float>(image->height() + padding) * scale);
     }
   }
-
-  context->submit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/blendMode"));
-  device->unlock();
 }
 
 TGFX_TEST(CanvasTest, Path_addArc) {
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
   auto canvas = surface->getCanvas();
@@ -1259,6 +1170,5 @@ TGFX_TEST(CanvasTest, Path_addArc) {
     canvas->drawPath(path, paint);
     EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc_reversed" + std::to_string(i)));
   }
-  device->unlock();
 }
 }  // namespace tgfx

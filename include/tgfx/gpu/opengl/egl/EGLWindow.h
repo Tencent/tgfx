@@ -37,6 +37,7 @@ class EGLWindow : public Window {
                                              EGLContext sharedContext = nullptr);
 
  protected:
+  void onInvalidSize() override;
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
   void onPresent(Context* context, int64_t presentationTime) override;
 

@@ -56,10 +56,6 @@ class PixelBuffer : public ImageBuffer {
     return _info.isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
   /**
    * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
    * PixelBuffer.

@@ -70,6 +70,7 @@ class Window {
   explicit Window(std::shared_ptr<Device> device);
   Window() = default;
 
+  virtual void onInvalidSize();
   virtual std::shared_ptr<Surface> onCreateSurface(Context* context) = 0;
   virtual void onPresent(Context* context, int64_t presentationTime) = 0;
   virtual void onFreeSurface();

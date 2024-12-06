@@ -22,6 +22,7 @@
 
 namespace tgfx {
 std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<ResourceImage> source) {
+  TRACE_EVENT;
   if (source == nullptr) {
     return nullptr;
   }
@@ -39,6 +40,7 @@ MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> sou
 }
 
 std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const {
+  TRACE_EVENT;
   auto newSource = std::static_pointer_cast<ResourceImage>(source->onMakeDecoded(context, false));
   if (newSource == nullptr) {
     return nullptr;
@@ -52,7 +54,8 @@ std::shared_ptr<Image> MipmapImage::onMakeMipmapped(bool enabled) const {
   return enabled ? weakThis.lock() : source;
 }
 
-std::shared_ptr<TextureProxy> MipmapImage::onLockTextureProxy(const TPArgs& args) const {
-  return source->onLockTextureProxy(args);
+std::shared_ptr<TextureProxy> MipmapImage::onLockTextureProxy(const TPArgs& args,
+                                                              const UniqueKey& key) const {
+  return source->onLockTextureProxy(args, key);
 }
 }  // namespace tgfx

@@ -38,10 +38,6 @@ class SubsetImage : public TransformImage {
     return static_cast<int>(bounds.height());
   }
 
-  bool isFlat() const override {
-    return false;
-  }
-
  protected:
   Rect bounds = Rect::MakeEmpty();
 

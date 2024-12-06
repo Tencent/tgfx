@@ -26,6 +26,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/Baseline.h"
+#include "utils/ContextScope.h"
 #include "utils/DevicePool.h"
 #include "utils/ProjectPath.h"
 

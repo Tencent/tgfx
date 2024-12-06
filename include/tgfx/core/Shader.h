@@ -137,6 +137,13 @@ class Shader {
   std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
  protected:
+  enum class Type { Color, ColorFilter, Image, Blend, Matrix, Gradient };
+
+  /**
+   * Returns the type of this shader.
+   */
+  virtual Type type() const = 0;
+
   std::weak_ptr<Shader> weakThis;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,

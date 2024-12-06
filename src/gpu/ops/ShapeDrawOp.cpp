@@ -79,19 +79,11 @@ void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
   rasterizeMatrix = matrix;
 }
 
-static std::shared_ptr<Data> MakeVertexData(const Rect& rect) {
-  Buffer buffer(8 * sizeof(float));
-  auto vertices = static_cast<float*>(buffer.data());
-  auto quad = Quad::MakeFrom(rect);
-  int index = 0;
-  for (size_t i = 4; i >= 1; --i) {
-    vertices[index++] = quad.point(i - 1).x;
-    vertices[index++] = quad.point(i - 1).y;
+static std::shared_ptr<Data> MakeVertexData(const Rect& rect, AAType aaType) {
+  if (aaType != AAType::Coverage) {
+    auto quad = Quad::MakeFrom(rect);
+    return quad.toTriangleStrips();
   }
-  return buffer.release();
-}
-
-static std::shared_ptr<Data> MakeAAVertexData(const Rect& rect) {
   Buffer buffer(24 * sizeof(float));
   auto vertices = static_cast<float*>(buffer.data());
   // There is no need to scale the padding by the view matrix scale, as the view matrix scale is
@@ -139,7 +131,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
       return;
     }
     auto rect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    vertexData = aa == AAType::Coverage ? MakeAAVertexData(rect) : MakeVertexData(rect);
+    vertexData = MakeVertexData(rect, aa);
     auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &maskMatrix, true);
     if (maskFP == nullptr) {
       return;

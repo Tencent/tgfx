@@ -19,6 +19,7 @@
 #pragma once
 
 #include "ResourceTask.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class RenderTargetCreateTask : public ResourceTask {
@@ -26,21 +27,20 @@ class RenderTargetCreateTask : public ResourceTask {
   /**
    * Create a new RenderTargetCreateTask to generate a RenderTarget with the given properties.
    */
-  static std::shared_ptr<RenderTargetCreateTask> MakeFrom(UniqueKey uniqueKey, UniqueKey textureKey,
-                                                          PixelFormat pixelFormat,
-                                                          int sampleCount = 1,
-                                                          bool clearAll = false);
+  static std::shared_ptr<RenderTargetCreateTask> MakeFrom(
+      UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy, PixelFormat pixelFormat,
+      int sampleCount = 1, bool clearAll = false);
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  UniqueKey textureKey = {};
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
   PixelFormat pixelFormat = PixelFormat::RGBA_8888;
   int sampleCount = 1;
   bool clearAll = false;
 
-  RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey textureKey, PixelFormat pixelFormat,
-                         int sampleCount, bool clearAll);
+  RenderTargetCreateTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy,
+                         PixelFormat pixelFormat, int sampleCount, bool clearAll);
 };
 }  // namespace tgfx

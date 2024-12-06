@@ -165,9 +165,8 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   bitmap.unlockPixels();
   EXPECT_TRUE(result);
 
-  auto device = DevicePool::Make();
-  ASSERT_TRUE(device != nullptr);
-  auto context = device->lockContext();
+  ContextScope scope;
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = Image::MakeFrom(bitmap);
   ASSERT_TRUE(image != nullptr);
@@ -255,7 +254,6 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_BL_rgb_A_to_rgb_A_100_-100");
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
-  device->unlock();
   bitmap.unlockPixels();
 }
 

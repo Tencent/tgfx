@@ -46,7 +46,6 @@ class OpsRenderTask : public RenderTask {
  private:
   bool closed = false;
   uint32_t renderFlags = 0;
-  std::shared_ptr<RenderPass> renderPass = nullptr;
   std::vector<std::unique_ptr<Op>> ops = {};
 };
 }  // namespace tgfx

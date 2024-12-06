@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Quad.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
@@ -31,11 +32,15 @@ Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
   return Quad(points);
 }
 
-Rect Quad::bounds() const {
-  auto min = [](const float c[4]) { return std::min(std::min(c[0], c[1]), std::min(c[2], c[3])); };
-  auto max = [](const float c[4]) { return std::max(std::max(c[0], c[1]), std::max(c[2], c[3])); };
-  float x[4] = {points[0].x, points[1].x, points[2].x, points[3].x};
-  float y[4] = {points[0].y, points[1].y, points[2].y, points[3].y};
-  return {min(x), min(y), max(x), max(y)};
+std::shared_ptr<Data> Quad::toTriangleStrips() const {
+  Buffer buffer(8 * sizeof(float));
+  auto vertices = static_cast<float*>(buffer.data());
+  int index = 0;
+  for (size_t i = 4; i >= 1; --i) {
+    vertices[index++] = points[i - 1].x;
+    vertices[index++] = points[i - 1].y;
+  }
+  return buffer.release();
 }
+
 }  // namespace tgfx

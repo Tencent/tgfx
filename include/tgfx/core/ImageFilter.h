@@ -126,6 +126,13 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect) const;
 
  protected:
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+
+  /**
+   * Returns the type of this image filter.
+   */
+  virtual Type type() const = 0;
+
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.
@@ -137,11 +144,10 @@ class ImageFilter {
    * @param source The source image.
    * @param clipBounds The clip bounds of the filtered image, relative to the source image.
    * @param args The arguments for creating the texture proxy.
-   * @param sampling The sampling options used for sampling the source image.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                         const Rect& clipBounds, const TPArgs& args,
-                                                         const SamplingOptions& sampling) const;
+                                                         const Rect& clipBounds,
+                                                         const TPArgs& args) const;
 
   /**
    * Returns a FragmentProcessor that applies this filter to the source image. The returned
@@ -151,20 +157,6 @@ class ImageFilter {
                                                                  const FPArgs& args,
                                                                  const SamplingOptions& sampling,
                                                                  const Matrix* uvMatrix) const = 0;
-
-  /**
-   * Returns true if this filter is a ComposeImageFilter.
-   */
-  virtual bool isComposeFilter() const {
-    return false;
-  }
-
-  /**
-   * Returns true if this filter requires the source image to be flattened.
-   */
-  virtual bool requireFlatSource() const {
-    return false;
-  }
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 

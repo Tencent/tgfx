@@ -178,11 +178,6 @@ class Image {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the Image is in the YUV format.
-   */
-  virtual bool isYUV() const = 0;
-
-  /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,
    * which may be ignored if the GPU or the associated image source doesn’t support mipmaps.
    */
@@ -207,43 +202,14 @@ class Image {
   }
 
   /**
-   * Returns true if the Image is guaranteed to produce a single-plane texture without extra
-   * transforms and can be cached for repeat drawing. Extra transforms may include orientation,
-   * scale, subsets, filters, or RGBAAA layouts. A YUV Image is also not flat since it has multiple
-   * planes.
-   */
-  virtual bool isFlat() const = 0;
-
-  /**
-   * Returns a flattened Image with the same content as this Image, as if this Image were drawn to
-   * the returned Image. Unlike the makeTextureImage() method, this method doesn’t perform a draw
-   * operation immediately. Instead, it defers the draw operation until it is actually required.
-   * The flattened Image is guaranteed to produce a single-plane texture without extra transforms
-   * and can be cached for repeat drawing. This method is useful for caching the drawing result of
-   * a complex Image for repeated use.
-   * For example, if you create a subset Image from a flat Image, the subset Image doesn’t create
-   * its own GPU cache but uses the full resolution cache created by the original Image. If you want
-   * the subset Image to create its own GPU cache, you should call makeFlattened() on the subset
-   * Image.
-   * @param mipmapped Specifies whether the flattened Image should have mipmaps. Ignored if the
-   * Image is already flat.
-   * @param sampling The sampling options may be applied if the image has scaling transforms.
-   * Ignored if the Image is already flat.
-   * @return If the Image is already flat, the original Image is returned.
-   */
-  std::shared_ptr<Image> makeFlattened(bool mipmapped = false,
-                                       const SamplingOptions& sampling = {}) const;
-
-  /**
    * Returns an Image backed by a GPU texture associated with the given context. If a corresponding
    * texture cache exists in the context, it returns an Image that wraps that texture. Otherwise, it
-   * creates one immediately, applying the sampling options if the image is scaled. If the Image is
-   * already texture-backed and the context is compatible with the GPU texture, it returns the
-   * original Image. Otherwise, it returns nullptr. It's safe to release the original Image to
-   * reduce CPU memory usage, as the returned Image holds a strong reference to the texture cache.
+   * creates one immediately. If the Image is already texture-backed and the context is compatible
+   * with the GPU texture, it returns the original Image. Otherwise, it returns nullptr. It's safe
+   * to release the original Image to reduce CPU memory usage, as the returned Image holds a strong
+   * reference to the texture cache.
    */
-  virtual std::shared_ptr<Image> makeTextureImage(Context* context,
-                                                  const SamplingOptions& sampling = {}) const;
+  virtual std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
    * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
@@ -281,11 +247,18 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
-   * Returns an Image with the specified scale. The returned Image always shares pixels and caches
-   * with the original Image. If both scaleX and scaleY are 1.0, the original Image is returned.
-   * If scaleX or scaleY is less than zero, nullptr is returned.
+   * Returns an Image scaled by the given factor. The scaled Image will have its own GPU cache at
+   * the new resolution and will not have mipmaps, even if the original Image does. You can call
+   * makeMipmapped() on the scaled Image to enable mipmaps. If the scale is greater than 1.0, it
+   * may result in blurring. Note that calling makeScaled() on an already scaled Image may return
+   * its internal non-scaled Image if the multiplied scale is 1.0.
+   * @param scale The factor to scale the Image by.
+   * @param sampling The sampling options to use when scaling the Image.
+   * @return The scaled Image. If the scale is 1.0, the original Image is returned. If the scale is
+   * less than 0, nullptr is returned.
    */
-  std::shared_ptr<Image> makeScaled(float scaleX, float scaleY) const;
+  virtual std::shared_ptr<Image> makeScaled(float scale,
+                                            const SamplingOptions& sampling = {}) const;
 
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
@@ -321,19 +294,14 @@ class Image {
 
   virtual std::shared_ptr<Image> onMakeOriented(Orientation orientation) const;
 
-  virtual std::shared_ptr<Image> onMakeScaled(float scaleX, float scaleY) const;
-
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
                                                   Point* offset, const Rect* clipRect) const;
 
   /**
    * Returns a texture proxy for the entire Image.
    * @param args The TPArgs used to create the texture proxy.
-   * @param sampling The sampling options applied when rasterizing the Image. This option
-   * may be ignored if the Image has no scaling transforms.
    */
-  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
-                                                         const SamplingOptions& sampling) const;
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const;
 
   /**
    * Returns a fragment processor for the entire Image.
@@ -353,7 +321,7 @@ class Image {
   friend class RuntimeImageFilter;
   friend class TransformImage;
   friend class RGBAAAImage;
-  friend class FlattenImage;
+  friend class ScaleImage;
   friend class ImageShader;
 };
 }  // namespace tgfx

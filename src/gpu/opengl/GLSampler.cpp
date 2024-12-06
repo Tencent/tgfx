@@ -34,16 +34,16 @@ std::unique_ptr<TextureSampler> TextureSampler::MakeFrom(Context* context,
   return sampler;
 }
 
-TextureType GLSampler::type() const {
+SamplerType GLSampler::type() const {
   switch (target) {
     case GL_TEXTURE_2D:
-      return TextureType::TwoD;
+      return SamplerType::TwoD;
     case GL_TEXTURE_RECTANGLE:
-      return TextureType::Rectangle;
+      return SamplerType::Rectangle;
     case GL_TEXTURE_EXTERNAL_OES:
-      return TextureType::External;
+      return SamplerType::External;
     default:
-      return TextureType::Unknown;
+      return SamplerType::None;
   }
 }
 
