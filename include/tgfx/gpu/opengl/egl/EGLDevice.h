@@ -56,7 +56,7 @@ class EGLDevice : public GLDevice {
   EGLSurface eglSurface = nullptr;
   EGLContext eglContext = nullptr;
   EGLContext shareContext = nullptr;
-  std::atomic<EGLNativeWindowType> sizeInvalidWindow = {nullptr};
+  std::atomic<EGLNativeWindowType> sizeInvalidWindow = {EGLNativeWindowType(0)};
 
   EGLDisplay oldEglDisplay = nullptr;
   EGLContext oldEglContext = nullptr;

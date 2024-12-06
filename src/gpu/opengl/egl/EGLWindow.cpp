@@ -68,6 +68,8 @@ ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
   GetClientRect(nativeWindow, &rect);
   size.width = static_cast<int>(rect.right - rect.left);
   size.height = static_cast<int>(rect.bottom - rect.top);
+#else
+  USE(nativeWindow);
 #endif
   return size;
 }
