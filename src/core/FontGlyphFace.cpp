@@ -47,4 +47,8 @@ std::shared_ptr<Image> FontGlyphFace::getImage(GlyphID glyphID, Matrix* matrix) 
 Rect FontGlyphFace::getBounds(GlyphID glyphID) const {
   return _font.getBounds(glyphID);
 }
+
+Font FontGlyphFace::asFont() const {
+  return _font;
+}
 }  // namespace tgfx

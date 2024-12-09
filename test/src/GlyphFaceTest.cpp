@@ -37,23 +37,25 @@ class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<Custo
   bool getPath(GlyphID glyphID, Path* path) const override {
     switch (glyphID) {
       case 1:
-        Point points[] = {{25.0f, 5.0f}, {45.0f, 45.0f}, {5.0f, 45.0f}};
-        path->moveTo(25.0f, 5.0f);
-        path->lineTo(45.0f, 45.0f);
-        path->lineTo(5.0f, 45.0f);
+        path->moveTo(Point::Make(25.0f, 5.0f) * _scale);
+        path->lineTo(Point::Make(45.0f, 45.0f) * _scale);
+        path->lineTo(Point::Make(5.0f, 45.0f) * _scale);
         path->close();
         return true;
       case 2:
-        path->moveTo(5.0f, 5.0f);
-        path->lineTo(45.0f, 5.0f);
-        path->lineTo(45.0f, 45.0f);
-        path->lineTo(5.0f, 45.0f);
+        path->moveTo(Point::Make(5.0f, 5.0f) * _scale);
+        path->lineTo(Point::Make(45.0f, 5.0f) * _scale);
+        path->lineTo(Point::Make(45.0f, 45.0f) * _scale);
+        path->lineTo(Point::Make(5.0f, 45.0f) * _scale);
         path->close();
         return true;
-      case 3:
-        path->addOval(Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f));
+      case 3: {
+        Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
+        rect.scale(_scale, _scale);
+        path->addOval(rect);
         path->close();
         return true;
+      }
       default:
         return false;
     }
@@ -67,7 +69,13 @@ class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<Custo
     if (glyphID < 1 || glyphID > 3) {
       return Rect::MakeEmpty();
     }
-    return Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
+    Rect bounds = Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
+    bounds.scale(_scale, _scale);
+    return bounds;
+  }
+
+  Font asFont() const override {
+    return Font();
   }
 
  private:
@@ -83,6 +91,7 @@ class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<Cust
     return false;
   }
   std::shared_ptr<GlyphFace> makeScaled(float scale) override {
+    printf("CustomImageGlyphFace::makeScaled -> scale: %f\n", scale);
     if (FloatNearlyZero(scale)) {
       return nullptr;
     }
@@ -110,7 +119,7 @@ class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<Cust
         return nullptr;
     }
 
-    matrix->setScale(0.25f, 0.25f);
+    matrix->setScale(0.25f * _scale, 0.25f * _scale);
     return Image::MakeFromFile(ProjectPath::Absolute(imagePath));
   }
 
@@ -118,7 +127,13 @@ class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<Cust
     if (glyphID < 3 || glyphID > 6) {
       return Rect::MakeEmpty();
     }
-    return Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
+    Rect bounds = Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
+    bounds.scale(_scale, _scale);
+    return bounds;
+  }
+
+  Font asFont() const override {
+    return Font();
   }
 
  private:
@@ -134,6 +149,9 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceSimple) {
 
   auto paint = Paint();
   paint.setColor(Color::Red());
+
+  float scaleFactor = 1.0f;
+  canvas->scale(scaleFactor, scaleFactor);
 
   std::vector<GlyphID> glyphIDs1 = {1, 2, 3};
   std::vector<Point> positions1 = {};
@@ -169,7 +187,17 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return false;
   }
   std::shared_ptr<GlyphFace> makeScaled(float scale) override {
-    _scale = scale;
+    if (FloatNearlyZero(scale)) {
+      return nullptr;
+    }
+
+    if (!FloatNearlyEqual(scale, _scale)) {
+      _scale = scale;
+      font20 = font20.makeWithSize(font20.getSize() * scale);
+      font40 = font40.makeWithSize(font40.getSize() * scale);
+      font60 = font60.makeWithSize(font60.getSize() * scale);
+    }
+
     return shared_from_this();
   }
 
@@ -197,6 +225,10 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return font20.getBounds(glyphID);
   }
 
+  Font asFont() const override {
+    return Font();
+  }
+
  private:
   float _scale = 1.0f;
 };
@@ -214,7 +246,12 @@ class CustomImageGlyphFace2 : public GlyphFace,
     if (FloatNearlyZero(scale)) {
       return nullptr;
     }
-    _scale = scale;
+
+    if (!FloatNearlyEqual(scale, _scale)) {
+      _scale = scale;
+      fontEmoji = fontEmoji.makeWithSize(fontEmoji.getSize() * scale);
+    }
+
     return shared_from_this();
   }
 
@@ -228,6 +265,10 @@ class CustomImageGlyphFace2 : public GlyphFace,
 
   Rect getBounds(GlyphID glyphID) const override {
     return fontEmoji.getBounds(glyphID);
+  }
+
+  Font asFont() const override {
+    return Font();
   }
 
  private:
@@ -245,6 +286,9 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
   // GlyphID:25483 14857 8699 16266 16671 24458 14689 15107 29702 41 70 77 77 80 29702 53 40 39 57 95
   // Text:这是一段测试文本，Hello，TGFX~
   auto glyphFace1 = std::make_shared<CustomPathGlyphFace2>();
+
+  float scaleFactor = 1.0f;
+  canvas->scale(scaleFactor, scaleFactor);
 
   auto paint = Paint();
   paint.setColor(Color::Red());
@@ -275,7 +319,7 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
   float advance = 240.0f;
   positions4.push_back(Point::Make(advance, 100.0f));
   for (size_t i = 1; i < glyphIDs4.size(); ++i) {
-    advance += font20.getAdvance(glyphIDs4[i - 1]);
+    advance += font20.getAdvance(glyphIDs4[i - 1]) / scaleFactor;
     positions4.push_back(Point::Make(advance, 100.0f));
   }
   canvas->drawGlyphs(glyphIDs4, positions4, glyphFace1, paint);

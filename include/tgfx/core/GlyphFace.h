@@ -64,5 +64,10 @@ class GlyphFace {
    * Returns the bounding box of the specified glyph.
    */
   virtual Rect getBounds(GlyphID glyphID) const = 0;
+
+  /**
+   * 
+   */
+  virtual Font asFont() const = 0;
 };
 }  // namespace tgfx
