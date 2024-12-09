@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Typeface.h"
