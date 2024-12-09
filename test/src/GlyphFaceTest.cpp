@@ -74,8 +74,8 @@ class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<Custo
     return bounds;
   }
 
-  Font asFont() const override {
-    return Font();
+  std::optional<Font> asFont() const override {
+    return std::nullopt;
   }
 
  private:
@@ -132,8 +132,8 @@ class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<Cust
     return bounds;
   }
 
-  Font asFont() const override {
-    return Font();
+  std::optional<Font> asFont() const override {
+    return std::nullopt;
   }
 
  private:
@@ -225,8 +225,8 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return font20.getBounds(glyphID);
   }
 
-  Font asFont() const override {
-    return Font();
+  std::optional<Font> asFont() const override {
+    return std::nullopt;
   }
 
  private:
@@ -267,8 +267,8 @@ class CustomImageGlyphFace2 : public GlyphFace,
     return fontEmoji.getBounds(glyphID);
   }
 
-  Font asFont() const override {
-    return Font();
+  std::optional<Font> asFont() const override {
+    return std::nullopt;
   }
 
  private:

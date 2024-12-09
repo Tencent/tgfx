@@ -38,7 +38,7 @@ class FontGlyphFace final : public GlyphFace {
 
   Rect getBounds(GlyphID glyphID) const override;
 
-  Font asFont() const override;
+  std::optional<Font> asFont() const override;
 
  private:
   Font _font = {};

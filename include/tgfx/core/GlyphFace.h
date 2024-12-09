@@ -66,8 +66,8 @@ class GlyphFace {
   virtual Rect getBounds(GlyphID glyphID) const = 0;
 
   /**
-   * 
+   * Returns the Font if this GlyphFace is a FontGlyphFace, otherwise returns std::nullopt.
    */
-  virtual Font asFont() const = 0;
+  virtual std::optional<Font> asFont() const = 0;
 };
 }  // namespace tgfx

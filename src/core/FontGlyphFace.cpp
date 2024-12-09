@@ -48,7 +48,7 @@ Rect FontGlyphFace::getBounds(GlyphID glyphID) const {
   return _font.getBounds(glyphID);
 }
 
-Font FontGlyphFace::asFont() const {
-  return _font;
+std::optional<Font> FontGlyphFace::asFont() const {
+  return std::optional(_font);
 }
 }  // namespace tgfx
