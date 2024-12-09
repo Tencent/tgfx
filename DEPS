@@ -57,7 +57,7 @@
       },
       {
         "url": "https://github.com/nlohmann/json.git",
-        "commit": "fec56a1a16c6e1c1b1f4e116a20e79398282626c",
+        "commit": "bc889afb4c5bf1c0d8ee29ef35eaaf4c8bef8a5d",
         "dir": "third_party/json"
       },
       {
