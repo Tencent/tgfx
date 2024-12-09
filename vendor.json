@@ -203,6 +203,7 @@
         "arguments": [
           "-DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE",
           "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE",
+          "-DFT_DISABLE_BROTLI=TRUE",
           "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
