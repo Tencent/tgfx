@@ -42,7 +42,7 @@
       },
       {
         "url": "https://github.com/freetype/freetype.git",
-        "commit": "86bc8a95056c97a810986434a3f268cbe67f2902",
+        "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
         "dir": "third_party/freetype"
       },
       {
