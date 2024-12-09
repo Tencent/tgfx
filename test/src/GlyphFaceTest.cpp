@@ -91,7 +91,6 @@ class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<Cust
     return false;
   }
   std::shared_ptr<GlyphFace> makeScaled(float scale) override {
-    printf("CustomImageGlyphFace::makeScaled -> scale: %f\n", scale);
     if (FloatNearlyZero(scale)) {
       return nullptr;
     }

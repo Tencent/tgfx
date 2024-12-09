@@ -73,6 +73,10 @@
         "innerShadow": "01cce38",
         "shaderMaskFilter": "ded3c91"
     },
+    "GlyphFaceTest": {
+        "GlyphFaceSimple": "4032de2",
+        "GlyphFaceWithStyle": "4032de2"
+    },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
         "update_mask": "d010fb8"
