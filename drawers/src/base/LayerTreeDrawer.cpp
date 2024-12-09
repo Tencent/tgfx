@@ -29,7 +29,6 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
     root = buildLayerTree(host);
     displayList.root()->addChild(root);
   }
-  prepare(host);
   updateRootMatrix(host);
   displayList.render(canvas->getSurface(), false);
 }
