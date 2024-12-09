@@ -23,6 +23,7 @@
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
 
