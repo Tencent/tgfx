@@ -21,9 +21,9 @@
 #include "core/GlyphRunList.h"
 #include "core/ScalerContext.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
 
