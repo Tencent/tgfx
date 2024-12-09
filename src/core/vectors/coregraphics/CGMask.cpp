@@ -193,9 +193,8 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
       continue;
     }
 
-    const auto& fontOptional = glyphFace->asFont();
-    auto& font = fontOptional.value();
-    if (font.isFauxBold() || font.getTypeface() == nullptr) {
+    const auto& font = glyphFace->asFont();
+    if (font->isFauxBold() || font->getTypeface() == nullptr) {
       return false;
     }
   }
@@ -222,13 +221,12 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     }
 
     CGContextSaveGState(cgContext);
-    const auto& fontOptional = glyphFace->asFont();
-    auto& font = fontOptional.value();
-    auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
+    const auto& font = glyphFace->asFont();
+    auto typeface = std::static_pointer_cast<CGTypeface>(font->getTypeface());
     CTFontRef ctFont = typeface->getCTFont();
-    ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
+    ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font->getSize()), nullptr,
                                             nullptr);
-    if (font.isFauxItalic()) {
+    if (font->isFauxItalic()) {
       CGContextSetTextMatrix(cgContext, CGAffineTransformMake(1, 0, -ITALIC_SKEW, 1, 0, 0));
     }
     CGContextTranslateCTM(cgContext, 0.f, static_cast<CGFloat>(height()));
