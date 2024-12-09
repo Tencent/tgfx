@@ -226,10 +226,15 @@ TGFX_TEST(CanvasTest, textShape) {
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
   std::string text =
-      "T";
+      "ffi fl\n"
+      "x²-y²\n"
+      "🤡👨🏼‍🦱👨‍👨‍👧‍👦\n"
+      "🇨🇳🇫🇮\n"
+      "#️⃣#*️⃣*\n"
+      "1️⃣🔟";
   auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
 
-  float fontSize = 40.f;
+  float fontSize = 25.f;
   float lineHeight = fontSize * 1.2f;
   float height = 0;
   float width = 0;
@@ -282,11 +287,11 @@ TGFX_TEST(CanvasTest, textShape) {
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
 
-  // Paint strokePaint;
-  // strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
-  // strokePaint.setStrokeWidth(2.f);
-  // strokePaint.setStyle(PaintStyle::Stroke);
-  // canvas->drawPath(path, strokePaint);
+  Paint strokePaint;
+  strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  strokePaint.setStrokeWidth(2.f);
+  strokePaint.setStyle(PaintStyle::Stroke);
+  canvas->drawPath(path, strokePaint);
 
   Paint paint;
   paint.setColor(Color::Black());

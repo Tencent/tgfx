@@ -447,12 +447,6 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
 void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
   auto face = ftTypeface()->face;
   FT_Outline_Get_CBox(&face->glyph->outline, bbox);
-
-  // outset the box to integral boundaries
-  // bbox->xMin &= ~63;
-  // bbox->yMin &= ~63;
-  // bbox->xMax = (bbox->xMax + 63) & ~63;
-  // bbox->yMax = (bbox->yMax + 63) & ~63;
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
