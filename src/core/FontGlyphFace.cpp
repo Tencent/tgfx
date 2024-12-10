@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/FontGlyphFace.h"
-#include "utils/MathExtra.h"
 
 namespace tgfx {
 std::shared_ptr<GlyphFace> GlyphFace::Wrap(Font font) {
