@@ -19,9 +19,9 @@
 #pragma once
 
 #include <stack>
+#include "core/CanvasState.h"
 #include "core/FillStyle.h"
 #include "core/GlyphRunList.h"
-#include "core/MCState.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
 

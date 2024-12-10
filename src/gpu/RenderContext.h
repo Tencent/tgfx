@@ -63,7 +63,7 @@ class RenderContext : public DrawContext {
   uint32_t renderFlags = 0;
   Surface* surface = nullptr;
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
-  uint32_t clipID = 0;
+  UniqueKey clipKey = {};
 
   explicit RenderContext(Surface* surface);
   Context* getContext() const;
