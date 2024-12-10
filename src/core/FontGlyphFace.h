@@ -38,7 +38,7 @@ class FontGlyphFace final : public GlyphFace {
   bool asFont(Font* font) const override;
 
  private:
-  explicit FontGlyphFace(const Font& font) : _font(font) {
+  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
   }
 
   Font _font = {};

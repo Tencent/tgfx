@@ -19,7 +19,6 @@
 #include "CustomLayer.h"
 #include "base/LayerTreeDrawers.h"
 #include "drawers/AppHost.h"
-#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/UTF.h"
 
 namespace drawers {

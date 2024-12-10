@@ -262,6 +262,9 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
                                     const MCState& state, const FillStyle& style) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
+  if (scale <= 0) {
+    return;
+  }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     auto glyphFace = glyphRun.glyphFace;

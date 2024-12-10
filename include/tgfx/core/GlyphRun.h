@@ -35,7 +35,7 @@ struct GlyphRun {
    * Constructs a GlyphRun using a font, a list of glyph IDs, and their positions.
    */
   GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
-      : GlyphRun(GlyphFace::Wrap(font), glyphIDs, positions) {
+      : GlyphRun(GlyphFace::Wrap(std::move(font)), std::move(glyphIDs), std::move(positions)) {
   }
 
   /**
@@ -43,7 +43,8 @@ struct GlyphRun {
    */
   GlyphRun(std::shared_ptr<GlyphFace> glyphFace, std::vector<GlyphID> glyphIDs,
            std::vector<Point> positions)
-      : glyphFace(glyphFace), glyphs(glyphIDs), positions(positions) {
+      : glyphFace(std::move(glyphFace)), glyphs(std::move(glyphIDs)),
+        positions(std::move(positions)) {
   }
 
   /**

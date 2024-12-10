@@ -38,6 +38,7 @@ GlyphRunList::GlyphRunList(GlyphRun glyphRun) {
 
 GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
   DEBUG_ASSERT(!_glyphRuns.empty());
+  DEBUG_ASSERT(_glyphRuns[0].glyphFace != nullptr);
   DEBUG_ASSERT(std::all_of(
       _glyphRuns.begin(), _glyphRuns.end(),
       [hasColor = _glyphRuns[0].glyphFace->hasColor()](const GlyphRun& glyphRun) {
@@ -57,7 +58,9 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
       glyphFace = glyphFace->makeScaled(resolutionScale);
-      DEBUG_ASSERT(glyphFace != nullptr);
+      if (glyphFace == nullptr) {
+        return Rect::MakeEmpty();
+      }
     }
     size_t index = 0;
     auto& positions = run.positions;
@@ -86,7 +89,9 @@ bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
       glyphFace = glyphFace->makeScaled(resolutionScale);
-      DEBUG_ASSERT(glyphFace != nullptr);
+      if (glyphFace == nullptr) {
+        return false;
+      }
     }
     size_t index = 0;
     auto& positions = run.positions;

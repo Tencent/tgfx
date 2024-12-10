@@ -31,7 +31,7 @@ namespace tgfx {
  */
 class GlyphFace {
  public:
-  static std::shared_ptr<GlyphFace> Wrap(const Font& font);
+  static std::shared_ptr<GlyphFace> Wrap(Font font);
 
   GlyphFace() = default;
   virtual ~GlyphFace() = default;
@@ -47,8 +47,8 @@ class GlyphFace {
   virtual bool hasOutlines() const = 0;
 
   /**
-   * Returns a new GlyphFace with the same attributes of this glyph face, but with the specified
-   * scale.
+   * Returns a new GlyphFace with the same attributes as this one, but with the glyph size scaled by
+   * the specified factor. If the scale is less than or equal to 0, returns nullptr.
    */
   virtual std::shared_ptr<GlyphFace> makeScaled(float scale) = 0;
 

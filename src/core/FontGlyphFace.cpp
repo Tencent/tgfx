@@ -20,11 +20,11 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-std::shared_ptr<GlyphFace> GlyphFace::Wrap(const Font& font) {
+std::shared_ptr<GlyphFace> GlyphFace::Wrap(Font font) {
   if (font.getTypeface() == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<FontGlyphFace>(new FontGlyphFace(font));
+  return std::shared_ptr<FontGlyphFace>(new FontGlyphFace(std::move(font)));
 }
 
 bool FontGlyphFace::hasColor() const {
