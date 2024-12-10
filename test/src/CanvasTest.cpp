@@ -634,6 +634,53 @@ TGFX_TEST(CanvasTest, shape) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
 }
 
+TGFX_TEST(CanvasTest, saveLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 600;
+  auto height = 500;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  auto saveCount = canvas->saveLayerAlpha(0.8f);
+  Paint layerPaint = {};
+  layerPaint.setImageFilter(ImageFilter::Blur(30, 30));
+  canvas->saveLayer(&layerPaint);
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  auto rect = Rect::MakeXYWH(50, 50, 100, 100);
+  canvas->drawRoundRect(rect, 30, 30, paint);
+  canvas->restoreToCount(saveCount);
+  auto dropShadowFilter = ImageFilter::DropShadow(10, 10, 20, 20, Color::Black());
+  paint.setImageFilter(dropShadowFilter);
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(200, 50, 100, 100), paint);
+  paint.setStrokeWidth(20);
+  canvas->drawLine(350, 50, 400, 150, paint);
+  canvas->drawRoundRect(Rect::MakeXYWH(450, 50, 100, 100), 30, 30, paint);
+  canvas->drawCircle(100, 250, 50, paint);
+  canvas->drawOval(Rect::MakeXYWH(200, 200, 150, 100), paint);
+  Path path = {};
+  path.addArc({0, 0, 150, 100}, 0, 180);
+  canvas->translate(400, 180);
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawPath(path, paint);
+  paint.setStyle(PaintStyle::Fill);
+  canvas->resetMatrix();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 30.f);
+  font.setFauxBold(true);
+  canvas->drawSimpleText("Hello TGFX", 50, 400, font, paint);
+  auto atlas = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(atlas != nullptr);
+  Matrix matrix[2] = {Matrix::I(), Matrix::MakeTrans(150, 0)};
+  Rect rects[2] = {Rect::MakeXYWH(0, 0, 110, 50), Rect::MakeXYWH(0, 60, 110, 50)};
+  canvas->translate(280, 360);
+  canvas->drawAtlas(atlas, matrix, rects, nullptr, 2, {}, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/saveLayer"));
+}
+
 TGFX_TEST(CanvasTest, drawShape) {
   ContextScope scope;
   auto context = scope.getContext();

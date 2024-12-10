@@ -331,8 +331,12 @@ std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip
 }
 
 std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AAType aaType) {
-  auto domainID = PathRef::GetUniqueKey(clip).domainID();
-  if (domainID == clipID) {
+  auto uniqueKey = PathRef::GetUniqueKey(clip);
+  if (aaType == AAType::Coverage) {
+    static const auto AntialiasFlag = UniqueID::Next();
+    uniqueKey = UniqueKey::Append(uniqueKey, &AntialiasFlag, 1);
+  }
+  if (uniqueKey == clipKey) {
     return clipTexture;
   }
   auto bounds = clip.getBounds();
@@ -359,7 +363,7 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
     auto proxyProvider = getContext()->proxyProvider();
     clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
   }
-  clipID = domainID;
+  clipKey = uniqueKey;
   return clipTexture;
 }
 
