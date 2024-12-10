@@ -21,11 +21,11 @@
 namespace tgfx {
 GlyphRun::GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
     : GlyphRun(FontGlyphFace::Make(font), glyphIDs, positions) {
-    }
+}
 
 GlyphRun::GlyphRun(std::shared_ptr<GlyphFace> glyphFace, std::vector<GlyphID> glyphIDs,
-           std::vector<Point> positions)
+                   std::vector<Point> positions)
     : glyphFace(glyphFace), glyphs(glyphIDs), positions(positions) {
-    }
+}
 
 }  // namespace tgfx

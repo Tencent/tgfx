@@ -18,10 +18,10 @@
 
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
+#include "core/FontGlyphFace.h"
 #include "core/LayerUnrollContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
-#include "core/FontGlyphFace.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -333,14 +333,13 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
 }
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
-                  std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) const {
+                        std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) const {
   TRACE_EVENT;
   if (glyphCount == 0 || glyphFace == nullptr || paint.nothingToDraw()) {
     return;
   }
 
-  GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount},
-                    {positions, positions + glyphCount});
+  GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());

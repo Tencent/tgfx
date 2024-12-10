@@ -26,7 +26,7 @@ namespace tgfx {
  * GlyphRun represents a sequence of glyphs from a single font, along with their positions.
  */
 class GlyphRun {
-public:
+ public:
   /**
    * Constructs an empty GlyphRun.
    */

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/TextBlob.h"
-#include "core/GlyphRunList.h"
 #include "core/FontGlyphFace.h"
+#include "core/GlyphRunList.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -53,8 +53,7 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Poi
   if (glyphCount == 0) {
     return nullptr;
   }
-  GlyphRun glyphRun(font, {glyphIDs, glyphIDs + glyphCount},
-                    {positions, positions + glyphCount});
+  GlyphRun glyphRun(font, {glyphIDs, glyphIDs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   return std::shared_ptr<TextBlob>(new TextBlob({glyphRunList}));
 }
