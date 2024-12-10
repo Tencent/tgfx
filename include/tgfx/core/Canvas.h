@@ -281,15 +281,15 @@ class Canvas {
                   const Font& font, const Paint& paint);
 
   /**
-   * Draws an array of glyphIDs using GlyphFace, with paths and images provided by GlyphFace and
-   * positions specified by positions.
-   * @param glyphIDs The array of GlyphID to draw.
+   * Draws an array of glyphs from glyphIDs at positions using clip, matrix, glyphFace, and paint.
+   * @param glyphs The array of GlyphID to draw.
    * @param positions Where to draw each glyph.
-   * @param glyphFace Custom GlyphFace used for rendering glyphs.
-   * @param paint Blend, color, and so on, used to draw.
-   * @note The lengths of `glyphIDs` and `positions` must be the same.
+   * @param glyphCount number of glyphs to draw.
+   * @param glyphFace custom `GlyphFace` used for rendering glyphs.
+   * @param paint blend, color, and so on, used to draw.
+   * @note The lengths of `glyphs` and `positions` must be the same.
    */
-  void drawGlyphs(const std::vector<GlyphID>& glyphIDs, const std::vector<Point>& positions,
+  void drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                   std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) const;
 
   /**

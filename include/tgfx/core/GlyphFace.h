@@ -19,15 +19,14 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 /**
-* GlyphFace is a provider for glyphs. It provides the glyph path, image, and bounds, etc.
-*/
+ * GlyphFace is a render-only font that contains only the necessary information to render glyphs. It can be implemented externally to render glyphs from a custom font or used as a wrapper around a Font object.
+ */
 class GlyphFace {
  public:
   GlyphFace() = default;
@@ -67,8 +66,10 @@ class GlyphFace {
   virtual Rect getBounds(GlyphID glyphID) const = 0;
 
   /**
-   * Returns the Font if this GlyphFace is a FontGlyphFace, otherwise returns std::nullopt.
+   * Returns the font object represented by this GlyphFace.
+   * If the GlyphFace is not a font object, returns false and sets the font pointer to null.
+   * If the GlyphFace is a font object, returns true and sets the font pointer to the font object.
    */
-  virtual std::optional<Font> asFont() const = 0;
+  virtual bool asFont(Font* font) const = 0;
 };
 }  // namespace tgfx

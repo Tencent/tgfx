@@ -20,6 +20,7 @@
 #include "CGTypeface.h"
 #include "core/GlyphRunList.h"
 #include "core/ScalerContext.h"
+#include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Mask.h"
@@ -188,13 +189,9 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     return false;
   }
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto glyphFace = glyphRun.glyphFace;
-    if (glyphFace == nullptr || glyphFace->asFont() == std::nullopt) {
-      continue;
-    }
-
-    const auto& font = glyphFace->asFont();
-    if (font->isFauxBold() || font->getTypeface() == nullptr) {
+    Font font;
+    bool success = glyphRun.glyphFace->asFont(&font);
+    if (!success || font.isFauxBold() || font.getTypeface() == nullptr) {
       return false;
     }
   }
@@ -215,18 +212,19 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
   CGContextSetShouldSubpixelPositionFonts(cgContext, true);
 
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto glyphFace = glyphRun.glyphFace;
-    if (glyphFace == nullptr || glyphFace->asFont() == std::nullopt) {
+    CGContextSaveGState(cgContext);
+    Font font;
+    bool success = glyphRun.glyphFace->asFont(&font);
+    if (!success) {
+      CGContextRestoreGState(cgContext);
       continue;
     }
-
-    CGContextSaveGState(cgContext);
-    const auto& font = glyphFace->asFont();
-    auto typeface = std::static_pointer_cast<CGTypeface>(font->getTypeface());
+    DEBUG_ASSERT(font.getTypeface() != nullptr);
+    auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
     CTFontRef ctFont = typeface->getCTFont();
-    ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font->getSize()), nullptr,
+    ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
                                             nullptr);
-    if (font->isFauxItalic()) {
+    if (font.isFauxItalic()) {
       CGContextSetTextMatrix(cgContext, CGAffineTransformMake(1, 0, -ITALIC_SKEW, 1, 0, 0));
     }
     CGContextTranslateCTM(cgContext, 0.f, static_cast<CGFloat>(height()));

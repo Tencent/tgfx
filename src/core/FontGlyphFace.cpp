@@ -16,10 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/FontGlyphFace.h"
+#include "core/FontGlyphFace.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
+std::shared_ptr<FontGlyphFace> FontGlyphFace::Make(const Font& font) {
+  if (font.getTypeface() == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<FontGlyphFace>(new FontGlyphFace(font));
+}
+
 bool FontGlyphFace::hasColor() const {
   return _font.hasColor();
 }
@@ -33,7 +40,7 @@ std::shared_ptr<GlyphFace> FontGlyphFace::makeScaled(float scale) {
     return nullptr;
   }
   auto size = _font.getSize() * scale;
-  return std::make_shared<FontGlyphFace>(_font.makeWithSize(size));
+  return FontGlyphFace::Make(_font.makeWithSize(size));
 }
 
 bool FontGlyphFace::getPath(GlyphID glyphID, Path* path) const {
@@ -48,7 +55,11 @@ Rect FontGlyphFace::getBounds(GlyphID glyphID) const {
   return _font.getBounds(glyphID);
 }
 
-std::optional<Font> FontGlyphFace::asFont() const {
-  return std::optional(_font);
+bool FontGlyphFace::asFont(Font* font) const {
+  if (font == nullptr) {
+    return false;
+  }
+  *font = _font;
+  return true;
 }
 }  // namespace tgfx

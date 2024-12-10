@@ -74,8 +74,8 @@ class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<Custo
     return bounds;
   }
 
-  std::optional<Font> asFont() const override {
-    return std::nullopt;
+  bool asFont(Font* /*font*/) const override {
+    return false;
   }
 
  private:
@@ -106,13 +106,13 @@ class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<Cust
     std::string imagePath;
     switch (glyphID) {
       case 4:
-        imagePath = "resources/assets/image1.png";
+        imagePath = "resources/assets/glyph1.png";
         break;
       case 5:
-        imagePath = "resources/assets/image2.png";
+        imagePath = "resources/assets/glyph2.png";
         break;
       case 6:
-        imagePath = "resources/assets/image3.png";
+        imagePath = "resources/assets/glyph3.png";
         break;
       default:
         return nullptr;
@@ -131,8 +131,8 @@ class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<Cust
     return bounds;
   }
 
-  std::optional<Font> asFont() const override {
-    return std::nullopt;
+  bool asFont(Font* /*font*/) const override {
+    return false;
   }
 
  private:
@@ -157,14 +157,16 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceSimple) {
   positions1.push_back(Point::Make(0.0f, 0.0f));
   positions1.push_back(Point::Make(50.0f, 0.0f));
   positions1.push_back(Point::Make(100.0f, 0.0f));
-  canvas->drawGlyphs(glyphIDs1, positions1, std::make_shared<CustomPathGlyphFace>(), paint);
+  canvas->drawGlyphs(glyphIDs1.data(), positions1.data(), glyphIDs1.size(),
+                     std::make_shared<CustomPathGlyphFace>(), paint);
 
   std::vector<GlyphID> glyphIDs2 = {4, 5, 6};
   std::vector<Point> positions2 = {};
   positions2.push_back(Point::Make(150.0f, 0.0f));
   positions2.push_back(Point::Make(205.0f, 0.0f));
   positions2.push_back(Point::Make(260.0f, 0.0f));
-  canvas->drawGlyphs(glyphIDs2, positions2, std::make_shared<CustomImageGlyphFace>(), paint);
+  canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(),
+                     std::make_shared<CustomImageGlyphFace>(), paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "GlyphFaceTest/GlyphFaceSimple"));
 }
@@ -224,8 +226,8 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return font20.getBounds(glyphID);
   }
 
-  std::optional<Font> asFont() const override {
-    return std::nullopt;
+  bool asFont(Font* /*font*/) const override {
+    return false;
   }
 
  private:
@@ -266,8 +268,8 @@ class CustomImageGlyphFace2 : public GlyphFace,
     return fontEmoji.getBounds(glyphID);
   }
 
-  std::optional<Font> asFont() const override {
-    return std::nullopt;
+  bool asFont(Font* /*font*/) const override {
+    return false;
   }
 
  private:
@@ -295,21 +297,21 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
   std::vector<Point> positions1 = {};
   positions1.push_back(Point::Make(0.0f, 100.0f));
   positions1.push_back(Point::Make(20.0f, 100.0f));
-  canvas->drawGlyphs(glyphIDs1, positions1, glyphFace1, paint);
+  canvas->drawGlyphs(glyphIDs1.data(), positions1.data(), glyphIDs1.size(), glyphFace1, paint);
 
   paint.setColor(Color::Green());
   std::vector<GlyphID> glyphIDs2 = {8699, 16266};
   std::vector<Point> positions2 = {};
   positions2.push_back(Point::Make(40.0f, 100.0f));
   positions2.push_back(Point::Make(80.0f, 100.0f));
-  canvas->drawGlyphs(glyphIDs2, positions2, glyphFace1, paint);
+  canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), glyphFace1, paint);
 
   paint.setColor(Color::Blue());
   std::vector<GlyphID> glyphIDs3 = {16671, 24458};
   std::vector<Point> positions3 = {};
   positions3.push_back(Point::Make(120.0f, 100.0f));
   positions3.push_back(Point::Make(180.0f, 100.0f));
-  canvas->drawGlyphs(glyphIDs3, positions3, glyphFace1, paint);
+  canvas->drawGlyphs(glyphIDs3.data(), positions3.data(), glyphIDs3.size(), glyphFace1, paint);
 
   paint.setColor(Color::FromRGBA(255, 0, 255, 255));
   std::vector<GlyphID> glyphIDs4 = {14689, 15107, 29702, 41, 70, 77, 77,
@@ -321,7 +323,7 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
     advance += font20.getAdvance(glyphIDs4[i - 1]) / scaleFactor;
     positions4.push_back(Point::Make(advance, 100.0f));
   }
-  canvas->drawGlyphs(glyphIDs4, positions4, glyphFace1, paint);
+  canvas->drawGlyphs(glyphIDs4.data(), positions4.data(), glyphIDs4.size(), glyphFace1, paint);
 
   // 1109 886 1110 888
   // 🤩😃🤪😅
@@ -331,8 +333,8 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
   emojiPositions.push_back(Point::Make(510.0f, 100.0f));
   emojiPositions.push_back(Point::Make(570.0f, 100.0f));
   emojiPositions.push_back(Point::Make(630.0f, 100.0f));
-  canvas->drawGlyphs(emojiGlyphIDs, emojiPositions, std::make_shared<CustomImageGlyphFace2>(),
-                     paint);
+  canvas->drawGlyphs(emojiGlyphIDs.data(), emojiPositions.data(), emojiGlyphIDs.size(),
+                     std::make_shared<CustomImageGlyphFace2>(), paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "GlyphFaceTest/GlyphFaceWithStyle"));
 }

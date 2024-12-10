@@ -21,7 +21,7 @@
 #include "core/LayerUnrollContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
-#include "tgfx/core/FontGlyphFace.h"
+#include "core/FontGlyphFace.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -329,31 +329,20 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
   TRACE_EVENT;
-  if (glyphCount == 0 || paint.nothingToDraw()) {
+  drawGlyphs(glyphs, positions, glyphCount, FontGlyphFace::Make(font), paint);
+}
+
+void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
+                  std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) const {
+  TRACE_EVENT;
+  if (glyphCount == 0 || glyphFace == nullptr || paint.nothingToDraw()) {
     return;
   }
-  GlyphRun glyphRun(std::make_shared<FontGlyphFace>(font), {glyphs, glyphs + glyphCount},
+
+  GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount},
                     {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
-  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
-}
-
-void Canvas::drawGlyphs(const std::vector<GlyphID>& glyphIDs, const std::vector<Point>& positions,
-                        std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) const {
-  TRACE_EVENT;
-  if (glyphIDs.empty() || positions.empty() || paint.nothingToDraw()) {
-    return;
-  }
-
-  if (glyphIDs.size() != positions.size()) {
-    LOGE("Canvas::drawGlyphs() glyphs and positions size mismatch!");
-    return;
-  }
-
-  GlyphRun glyphRun(glyphFace, glyphIDs, positions);
-  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
-  const auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
 }
 
