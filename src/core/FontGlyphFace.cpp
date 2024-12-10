@@ -36,7 +36,7 @@ bool FontGlyphFace::hasOutlines() const {
 }
 
 std::shared_ptr<GlyphFace> FontGlyphFace::makeScaled(float scale) {
-  if (FloatNearlyZero(scale)) {
+  if (scale <= 0) {
     return nullptr;
   }
   auto size = _font.getSize() * scale;
