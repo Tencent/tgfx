@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,28 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
-class TextContent : public LayerContent {
+class FontGlyphFace final : public GlyphFace {
  public:
-  TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor);
+  bool hasColor() const override;
 
-  Rect getBounds() const override {
-    return bounds;
-  }
+  bool hasOutlines() const override;
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
+  std::shared_ptr<GlyphFace> makeScaled(float scale) override;
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  bool getPath(GlyphID glyphID, Path* path) const override;
+
+  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
+
+  Rect getBounds(GlyphID glyphID) const override;
+
+  bool asFont(Font* font) const override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
-  std::shared_ptr<TextBlob> textBlob = nullptr;
-  Color textColor = Color::White();
+  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
+  }
 
-  static bool HitTestPointInternal(float localX, float localY,
-                                   const std::shared_ptr<GlyphRunList>& glyphRunList);
+  Font _font = {};
+
+  friend class GlyphFace;
 };
 }  // namespace tgfx

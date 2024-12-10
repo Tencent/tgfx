@@ -385,11 +385,17 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
   TRACE_EVENT;
-  if (glyphCount == 0 || paint.nothingToDraw()) {
+  drawGlyphs(glyphs, positions, glyphCount, GlyphFace::Wrap(font), paint);
+}
+
+void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
+                        std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) {
+  TRACE_EVENT;
+  if (glyphCount == 0 || glyphFace == nullptr || paint.nothingToDraw()) {
     return;
   }
   AutoLayerForImageFilter autoLayer(this, &paint);
-  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());

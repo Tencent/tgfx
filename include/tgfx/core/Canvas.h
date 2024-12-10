@@ -361,6 +361,18 @@ class Canvas {
                   const Font& font, const Paint& paint);
 
   /**
+   * Draws an array of glyphs at specified positions using the current clip, matrix, glyphFace, and
+   * paint.
+   * @param glyphs The array of GlyphIDs to draw.
+   * @param positions The positions to draw each glyph.
+   * @param glyphCount The number of glyphs to draw.
+   * @param glyphFace The custom GlyphFace used for rendering glyphs.
+   * @param paint The paint used for blending, coloring, etc.
+   */
+  void drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
+                  std::shared_ptr<GlyphFace> glyphFace, const Paint& paint);
+
+  /**
    * Draws a TextBlob at the specified (x, y) coordinates using the current clip, matrix, and paint.
    * @param textBlob The TextBlob to draw.
    * @param x The horizontal offset to apply to the TextBlob.

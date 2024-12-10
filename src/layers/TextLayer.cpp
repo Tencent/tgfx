@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
+#include "core/FontGlyphFace.h"
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
 #include "layers/contents/TextContent.h"
