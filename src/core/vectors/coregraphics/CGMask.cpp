@@ -191,7 +191,7 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     Font font;
     bool success = glyphRun.glyphFace->asFont(&font);
-    if (!success || font.isFauxBold() || font.getTypeface() == nullptr) {
+    if (!success || font.isFauxBold()) {
       return false;
     }
   }
@@ -214,12 +214,7 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     CGContextSaveGState(cgContext);
     Font font;
-    bool success = glyphRun.glyphFace->asFont(&font);
-    if (!success) {
-      CGContextRestoreGState(cgContext);
-      continue;
-    }
-    DEBUG_ASSERT(font.getTypeface() != nullptr);
+    glyphRun.glyphFace->asFont(&font);
     auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
     CTFontRef ctFont = typeface->getCTFont();
     ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,

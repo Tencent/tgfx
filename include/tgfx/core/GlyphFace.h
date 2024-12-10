@@ -25,25 +25,30 @@
 
 namespace tgfx {
 /**
- * GlyphFace is a render-only font that contains only the necessary information to render glyphs. It can be implemented externally to render glyphs from a custom font or used as a wrapper around a Font object.
+ * GlyphFace is a render-only font that contains only the necessary information to render glyphs.
+ * It can be implemented externally to render glyphs from a custom font or used as a wrapper
+ * around a Font object.
  */
 class GlyphFace {
  public:
+  static std::shared_ptr<GlyphFace> Wrap(const Font& font);
+
   GlyphFace() = default;
   virtual ~GlyphFace() = default;
 
   /**
-   * Returns true if the font has color glyphs, for example, color emojis.
+   * Returns true if the glyph face has color glyphs, for example, color emojis.
    */
   virtual bool hasColor() const = 0;
 
   /**
-   * Returns true if the font has outline glyphs, meaning it can generate paths.
+   * Returns true if the glyph face has outline glyphs, meaning it can generate paths.
    */
   virtual bool hasOutlines() const = 0;
 
   /**
-   * Returns a new GlyphFace with the same attributes of this font, but with the specified scale.
+   * Returns a new GlyphFace with the same attributes of this glyph face, but with the specified
+   * scale.
    */
   virtual std::shared_ptr<GlyphFace> makeScaled(float scale) = 0;
 
@@ -66,9 +71,9 @@ class GlyphFace {
   virtual Rect getBounds(GlyphID glyphID) const = 0;
 
   /**
-   * Returns the font object represented by this GlyphFace.
-   * If the GlyphFace is not a font object, returns false and sets the font pointer to null.
-   * If the GlyphFace is a font object, returns true and sets the font pointer to the font object.
+   * Checks if the GlyphFace is backed by a Font object.
+   * If so, sets the font pointer to the backing Font object and returns true.
+   * Otherwise, returns false and leaves the font pointer unchanged.
    */
   virtual bool asFont(Font* font) const = 0;
 };

@@ -23,6 +23,10 @@
 
 namespace tgfx {
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font& font) {
+  if (font.getTypeface() == nullptr) {
+    return nullptr;
+  }
+
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
   GlyphRun glyphRun = GlyphRun(font, {}, {});
@@ -50,7 +54,7 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
 
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
                                              size_t glyphCount, const Font& font) {
-  if (glyphCount == 0) {
+  if (glyphCount == 0 || font.getTypeface() == nullptr) {
     return nullptr;
   }
   GlyphRun glyphRun(font, {glyphIDs, glyphIDs + glyphCount}, {positions, positions + glyphCount});
@@ -63,6 +67,9 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(GlyphRun glyphRun) {
     return nullptr;
   }
   if (glyphRun.glyphs.empty()) {
+    return nullptr;
+  }
+  if (glyphRun.glyphFace == nullptr) {
     return nullptr;
   }
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
@@ -98,6 +105,9 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(std::vector<GlyphRun> glyphRuns) {
   GlyphFaceType glyphFaceType = GetGlyphFaceType(glyphRuns[0].glyphFace);
   for (auto& run : glyphRuns) {
     if (run.glyphs.size() != run.positions.size()) {
+      return nullptr;
+    }
+    if (run.glyphFace == nullptr) {
       return nullptr;
     }
     if (run.glyphs.empty()) {

@@ -329,7 +329,7 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
   TRACE_EVENT;
-  drawGlyphs(glyphs, positions, glyphCount, FontGlyphFace::Make(font), paint);
+  drawGlyphs(glyphs, positions, glyphCount, GlyphFace::Wrap(font), paint);
 }
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,

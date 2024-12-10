@@ -23,8 +23,6 @@
 namespace tgfx {
 class FontGlyphFace final : public GlyphFace {
  public:
-  static std::shared_ptr<FontGlyphFace> Make(const Font& font);
-
   bool hasColor() const override;
 
   bool hasOutlines() const override;
@@ -44,5 +42,7 @@ class FontGlyphFace final : public GlyphFace {
   }
 
   Font _font = {};
+
+  friend class GlyphFace;
 };
 }  // namespace tgfx

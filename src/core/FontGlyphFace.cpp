@@ -20,7 +20,7 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-std::shared_ptr<FontGlyphFace> FontGlyphFace::Make(const Font& font) {
+std::shared_ptr<GlyphFace> GlyphFace::Wrap(const Font& font) {
   if (font.getTypeface() == nullptr) {
     return nullptr;
   }
@@ -40,7 +40,7 @@ std::shared_ptr<GlyphFace> FontGlyphFace::makeScaled(float scale) {
     return nullptr;
   }
   auto size = _font.getSize() * scale;
-  return FontGlyphFace::Make(_font.makeWithSize(size));
+  return GlyphFace::Wrap(_font.makeWithSize(size));
 }
 
 bool FontGlyphFace::getPath(GlyphID glyphID, Path* path) const {

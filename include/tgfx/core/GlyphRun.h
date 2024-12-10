@@ -25,8 +25,7 @@ namespace tgfx {
 /**
  * GlyphRun represents a sequence of glyphs from a single font, along with their positions.
  */
-class GlyphRun {
- public:
+struct GlyphRun {
   /**
    * Constructs an empty GlyphRun.
    */
@@ -35,13 +34,17 @@ class GlyphRun {
   /**
    * Constructs a GlyphRun using a font, a list of glyph IDs, and their positions.
    */
-  GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions);
+  GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
+      : GlyphRun(GlyphFace::Wrap(font), glyphIDs, positions) {
+  }
 
   /**
    * Constructs a GlyphRun using a GlyphFace, a list of glyph IDs, and their positions.
    */
   GlyphRun(std::shared_ptr<GlyphFace> glyphFace, std::vector<GlyphID> glyphIDs,
-           std::vector<Point> positions);
+           std::vector<Point> positions)
+      : glyphFace(glyphFace), glyphs(glyphIDs), positions(positions) {
+  }
 
   /**
    * Returns the GlyphFace used to render the glyphs in this run.
