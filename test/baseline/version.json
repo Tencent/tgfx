@@ -56,7 +56,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
-        "SimpleLayerTreeDrawer": "b062b9a",
+        "SimpleLayerTreeDrawer": "4513df8",
         "SimpleText": "b062b9a"
     },
     "FilterTest": {
@@ -92,7 +92,7 @@
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
-        "getBounds": "febf424",
+        "getBounds": "3888c19",
         "getLayersUnderPoint": "b062b9a",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
