@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Recorder.h"
+#include "CanvasState.h"
 #include "core/RecordingContext.h"
 
 namespace tgfx {
-Recorder::~Recorder() {
-  delete canvas;
-  delete recordingContext;
-}
-
-Canvas* Recorder::beginRecording() {
-  if (canvas == nullptr) {
-    recordingContext = new RecordingContext();
-    canvas = new Canvas(recordingContext);
+CanvasLayer::CanvasLayer(DrawContext* drawContext, const Paint* paint)
+    : drawContext(drawContext), layerContext(std::make_unique<RecordingContext>()) {
+  if (paint) {
+    layerPaint = *paint;
   }
-  if (activelyRecording) {
-    canvas->resetStateStack();
-    recordingContext->clear();
-  } else {
-    activelyRecording = true;
-  }
-  return getRecordingCanvas();
-}
-
-Canvas* Recorder::getRecordingCanvas() const {
-  return activelyRecording ? canvas : nullptr;
-}
-
-std::shared_ptr<Picture> Recorder::finishRecordingAsPicture() {
-  if (!activelyRecording || recordingContext == nullptr) {
-    return nullptr;
-  }
-  activelyRecording = false;
-  canvas->resetStateStack();
-  return recordingContext->finishRecordingAsPicture();
 }
 }  // namespace tgfx
