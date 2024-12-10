@@ -50,10 +50,10 @@ static const float BLUR_STABLE = 10.0f;
 static std::tuple<int, float, float> Get(float blurriness) {
   blurriness = blurriness < BLUR_LEVEL_MAX_LIMIT ? blurriness : BLUR_LEVEL_MAX_LIMIT;
   if (blurriness < BLUR_LEVEL_1_LIMIT) {
-    return {BLUR_LEVEL_1_DEPTH, BLUR_LEVEL_1_SCALE, blurriness / BLUR_LEVEL_1_LIMIT * 2.0};
+    return {BLUR_LEVEL_1_DEPTH, BLUR_LEVEL_1_SCALE, blurriness / BLUR_LEVEL_1_LIMIT * 1.2};
   } else if (blurriness < BLUR_LEVEL_2_LIMIT) {
     return {BLUR_LEVEL_2_DEPTH, BLUR_LEVEL_2_SCALE,
-            (blurriness - BLUR_STABLE) / (BLUR_LEVEL_2_LIMIT - BLUR_STABLE) * 3.0};
+            0.48 + (blurriness - BLUR_STABLE) / (BLUR_LEVEL_2_LIMIT - BLUR_STABLE) * 0.4};
   } else if (blurriness < BLUR_LEVEL_3_LIMIT) {
     return {BLUR_LEVEL_3_DEPTH, BLUR_LEVEL_3_SCALE,
             (blurriness - BLUR_STABLE) / (BLUR_LEVEL_3_LIMIT - BLUR_STABLE) * 5.0};
