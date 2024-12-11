@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Typeface.h"
+#include <vector>
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/UTF.h"
 
@@ -62,6 +63,13 @@ class EmptyTypeface : public Typeface {
   std::shared_ptr<Data> copyTableData(FontTableTag) const override {
     return nullptr;
   }
+
+ protected:
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  std::vector<Unichar> getGlyphToUnicodeMap() const override {
+    return std::vector<Unichar>();
+  }
+#endif
 
  private:
   uint32_t _uniqueID = UniqueID::Next();

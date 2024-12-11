@@ -39,12 +39,11 @@ namespace tgfx {
 
 class ElementWriter {
  public:
-  ElementWriter(const std::string& name, Context* GPUContext, XMLWriter* writer);
-  ElementWriter(const std::string& name, Context* GPUContext,
-                const std::unique_ptr<XMLWriter>& writer);
-  ElementWriter(const std::string& name, Context* GPUContext,
-                const std::unique_ptr<XMLWriter>& writer, ResourceStore* bucket);
-  ElementWriter(const std::string& name, Context* GPUContext, SVGContext* svgContext,
+  ElementWriter(const std::string& name, XMLWriter* writer);
+  ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer);
+  ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
+                ResourceStore* bucket);
+  ElementWriter(const std::string& name, Context* gpuContext, SVGExportingContext* svgContext,
                 ResourceStore* bucket, const MCState& state, const FillStyle& fill,
                 const Stroke* stroke = nullptr);
   ~ElementWriter();
@@ -54,6 +53,7 @@ class ElementWriter {
   void addAttribute(const std::string& name, float val);
 
   void addText(const std::string& text);
+  void addFontAttributes(const Font& font);
   void addRectAttributes(const Rect& rect);
   void addRoundRectAttributes(const RRect& roundRect);
   void addCircleAttributes(const Rect& bound);
@@ -63,15 +63,16 @@ class ElementWriter {
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
 
  private:
-  Resources addResources(const FillStyle& fill);
+  Resources addResources(const FillStyle& fill, Context* gpuContext);
 
-  void addShaderResources(const std::shared_ptr<Shader>& shader, Resources* resources);
+  void addShaderResources(const std::shared_ptr<Shader>& shader, Context* gpuContext,
+                          Resources* resources);
   void addColorShaderResources(const std::shared_ptr<const ColorShader>& shader,
                                Resources* resources);
   void addGradientShaderResources(const std::shared_ptr<const GradientShader>& shader,
                                   Resources* resources);
   void addImageShaderResources(const std::shared_ptr<const ImageShader>& shader,
-                               Resources* resources);
+                               Context* gpuContext, Resources* resources);
 
   void addColorFilterResources(const ColorFilter& colorFilter, Resources* resources);
 
@@ -86,9 +87,8 @@ class ElementWriter {
   void addDropShadowImageFilter(const std::shared_ptr<const DropShadowImageFilter>& filter);
   void addInnerShadowImageFilter(const std::shared_ptr<const InnerShadowImageFilter>& filter);
 
-  Context* _context = nullptr;
-  XMLWriter* _writer = nullptr;
-  ResourceStore* _resourceStore = nullptr;
+  XMLWriter* writer = nullptr;
+  ResourceStore* resourceStore = nullptr;
 };
 
 }  // namespace tgfx

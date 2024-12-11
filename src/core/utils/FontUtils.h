@@ -18,53 +18,16 @@
 
 #pragma once
 
-#include "core/FillStyle.h"
-
+#include "tgfx/core/Font.h"
+#include "tgfx/core/Typeface.h"
 namespace tgfx {
 
-struct Resources {
-  Resources() = default;
-  explicit Resources(const FillStyle& fill);
-  std::string paintColor;
-  std::string filter;
-};
-
-// TODO(YGAurora) implements the feature to reuse resources
-class ResourceStore {
+class FontUtils {
  public:
-  ResourceStore() = default;
-
-  std::string addGradient() {
-    return "gradient_" + std::to_string(gradientCount++);
-  }
-
-  std::string addPath() {
-    return "path_" + std::to_string(pathCount++);
-  }
-
-  std::string addImage() {
-    return "img_" + std::to_string(imageCount++);
-  }
-
-  std::string addFilter() {
-    return "filter_" + std::to_string(filterCount++);
-  }
-
-  std::string addPattern() {
-    return "pattern_" + std::to_string(patternCount++);
-  }
-
-  std::string addClip() {
-    return "clip_" + std::to_string(clipCount++);
-  }
-
- private:
-  uint32_t gradientCount = 0;
-  uint32_t pathCount = 0;
-  uint32_t imageCount = 0;
-  uint32_t patternCount = 0;
-  uint32_t filterCount = 0;
-  uint32_t clipCount = 0;
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  static std::vector<Unichar> GlyphsToUnichars(const Font& font,
+                                               const std::vector<GlyphID>& glyphs);
+#endif
 };
 
 }  // namespace tgfx

@@ -93,7 +93,7 @@ class XMLWriter {
 class XMLStreamWriter : public XMLWriter {
  public:
   enum : uint32_t {
-    NoPretty_Flag = 0x01,
+    NoPretty = 0x01,
   };
 
   explicit XMLStreamWriter(std::stringstream& stream, uint32_t flags = 0);

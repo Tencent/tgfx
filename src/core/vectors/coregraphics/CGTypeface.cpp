@@ -19,6 +19,7 @@
 #include "CGTypeface.h"
 #include "CGScalerContext.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -221,4 +222,101 @@ std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {
       bytePtr, length, [](const void*, void* context) { CFRelease((CFDataRef)context); },
       (void*)cfData);
 }
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+
+static std::vector<Unichar> GetGlyphMapByChar(CTFontRef ctFont, CFIndex glyphCount) {
+  std::vector<Unichar> returnMap(static_cast<size_t>(glyphCount), 0);
+  UniChar unichar = 0;
+  while (glyphCount > 0) {
+    CGGlyph glyph;
+    if (CTFontGetGlyphsForCharacters(ctFont, &unichar, &glyph, 1)) {
+      if (returnMap[glyph] == 0) {
+        returnMap[glyph] = unichar;
+        --glyphCount;
+      }
+    }
+    if (++unichar == 0) {
+      break;
+    }
+  }
+  return returnMap;
+}
+
+static constexpr uint16_t PLANE_SIZE = 1 << 13;
+
+static void GetGlyphMapByPlane(const uint8_t* bits, CTFontRef ctFont, std::vector<Unichar>& map,
+                               uint8_t planeIndex) {
+  Unichar planeOrigin = planeIndex << 16;  // top half of codepoint.
+  for (uint16_t i = 0; i < PLANE_SIZE; i++) {
+    uint8_t mask = bits[i];
+    if (!mask) {
+      continue;
+    }
+    for (uint8_t j = 0; j < 8; j++) {
+      if (0 == (mask & (static_cast<uint8_t>(1) << j))) {
+        continue;
+      }
+      auto planeOffset = static_cast<uint16_t>((i << 3) | j);
+      Unichar codepoint = planeOrigin | static_cast<Unichar>(planeOffset);
+      uint16_t utf16[2] = {planeOffset, 0};
+      size_t count = 1;
+      if (planeOrigin != 0) {
+        count = ToUTF16(codepoint, utf16);
+      }
+      CGGlyph glyphs[2] = {0, 0};
+      if (CTFontGetGlyphsForCharacters(ctFont, utf16, glyphs, static_cast<CFIndex>(count))) {
+        if (map[glyphs[0]] < 0x20) {
+          map[glyphs[0]] = codepoint;
+        }
+      }
+    }
+  }
+}
+
+std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
+  auto glyphCount = CTFontGetGlyphCount(ctFont);
+
+  const auto* charSet = CTFontCopyCharacterSet(ctFont);
+  if (!charSet) {
+    return GetGlyphMapByChar(ctFont, glyphCount);
+  }
+
+  const auto* bitmap = CFCharacterSetCreateBitmapRepresentation(nullptr, charSet);
+  if (!bitmap) {
+    return {};
+  }
+
+  CFIndex dataLength = CFDataGetLength(bitmap);
+  if (dataLength == 0) {
+    return {};
+  }
+
+  std::vector<Unichar> returnMap(static_cast<size_t>(glyphCount), 0);
+  const auto* bits = CFDataGetBytePtr(bitmap);
+  GetGlyphMapByPlane(bits, ctFont, returnMap, 0);
+  /*
+    A CFData object that specifies the bitmap representation of the Unicode
+    character points the for the new character set. The bitmap representation could
+    contain all the Unicode character range starting from BMP to Plane 16. The
+    first 8KiB (8192 bytes) of the data represent the BMP range. The BMP range 8KiB
+    can be followed by zero to sixteen 8KiB bitmaps, each prepended with the plane
+    index byte. For example, the bitmap representing the BMP and Plane 2 has the
+    size of 16385 bytes (8KiB for BMP, 1 byte index, and a 8KiB bitmap for Plane
+    2). The plane index byte, in this case, contains the integer value two.
+    */
+
+  if (dataLength <= PLANE_SIZE) {
+    return returnMap;
+  }
+  auto extraPlaneCount = (dataLength - PLANE_SIZE) / (1 + PLANE_SIZE);
+  while (extraPlaneCount-- > 0) {
+    bits += PLANE_SIZE;
+    uint8_t planeIndex = *bits++;
+    GetGlyphMapByPlane(bits, ctFont, returnMap, planeIndex);
+  }
+  return returnMap;
+}
+#endif
+
 }  // namespace tgfx

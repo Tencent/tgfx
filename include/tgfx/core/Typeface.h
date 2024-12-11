@@ -131,11 +131,20 @@ class Typeface {
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
  protected:
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  /**
+   * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
+   * unicode. The array length is glyphsCount(). 
+   * The length of the array is not required, it will be resized within the method.
+   */
+  virtual std::vector<Unichar> getGlyphToUnicodeMap() const = 0;
+#endif
   mutable std::mutex locker = {};
 
  private:
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
   friend class ScalerContext;
+  friend class FontUtils;
 };
 }  // namespace tgfx

@@ -18,53 +18,38 @@
 
 #pragma once
 
-#include "core/FillStyle.h"
+#include <MacTypes.h>
+#include <string>
+#include "tgfx/core/GlyphRun.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-
-struct Resources {
-  Resources() = default;
-  explicit Resources(const FillStyle& fill);
-  std::string paintColor;
-  std::string filter;
-};
-
-// TODO(YGAurora) implements the feature to reuse resources
-class ResourceStore {
+class SVGTextBuilder {
  public:
-  ResourceStore() = default;
+  explicit SVGTextBuilder(const GlyphRun& glyphRun);
 
-  std::string addGradient() {
-    return "gradient_" + std::to_string(gradientCount++);
+  std::string posX() const {
+    return posXString;
   }
 
-  std::string addPath() {
-    return "path_" + std::to_string(pathCount++);
+  std::string posY() const {
+    return hasConstY ? constYString : posYString;
   }
 
-  std::string addImage() {
-    return "img_" + std::to_string(imageCount++);
-  }
-
-  std::string addFilter() {
-    return "filter_" + std::to_string(filterCount++);
-  }
-
-  std::string addPattern() {
-    return "pattern_" + std::to_string(patternCount++);
-  }
-
-  std::string addClip() {
-    return "clip_" + std::to_string(clipCount++);
+  std::string text() const {
+    return _text;
   }
 
  private:
-  uint32_t gradientCount = 0;
-  uint32_t pathCount = 0;
-  uint32_t imageCount = 0;
-  uint32_t patternCount = 0;
-  uint32_t filterCount = 0;
-  uint32_t clipCount = 0;
-};
+  void appendUnichar(Unichar c, Point position);
 
+  std::string _text;
+  std::string posXString;
+  std::string posYString;
+  std::string constYString;
+  float constY;
+  bool lastCharWasWhitespace = true;
+  bool hasConstY = true;
+};
 }  // namespace tgfx

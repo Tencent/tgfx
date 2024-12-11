@@ -19,12 +19,15 @@
 #pragma once
 
 #include <string>
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -67,9 +70,14 @@ std::string FloatToString(float value);
 void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret);
 
 /**
+ * Draws a image onto a surface and reads the pixels from the surface.
+ */
+Bitmap ImageToBitmap(Context* gpuContext, const std::shared_ptr<Image>& image);
+
+/**
  * Returns data uri from bytes.
  * it will use any cached data if available, otherwise will encode as png.
  */
-std::shared_ptr<Data> AsDataUri(Context* GPUContext, const std::shared_ptr<Image>& image);
+std::shared_ptr<Data> AsDataUri(const Bitmap& bitmap);
 
 }  // namespace tgfx

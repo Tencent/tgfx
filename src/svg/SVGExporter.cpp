@@ -16,56 +16,61 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/SVGGenerator.h"
+#include "tgfx/svg/SVGExporter.h"
+#include <cstdint>
 #include <memory>
 #include "ElementWriter.h"
 #include "core/utils/Log.h"
-#include "svg/SVGContext.h"
+#include "svg/SVGExportingContext.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Size.h"
 
 namespace tgfx {
 
-SVGGenerator::~SVGGenerator() {
-  delete _canvas;
-  delete _context;
+SVGExporter::~SVGExporter() {
+  delete canvas;
+  delete context;
 };
 
-Canvas* SVGGenerator::beginGenerate(Context* GPUContext, const ISize& size, bool isPretty) {
-  ASSERT(GPUContext)
-  if (_canvas == nullptr) {
-    auto writer = std::make_unique<XMLStreamWriter>(_svgStream,
-                                                    isPretty ? 0 : XMLStreamWriter::NoPretty_Flag);
-    _context = new SVGContext(GPUContext, size, std::move(writer));
-    _canvas = new Canvas(_context);
-    _context->setCanvas(_canvas);
+Canvas* SVGExporter::beginExporting(Context* gpuContext, const ISize& size,
+                                    uint32_t exportingOptions) {
+  ASSERT(gpuContext)
+  if (canvas == nullptr) {
+    uint32_t xmlOptions = exportingOptions & NoPrettyXML ? XMLStreamWriter::NoPretty : 0;
+    auto writer = std::make_unique<XMLStreamWriter>(svgStream, xmlOptions);
+    context = new SVGExportingContext(gpuContext, size, std::move(writer), exportingOptions);
+    canvas = new Canvas(context);
+    context->setCanvas(canvas);
   }
 
-  if (_actively) {
-    _canvas->resetMCState();
+  if (actively) {
+    canvas->resetMCState();
   } else {
-    _actively = true;
+    actively = true;
   }
   return getCanvas();
 }
 
-Canvas* SVGGenerator::getCanvas() const {
-  return _actively ? _canvas : nullptr;
+Canvas* SVGExporter::getCanvas() const {
+  return actively ? canvas : nullptr;
 };
 
-std::string SVGGenerator::finishGenerate() {
-  if (!_actively || _context == nullptr) {
+std::string SVGExporter::finishExportingAsString() {
+  if (!actively || context == nullptr) {
     return "";
   }
-  _actively = false;
-  _canvas->resetMCState();
-  auto svgStr = _svgStream.str();
-  delete _canvas;
-  _canvas = nullptr;
-  delete _context;
-  _context = nullptr;
-  return _svgStream.str();
+  actively = false;
+  canvas->resetMCState();
+  delete canvas;
+  canvas = nullptr;
+  delete context;
+  context = nullptr;
+
+  auto svgString = svgStream.str();
+  svgStream.str("");
+  svgStream.clear();
+  return svgString;
 };
 
 }  // namespace tgfx

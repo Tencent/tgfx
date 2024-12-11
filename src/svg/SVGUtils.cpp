@@ -24,6 +24,7 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
@@ -245,25 +246,25 @@ void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret) 
   }
 }
 
-// Returns data uri from bytes.
-// it will use any cached data if available, otherwise will
-// encode as png.
-std::shared_ptr<Data> AsDataUri(Context* GPUContext, const std::shared_ptr<Image>& image) {
-  static constexpr auto pngPrefix = "data:image/png;base64,";
-  size_t prefixLength = strlen(pngPrefix);
-
-  auto surface = Surface::Make(GPUContext, image->width(), image->height());
+Bitmap ImageToBitmap(Context* gpuContext, const std::shared_ptr<Image>& image) {
+  auto surface = Surface::Make(gpuContext, image->width(), image->height());
   auto* canvas = surface->getCanvas();
   canvas->clear();
-  auto textureImage = image->makeTextureImage(GPUContext);
+  auto textureImage = image->makeTextureImage(gpuContext);
   canvas->drawImage(textureImage);
 
   Bitmap bitmap(surface->width(), surface->height(), false, false);
+  return bitmap;
+}
+
+// Returns data uri from bytes.
+// it will use any cached data if available, otherwise will
+// encode as png.
+std::shared_ptr<Data> AsDataUri(const Bitmap& bitmap) {
+  static constexpr auto pngPrefix = "data:image/png;base64,";
+  size_t prefixLength = strlen(pngPrefix);
+
   Pixmap pixmap(bitmap);
-  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-  if (!result) {
-    return nullptr;
-  }
   auto imageData = ImageCodec::Encode(pixmap, EncodedFormat::PNG, 100);
   if (!imageData) {
     return nullptr;

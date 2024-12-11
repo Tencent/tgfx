@@ -19,7 +19,7 @@
 #include "Caster.h"
 
 namespace tgfx {
-std::shared_ptr<const ColorShader> ShaderCaster::CastToColorShader(
+std::shared_ptr<const ColorShader> ShaderCaster::AsColorShader(
     const std::shared_ptr<Shader>& shader) {
   if (shader->type() == Shader::Type::Color) {
     return std::static_pointer_cast<const ColorShader>(shader);
@@ -27,7 +27,7 @@ std::shared_ptr<const ColorShader> ShaderCaster::CastToColorShader(
   return nullptr;
 }
 
-std::shared_ptr<const ImageShader> ShaderCaster::CastToImageShader(
+std::shared_ptr<const ImageShader> ShaderCaster::AsImageShader(
     const std::shared_ptr<Shader>& shader) {
   if (shader->type() == Shader::Type::Image) {
     return std::static_pointer_cast<const ImageShader>(shader);
@@ -35,7 +35,7 @@ std::shared_ptr<const ImageShader> ShaderCaster::CastToImageShader(
   return nullptr;
 }
 
-std::shared_ptr<const GradientShader> ShaderCaster::CastToGradientShader(
+std::shared_ptr<const GradientShader> ShaderCaster::AsGradientShader(
     const std::shared_ptr<Shader>& shader) {
   if (shader->type() == Shader::Type::Gradient) {
     return std::static_pointer_cast<const GradientShader>(shader);
@@ -43,14 +43,14 @@ std::shared_ptr<const GradientShader> ShaderCaster::CastToGradientShader(
   return nullptr;
 }
 
-std::shared_ptr<const BlurImageFilter> ImageFilterCaster::CastToBlurImageFilter(
+std::shared_ptr<const BlurImageFilter> ImageFilterCaster::AsBlurImageFilter(
     const std::shared_ptr<ImageFilter>& imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::Blur) {
     return std::static_pointer_cast<const BlurImageFilter>(imageFilter);
   }
   return nullptr;
 }
-std::shared_ptr<const DropShadowImageFilter> ImageFilterCaster::CastToDropShadowImageFilter(
+std::shared_ptr<const DropShadowImageFilter> ImageFilterCaster::AsDropShadowImageFilter(
     const std::shared_ptr<ImageFilter>& imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::DropShadow) {
     return std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
@@ -58,7 +58,7 @@ std::shared_ptr<const DropShadowImageFilter> ImageFilterCaster::CastToDropShadow
   return nullptr;
 }
 
-std::shared_ptr<const InnerShadowImageFilter> ImageFilterCaster::CastToInnerShadowImageFilter(
+std::shared_ptr<const InnerShadowImageFilter> ImageFilterCaster::AsInnerShadowImageFilter(
     const std::shared_ptr<ImageFilter>& imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::InnerShadow) {
     return std::static_pointer_cast<const InnerShadowImageFilter>(imageFilter);

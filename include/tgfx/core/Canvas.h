@@ -27,6 +27,7 @@
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/svg/SVGExporter.h"
 
 namespace tgfx {
 class Surface;
@@ -335,6 +336,6 @@ class Canvas {
   friend class Surface;
   friend class Picture;
   friend class Recorder;
-  friend class SVGGenerator;
+  friend class SVGExporter;
 };
 }  // namespace tgfx

@@ -22,14 +22,12 @@
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
-#include "svg/xml/XMLParser.h"
 #include "tgfx/core/Color.h"
-#include "tgfx/core/Data.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/svg/SVGGenerator.h"
-#include "tgfx/svg/xml/XMLDOM.h"
+#include "tgfx/svg/SVGExporter.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -47,10 +45,10 @@ TGFX_TEST(SVGExportTest, PureColor) {
   tgfx::Paint paint;
   paint.setColor(Color::Blue());
 
-  SVGGenerator SVGGenerator;
-  auto* canvas = SVGGenerator.beginGenerate(context, ISize::Make(200, 200), false);
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(200, 200), SVGExporter::NoPrettyXML);
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
-  std::string SVGString = SVGGenerator.finishGenerate();
+  std::string SVGString = exporter.finishExportingAsString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -68,10 +66,10 @@ TGFX_TEST(SVGExportTest, OpacityColor) {
   paint.setColor(Color::Blue());
   paint.setAlpha(0.5f);
 
-  SVGGenerator SVGGenerator;
-  auto* canvas = SVGGenerator.beginGenerate(context, ISize::Make(200, 200), false);
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(200, 200), SVGExporter::NoPrettyXML);
   canvas->drawCircle(100, 100, 100, paint);
-  std::string SVGString = SVGGenerator.finishGenerate();
+  std::string SVGString = exporter.finishExportingAsString();
 
   ASSERT_EQ(SVGString, compareString);
 }
@@ -95,10 +93,10 @@ TGFX_TEST(SVGExportTest, LinearGradient) {
       {tgfx::Color{0.f, 1.f, 0.f, 1.f}, tgfx::Color{0.f, 0.f, 0.f, 1.f}}, {});
   paint.setShader(shader);
 
-  SVGGenerator SVGGenerator;
-  auto* canvas = SVGGenerator.beginGenerate(context, ISize::Make(200, 200), false);
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(200, 200), SVGExporter::NoPrettyXML);
   canvas->drawCircle(100, 100, 100, paint);
-  std::string SVGString = SVGGenerator.finishGenerate();
+  std::string SVGString = exporter.finishExportingAsString();
 
   ASSERT_EQ(SVGString, compareString);
 }
@@ -122,10 +120,10 @@ TGFX_TEST(SVGExportTest, RadialGradient) {
       center, 50, {tgfx::Color::Red(), tgfx::Color::Blue(), tgfx::Color::Black()}, {0, 0.5, 1.0});
   paint.setShader(shader);
 
-  SVGGenerator SVGGenerator;
-  auto* canvas = SVGGenerator.beginGenerate(context, ISize::Make(200, 200), false);
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(200, 200), SVGExporter::NoPrettyXML);
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
-  std::string SVGString = SVGGenerator.finishGenerate();
+  std::string SVGString = exporter.finishExportingAsString();
 
   ASSERT_EQ(SVGString, compareString);
 }
@@ -152,10 +150,10 @@ TGFX_TEST(SVGExportTest, UnsupportedGradient) {
       {0, 0.5, 1.0});
   paint.setShader(shader);
 
-  SVGGenerator SVGGenerator;
-  auto* canvas = SVGGenerator.beginGenerate(context, ISize::Make(200, 200), false);
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(200, 200), SVGExporter::NoPrettyXML);
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
-  std::string SVGString = SVGGenerator.finishGenerate();
+  std::string SVGString = exporter.finishExportingAsString();
 
   ASSERT_EQ(SVGString, compareString);
 }
@@ -178,11 +176,11 @@ TGFX_TEST(SVGExportTest, BlendMode) {
   paint.setColor(Color::Red());
   paint.setBlendMode(BlendMode::Difference);
 
-  SVGGenerator SVGGenerator;
-  auto* canvas = SVGGenerator.beginGenerate(context, ISize::Make(200, 200), false);
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(200, 200), SVGExporter::NoPrettyXML);
   canvas->drawRect(tgfx::Rect::MakeXYWH(0, 0, 100, 100), paintBackground);
   canvas->drawRect(tgfx::Rect::MakeXYWH(50, 50, 100, 100), paint);
-  std::string SVGString = SVGGenerator.finishGenerate();
+  std::string SVGString = exporter.finishExportingAsString();
 
   ASSERT_EQ(SVGString, compareString);
 }
@@ -203,10 +201,95 @@ TGFX_TEST(SVGExportTest, StrokeWidth) {
   paint.setStyle(PaintStyle::Stroke);
   paint.setStrokeWidth(5);
 
-  SVGGenerator SVGGenerator;
-  auto* canvas = SVGGenerator.beginGenerate(context, ISize::Make(200, 200), false);
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(200, 200), SVGExporter::NoPrettyXML);
   canvas->drawRect(tgfx::Rect::MakeXYWH(50, 50, 100, 100), paint);
-  std::string SVGString = SVGGenerator.finishGenerate();
+  std::string SVGString = exporter.finishExportingAsString();
+
+  ASSERT_EQ(SVGString, compareString);
 }
 
+TGFX_TEST(SVGExportTest, SimpleTextAsText) {
+  std::string compareString =
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"400\" height=\"200\"><text "
+      "fill=\"#F00\" transform=\"matrix(1 0 0 1 0 80)\" font-size=\"50\" font-family=\"Noto Serif "
+      "SC\" x=\"0, 43, 70, 86, 102, 132, 145, 178, 215, 246, \" y=\"0, \">Hello TGFX</text></svg>";
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 50.f);
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(context, ISize::Make(400, 200), SVGExporter::NoPrettyXML);
+  canvas->drawSimpleText("Hello TGFX", 0, 80, font, paint);
+  std::string SVGString = exporter.finishExportingAsString();
+  std::cout << SVGString << std::endl;
+  std::cout << compareString << std::endl;
+
+  ASSERT_EQ(SVGString, compareString);
+}
+
+TGFX_TEST(SVGExportTest, SimpleTextAsPath) {
+  std::string compareString =
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"400\" height=\"200\"><path "
+      "fill=\"#F00\" transform=\"matrix(1 0 0 1 0 80)\" d=\"M5 -0L9.6406 0L9.6406 -17L26.75 "
+      "-17L26.75 0L31.3438 0L31.3438 -37L26.75 -37L26.75 -21L9.6406 -21L9.6406 -37L5 -37L5 "
+      "0ZM40.5938 0L45.1406 0L45.1406 -27L40.5938 -27L40.5938 0ZM42.8906 -32.9844C44.6875 -32.9844 "
+      "45.9375 -34.1875 45.9375 -36.0469C45.9375 -37.7969 44.6875 -39 42.8906 -39C41.0938 -39 "
+      "39.8438 -37.7969 39.8438 -36.0469C39.8438 -34.1875 41.0938 -32.9844 42.8906 "
+      "-32.9844Z\"/></svg>";
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  Font font(typeface, 50.f);
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(
+      context, ISize::Make(400, 200), SVGExporter::NoPrettyXML | SVGExporter::ConvertTextToPaths);
+  canvas->drawSimpleText("Hi", 0, 80, font, paint);
+  std::string SVGString = exporter.finishExportingAsString();
+
+  ASSERT_EQ(SVGString, compareString);
+}
+
+TGFX_TEST(SVGExportTest, EmojiText) {
+  std::string compareString =
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"400\" height=\"200\"><text "
+      "fill=\"#F00\" transform=\"matrix(1 0 0 1 0 80)\" font-size=\"50\" font-family=\"Noto Color "
+      "Emoji\" x=\"0, 62.3906, 124.7812, 187.1719, 249.5625, 311.9531, \" y=\"0, "
+      "\">🤡👻🐠🤩😃🤪</text></svg>";
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  Font font(typeface, 50.f);
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  SVGExporter exporter;
+  auto* canvas = exporter.beginExporting(
+      context, ISize::Make(400, 200), SVGExporter::NoPrettyXML | SVGExporter::ConvertTextToPaths);
+  canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
+  std::string SVGString = exporter.finishExportingAsString();
+
+  ASSERT_EQ(SVGString, compareString);
+}
 }  // namespace tgfx

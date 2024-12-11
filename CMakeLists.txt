@@ -204,6 +204,11 @@ if (TGFX_USE_ZLIB)
     list(APPEND TGFX_STATIC_VENDORS zlib)
 endif ()
 
+if (TGFX_BUILD_SVG)
+    # SVG and PDF export requires glyph translation to Unicode.
+    list(APPEND TGFX_DEFINES TGFX_USE_GLYPH_TO_UNICODE)
+endif ()
+
 if (TGFX_USE_FREETYPE)
     list(APPEND TGFX_DEFINES TGFX_USE_FREETYPE)
     list(APPEND TGFX_STATIC_VENDORS freetype)

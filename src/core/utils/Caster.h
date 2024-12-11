@@ -30,25 +30,23 @@ namespace tgfx {
 
 class ShaderCaster {
  public:
-  static std::shared_ptr<const ColorShader> CastToColorShader(
-      const std::shared_ptr<Shader>& shader);
+  static std::shared_ptr<const ColorShader> AsColorShader(const std::shared_ptr<Shader>& shader);
 
-  static std::shared_ptr<const ImageShader> CastToImageShader(
-      const std::shared_ptr<Shader>& shader);
+  static std::shared_ptr<const ImageShader> AsImageShader(const std::shared_ptr<Shader>& shader);
 
-  static std::shared_ptr<const GradientShader> CastToGradientShader(
+  static std::shared_ptr<const GradientShader> AsGradientShader(
       const std::shared_ptr<Shader>& shader);
 };
 
 class ImageFilterCaster {
  public:
-  static std::shared_ptr<const BlurImageFilter> CastToBlurImageFilter(
+  static std::shared_ptr<const BlurImageFilter> AsBlurImageFilter(
       const std::shared_ptr<ImageFilter>& imageFilter);
 
-  static std::shared_ptr<const DropShadowImageFilter> CastToDropShadowImageFilter(
+  static std::shared_ptr<const DropShadowImageFilter> AsDropShadowImageFilter(
       const std::shared_ptr<ImageFilter>& imageFilter);
 
-  static std::shared_ptr<const InnerShadowImageFilter> CastToInnerShadowImageFilter(
+  static std::shared_ptr<const InnerShadowImageFilter> AsInnerShadowImageFilter(
       const std::shared_ptr<ImageFilter>& imageFilter);
 };
 

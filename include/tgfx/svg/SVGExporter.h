@@ -23,43 +23,55 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class SVGContext;
+class SVGExportingContext;
 
 /**
- * SVGGenerator is a class used to generate SVG text, converting drawing commands in the Canvas to
+ * SVGExporter is a class used to export SVG text, converting drawing commands in the Canvas to
  * SVG text.
  */
-class SVGGenerator {
+class SVGExporter {
  public:
-  SVGGenerator() = default;
-  ~SVGGenerator();
+  enum ExportingOptions {
+    /**
+     * Convert text to paths in the exported SVG text, only applicable to outline fonts. Emoji and
+     * web fonts will only be exported as text.
+     */
+    ConvertTextToPaths = 0x01,
+    /**
+     * Do not format SVG text with spaces('/t') and newlines('/n').
+     */
+    NoPrettyXML = 0x02,
+  };
+
+  SVGExporter() = default;
+  ~SVGExporter();
 
   /**
-   * Begin generating SVG text and return a Canvas object for drawing SVG graphics.
+   * Begin exporting SVG text and return a Canvas object for drawing SVG graphics.
    *
-   * @param GPUContext used to convert some rendering commands into image data.
+   * @param gpuContext used to convert some rendering commands into image data.
    * @param size The size sets the size of the SVG, and content that exceeds the display area in the
    * SVG will be clipped.
-   * @param isPretty Whether to format the generated SVG text with "/n"、"/t"".
+   * @param exportingOptions Options for exporting SVG text.
    * @return Canvas* 
    */
-  Canvas* beginGenerate(Context* GPUContext, const ISize& size, bool isPretty = true);
+  Canvas* beginExporting(Context* gpuContext, const ISize& size, uint32_t exportingOptions = 0);
 
   /**
-   * Returns the recording canvas if it is active, or nullptr.
+   * Returns the canvas if it is active, or nullptr.
    */
   Canvas* getCanvas() const;
 
   /**
-   * Finish generating SVG text and return the generated SVG text. If no recording is active.
+   * Finish exporting and return the SVG text. If the canvas is not active, return an empty string.
    */
-  std::string finishGenerate();
+  std::string finishExportingAsString();
 
  private:
-  bool _actively = false;
-  SVGContext* _context = nullptr;
-  Canvas* _canvas = nullptr;
-  std::stringstream _svgStream;
+  bool actively = false;
+  SVGExportingContext* context = nullptr;
+  Canvas* canvas = nullptr;
+  std::stringstream svgStream;
 };
 
 }  // namespace tgfx
