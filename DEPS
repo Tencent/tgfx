@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "effcc0d22be03e55fab5c42ae82815ee7d76f74f",
+        "commit": "4e331972e2e828655b1901dccd5081cc995b32fc",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -42,7 +42,7 @@
       },
       {
         "url": "https://github.com/freetype/freetype.git",
-        "commit": "86bc8a95056c97a810986434a3f268cbe67f2902",
+        "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
         "dir": "third_party/freetype"
       },
       {

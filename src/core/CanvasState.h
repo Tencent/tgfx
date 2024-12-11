@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,9 +19,13 @@
 #pragma once
 
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
+class DrawContext;
+class RecordingContext;
+
 class MCState {
  public:
   explicit MCState(const Matrix& matrix) : matrix(matrix) {
@@ -40,5 +44,24 @@ class MCState {
 
   Matrix matrix = Matrix::I();
   Path clip = {};
+};
+
+class CanvasLayer {
+ public:
+  CanvasLayer(DrawContext* drawContext, const Paint* paint);
+
+  DrawContext* drawContext = nullptr;
+  std::unique_ptr<DrawContext> layerContext = nullptr;
+  Paint layerPaint = {};
+};
+
+class CanvasState {
+ public:
+  explicit CanvasState(MCState mcState, std::unique_ptr<CanvasLayer> savedLayer = nullptr)
+      : mcState(std::move(mcState)), savedLayer(std::move(savedLayer)) {
+  }
+
+  MCState mcState = {};
+  std::unique_ptr<CanvasLayer> savedLayer = nullptr;
 };
 }  // namespace tgfx

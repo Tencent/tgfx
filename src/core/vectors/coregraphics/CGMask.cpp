@@ -20,7 +20,9 @@
 #include "CGTypeface.h"
 #include "core/GlyphRunList.h"
 #include "core/ScalerContext.h"
+#include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -187,8 +189,9 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     return false;
   }
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto& font = glyphRun.font;
-    if (font.isFauxBold() || font.getTypeface() == nullptr) {
+    Font font;
+    bool success = glyphRun.glyphFace->asFont(&font);
+    if (!success || font.isFauxBold()) {
       return false;
     }
   }
@@ -210,7 +213,8 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
 
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     CGContextSaveGState(cgContext);
-    auto& font = glyphRun.font;
+    Font font;
+    glyphRun.glyphFace->asFont(&font);
     auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
     CTFontRef ctFont = typeface->getCTFont();
     ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,

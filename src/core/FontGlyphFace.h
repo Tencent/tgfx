@@ -16,39 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Recorder.h"
-#include "core/RecordingContext.h"
+#pragma once
+#include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
-Recorder::~Recorder() {
-  delete canvas;
-  delete recordingContext;
-}
+class FontGlyphFace final : public GlyphFace {
+ public:
+  bool hasColor() const override;
 
-Canvas* Recorder::beginRecording() {
-  if (canvas == nullptr) {
-    recordingContext = new RecordingContext();
-    canvas = new Canvas(recordingContext);
-  }
-  if (activelyRecording) {
-    canvas->resetStateStack();
-    recordingContext->clear();
-  } else {
-    activelyRecording = true;
-  }
-  return getRecordingCanvas();
-}
+  bool hasOutlines() const override;
 
-Canvas* Recorder::getRecordingCanvas() const {
-  return activelyRecording ? canvas : nullptr;
-}
+  std::shared_ptr<GlyphFace> makeScaled(float scale) override;
 
-std::shared_ptr<Picture> Recorder::finishRecordingAsPicture() {
-  if (!activelyRecording || recordingContext == nullptr) {
-    return nullptr;
+  bool getPath(GlyphID glyphID, Path* path) const override;
+
+  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
+
+  Rect getBounds(GlyphID glyphID) const override;
+
+  bool asFont(Font* font) const override;
+
+ private:
+  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
   }
-  activelyRecording = false;
-  canvas->resetStateStack();
-  return recordingContext->finishRecordingAsPicture();
-}
+
+  Font _font = {};
+
+  friend class GlyphFace;
+};
 }  // namespace tgfx
