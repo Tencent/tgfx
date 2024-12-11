@@ -16,25 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FontUtils.h"
-#include "tgfx/core/Typeface.h"
+#pragma once
 
+#include <unordered_map>
+#include "tgfx/core/Font.h"
+#include "tgfx/core/Typeface.h"
 namespace tgfx {
 
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-std::vector<Unichar> FontUtils::GlyphsToUnichars(const Font& font,
-                                                 const std::vector<GlyphID>& glyphs) {
-  auto typeface = font.getTypeface();
-  if (!typeface) {
-    return {};
-  }
-  std::vector<Unichar> ret(glyphs.size(), 0);
-  auto glyphMap = typeface->getGlyphToUnicodeMap();
-  for (size_t i = 0; i < glyphs.size(); i++) {
-    ret[i] = glyphMap[glyphs[i]];
-  }
-  return ret;
-}
-#endif
 
+/**
+ * The glyph converter can convert glyphs to Unicode characters and cache the mapping of glyphs to
+ * Unicode.The cache is released when the converter is destructed.
+ */
+class GlyphConverter {
+ public:
+  GlyphConverter() = default;
+  ~GlyphConverter() = default;
+
+  std::vector<Unichar> glyphsToUnichars(const Font& font, const std::vector<GlyphID>& glyphs);
+
+ private:
+  const std::vector<Unichar>& getGlyphToUnicodeMap(const std::shared_ptr<Typeface>& typeface);
+
+  std::unordered_map<uint32_t, std::vector<Unichar>> fontToGlyphMap;
+};
+
+#endif
 }  // namespace tgfx

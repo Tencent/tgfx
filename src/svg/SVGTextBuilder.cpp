@@ -19,81 +19,94 @@
 #include "SVGTextBuilder.h"
 #include <cstdint>
 #include <string>
-#include "core/utils/FontUtils.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
 
-SVGTextBuilder::SVGTextBuilder(const GlyphRun& glyphRun) {
-  if (auto typeface = glyphRun.font.getTypeface()) {
-    auto unichars = FontUtils::GlyphsToUnichars(glyphRun.font, glyphRun.glyphs);
-    for (uint32_t i = 0; i < unichars.size(); i++) {
-      this->appendUnichar(unichars[i], glyphRun.positions[i]);
+SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun& glyphRun) {
+
+  Font font;
+  if (!glyphRun.glyphFace->asFont(&font)) {
+    return {};
+  }
+
+  auto unicodeChars = converter.glyphsToUnichars(font, glyphRun.glyphs);
+
+  std::string _text;
+  std::string posXString;
+  std::string posYString;
+  std::string constYString;
+  float constY = 0.f;
+  bool lastCharWasWhitespace = true;
+  bool hasConstY = true;
+
+  for (uint32_t i = 0; i < unicodeChars.size(); i++) {
+    Unichar c = unicodeChars[i];
+    Point position = glyphRun.positions[i];
+    bool discardPos = false;
+    bool isWhitespace = false;
+
+    switch (c) {
+      case ' ':
+      case '\t':
+        // consolidate whitespace to match SVG's xml:space=default munging
+        // (http://www.w3.org/TR/SVG/text.html#WhiteSpace)
+        if (lastCharWasWhitespace) {
+          discardPos = true;
+        } else {
+          _text.append(UTF::ToUTF8(c));
+        }
+        isWhitespace = true;
+        break;
+      case '\0':
+        // '\0' for inconvertible glyphs, but these are not legal XML characters
+        // (http://www.w3.org/TR/REC-xml/#charsets)
+        discardPos = true;
+        isWhitespace = lastCharWasWhitespace;  // preserve whitespace consolidation
+        break;
+      case '&':
+        _text.append("&amp;");
+        break;
+      case '"':
+        _text.append("&quot;");
+        break;
+      case '\'':
+        _text.append("&apos;");
+        break;
+      case '<':
+        _text.append("&lt;");
+        break;
+      case '>':
+        _text.append("&gt;");
+        break;
+      default:
+        _text.append(UTF::ToUTF8(c));
+        break;
+    }
+
+    lastCharWasWhitespace = isWhitespace;
+
+    if (discardPos) {
+      break;
+    }
+
+    posXString.append(FloatToString(position.x) + ", ");
+    posYString.append(FloatToString(position.y) + ", ");
+
+    if (constYString.empty()) {
+      constYString = posYString;
+      constY = position.y;
+    } else {
+      hasConstY &= FloatNearlyEqual(constY, position.y);
     }
   }
-}
-
-void SVGTextBuilder::appendUnichar(Unichar c, Point position) {
-  bool discardPos = false;
-  bool isWhitespace = false;
-
-  switch (c) {
-    case ' ':
-    case '\t':
-      // consolidate whitespace to match SVG's xml:space=default munging
-      // (http://www.w3.org/TR/SVG/text.html#WhiteSpace)
-      if (lastCharWasWhitespace) {
-        discardPos = true;
-      } else {
-        _text.append(UTF::ToUTF8(c));
-      }
-      isWhitespace = true;
-      break;
-    case '\0':
-      // '\0' for inconvertible glyphs, but these are not legal XML characters
-      // (http://www.w3.org/TR/REC-xml/#charsets)
-      discardPos = true;
-      isWhitespace = lastCharWasWhitespace;  // preserve whitespace consolidation
-      break;
-    case '&':
-      _text.append("&amp;");
-      break;
-    case '"':
-      _text.append("&quot;");
-      break;
-    case '\'':
-      _text.append("&apos;");
-      break;
-    case '<':
-      _text.append("&lt;");
-      break;
-    case '>':
-      _text.append("&gt;");
-      break;
-    default:
-      _text.append(UTF::ToUTF8(c));
-      break;
-  }
-
-  lastCharWasWhitespace = isWhitespace;
-
-  if (discardPos) {
-    return;
-  }
-
-  posXString.append(FloatToString(position.x) + ", ");
-  posYString.append(FloatToString(position.y) + ", ");
-
-  if (constYString.empty()) {
-    constYString = posYString;
-    constY = position.y;
-  } else {
-    hasConstY &= FloatNearlyEqual(constY, position.y);
-  }
+  return {std::move(_text), std::move(posXString),
+          std::move(hasConstY ? constYString : posYString)};
 }
 
 }  // namespace tgfx

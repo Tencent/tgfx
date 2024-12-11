@@ -22,9 +22,10 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
+#include "core/CanvasState.h"
 #include "core/DrawContext.h"
 #include "core/FillStyle.h"
-#include "core/MCState.h"
+#include "svg/SVGTextBuilder.h"
 #include "svg/SVGUtils.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
@@ -92,6 +93,9 @@ class SVGExportingContext : public DrawContext {
   void exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                           const FillStyle& style);
 
+  void exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
+                           const FillStyle& style);
+
   static PathEncoding PathEncoding();
 
   uint32_t options;
@@ -101,6 +105,7 @@ class SVGExportingContext : public DrawContext {
   const std::unique_ptr<XMLWriter> writer;
   const std::unique_ptr<ResourceStore> resourceBucket;
   std::unique_ptr<ElementWriter> rootElement;
-  std::stack<std::pair<size_t, std::unique_ptr<ElementWriter>>> stateStack;
+  std::stack<std::pair<int, std::unique_ptr<ElementWriter>>> stateStack;
+  SVGTextBuilder textBuilder;
 };
 }  // namespace tgfx

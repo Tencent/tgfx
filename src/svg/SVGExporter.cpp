@@ -45,7 +45,7 @@ Canvas* SVGExporter::beginExporting(Context* gpuContext, const ISize& size,
   }
 
   if (actively) {
-    canvas->resetMCState();
+    canvas->resetStateStack();
   } else {
     actively = true;
   }
@@ -61,7 +61,7 @@ std::string SVGExporter::finishExportingAsString() {
     return "";
   }
   actively = false;
-  canvas->resetMCState();
+  canvas->resetStateStack();
   delete canvas;
   canvas = nullptr;
   delete context;

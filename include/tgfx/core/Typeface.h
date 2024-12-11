@@ -145,6 +145,6 @@ class Typeface {
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
   friend class ScalerContext;
-  friend class FontUtils;
+  friend class GlyphConverter;
 };
 }  // namespace tgfx

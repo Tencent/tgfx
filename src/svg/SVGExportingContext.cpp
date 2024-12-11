@@ -22,12 +22,13 @@
 #include <string>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
+#include "core/CanvasState.h"
 #include "core/FillStyle.h"
-#include "core/MCState.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGTextBuilder.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
@@ -184,16 +185,29 @@ void SVGExportingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRu
     return;
   }
 
+  if (glyphRunList->glyphRuns().empty()) {
+    return;
+  }
+  bool hasEntityFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
+
   // If the font has color (emoji) or does not have outlines (web font), it cannot be converted to
   // a path.
   // If the options do not require converting text to paths and there is no stroke, do not convert
   // to a path.
-  if (glyphRunList->hasColor() || !glyphRunList->hasOutlines() ||
-      (!(options & SVGExporter::ConvertTextToPaths) && stroke == nullptr)) {
-    exportGlyphsAsText(glyphRunList, state, style);
+  if (hasEntityFont) {
+    if ((!glyphRunList->hasOutlines()) ||
+        (!(options & SVGExporter::ConvertTextToPaths) && stroke == nullptr)) {
+      exportGlyphsAsText(glyphRunList, state, style);
+    } else {
+      // If the options require converting text to paths or there is a stroke, convert to a path.
+      exportGlyphsAsPath(glyphRunList, state, style, stroke);
+    }
   } else {
-    // If the options require converting text to paths or there is a stroke, convert to a path.
-    exportGlyphsAsPath(std::move(glyphRunList), state, style, stroke);
+    if (!glyphRunList->hasOutlines()) {
+      exportGlyphsAsImage(glyphRunList, state, style);
+    } else {
+      exportGlyphsAsPath(glyphRunList, state, style, stroke);
+    }
   }
 }
 
@@ -213,12 +227,46 @@ void SVGExportingContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>
                                              const MCState& state, const FillStyle& style) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     ElementWriter textElement("text", context, this, resourceBucket.get(), state, style);
-    textElement.addFontAttributes(glyphRun.font);
 
-    SVGTextBuilder builder(glyphRun);
-    textElement.addAttribute("x", builder.posX());
-    textElement.addAttribute("y", builder.posY());
-    textElement.addText(builder.text());
+    if (Font font; glyphRun.glyphFace->asFont(&font)) {
+      textElement.addFontAttributes(font);
+
+      auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
+      textElement.addAttribute("x", unicharInfo.posX);
+      textElement.addAttribute("y", unicharInfo.posY);
+      textElement.addText(unicharInfo.text);
+    }
+  }
+}
+
+void SVGExportingContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList,
+                                              const MCState& state, const FillStyle& style) {
+  auto viewMatrix = state.matrix;
+  auto scale = viewMatrix.getMaxScale();
+  if (scale <= 0) {
+    return;
+  }
+  viewMatrix.preScale(1.0f / scale, 1.0f / scale);
+  for (const auto& glyphRun : glyphRunList->glyphRuns()) {
+    auto glyphFace = glyphRun.glyphFace;
+    glyphFace = glyphFace->makeScaled(scale);
+    DEBUG_ASSERT(glyphFace != nullptr);
+    const auto& glyphIDs = glyphRun.glyphs;
+    auto glyphCount = glyphIDs.size();
+    const auto& positions = glyphRun.positions;
+    auto glyphState = state;
+    for (size_t i = 0; i < glyphCount; ++i) {
+      const auto& glyphID = glyphIDs[i];
+      const auto& position = positions[i];
+      auto glyphImage = glyphFace->getImage(glyphID, &glyphState.matrix);
+      if (glyphImage == nullptr) {
+        continue;
+      }
+      glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
+      glyphState.matrix.postConcat(viewMatrix);
+      auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
+      SVGExportingContext::drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
+    }
   }
 }
 

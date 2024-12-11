@@ -16,18 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Font.h"
+#include "GlyphConverter.h"
 #include "tgfx/core/Typeface.h"
+
 namespace tgfx {
 
-class FontUtils {
- public:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-  static std::vector<Unichar> GlyphsToUnichars(const Font& font,
-                                               const std::vector<GlyphID>& glyphs);
+std::vector<Unichar> GlyphConverter::glyphsToUnichars(const Font& font,
+                                                      const std::vector<GlyphID>& glyphs) {
+  auto typeface = font.getTypeface();
+  if (!typeface) {
+    return {};
+  }
+  std::vector<Unichar> ret(glyphs.size(), 0);
+  auto glyphMap = this->getGlyphToUnicodeMap(typeface);
+  for (size_t i = 0; i < glyphs.size(); i++) {
+    ret[i] = glyphMap[glyphs[i]];
+  }
+  return ret;
+}
+
+const std::vector<Unichar>& GlyphConverter::getGlyphToUnicodeMap(
+    const std::shared_ptr<Typeface>& typeface) {
+  if (fontToGlyphMap.find(typeface->uniqueID()) == fontToGlyphMap.end()) {
+    fontToGlyphMap[typeface->uniqueID()] = typeface->getGlyphToUnicodeMap();
+  }
+  return fontToGlyphMap[typeface->uniqueID()];
+}
+
 #endif
-};
 
 }  // namespace tgfx

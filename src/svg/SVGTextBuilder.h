@@ -20,36 +20,25 @@
 
 #include <MacTypes.h>
 #include <string>
+#include "core/utils/GlyphConverter.h"
 #include "tgfx/core/GlyphRun.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 class SVGTextBuilder {
  public:
-  explicit SVGTextBuilder(const GlyphRun& glyphRun);
+  struct UnicharsInfo {
+    std::string text;
+    std::string posX;
+    std::string posY;
+  };
 
-  std::string posX() const {
-    return posXString;
-  }
+  SVGTextBuilder() = default;
+  ~SVGTextBuilder() = default;
 
-  std::string posY() const {
-    return hasConstY ? constYString : posYString;
-  }
-
-  std::string text() const {
-    return _text;
-  }
+  UnicharsInfo glyphToUnicharsInfo(const GlyphRun& glyphRun);
 
  private:
-  void appendUnichar(Unichar c, Point position);
-
-  std::string _text;
-  std::string posXString;
-  std::string posYString;
-  std::string constYString;
-  float constY;
-  bool lastCharWasWhitespace = true;
-  bool hasConstY = true;
+  GlyphConverter converter;
 };
 }  // namespace tgfx

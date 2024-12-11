@@ -21,7 +21,7 @@
 #include <unordered_set>
 #include "SVGExportingContext.h"
 #include "SVGUtils.h"
-#include "core/MCState.h"
+#include "core/CanvasState.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
