@@ -21,15 +21,16 @@
 #include <memory>
 #include <utility>
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg//SVGTypes.h"
 #include "tgfx/svg/SVGAttribute.h"
-#include "tgfx/svg/SVGAttributeParser.h"
-#include "tgfx/svg/SVGRenderContext.h"
+#include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
 class SVGValue;
+class SVGRenderContext;
 
 enum class SVGTag {
   Circle,
@@ -79,37 +80,36 @@ enum class SVGTag {
   Use
 };
 
-#define SVG_PRES_ATTR(attr_name, attr_type, attr_inherited)                             \
- private:                                                                               \
-  bool set##attr_name(                                                                  \
-      SVGAttributeParser::ParseResult<SVGProperty<attr_type, (attr_inherited)>>&& pr) { \
-    if (pr.has_value()) {                                                               \
-      this->set##attr_name(std::move(*pr));                                             \
-    }                                                                                   \
-    return pr.has_value();                                                              \
-  }                                                                                     \
-                                                                                        \
- public:                                                                                \
-  const SVGProperty<attr_type, attr_inherited>& get##attr_name() const {                \
-    return _presentationAttributes.attr_name;                                           \
-  }                                                                                     \
-  void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {                \
-    auto* dest = &_presentationAttributes.attr_name;                                    \
-    if (!dest->isInheritable() || v.isValue()) {                                        \
-      /* TODO: If dest is not inheritable, handle v == "inherit" */                     \
-      *dest = v;                                                                        \
-    } else {                                                                            \
-      dest->set(SVGPropertyState::Inherit);                                             \
-    }                                                                                   \
-  }                                                                                     \
-  void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                     \
-    auto* dest = &_presentationAttributes.attr_name;                                    \
-    if (!dest->isInheritable() || v.isValue()) {                                        \
-      /* TODO: If dest is not inheritable, handle v == "inherit" */                     \
-      *dest = std::move(v);                                                             \
-    } else {                                                                            \
-      dest->set(SVGPropertyState::Inherit);                                             \
-    }                                                                                   \
+#define SVG_PRES_ATTR(attr_name, attr_type, attr_inherited)                           \
+ private:                                                                             \
+  bool set##attr_name(std::optional<SVGProperty<attr_type, (attr_inherited)>>&& pr) { \
+    if (pr.has_value()) {                                                             \
+      this->set##attr_name(std::move(*pr));                                           \
+    }                                                                                 \
+    return pr.has_value();                                                            \
+  }                                                                                   \
+                                                                                      \
+ public:                                                                              \
+  const SVGProperty<attr_type, attr_inherited>& get##attr_name() const {              \
+    return _presentationAttributes.attr_name;                                         \
+  }                                                                                   \
+  void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {              \
+    auto* dest = &_presentationAttributes.attr_name;                                  \
+    if (!dest->isInheritable() || v.isValue()) {                                      \
+      /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
+      *dest = v;                                                                      \
+    } else {                                                                          \
+      dest->set(SVGPropertyState::Inherit);                                           \
+    }                                                                                 \
+  }                                                                                   \
+  void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                   \
+    auto* dest = &_presentationAttributes.attr_name;                                  \
+    if (!dest->isInheritable() || v.isValue()) {                                      \
+      /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
+      *dest = std::move(v);                                                           \
+    } else {                                                                          \
+      dest->set(SVGPropertyState::Inherit);                                           \
+    }                                                                                 \
   }
 
 class SVGNode {
@@ -130,18 +130,14 @@ class SVGNode {
     return false;
   }
 
-#ifndef RENDER_SVG
-
   void render(const SVGRenderContext&) const;
   bool asPaint(const SVGRenderContext&, Paint*) const;
   Path asPath(const SVGRenderContext&) const;
   Rect objectBoundingBox(const SVGRenderContext&) const;
 
-#endif
-
   void setAttribute(SVGAttribute, const SVGValue&);
   bool setAttribute(const std::string& attributeName, const std::string& attributeValue);
-  virtual bool parseAndSetAttribute(const char* name, const char* value);
+  virtual bool parseAndSetAttribute(const std::string& name, const std::string& value);
 
   SVG_PRES_ATTR(ClipRule, SVGFillRule, true)
   SVG_PRES_ATTR(Color, SVGColorType, true)
@@ -184,9 +180,9 @@ class SVGNode {
 
   virtual void onSetAttribute(SVGAttribute, const SVGValue&) {
   }
-#ifndef RENDER_SVG
+
   // Called before onRender(), to apply local attributes to the context.  Unlike onRender(),
-  // onPrepareToRender() bubbles up the inheritance chain: overriders should always call
+  // onPrepareToRender() bubbles up the inheritance chain: override should always call
   // INHERITED::onPrepareToRender(), unless they intend to short-circuit rendering
   // (return false).
   // Implementations are expected to return true if rendering is to continue, or false if
@@ -204,39 +200,37 @@ class SVGNode {
   virtual Rect onObjectBoundingBox(const SVGRenderContext&) const {
     return Rect::MakeEmpty();
   }
-#endif
 
  private:
   SVGTag _tag;
 
-  // FIXME: this should be sparse
   SVGPresentationAttributes _presentationAttributes;
 };
 
 //NOLINTBEGIN
 #undef SVG_PRES_ATTR  // presentation attributes are only defined for the base class
 
-#define SVG_ATTR_SETTERS(attr_name, attr_type, attr_default, set_cp, set_mv)  \
- private:                                                                     \
-  bool set##attr_name(const SVGAttributeParser::ParseResult<attr_type>& pr) { \
-    if (pr.has_value()) {                                                     \
-      this->set##attr_name(*pr);                                              \
-    }                                                                         \
-    return pr.has_value();                                                    \
-  }                                                                           \
-  bool set##attr_name(SVGAttributeParser::ParseResult<attr_type>&& pr) {      \
-    if (pr.has_value()) {                                                     \
-      this->set##attr_name(std::move(*pr));                                   \
-    }                                                                         \
-    return pr.has_value();                                                    \
-  }                                                                           \
-                                                                              \
- public:                                                                      \
-  void set##attr_name(const attr_type& a) {                                   \
-    set_cp(a);                                                                \
-  }                                                                           \
-  void set##attr_name(attr_type&& a) {                                        \
-    set_mv(std::move(a));                                                     \
+#define SVG_ATTR_SETTERS(attr_name, attr_type, attr_default, set_cp, set_mv) \
+ private:                                                                    \
+  bool set##attr_name(const std::optional<attr_type>& pr) {                  \
+    if (pr.has_value()) {                                                    \
+      this->set##attr_name(*pr);                                             \
+    }                                                                        \
+    return pr.has_value();                                                   \
+  }                                                                          \
+  bool set##attr_name(std::optional<attr_type>&& pr) {                       \
+    if (pr.has_value()) {                                                    \
+      this->set##attr_name(std::move(*pr));                                  \
+    }                                                                        \
+    return pr.has_value();                                                   \
+  }                                                                          \
+                                                                             \
+ public:                                                                     \
+  void set##attr_name(const attr_type& a) {                                  \
+    set_cp(a);                                                               \
+  }                                                                          \
+  void set##attr_name(attr_type&& a) {                                       \
+    set_mv(std::move(a));                                                    \
   }
 
 #define SVG_ATTR(attr_name, attr_type, attr_default)                                           \

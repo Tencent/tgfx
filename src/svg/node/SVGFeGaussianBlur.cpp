@@ -17,31 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGFeGaussianBlur.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGFeGaussianBlur::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeGaussianBlur::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
-         this->setstdDeviation(SVGAttributeParser::parse<SkSVGFeGaussianBlur::StdDeviation>(
+         this->setstdDeviation(SVGAttributeParser::parse<SVGFeGaussianBlur::StdDeviation>(
              "stdDeviation", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<ImageFilter> SkSVGFeGaussianBlur::onMakeImageFilter(
-    const SVGRenderContext& ctx, const SkSVGFilterContext& fctx) const {
+std::shared_ptr<ImageFilter> SVGFeGaussianBlur::onMakeImageFilter(
+    const SVGRenderContext& ctx, const SVGFilterContext& fctx) const {
   auto scale = ctx.transformForCurrentOBB(fctx.primitiveUnits()).scale;
   const auto sigmaX = stdDeviation.fX * scale.x * 4;
   const auto sigmaY = stdDeviation.fY * scale.y * 4;
   return ImageFilter::Blur(sigmaX, sigmaY);
 }
-#endif
 
 template <>
-bool SVGAttributeParser::parse<SkSVGFeGaussianBlur::StdDeviation>(
-    SkSVGFeGaussianBlur::StdDeviation* stdDeviation) {
+bool SVGAttributeParser::parse<SVGFeGaussianBlur::StdDeviation>(
+    SVGFeGaussianBlur::StdDeviation* stdDeviation) {
   std::vector<SVGNumberType> values;
   if (!this->parse(&values)) {
     return false;

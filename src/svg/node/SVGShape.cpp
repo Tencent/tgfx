@@ -19,8 +19,8 @@
 #include "tgfx/svg/node/SVGShape.h"
 #include <memory>
 #include "core/utils/Log.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Size.h"
-#include "tgfx/svg/SVGRenderContext.h"
 
 class SkSVGNode;
 enum class SkSVGTag;
@@ -30,7 +30,6 @@ namespace tgfx {
 SVGShape::SVGShape(SVGTag t) : INHERITED(t) {
 }
 
-#ifndef RENDER_SVG
 void SVGShape::onRender(const SVGRenderContext& ctx) const {
   const auto fillType = ctx.presentationContext()._inherited.FillRule->asFillType();
 
@@ -42,7 +41,6 @@ void SVGShape::onRender(const SVGRenderContext& ctx) const {
   const auto fillPaint = paintCtx.fillPaint();
   const auto strokePaint = paintCtx.strokePaint();
 
-  // TODO: this approach forces duplicate geometry resolution in onDraw(); refactor to avoid.
   if (fillPaint.has_value()) {
     this->onDraw(ctx.canvas(), ctx.lengthContext(), fillPaint.value(), fillType);
   }
@@ -51,7 +49,6 @@ void SVGShape::onRender(const SVGRenderContext& ctx) const {
     this->onDraw(ctx.canvas(), ctx.lengthContext(), strokePaint.value(), fillType);
   }
 }
-#endif
 
 void SVGShape::appendChild(std::shared_ptr<SVGNode>) {
   LOGE("cannot append child nodes to an SVG shape.\n");

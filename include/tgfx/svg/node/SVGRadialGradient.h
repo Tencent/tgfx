@@ -27,10 +27,10 @@
 
 namespace tgfx {
 
-class SkSVGRadialGradient final : public SkSVGGradient {
+class SVGRadialGradient final : public SVGGradient {
  public:
-  static std::shared_ptr<SkSVGRadialGradient> Make() {
-    return std::shared_ptr<SkSVGRadialGradient>(new SkSVGRadialGradient());
+  static std::shared_ptr<SVGRadialGradient> Make() {
+    return std::shared_ptr<SVGRadialGradient>(new SVGRadialGradient());
   }
 
   SVG_ATTR(Cx, SVGLength, SVGLength(50, SVGLength::Unit::Percentage))
@@ -40,17 +40,15 @@ class SkSVGRadialGradient final : public SkSVGGradient {
   SVG_OPTIONAL_ATTR(Fy, SVGLength)
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   std::shared_ptr<Shader> onMakeShader(const SVGRenderContext&, const std::vector<Color>&,
                                        const std::vector<float>&, TileMode,
                                        const Matrix&) const override;
-#endif
 
  private:
-  SkSVGRadialGradient();
+  SVGRadialGradient();
 
-  using INHERITED = SkSVGGradient;
+  using INHERITED = SVGGradient;
 };
 }  // namespace tgfx

@@ -27,7 +27,9 @@
 
 namespace tgfx {
 
-class SVGSVG : public SkSVGContainer {
+class SVGLengthContext;
+
+class SVGSVG : public SVGContainer {
  public:
   enum class Type {
     kRoot,
@@ -45,16 +47,12 @@ class SVGSVG : public SkSVGContainer {
 
   SVG_OPTIONAL_ATTR(ViewBox, SVGViewBoxType)
 
-#ifndef RENDER_SVG
   Size intrinsicSize(const SVGLengthContext&) const;
 
   void renderNode(const SVGRenderContext&, const SVGIRI& iri) const;
-#endif
 
  protected:
-#ifndef RENDER_SVG
   bool onPrepareToRender(SVGRenderContext*) const override;
-#endif
 
   void onSetAttribute(SVGAttribute, const SVGValue&) override;
 
@@ -65,7 +63,7 @@ class SVGSVG : public SkSVGContainer {
   // Some attributes behave differently for the outermost svg element.
   const Type type;
 
-  using INHERITED = SkSVGContainer;
+  using INHERITED = SVGContainer;
 };
 
 }  // namespace tgfx

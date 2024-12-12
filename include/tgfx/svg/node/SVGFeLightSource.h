@@ -38,10 +38,10 @@ class SkSVGFeLightSource : public SVGHiddenContainer {
   using INHERITED = SVGHiddenContainer;
 };
 
-class SkSVGFeDistantLight final : public SkSVGFeLightSource {
+class SVGFeDistantLight final : public SkSVGFeLightSource {
  public:
-  static std::shared_ptr<SkSVGFeDistantLight> Make() {
-    return std::shared_ptr<SkSVGFeDistantLight>(new SkSVGFeDistantLight());
+  static std::shared_ptr<SVGFeDistantLight> Make() {
+    return std::shared_ptr<SVGFeDistantLight>(new SVGFeDistantLight());
   }
 
   //   pk::SkPoint3 computeDirection() const;
@@ -50,18 +50,18 @@ class SkSVGFeDistantLight final : public SkSVGFeLightSource {
   SVG_ATTR(Elevation, SVGNumberType, 0)
 
  private:
-  SkSVGFeDistantLight() : INHERITED(SVGTag::FeDistantLight) {
+  SVGFeDistantLight() : INHERITED(SVGTag::FeDistantLight) {
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
   using INHERITED = SkSVGFeLightSource;
 };
 
-class SkSVGFePointLight final : public SkSVGFeLightSource {
+class SVGFePointLight final : public SkSVGFeLightSource {
  public:
-  static std::shared_ptr<SkSVGFePointLight> Make() {
-    return std::shared_ptr<SkSVGFePointLight>(new SkSVGFePointLight());
+  static std::shared_ptr<SVGFePointLight> Make() {
+    return std::shared_ptr<SVGFePointLight>(new SVGFePointLight());
   }
 
   SVG_ATTR(X, SVGNumberType, 0)
@@ -69,18 +69,18 @@ class SkSVGFePointLight final : public SkSVGFeLightSource {
   SVG_ATTR(Z, SVGNumberType, 0)
 
  private:
-  SkSVGFePointLight() : INHERITED(SVGTag::FePointLight) {
+  SVGFePointLight() : INHERITED(SVGTag::FePointLight) {
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
   using INHERITED = SkSVGFeLightSource;
 };
 
-class SkSVGFeSpotLight final : public SkSVGFeLightSource {
+class SVGFeSpotLight final : public SkSVGFeLightSource {
  public:
-  static std::shared_ptr<SkSVGFeSpotLight> Make() {
-    return std::shared_ptr<SkSVGFeSpotLight>(new SkSVGFeSpotLight());
+  static std::shared_ptr<SVGFeSpotLight> Make() {
+    return std::shared_ptr<SVGFeSpotLight>(new SVGFeSpotLight());
   }
 
   SVG_ATTR(X, SVGNumberType, 0)
@@ -94,10 +94,10 @@ class SkSVGFeSpotLight final : public SkSVGFeLightSource {
   SVG_OPTIONAL_ATTR(LimitingConeAngle, SVGNumberType)
 
  private:
-  SkSVGFeSpotLight() : INHERITED(SVGTag::FeSpotLight) {
+  SVGFeSpotLight() : INHERITED(SVGTag::FeSpotLight) {
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
   using INHERITED = SkSVGFeLightSource;
 };

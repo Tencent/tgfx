@@ -35,12 +35,12 @@ using ShapedTextCallback =
     std::function<void(const SVGRenderContext&, const std::shared_ptr<TextBlob>&)>;
 
 // Base class for text-rendering nodes.
-class SkSVGTextFragment : public SkSVGTransformableNode {
+class SVGTextFragment : public SVGTransformableNode {
  public:
   void renderText(const SVGRenderContext&, const ShapedTextCallback&) const;
 
  protected:
-  explicit SkSVGTextFragment(SVGTag t) : INHERITED(t) {
+  explicit SVGTextFragment(SVGTag t) : INHERITED(t) {
   }
 
   virtual void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const = 0;
@@ -52,11 +52,11 @@ class SkSVGTextFragment : public SkSVGTransformableNode {
  private:
   Path onAsPath(const SVGRenderContext&) const override;
 
-  using INHERITED = SkSVGTransformableNode;
+  using INHERITED = SVGTransformableNode;
 };
 
 // Base class for nestable text containers (<text>, <tspan>, etc).
-class SkSVGTextContainer : public SkSVGTextFragment {
+class SVGTextContainer : public SVGTextFragment {
  public:
   SVG_ATTR(X, std::vector<SVGLength>, {})
   SVG_ATTR(Y, std::vector<SVGLength>, {})
@@ -67,59 +67,59 @@ class SkSVGTextContainer : public SkSVGTextFragment {
   void appendChild(std::shared_ptr<SVGNode>) final;
 
  protected:
-  explicit SkSVGTextContainer(SVGTag t) : INHERITED(t) {
+  explicit SVGTextContainer(SVGTag t) : INHERITED(t) {
   }
 
   void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  std::vector<std::shared_ptr<SkSVGTextFragment>> fChildren;
+  std::vector<std::shared_ptr<SVGTextFragment>> children;
 
-  using INHERITED = SkSVGTextFragment;
+  using INHERITED = SVGTextFragment;
 };
 
-class SkSVGText final : public SkSVGTextContainer {
+class SVGText final : public SVGTextContainer {
  public:
-  static std::shared_ptr<SkSVGText> Make() {
-    return std::shared_ptr<SkSVGText>(new SkSVGText());
+  static std::shared_ptr<SVGText> Make() {
+    return std::shared_ptr<SVGText>(new SVGText());
   }
 
  private:
-  SkSVGText() : INHERITED(SVGTag::Text) {
+  SVGText() : INHERITED(SVGTag::Text) {
   }
 
   void onRender(const SVGRenderContext&) const override;
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
   Path onAsPath(const SVGRenderContext&) const override;
 
-  using INHERITED = SkSVGTextContainer;
+  using INHERITED = SVGTextContainer;
 };
 
-class SkSVGTSpan final : public SkSVGTextContainer {
+class SVGTSpan final : public SVGTextContainer {
  public:
-  static std::shared_ptr<SkSVGTSpan> Make() {
-    return std::shared_ptr<SkSVGTSpan>(new SkSVGTSpan());
+  static std::shared_ptr<SVGTSpan> Make() {
+    return std::shared_ptr<SVGTSpan>(new SVGTSpan());
   }
 
  private:
-  SkSVGTSpan() : INHERITED(SVGTag::TSpan) {
+  SVGTSpan() : INHERITED(SVGTag::TSpan) {
   }
 
-  using INHERITED = SkSVGTextContainer;
+  using INHERITED = SVGTextContainer;
 };
 
-class SkSVGTextLiteral final : public SkSVGTextFragment {
+class SVGTextLiteral final : public SVGTextFragment {
  public:
-  static std::shared_ptr<SkSVGTextLiteral> Make() {
-    return std::shared_ptr<SkSVGTextLiteral>(new SkSVGTextLiteral());
+  static std::shared_ptr<SVGTextLiteral> Make() {
+    return std::shared_ptr<SVGTextLiteral>(new SVGTextLiteral());
   }
 
   SVG_ATTR(Text, SVGStringType, SVGStringType())
 
  private:
-  SkSVGTextLiteral() : INHERITED(SVGTag::TextLiteral) {
+  SVGTextLiteral() : INHERITED(SVGTag::TextLiteral) {
   }
 
   void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;
@@ -127,26 +127,26 @@ class SkSVGTextLiteral final : public SkSVGTextFragment {
   void appendChild(std::shared_ptr<SVGNode>) override {
   }
 
-  using INHERITED = SkSVGTextFragment;
+  using INHERITED = SVGTextFragment;
 };
 
-class SkSVGTextPath final : public SkSVGTextContainer {
+class SVGTextPath final : public SVGTextContainer {
  public:
-  static std::shared_ptr<SkSVGTextPath> Make() {
-    return std::shared_ptr<SkSVGTextPath>(new SkSVGTextPath());
+  static std::shared_ptr<SVGTextPath> Make() {
+    return std::shared_ptr<SVGTextPath>(new SVGTextPath());
   }
 
   SVG_ATTR(Href, SVGIRI, {})
   SVG_ATTR(StartOffset, SVGLength, SVGLength(0))
 
  private:
-  SkSVGTextPath() : INHERITED(SVGTag::TextPath) {
+  SVGTextPath() : INHERITED(SVGTag::TextPath) {
   }
 
   void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-  using INHERITED = SkSVGTextContainer;
+  using INHERITED = SVGTextContainer;
 };
 }  // namespace tgfx

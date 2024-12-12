@@ -26,10 +26,10 @@
 
 namespace tgfx {
 
-class SkSVGFilter final : public SVGHiddenContainer {
+class SVGFilter final : public SVGHiddenContainer {
  public:
-  static std::shared_ptr<SkSVGFilter> Make() {
-    return std::shared_ptr<SkSVGFilter>(new SkSVGFilter());
+  static std::shared_ptr<SVGFilter> Make() {
+    return std::shared_ptr<SVGFilter>(new SVGFilter());
   }
 
   /** Propagates any inherited presentation attributes in the given context. */
@@ -47,10 +47,10 @@ class SkSVGFilter final : public SVGHiddenContainer {
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse))
 
  private:
-  SkSVGFilter() : INHERITED(SVGTag::Filter) {
+  SVGFilter() : INHERITED(SVGTag::Filter) {
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
   using INHERITED = SVGHiddenContainer;
 };

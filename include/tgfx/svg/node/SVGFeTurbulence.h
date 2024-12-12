@@ -26,10 +26,10 @@
 
 namespace tgfx {
 
-class SkSVGFeTurbulence : public SkSVGFe {
+class SVGFeTurbulence : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeTurbulence> Make() {
-    return std::shared_ptr<SkSVGFeTurbulence>(new SkSVGFeTurbulence());
+  static std::shared_ptr<SVGFeTurbulence> Make() {
+    return std::shared_ptr<SVGFeTurbulence>(new SVGFeTurbulence());
   }
 
   SVG_ATTR(BaseFrequency, SVGFeTurbulenceBaseFrequency, SVGFeTurbulenceBaseFrequency({}))
@@ -39,22 +39,20 @@ class SkSVGFeTurbulence : public SkSVGFe {
            SVGFeTurbulenceType(SVGFeTurbulenceType::Type::Turbulence))
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeTurbulence() : INHERITED(SVGTag::FeTurbulence) {
+  SVGFeTurbulence() : INHERITED(SVGTag::FeTurbulence) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 
 }  // namespace tgfx

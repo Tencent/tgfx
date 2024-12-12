@@ -29,10 +29,10 @@
 
 namespace tgfx {
 
-class SkSVGLine final : public SVGShape {
+class SVGLine final : public SVGShape {
  public:
-  static std::shared_ptr<SkSVGLine> Make() {
-    return std::shared_ptr<SkSVGLine>(new SkSVGLine());
+  static std::shared_ptr<SVGLine> Make() {
+    return std::shared_ptr<SVGLine>(new SVGLine());
   }
 
   SVG_ATTR(X1, SVGLength, SVGLength(0))
@@ -41,21 +41,17 @@ class SkSVGLine final : public SVGShape {
   SVG_ATTR(Y2, SVGLength, SVGLength(0))
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
 
   Path onAsPath(const SVGRenderContext&) const override;
-#endif
 
  private:
-  SkSVGLine();
+  SVGLine();
 
-#ifndef RENDER_SVG
   // resolve and return the two endpoints
   std::tuple<Point, Point> resolve(const SVGLengthContext&) const;
-#endif
 
   using INHERITED = SVGShape;
 };

@@ -27,12 +27,12 @@
 #include "tgfx/svg/node/SVGHiddenContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
 namespace tgfx {
 
-class SkSVGFe : public SVGHiddenContainer {
+class SVGFe : public SVGHiddenContainer {
  public:
   static bool IsFilterEffect(const std::shared_ptr<SVGNode>& node) {
     switch (node->tag()) {
@@ -57,17 +57,17 @@ class SkSVGFe : public SVGHiddenContainer {
   }
 
   std::shared_ptr<ImageFilter> makeImageFilter(const SVGRenderContext& ctx,
-                                               const SkSVGFilterContext& filterContext) const;
+                                               const SVGFilterContext& filterContext) const;
 
   // https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveSubRegion
-  Rect resolveFilterSubregion(const SVGRenderContext&, const SkSVGFilterContext&) const;
+  Rect resolveFilterSubregion(const SVGRenderContext&, const SVGFilterContext&) const;
 
   /**
-     * Resolves the colorspace within which this filter effect should be applied.
-     * Spec: https://www.w3.org/TR/SVG11/painting.html#ColorInterpolationProperties
-     * 'color-interpolation-filters' property.
-     */
-  virtual SVGColorspace resolveColorspace(const SVGRenderContext&, const SkSVGFilterContext&) const;
+   * Resolves the colorspace within which this filter effect should be applied.
+   * Spec: https://www.w3.org/TR/SVG11/painting.html#ColorInterpolationProperties
+   * 'color-interpolation-filters' property.
+   */
+  virtual SVGColorspace resolveColorspace(const SVGRenderContext&, const SVGFilterContext&) const;
 
   /** Propagates any inherited presentation attributes in the given context. */
   void applyProperties(SVGRenderContext*) const;
@@ -81,27 +81,23 @@ class SkSVGFe : public SVGHiddenContainer {
   SVG_OPTIONAL_ATTR(Height, SVGLength)
 
  protected:
-  explicit SkSVGFe(SVGTag t) : INHERITED(t) {
+  explicit SVGFe(SVGTag t) : INHERITED(t) {
   }
 
-#ifndef RENDER_SVG
   virtual std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                         const SkSVGFilterContext&) const = 0;
-#endif
+                                                         const SVGFilterContext&) const = 0;
 
   virtual std::vector<SVGFeInputType> getInputs() const = 0;
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-#ifndef RENDER_SVG
   /**
      * Resolves the rect specified by the x, y, width and height attributes (if specified) on this
      * filter effect. These attributes are resolved according to the given length context and
      * the value of 'primitiveUnits' on the parent <filter> element.
      */
-  Rect resolveBoundaries(const SVGRenderContext&, const SkSVGFilterContext&) const;
-#endif
+  Rect resolveBoundaries(const SVGRenderContext&, const SVGFilterContext&) const;
 
   using INHERITED = SVGHiddenContainer;
 };

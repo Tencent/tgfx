@@ -19,16 +19,14 @@
 #include "tgfx/svg/node/SVGFeComposite.h"
 #include <tuple>
 #include "core/utils/Log.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
+#include "svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
 class SVGRenderContext;
 
-bool SkSVGFeComposite::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeComposite::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
-         // SkSVGFeInputType parsing defined in SkSVGFe.cpp:
          this->setIn2(SVGAttributeParser::parse<SVGFeInputType>("in2", name, value)) ||
          this->setK1(SVGAttributeParser::parse<SVGNumberType>("k1", name, value)) ||
          this->setK2(SVGAttributeParser::parse<SVGNumberType>("k2", name, value)) ||
@@ -38,8 +36,7 @@ bool SkSVGFeComposite::parseAndSetAttribute(const char* name, const char* value)
              SVGAttributeParser::parse<SVGFeCompositeOperator>("operator", name, value));
 }
 
-#ifndef RENDER_SVG
-BlendMode SkSVGFeComposite::BlendModeForOperator(SVGFeCompositeOperator op) {
+BlendMode SVGFeComposite::BlendModeForOperator(SVGFeCompositeOperator op) {
   switch (op) {
     case SVGFeCompositeOperator::Over:
       return BlendMode::SrcOver;
@@ -58,8 +55,8 @@ BlendMode SkSVGFeComposite::BlendModeForOperator(SVGFeCompositeOperator op) {
   }
 }
 
-std::shared_ptr<ImageFilter> SkSVGFeComposite::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SkSVGFilterContext& /*fctx*/) const {
+std::shared_ptr<ImageFilter> SVGFeComposite::onMakeImageFilter(
+    const SVGRenderContext& /*ctx*/, const SVGFilterContext& /*fctx*/) const {
   // const Rect cropRect = this->resolveFilterSubregion(ctx, fctx);
   // const SVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
   // const std::shared_ptr<ImageFilter> background = fctx.resolveInput(ctx, fIn2, colorspace);
@@ -75,7 +72,6 @@ std::shared_ptr<ImageFilter> SkSVGFeComposite::onMakeImageFilter(
   //TODO (YG)
   return nullptr;
 }
-#endif  // RENDER_SVG
 
 template <>
 bool SVGAttributeParser::parse(SVGFeCompositeOperator* op) {

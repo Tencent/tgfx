@@ -17,29 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGFeOffset.h"
+#include "svg/SVGAttributeParser.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGFeOffset::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeOffset::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setDx(SVGAttributeParser::parse<SVGNumberType>("dx", name, value)) ||
          this->setDy(SVGAttributeParser::parse<SVGNumberType>("dy", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<ImageFilter> SkSVGFeOffset::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SkSVGFilterContext& /*fctx*/) const {
-  // const auto d =
-  //     SkV2{this->getDx(), this->getDy()} * ctx.transformForCurrentOBB(fctx.primitiveUnits()).scale;
-
-  // sk_sp<SkImageFilter> in =
-  //     fctx.resolveInput(ctx, this->getIn(), this->resolveColorspace(ctx, fctx));
-  // return SkImageFilters::Offset(d.x, d.y, std::move(in), this->resolveFilterSubregion(ctx, fctx));
-
-  //TODO (YG)
+std::shared_ptr<ImageFilter> SVGFeOffset::onMakeImageFilter(
+    const SVGRenderContext& /*ctx*/, const SVGFilterContext& /*fctx*/) const {
   return nullptr;
 }
-#endif
+
 }  // namespace tgfx

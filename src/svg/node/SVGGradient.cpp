@@ -18,16 +18,16 @@
 
 #include "tgfx/svg/node/SVGGradient.h"
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include "core/utils/Log.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGGradient::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGGradient::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setGradientTransform(
              SVGAttributeParser::parse<SVGTransformType>("gradientTransform", name, value)) ||
@@ -38,14 +38,13 @@ bool SkSVGGradient::parseAndSetAttribute(const char* name, const char* value) {
              SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("gradientUnits", name, value));
 }
 
-#ifndef RENDER_SVG
 // https://www.w3.org/TR/SVG11/pservers.html#LinearGradientElementHrefAttribute
-void SkSVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<Color>& colors,
-                                      std::vector<float>& positions) const {
+void SVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<Color>& colors,
+                                    std::vector<float>& positions) const {
   // Used to resolve percentage offsets.
   const SVGLengthContext ltx(Size::Make(1, 1));
 
-  this->forEachChild<SkSVGStop>([&](const SkSVGStop* stop) {
+  this->forEachChild<SVGStop>([&](const SVGStop* stop) {
     colors.push_back(this->resolveStopColor(ctx, *stop));
     positions.push_back(
         std::clamp(ltx.resolve(stop->getOffset(), SVGLengthContext::LengthType::Other), 0.f, 1.f));
@@ -56,12 +55,12 @@ void SkSVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<C
   if (positions.empty() && !Href.iri().empty()) {
     const auto ref = ctx.findNodeById(Href);
     if (ref && (ref->tag() == SVGTag::LinearGradient || ref->tag() == SVGTag::RadialGradient)) {
-      static_cast<const SkSVGGradient*>(ref.get())->collectColorStops(ctx, colors, positions);
+      static_cast<const SVGGradient*>(ref.get())->collectColorStops(ctx, colors, positions);
     }
   }
 }
 
-Color SkSVGGradient::resolveStopColor(const SVGRenderContext& ctx, const SkSVGStop& stop) const {
+Color SVGGradient::resolveStopColor(const SVGRenderContext& ctx, const SVGStop& stop) const {
   const auto& stopColor = stop.getStopColor();
   const auto& stopOpacity = stop.getStopOpacity();
   // Uninherited presentation attrs should have a concrete value at this point.
@@ -74,7 +73,7 @@ Color SkSVGGradient::resolveStopColor(const SVGRenderContext& ctx, const SkSVGSt
   return {color.red, color.green, color.blue, *stopOpacity * color.alpha};
 }
 
-bool SkSVGGradient::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
+bool SVGGradient::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   std::vector<Color> colors;
   std::vector<float> positions;
 
@@ -101,7 +100,6 @@ bool SkSVGGradient::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   paint->setShader(this->onMakeShader(ctx, colors, positions, tileMode, localMatrix));
   return true;
 }
-#endif
 
 // https://www.w3.org/TR/SVG11/pservers.html#LinearGradientElementSpreadMethodAttribute
 template <>

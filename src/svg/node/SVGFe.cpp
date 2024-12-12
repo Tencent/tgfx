@@ -19,22 +19,20 @@
 #include "tgfx/svg/node/SVGFe.h"
 #include <cstddef>
 #include <tuple>
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
-#include "tgfx/svg/SVGRenderContext.h"
 #include "tgfx/svg/node/SVGFilterContext.h"
 
 namespace tgfx {
 
-#ifndef RENDER_SVG
-
-std::shared_ptr<ImageFilter> SkSVGFe::makeImageFilter(
-    const SVGRenderContext& ctx, const SkSVGFilterContext& filterContext) const {
+std::shared_ptr<ImageFilter> SVGFe::makeImageFilter(const SVGRenderContext& ctx,
+                                                    const SVGFilterContext& filterContext) const {
   return this->onMakeImageFilter(ctx, filterContext);
 }
 
-Rect SkSVGFe::resolveBoundaries(const SVGRenderContext& ctx,
-                                const SkSVGFilterContext& filterContext) const {
+Rect SVGFe::resolveBoundaries(const SVGRenderContext& ctx,
+                              const SVGFilterContext& filterContext) const {
   const auto x = X.has_value() ? *X : SVGLength(0, SVGLength::Unit::Percentage);
   const auto y = Y.has_value() ? *Y : SVGLength(0, SVGLength::Unit::Percentage);
   const auto w = Width.has_value() ? *Width : SVGLength(100, SVGLength::Unit::Percentage);
@@ -43,7 +41,7 @@ Rect SkSVGFe::resolveBoundaries(const SVGRenderContext& ctx,
   return ctx.resolveOBBRect(x, y, w, h, filterContext.primitiveUnits());
 }
 
-static bool AnyIsStandardInput(const SkSVGFilterContext& fctx,
+static bool AnyIsStandardInput(const SVGFilterContext& fctx,
                                const std::vector<SVGFeInputType>& inputs) {
   for (const auto& in : inputs) {
     switch (in.type()) {
@@ -68,8 +66,8 @@ static bool AnyIsStandardInput(const SkSVGFilterContext& fctx,
   return false;
 }
 
-Rect SkSVGFe::resolveFilterSubregion(const SVGRenderContext& ctx,
-                                     const SkSVGFilterContext& fctx) const {
+Rect SVGFe::resolveFilterSubregion(const SVGRenderContext& ctx,
+                                   const SVGFilterContext& fctx) const {
   // From https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveSubRegion,
   // the default filter effect subregion is equal to the union of the subregions defined
   // for all "referenced nodes" (filter effect inputs). If there are no inputs, the
@@ -98,19 +96,17 @@ Rect SkSVGFe::resolveFilterSubregion(const SVGRenderContext& ctx,
                         Height.has_value() ? boundaries.height() : defaultSubregion.height());
 }
 
-SVGColorspace SkSVGFe::resolveColorspace(const SVGRenderContext& ctx,
-                                         const SkSVGFilterContext&) const {
+SVGColorspace SVGFe::resolveColorspace(const SVGRenderContext& ctx, const SVGFilterContext&) const {
   constexpr SVGColorspace kDefaultCS = SVGColorspace::SRGB;
   const SVGColorspace cs = *ctx.presentationContext()._inherited.ColorInterpolationFilters;
   return cs == SVGColorspace::Auto ? kDefaultCS : cs;
 }
 
-void SkSVGFe::applyProperties(SVGRenderContext* ctx) const {
+void SVGFe::applyProperties(SVGRenderContext* ctx) const {
   this->onPrepareToRender(ctx);
 }
-#endif
 
-bool SkSVGFe::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFe::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setIn(SVGAttributeParser::parse<SVGFeInputType>("in", name, value)) ||
          this->setResult(SVGAttributeParser::parse<SVGStringType>("result", name, value)) ||

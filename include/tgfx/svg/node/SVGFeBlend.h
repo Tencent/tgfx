@@ -24,12 +24,12 @@
 #include "tgfx/svg/node/SVGFe.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
 namespace tgfx {
 
-class SkSVGFeBlend : public SkSVGFe {
+class SVGFeBlend : public SVGFe {
  public:
   enum class Mode {
     kNormal,
@@ -39,29 +39,27 @@ class SkSVGFeBlend : public SkSVGFe {
     kLighten,
   };
 
-  static std::shared_ptr<SkSVGFeBlend> Make() {
-    return std::shared_ptr<SkSVGFeBlend>(new SkSVGFeBlend());
+  static std::shared_ptr<SVGFeBlend> Make() {
+    return std::shared_ptr<SVGFeBlend>(new SVGFeBlend());
   }
 
   SVG_ATTR(BlendMode, Mode, Mode::kNormal)
   SVG_ATTR(In2, SVGFeInputType, SVGFeInputType())
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn(), this->getIn2()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeBlend() : INHERITED(SVGTag::FeBlend) {
+  SVGFeBlend() : INHERITED(SVGTag::FeBlend) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 }  // namespace tgfx

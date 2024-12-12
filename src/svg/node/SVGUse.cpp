@@ -17,27 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGUse.h"
-#include <cstring>
 #include "core/utils/MathExtra.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
-#include "tgfx/svg/SVGRenderContext.h"
 
 namespace tgfx {
 
-SkSVGUse::SkSVGUse() : INHERITED(SVGTag::Use) {
+SVGUse::SVGUse() : INHERITED(SVGTag::Use) {
 }
 
-bool SkSVGUse::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGUse::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setX(SVGAttributeParser::parse<SVGLength>("x", n, v)) ||
          this->setY(SVGAttributeParser::parse<SVGLength>("y", n, v)) ||
          this->setHref(SVGAttributeParser::parse<SVGIRI>("xlink:href", n, v));
 }
 
-#ifndef RENDER_SVG
-bool SkSVGUse::onPrepareToRender(SVGRenderContext* ctx) const {
+bool SVGUse::onPrepareToRender(SVGRenderContext* ctx) const {
   if (Href.iri().empty() || !INHERITED::onPrepareToRender(ctx)) {
     return false;
   }
@@ -48,12 +46,10 @@ bool SkSVGUse::onPrepareToRender(SVGRenderContext* ctx) const {
     ctx->canvas()->translate(X.value(), Y.value());
   }
 
-  // TODO: width/height override for <svg> targets.
-
   return true;
 }
 
-void SkSVGUse::onRender(const SVGRenderContext& ctx) const {
+void SVGUse::onRender(const SVGRenderContext& ctx) const {
   const auto ref = ctx.findNodeById(Href);
   if (!ref) {
     return;
@@ -65,7 +61,7 @@ void SkSVGUse::onRender(const SVGRenderContext& ctx) const {
   ref->render(localContext);
 }
 
-Path SkSVGUse::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGUse::onAsPath(const SVGRenderContext& ctx) const {
   const auto ref = ctx.findNodeById(Href);
   if (!ref) {
     return Path();
@@ -77,7 +73,7 @@ Path SkSVGUse::onAsPath(const SVGRenderContext& ctx) const {
   return ref->asPath(localContext);
 }
 
-Rect SkSVGUse::onObjectBoundingBox(const SVGRenderContext& ctx) const {
+Rect SVGUse::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   const auto ref = ctx.findNodeById(Href);
   if (!ref) {
     return Rect::MakeEmpty();
@@ -93,5 +89,5 @@ Rect SkSVGUse::onObjectBoundingBox(const SVGRenderContext& ctx) const {
 
   return bounds;
 }
-#endif
+
 }  // namespace tgfx

@@ -26,39 +26,37 @@
 
 namespace tgfx {
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
-class SkSVGFeGaussianBlur : public SkSVGFe {
+class SVGFeGaussianBlur : public SVGFe {
  public:
   struct StdDeviation {
     SVGNumberType fX;
     SVGNumberType fY;
   };
 
-  static std::shared_ptr<SkSVGFeGaussianBlur> Make() {
-    return std::shared_ptr<SkSVGFeGaussianBlur>(new SkSVGFeGaussianBlur());
+  static std::shared_ptr<SVGFeGaussianBlur> Make() {
+    return std::shared_ptr<SVGFeGaussianBlur>(new SVGFeGaussianBlur());
   }
 
   SVG_ATTR(stdDeviation, StdDeviation, StdDeviation({0, 0}))
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeGaussianBlur() : INHERITED(SVGTag::FeGaussianBlur) {
+  SVGFeGaussianBlur() : INHERITED(SVGTag::FeGaussianBlur) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 
 }  // namespace tgfx

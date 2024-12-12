@@ -22,10 +22,11 @@
 #include <memory>
 #include <tuple>
 #include "core/utils/Log.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGFontManager.h"
 
 namespace tgfx {
@@ -113,7 +114,7 @@ std::vector<float> ResolveLengths(const SVGLengthContext& lengthCtx,
   return resolved;
 }
 
-float ComputeAlignmentFactor(const SkSVGPresentationContext& context) {
+float ComputeAlignmentFactor(const SVGPresentationContext& context) {
   switch (context._inherited.TextAnchor->type()) {
     case SVGTextAnchor::Type::Start:
       return 0.0f;
@@ -128,37 +129,34 @@ float ComputeAlignmentFactor(const SkSVGPresentationContext& context) {
 }
 }  // namespace
 
-void SkSVGTextContainer::appendChild(std::shared_ptr<SVGNode> child) {
+void SVGTextContainer::appendChild(std::shared_ptr<SVGNode> child) {
   // Only allow text content child nodes.
   switch (child->tag()) {
     case SVGTag::TextLiteral:
     case SVGTag::TextPath:
     case SVGTag::TSpan:
-      fChildren.push_back(std::static_pointer_cast<SkSVGTextFragment>(child));
+      children.push_back(std::static_pointer_cast<SVGTextFragment>(child));
       break;
     default:
       break;
   }
 }
 
-void SkSVGTextFragment::renderText(const SVGRenderContext& context,
-                                   const ShapedTextCallback& function) const {
-  // N.B.: unlike regular elements, text fragments do not establish a new OBB scope -- they
-  // always defer to the root <text> element for OBB resolution.
+void SVGTextFragment::renderText(const SVGRenderContext& context,
+                                 const ShapedTextCallback& function) const {
   SVGRenderContext localContext(context);
-
   if (this->onPrepareToRender(&localContext)) {
     this->onShapeText(localContext, function);
   }
 }
 
-Path SkSVGTextFragment::onAsPath(const SVGRenderContext&) const {
+Path SVGTextFragment::onAsPath(const SVGRenderContext&) const {
   // TODO (YGAurora)
   return Path();
 }
 
-void SkSVGTextContainer::onShapeText(const SVGRenderContext& context,
-                                     const ShapedTextCallback& function) const {
+void SVGTextContainer::onShapeText(const SVGRenderContext& context,
+                                   const ShapedTextCallback& function) const {
 
   auto x = ResolveLengths(context.lengthContext(), X, SVGLengthContext::LengthType::Horizontal);
   auto y = ResolveLengths(context.lengthContext(), Y, SVGLengthContext::LengthType::Vertical);
@@ -166,8 +164,8 @@ void SkSVGTextContainer::onShapeText(const SVGRenderContext& context,
   auto dy = ResolveLengths(context.lengthContext(), Dy, SVGLengthContext::LengthType::Vertical);
 
   // TODO (YGAurora) : Handle rotate
-  for (uint32_t i = 0; i < fChildren.size(); i++) {
-    auto child = fChildren[i];
+  for (uint32_t i = 0; i < children.size(); i++) {
+    auto child = children[i];
     context.canvas()->save();
     float offsetX = x[i] + (i < dx.size() ? dx[i] : 0);
     float offsetY = y[i] + (i < dy.size() ? dy[i] : 0);
@@ -177,7 +175,7 @@ void SkSVGTextContainer::onShapeText(const SVGRenderContext& context,
   }
 }
 
-bool SkSVGTextContainer::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGTextContainer::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setX(SVGAttributeParser::parse<std::vector<SVGLength>>("x", name, value)) ||
          this->setY(SVGAttributeParser::parse<std::vector<SVGLength>>("y", name, value)) ||
@@ -187,8 +185,8 @@ bool SkSVGTextContainer::parseAndSetAttribute(const char* name, const char* valu
              SVGAttributeParser::parse<std::vector<SVGNumberType>>("rotate", name, value));
 }
 
-void SkSVGTextLiteral::onShapeText(const SVGRenderContext& context,
-                                   const ShapedTextCallback& function) const {
+void SVGTextLiteral::onShapeText(const SVGRenderContext& context,
+                                 const ShapedTextCallback& function) const {
 
   auto [success, font] = ResolveFont(context);
   if (!success) {
@@ -198,7 +196,7 @@ void SkSVGTextLiteral::onShapeText(const SVGRenderContext& context,
   function(context, textBlob);
 }
 
-void SkSVGText::onRender(const SVGRenderContext& context) const {
+void SVGText::onRender(const SVGRenderContext& context) const {
 
   auto renderer = [](const SVGRenderContext& renderCtx,
                      const std::shared_ptr<TextBlob>& textBlob) -> void {
@@ -227,7 +225,7 @@ void SkSVGText::onRender(const SVGRenderContext& context) const {
   this->onShapeText(context, renderer);
 }
 
-Rect SkSVGText::onObjectBoundingBox(const SVGRenderContext& ctx) const {
+Rect SVGText::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   Rect bounds = Rect::MakeEmpty();
 
   auto boundCollector = [&bounds](const SVGRenderContext&,
@@ -243,17 +241,17 @@ Rect SkSVGText::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   return bounds;
 }
 
-Path SkSVGText::onAsPath(const SVGRenderContext&) const {
+Path SVGText::onAsPath(const SVGRenderContext&) const {
   // TODO (YGAurora)
   return Path();
 }
 
-void SkSVGTextPath::onShapeText(const SVGRenderContext& ctx,
-                                const ShapedTextCallback& function) const {
+void SVGTextPath::onShapeText(const SVGRenderContext& ctx,
+                              const ShapedTextCallback& function) const {
   this->INHERITED::onShapeText(ctx, function);
 }
 
-bool SkSVGTextPath::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGTextPath::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setHref(SVGAttributeParser::parse<SVGIRI>("xlink:href", name, value)) ||
          this->setStartOffset(SVGAttributeParser::parse<SVGLength>("startOffset", name, value));

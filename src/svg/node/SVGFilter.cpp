@@ -17,17 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGFilter.h"
-#include "tgfx/core/ColorFilter.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
-#include "tgfx/svg/SVGRenderContext.h"
 #include "tgfx/svg/node/SVGFe.h"
 #include "tgfx/svg/node/SVGFilterContext.h"
 
 namespace tgfx {
 
-bool SkSVGFilter::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFilter::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setX(SVGAttributeParser::parse<SVGLength>("x", name, value)) ||
          this->setY(SVGAttributeParser::parse<SVGLength>("y", name, value)) ||
@@ -39,26 +38,26 @@ bool SkSVGFilter::parseAndSetAttribute(const char* name, const char* value) {
              SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("primitiveUnits", name, value));
 }
 
-void SkSVGFilter::applyProperties(SVGRenderContext* ctx) const {
+void SVGFilter::applyProperties(SVGRenderContext* ctx) const {
   this->onPrepareToRender(ctx);
 }
 
-std::shared_ptr<ImageFilter> SkSVGFilter::buildFilterDAG(const SVGRenderContext& ctx) const {
+std::shared_ptr<ImageFilter> SVGFilter::buildFilterDAG(const SVGRenderContext& ctx) const {
   std::shared_ptr<ImageFilter> filter;
-  SkSVGFilterContext fctx(ctx.resolveOBBRect(X, Y, Width, Height, FilterUnits), PrimitiveUnits);
+  SVGFilterContext fctx(ctx.resolveOBBRect(X, Y, Width, Height, FilterUnits), PrimitiveUnits);
   SVGRenderContext localCtx(ctx);
   this->applyProperties(&localCtx);
   SVGColorspace cs = SVGColorspace::SRGB;
-  for (const auto& child : fChildren) {
-    if (!SkSVGFe::IsFilterEffect(child)) {
+  for (const auto& child : children) {
+    if (!SVGFe::IsFilterEffect(child)) {
       continue;
     }
 
-    const auto& feNode = static_cast<const SkSVGFe&>(*child);
+    const auto& feNode = static_cast<const SVGFe&>(*child);
     const auto& feResultType = feNode.getResult();
 
     // Propagate any inherited properties that may impact filter effect behavior (e.g.
-    // color-interpolation-filters). We call this explicitly here because the SkSVGFe
+    // color-interpolation-filters). We call this explicitly here because the SVGFe
     // nodes do not participate in the normal onRender path, which is when property
     // propagation currently occurs.
     SVGRenderContext localChildCtx(localCtx);
@@ -78,9 +77,7 @@ std::shared_ptr<ImageFilter> SkSVGFilter::buildFilterDAG(const SVGRenderContext&
 
   // Convert to final destination colorspace
   if (cs != SVGColorspace::SRGB) {
-    // filter = SkImageFilters::ColorFilter(SkColorFilters::LinearToSRGBGamma(), filter);
-
-    //TODO (YG)
+    //TODO (YGAurora): Implement color space conversion
     filter = nullptr;
   }
 

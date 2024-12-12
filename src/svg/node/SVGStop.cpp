@@ -17,14 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGStop.h"
-#include "tgfx/svg/SVGAttributeParser.h"
+#include "svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-SkSVGStop::SkSVGStop() : INHERITED(SVGTag::Stop) {
+SVGStop::SVGStop() : INHERITED(SVGTag::Stop) {
 }
 
-bool SkSVGStop::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGStop::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setOffset(SVGAttributeParser::parse<SVGLength>("offset", n, v));
 }

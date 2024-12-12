@@ -17,22 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGClipPath.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
 SVGClipPath::SVGClipPath() : INHERITED(SVGTag::ClipPath) {
 }
 
-bool SVGClipPath::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGClipPath::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setClipPathUnits(
              SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("clipPathUnits", n, v));
 }
 
-#ifndef RENDER_SVG
 Path SVGClipPath::resolveClip(const SVGRenderContext& ctx) const {
   auto clip = this->asPath(ctx);
 
@@ -43,5 +43,5 @@ Path SVGClipPath::resolveClip(const SVGRenderContext& ctx) const {
 
   return clip;
 }
-#endif
+
 }  // namespace tgfx

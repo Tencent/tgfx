@@ -19,11 +19,6 @@
 #pragma once
 
 #include <memory>
-// #include "include/core/SkImage.h"
-// #include "include/core/SkRect.h"
-// #include "include/core/SkRefCnt.h"
-// #include "include/private/base/SkAPI.h"
-// #include "include/private/base/SkDebug.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -39,10 +34,10 @@ namespace skresources {
 class ResourceProvider;
 }
 
-class SkSVGImage final : public SkSVGTransformableNode {
+class SVGImage final : public SVGTransformableNode {
  public:
-  static std::shared_ptr<SkSVGImage> Make() {
-    return std::shared_ptr<SkSVGImage>(new SkSVGImage());
+  static std::shared_ptr<SVGImage> Make() {
+    return std::shared_ptr<SVGImage>(new SVGImage());
   }
 
   void appendChild(std::shared_ptr<SVGNode>) override {
@@ -53,13 +48,11 @@ class SkSVGImage final : public SkSVGTransformableNode {
     Rect fDst;
   };
 
-#ifndef RENDER_SVG
   bool onPrepareToRender(SVGRenderContext*) const override;
   void onRender(const SVGRenderContext&) const override;
   Path onAsPath(const SVGRenderContext&) const override;
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
   static ImageInfo LoadImage(const SVGIRI&, const Rect&, SVGPreserveAspectRatio);
-#endif
 
   SVG_ATTR(X, SVGLength, SVGLength(0))
   SVG_ATTR(Y, SVGLength, SVGLength(0))
@@ -69,13 +62,13 @@ class SkSVGImage final : public SkSVGTransformableNode {
   SVG_ATTR(PreserveAspectRatio, SVGPreserveAspectRatio, SVGPreserveAspectRatio())
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGImage() : INHERITED(SVGTag::Image) {
+  SVGImage() : INHERITED(SVGTag::Image) {
   }
 
-  using INHERITED = SkSVGTransformableNode;
+  using INHERITED = SVGTransformableNode;
 };
 
 }  // namespace tgfx

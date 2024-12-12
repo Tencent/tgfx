@@ -17,25 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGCircle.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
 SVGCircle::SVGCircle() : INHERITED(SVGTag::Circle) {
 }
 
-bool SVGCircle::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGCircle::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setCx(SVGAttributeParser::parse<SVGLength>("cx", n, v)) ||
          this->setCy(SVGAttributeParser::parse<SVGLength>("cy", n, v)) ||
          this->setR(SVGAttributeParser::parse<SVGLength>("r", n, v));
 }
 
-#ifndef RENDER_SVG
 std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lctx) const {
   const auto cx = lctx.resolve(Cx, SVGLengthContext::LengthType::Horizontal);
   const auto cy = lctx.resolve(Cy, SVGLengthContext::LengthType::Vertical);
@@ -66,5 +66,4 @@ Rect SVGCircle::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   const auto [pos, r] = this->resolve(ctx.lengthContext());
   return Rect::MakeXYWH(pos.x - r, pos.y - r, 2 * r, 2 * r);
 }
-#endif
 }  // namespace tgfx

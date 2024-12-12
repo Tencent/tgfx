@@ -18,19 +18,17 @@
 
 #include "tgfx/svg/node/SVGImage.h"
 #include <memory>
-#include "core/ImageDecoder.h"
 #include "core/utils/Log.h"
-#include "fstream"
-#include "gpu/ResourceProvider.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGImage::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGImage::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setX(SVGAttributeParser::parse<SVGLength>("x", n, v)) ||
          this->setY(SVGAttributeParser::parse<SVGLength>("y", n, v)) ||
@@ -41,8 +39,7 @@ bool SkSVGImage::parseAndSetAttribute(const char* n, const char* v) {
              SVGAttributeParser::parse<SVGPreserveAspectRatio>("preserveAspectRatio", n, v));
 }
 
-#ifndef RENDER_SVG
-bool SkSVGImage::onPrepareToRender(SVGRenderContext* ctx) const {
+bool SVGImage::onPrepareToRender(SVGRenderContext* ctx) const {
   // Width or height of 0 disables rendering per spec:
   // https://www.w3.org/TR/SVG11/struct.html#ImageElement
   return !Href.iri().empty() && Width.value() > 0 && Height.value() > 0 &&
@@ -103,8 +100,8 @@ std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
   return Image::MakeFromEncoded(data);
 }
 
-SkSVGImage::ImageInfo SkSVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
-                                            SVGPreserveAspectRatio /*par*/) {
+SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
+                                        SVGPreserveAspectRatio /*par*/) {
   std::shared_ptr<Image> image = ::tgfx::LoadImage(iri);
   if (!image) {
     return {};
@@ -121,12 +118,11 @@ SkSVGImage::ImageInfo SkSVGImage::LoadImage(const SVGIRI& iri, const Rect& viewP
   return {std::move(image), dst};
 }
 
-void SkSVGImage::onRender(const SVGRenderContext& ctx) const {
+void SVGImage::onRender(const SVGRenderContext& ctx) const {
   // Per spec: x, w, width, height attributes establish the new viewport.
   const SVGLengthContext& lctx = ctx.lengthContext();
   const Rect viewPort = lctx.resolveRect(X, Y, Width, Height);
 
-  //TODO (YG)
   ImageInfo image;
   const auto imgInfo = LoadImage(Href, viewPort, PreserveAspectRatio);
   if (!imgInfo.fImage) {
@@ -134,7 +130,6 @@ void SkSVGImage::onRender(const SVGRenderContext& ctx) const {
     return;
   }
 
-  // TODO: image-rendering property
   auto matrix = Matrix::MakeScale(viewPort.width() / imgInfo.fDst.width(),
                                   viewPort.height() / imgInfo.fDst.height());
   matrix.preTranslate(imgInfo.fDst.x(), imgInfo.fDst.y());
@@ -144,13 +139,13 @@ void SkSVGImage::onRender(const SVGRenderContext& ctx) const {
   // drawImageRect(imgInfo.fImage, imgInfo.fDst, SkSamplingOptions(SkFilterMode::kLinear));
 }
 
-Path SkSVGImage::onAsPath(const SVGRenderContext&) const {
+Path SVGImage::onAsPath(const SVGRenderContext&) const {
   return {};
 }
 
-Rect SkSVGImage::onObjectBoundingBox(const SVGRenderContext& ctx) const {
+Rect SVGImage::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   const SVGLengthContext& lctx = ctx.lengthContext();
   return lctx.resolveRect(X, Y, Width, Height);
 }
-#endif
+
 }  // namespace tgfx

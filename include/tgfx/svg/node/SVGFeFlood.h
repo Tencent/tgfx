@@ -27,36 +27,29 @@
 namespace tgfx {
 
 class SkImageFilter;
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
-class SkSVGFeFlood : public SkSVGFe {
+class SVGFeFlood : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeFlood> Make() {
-    return std::shared_ptr<SkSVGFeFlood>(new SkSVGFeFlood());
+  static std::shared_ptr<SVGFeFlood> Make() {
+    return std::shared_ptr<SVGFeFlood>(new SVGFeFlood());
   }
 
  protected:
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override {
+                                                 const SVGFilterContext&) const override {
     return nullptr;
   };
-#ifdef RENDER_SVG
-  sk_sp<SkImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                         const SkSVGFilterContext&) const override;
-#endif
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {};
   }
 
  private:
-  SkSVGFeFlood() : INHERITED(SVGTag::FeFlood) {
+  SVGFeFlood() : INHERITED(SVGTag::FeFlood) {
   }
-#ifdef RENDER_SVG
-  SkColor resolveFloodColor(const SVGRenderContext&) const;
-#endif
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 }  // namespace tgfx

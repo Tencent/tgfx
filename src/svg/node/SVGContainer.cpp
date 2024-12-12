@@ -27,33 +27,32 @@ namespace tgfx {
 
 class SVGRenderContext;
 
-SkSVGContainer::SkSVGContainer(SVGTag t) : INHERITED(t) {
+SVGContainer::SVGContainer(SVGTag t) : INHERITED(t) {
 }
 
-void SkSVGContainer::appendChild(std::shared_ptr<SVGNode> node) {
+void SVGContainer::appendChild(std::shared_ptr<SVGNode> node) {
   ASSERT(node);
-  fChildren.push_back(std::move(node));
+  children.push_back(std::move(node));
 }
 
-const std::vector<std::shared_ptr<SVGNode>>& SkSVGContainer::getChildren() const {
-  return fChildren;
+const std::vector<std::shared_ptr<SVGNode>>& SVGContainer::getChildren() const {
+  return children;
 }
 
-bool SkSVGContainer::hasChildren() const {
-  return !fChildren.empty();
+bool SVGContainer::hasChildren() const {
+  return !children.empty();
 }
 
-#ifndef RENDER_SVG
-void SkSVGContainer::onRender(const SVGRenderContext& ctx) const {
-  for (const auto& i : fChildren) {
+void SVGContainer::onRender(const SVGRenderContext& ctx) const {
+  for (const auto& i : children) {
     i->render(ctx);
   }
 }
 
-Path SkSVGContainer::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGContainer::onAsPath(const SVGRenderContext& ctx) const {
   Path path;
 
-  for (const auto& i : fChildren) {
+  for (const auto& i : children) {
     const Path childPath = i->asPath(ctx);
     path.addPath(childPath, PathOp::Union);
   }
@@ -62,15 +61,15 @@ Path SkSVGContainer::onAsPath(const SVGRenderContext& ctx) const {
   return path;
 }
 
-Rect SkSVGContainer::onObjectBoundingBox(const SVGRenderContext& ctx) const {
+Rect SVGContainer::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   Rect bounds = Rect::MakeEmpty();
 
-  for (const auto& i : fChildren) {
+  for (const auto& i : children) {
     const Rect childBounds = i->objectBoundingBox(ctx);
     bounds.join(childBounds);
   }
 
   return bounds;
 }
-#endif
+
 }  // namespace tgfx

@@ -27,27 +27,27 @@
 #include "tgfx/svg/node/SVGHiddenContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
 namespace tgfx {
 
-class SkSVGFeFunc final : public SVGHiddenContainer {
+class SVGFeFunc final : public SVGHiddenContainer {
  public:
-  static std::shared_ptr<SkSVGFeFunc> MakeFuncA() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncA));
+  static std::shared_ptr<SVGFeFunc> MakeFuncA() {
+    return std::shared_ptr<SVGFeFunc>(new SVGFeFunc(SVGTag::FeFuncA));
   }
 
-  static std::shared_ptr<SkSVGFeFunc> MakeFuncR() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncR));
+  static std::shared_ptr<SVGFeFunc> MakeFuncR() {
+    return std::shared_ptr<SVGFeFunc>(new SVGFeFunc(SVGTag::FeFuncR));
   }
 
-  static std::shared_ptr<SkSVGFeFunc> MakeFuncG() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncG));
+  static std::shared_ptr<SVGFeFunc> MakeFuncG() {
+    return std::shared_ptr<SVGFeFunc>(new SVGFeFunc(SVGTag::FeFuncG));
   }
 
-  static std::shared_ptr<SkSVGFeFunc> MakeFuncB() {
-    return std::shared_ptr<SkSVGFeFunc>(new SkSVGFeFunc(SVGTag::FeFuncB));
+  static std::shared_ptr<SVGFeFunc> MakeFuncB() {
+    return std::shared_ptr<SVGFeFunc>(new SVGFeFunc(SVGTag::FeFuncB));
   }
 
   SVG_ATTR(Amplitude, SVGNumberType, 1)
@@ -61,36 +61,35 @@ class SkSVGFeFunc final : public SVGHiddenContainer {
   std::vector<uint8_t> getTable() const;
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeFunc(SVGTag tag) : INHERITED(tag) {
+  SVGFeFunc(SVGTag tag) : INHERITED(tag) {
   }
 
   using INHERITED = SVGHiddenContainer;
 };
 
-class SkSVGFeComponentTransfer final : public SkSVGFe {
+class SVGFeComponentTransfer final : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeComponentTransfer> Make() {
-    return std::shared_ptr<SkSVGFeComponentTransfer>(new SkSVGFeComponentTransfer());
+  static std::shared_ptr<SVGFeComponentTransfer> Make() {
+    return std::shared_ptr<SVGFeComponentTransfer>(new SVGFeComponentTransfer());
   }
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override {
+                                                 const SVGFilterContext&) const override {
     return nullptr;
   };
-#endif
+
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
  private:
-  SkSVGFeComponentTransfer() : INHERITED(SVGTag::FeComponentTransfer) {
+  SVGFeComponentTransfer() : INHERITED(SVGTag::FeComponentTransfer) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 }  // namespace tgfx

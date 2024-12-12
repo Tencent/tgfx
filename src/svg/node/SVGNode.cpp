@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <optional>
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -27,7 +29,6 @@
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGRenderContext.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
@@ -44,7 +45,6 @@ SVGNode::SVGNode(SVGTag t) : _tag(t) {
 SVGNode::~SVGNode() {
 }
 
-#ifndef RENDER_SVG
 void SVGNode::render(const SVGRenderContext& ctx) const {
   SVGRenderContext localContext(ctx, this);
 
@@ -91,7 +91,6 @@ bool SVGNode::onPrepareToRender(SVGRenderContext* ctx) const {
   return visibility != SVGVisibility::Type::Hidden &&
          (!display.isValue() || *display != SVGDisplay::None);
 }
-#endif
 
 void SVGNode::setAttribute(SVGAttribute attr, const SVGValue& v) {
   this->onSetAttribute(attr, v);
@@ -108,7 +107,7 @@ void SetInheritedByDefault(std::optional<T>& presentation_attribute, const T& va
   }
 }
 
-bool SVGNode::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGNode::parseAndSetAttribute(const std::string& n, const std::string& v) {
 #define PARSE_AND_SET(svgName, attrName)                                                        \
   this->set##attrName(                                                                          \
       SVGAttributeParser::parseProperty<decltype(_presentationAttributes.attrName)>(svgName, n, \

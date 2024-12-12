@@ -17,19 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGMask.h"
-#include "tgfx/core/Color.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/ColorFilter.h"
-#include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
-bool SkSVGMask::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGMask::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setX(SVGAttributeParser::parse<SVGLength>("x", n, v)) ||
          this->setY(SVGAttributeParser::parse<SVGLength>("y", n, v)) ||
@@ -41,8 +39,7 @@ bool SkSVGMask::parseAndSetAttribute(const char* n, const char* v) {
              SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("maskContentUnits", n, v));
 }
 
-#ifndef RENDER_SVG
-Rect SkSVGMask::bounds(const SVGRenderContext& context) const {
+Rect SVGMask::bounds(const SVGRenderContext& context) const {
   auto lengthContext = context.lengthContext();
   lengthContext.setPatternUnits(MaskUnits);
   SVGRenderContext resolveContext(context, lengthContext);
@@ -64,7 +61,7 @@ std::array<float, 20> MakeLuminanceToAlpha() {
                                0, 0, 0, 0, 0, LUM_COEFF_R, LUM_COEFF_G, LUM_COEFF_B, 0, 0};
 }
 
-void SkSVGMask::renderMask(const SVGRenderContext& context) const {
+void SVGMask::renderMask(const SVGRenderContext& context) const {
   // https://www.w3.org/TR/SVG11/masking.html#Masking
   // Propagate any inherited properties that may impact mask effect behavior (e.g.
   // color-interpolation). We call this explicitly here because the SkSVGMask
@@ -78,7 +75,7 @@ void SkSVGMask::renderMask(const SVGRenderContext& context) const {
     // Ensure the render context is destructed, drawing to the canvas upon destruction
     SVGRenderContext localContext(context, canvas);
     this->onPrepareToRender(&localContext);
-    for (const auto& child : fChildren) {
+    for (const auto& child : children) {
       child->render(localContext);
     }
   }
@@ -91,5 +88,5 @@ void SkSVGMask::renderMask(const SVGRenderContext& context) const {
   luminancePaint.setColorFilter(luminanceFilter);
   context.canvas()->drawPicture(picture, nullptr, &luminancePaint);
 }
-#endif
+
 }  // namespace tgfx

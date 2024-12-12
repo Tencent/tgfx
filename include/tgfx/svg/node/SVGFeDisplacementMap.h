@@ -26,15 +26,15 @@
 
 namespace tgfx {
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
-class SkSVGFeDisplacementMap : public SkSVGFe {
+class SVGFeDisplacementMap : public SVGFe {
  public:
   using ChannelSelector = ColorChannel;
 
-  static std::shared_ptr<SkSVGFeDisplacementMap> Make() {
-    return std::shared_ptr<SkSVGFeDisplacementMap>(new SkSVGFeDisplacementMap());
+  static std::shared_ptr<SVGFeDisplacementMap> Make() {
+    return std::shared_ptr<SVGFeDisplacementMap>(new SVGFeDisplacementMap());
   }
 
   SVG_ATTR(In2, SVGFeInputType, SVGFeInputType())
@@ -42,27 +42,23 @@ class SkSVGFeDisplacementMap : public SkSVGFe {
   SVG_ATTR(YChannelSelector, ChannelSelector, ChannelSelector::A)
   SVG_ATTR(Scale, SVGNumberType, SVGNumberType(0))
 
+  SVGColorspace resolveColorspace(const SVGRenderContext&, const SVGFilterContext&) const final;
+
  protected:
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn(), this->getIn2()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+
+  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
+                                                 const SVGFilterContext&) const override;
 
  private:
-  SkSVGFeDisplacementMap() : INHERITED(SVGTag::FeDisplacementMap) {
+  SVGFeDisplacementMap() : INHERITED(SVGTag::FeDisplacementMap) {
   }
 
-  using INHERITED = SkSVGFe;
-
-#ifndef RENDER_SVG
- public:
-  SVGColorspace resolveColorspace(const SVGRenderContext&, const SkSVGFilterContext&) const final;
-
- protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+  using INHERITED = SVGFe;
 };
 
 }  // namespace tgfx

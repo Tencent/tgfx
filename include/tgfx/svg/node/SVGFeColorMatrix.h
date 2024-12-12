@@ -24,38 +24,36 @@
 #include "tgfx/svg/node/SVGFe.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
 namespace tgfx {
 
 using ColorMatrix = std::array<float, 20>;
 
-class SkSVGFeColorMatrix final : public SkSVGFe {
+class SVGFeColorMatrix final : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeColorMatrix> Make() {
-    return std::shared_ptr<SkSVGFeColorMatrix>(new SkSVGFeColorMatrix());
+  static std::shared_ptr<SVGFeColorMatrix> Make() {
+    return std::shared_ptr<SVGFeColorMatrix>(new SVGFeColorMatrix());
   }
 
   SVG_ATTR(Type, SVGFeColorMatrixType, SVGFeColorMatrixType(SVGFeColorMatrixType::Matrix))
   SVG_ATTR(Values, SVGFeColorMatrixValues, SVGFeColorMatrixValues())
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
+
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeColorMatrix() : INHERITED(SVGTag::FeColorMatrix) {
+  SVGFeColorMatrix() : INHERITED(SVGTag::FeColorMatrix) {
   }
 
-#ifndef RENDER_SVG
   ColorMatrix makeMatrixForType() const;
 
   static ColorMatrix MakeSaturate(SVGNumberType s);
@@ -63,8 +61,7 @@ class SkSVGFeColorMatrix final : public SkSVGFe {
   static ColorMatrix MakeHueRotate(SVGNumberType degrees);
 
   static ColorMatrix MakeLuminanceToAlpha();
-#endif
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 }  // namespace tgfx

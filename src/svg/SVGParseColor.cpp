@@ -18,11 +18,11 @@
 
 #include <cstdint>
 #include <string>
+#include "svg/SVGParse.h"
 #include "tgfx/core/Color.h"
-#include "tgfx/svg/SVGParse.h"
 
 namespace {
-static const char* colorNames[] = {
+const char* colorNames[] = {
     "aliceblue",
     "antiquewhite",
     "aqua",
@@ -169,7 +169,7 @@ struct ColorRec {
   uint8_t r, g, b;
 };
 
-static constexpr ColorRec colors[] = {
+constexpr ColorRec colors[] = {
     {0xf0, 0xf8, 0xff},  // aliceblue
     {0xfa, 0xeb, 0xd7},  // antiquewhite
     {0x00, 0xff, 0xff},  // aqua

@@ -22,16 +22,16 @@
 #include "tgfx/svg/node/SVGContainer.h"
 
 namespace tgfx {
-class SkSVGG : public SkSVGContainer {
+class SVGG : public SVGContainer {
  public:
-  static std::shared_ptr<SkSVGG> Make() {
-    return std::shared_ptr<SkSVGG>(new SkSVGG());
+  static std::shared_ptr<SVGG> Make() {
+    return std::shared_ptr<SVGG>(new SVGG());
   }
 
  private:
-  SkSVGG() : INHERITED(SVGTag::G) {
+  SVGG() : INHERITED(SVGTag::G) {
   }
 
-  using INHERITED = SkSVGContainer;
+  using INHERITED = SVGContainer;
 };
 }  // namespace tgfx

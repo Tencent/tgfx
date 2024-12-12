@@ -18,18 +18,19 @@
 
 #include "tgfx/svg/node/SVGRadialGradient.h"
 #include <cstdint>
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/TileMode.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-SkSVGRadialGradient::SkSVGRadialGradient() : INHERITED(SVGTag::RadialGradient) {
+SVGRadialGradient::SVGRadialGradient() : INHERITED(SVGTag::RadialGradient) {
 }
 
-bool SkSVGRadialGradient::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGRadialGradient::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setCx(SVGAttributeParser::parse<SVGLength>("cx", name, value)) ||
          this->setCy(SVGAttributeParser::parse<SVGLength>("cy", name, value)) ||
@@ -38,11 +39,10 @@ bool SkSVGRadialGradient::parseAndSetAttribute(const char* name, const char* val
          this->setFy(SVGAttributeParser::parse<SVGLength>("fy", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<Shader> SkSVGRadialGradient::onMakeShader(const SVGRenderContext& ctx,
-                                                          const std::vector<Color>& colors,
-                                                          const std::vector<float>& position,
-                                                          TileMode, const Matrix& matrix) const {
+std::shared_ptr<Shader> SVGRadialGradient::onMakeShader(const SVGRenderContext& ctx,
+                                                        const std::vector<Color>& colors,
+                                                        const std::vector<float>& position,
+                                                        TileMode, const Matrix& matrix) const {
   SVGLengthContext lctx = ctx.lengthContext();
   lctx.setPatternUnits(getGradientUnits());
 
@@ -59,5 +59,5 @@ std::shared_ptr<Shader> SkSVGRadialGradient::onMakeShader(const SVGRenderContext
   radius *= matrix.getAxisScales().x;
   return Shader::MakeRadialGradient(center, radius, colors, position);
 }
-#endif
+
 }  // namespace tgfx

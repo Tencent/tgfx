@@ -17,18 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGLinearGradient.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/TileMode.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-SkSVGLinearGradient::SkSVGLinearGradient() : INHERITED(SVGTag::LinearGradient) {
+SVGLinearGradient::SVGLinearGradient() : INHERITED(SVGTag::LinearGradient) {
 }
 
-bool SkSVGLinearGradient::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGLinearGradient::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setX1(SVGAttributeParser::parse<SVGLength>("x1", name, value)) ||
          this->setY1(SVGAttributeParser::parse<SVGLength>("y1", name, value)) ||
@@ -36,11 +37,10 @@ bool SkSVGLinearGradient::parseAndSetAttribute(const char* name, const char* val
          this->setY2(SVGAttributeParser::parse<SVGLength>("y2", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<Shader> SkSVGLinearGradient::onMakeShader(const SVGRenderContext& ctx,
-                                                          const std::vector<Color>& colors,
-                                                          const std::vector<float>& positions,
-                                                          TileMode, const Matrix&) const {
+std::shared_ptr<Shader> SVGLinearGradient::onMakeShader(const SVGRenderContext& ctx,
+                                                        const std::vector<Color>& colors,
+                                                        const std::vector<float>& positions,
+                                                        TileMode, const Matrix&) const {
   SVGLengthContext lctx = ctx.lengthContext();
   lctx.setPatternUnits(getGradientUnits());
 
@@ -51,5 +51,5 @@ std::shared_ptr<Shader> SkSVGLinearGradient::onMakeShader(const SVGRenderContext
 
   return Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
 }
-#endif
+
 }  // namespace tgfx

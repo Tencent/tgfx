@@ -17,41 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGFeImage.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
+#include "svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGFeImage::parseAndSetAttribute(const char* n, const char* v) {
-  return INHERITED::parseAndSetAttribute(n, v) ||
-         this->setHref(SVGAttributeParser::parse<SVGIRI>("xlink:href", n, v)) ||
+bool SVGFeImage::parseAndSetAttribute(const std::string& name, const std::string& value) {
+  return INHERITED::parseAndSetAttribute(name, value) ||
+         this->setHref(SVGAttributeParser::parse<SVGIRI>("xlink:href", name, value)) ||
          this->setPreserveAspectRatio(
-             SVGAttributeParser::parse<SVGPreserveAspectRatio>("preserveAspectRatio", n, v));
+             SVGAttributeParser::parse<SVGPreserveAspectRatio>("preserveAspectRatio", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<ImageFilter> SkSVGFeImage::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SkSVGFilterContext& /*fctx*/) const {
-  // // Load image and map viewbox (image bounds) to viewport (filter effects subregion).
-  // const Rect viewport = this->resolveFilterSubregion(ctx, fctx);
-  // const auto imgInfo =
-  //     SVGImage::LoadImage(ctx.resourceProvider(), fHref, viewport, fPreserveAspectRatio);
-  // if (!imgInfo.fImage) {
-  //   return nullptr;
-  // }
-
-  // // Create the image filter mapped according to aspect ratio
-  // const Rect srcRect = Rect::Make(imgInfo.fImage->bounds());
-  // const Rect& dstRect = imgInfo.fDst;
-  // // TODO: image-rendering property
-  // auto imgfilt =
-  //     ImageFilter:: ::Image(imgInfo.fImage, srcRect, dstRect,
-  //                           SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNearest));
-
-  // // Aspect ratio mapping may end up drawing content outside of the filter effects region,
-  // // so perform an explicit crop.
-  // return SkImageFilters::Merge(&imgfilt, 1, fctx.filterEffectsRegion());
+std::shared_ptr<ImageFilter> SVGFeImage::onMakeImageFilter(const SVGRenderContext& /*ctx*/,
+                                                           const SVGFilterContext& /*fctx*/) const {
   return nullptr;
 }
-#endif
+
 }  // namespace tgfx

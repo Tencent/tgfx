@@ -32,14 +32,12 @@ namespace tgfx {
 
 class SVGAttributeParser {
  public:
-  explicit SVGAttributeParser(const char[]);
+  explicit SVGAttributeParser(std::string);
 
   bool parseInteger(SVGIntegerType*);
   bool parseViewBox(SVGViewBoxType*);
   bool parsePreserveAspectRatio(SVGPreserveAspectRatio*);
 
-  // TODO: Migrate all parse*() functions to this style (and delete the old version)
-  //      so they can be used by parse<T>():
   bool parse(SVGIntegerType* v) {
     return parseInteger(v);
   }
@@ -48,7 +46,7 @@ class SVGAttributeParser {
   using ParseResult = std::optional<T>;
 
   template <typename T>
-  static ParseResult<T> parse(const char* value) {
+  static ParseResult<T> parse(const std::string& value) {
     ParseResult<T> result;
     T parsedValue;
     if (SVGAttributeParser(value).parse(&parsedValue)) {
@@ -58,8 +56,9 @@ class SVGAttributeParser {
   }
 
   template <typename T>
-  static ParseResult<T> parse(const char* expectedName, const char* name, const char* value) {
-    if (!strcmp(name, expectedName)) {
+  static ParseResult<T> parse(const std::string& expectedName, const std::string& name,
+                              const std::string& value) {
+    if (name == expectedName) {
       return parse<T>(value);
     }
 
@@ -67,13 +66,13 @@ class SVGAttributeParser {
   }
 
   template <typename PropertyT>
-  static ParseResult<PropertyT> parseProperty(const char* expectedName, const char* name,
-                                              const char* value) {
-    if (strcmp(name, expectedName) != 0) {
+  static ParseResult<PropertyT> parseProperty(const std::string& expectedName,
+                                              const std::string& name, const std::string& value) {
+    if (name != expectedName) {
       return ParseResult<PropertyT>();
     }
 
-    if (!strcmp(value, "inherit")) {
+    if (value == "inherit") {
       PropertyT result(SVGPropertyState::Inherit);
       return ParseResult<PropertyT>(result);
     }
@@ -94,22 +93,22 @@ class SVGAttributeParser {
  private:
   class RestoreCurPos {
    public:
-    explicit RestoreCurPos(SVGAttributeParser* self) : fSelf(self), fCurPos(self->fCurPos) {
+    explicit RestoreCurPos(SVGAttributeParser* self) : self(self), currentPos(self->fCurPos) {
     }
 
     ~RestoreCurPos() {
-      if (fSelf) {
-        fSelf->fCurPos = this->fCurPos;
+      if (self) {
+        self->fCurPos = this->currentPos;
       }
     }
 
     void clear() {
-      fSelf = nullptr;
+      self = nullptr;
     }
 
    private:
-    SVGAttributeParser* fSelf;
-    const char* fCurPos;
+    SVGAttributeParser* self;
+    const char* currentPos;
 
    public:
     RestoreCurPos(const RestoreCurPos&) = delete;
@@ -178,7 +177,5 @@ class SVGAttributeParser {
   // The current position in the input string.
   const char* fCurPos;
   const char* fEndPos;
-
-  //   using INHERITED = SkNoncopyable;
 };
 }  // namespace tgfx

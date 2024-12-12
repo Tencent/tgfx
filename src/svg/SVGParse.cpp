@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/SVGParse.h"
+#include "SVGParse.h"
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
@@ -418,9 +418,6 @@ std::tuple<bool, std::shared_ptr<Path>> PathParse::FromSVGString(const char data
 
 std::string PathParse::ToSVGString(const std::shared_ptr<Path>& path,
                                    PathParse::PathEncoding encoding) {
-
-  // SkDynamicMemoryWStream stream;
-
   Point currentPoint = Point::Zero();
   const int relSelector = encoding == PathParse::PathEncoding::Relative ? 1 : 0;
 

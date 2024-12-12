@@ -30,10 +30,10 @@
 
 namespace tgfx {
 
-class SkSVGRect final : public SVGShape {
+class SVGRect final : public SVGShape {
  public:
-  static std::shared_ptr<SkSVGRect> Make() {
-    return std::shared_ptr<SkSVGRect>(new SkSVGRect());
+  static std::shared_ptr<SVGRect> Make() {
+    return std::shared_ptr<SVGRect>(new SVGRect());
   }
 
   SVG_ATTR(X, SVGLength, SVGLength(0))
@@ -45,21 +45,16 @@ class SkSVGRect final : public SVGShape {
   SVG_OPTIONAL_ATTR(Ry, SVGLength)
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
-
-#ifndef RENDER_SVG
-
-  // void onRender(const SVGRenderContext&) const override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
   void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
 
   Path onAsPath(const SVGRenderContext&) const override;
 
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-#endif
 
  private:
-  SkSVGRect();
+  SVGRect();
 
   RRect resolve(const SVGLengthContext&) const;
 

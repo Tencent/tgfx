@@ -42,11 +42,9 @@ class SVGClipPath final : public SVGHiddenContainer {
 
   SVGClipPath();
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   Path resolveClip(const SVGRenderContext&) const;
-#endif
 
   using INHERITED = SVGHiddenContainer;
 };

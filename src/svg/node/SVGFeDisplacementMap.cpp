@@ -18,27 +18,24 @@
 
 #include "tgfx/svg/node/SVGFeDisplacementMap.h"
 #include <tuple>
-#include "tgfx/core/Color.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGFeDisplacementMap::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeDisplacementMap::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setIn2(SVGAttributeParser::parse<SVGFeInputType>("in2", name, value)) ||
-         this->setXChannelSelector(
-             SVGAttributeParser::parse<SkSVGFeDisplacementMap::ChannelSelector>("xChannelSelector",
-                                                                                name, value)) ||
-         this->setYChannelSelector(
-             SVGAttributeParser::parse<SkSVGFeDisplacementMap::ChannelSelector>("yChannelSelector",
-                                                                                name, value)) ||
+         this->setXChannelSelector(SVGAttributeParser::parse<SVGFeDisplacementMap::ChannelSelector>(
+             "xChannelSelector", name, value)) ||
+         this->setYChannelSelector(SVGAttributeParser::parse<SVGFeDisplacementMap::ChannelSelector>(
+             "yChannelSelector", name, value)) ||
          this->setScale(SVGAttributeParser::parse<SVGNumberType>("scale", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<ImageFilter> SkSVGFeDisplacementMap::onMakeImageFilter(
-    const SVGRenderContext& ctx, const SkSVGFilterContext& fctx) const {
+std::shared_ptr<ImageFilter> SVGFeDisplacementMap::onMakeImageFilter(
+    const SVGRenderContext& ctx, const SVGFilterContext& fctx) const {
   const Rect cropRect = this->resolveFilterSubregion(ctx, fctx);
   cropRect.centerX();
   const SVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
@@ -57,27 +54,24 @@ std::shared_ptr<ImageFilter> SkSVGFeDisplacementMap::onMakeImageFilter(
   }
 
   return nullptr;
-  // return SkImageFilters::DisplacementMap(fXChannelSelector, fYChannelSelector, scale, in2, in,
-  //                                        cropRect);
 }
 
-SVGColorspace SkSVGFeDisplacementMap::resolveColorspace(const SVGRenderContext& ctx,
-                                                        const SkSVGFilterContext& fctx) const {
+SVGColorspace SVGFeDisplacementMap::resolveColorspace(const SVGRenderContext& ctx,
+                                                      const SVGFilterContext& fctx) const {
   // According to spec https://www.w3.org/TR/SVG11/filters.html#feDisplacementMapElement,
   // the 'in' source image must remain in its current colorspace, which means the colorspace of
   // this FE node is the same as the input.
   return fctx.resolveInputColorspace(ctx, this->getIn());
 }
-#endif
 
 template <>
-bool SVGAttributeParser::parse<SkSVGFeDisplacementMap::ChannelSelector>(
-    SkSVGFeDisplacementMap::ChannelSelector* channel) {
-  static constexpr std::tuple<const char*, SkSVGFeDisplacementMap::ChannelSelector> gMap[] = {
-      {"R", SkSVGFeDisplacementMap::ChannelSelector::R},
-      {"G", SkSVGFeDisplacementMap::ChannelSelector::G},
-      {"B", SkSVGFeDisplacementMap::ChannelSelector::B},
-      {"A", SkSVGFeDisplacementMap::ChannelSelector::A},
+bool SVGAttributeParser::parse<SVGFeDisplacementMap::ChannelSelector>(
+    SVGFeDisplacementMap::ChannelSelector* channel) {
+  static constexpr std::tuple<const char*, SVGFeDisplacementMap::ChannelSelector> gMap[] = {
+      {"R", SVGFeDisplacementMap::ChannelSelector::R},
+      {"G", SVGFeDisplacementMap::ChannelSelector::G},
+      {"B", SVGFeDisplacementMap::ChannelSelector::B},
+      {"A", SVGFeDisplacementMap::ChannelSelector::A},
   };
 
   return this->parseEnumMap(gMap, channel) && this->parseEOSToken();

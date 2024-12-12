@@ -18,23 +18,23 @@
 
 #include "tgfx/svg/node/SVGPattern.h"
 #include <cstring>
-#include <fstream>
 #include <optional>
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
-SkSVGPattern::SkSVGPattern() : INHERITED(SVGTag::Pattern) {
+SVGPattern::SVGPattern() : INHERITED(SVGTag::Pattern) {
 }
 
-bool SkSVGPattern::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGPattern::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setX(SVGAttributeParser::parse<SVGLength>("x", name, value)) ||
          this->setY(SVGAttributeParser::parse<SVGLength>("y", name, value)) ||
@@ -49,8 +49,7 @@ bool SkSVGPattern::parseAndSetAttribute(const char* name, const char* value) {
              "patternContentUnits", name, value));
 }
 
-#ifndef RENDER_SVG
-const SkSVGPattern* SkSVGPattern::hrefTarget(const SVGRenderContext& ctx) const {
+const SVGPattern* SVGPattern::hrefTarget(const SVGRenderContext& ctx) const {
   if (Href.iri().empty()) {
     return nullptr;
   }
@@ -60,7 +59,7 @@ const SkSVGPattern* SkSVGPattern::hrefTarget(const SVGRenderContext& ctx) const 
     return nullptr;
   }
 
-  return static_cast<const SkSVGPattern*>(href.get());
+  return static_cast<const SVGPattern*>(href.get());
 }
 
 template <typename T>
@@ -82,10 +81,10 @@ int inherit_if_needed(const std::optional<T>& src, std::optional<T>& dst) {
  * referenced element inherits attributes or children due to its own ‘xlink:href’ attribute, then
  * the current element can inherit those attributes or children.
  */
-const SkSVGPattern* SkSVGPattern::resolveHref(const SVGRenderContext& ctx,
-                                              PatternAttributes* attrs) const {
-  const SkSVGPattern* currentNode = this;
-  const SkSVGPattern* contentNode = this;
+const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& ctx,
+                                          PatternAttributes* attrs) const {
+  const SVGPattern* currentNode = this;
+  const SVGPattern* contentNode = this;
 
   do {
     // Bitwise OR to avoid short-circuiting.
@@ -129,7 +128,7 @@ const SkSVGPattern* SkSVGPattern::resolveHref(const SVGRenderContext& ctx,
   return contentNode;
 }
 
-bool SkSVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
+bool SVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   PatternAttributes attrs;
   const auto* contentNode = this->resolveHref(ctx, &attrs);
   auto lengthContext = ctx.lengthContext();
@@ -149,7 +148,7 @@ bool SkSVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   canvas->concat(patternMatrix);
   {
     SVGRenderContext recordingContext(ctx, canvas, lengthContext);
-    contentNode->SkSVGContainer::onRender(recordingContext);
+    contentNode->SVGContainer::onRender(recordingContext);
   }
   auto picture = patternRecorder.finishRecordingAsPicture();
   auto shaderImage =
@@ -158,5 +157,5 @@ bool SkSVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   paint->setShader(shader);
   return true;
 }
-#endif
+
 }  // namespace tgfx

@@ -16,14 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/SVGRenderContext.h"
+#include "SVGRenderContext.h"
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <memory>
 #include <optional>
 #include "core/utils/Log.h"
-#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ImageFilter.h"
@@ -40,8 +38,6 @@
 #include "tgfx/svg/node/SVGFilter.h"
 #include "tgfx/svg/node/SVGMask.h"
 #include "tgfx/svg/node/SVGNode.h"
-
-#ifndef RENDER_SVG
 
 namespace tgfx {
 
@@ -118,7 +114,7 @@ Rect SVGLengthContext::resolveRect(const SVGLength& x, const SVGLength& y, const
 
 namespace {
 
-LineCap toSkCap(const SVGLineCap& cap) {
+LineCap toCap(const SVGLineCap& cap) {
   switch (cap) {
     case SVGLineCap::Butt:
       return LineCap::Butt;
@@ -129,7 +125,7 @@ LineCap toSkCap(const SVGLineCap& cap) {
   }
 }
 
-LineJoin toSkJoin(const SVGLineJoin& join) {
+LineJoin toJoin(const SVGLineJoin& join) {
   switch (join.type()) {
     case SVGLineJoin::Type::Miter:
       return LineJoin::Miter;
@@ -173,14 +169,14 @@ std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
 
 }  // namespace
 
-SkSVGPresentationContext::SkSVGPresentationContext()
+SVGPresentationContext::SVGPresentationContext()
     : _inherited(SVGPresentationAttributes::MakeInitial()) {
 }
 
 SVGRenderContext::SVGRenderContext(Context* device, Canvas* canvas,
                                    const std::shared_ptr<SVGFontManager>& fontManager,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lctx,
-                                   const SkSVGPresentationContext& pctx, const OBBScope& obbs,
+                                   const SVGPresentationContext& pctx, const OBBScope& obbs,
                                    const Matrix& matrix)
     : fontManager(fontManager), nodeIDMapper(mapper), _lengthContext(lctx),
       _presentationContext(pctx), renderCanvas(canvas), recorder(),
@@ -336,7 +332,7 @@ std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& fil
     return nullptr;
   }
 
-  const auto* filterNode = reinterpret_cast<const SkSVGFilter*>(node.get());
+  const auto* filterNode = reinterpret_cast<const SVGFilter*>(node.get());
   return filterNode->buildFilterDAG(*this);
 }
 
@@ -367,7 +363,7 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
     return nullptr;
   }
 
-  auto maskNode = std::static_pointer_cast<SkSVGMask>(node);
+  auto maskNode = std::static_pointer_cast<SVGMask>(node);
   auto maskBound = maskNode->bounds(*this);
 
   Recorder maskRecorder;
@@ -384,56 +380,10 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   auto bound = picture->getBounds();
   maskBound.join(bound);
 
-  // if (!_deviceContext) {
-  //   return nullptr;
-  // }
-  // auto tempSurface = Surface::Make(_deviceContext, static_cast<int>(bound.width()),
-  //                                  static_cast<int>(bound.height()));
-  // if (!tempSurface) {
-  //   return nullptr;
-  // }
-  // auto* tempCanvas = tempSurface->getCanvas();
-  // tempCanvas->translate(bound.x(), bound.y());
-  // // Matrix matrix = Matrix::I();
-  // // Paint paint;
-  // // paint.setColor(Color::Green());
-  // // tempCanvas->drawPicture(picture, &matrix, &paint);
-  // tempCanvas->drawPicture(picture);
-  // // Paint paint;
-  // // paint.setColor(Color::Black());
-  // // tempCanvas->drawCircle(50, 50, 50, paint);
-  // _deviceContext->flushAndSubmit();
-  // auto shaderImage = tempSurface->makeImageSnapshot();
-  // if (!shaderImage) {
-  //   return nullptr;
-  // }
   auto transMatrix = matrix * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
   auto shaderImage =
       Image::MakeFrom(picture, static_cast<int>(bound.width() * matrix.getScaleX()),
                       static_cast<int>(bound.height() * matrix.getScaleY()), &transMatrix);
-  // {
-  //   auto tempSurface = Surface::Make(_deviceContext, static_cast<int>(bound.width()) * 2,
-  //                                    static_cast<int>(bound.height()) * 2);
-  //   tempSurface->getCanvas()->clear();
-  //   tempSurface->getCanvas()->drawPicture(picture);
-  //   tgfx::Bitmap bitmap = {};
-  //   bitmap.allocPixels(tempSurface->width(), tempSurface->height());
-  //   auto* pixels = bitmap.lockPixels();
-  //   auto success = tempSurface->readPixels(bitmap.info(), pixels);
-  //   bitmap.unlockPixels();
-  //   if (!success) {
-  //     return nullptr;
-  //   }
-  //   auto imageData = bitmap.encode();
-  //   imageData->bytes();
-
-  //   std::ofstream out("/Users/yg/Downloads/yg.png", std::ios::binary);
-  //   if (!out) {
-  //     return nullptr;
-  //   }
-  //   out.write(reinterpret_cast<const char*>(imageData->data()),
-  //             static_cast<std::streamsize>(imageData->size()));
-  // }
   auto shader = Shader::MakeImageShader(shaderImage, TileMode::Decal, TileMode::Decal);
   if (!shader) {
     return nullptr;
@@ -462,7 +412,7 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selecto
       // Preserve the OBB scope because some paints use object bounding box coords
       // (e.g. gradient control points), which requires access to the render context
       // and node being rendered.
-      SkSVGPresentationContext pctx;
+      SVGPresentationContext pctx;
       pctx._namedColors = _presentationContext->_namedColors;
       SVGRenderContext local_ctx(_deviceContext, _canvas, fontManager, nodeIDMapper,
                                  *_lengthContext, pctx, scope, Matrix::I());
@@ -506,8 +456,8 @@ std::optional<Paint> SVGRenderContext::strokePaint() const {
     p->setStrokeWidth(
         _lengthContext->resolve(*props.StrokeWidth, SVGLengthContext::LengthType::Other));
     Stroke stroke;
-    stroke.cap = toSkCap(*props.StrokeLineCap);
-    stroke.join = toSkJoin(*props.StrokeLineJoin);
+    stroke.cap = toCap(*props.StrokeLineCap);
+    stroke.join = toJoin(*props.StrokeLineJoin);
     stroke.miterLimit = *props.StrokeMiterLimit;
     p->setStroke(stroke);
 
@@ -564,5 +514,3 @@ Rect SVGRenderContext::resolveOBBRect(const SVGLength& x, const SVGLength& y, co
                         obbt.scale.x * r.width(), obbt.scale.y * r.height());
 }
 }  // namespace tgfx
-
-#endif  // RENDER_SVG

@@ -22,18 +22,16 @@
 
 namespace tgfx {
 
-class SVGHiddenContainer : public SkSVGContainer {
+class SVGHiddenContainer : public SVGContainer {
  protected:
   explicit SVGHiddenContainer(SVGTag t) : INHERITED(t) {
   }
 
-#ifndef RENDER_SVG
   void onRender(const SVGRenderContext&) const final {
     //abort rendering children nodes
   }
-#endif
 
  private:
-  using INHERITED = SkSVGContainer;
+  using INHERITED = SVGContainer;
 };
 }  // namespace tgfx

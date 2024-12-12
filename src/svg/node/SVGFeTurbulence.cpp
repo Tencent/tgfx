@@ -6,12 +6,12 @@
  */
 
 #include "tgfx/svg/node/SVGFeTurbulence.h"
+#include "svg/SVGAttributeParser.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGFeTurbulence::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeTurbulence::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setNumOctaves(
              SVGAttributeParser::parse<SVGIntegerType>("numOctaves", name, value)) ||
@@ -55,27 +55,9 @@ bool SVGAttributeParser::parse<SVGFeTurbulenceType>(SVGFeTurbulenceType* type) {
   return parsedValue && this->parseEOSToken();
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<ImageFilter> SkSVGFeTurbulence::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SkSVGFilterContext& /*fctx*/) const {
-  // const SkISize* tileSize = nullptr;  // TODO: needs filter element subregion properties
-
-  // sk_sp<SkShader> shader;
-  // switch (fTurbulenceType.fType) {
-  //   case SkSVGFeTurbulenceType::Type::kTurbulence:
-  //     shader = SkShaders::MakeTurbulence(fBaseFrequency.freqX(), fBaseFrequency.freqY(),
-  //                                        fNumOctaves, fSeed, tileSize);
-  //     break;
-  //   case SkSVGFeTurbulenceType::Type::kFractalNoise:
-  //     shader = SkShaders::MakeFractalNoise(fBaseFrequency.freqX(), fBaseFrequency.freqY(),
-  //                                          fNumOctaves, fSeed, tileSize);
-  //     break;
-  // }
-
-  // return SkImageFilters::Shader(shader, this->resolveFilterSubregion(ctx, fctx));
-
-  //TODO (YG)
+std::shared_ptr<ImageFilter> SVGFeTurbulence::onMakeImageFilter(
+    const SVGRenderContext& /*ctx*/, const SVGFilterContext& /*fctx*/) const {
   return nullptr;
 }
-#endif
+
 }  // namespace tgfx

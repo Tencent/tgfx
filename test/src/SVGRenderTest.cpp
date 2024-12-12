@@ -25,7 +25,7 @@ TGFX_TEST(SVGRenderTest, PathSVG) {
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
   ASSERT_TRUE(fontManager != nullptr);
-  auto SVGDom = SVGDOM::Builder().make(*data, fontManager);
+  auto SVGDom = SVGDOM::Make(data, fontManager);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -48,7 +48,7 @@ TGFX_TEST(SVGRenderTest, PNGImageSVG) {
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
   ASSERT_TRUE(fontManager != nullptr);
-  auto SVGDom = SVGDOM::Builder().make(*data, fontManager);
+  auto SVGDom = SVGDOM::Make(data, fontManager);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -71,7 +71,7 @@ TGFX_TEST(SVGRenderTest, JPGImageSVG) {
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
   ASSERT_TRUE(fontManager != nullptr);
-  auto SVGDom = SVGDOM::Builder().make(*data, fontManager);
+  auto SVGDom = SVGDOM::Make(data, fontManager);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -94,7 +94,7 @@ TGFX_TEST(SVGRenderTest, MaskSVG) {
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
   ASSERT_TRUE(fontManager != nullptr);
-  auto SVGDom = SVGDOM::Builder().make(*data, fontManager);
+  auto SVGDom = SVGDOM::Make(data, fontManager);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -117,7 +117,7 @@ TGFX_TEST(SVGRenderTest, GradientSVG) {
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
   ASSERT_TRUE(fontManager != nullptr);
-  auto SVGDom = SVGDOM::Builder().make(*data, fontManager);
+  auto SVGDom = SVGDOM::Make(data, fontManager);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -140,7 +140,7 @@ TGFX_TEST(SVGRenderTest, BlurSVG) {
   ASSERT_TRUE(data != nullptr);
   auto fontManager = std::make_shared<tgfx::SVGFontManager>();
   ASSERT_TRUE(fontManager != nullptr);
-  auto SVGDom = SVGDOM::Builder().make(*data, fontManager);
+  auto SVGDom = SVGDOM::Make(data, fontManager);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
@@ -167,7 +167,7 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
   ASSERT_TRUE(typeface != nullptr);
   fontManager->setDefaultTypeface(typeface);
 
-  auto SVGDom = SVGDOM::Builder().make(*data, fontManager);
+  auto SVGDom = SVGDOM::Make(data, fontManager);
 
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);

@@ -27,13 +27,11 @@
 
 namespace tgfx {
 
-class SkSVGFeDistantLight;
-class SkSVGFePointLight;
-class SkSVGFeSpotLight;
-// class SkSVGFilterContext;
-// class SVGRenderContext;
+class SVGFeDistantLight;
+class SVGFePointLight;
+class SVGFeSpotLight;
 
-class SkSVGFeLighting : public SkSVGFe {
+class SVGFeLighting : public SVGFe {
  public:
   struct KernelUnitLength {
     SVGNumberType fDx;
@@ -44,98 +42,59 @@ class SkSVGFeLighting : public SkSVGFe {
   SVG_OPTIONAL_ATTR(UnitLength, KernelUnitLength)
 
  protected:
-  explicit SkSVGFeLighting(SVGTag t) : INHERITED(t) {
+  explicit SVGFeLighting(SVGTag t) : INHERITED(t) {
   }
 
   std::vector<SVGFeInputType> getInputs() const final {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const final {
+                                                 const SVGFilterContext&) const final {
     return nullptr;
   };
-#ifdef RENDER_SVG
-  sk_sp<SkImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                         const SkSVGFilterContext&) const final;
-
-  virtual sk_sp<SkImageFilter> makeDistantLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                                const SkSVGFeDistantLight*) const = 0;
-
-  virtual sk_sp<SkImageFilter> makePointLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                              const SkSVGFePointLight*) const = 0;
-
-  virtual sk_sp<SkImageFilter> makeSpotLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                             const SkSVGFeSpotLight*) const = 0;
-
-  SkColor resolveLightingColor(const SVGRenderContext&) const;
-
-  SkPoint3 resolveXYZ(const SVGRenderContext&, const SkSVGFilterContext&, SkSVGNumberType,
-                      SkSVGNumberType, SkSVGNumberType) const;
-#endif
 
  private:
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 
-class SkSVGFeSpecularLighting final : public SkSVGFeLighting {
+class SVGFeSpecularLighting final : public SVGFeLighting {
  public:
-  static std::shared_ptr<SkSVGFeSpecularLighting> Make() {
-    return std::shared_ptr<SkSVGFeSpecularLighting>(new SkSVGFeSpecularLighting());
+  static std::shared_ptr<SVGFeSpecularLighting> Make() {
+    return std::shared_ptr<SVGFeSpecularLighting>(new SVGFeSpecularLighting());
   }
 
   SVG_ATTR(SpecularConstant, SVGNumberType, 1)
   SVG_ATTR(SpecularExponent, SVGNumberType, 1)
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
-
-#ifdef RENDER_SVG
-  sk_sp<SkImageFilter> makeDistantLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                        const SkSVGFeDistantLight*) const final;
-
-  sk_sp<SkImageFilter> makePointLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                      const SkSVGFePointLight*) const final;
-
-  sk_sp<SkImageFilter> makeSpotLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                     const SkSVGFeSpotLight*) const final;
-#endif
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeSpecularLighting() : INHERITED(SVGTag::FeSpecularLighting) {
+  SVGFeSpecularLighting() : INHERITED(SVGTag::FeSpecularLighting) {
   }
 
-  using INHERITED = SkSVGFeLighting;
+  using INHERITED = SVGFeLighting;
 };
 
-class SkSVGFeDiffuseLighting final : public SkSVGFeLighting {
+class SVGFeDiffuseLighting final : public SVGFeLighting {
  public:
-  static std::shared_ptr<SkSVGFeDiffuseLighting> Make() {
-    return std::shared_ptr<SkSVGFeDiffuseLighting>(new SkSVGFeDiffuseLighting());
+  static std::shared_ptr<SVGFeDiffuseLighting> Make() {
+    return std::shared_ptr<SVGFeDiffuseLighting>(new SVGFeDiffuseLighting());
   }
 
   SVG_ATTR(DiffuseConstant, SVGNumberType, 1)
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifdef RENDER_SVG
-  sk_sp<SkImageFilter> makeDistantLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                        const SkSVGFeDistantLight*) const final;
-
-  sk_sp<SkImageFilter> makePointLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                      const SkSVGFePointLight*) const final;
-
-  sk_sp<SkImageFilter> makeSpotLight(const SVGRenderContext&, const SkSVGFilterContext&,
-                                     const SkSVGFeSpotLight*) const final;
-#endif
  private:
-  SkSVGFeDiffuseLighting() : INHERITED(SVGTag::FeDiffuseLighting) {
+  SVGFeDiffuseLighting() : INHERITED(SVGTag::FeDiffuseLighting) {
   }
 
-  using INHERITED = SkSVGFeLighting;
+  using INHERITED = SVGFeLighting;
 };
 
 }  // namespace tgfx

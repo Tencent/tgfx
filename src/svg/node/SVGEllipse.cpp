@@ -17,16 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "tgfx/svg/node/SVGEllipse.h"
 #include "SVGRectPriv.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
-SkSVGEllipse::SkSVGEllipse() : INHERITED(SVGTag::Ellipse) {
+SVGEllipse::SVGEllipse() : INHERITED(SVGTag::Ellipse) {
 }
 
-bool SkSVGEllipse::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGEllipse::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setCx(SVGAttributeParser::parse<SVGLength>("cx", n, v)) ||
          this->setCy(SVGAttributeParser::parse<SVGLength>("cy", n, v)) ||
@@ -36,8 +37,7 @@ bool SkSVGEllipse::parseAndSetAttribute(const char* n, const char* v) {
   s = 10;
 }
 
-#ifndef RENDER_SVG
-Rect SkSVGEllipse::resolve(const SVGLengthContext& lctx) const {
+Rect SVGEllipse::resolve(const SVGLengthContext& lctx) const {
   const auto cx = lctx.resolve(Cx, SVGLengthContext::LengthType::Horizontal);
   const auto cy = lctx.resolve(Cy, SVGLengthContext::LengthType::Vertical);
 
@@ -52,17 +52,17 @@ Rect SkSVGEllipse::resolve(const SVGLengthContext& lctx) const {
   return (rx > 0 && ry > 0) ? Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2) : Rect::MakeEmpty();
 }
 
-void SkSVGEllipse::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
-                          PathFillType) const {
+void SVGEllipse::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
+                        PathFillType) const {
   canvas->drawOval(this->resolve(lctx), paint);
 }
 
-Path SkSVGEllipse::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGEllipse::onAsPath(const SVGRenderContext& ctx) const {
   Path path;
   path.addOval(this->resolve(ctx.lengthContext()));
   this->mapToParent(&path);
 
   return path;
 }
-#endif
+
 }  // namespace tgfx

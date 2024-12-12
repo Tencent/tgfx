@@ -33,10 +33,10 @@ class SVGRenderContext;
  * Implements support for <use> (reference) elements.
  * (https://www.w3.org/TR/SVG11/struct.html#UseElement)
  */
-class SkSVGUse final : public SkSVGTransformableNode {
+class SVGUse final : public SVGTransformableNode {
  public:
-  static std::shared_ptr<SkSVGUse> Make() {
-    return std::shared_ptr<SkSVGUse>(new SkSVGUse());
+  static std::shared_ptr<SVGUse> Make() {
+    return std::shared_ptr<SVGUse>(new SVGUse());
   }
 
   void appendChild(std::shared_ptr<SVGNode>) override{};
@@ -46,18 +46,16 @@ class SkSVGUse final : public SkSVGTransformableNode {
   SVG_ATTR(Href, SVGIRI, SVGIRI())
 
  protected:
-#ifndef RENDER_SVG
   bool onPrepareToRender(SVGRenderContext*) const override;
   void onRender(const SVGRenderContext&) const override;
   Path onAsPath(const SVGRenderContext&) const override;
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-#endif
 
  private:
-  SkSVGUse();
+  SVGUse();
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-  using INHERITED = SkSVGTransformableNode;
+  using INHERITED = SVGTransformableNode;
 };
 }  // namespace tgfx

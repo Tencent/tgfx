@@ -29,31 +29,29 @@
 namespace tgfx {
 
 // Handles <polygon> and <polyline> elements.
-class SkSVGPoly final : public SVGShape {
+class SVGPoly final : public SVGShape {
  public:
-  static std::shared_ptr<SkSVGPoly> MakePolygon() {
-    return std::shared_ptr<SkSVGPoly>(new SkSVGPoly(SVGTag::Polygon));
+  static std::shared_ptr<SVGPoly> MakePolygon() {
+    return std::shared_ptr<SVGPoly>(new SVGPoly(SVGTag::Polygon));
   }
 
-  static std::shared_ptr<SkSVGPoly> MakePolyline() {
-    return std::shared_ptr<SkSVGPoly>(new SkSVGPoly(SVGTag::Polyline));
+  static std::shared_ptr<SVGPoly> MakePolyline() {
+    return std::shared_ptr<SVGPoly>(new SVGPoly(SVGTag::Polyline));
   }
 
   SVG_ATTR(Points, SVGPointsType, SVGPointsType())
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
 
   Path onAsPath(const SVGRenderContext&) const override;
 
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-#endif
 
  private:
-  SkSVGPoly(SVGTag);
+  SVGPoly(SVGTag);
 
   mutable Path fPath;  // mutated in onDraw(), to apply inherited fill types.
 

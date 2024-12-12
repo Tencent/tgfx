@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGTransformableNode.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -26,12 +27,10 @@
 
 namespace tgfx {
 
-SkSVGTransformableNode::SkSVGTransformableNode(SVGTag tag)
-    : INHERITED(tag), fTransform(Matrix::I()) {
+SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag), fTransform(Matrix::I()) {
 }
 
-#ifndef RENDER_SVG
-bool SkSVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
+bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
   if (!fTransform.isIdentity()) {
     auto transform = fTransform;
     if (auto unit = ctx->lengthContext().getPatternUnits();
@@ -47,9 +46,8 @@ bool SkSVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
 
   return this->INHERITED::onPrepareToRender(ctx);
 }
-#endif
 
-void SkSVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
+void SVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   switch (attr) {
     case SVGAttribute::Transform:
       if (const auto* transform = v.as<SVGTransformValue>()) {
@@ -62,14 +60,13 @@ void SkSVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v
   }
 }
 
-#ifndef RENDER_SVG
-void SkSVGTransformableNode::mapToParent(Path* path) const {
+void SVGTransformableNode::mapToParent(Path* path) const {
   // transforms the path to parent node coordinates.
   path->transform(fTransform);
 }
 
-void SkSVGTransformableNode::mapToParent(Rect* rect) const {
+void SVGTransformableNode::mapToParent(Rect* rect) const {
   *rect = fTransform.mapRect(*rect);
 }
-#endif
+
 }  // namespace tgfx

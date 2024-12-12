@@ -17,23 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGDOM.h"
-#include <array>
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 #include <ctime>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include "core/utils/Log.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGAttribute.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
 #include "tgfx/svg/node/SVGCircle.h"
@@ -75,7 +74,7 @@
 namespace tgfx {
 namespace {
 
-bool SetIRIAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) {
+bool SetIRIAttribute(SVGNode& node, SVGAttribute attr, const std::string& stringValue) {
   auto parseResult = SVGAttributeParser::parse<SVGIRI>(stringValue);
   if (!parseResult.has_value()) {
     return false;
@@ -85,14 +84,13 @@ bool SetIRIAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) 
   return true;
 }
 
-bool SetStringAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) {
-  std::string str(stringValue, strlen(stringValue));
-  SVGStringType strType = SVGStringType(str);
+bool SetStringAttribute(SVGNode& node, SVGAttribute attr, const std::string& stringValue) {
+  SVGStringType strType = SVGStringType(stringValue);
   node.setAttribute(attr, SVGStringValue(strType));
   return true;
 }
 
-bool SetTransformAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) {
+bool SetTransformAttribute(SVGNode& node, SVGAttribute attr, const std::string& stringValue) {
   auto parseResult = SVGAttributeParser::parse<SVGTransformType>(stringValue);
   if (!parseResult.has_value()) {
     return false;
@@ -102,7 +100,7 @@ bool SetTransformAttribute(SVGNode& node, SVGAttribute attr, const char* stringV
   return true;
 }
 
-bool SetLengthAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) {
+bool SetLengthAttribute(SVGNode& node, SVGAttribute attr, const std::string& stringValue) {
   auto parseResult = SVGAttributeParser::parse<SVGLength>(stringValue);
   if (!parseResult.has_value()) {
     return false;
@@ -112,7 +110,7 @@ bool SetLengthAttribute(SVGNode& node, SVGAttribute attr, const char* stringValu
   return true;
 }
 
-bool SetViewBoxAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) {
+bool SetViewBoxAttribute(SVGNode& node, SVGAttribute attr, const std::string& stringValue) {
   SVGViewBoxType viewBox;
   SVGAttributeParser parser(stringValue);
   if (!parser.parseViewBox(&viewBox)) {
@@ -123,7 +121,8 @@ bool SetViewBoxAttribute(SVGNode& node, SVGAttribute attr, const char* stringVal
   return true;
 }
 
-bool SetObjectBoundingBoxUnitsAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) {
+bool SetObjectBoundingBoxUnitsAttribute(SVGNode& node, SVGAttribute attr,
+                                        const std::string& stringValue) {
   auto parseResult = SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>(stringValue);
   if (!parseResult.has_value()) {
     return false;
@@ -133,7 +132,8 @@ bool SetObjectBoundingBoxUnitsAttribute(SVGNode& node, SVGAttribute attr, const 
   return true;
 }
 
-bool SetPreserveAspectRatioAttribute(SVGNode& node, SVGAttribute attr, const char* stringValue) {
+bool SetPreserveAspectRatioAttribute(SVGNode& node, SVGAttribute attr,
+                                     const std::string& stringValue) {
   SVGPreserveAspectRatio par;
   SVGAttributeParser parser(stringValue);
   if (!parser.parsePreserveAspectRatio(&par)) {
@@ -163,24 +163,25 @@ std::string TrimmedString(const char* first, const char* last) {
 // Breaks a "foo: bar; baz: ..." string into key:value pairs.
 class StyleIterator {
  public:
-  explicit StyleIterator(const char* str) : fPos(str) {
+  explicit StyleIterator(const std::string& str) : pos(str.data()) {
   }
 
   std::tuple<std::string, std::string> next() {
     std::string name;
     std::string value;
 
-    if (fPos) {
+    if (pos) {
       const char* sep = this->nextSeparator();
-      ASSERT(*sep == ';' || *sep == '\0');
+      ASSERT(*sep == ';');
+      ASSERT(*sep == '\0')
 
-      const char* valueSep = strchr(fPos, ':');
+      const char* valueSep = strchr(pos, ':');
       if (valueSep && valueSep < sep) {
-        name = TrimmedString(fPos, valueSep - 1);
+        name = TrimmedString(pos, valueSep - 1);
         value = TrimmedString(valueSep + 1, sep - 1);
       }
 
-      fPos = *sep ? sep + 1 : nullptr;
+      pos = *sep ? sep + 1 : nullptr;
     }
 
     return std::make_tuple(name, value);
@@ -188,19 +189,19 @@ class StyleIterator {
 
  private:
   const char* nextSeparator() const {
-    const char* sep = fPos;
+    const char* sep = pos;
     while (*sep != ';' && *sep != '\0') {
       sep++;
     }
     return sep;
   }
 
-  const char* fPos;
+  const char* pos;
 };
 
-bool set_string_attribute(SVGNode& node, const std::string& name, const std::string& value);
+bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value);
 
-bool SetStyleAttributes(SVGNode& node, SVGAttribute, const char* stringValue) {
+bool SetStyleAttributes(SVGNode& node, SVGAttribute, const std::string& stringValue) {
 
   std::string name;
   std::string value;
@@ -210,26 +211,19 @@ bool SetStyleAttributes(SVGNode& node, SVGAttribute, const char* stringValue) {
     if (name.empty()) {
       break;
     }
-    set_string_attribute(node, name, value);
+    SetAttribute(node, name, value);
   }
 
   return true;
 }
 
-template <typename T>
-struct SortedDictionaryEntry {
-  const std::string fKey;
-  const T fValue;
-};
-
-using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const char*)>;
-
+using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
 struct AttrParseInfo {
-  SVGAttribute fAttr;
-  AttributeSetter fSetter;
+  SVGAttribute attribute;
+  AttributeSetter setter;
 };
 
-std::vector<SortedDictionaryEntry<AttrParseInfo>> gAttributeParseInfo = {
+std::unordered_map<std::string, AttrParseInfo> gAttributeParseInfo = {
     {"cx", {SVGAttribute::Cx, SetLengthAttribute}},
     {"cy", {SVGAttribute::Cy, SetLengthAttribute}},
     {"filterUnits", {SVGAttribute::FilterUnits, SetObjectBoundingBoxUnitsAttribute}},
@@ -255,101 +249,85 @@ std::vector<SortedDictionaryEntry<AttrParseInfo>> gAttributeParseInfo = {
     {"y2", {SVGAttribute::Y2, SetLengthAttribute}},
 };
 
-std::vector<SortedDictionaryEntry<std::shared_ptr<SVGNode> (*)()>> gTagFactories = {
-    {"a", []() -> std::shared_ptr<SVGNode> { return SkSVGG::Make(); }},
+using ElementFactory = std::function<std::shared_ptr<SVGNode>()>;
+std::unordered_map<std::string, ElementFactory> ElementFactories = {
+    {"a", []() -> std::shared_ptr<SVGNode> { return SVGG::Make(); }},
     {"circle", []() -> std::shared_ptr<SVGNode> { return SVGCircle::Make(); }},
     {"clipPath", []() -> std::shared_ptr<SVGNode> { return SVGClipPath::Make(); }},
-    {"defs", []() -> std::shared_ptr<SVGNode> { return SkSVGDefs::Make(); }},
-    {"ellipse", []() -> std::shared_ptr<SVGNode> { return SkSVGEllipse::Make(); }},
-    {"feBlend", []() -> std::shared_ptr<SVGNode> { return SkSVGFeBlend::Make(); }},
-    {"feColorMatrix", []() -> std::shared_ptr<SVGNode> { return SkSVGFeColorMatrix::Make(); }},
+    {"defs", []() -> std::shared_ptr<SVGNode> { return SVGDefs::Make(); }},
+    {"ellipse", []() -> std::shared_ptr<SVGNode> { return SVGEllipse::Make(); }},
+    {"feBlend", []() -> std::shared_ptr<SVGNode> { return SVGFeBlend::Make(); }},
+    {"feColorMatrix", []() -> std::shared_ptr<SVGNode> { return SVGFeColorMatrix::Make(); }},
     {"feComponentTransfer",
-     []() -> std::shared_ptr<SVGNode> { return SkSVGFeComponentTransfer::Make(); }},
-    {"feComposite", []() -> std::shared_ptr<SVGNode> { return SkSVGFeComposite::Make(); }},
+     []() -> std::shared_ptr<SVGNode> { return SVGFeComponentTransfer::Make(); }},
+    {"feComposite", []() -> std::shared_ptr<SVGNode> { return SVGFeComposite::Make(); }},
     {"feDiffuseLighting",
-     []() -> std::shared_ptr<SVGNode> { return SkSVGFeDiffuseLighting::Make(); }},
+     []() -> std::shared_ptr<SVGNode> { return SVGFeDiffuseLighting::Make(); }},
     {"feDisplacementMap",
-     []() -> std::shared_ptr<SVGNode> { return SkSVGFeDisplacementMap::Make(); }},
-    {"feDistantLight", []() -> std::shared_ptr<SVGNode> { return SkSVGFeDistantLight::Make(); }},
-    {"feFlood", []() -> std::shared_ptr<SVGNode> { return SkSVGFeFlood::Make(); }},
-    {"feFuncA", []() -> std::shared_ptr<SVGNode> { return SkSVGFeFunc::MakeFuncA(); }},
-    {"feFuncB", []() -> std::shared_ptr<SVGNode> { return SkSVGFeFunc::MakeFuncB(); }},
-    {"feFuncG", []() -> std::shared_ptr<SVGNode> { return SkSVGFeFunc::MakeFuncG(); }},
-    {"feFuncR", []() -> std::shared_ptr<SVGNode> { return SkSVGFeFunc::MakeFuncR(); }},
-    {"feGaussianBlur", []() -> std::shared_ptr<SVGNode> { return SkSVGFeGaussianBlur::Make(); }},
-    {"feImage", []() -> std::shared_ptr<SVGNode> { return SkSVGFeImage::Make(); }},
-    {"feMerge", []() -> std::shared_ptr<SVGNode> { return SkSVGFeMerge::Make(); }},
-    {"feMergeNode", []() -> std::shared_ptr<SVGNode> { return SkSVGFeMergeNode::Make(); }},
-    {"feMorphology", []() -> std::shared_ptr<SVGNode> { return SkSVGFeMorphology::Make(); }},
-    {"feOffset", []() -> std::shared_ptr<SVGNode> { return SkSVGFeOffset::Make(); }},
-    {"fePointLight", []() -> std::shared_ptr<SVGNode> { return SkSVGFePointLight::Make(); }},
+     []() -> std::shared_ptr<SVGNode> { return SVGFeDisplacementMap::Make(); }},
+    {"feDistantLight", []() -> std::shared_ptr<SVGNode> { return SVGFeDistantLight::Make(); }},
+    {"feFlood", []() -> std::shared_ptr<SVGNode> { return SVGFeFlood::Make(); }},
+    {"feFuncA", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncA(); }},
+    {"feFuncB", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncB(); }},
+    {"feFuncG", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncG(); }},
+    {"feFuncR", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncR(); }},
+    {"feGaussianBlur", []() -> std::shared_ptr<SVGNode> { return SVGFeGaussianBlur::Make(); }},
+    {"feImage", []() -> std::shared_ptr<SVGNode> { return SVGFeImage::Make(); }},
+    {"feMerge", []() -> std::shared_ptr<SVGNode> { return SVGFeMerge::Make(); }},
+    {"feMergeNode", []() -> std::shared_ptr<SVGNode> { return SVGFeMergeNode::Make(); }},
+    {"feMorphology", []() -> std::shared_ptr<SVGNode> { return SVGFeMorphology::Make(); }},
+    {"feOffset", []() -> std::shared_ptr<SVGNode> { return SVGFeOffset::Make(); }},
+    {"fePointLight", []() -> std::shared_ptr<SVGNode> { return SVGFePointLight::Make(); }},
     {"feSpecularLighting",
-     []() -> std::shared_ptr<SVGNode> { return SkSVGFeSpecularLighting::Make(); }},
-    {"feSpotLight", []() -> std::shared_ptr<SVGNode> { return SkSVGFeSpotLight::Make(); }},
-    {"feTurbulence", []() -> std::shared_ptr<SVGNode> { return SkSVGFeTurbulence::Make(); }},
-    {"filter", []() -> std::shared_ptr<SVGNode> { return SkSVGFilter::Make(); }},
-    {"g", []() -> std::shared_ptr<SVGNode> { return SkSVGG::Make(); }},
-    {"image", []() -> std::shared_ptr<SVGNode> { return SkSVGImage::Make(); }},
-    {"line", []() -> std::shared_ptr<SVGNode> { return SkSVGLine::Make(); }},
-    {"linearGradient", []() -> std::shared_ptr<SVGNode> { return SkSVGLinearGradient::Make(); }},
-    {"mask", []() -> std::shared_ptr<SVGNode> { return SkSVGMask::Make(); }},
-    {"path", []() -> std::shared_ptr<SVGNode> { return SkSVGPath::Make(); }},
-    {"pattern", []() -> std::shared_ptr<SVGNode> { return SkSVGPattern::Make(); }},
-    {"polygon", []() -> std::shared_ptr<SVGNode> { return SkSVGPoly::MakePolygon(); }},
-    {"polyline", []() -> std::shared_ptr<SVGNode> { return SkSVGPoly::MakePolyline(); }},
-    {"radialGradient", []() -> std::shared_ptr<SVGNode> { return SkSVGRadialGradient::Make(); }},
-    {"rect", []() -> std::shared_ptr<SVGNode> { return SkSVGRect::Make(); }},
-    {"stop", []() -> std::shared_ptr<SVGNode> { return SkSVGStop::Make(); }},
+     []() -> std::shared_ptr<SVGNode> { return SVGFeSpecularLighting::Make(); }},
+    {"feSpotLight", []() -> std::shared_ptr<SVGNode> { return SVGFeSpotLight::Make(); }},
+    {"feTurbulence", []() -> std::shared_ptr<SVGNode> { return SVGFeTurbulence::Make(); }},
+    {"filter", []() -> std::shared_ptr<SVGNode> { return SVGFilter::Make(); }},
+    {"g", []() -> std::shared_ptr<SVGNode> { return SVGG::Make(); }},
+    {"image", []() -> std::shared_ptr<SVGNode> { return SVGImage::Make(); }},
+    {"line", []() -> std::shared_ptr<SVGNode> { return SVGLine::Make(); }},
+    {"linearGradient", []() -> std::shared_ptr<SVGNode> { return SVGLinearGradient::Make(); }},
+    {"mask", []() -> std::shared_ptr<SVGNode> { return SVGMask::Make(); }},
+    {"path", []() -> std::shared_ptr<SVGNode> { return SVGPath::Make(); }},
+    {"pattern", []() -> std::shared_ptr<SVGNode> { return SVGPattern::Make(); }},
+    {"polygon", []() -> std::shared_ptr<SVGNode> { return SVGPoly::MakePolygon(); }},
+    {"polyline", []() -> std::shared_ptr<SVGNode> { return SVGPoly::MakePolyline(); }},
+    {"radialGradient", []() -> std::shared_ptr<SVGNode> { return SVGRadialGradient::Make(); }},
+    {"rect", []() -> std::shared_ptr<SVGNode> { return SVGRect::Make(); }},
+    {"stop", []() -> std::shared_ptr<SVGNode> { return SVGStop::Make(); }},
     //    "svg" handled explicitly
-    {"text", []() -> std::shared_ptr<SVGNode> { return SkSVGText::Make(); }},
-    {"textPath", []() -> std::shared_ptr<SVGNode> { return SkSVGTextPath::Make(); }},
-    {"tspan", []() -> std::shared_ptr<SVGNode> { return SkSVGTSpan::Make(); }},
-    {"use", []() -> std::shared_ptr<SVGNode> { return SkSVGUse::Make(); }},
+    {"text", []() -> std::shared_ptr<SVGNode> { return SVGText::Make(); }},
+    {"textPath", []() -> std::shared_ptr<SVGNode> { return SVGTextPath::Make(); }},
+    {"tspan", []() -> std::shared_ptr<SVGNode> { return SVGTSpan::Make(); }},
+    {"use", []() -> std::shared_ptr<SVGNode> { return SVGUse::Make(); }},
 };
-
-template <typename T>
-int StringSearch(const std::vector<SortedDictionaryEntry<T>>& base, const std::string& target) {
-  if (base.empty()) {
-    return -1;
-  }
-
-  for (uint32_t i = 0; i < base.size(); i++) {
-    if (base[i].fKey == target) {
-      return static_cast<int>(i);
-    }
-  }
-  return -1;
-}
 
 struct ConstructionContext {
-  explicit ConstructionContext(SVGIDMapper* mapper) : fParent(nullptr), fIDMapper(mapper) {
+  explicit ConstructionContext(SVGIDMapper* mapper) : parentNode(nullptr), nodeIDMapper(mapper) {
   }
   ConstructionContext(const ConstructionContext& other, const std::shared_ptr<SVGNode>& newParent)
-      : fParent(newParent.get()), fIDMapper(other.fIDMapper) {
+      : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper) {
   }
 
-  SVGNode* fParent;
-  SVGIDMapper* fIDMapper;
+  SVGNode* parentNode;
+  SVGIDMapper* nodeIDMapper;
 };
 
-bool set_string_attribute(SVGNode& node, const std::string& name, const std::string& value) {
-  if (node.parseAndSetAttribute(name.c_str(), value.c_str())) {
+bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value) {
+  if (node.parseAndSetAttribute(name, value)) {
     // Handled by new code path
     return true;
   }
 
-  const int attrIndex = StringSearch(gAttributeParseInfo, name);
-  if (attrIndex < 0) {
-    return false;
+  if (auto iter = gAttributeParseInfo.find(name); iter != gAttributeParseInfo.end()) {
+    auto setter = iter->second.setter;
+    return setter(node, iter->second.attribute, value);
   }
-
-  ASSERT(static_cast<size_t>(attrIndex) < std::size(gAttributeParseInfo));
-  const auto& attrInfo = gAttributeParseInfo[static_cast<size_t>(attrIndex)].fValue;
-  return attrInfo.fSetter(node, attrInfo.fAttr, value.c_str());
+  return true;
 }
 
-void parse_node_attributes(const DOMNode* xmlNode, const std::shared_ptr<SVGNode>& svgNode,
-                           SVGIDMapper* mapper) {
+void ParseNodeAttributes(const DOMNode* xmlNode, const std::shared_ptr<SVGNode>& svgNode,
+                         SVGIDMapper* mapper) {
 
   for (const auto& attr : xmlNode->attributes) {
     auto name = attr.name;
@@ -358,56 +336,51 @@ void parse_node_attributes(const DOMNode* xmlNode, const std::shared_ptr<SVGNode
       mapper->insert({value, svgNode});
       continue;
     }
-    set_string_attribute(*svgNode, name, value);
+    SetAttribute(*svgNode, name, value);
   }
 }
 
-std::shared_ptr<SVGNode> construct_svg_node(const ConstructionContext& ctx,
-                                            const DOMNode* xmlNode) {
-  std::string elem = xmlNode->name;
-  const auto elemType = xmlNode->type;
+std::shared_ptr<SVGNode> ConstructSVGNode(const ConstructionContext& context,
+                                          const DOMNode* xmlNode) {
+  std::string elementName = xmlNode->name;
+  const auto elementType = xmlNode->type;
 
-  if (elemType == DOMNodeType::Text) {
+  if (elementType == DOMNodeType::Text) {
     // Text literals require special handling.
     ASSERT(xmlNode->attributes.empty());
-    auto txt = SkSVGTextLiteral::Make();
-    txt->setText(xmlNode->name);
-    ctx.fParent->appendChild(std::move(txt));
-
+    auto text = SVGTextLiteral::Make();
+    text->setText(xmlNode->name);
+    context.parentNode->appendChild(std::move(text));
     return nullptr;
   }
 
-  ASSERT(elemType == DOMNodeType::Element);
+  ASSERT(elementType == DOMNodeType::Element);
 
-  auto makeNode = [](const ConstructionContext& ctx,
-                     const std::string& elem) -> std::shared_ptr<SVGNode> {
-    if (elem == "svg") {
+  auto makeNode = [](const ConstructionContext& context,
+                     const std::string& elementName) -> std::shared_ptr<SVGNode> {
+    if (elementName == "svg") {
       // Outermost SVG element must be tagged as such.
-      return SVGSVG::Make(ctx.fParent ? SVGSVG::Type::kInner : SVGSVG::Type::kRoot);
+      return SVGSVG::Make(context.parentNode ? SVGSVG::Type::kInner : SVGSVG::Type::kRoot);
     }
 
-    // const int tagIndex =
-    //     StringSearch(&gTagFactories[0].fKey, static_cast<int>(std::size(gTagFactories)),
-    //                  elem.c_str(), sizeof(gTagFactories[0]));
-    int tagIndex = StringSearch(gTagFactories, elem);
-    if (tagIndex < 0) {
-      return nullptr;
+    if (auto iter = ElementFactories.find(elementName); iter != ElementFactories.end()) {
+      return iter->second();
     }
-    ASSERT(static_cast<size_t>(tagIndex) < std::size(gTagFactories));
-    return gTagFactories[static_cast<size_t>(tagIndex)].fValue();
+    //can't find the element factory
+    ASSERT(false);
   };
 
-  auto node = makeNode(ctx, elem);
+  auto node = makeNode(context, elementName);
   if (!node) {
     return nullptr;
   }
 
-  parse_node_attributes(xmlNode, node, ctx.fIDMapper);
+  ParseNodeAttributes(xmlNode, node, context.nodeIDMapper);
 
-  ConstructionContext localCtx(ctx, node);
+  ConstructionContext localCtx(context, node);
   std::shared_ptr<DOMNode> child = xmlNode->firstChild;
   while (child) {
-    std::shared_ptr<SVGNode> childNode = construct_svg_node(localCtx, child.get());
+    std::shared_ptr<SVGNode> childNode = ConstructSVGNode(localCtx, child.get());
     if (childNode) {
       node->appendChild(std::move(childNode));
     }
@@ -418,28 +391,12 @@ std::shared_ptr<SVGNode> construct_svg_node(const ConstructionContext& ctx,
 
 }  // anonymous namespace
 
-// SVGDOM::Builder& SVGDOM::Builder::setFontManager(std::shared_ptr<SkFontMgr> fmgr) {
-//     fFontMgr = std::move(fmgr);
-//     return *this;
-// }
-
-// SVGDOM::Builder& SVGDOM::Builder::setResourceProvider(std::shared_ptr<skresources::ResourceProvider> rp) {
-//     fResourceProvider = std::move(rp);
-//     return *this;
-// }
-
-// SVGDOM::Builder& SVGDOM::Builder::setTextShapingFactory(std::shared_ptr<SkShapers::Factory> f) {
-//     fTextShapingFactory = f;
-//     return *this;
-// }
-
-std::shared_ptr<SVGDOM> SVGDOM::Builder::make(Data& data,
-                                              std::shared_ptr<SVGFontManager> fontManager) const {
-  // TRACE_EVENT0("skia", TRACE_FUNC);
-  if (data.empty()) {
+std::shared_ptr<SVGDOM> SVGDOM::Make(const std::shared_ptr<Data>& data,
+                                     std::shared_ptr<SVGFontManager> fontManager) {
+  if (!data) {
     return nullptr;
   }
-  auto xmlDom = DOM::MakeFromData(data);
+  auto xmlDom = DOM::MakeFromData(*data);
   if (!xmlDom) {
     return nullptr;
   }
@@ -447,19 +404,10 @@ std::shared_ptr<SVGDOM> SVGDOM::Builder::make(Data& data,
   SVGIDMapper mapper;
   ConstructionContext ctx(&mapper);
 
-  auto root = construct_svg_node(ctx, xmlDom->getRootNode().get());
+  auto root = ConstructSVGNode(ctx, xmlDom->getRootNode().get());
   if (!root || root->tag() != SVGTag::Svg) {
     return nullptr;
   }
-
-  // class NullResourceProvider final : public skresources::ResourceProvider {
-  //     std::shared_ptr<SkData> load(const char[], const char[]) const override { return nullptr; }
-  // };
-
-  // auto resource_provider = fResourceProvider ? fResourceProvider
-  //                                            : sk_make_sp<NullResourceProvider>();
-
-  // auto factory = fTextShapingFactory ? fTextShapingFactory : SkShapers::Primitive::Factory();
 
   return std::shared_ptr<SVGDOM>(new SVGDOM(std::static_pointer_cast<SVGSVG>(root),
                                             std::move(mapper), std::move(fontManager)));
@@ -473,8 +421,8 @@ SVGDOM::SVGDOM(std::shared_ptr<SVGSVG> root, SVGIDMapper&& mapper,
 void SVGDOM::render(Canvas* canvas) {
   if (root) {
     if (!renderPicture) {
-      SVGLengthContext lctx(_containerSize);
-      SkSVGPresentationContext pctx;
+      SVGLengthContext lctx(containerSize);
+      SVGPresentationContext pctx;
 
       Recorder recorder;
       auto* drawCanvas = recorder.beginRecording();
@@ -490,31 +438,15 @@ void SVGDOM::render(Canvas* canvas) {
   }
 }
 
-void SVGDOM::renderNode(Canvas* canvas, SkSVGPresentationContext& pctx, const char* id) const {
-  if (root) {
-    SVGLengthContext lctx(_containerSize);
-    SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, fontManager,
-                               _nodeIDMapper, lctx, pctx, {nullptr, nullptr}, canvas->getMatrix());
-    root->renderNode(renderCtx, SVGIRI(SVGIRI::Type::Local, SVGStringType(id)));
-  }
+const Size& SVGDOM::getContainerSize() const {
+  return containerSize;
 }
 
-const Size& SVGDOM::containerSize() const {
-  return _containerSize;
+void SVGDOM::setContainerSize(const Size& size) {
+  containerSize = size;
 }
 
-void SVGDOM::setContainerSize(const Size& containerSize) {
-  // TODO: inval
-  _containerSize = containerSize;
-}
-
-std::shared_ptr<SVGNode> SVGDOM::findNodeById(const std::string& id) {
-  auto iter = _nodeIDMapper.find(id);
-  return iter == this->_nodeIDMapper.end() ? nullptr : iter->second;
-}
-
-// TODO(fuego): move this to SkSVGNode or its own CU.
 bool SVGNode::setAttribute(const std::string& attributeName, const std::string& attributeValue) {
-  return set_string_attribute(*this, attributeName, attributeValue);
+  return SetAttribute(*this, attributeName, attributeValue);
 }
 }  // namespace tgfx

@@ -24,85 +24,41 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/svg/SVGFontManager.h"
-#include "tgfx/svg/SVGIDMapper.h"
 #include "tgfx/svg/node/SVGSVG.h"
 
 namespace tgfx {
 
+class SVGNode;
+using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
 class SVGDOM {
  public:
-  class Builder final {
-   public:
-    // /**
-    //  * Specify a font manager for loading fonts (e.g. from the system) to render <text>
-    //  * SVG nodes.
-    //  * If this is not set, but a font is required as part of rendering, the text will
-    //  * not be displayed.
-    //  */
-    // Builder& setFontManager(sk_sp<SkFontMgr>);
-
-    // /**
-    //  * Specify a resource provider for loading images etc.
-    //  */
-    // Builder& setResourceProvider(sk_sp<skresources::ResourceProvider>);
-
-    // /**
-    //  * Specify the callbacks for dealing with shaping text. See also
-    //  * modules/skshaper/utils/FactoryHelpers.h
-    //  */
-    // Builder& setTextShapingFactory(sk_sp<SkShapers::Factory>);
-
-    std::shared_ptr<SVGDOM> make(Data&, std::shared_ptr<SVGFontManager>) const;
-
-   private:
-    // sk_sp<SkFontMgr>                             fFontMgr;
-    // sk_sp<skresources::ResourceProvider>         fResourceProvider;
-    // sk_sp<SkShapers::Factory>                    fTextShapingFactory;
-  };
-
-  // static std::shared_ptr<SVGDOM> MakeFromData(Data& data) {
-  //   return Builder().make(data);
-  // }
+  static std::shared_ptr<SVGDOM> Make(const std::shared_ptr<Data>&,
+                                      std::shared_ptr<SVGFontManager>);
 
   /**
-     * Returns the root (outermost) SVG element.
-     */
+   * Returns the root SVG node.
+   */
   const std::shared_ptr<SVGSVG>& getRoot() const {
     return root;
   }
 
   /**
-     * Specify a "container size" for the SVG dom.
-     *
-     * This is used to resolve the initial viewport when the root SVG width/height are specified
-     * in relative units.
-     *
-     * If the root dimensions are in absolute units, then the container size has no effect since
-     * the initial viewport is fixed.
-     */
-  void setContainerSize(const Size&);
-
-  /**
-     * DEPRECATED: use getRoot()->intrinsicSize() to query the root element intrinsic size.
-     *
-     * Returns the SVG dom container size.
-     *
-     * If the client specified a container size via setContainerSize(), then the same size is
-     * returned.
-     *
-     * When unspecified by clients, this returns the intrinsic size of the root element, as defined
-     * by its width/height attributes.  If either width or height is specified in relative units
-     * (e.g. "100%"), then the corresponding intrinsic size dimension is zero.
-     */
-  const Size& containerSize() const;
-
-  // Returns the node with the given id, or nullptr if not found.
-  std::shared_ptr<SVGNode> findNodeById(const std::string& id);
-
+   * Renders the SVG to the provided canvas.
+   */
   void render(Canvas*);
 
-  /** Render the node with the given id as if it were the only child of the root. */
-  void renderNode(Canvas*, SkSVGPresentationContext&, const char* id) const;
+  /**
+   * Specify a "container size" for the SVG dom.
+   *
+   * This is used to resolve the initial viewport when the root SVG width/height are specified
+   * in relative units.
+   *
+   * If the root dimensions are in absolute units, then the container size has no effect since
+   * the initial viewport is fixed.
+   */
+  void setContainerSize(const Size&);
+
+  const Size& getContainerSize() const;
 
  private:
   SVGDOM(std::shared_ptr<SVGSVG>, SVGIDMapper&&, std::shared_ptr<SVGFontManager> fontManager);
@@ -110,8 +66,7 @@ class SVGDOM {
   const std::shared_ptr<SVGSVG> root;
   const std::shared_ptr<SVGFontManager> fontManager;
   const SVGIDMapper _nodeIDMapper;
-  Size _containerSize;
-
+  Size containerSize;
   std::shared_ptr<Picture> renderPicture;
 };
 }  // namespace tgfx

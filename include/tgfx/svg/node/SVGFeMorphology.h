@@ -24,12 +24,9 @@
 #include "tgfx/svg/node/SVGFe.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-// class SkSVGFilterContext;
-// class SVGRenderContext;
-
 namespace tgfx {
 
-class SkSVGFeMorphology : public SkSVGFe {
+class SVGFeMorphology : public SVGFe {
  public:
   struct Radius {
     SVGNumberType fX;
@@ -41,30 +38,28 @@ class SkSVGFeMorphology : public SkSVGFe {
     kDilate,
   };
 
-  static std::shared_ptr<SkSVGFeMorphology> Make() {
-    return std::shared_ptr<SkSVGFeMorphology>(new SkSVGFeMorphology());
+  static std::shared_ptr<SVGFeMorphology> Make() {
+    return std::shared_ptr<SVGFeMorphology>(new SVGFeMorphology());
   }
 
   SVG_ATTR(MorphOperator, Operator, Operator::kErode)
   SVG_ATTR(MorphRadius, Radius, Radius({0, 0}))
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeMorphology() : INHERITED(SVGTag::FeMorphology) {
+  SVGFeMorphology() : INHERITED(SVGTag::FeMorphology) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 
 }  // namespace tgfx

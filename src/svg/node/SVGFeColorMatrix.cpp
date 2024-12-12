@@ -19,15 +19,15 @@
 #include "tgfx/svg/node/SVGFeColorMatrix.h"
 #include <tuple>
 #include "core/utils/MathExtra.h"
+#include "svg/SVGAttributeParser.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 class SVGRenderContext;
 
 namespace tgfx {
 
-bool SkSVGFeColorMatrix::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeColorMatrix::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setType(SVGAttributeParser::parse<SVGFeColorMatrixType>("type", name, value)) ||
          this->setValues(SVGAttributeParser::parse<SVGFeColorMatrixValues>("values", name, value));
@@ -45,8 +45,7 @@ bool SVGAttributeParser::parse(SVGFeColorMatrixType* type) {
   return this->parseEnumMap(gTypeMap, type) && this->parseEOSToken();
 }
 
-#ifndef RENDER_SVG
-ColorMatrix SkSVGFeColorMatrix::makeMatrixForType() const {
+ColorMatrix SVGFeColorMatrix::makeMatrixForType() const {
   if (Values.empty() && Type != SVGFeColorMatrixType::LuminanceToAlpha) {
     return ColorMatrix();
   }
@@ -69,7 +68,7 @@ ColorMatrix SkSVGFeColorMatrix::makeMatrixForType() const {
   }
 }
 
-ColorMatrix SkSVGFeColorMatrix::MakeSaturate(SVGNumberType sat) {
+ColorMatrix SVGFeColorMatrix::MakeSaturate(SVGNumberType sat) {
   enum {
     kR_Scale = 0,
     kG_Scale = 6,
@@ -106,7 +105,7 @@ ColorMatrix SkSVGFeColorMatrix::MakeSaturate(SVGNumberType sat) {
   return matrix;
 }
 
-ColorMatrix SkSVGFeColorMatrix::MakeHueRotate(SVGNumberType degrees) {
+ColorMatrix SVGFeColorMatrix::MakeHueRotate(SVGNumberType degrees) {
   const float theta = DegreesToRadians(degrees);
   const SVGNumberType c = std::cos(theta);
   const SVGNumberType s = std::sin(theta);
@@ -140,14 +139,14 @@ constexpr float LUM_COEFF_R = 0.2126f;
 constexpr float LUM_COEFF_G = 0.7152f;
 constexpr float LUM_COEFF_B = 0.0722f;
 
-ColorMatrix SkSVGFeColorMatrix::MakeLuminanceToAlpha() {
+ColorMatrix SVGFeColorMatrix::MakeLuminanceToAlpha() {
   return ColorMatrix{0, 0, 0, 0, 0, 0,           0,           0,           0, 0,
                      0, 0, 0, 0, 0, LUM_COEFF_R, LUM_COEFF_G, LUM_COEFF_B, 0, 0};
 }
 
-std::shared_ptr<ImageFilter> SkSVGFeColorMatrix::onMakeImageFilter(
-    const SVGRenderContext&, const SkSVGFilterContext&) const {
+std::shared_ptr<ImageFilter> SVGFeColorMatrix::onMakeImageFilter(const SVGRenderContext&,
+                                                                 const SVGFilterContext&) const {
   return ImageFilter::ColorFilter(ColorFilter::Matrix(makeMatrixForType()));
 }
-#endif
+
 }  // namespace tgfx

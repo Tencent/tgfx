@@ -27,34 +27,32 @@
 namespace tgfx {
 
 class SkImageFilter;
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
-class SkSVGFeOffset : public SkSVGFe {
+class SVGFeOffset : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeOffset> Make() {
-    return std::shared_ptr<SkSVGFeOffset>(new SkSVGFeOffset());
+  static std::shared_ptr<SVGFeOffset> Make() {
+    return std::shared_ptr<SVGFeOffset>(new SVGFeOffset());
   }
 
   SVG_ATTR(Dx, SVGNumberType, SVGNumberType(0))
   SVG_ATTR(Dy, SVGNumberType, SVGNumberType(0))
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeOffset() : INHERITED(SVGTag::FeOffset) {
+  SVGFeOffset() : INHERITED(SVGTag::FeOffset) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 }  // namespace tgfx

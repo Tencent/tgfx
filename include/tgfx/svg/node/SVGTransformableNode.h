@@ -29,25 +29,22 @@ namespace tgfx {
 class SVGRenderContext;
 enum class SVGAttribute;
 
-class SkSVGTransformableNode : public SVGNode {
+class SVGTransformableNode : public SVGNode {
  public:
   void setTransform(const SVGTransformType& t) {
     fTransform = t;
   }
 
  protected:
-  SkSVGTransformableNode(SVGTag);
+  SVGTransformableNode(SVGTag);
 
-#ifndef RENDER_SVG
   bool onPrepareToRender(SVGRenderContext*) const override;
-#endif
+
   void onSetAttribute(SVGAttribute, const SVGValue&) override;
 
-#ifndef RENDER_SVG
   void mapToParent(Path*) const;
 
   void mapToParent(Rect*) const;
-#endif
 
  private:
   // FIXME: should be sparse

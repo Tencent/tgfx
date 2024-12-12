@@ -30,21 +30,19 @@ class SVGNode;
 class SVGRenderContext;
 enum class SVGTag;
 
-class SVGShape : public SkSVGTransformableNode {
+class SVGShape : public SVGTransformableNode {
  public:
   void appendChild(std::shared_ptr<SVGNode>) override;
 
  protected:
   explicit SVGShape(SVGTag);
 
-#ifndef RENDER_SVG
   void onRender(const SVGRenderContext&) const override;
 
   virtual void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const = 0;
-#endif
 
  private:
-  using INHERITED = SkSVGTransformableNode;
+  using INHERITED = SVGTransformableNode;
 };
 
 }  // namespace tgfx

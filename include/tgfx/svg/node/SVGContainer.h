@@ -28,36 +28,34 @@ namespace tgfx {
 
 class SVGRenderContext;
 
-class SkSVGContainer : public SkSVGTransformableNode {
+class SVGContainer : public SVGTransformableNode {
  public:
   void appendChild(std::shared_ptr<SVGNode>) override;
   const std::vector<std::shared_ptr<SVGNode>>& getChildren() const;
   bool hasChildren() const final;
 
  protected:
-  explicit SkSVGContainer(SVGTag);
-#ifndef RENDER_SVG
+  explicit SVGContainer(SVGTag);
+
   void onRender(const SVGRenderContext&) const override;
 
   Path onAsPath(const SVGRenderContext&) const override;
 
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-#endif
 
   template <typename NodeType, typename Func>
   void forEachChild(Func func) const {
-    for (const auto& child : fChildren) {
+    for (const auto& child : children) {
       if (child->tag() == NodeType::tag) {
         func(static_cast<const NodeType*>(child.get()));
       }
     }
   }
 
-  // TODO: convert remaining direct users to iterators, and make the container private.
-  std::vector<std::shared_ptr<SVGNode>> fChildren;
+  std::vector<std::shared_ptr<SVGNode>> children;
 
  private:
-  using INHERITED = SkSVGTransformableNode;
+  using INHERITED = SVGTransformableNode;
 };
 
 }  // namespace tgfx

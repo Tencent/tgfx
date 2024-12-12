@@ -23,14 +23,14 @@
 
 namespace tgfx {
 
-class SkSVGDefs : public SVGHiddenContainer {
+class SVGDefs : public SVGHiddenContainer {
  public:
-  static std::shared_ptr<SkSVGDefs> Make() {
-    return std::shared_ptr<SkSVGDefs>(new SkSVGDefs());
+  static std::shared_ptr<SVGDefs> Make() {
+    return std::shared_ptr<SVGDefs>(new SVGDefs());
   }
 
  private:
-  SkSVGDefs() : INHERITED(SVGTag::Defs) {
+  SVGDefs() : INHERITED(SVGTag::Defs) {
   }
 
   using INHERITED = SVGHiddenContainer;

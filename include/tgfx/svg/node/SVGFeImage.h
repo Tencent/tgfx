@@ -24,37 +24,35 @@
 #include "tgfx/svg/node/SVGFe.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
 namespace tgfx {
 
-class SkSVGFeImage : public SkSVGFe {
+class SVGFeImage : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeImage> Make() {
-    return std::shared_ptr<SkSVGFeImage>(new SkSVGFeImage());
+  static std::shared_ptr<SVGFeImage> Make() {
+    return std::shared_ptr<SVGFeImage>(new SVGFeImage());
   }
 
   SVG_ATTR(Href, SVGIRI, SVGIRI())
   SVG_ATTR(PreserveAspectRatio, SVGPreserveAspectRatio, SVGPreserveAspectRatio())
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {};
   }
 
  private:
-  SkSVGFeImage() : INHERITED(SVGTag::FeImage) {
+  SVGFeImage() : INHERITED(SVGTag::FeImage) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 
 }  // namespace tgfx

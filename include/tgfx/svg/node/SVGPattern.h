@@ -27,10 +27,10 @@
 
 namespace tgfx {
 
-class SkSVGPattern final : public SVGHiddenContainer {
+class SVGPattern final : public SVGHiddenContainer {
  public:
-  static std::shared_ptr<SkSVGPattern> Make() {
-    return std::shared_ptr<SkSVGPattern>(new SkSVGPattern());
+  static std::shared_ptr<SVGPattern> Make() {
+    return std::shared_ptr<SVGPattern>(new SVGPattern());
   }
 
   SVG_ATTR(Href, SVGIRI, SVGIRI())
@@ -45,13 +45,11 @@ class SkSVGPattern final : public SVGHiddenContainer {
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse))
 
  protected:
-  SkSVGPattern();
+  SVGPattern();
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   bool onAsPaint(const SVGRenderContext&, Paint*) const override;
-#endif
 
  private:
   struct PatternAttributes {
@@ -59,10 +57,8 @@ class SkSVGPattern final : public SVGHiddenContainer {
     std::optional<SVGTransformType> patternTransform;
   };
 
-#ifndef RENDER_SVG
-  const SkSVGPattern* resolveHref(const SVGRenderContext&, PatternAttributes*) const;
-  const SkSVGPattern* hrefTarget(const SVGRenderContext&) const;
-#endif
+  const SVGPattern* resolveHref(const SVGRenderContext&, PatternAttributes*) const;
+  const SVGPattern* hrefTarget(const SVGRenderContext&) const;
 
   using INHERITED = SVGHiddenContainer;
 };

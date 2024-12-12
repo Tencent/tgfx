@@ -24,13 +24,13 @@
 
 namespace tgfx {
 
-class SkSVGFilterContext;
+class SVGFilterContext;
 class SVGRenderContext;
 
-class SkSVGFeComposite final : public SkSVGFe {
+class SVGFeComposite final : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeComposite> Make() {
-    return std::shared_ptr<SkSVGFeComposite>(new SkSVGFeComposite());
+  static std::shared_ptr<SVGFeComposite> Make() {
+    return std::shared_ptr<SVGFeComposite>(new SVGFeComposite());
   }
 
   SVG_ATTR(In2, SVGFeInputType, SVGFeInputType())
@@ -45,21 +45,17 @@ class SkSVGFeComposite final : public SkSVGFe {
     return {this->getIn(), this->getIn2()};
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+
+  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
+                                                 const SVGFilterContext&) const override;
 
  private:
-  SkSVGFeComposite() : INHERITED(SVGTag::FeComposite) {
+  SVGFeComposite() : INHERITED(SVGTag::FeComposite) {
   }
 
-  using INHERITED = SkSVGFe;
-
-#ifndef RENDER_SVG
- protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-
- private:
   static BlendMode BlendModeForOperator(SVGFeCompositeOperator);
-#endif
+
+  using INHERITED = SVGFe;
 };
 }  // namespace tgfx

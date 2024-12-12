@@ -25,10 +25,10 @@
 
 namespace tgfx {
 
-class SkSVGMask final : public SVGHiddenContainer {
+class SVGMask final : public SVGHiddenContainer {
  public:
-  static std::shared_ptr<SkSVGMask> Make() {
-    return std::shared_ptr<SkSVGMask>(new SkSVGMask());
+  static std::shared_ptr<SVGMask> Make() {
+    return std::shared_ptr<SVGMask>(new SVGMask());
   }
 
   SVG_OPTIONAL_ATTR(X, SVGLength)
@@ -44,16 +44,14 @@ class SkSVGMask final : public SVGHiddenContainer {
  private:
   friend class SVGRenderContext;
 
-  SkSVGMask() : INHERITED(SVGTag::Mask) {
+  SVGMask() : INHERITED(SVGTag::Mask) {
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   Rect bounds(const SVGRenderContext&) const;
 
   void renderMask(const SVGRenderContext&) const;
-#endif
 
   using INHERITED = SVGHiddenContainer;
 };

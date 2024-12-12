@@ -23,54 +23,14 @@
 #include <cstdint>
 #include <tuple>
 #include "core/utils/Log.h"
-#include "tgfx/svg/SVGAttributeParser.h"
+#include "svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
 class SVGRenderContext;
 
-#ifdef RENDER_SVG
-sk_sp<SkImageFilter> SkSVGFeComponentTransfer::onMakeImageFilter(
-    const SVGRenderContext& ctx, const SkSVGFilterContext& fctx) const {
-  std::vector<uint8_t> a_tbl, b_tbl, g_tbl, r_tbl;
-
-  for (const auto& child : fChildren) {
-    switch (child->tag()) {
-      case SkSVGTag::kFeFuncA:
-        a_tbl = static_cast<const SkSVGFeFunc*>(child.get())->getTable();
-        break;
-      case SkSVGTag::kFeFuncB:
-        b_tbl = static_cast<const SkSVGFeFunc*>(child.get())->getTable();
-        break;
-      case SkSVGTag::kFeFuncG:
-        g_tbl = static_cast<const SkSVGFeFunc*>(child.get())->getTable();
-        break;
-      case SkSVGTag::kFeFuncR:
-        r_tbl = static_cast<const SkSVGFeFunc*>(child.get())->getTable();
-        break;
-      default:
-        break;
-    }
-  }
-  SkASSERT(a_tbl.empty() || a_tbl.size() == 256);
-  SkASSERT(b_tbl.empty() || b_tbl.size() == 256);
-  SkASSERT(g_tbl.empty() || g_tbl.size() == 256);
-  SkASSERT(r_tbl.empty() || r_tbl.size() == 256);
-
-  const SkRect cropRect = this->resolveFilterSubregion(ctx, fctx);
-  const sk_sp<SkImageFilter> input =
-      fctx.resolveInput(ctx, this->getIn(), this->resolveColorspace(ctx, fctx));
-
-  const auto cf = SkColorFilters::TableARGB(
-      a_tbl.empty() ? nullptr : a_tbl.data(), r_tbl.empty() ? nullptr : r_tbl.data(),
-      g_tbl.empty() ? nullptr : g_tbl.data(), b_tbl.empty() ? nullptr : b_tbl.data());
-
-  return SkImageFilters::ColorFilter(std::move(cf), std::move(input), cropRect);
-}
-#endif
-
-std::vector<uint8_t> SkSVGFeFunc::getTable() const {
+std::vector<uint8_t> SVGFeFunc::getTable() const {
   // https://www.w3.org/TR/SVG11/filters.html#feComponentTransferTypeAttribute
   const auto make_linear = [this]() -> std::vector<uint8_t> {
     std::vector<uint8_t> tbl(256);
@@ -152,20 +112,18 @@ std::vector<uint8_t> SkSVGFeFunc::getTable() const {
     case SVGFeFuncType::Gamma:
       return make_gamma();
   }
-
-  //   SkUNREACHABLE;
 }
 
-bool SkSVGFeFunc::parseAndSetAttribute(const char* name, const char* val) {
-  return INHERITED::parseAndSetAttribute(name, val) ||
-         this->setAmplitude(SVGAttributeParser::parse<SVGNumberType>("amplitude", name, val)) ||
-         this->setExponent(SVGAttributeParser::parse<SVGNumberType>("exponent", name, val)) ||
-         this->setIntercept(SVGAttributeParser::parse<SVGNumberType>("intercept", name, val)) ||
-         this->setOffset(SVGAttributeParser::parse<SVGNumberType>("offset", name, val)) ||
-         this->setSlope(SVGAttributeParser::parse<SVGNumberType>("slope", name, val)) ||
+bool SVGFeFunc::parseAndSetAttribute(const std::string& name, const std::string& value) {
+  return INHERITED::parseAndSetAttribute(name, value) ||
+         this->setAmplitude(SVGAttributeParser::parse<SVGNumberType>("amplitude", name, value)) ||
+         this->setExponent(SVGAttributeParser::parse<SVGNumberType>("exponent", name, value)) ||
+         this->setIntercept(SVGAttributeParser::parse<SVGNumberType>("intercept", name, value)) ||
+         this->setOffset(SVGAttributeParser::parse<SVGNumberType>("offset", name, value)) ||
+         this->setSlope(SVGAttributeParser::parse<SVGNumberType>("slope", name, value)) ||
          this->setTableValues(
-             SVGAttributeParser::parse<std::vector<SVGNumberType>>("tableValues", name, val)) ||
-         this->setType(SVGAttributeParser::parse<SVGFeFuncType>("type", name, val));
+             SVGAttributeParser::parse<std::vector<SVGNumberType>>("tableValues", name, value)) ||
+         this->setType(SVGAttributeParser::parse<SVGFeFuncType>("type", name, value));
 }
 
 template <>

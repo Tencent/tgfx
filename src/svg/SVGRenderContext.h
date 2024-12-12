@@ -34,8 +34,8 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGAttribute.h"
+#include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGFontManager.h"
-#include "tgfx/svg/SVGIDMapper.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
@@ -147,10 +147,10 @@ class SVGLengthContext {
   std::optional<SVGObjectBoundingBoxUnits> patternUnit;
 };
 
-struct SkSVGPresentationContext {
-  SkSVGPresentationContext();
-  SkSVGPresentationContext(const SkSVGPresentationContext&) = default;
-  SkSVGPresentationContext& operator=(const SkSVGPresentationContext&) = default;
+struct SVGPresentationContext {
+  SVGPresentationContext();
+  SVGPresentationContext(const SVGPresentationContext&) = default;
+  SVGPresentationContext& operator=(const SVGPresentationContext&) = default;
 
   const std::unordered_map<std::string, SVGColorType>* _namedColors = nullptr;
   // Inherited presentation attributes, computed for the current node.
@@ -166,7 +166,7 @@ class SVGRenderContext {
   };
 
   SVGRenderContext(Context*, Canvas*, const std::shared_ptr<SVGFontManager>&, const SVGIDMapper&,
-                   const SVGLengthContext&, const SkSVGPresentationContext&, const OBBScope&,
+                   const SVGLengthContext&, const SVGPresentationContext&, const OBBScope&,
                    const Matrix& matrix);
   SVGRenderContext(const SVGRenderContext&);
   SVGRenderContext(const SVGRenderContext&, Canvas*);
@@ -185,7 +185,7 @@ class SVGRenderContext {
     return _lengthContext.writable();
   }
 
-  const SkSVGPresentationContext& presentationContext() const {
+  const SVGPresentationContext& presentationContext() const {
     return *_presentationContext;
   }
 
@@ -258,7 +258,7 @@ class SVGRenderContext {
   std::shared_ptr<SVGFontManager> fontManager;
   const SVGIDMapper& nodeIDMapper;
   CopyOnWrite<SVGLengthContext> _lengthContext;
-  CopyOnWrite<SkSVGPresentationContext> _presentationContext;
+  CopyOnWrite<SVGPresentationContext> _presentationContext;
   Canvas* renderCanvas;
 
   Recorder recorder;

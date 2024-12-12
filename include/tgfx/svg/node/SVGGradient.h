@@ -30,7 +30,7 @@
 
 namespace tgfx {
 
-class SkSVGGradient : public SVGHiddenContainer {
+class SVGGradient : public SVGHiddenContainer {
  public:
   SVG_ATTR(Href, SVGIRI, SVGIRI())
   SVG_ATTR(GradientTransform, SVGTransformType, SVGTransformType(Matrix::I()))
@@ -39,10 +39,10 @@ class SkSVGGradient : public SVGHiddenContainer {
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox))
 
  protected:
-  explicit SkSVGGradient(SVGTag t) : INHERITED(t) {
+  explicit SVGGradient(SVGTag t) : INHERITED(t) {
   }
 
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
   bool onAsPaint(const SVGRenderContext&, Paint*) const final;
 
@@ -52,7 +52,7 @@ class SkSVGGradient : public SVGHiddenContainer {
 
  private:
   void collectColorStops(const SVGRenderContext&, std::vector<Color>&, std::vector<float>&) const;
-  Color resolveStopColor(const SVGRenderContext&, const SkSVGStop&) const;
+  Color resolveStopColor(const SVGRenderContext&, const SVGStop&) const;
 
   using INHERITED = SVGHiddenContainer;
 };

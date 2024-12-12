@@ -19,20 +19,19 @@
 #include "tgfx/svg/node/SVGRect.h"
 #include <optional>
 #include "SVGRectPriv.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
-#include "tgfx/svg/SVGAttributeParser.h"
-#include "tgfx/svg/SVGRenderContext.h"
 
 namespace tgfx {
 
-SkSVGRect::SkSVGRect() : INHERITED(SVGTag::Rect) {
+SVGRect::SVGRect() : INHERITED(SVGTag::Rect) {
 }
 
-bool SkSVGRect::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGRect::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setX(SVGAttributeParser::parse<SVGLength>("x", n, v)) ||
          this->setY(SVGAttributeParser::parse<SVGLength>("y", n, v)) ||
@@ -42,7 +41,6 @@ bool SkSVGRect::parseAndSetAttribute(const char* n, const char* v) {
          this->setRy(SVGAttributeParser::parse<SVGLength>("ry", n, v));
 }
 
-#ifndef RENDER_SVG
 std::tuple<float, float> ResolveOptionalRadii(const std::optional<SVGLength>& opt_rx,
                                               const std::optional<SVGLength>& opt_ry,
                                               const SVGLengthContext& lctx) {
@@ -73,7 +71,7 @@ std::tuple<float, float> ResolveOptionalRadii(const std::optional<SVGLength>& op
   return {opt_rx.has_value() ? rx : ry, opt_ry.has_value() ? ry : rx};
 }
 
-RRect SkSVGRect::resolve(const SVGLengthContext& lctx) const {
+RRect SVGRect::resolve(const SVGLengthContext& lctx) const {
   const auto rect = lctx.resolveRect(X, Y, Width, Height);
   const auto [rx, ry] = ResolveOptionalRadii(Rx, Ry, lctx);
 
@@ -91,29 +89,8 @@ RRect SkSVGRect::resolve(const SVGLengthContext& lctx) const {
   return rrect;
 }
 
-// void SkSVGRect::onRender(const SVGRenderContext& ctx) const {
-//   const auto fillType = ctx.presentationContext().fInherited.fFillRule->asFillType();
-
-//   auto lengthCtx = ctx.lengthContext();
-//   Size rectSize = Size::Make(lengthCtx.resolve(fWidth, SkSVGLengthContext::LengthType::kHorizontal),
-//                              lengthCtx.resolve(fHeight, SkSVGLengthContext::LengthType::kVertical));
-//   lengthCtx.setViewPort(rectSize);
-//   SVGRenderContext paintCtx(ctx, ctx.canvas(), lengthCtx);
-//   const auto fillPaint = paintCtx.fillPaint();
-//   const auto strokePaint = paintCtx.strokePaint();
-
-//   // TODO: this approach forces duplicate geometry resolution in onDraw(); refactor to avoid.
-//   if (fillPaint.has_value()) {
-//     this->onDraw(ctx.canvas(), ctx.lengthContext(), fillPaint.value(), fillType);
-//   }
-
-//   if (strokePaint.has_value()) {
-//     this->onDraw(ctx.canvas(), ctx.lengthContext(), strokePaint.value(), fillType);
-//   }
-// }
-
-void SkSVGRect::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
-                       PathFillType) const {
+void SVGRect::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
+                     PathFillType) const {
   auto rect = this->resolve(lctx);
   auto offset = Point::Make(rect.rect.left, rect.rect.top);
   rect.rect = rect.rect.makeOffset(-offset.x, -offset.y);
@@ -123,7 +100,7 @@ void SkSVGRect::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint
   canvas->restore();
 }
 
-Path SkSVGRect::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGRect::onAsPath(const SVGRenderContext& ctx) const {
   Path path;
   path.addRRect(this->resolve(ctx.lengthContext()));
   this->mapToParent(&path);
@@ -131,8 +108,8 @@ Path SkSVGRect::onAsPath(const SVGRenderContext& ctx) const {
   return path;
 }
 
-Rect SkSVGRect::onObjectBoundingBox(const SVGRenderContext& ctx) const {
+Rect SVGRect::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   return ctx.lengthContext().resolveRect(X, Y, Width, Height);
 }
-#endif
+
 }  // namespace tgfx

@@ -25,21 +25,21 @@
 
 namespace tgfx {
 
-class SkSVGStop : public SVGHiddenContainer {
+class SVGStop : public SVGHiddenContainer {
  public:
   static constexpr SVGTag tag = SVGTag::Stop;
 
-  static std::shared_ptr<SkSVGStop> Make() {
-    return std::shared_ptr<SkSVGStop>(new SkSVGStop());
+  static std::shared_ptr<SVGStop> Make() {
+    return std::shared_ptr<SVGStop>(new SVGStop());
   }
 
   SVG_ATTR(Offset, SVGLength, SVGLength(0, SVGLength::Unit::Percentage))
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGStop();
+  SVGStop();
 
   using INHERITED = SVGHiddenContainer;
 };

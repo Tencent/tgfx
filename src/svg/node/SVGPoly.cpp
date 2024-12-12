@@ -17,15 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGPoly.h"
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-SkSVGPoly::SkSVGPoly(SVGTag t) : INHERITED(t) {
+SVGPoly::SVGPoly(SVGTag t) : INHERITED(t) {
 }
 
-bool SkSVGPoly::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGPoly::parseAndSetAttribute(const std::string& n, const std::string& v) {
   if (INHERITED::parseAndSetAttribute(n, v)) {
     return true;
   }
@@ -41,15 +42,14 @@ bool SkSVGPoly::parseAndSetAttribute(const char* n, const char* v) {
   return false;
 }
 
-#ifndef RENDER_SVG
-void SkSVGPoly::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
-                       PathFillType fillType) const {
+void SVGPoly::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
+                     PathFillType fillType) const {
   // the passed fillType follows inheritance rules and needs to be applied at draw time.
   fPath.setFillType(fillType);
   canvas->drawPath(fPath, paint);
 }
 
-Path SkSVGPoly::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGPoly::onAsPath(const SVGRenderContext& ctx) const {
   Path path = fPath;
 
   // clip-rule can be inherited and needs to be applied at clip time.
@@ -59,8 +59,8 @@ Path SkSVGPoly::onAsPath(const SVGRenderContext& ctx) const {
   return path;
 }
 
-Rect SkSVGPoly::onObjectBoundingBox(const SVGRenderContext&) const {
+Rect SVGPoly::onObjectBoundingBox(const SVGRenderContext&) const {
   return fPath.getBounds();
 }
-#endif
+
 }  // namespace tgfx

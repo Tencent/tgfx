@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGSVG.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGTypes.h"
@@ -24,7 +25,6 @@
 
 namespace tgfx {
 
-#ifndef RENDER_SVG
 void SVGSVG::renderNode(const SVGRenderContext& ctx, const SVGIRI& iri) const {
   SVGRenderContext localContext(ctx, this);
   auto node = localContext.findNodeById(iri);
@@ -86,7 +86,6 @@ Size SVGSVG::intrinsicSize(const SVGLengthContext& lctx) const {
   return Size::Make(lctx.resolve(Width, SVGLengthContext::LengthType::Horizontal),
                     lctx.resolve(Height, SVGLengthContext::LengthType::Vertical));
 }
-#endif
 
 void SVGSVG::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   if (type != Type::kInner && type != Type::kRoot) return;

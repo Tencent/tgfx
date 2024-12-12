@@ -17,37 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGFeLightSource.h"
-#include <cmath>
-#include "tgfx/svg/SVGAttributeParser.h"
+#include "svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-// SkPoint3 SkSVGFeDistantLight::computeDirection() const {
-//   // Computing direction from azimuth+elevation is two 3D rotations:
-//   //  - Rotate [1,0,0] about y axis first (elevation)
-//   //  - Rotate result about z axis (azimuth)
-//   // Which is just the first column vector in the 3x3 matrix Rz*Ry.
-//   const float azimuthRad = SkDegreesToRadians(fAzimuth);
-//   const float elevationRad = SkDegreesToRadians(fElevation);
-//   const float sinAzimuth = sinf(azimuthRad), cosAzimuth = cosf(azimuthRad);
-//   const float sinElevation = sinf(elevationRad), cosElevation = cosf(elevationRad);
-//   return SkPoint3::Make(cosAzimuth * cosElevation, sinAzimuth * cosElevation, sinElevation);
-// }
-
-bool SkSVGFeDistantLight::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGFeDistantLight::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setAzimuth(SVGAttributeParser::parse<SVGNumberType>("azimuth", n, v)) ||
          this->setElevation(SVGAttributeParser::parse<SVGNumberType>("elevation", n, v));
 }
 
-bool SkSVGFePointLight::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGFePointLight::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setX(SVGAttributeParser::parse<SVGNumberType>("x", n, v)) ||
          this->setY(SVGAttributeParser::parse<SVGNumberType>("y", n, v)) ||
          this->setZ(SVGAttributeParser::parse<SVGNumberType>("z", n, v));
 }
 
-bool SkSVGFeSpotLight::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGFeSpotLight::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setX(SVGAttributeParser::parse<SVGNumberType>("x", n, v)) ||
          this->setY(SVGAttributeParser::parse<SVGNumberType>("y", n, v)) ||

@@ -17,42 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGFeMerge.h"
+#include "svg/SVGAttributeParser.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
 // class SVGRenderContext;
 
-bool SkSVGFeMergeNode::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeMergeNode::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setIn(SVGAttributeParser::parse<SVGFeInputType>("in", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<ImageFilter> SkSVGFeMerge::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SkSVGFilterContext& /*fctx*/) const {
-  // const SkSVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
-
-  // skia_private::STArray<8, sk_sp<SkImageFilter>> merge_node_filters;
-  // merge_node_filters.reserve(fChildren.size());
-
-  // this->forEachChild<SkSVGFeMergeNode>([&](const SkSVGFeMergeNode* child) {
-  //   merge_node_filters.push_back(fctx.resolveInput(ctx, child->getIn(), colorspace));
-  // });
-
-  // return SkImageFilters::Merge(merge_node_filters.data(), merge_node_filters.size(),
-  //                              this->resolveFilterSubregion(ctx, fctx));
+std::shared_ptr<ImageFilter> SVGFeMerge::onMakeImageFilter(const SVGRenderContext& /*ctx*/,
+                                                           const SVGFilterContext& /*fctx*/) const {
+  //TODO (YGAurora): Implement this
   return nullptr;
 }
-#endif
 
-std::vector<SVGFeInputType> SkSVGFeMerge::getInputs() const {
+std::vector<SVGFeInputType> SVGFeMerge::getInputs() const {
   std::vector<SVGFeInputType> inputs;
-  inputs.reserve(fChildren.size());
+  inputs.reserve(children.size());
 
-  this->forEachChild<SkSVGFeMergeNode>(
-      [&](const SkSVGFeMergeNode* child) { inputs.push_back(child->getIn()); });
+  this->forEachChild<SVGFeMergeNode>(
+      [&](const SVGFeMergeNode* child) { inputs.push_back(child->getIn()); });
 
   return inputs;
 }

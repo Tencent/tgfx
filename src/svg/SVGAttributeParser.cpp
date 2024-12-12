@@ -16,29 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/SVGAttributeParser.h"
-#include <math.h>
+#include "SVGAttributeParser.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <utility>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "svg/SVGParse.h"
 #include "tgfx/core/Color.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Point.h"
-#include "tgfx/core/Rect.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
-#include "tgfx/svg/SVGParse.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace {
-
-// TODO: these should be shared with SkParse.cpp
 
 inline bool is_between(char c, char min, char max) {
   ASSERT(min <= max);
@@ -65,14 +58,13 @@ inline bool is_hex(char c) {
 
 namespace tgfx {
 
-SVGAttributeParser::SVGAttributeParser(const char attributeString[])
-    // TODO: need actual UTF-8 with length.
-    : fCurPos(attributeString), fEndPos(fCurPos + strlen(attributeString)) {
+SVGAttributeParser::SVGAttributeParser(std::string attributeString)
+    : fCurPos(attributeString.data()), fEndPos(fCurPos + attributeString.size()) {
 }
 
 template <typename F>
 inline bool SVGAttributeParser::advanceWhile(F f) {
-  auto initial = fCurPos;
+  const auto* initial = fCurPos;
   while (fCurPos < fEndPos && f(*fCurPos)) {
     fCurPos++;
   }
@@ -356,7 +348,9 @@ bool SVGAttributeParser::parseRGBColorToken(Color* c) {
   return this->parseParenthesized(
       "rgb",
       [this](Color* c) -> bool {
-        int32_t r, g, b;
+        int32_t r = 0;
+        int32_t g = 0;
+        int32_t b = 0;
         if (this->parseColorComponentToken(&r) && this->parseSepToken() &&
             this->parseColorComponentToken(&g) && this->parseSepToken() &&
             this->parseColorComponentToken(&b)) {
@@ -374,7 +368,10 @@ bool SVGAttributeParser::parseRGBAColorToken(Color* c) {
   return this->parseParenthesized(
       "rgba",
       [this](Color* c) -> bool {
-        int32_t r, g, b, a;
+        int32_t r = 0;
+        int32_t g = 0;
+        int32_t b = 0;
+        int32_t a = 0;
         if (this->parseColorComponentToken(&r) && this->parseSepToken() &&
             this->parseColorComponentToken(&g) && this->parseSepToken() &&
             this->parseColorComponentToken(&b) && this->parseSepToken() &&
@@ -523,7 +520,7 @@ bool SVGAttributeParser::parse(SVGNumberType* number) {
 
   float s;
   if (this->parseScalarToken(&s)) {
-    *number = SVGNumberType(s);
+    *number = static_cast<SVGNumberType>(s);
     // consume trailing separators
     this->parseSepToken();
     return true;
@@ -570,7 +567,10 @@ bool SVGAttributeParser::parse(SVGLength* length) {
 
 // https://www.w3.org/TR/SVG11/coords.html#ViewBoxAttribute
 bool SVGAttributeParser::parseViewBox(SVGViewBoxType* vb) {
-  float x, y, w, h;
+  float x = 0.0f;
+  float y = 0.0f;
+  float w = 0.0f;
+  float h = 0.0f;
   this->parseWSToken();
 
   bool parsedValue = false;
@@ -619,7 +619,7 @@ bool SVGAttributeParser::parseMatrixToken(Matrix* matrix) {
       [this](Matrix* m) -> bool {
         float scalars[6];
         for (int i = 0; i < 6; ++i) {
-          if (!(this->parseScalarToken(scalars + i) && (i > 4 || this->parseSepToken()))) {
+          if (!this->parseScalarToken(scalars + i) || (i <= 4 && !this->parseSepToken())) {
             return false;
           }
         }
@@ -634,7 +634,8 @@ bool SVGAttributeParser::parseTranslateToken(Matrix* matrix) {
   return this->parseParenthesized(
       "translate",
       [this](Matrix* m) -> bool {
-        float tx = 0.0, ty = 0.0;
+        float tx = 0.0;
+        float ty = 0.0;
         this->parseWSToken();
         if (!this->parseScalarToken(&tx)) {
           return false;
@@ -654,7 +655,8 @@ bool SVGAttributeParser::parseScaleToken(Matrix* matrix) {
   return this->parseParenthesized(
       "scale",
       [this](Matrix* m) -> bool {
-        float sx = 0.0, sy = 0.0;
+        float sx = 0.0;
+        float sy = 0.0;
         if (!this->parseScalarToken(&sx)) {
           return false;
         }

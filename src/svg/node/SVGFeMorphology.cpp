@@ -18,49 +18,35 @@
 
 #include "tgfx/svg/node/SVGFeMorphology.h"
 #include <tuple>
-#include "tgfx/svg/SVGAttributeParser.h"
+#include "svg/SVGAttributeParser.h"
 
 namespace tgfx {
 
-bool SkSVGFeMorphology::parseAndSetAttribute(const char* name, const char* value) {
+bool SVGFeMorphology::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setMorphOperator(
-             SVGAttributeParser::parse<SkSVGFeMorphology::Operator>("operator", name, value)) ||
+             SVGAttributeParser::parse<SVGFeMorphology::Operator>("operator", name, value)) ||
          this->setMorphRadius(
-             SVGAttributeParser::parse<SkSVGFeMorphology::Radius>("radius", name, value));
+             SVGAttributeParser::parse<SVGFeMorphology::Radius>("radius", name, value));
 }
 
-#ifndef RENDER_SVG
-std::shared_ptr<ImageFilter> SkSVGFeMorphology::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SkSVGFilterContext& /*fctx*/) const {
-  // const SkRect cropRect = this->resolveFilterSubregion(ctx, fctx);
-  // const SkSVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
-  // sk_sp<SkImageFilter> input = fctx.resolveInput(ctx, this->getIn(), colorspace);
-
-  // const auto r =
-  //     SkV2{fRadius.fX, fRadius.fY} * ctx.transformForCurrentOBB(fctx.primitiveUnits()).scale;
-  // switch (fOperator) {
-  //   case Operator::kErode:
-  //     return SkImageFilters::Erode(r.x, r.y, input, cropRect);
-  //   case Operator::kDilate:
-  //     return SkImageFilters::Dilate(r.x, r.y, input, cropRect);
-  // }
+std::shared_ptr<ImageFilter> SVGFeMorphology::onMakeImageFilter(
+    const SVGRenderContext& /*ctx*/, const SVGFilterContext& /*fctx*/) const {
   return nullptr;
 }
-#endif
 
 template <>
-bool SVGAttributeParser::parse<SkSVGFeMorphology::Operator>(SkSVGFeMorphology::Operator* op) {
-  static constexpr std::tuple<const char*, SkSVGFeMorphology::Operator> gMap[] = {
-      {"dilate", SkSVGFeMorphology::Operator::kDilate},
-      {"erode", SkSVGFeMorphology::Operator::kErode},
+bool SVGAttributeParser::parse<SVGFeMorphology::Operator>(SVGFeMorphology::Operator* op) {
+  static constexpr std::tuple<const char*, SVGFeMorphology::Operator> gMap[] = {
+      {"dilate", SVGFeMorphology::Operator::kDilate},
+      {"erode", SVGFeMorphology::Operator::kErode},
   };
 
   return this->parseEnumMap(gMap, op) && this->parseEOSToken();
 }
 
 template <>
-bool SVGAttributeParser::parse<SkSVGFeMorphology::Radius>(SkSVGFeMorphology::Radius* radius) {
+bool SVGAttributeParser::parse<SVGFeMorphology::Radius>(SVGFeMorphology::Radius* radius) {
   std::vector<SVGNumberType> values;
   if (!this->parse(&values)) {
     return false;

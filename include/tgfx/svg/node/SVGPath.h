@@ -27,27 +27,25 @@
 
 namespace tgfx {
 
-class SkSVGPath final : public SVGShape {
+class SVGPath final : public SVGShape {
  public:
-  static std::shared_ptr<SkSVGPath> Make() {
-    return std::shared_ptr<SkSVGPath>(new SkSVGPath());
+  static std::shared_ptr<SVGPath> Make() {
+    return std::shared_ptr<SVGPath>(new SVGPath());
   }
 
   SVG_ATTR(ShapePath, Path, Path())
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
 
   Path onAsPath(const SVGRenderContext&) const override;
 
   Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-#endif
 
  private:
-  SkSVGPath();
+  SVGPath();
 
   using INHERITED = SVGShape;
 };

@@ -29,8 +29,6 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 
-// #define RENDER_SVG
-
 namespace tgfx {
 
 using SVGColorType = Color;

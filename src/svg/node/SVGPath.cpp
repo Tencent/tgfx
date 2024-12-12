@@ -18,18 +18,19 @@
 
 #include "tgfx/svg/node/SVGPath.h"
 #include <memory>
+#include "svg/SVGAttributeParser.h"
+#include "svg/SVGParse.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/SVGAttributeParser.h"
-#include "tgfx/svg/SVGParse.h"
 
 namespace tgfx {
 
-SkSVGPath::SkSVGPath() : INHERITED(SVGTag::Path) {
+SVGPath::SVGPath() : INHERITED(SVGTag::Path) {
 }
 
-bool SkSVGPath::parseAndSetAttribute(const char* n, const char* v) {
+bool SVGPath::parseAndSetAttribute(const std::string& n, const std::string& v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setShapePath(SVGAttributeParser::parse<Path>("d", n, v));
 }
@@ -43,16 +44,15 @@ bool SVGAttributeParser::parse<Path>(Path* path) {
   return success;
 }
 
-#ifndef RENDER_SVG
-void SkSVGPath::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
-                       PathFillType fillType) const {
+void SVGPath::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
+                     PathFillType fillType) const {
   // the passed fillType follows inheritance rules and needs to be applied at draw time.
   Path path = ShapePath;  // Note: point and verb data are CoW
   path.setFillType(fillType);
   canvas->drawPath(path, paint);
 }
 
-Path SkSVGPath::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGPath::onAsPath(const SVGRenderContext& ctx) const {
   Path path = ShapePath;
   // clip-rule can be inherited and needs to be applied at clip time.
   path.setFillType(ctx.presentationContext()._inherited.ClipRule->asFillType());
@@ -60,10 +60,8 @@ Path SkSVGPath::onAsPath(const SVGRenderContext& ctx) const {
   return path;
 }
 
-Rect SkSVGPath::onObjectBoundingBox(const SVGRenderContext&) const {
+Rect SVGPath::onObjectBoundingBox(const SVGRenderContext&) const {
   return ShapePath.getBounds();
-  //TODO (YG): Implement this
-  // return fPath.computeTightBounds();
+  //TODO (YGAurora): Implement thigh bounds computation
 }
-#endif
 }  // namespace tgfx

@@ -25,52 +25,47 @@
 #include "tgfx/svg/node/SVGHiddenContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-// class SkSVGFilterContext;
-// class SVGRenderContext;
-
 namespace tgfx {
 
 // https://www.w3.org/TR/SVG11/filters.html#feMergeNodeElement
-class SkSVGFeMergeNode : public SVGHiddenContainer {
+class SVGFeMergeNode : public SVGHiddenContainer {
  public:
   static constexpr SVGTag tag = SVGTag::FeMergeNode;
 
-  static std::shared_ptr<SkSVGFeMergeNode> Make() {
-    return std::shared_ptr<SkSVGFeMergeNode>(new SkSVGFeMergeNode());
+  static std::shared_ptr<SVGFeMergeNode> Make() {
+    return std::shared_ptr<SVGFeMergeNode>(new SVGFeMergeNode());
   }
 
   SVG_ATTR(In, SVGFeInputType, SVGFeInputType())
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
  private:
-  SkSVGFeMergeNode() : INHERITED(tag) {
+  SVGFeMergeNode() : INHERITED(tag) {
   }
 
   using INHERITED = SVGHiddenContainer;
 };
 
 // https://www.w3.org/TR/SVG11/filters.html#feMergeElement
-class SkSVGFeMerge : public SkSVGFe {
+class SVGFeMerge : public SVGFe {
  public:
-  static std::shared_ptr<SkSVGFeMerge> Make() {
-    return std::shared_ptr<SkSVGFeMerge>(new SkSVGFeMerge());
+  static std::shared_ptr<SVGFeMerge> Make() {
+    return std::shared_ptr<SVGFeMerge>(new SVGFeMerge());
   }
 
  protected:
-#ifndef RENDER_SVG
   std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SkSVGFilterContext&) const override;
-#endif
+                                                 const SVGFilterContext&) const override;
 
   std::vector<SVGFeInputType> getInputs() const override;
 
  private:
-  SkSVGFeMerge() : INHERITED(SVGTag::FeMerge) {
+  SVGFeMerge() : INHERITED(SVGTag::FeMerge) {
   }
 
-  using INHERITED = SkSVGFe;
+  using INHERITED = SVGFe;
 };
 
 }  // namespace tgfx

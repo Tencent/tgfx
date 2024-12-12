@@ -41,9 +41,8 @@ class SVGCircle final : public SVGShape {
   SVG_ATTR(R, SVGLength, SVGLength(0))
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
 
   Path onAsPath(const SVGRenderContext&) const override;
@@ -53,7 +52,6 @@ class SVGCircle final : public SVGShape {
  private:
   // resolve and return the center and radius values
   std::tuple<Point, float> resolve(const SVGLengthContext&) const;
-#endif
 
   SVGCircle();
 

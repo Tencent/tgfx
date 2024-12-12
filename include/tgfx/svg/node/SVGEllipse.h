@@ -30,10 +30,10 @@ namespace tgfx {
 class SVGLengthContext;
 class SVGRenderContext;
 
-class SkSVGEllipse final : public SVGShape {
+class SVGEllipse final : public SVGShape {
  public:
-  static std::shared_ptr<SkSVGEllipse> Make() {
-    return std::shared_ptr<SkSVGEllipse>(new SkSVGEllipse());
+  static std::shared_ptr<SVGEllipse> Make() {
+    return std::shared_ptr<SVGEllipse>(new SVGEllipse());
   }
 
   SVG_ATTR(Cx, SVGLength, SVGLength(0))
@@ -43,20 +43,16 @@ class SkSVGEllipse final : public SVGShape {
   SVG_OPTIONAL_ATTR(Ry, SVGLength)
 
  protected:
-  bool parseAndSetAttribute(const char*, const char*) override;
+  bool parseAndSetAttribute(const std::string&, const std::string&) override;
 
-#ifndef RENDER_SVG
   void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
 
   Path onAsPath(const SVGRenderContext&) const override;
-#endif
 
  private:
-  SkSVGEllipse();
+  SVGEllipse();
 
-#ifndef RENDER_SVG
   Rect resolve(const SVGLengthContext&) const;
-#endif
 
   using INHERITED = SVGShape;
 };
