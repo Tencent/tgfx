@@ -53,8 +53,8 @@ void SkSVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<C
 
   ASSERT(colors.size() == positions.size());
 
-  if (positions.empty() && !fHref.iri().empty()) {
-    const auto ref = ctx.findNodeById(fHref);
+  if (positions.empty() && !Href.iri().empty()) {
+    const auto ref = ctx.findNodeById(Href);
     if (ref && (ref->tag() == SVGTag::LinearGradient || ref->tag() == SVGTag::RadialGradient)) {
       static_cast<const SkSVGGradient*>(ref.get())->collectColorStops(ctx, colors, positions);
     }
@@ -92,11 +92,11 @@ bool SkSVGGradient::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
                 "SkSVGSpreadMethod::Type is out of sync");
   static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::Reflect) == TileMode::Mirror,
                 "SkSVGSpreadMethod::Type is out of sync");
-  const auto tileMode = static_cast<TileMode>(fSpreadMethod.type());
+  const auto tileMode = static_cast<TileMode>(SpreadMethod.type());
 
-  const auto obbt = ctx.transformForCurrentOBB(fGradientUnits);
+  const auto obbt = ctx.transformForCurrentOBB(GradientUnits);
   const auto localMatrix = Matrix::MakeTrans(obbt.offset.x, obbt.offset.y) *
-                           Matrix::MakeScale(obbt.scale.x, obbt.scale.y) * fGradientTransform;
+                           Matrix::MakeScale(obbt.scale.x, obbt.scale.y) * GradientTransform;
 
   paint->setShader(this->onMakeShader(ctx, colors, positions, tileMode, localMatrix));
   return true;

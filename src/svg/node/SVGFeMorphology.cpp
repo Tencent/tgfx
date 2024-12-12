@@ -24,9 +24,9 @@ namespace tgfx {
 
 bool SkSVGFeMorphology::parseAndSetAttribute(const char* name, const char* value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
-         this->setOperator(
+         this->setMorphOperator(
              SVGAttributeParser::parse<SkSVGFeMorphology::Operator>("operator", name, value)) ||
-         this->setRadius(
+         this->setMorphRadius(
              SVGAttributeParser::parse<SkSVGFeMorphology::Radius>("radius", name, value));
 }
 

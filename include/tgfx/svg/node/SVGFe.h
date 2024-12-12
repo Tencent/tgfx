@@ -73,6 +73,7 @@ class SkSVGFe : public SVGHiddenContainer {
   void applyProperties(SVGRenderContext*) const;
 
   SVG_ATTR(In, SVGFeInputType, SVGFeInputType())
+
   SVG_ATTR(Result, SVGStringType, SVGStringType())
   SVG_OPTIONAL_ATTR(X, SVGLength)
   SVG_OPTIONAL_ATTR(Y, SVGLength)

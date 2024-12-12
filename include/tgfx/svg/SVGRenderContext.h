@@ -22,7 +22,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <tuple>
 #include <unordered_map>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/MaskFilter.h"
@@ -46,14 +45,14 @@ class SVGNode;
 template <typename T>
 class CopyOnWrite {
  public:
-  explicit CopyOnWrite(const T& initial) : _obj(&initial) {
+  explicit CopyOnWrite(const T& initial) : object(&initial) {
   }
 
-  explicit CopyOnWrite(const T* initial) : _obj(initial) {
+  explicit CopyOnWrite(const T* initial) : object(initial) {
   }
 
   // Constructor for delayed initialization.
-  CopyOnWrite() : _obj(nullptr) {
+  CopyOnWrite() : object(nullptr) {
   }
 
   CopyOnWrite(const CopyOnWrite& that) {
@@ -65,14 +64,14 @@ class CopyOnWrite {
   }
 
   CopyOnWrite& operator=(const CopyOnWrite& that) {
-    _optional = that._optional;
-    _obj = _optional.has_value() ? &_optional.value() : that._obj;
+    optional = that.optional;
+    object = optional.has_value() ? &optional.value() : that.object;
     return *this;
   }
 
   CopyOnWrite& operator=(CopyOnWrite&& that) {
-    _optional = std::move(that._optional);
-    _obj = _optional.has_value() ? &_optional.value() : that._obj;
+    optional = std::move(that.optional);
+    object = optional.has_value() ? &optional.value() : that.object;
     return *this;
   }
 
@@ -80,15 +79,15 @@ class CopyOnWrite {
      * Returns a writable T*. The first time this is called the initial object is cloned.
      */
   T* writable() {
-    if (!_optional.has_value()) {
-      _optional = *_obj;
-      _obj = &_optional.value();
+    if (!optional.has_value()) {
+      optional = *object;
+      object = &optional.value();
     }
-    return &_optional.value();
+    return &optional.value();
   }
 
   const T* get() const {
-    return _obj;
+    return object;
   }
 
   /**
@@ -96,21 +95,21 @@ class CopyOnWrite {
      */
 
   const T* operator->() const {
-    return _obj;
+    return object;
   }
 
   const T& operator*() const {
-    return *_obj;
+    return *object;
   }
 
  private:
-  const T* _obj;
-  std::optional<T> _optional;
+  const T* object;
+  std::optional<T> optional;
 };
 
 class SVGLengthContext {
  public:
-  explicit SVGLengthContext(const Size& viewport, float dpi = 90) : _viewport(viewport), _dpi(dpi) {
+  explicit SVGLengthContext(const Size& viewport, float dpi = 90) : _viewPort(viewport), dpi(dpi) {
   }
 
   enum class LengthType {
@@ -120,10 +119,10 @@ class SVGLengthContext {
   };
 
   const Size& viewPort() const {
-    return _viewport;
+    return _viewPort;
   }
-  void setViewPort(const Size& viewport) {
-    _viewport = viewport;
+  void setViewPort(const Size& viewPort) {
+    _viewPort = viewPort;
   }
 
   float resolve(const SVGLength&, LengthType) const;
@@ -131,21 +130,21 @@ class SVGLengthContext {
                    const SVGLength& h) const;
 
   void setPatternUnits(SVGObjectBoundingBoxUnits unit) {
-    _patternUnit = unit;
+    patternUnit = unit;
   }
 
   void clearPatternUnits() {
-    _patternUnit.reset();
+    patternUnit.reset();
   }
 
   std::optional<SVGObjectBoundingBoxUnits> getPatternUnits() const {
-    return _patternUnit;
+    return patternUnit;
   }
 
  private:
-  Size _viewport;
-  float _dpi;
-  std::optional<SVGObjectBoundingBoxUnits> _patternUnit;
+  Size _viewPort;
+  float dpi;
+  std::optional<SVGObjectBoundingBoxUnits> patternUnit;
 };
 
 struct SkSVGPresentationContext {
@@ -199,8 +198,8 @@ class SVGRenderContext {
   }
   void saveOnce();
 
-  void concat(const Matrix& matrix) {
-    _matrix.preConcat(matrix);
+  void concat(const Matrix& inputMatrix) {
+    matrix.preConcat(inputMatrix);
   }
 
   enum ApplyFlags {
@@ -223,13 +222,13 @@ class SVGRenderContext {
   };
 
   const std::shared_ptr<SVGFontManager>& fontMgr() const {
-    return _fontMgr;
+    return fontManager;
   }
 
   std::shared_ptr<SVGFontManager>& fontMgr() {
     // It is probably an oversight to try to render <text> without having set the SVGFontManager.
     // We will assert this in debug mode, but fallback to an empty _fontMgr in release builds.
-    return _fontMgr;
+    return fontManager;
   }
 
   // Returns the translate/scale transformation required to map into the current OBB scope,
@@ -250,33 +249,33 @@ class SVGRenderContext {
 
  private:
   float applyOpacity(float opacity, uint32_t flags, bool hasFilter);
-  std::shared_ptr<ImageFilter> applyFilter(const SVGFuncIRI&);
-  Path applyClip(const SVGFuncIRI&);
+  std::shared_ptr<ImageFilter> applyFilter(const SVGFuncIRI&) const;
+  Path applyClip(const SVGFuncIRI&) const;
   std::shared_ptr<MaskFilter> applyMask(const SVGFuncIRI&);
 
   std::optional<Paint> commonPaint(const SVGPaint&, float opacity) const;
 
-  std::shared_ptr<SVGFontManager> _fontMgr;
-  const SVGIDMapper& _nodeIDMapper;
+  std::shared_ptr<SVGFontManager> fontManager;
+  const SVGIDMapper& nodeIDMapper;
   CopyOnWrite<SVGLengthContext> _lengthContext;
   CopyOnWrite<SkSVGPresentationContext> _presentationContext;
-  Canvas* _renderCanvas;
+  Canvas* renderCanvas;
 
-  Recorder _recorder;
+  Recorder recorder;
   Canvas* _canvas;
 
   // clipPath, if present for the current context (not inherited).
   std::optional<Path> _clipPath;
 
   // Deferred opacity optimization for leaf nodes.
-  float _deferredPaintOpacity = 1;
+  float deferredPaintOpacity = 1;
 
   // Current object bounding box scope.
-  const OBBScope _scope;
+  const OBBScope scope;
 
   Context* _deviceContext;
-  Paint _picturePaint;
+  Paint picturePaint;
 
-  Matrix _matrix = Matrix::I();
+  Matrix matrix = Matrix::I();
 };
 }  // namespace tgfx

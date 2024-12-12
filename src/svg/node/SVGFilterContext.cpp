@@ -69,10 +69,10 @@ const SkSVGFilterContext::Result* SkSVGFilterContext::findResultById(
 
 const Rect& SkSVGFilterContext::filterPrimitiveSubregion(const SVGFeInputType& input) const {
   const Result* res = nullptr;
-  if (input.type() == SVGFeInputType::Type::kFilterPrimitiveReference) {
+  if (input.type() == SVGFeInputType::Type::FilterPrimitiveReference) {
     auto iter = fResults.find(input.id());
     res = iter != fResults.end() ? &iter->second : nullptr;
-  } else if (input.type() == SVGFeInputType::Type::kUnspecified) {
+  } else if (input.type() == SVGFeInputType::Type::Unspecified) {
     res = &fPreviousResult;
   }
   return res ? res->fFilterSubregion : fFilterEffectsRegion;
@@ -98,10 +98,10 @@ bool SkSVGFilterContext::previousResultIsSourceGraphic() const {
 // https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveInAttribute
 std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SkSVGFilterContext::getInput(
     const SVGRenderContext& ctx, const SVGFeInputType& inputType) const {
-  SVGColorspace inputCS = SVGColorspace::kSRGB;
+  SVGColorspace inputCS = SVGColorspace::SRGB;
   std::shared_ptr<ImageFilter> result;
   switch (inputType.type()) {
-    case SVGFeInputType::Type::kSourceAlpha: {
+    case SVGFeInputType::Type::SourceAlpha: {
 
       //TODO (YG) - Implement this with class ColorMatrix
       std::array<float, 20> colorMatrix{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
@@ -109,10 +109,10 @@ std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SkSVGFilterContext::getI
       result = ImageFilter::ColorFilter(colorFilter);
       break;
     }
-    case SVGFeInputType::Type::kSourceGraphic:
+    case SVGFeInputType::Type::SourceGraphic:
       // Do nothing.
       break;
-    case SVGFeInputType::Type::kFillPaint: {
+    case SVGFeInputType::Type::FillPaint: {
       const auto& fillPaint = ctx.fillPaint();
       if (fillPaint.has_value()) {
         //TODO (YG) - Implement this by dither and shader image filter
@@ -122,7 +122,7 @@ std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SkSVGFilterContext::getI
       }
       break;
     }
-    case SVGFeInputType::Type::kStrokePaint: {
+    case SVGFeInputType::Type::StrokePaint: {
       // The paint filter doesn't apply fill/stroke styling, but use the paint settings
       // defined for strokes.
       const auto& strokePaint = ctx.strokePaint();
@@ -134,7 +134,7 @@ std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SkSVGFilterContext::getI
       }
       break;
     }
-    case SVGFeInputType::Type::kFilterPrimitiveReference: {
+    case SVGFeInputType::Type::FilterPrimitiveReference: {
       const Result* res = findResultById(inputType.id());
       if (res) {
         result = res->fImageFilter;
@@ -142,7 +142,7 @@ std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SkSVGFilterContext::getI
       }
       break;
     }
-    case SVGFeInputType::Type::kUnspecified: {
+    case SVGFeInputType::Type::Unspecified: {
       result = fPreviousResult.fImageFilter;
       inputCS = fPreviousResult.fColorspace;
       break;

@@ -59,11 +59,11 @@ class SVGSVG : public SkSVGContainer {
   void onSetAttribute(SVGAttribute, const SVGValue&) override;
 
  private:
-  explicit SVGSVG(Type t) : INHERITED(SVGTag::Svg), fType(t) {
+  explicit SVGSVG(Type t) : INHERITED(SVGTag::Svg), type(t) {
   }
 
   // Some attributes behave differently for the outermost svg element.
-  const Type fType;
+  const Type type;
 
   using INHERITED = SkSVGContainer;
 };

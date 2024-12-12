@@ -41,7 +41,7 @@ class SkSVGFeLighting : public SkSVGFe {
   };
 
   SVG_ATTR(SurfaceScale, SVGNumberType, 1)
-  SVG_OPTIONAL_ATTR(KernelUnitLength, KernelUnitLength)
+  SVG_OPTIONAL_ATTR(UnitLength, KernelUnitLength)
 
  protected:
   explicit SkSVGFeLighting(SVGTag t) : INHERITED(t) {

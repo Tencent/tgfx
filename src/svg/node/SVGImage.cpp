@@ -45,7 +45,7 @@ bool SkSVGImage::parseAndSetAttribute(const char* n, const char* v) {
 bool SkSVGImage::onPrepareToRender(SVGRenderContext* ctx) const {
   // Width or height of 0 disables rendering per spec:
   // https://www.w3.org/TR/SVG11/struct.html#ImageElement
-  return !fHref.iri().empty() && fWidth.value() > 0 && fHeight.value() > 0 &&
+  return !Href.iri().empty() && Width.value() > 0 && Height.value() > 0 &&
          INHERITED::onPrepareToRender(ctx);
 }
 
@@ -124,11 +124,11 @@ SkSVGImage::ImageInfo SkSVGImage::LoadImage(const SVGIRI& iri, const Rect& viewP
 void SkSVGImage::onRender(const SVGRenderContext& ctx) const {
   // Per spec: x, w, width, height attributes establish the new viewport.
   const SVGLengthContext& lctx = ctx.lengthContext();
-  const Rect viewPort = lctx.resolveRect(fX, fY, fWidth, fHeight);
+  const Rect viewPort = lctx.resolveRect(X, Y, Width, Height);
 
   //TODO (YG)
   ImageInfo image;
-  const auto imgInfo = LoadImage(fHref, viewPort, fPreserveAspectRatio);
+  const auto imgInfo = LoadImage(Href, viewPort, PreserveAspectRatio);
   if (!imgInfo.fImage) {
     LOGE("can't render image: load image failed\n");
     return;
@@ -150,7 +150,7 @@ Path SkSVGImage::onAsPath(const SVGRenderContext&) const {
 
 Rect SkSVGImage::onObjectBoundingBox(const SVGRenderContext& ctx) const {
   const SVGLengthContext& lctx = ctx.lengthContext();
-  return lctx.resolveRect(fX, fY, fWidth, fHeight);
+  return lctx.resolveRect(X, Y, Width, Height);
 }
 #endif
 }  // namespace tgfx

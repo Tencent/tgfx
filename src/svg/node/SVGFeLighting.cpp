@@ -24,7 +24,7 @@ namespace tgfx {
 bool SkSVGFeLighting::parseAndSetAttribute(const char* n, const char* v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
          this->setSurfaceScale(SVGAttributeParser::parse<SVGNumberType>("surfaceScale", n, v)) ||
-         this->setKernelUnitLength(SVGAttributeParser::parse<SkSVGFeLighting::KernelUnitLength>(
+         this->setUnitLength(SVGAttributeParser::parse<SkSVGFeLighting::KernelUnitLength>(
              "kernelUnitLength", n, v));
 }
 

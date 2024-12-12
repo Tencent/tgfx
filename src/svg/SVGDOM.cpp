@@ -230,29 +230,29 @@ struct AttrParseInfo {
 };
 
 std::vector<SortedDictionaryEntry<AttrParseInfo>> gAttributeParseInfo = {
-    {"cx", {SVGAttribute::kCx, SetLengthAttribute}},
-    {"cy", {SVGAttribute::kCy, SetLengthAttribute}},
-    {"filterUnits", {SVGAttribute::kFilterUnits, SetObjectBoundingBoxUnitsAttribute}},
+    {"cx", {SVGAttribute::Cx, SetLengthAttribute}},
+    {"cy", {SVGAttribute::Cy, SetLengthAttribute}},
+    {"filterUnits", {SVGAttribute::FilterUnits, SetObjectBoundingBoxUnitsAttribute}},
     // focal point x & y
-    {"fx", {SVGAttribute::kFx, SetLengthAttribute}},
-    {"fy", {SVGAttribute::kFy, SetLengthAttribute}},
-    {"height", {SVGAttribute::kHeight, SetLengthAttribute}},
-    {"preserveAspectRatio", {SVGAttribute::kPreserveAspectRatio, SetPreserveAspectRatioAttribute}},
-    {"r", {SVGAttribute::kR, SetLengthAttribute}},
-    {"rx", {SVGAttribute::kRx, SetLengthAttribute}},
-    {"ry", {SVGAttribute::kRy, SetLengthAttribute}},
-    {"style", {SVGAttribute::kUnknown, SetStyleAttributes}},
-    {"text", {SVGAttribute::kText, SetStringAttribute}},
-    {"transform", {SVGAttribute::kTransform, SetTransformAttribute}},
-    {"viewBox", {SVGAttribute::kViewBox, SetViewBoxAttribute}},
-    {"width", {SVGAttribute::kWidth, SetLengthAttribute}},
-    {"x", {SVGAttribute::kX, SetLengthAttribute}},
-    {"x1", {SVGAttribute::kX1, SetLengthAttribute}},
-    {"x2", {SVGAttribute::kX2, SetLengthAttribute}},
-    {"xlink:href", {SVGAttribute::kHref, SetIRIAttribute}},
-    {"y", {SVGAttribute::kY, SetLengthAttribute}},
-    {"y1", {SVGAttribute::kY1, SetLengthAttribute}},
-    {"y2", {SVGAttribute::kY2, SetLengthAttribute}},
+    {"fx", {SVGAttribute::Fx, SetLengthAttribute}},
+    {"fy", {SVGAttribute::Fy, SetLengthAttribute}},
+    {"height", {SVGAttribute::Height, SetLengthAttribute}},
+    {"preserveAspectRatio", {SVGAttribute::PreserveAspectRatio, SetPreserveAspectRatioAttribute}},
+    {"r", {SVGAttribute::R, SetLengthAttribute}},
+    {"rx", {SVGAttribute::Rx, SetLengthAttribute}},
+    {"ry", {SVGAttribute::Ry, SetLengthAttribute}},
+    {"style", {SVGAttribute::Unknown, SetStyleAttributes}},
+    {"text", {SVGAttribute::Text, SetStringAttribute}},
+    {"transform", {SVGAttribute::Transform, SetTransformAttribute}},
+    {"viewBox", {SVGAttribute::ViewBox, SetViewBoxAttribute}},
+    {"width", {SVGAttribute::Width, SetLengthAttribute}},
+    {"x", {SVGAttribute::X, SetLengthAttribute}},
+    {"x1", {SVGAttribute::X1, SetLengthAttribute}},
+    {"x2", {SVGAttribute::X2, SetLengthAttribute}},
+    {"xlink:href", {SVGAttribute::Href, SetIRIAttribute}},
+    {"y", {SVGAttribute::Y, SetLengthAttribute}},
+    {"y1", {SVGAttribute::Y1, SetLengthAttribute}},
+    {"y2", {SVGAttribute::Y2, SetLengthAttribute}},
 };
 
 std::vector<SortedDictionaryEntry<std::shared_ptr<SVGNode> (*)()>> gTagFactories = {
@@ -467,35 +467,35 @@ std::shared_ptr<SVGDOM> SVGDOM::Builder::make(Data& data,
 
 SVGDOM::SVGDOM(std::shared_ptr<SVGSVG> root, SVGIDMapper&& mapper,
                std::shared_ptr<SVGFontManager> fontManager)
-    : _root(std::move(root)), _fontMgr(std::move(fontManager)), _nodeIDMapper(std::move(mapper)) {
+    : root(std::move(root)), fontManager(std::move(fontManager)), _nodeIDMapper(std::move(mapper)) {
 }
 
 void SVGDOM::render(Canvas* canvas) {
-  if (_root) {
-    if (!_renderPicture) {
+  if (root) {
+    if (!renderPicture) {
       SVGLengthContext lctx(_containerSize);
       SkSVGPresentationContext pctx;
 
       Recorder recorder;
       auto* drawCanvas = recorder.beginRecording();
       {
-        SVGRenderContext renderCtx(canvas->getSurface()->getContext(), drawCanvas, _fontMgr,
+        SVGRenderContext renderCtx(canvas->getSurface()->getContext(), drawCanvas, fontManager,
                                    _nodeIDMapper, lctx, pctx, {nullptr, nullptr},
                                    canvas->getMatrix());
-        _root->render(renderCtx);
+        root->render(renderCtx);
       }
-      _renderPicture = recorder.finishRecordingAsPicture();
+      renderPicture = recorder.finishRecordingAsPicture();
     }
-    canvas->drawPicture(_renderPicture);
+    canvas->drawPicture(renderPicture);
   }
 }
 
 void SVGDOM::renderNode(Canvas* canvas, SkSVGPresentationContext& pctx, const char* id) const {
-  if (_root) {
+  if (root) {
     SVGLengthContext lctx(_containerSize);
-    SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, _fontMgr, _nodeIDMapper,
-                               lctx, pctx, {nullptr, nullptr}, canvas->getMatrix());
-    _root->renderNode(renderCtx, SVGIRI(SVGIRI::Type::Local, SVGStringType(id)));
+    SVGRenderContext renderCtx(canvas->getSurface()->getContext(), canvas, fontManager,
+                               _nodeIDMapper, lctx, pctx, {nullptr, nullptr}, canvas->getMatrix());
+    root->renderNode(renderCtx, SVGIRI(SVGIRI::Type::Local, SVGStringType(id)));
   }
 }
 

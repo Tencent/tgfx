@@ -38,14 +38,14 @@ bool SkSVGUse::parseAndSetAttribute(const char* n, const char* v) {
 
 #ifndef RENDER_SVG
 bool SkSVGUse::onPrepareToRender(SVGRenderContext* ctx) const {
-  if (fHref.iri().empty() || !INHERITED::onPrepareToRender(ctx)) {
+  if (Href.iri().empty() || !INHERITED::onPrepareToRender(ctx)) {
     return false;
   }
 
-  if (!FloatNearlyZero(fX.value()) || !FloatNearlyZero(fY.value())) {
+  if (!FloatNearlyZero(X.value()) || !FloatNearlyZero(Y.value())) {
     // Restored when the local SVGRenderContext leaves scope.
     ctx->saveOnce();
-    ctx->canvas()->translate(fX.value(), fY.value());
+    ctx->canvas()->translate(X.value(), Y.value());
   }
 
   // TODO: width/height override for <svg> targets.
@@ -54,7 +54,7 @@ bool SkSVGUse::onPrepareToRender(SVGRenderContext* ctx) const {
 }
 
 void SkSVGUse::onRender(const SVGRenderContext& ctx) const {
-  const auto ref = ctx.findNodeById(fHref);
+  const auto ref = ctx.findNodeById(Href);
   if (!ref) {
     return;
   }
@@ -66,7 +66,7 @@ void SkSVGUse::onRender(const SVGRenderContext& ctx) const {
 }
 
 Path SkSVGUse::onAsPath(const SVGRenderContext& ctx) const {
-  const auto ref = ctx.findNodeById(fHref);
+  const auto ref = ctx.findNodeById(Href);
   if (!ref) {
     return Path();
   }
@@ -78,15 +78,15 @@ Path SkSVGUse::onAsPath(const SVGRenderContext& ctx) const {
 }
 
 Rect SkSVGUse::onObjectBoundingBox(const SVGRenderContext& ctx) const {
-  const auto ref = ctx.findNodeById(fHref);
+  const auto ref = ctx.findNodeById(Href);
   if (!ref) {
     return Rect::MakeEmpty();
   }
 
   auto lengthContext = ctx.lengthContext();
   lengthContext.clearPatternUnits();
-  float x = lengthContext.resolve(fX, SVGLengthContext::LengthType::Horizontal);
-  float y = lengthContext.resolve(fY, SVGLengthContext::LengthType::Vertical);
+  float x = lengthContext.resolve(X, SVGLengthContext::LengthType::Horizontal);
+  float y = lengthContext.resolve(Y, SVGLengthContext::LengthType::Vertical);
 
   Rect bounds = ref->objectBoundingBox(ctx);
   bounds.offset(x, y);

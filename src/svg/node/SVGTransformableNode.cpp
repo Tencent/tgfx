@@ -51,7 +51,7 @@ bool SkSVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
 
 void SkSVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   switch (attr) {
-    case SVGAttribute::kTransform:
+    case SVGAttribute::Transform:
       if (const auto* transform = v.as<SVGTransformValue>()) {
         this->setTransform(*transform);
       }

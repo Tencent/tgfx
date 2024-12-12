@@ -91,10 +91,10 @@ enum class SVGTag {
                                                                                         \
  public:                                                                                \
   const SVGProperty<attr_type, attr_inherited>& get##attr_name() const {                \
-    return _presentationAttributes.f##attr_name;                                        \
+    return _presentationAttributes.attr_name;                                           \
   }                                                                                     \
   void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {                \
-    auto* dest = &_presentationAttributes.f##attr_name;                                 \
+    auto* dest = &_presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                        \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                     \
       *dest = v;                                                                        \
@@ -103,7 +103,7 @@ enum class SVGTag {
     }                                                                                   \
   }                                                                                     \
   void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                     \
-    auto* dest = &_presentationAttributes.f##attr_name;                                 \
+    auto* dest = &_presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                        \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                     \
       *dest = std::move(v);                                                             \
@@ -143,7 +143,6 @@ class SVGNode {
   bool setAttribute(const std::string& attributeName, const std::string& attributeValue);
   virtual bool parseAndSetAttribute(const char* name, const char* value);
 
-  // inherited
   SVG_PRES_ATTR(ClipRule, SVGFillRule, true)
   SVG_PRES_ATTR(Color, SVGColorType, true)
   SVG_PRES_ATTR(ColorInterpolation, SVGColorspace, true)
@@ -240,29 +239,29 @@ class SVGNode {
     set_mv(std::move(a));                                                     \
   }
 
-#define SVG_ATTR(attr_name, attr_type, attr_default)                                              \
- private:                                                                                         \
-  attr_type f##attr_name = attr_default;                                                          \
-                                                                                                  \
- public:                                                                                          \
-  const attr_type& get##attr_name() const {                                                       \
-    return f##attr_name;                                                                          \
-  }                                                                                               \
-  SVG_ATTR_SETTERS(                                                                               \
-      attr_name, attr_type, attr_default, [this](const attr_type& a) { this->f##attr_name = a; }, \
-      [this](attr_type&& a) { this->f##attr_name = std::move(a); })
+#define SVG_ATTR(attr_name, attr_type, attr_default)                                           \
+ private:                                                                                      \
+  attr_type attr_name = attr_default;                                                          \
+                                                                                               \
+ public:                                                                                       \
+  const attr_type& get##attr_name() const {                                                    \
+    return attr_name;                                                                          \
+  }                                                                                            \
+  SVG_ATTR_SETTERS(                                                                            \
+      attr_name, attr_type, attr_default, [this](const attr_type& a) { this->attr_name = a; }, \
+      [this](attr_type&& a) { this->attr_name = std::move(a); })
 
-#define SVG_OPTIONAL_ATTR(attr_name, attr_type)                                                   \
- private:                                                                                         \
-  std::optional<attr_type> f##attr_name;                                                          \
-                                                                                                  \
- public:                                                                                          \
-  const std::optional<attr_type>& get##attr_name() const {                                        \
-    return f##attr_name;                                                                          \
-  }                                                                                               \
-  SVG_ATTR_SETTERS(                                                                               \
-      attr_name, attr_type, attr_default, [this](const attr_type& a) { this->f##attr_name = a; }, \
-      [this](attr_type&& a) { this->f##attr_name = a; })
+#define SVG_OPTIONAL_ATTR(attr_name, attr_type)                                                \
+ private:                                                                                      \
+  std::optional<attr_type> attr_name;                                                          \
+                                                                                               \
+ public:                                                                                       \
+  const std::optional<attr_type>& get##attr_name() const {                                     \
+    return attr_name;                                                                          \
+  }                                                                                            \
+  SVG_ATTR_SETTERS(                                                                            \
+      attr_name, attr_type, attr_default, [this](const attr_type& a) { this->attr_name = a; }, \
+      [this](attr_type&& a) { this->attr_name = a; })
 //NOLINTEND
 
 }  // namespace tgfx

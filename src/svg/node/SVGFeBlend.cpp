@@ -30,7 +30,7 @@ class SVGRenderContext;
 bool SkSVGFeBlend::parseAndSetAttribute(const char* name, const char* value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
          this->setIn2(SVGAttributeParser::parse<SVGFeInputType>("in2", name, value)) ||
-         this->setMode(SVGAttributeParser::parse<SkSVGFeBlend::Mode>("mode", name, value));
+         this->setBlendMode(SVGAttributeParser::parse<SkSVGFeBlend::Mode>("mode", name, value));
 }
 
 #ifndef RENDER_SVG
@@ -55,7 +55,7 @@ std::shared_ptr<ImageFilter> SkSVGFeBlend::onMakeImageFilter(const SVGRenderCont
   // const Rect cropRect = this->resolveFilterSubregion(ctx, fctx);
   // const BlendMode blendMode = GetBlendMode(this->getMode());
   const SVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
-  const std::shared_ptr<ImageFilter> background = fctx.resolveInput(ctx, fIn2, colorspace);
+  const std::shared_ptr<ImageFilter> background = fctx.resolveInput(ctx, In2, colorspace);
   const std::shared_ptr<ImageFilter> foreground = fctx.resolveInput(ctx, this->getIn(), colorspace);
   return ImageFilter::Compose(background, foreground);
   // TODO (YG),relay on ImageFilters::Blend to implement this

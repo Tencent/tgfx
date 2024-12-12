@@ -55,8 +55,8 @@ class SkSVGPattern final : public SVGHiddenContainer {
 
  private:
   struct PatternAttributes {
-    std::optional<SVGLength> fX, fY, fWidth, fHeight;
-    std::optional<SVGTransformType> fPatternTransform;
+    std::optional<SVGLength> x, y, width, height;
+    std::optional<SVGTransformType> patternTransform;
   };
 
 #ifndef RENDER_SVG

@@ -45,8 +45,8 @@ class SkSVGFeMorphology : public SkSVGFe {
     return std::shared_ptr<SkSVGFeMorphology>(new SkSVGFeMorphology());
   }
 
-  SVG_ATTR(Operator, Operator, Operator::kErode)
-  SVG_ATTR(Radius, Radius, Radius({0, 0}))
+  SVG_ATTR(MorphOperator, Operator, Operator::kErode)
+  SVG_ATTR(MorphRadius, Radius, Radius({0, 0}))
 
  protected:
 #ifndef RENDER_SVG

@@ -32,7 +32,7 @@ class SkSVGFilterContext {
   SkSVGFilterContext(const Rect& filterEffectsRegion,
                      const SVGObjectBoundingBoxUnits& primitiveUnits)
       : fFilterEffectsRegion(filterEffectsRegion), fPrimitiveUnits(primitiveUnits),
-        fPreviousResult({nullptr, filterEffectsRegion, SVGColorspace::kSRGB}) {
+        fPreviousResult({nullptr, filterEffectsRegion, SVGColorspace::SRGB}) {
   }
 
   const Rect& filterEffectsRegion() const {

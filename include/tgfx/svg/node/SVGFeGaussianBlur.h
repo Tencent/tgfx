@@ -40,7 +40,7 @@ class SkSVGFeGaussianBlur : public SkSVGFe {
     return std::shared_ptr<SkSVGFeGaussianBlur>(new SkSVGFeGaussianBlur());
   }
 
-  SVG_ATTR(StdDeviation, StdDeviation, StdDeviation({0, 0}))
+  SVG_ATTR(stdDeviation, StdDeviation, StdDeviation({0, 0}))
 
  protected:
 #ifndef RENDER_SVG

@@ -46,9 +46,9 @@ std::shared_ptr<Shader> SkSVGRadialGradient::onMakeShader(const SVGRenderContext
   SVGLengthContext lctx = ctx.lengthContext();
   lctx.setPatternUnits(getGradientUnits());
 
-  auto radius = lctx.resolve(fR, SVGLengthContext::LengthType::Other);
-  auto center = Point::Make(lctx.resolve(fCx, SVGLengthContext::LengthType::Horizontal),
-                            lctx.resolve(fCy, SVGLengthContext::LengthType::Vertical));
+  auto radius = lctx.resolve(R, SVGLengthContext::LengthType::Other);
+  auto center = Point::Make(lctx.resolve(Cx, SVGLengthContext::LengthType::Horizontal),
+                            lctx.resolve(Cy, SVGLengthContext::LengthType::Vertical));
 
   // TODO(YGAurora): MakeTwoPointConical are unimplemented in tgfx
   if (radius == 0) {

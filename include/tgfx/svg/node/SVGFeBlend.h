@@ -43,7 +43,7 @@ class SkSVGFeBlend : public SkSVGFe {
     return std::shared_ptr<SkSVGFeBlend>(new SkSVGFeBlend());
   }
 
-  SVG_ATTR(Mode, Mode, Mode::kNormal)
+  SVG_ATTR(BlendMode, Mode, Mode::kNormal)
   SVG_ATTR(In2, SVGFeInputType, SVGFeInputType())
 
  protected:

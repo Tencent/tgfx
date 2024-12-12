@@ -34,34 +34,34 @@ std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
   auto weight = [](const SVGFontWeight& w) {
     switch (w.type()) {
       case SVGFontWeight::Type::W100:
-        return FontStyle::Weight::kThin_Weight;
+        return FontStyle::Weight::Thin_Weight;
       case SVGFontWeight::Type::W200:
-        return FontStyle::Weight::kExtraLight_Weight;
+        return FontStyle::Weight::ExtraLight_Weight;
       case SVGFontWeight::Type::W300:
-        return FontStyle::Weight::kLight_Weight;
+        return FontStyle::Weight::Light_Weight;
       case SVGFontWeight::Type::W400:
-        return FontStyle::Weight::kNormal_Weight;
+        return FontStyle::Weight::Normal_Weight;
       case SVGFontWeight::Type::W500:
-        return FontStyle::Weight::kMedium_Weight;
+        return FontStyle::Weight::Medium_Weight;
       case SVGFontWeight::Type::W600:
-        return FontStyle::Weight::kSemiBold_Weight;
+        return FontStyle::Weight::SemiBold_Weight;
       case SVGFontWeight::Type::W700:
-        return FontStyle::Weight::kBold_Weight;
+        return FontStyle::Weight::Bold_Weight;
       case SVGFontWeight::Type::W800:
-        return FontStyle::Weight::kExtraBold_Weight;
+        return FontStyle::Weight::ExtraBold_Weight;
       case SVGFontWeight::Type::W900:
-        return FontStyle::Weight::kBlack_Weight;
+        return FontStyle::Weight::Black_Weight;
       case SVGFontWeight::Type::Normal:
-        return FontStyle::Weight::kNormal_Weight;
+        return FontStyle::Weight::Normal_Weight;
       case SVGFontWeight::Type::Bold:
-        return FontStyle::Weight::kBold_Weight;
+        return FontStyle::Weight::Bold_Weight;
       case SVGFontWeight::Type::Bolder:
-        return FontStyle::Weight::kExtraBold_Weight;
+        return FontStyle::Weight::ExtraBold_Weight;
       case SVGFontWeight::Type::Lighter:
-        return FontStyle::Weight::kLight_Weight;
+        return FontStyle::Weight::Light_Weight;
       case SVGFontWeight::Type::Inherit: {
         ASSERT(false);
-        return FontStyle::Weight::kNormal_Weight;
+        return FontStyle::Weight::Normal_Weight;
       }
     }
   };
@@ -69,23 +69,23 @@ std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
   auto slant = [](const SVGFontStyle& style) {
     switch (style.type()) {
       case SVGFontStyle::Type::Normal:
-        return FontStyle::Slant::kUpright_Slant;
+        return FontStyle::Slant::Upright_Slant;
       case SVGFontStyle::Type::Italic:
-        return FontStyle::Slant::kItalic_Slant;
+        return FontStyle::Slant::Italic_Slant;
       case SVGFontStyle::Type::Oblique:
-        return FontStyle::Slant::kOblique_Slant;
+        return FontStyle::Slant::Oblique_Slant;
       case SVGFontStyle::Type::Inherit: {
         ASSERT(false);
-        return FontStyle::Slant::kUpright_Slant;
+        return FontStyle::Slant::Upright_Slant;
       }
     }
   };
 
-  const std::string& family = context.presentationContext()._inherited.fFontFamily->family();
+  const std::string& family = context.presentationContext()._inherited.FontFamily->family();
 
-  auto fontWeight = weight(*context.presentationContext()._inherited.fFontWeight);
-  auto fontWidth = FontStyle::Width::kNormal_Width;
-  auto fontSlant = slant(*context.presentationContext()._inherited.fFontStyle);
+  auto fontWeight = weight(*context.presentationContext()._inherited.FontWeight);
+  auto fontWidth = FontStyle::Width::Normal_Width;
+  auto fontSlant = slant(*context.presentationContext()._inherited.FontStyle);
   FontStyle style(fontWeight, fontWidth, fontSlant);
 
   auto typeface = context.fontMgr()->getTypefaceForRender(family, style);
@@ -95,7 +95,7 @@ std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
   }
 
   float size =
-      context.lengthContext().resolve(context.presentationContext()._inherited.fFontSize->size(),
+      context.lengthContext().resolve(context.presentationContext()._inherited.FontSize->size(),
                                       SVGLengthContext::LengthType::Vertical);
   return {true, Font(typeface, size)};
 }
@@ -114,14 +114,14 @@ std::vector<float> ResolveLengths(const SVGLengthContext& lengthCtx,
 }
 
 float ComputeAlignmentFactor(const SkSVGPresentationContext& context) {
-  switch (context._inherited.fTextAnchor->type()) {
-    case SVGTextAnchor::Type::kStart:
+  switch (context._inherited.TextAnchor->type()) {
+    case SVGTextAnchor::Type::Start:
       return 0.0f;
-    case SVGTextAnchor::Type::kMiddle:
+    case SVGTextAnchor::Type::Middle:
       return -0.5f;
-    case SVGTextAnchor::Type::kEnd:
+    case SVGTextAnchor::Type::End:
       return -1.0f;
-    case SVGTextAnchor::Type::kInherit:
+    case SVGTextAnchor::Type::Inherit:
       ASSERT(false);
       return 0.0f;
   }
@@ -160,10 +160,10 @@ Path SkSVGTextFragment::onAsPath(const SVGRenderContext&) const {
 void SkSVGTextContainer::onShapeText(const SVGRenderContext& context,
                                      const ShapedTextCallback& function) const {
 
-  auto x = ResolveLengths(context.lengthContext(), fX, SVGLengthContext::LengthType::Horizontal);
-  auto y = ResolveLengths(context.lengthContext(), fY, SVGLengthContext::LengthType::Vertical);
-  auto dx = ResolveLengths(context.lengthContext(), fDx, SVGLengthContext::LengthType::Horizontal);
-  auto dy = ResolveLengths(context.lengthContext(), fDy, SVGLengthContext::LengthType::Vertical);
+  auto x = ResolveLengths(context.lengthContext(), X, SVGLengthContext::LengthType::Horizontal);
+  auto y = ResolveLengths(context.lengthContext(), Y, SVGLengthContext::LengthType::Vertical);
+  auto dx = ResolveLengths(context.lengthContext(), Dx, SVGLengthContext::LengthType::Horizontal);
+  auto dy = ResolveLengths(context.lengthContext(), Dy, SVGLengthContext::LengthType::Vertical);
 
   // TODO (YGAurora) : Handle rotate
   for (uint32_t i = 0; i < fChildren.size(); i++) {
@@ -194,7 +194,7 @@ void SkSVGTextLiteral::onShapeText(const SVGRenderContext& context,
   if (!success) {
     return;
   }
-  auto textBlob = TextBlob::MakeFrom(fText, font);
+  auto textBlob = TextBlob::MakeFrom(Text, font);
   function(context, textBlob);
 }
 

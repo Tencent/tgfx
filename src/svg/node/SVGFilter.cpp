@@ -45,11 +45,10 @@ void SkSVGFilter::applyProperties(SVGRenderContext* ctx) const {
 
 std::shared_ptr<ImageFilter> SkSVGFilter::buildFilterDAG(const SVGRenderContext& ctx) const {
   std::shared_ptr<ImageFilter> filter;
-  SkSVGFilterContext fctx(ctx.resolveOBBRect(fX, fY, fWidth, fHeight, fFilterUnits),
-                          fPrimitiveUnits);
+  SkSVGFilterContext fctx(ctx.resolveOBBRect(X, Y, Width, Height, FilterUnits), PrimitiveUnits);
   SVGRenderContext localCtx(ctx);
   this->applyProperties(&localCtx);
-  SVGColorspace cs = SVGColorspace::kSRGB;
+  SVGColorspace cs = SVGColorspace::SRGB;
   for (const auto& child : fChildren) {
     if (!SkSVGFe::IsFilterEffect(child)) {
       continue;
@@ -78,7 +77,7 @@ std::shared_ptr<ImageFilter> SkSVGFilter::buildFilterDAG(const SVGRenderContext&
   }
 
   // Convert to final destination colorspace
-  if (cs != SVGColorspace::kSRGB) {
+  if (cs != SVGColorspace::SRGB) {
     // filter = SkImageFilters::ColorFilter(SkColorFilters::LinearToSRGBGamma(), filter);
 
     //TODO (YG)

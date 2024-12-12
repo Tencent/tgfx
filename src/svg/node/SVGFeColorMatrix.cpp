@@ -36,10 +36,10 @@ bool SkSVGFeColorMatrix::parseAndSetAttribute(const char* name, const char* valu
 template <>
 bool SVGAttributeParser::parse(SVGFeColorMatrixType* type) {
   static constexpr std::tuple<const char*, SVGFeColorMatrixType> gTypeMap[] = {
-      {"matrix", SVGFeColorMatrixType::kMatrix},
-      {"saturate", SVGFeColorMatrixType::kSaturate},
-      {"hueRotate", SVGFeColorMatrixType::kHueRotate},
-      {"luminanceToAlpha", SVGFeColorMatrixType::kLuminanceToAlpha},
+      {"matrix", SVGFeColorMatrixType::Matrix},
+      {"saturate", SVGFeColorMatrixType::Saturate},
+      {"hueRotate", SVGFeColorMatrixType::HueRotate},
+      {"luminanceToAlpha", SVGFeColorMatrixType::LuminanceToAlpha},
   };
 
   return this->parseEnumMap(gTypeMap, type) && this->parseEOSToken();
@@ -47,24 +47,24 @@ bool SVGAttributeParser::parse(SVGFeColorMatrixType* type) {
 
 #ifndef RENDER_SVG
 ColorMatrix SkSVGFeColorMatrix::makeMatrixForType() const {
-  if (fValues.empty() && fType != SVGFeColorMatrixType::kLuminanceToAlpha) {
+  if (Values.empty() && Type != SVGFeColorMatrixType::LuminanceToAlpha) {
     return ColorMatrix();
   }
 
-  switch (fType) {
-    case SVGFeColorMatrixType::kMatrix: {
-      if (fValues.size() < 20) {
+  switch (Type) {
+    case SVGFeColorMatrixType::Matrix: {
+      if (Values.size() < 20) {
         return ColorMatrix();
       }
       ColorMatrix m;
-      std::copy_n(fValues.data(), 20, m.begin());
+      std::copy_n(Values.data(), 20, m.begin());
       return m;
     }
-    case SVGFeColorMatrixType::kSaturate:
-      return MakeSaturate(!fValues.empty() ? fValues[0] : 1);
-    case SVGFeColorMatrixType::kHueRotate:
-      return MakeHueRotate(!fValues.empty() ? fValues[0] : 0);
-    case SVGFeColorMatrixType::kLuminanceToAlpha:
+    case SVGFeColorMatrixType::Saturate:
+      return MakeSaturate(!Values.empty() ? Values[0] : 1);
+    case SVGFeColorMatrixType::HueRotate:
+      return MakeHueRotate(!Values.empty() ? Values[0] : 0);
+    case SVGFeColorMatrixType::LuminanceToAlpha:
       return MakeLuminanceToAlpha();
   }
 }

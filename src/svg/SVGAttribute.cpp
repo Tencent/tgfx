@@ -23,39 +23,39 @@ namespace tgfx {
 SVGPresentationAttributes SVGPresentationAttributes::MakeInitial() {
   SVGPresentationAttributes result;
 
-  result.fFill.set(SVGPaint(SVGColor(Color::Black())));
-  result.fFillOpacity.set(static_cast<SVGNumberType>(1));
-  result.fFillRule.set(SVGFillRule(SVGFillRule::Type::NonZero));
-  result.fClipRule.set(SVGFillRule(SVGFillRule::Type::NonZero));
+  result.Fill.set(SVGPaint(SVGColor(Color::Black())));
+  result.FillOpacity.set(static_cast<SVGNumberType>(1));
+  result.FillRule.set(SVGFillRule(SVGFillRule::Type::NonZero));
+  result.ClipRule.set(SVGFillRule(SVGFillRule::Type::NonZero));
 
-  result.fStroke.set(SVGPaint(SVGPaint::Type::None));
-  result.fStrokeDashArray.set(SVGDashArray(SVGDashArray::Type::None));
-  result.fStrokeDashOffset.set(SVGLength(0));
-  result.fStrokeLineCap.set(SVGLineCap::Butt);
-  result.fStrokeLineJoin.set(SVGLineJoin(SVGLineJoin::Type::Miter));
-  result.fStrokeMiterLimit.set(static_cast<SVGNumberType>(4));
-  result.fStrokeOpacity.set(static_cast<SVGNumberType>(1));
-  result.fStrokeWidth.set(SVGLength(1));
+  result.Stroke.set(SVGPaint(SVGPaint::Type::None));
+  result.StrokeDashArray.set(SVGDashArray(SVGDashArray::Type::None));
+  result.StrokeDashOffset.set(SVGLength(0));
+  result.StrokeLineCap.set(SVGLineCap::Butt);
+  result.StrokeLineJoin.set(SVGLineJoin(SVGLineJoin::Type::Miter));
+  result.StrokeMiterLimit.set(static_cast<SVGNumberType>(4));
+  result.StrokeOpacity.set(static_cast<SVGNumberType>(1));
+  result.StrokeWidth.set(SVGLength(1));
 
-  result.fVisibility.set(SVGVisibility(SVGVisibility::Type::Visible));
+  result.Visibility.set(SVGVisibility(SVGVisibility::Type::Visible));
 
-  result.fColor.set(SVGColorType(Color::Black()));
-  result.fColorInterpolation.set(SVGColorspace::kSRGB);
-  result.fColorInterpolationFilters.set(SVGColorspace::kLinearRGB);
+  result.Color.set(SVGColorType(Color::Black()));
+  result.ColorInterpolation.set(SVGColorspace::SRGB);
+  result.ColorInterpolationFilters.set(SVGColorspace::LinearRGB);
 
-  result.fFontFamily.init("default");
-  result.fFontStyle.init(SVGFontStyle::Type::Normal);
-  result.fFontSize.init(SVGLength(24));
-  result.fFontWeight.init(SVGFontWeight::Type::Normal);
-  result.fTextAnchor.init(SVGTextAnchor::Type::kStart);
+  result.FontFamily.init("default");
+  result.FontStyle.init(SVGFontStyle::Type::Normal);
+  result.FontSize.init(SVGLength(24));
+  result.FontWeight.init(SVGFontWeight::Type::Normal);
+  result.TextAnchor.init(SVGTextAnchor::Type::Start);
 
-  result.fDisplay.init(SVGDisplay::kInline);
+  result.Display.init(SVGDisplay::Inline);
 
-  result.fStopColor.set(SVGColor(Color::Black()));
-  result.fStopOpacity.set(static_cast<SVGNumberType>(1));
-  result.fFloodColor.set(SVGColor(Color::Black()));
-  result.fFloodOpacity.set(static_cast<SVGNumberType>(1));
-  result.fLightingColor.set(SVGColor(Color::White()));
+  result.StopColor.set(SVGColor(Color::Black()));
+  result.StopOpacity.set(static_cast<SVGNumberType>(1));
+  result.FloodColor.set(SVGColor(Color::Black()));
+  result.FloodOpacity.set(static_cast<SVGNumberType>(1));
+  result.LightingColor.set(SVGColor(Color::White()));
 
   return result;
 }

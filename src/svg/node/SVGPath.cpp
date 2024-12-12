@@ -31,7 +31,7 @@ SkSVGPath::SkSVGPath() : INHERITED(SVGTag::Path) {
 
 bool SkSVGPath::parseAndSetAttribute(const char* n, const char* v) {
   return INHERITED::parseAndSetAttribute(n, v) ||
-         this->setPath(SVGAttributeParser::parse<Path>("d", n, v));
+         this->setShapePath(SVGAttributeParser::parse<Path>("d", n, v));
 }
 
 template <>
@@ -47,21 +47,21 @@ bool SVGAttributeParser::parse<Path>(Path* path) {
 void SkSVGPath::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
                        PathFillType fillType) const {
   // the passed fillType follows inheritance rules and needs to be applied at draw time.
-  Path path = fPath;  // Note: point and verb data are CoW
+  Path path = ShapePath;  // Note: point and verb data are CoW
   path.setFillType(fillType);
   canvas->drawPath(path, paint);
 }
 
 Path SkSVGPath::onAsPath(const SVGRenderContext& ctx) const {
-  Path path = fPath;
+  Path path = ShapePath;
   // clip-rule can be inherited and needs to be applied at clip time.
-  path.setFillType(ctx.presentationContext()._inherited.fClipRule->asFillType());
+  path.setFillType(ctx.presentationContext()._inherited.ClipRule->asFillType());
   this->mapToParent(&path);
   return path;
 }
 
 Rect SkSVGPath::onObjectBoundingBox(const SVGRenderContext&) const {
-  return fPath.getBounds();
+  return ShapePath.getBounds();
   //TODO (YG): Implement this
   // return fPath.computeTightBounds();
 }

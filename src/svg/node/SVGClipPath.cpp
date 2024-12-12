@@ -36,7 +36,7 @@ bool SVGClipPath::parseAndSetAttribute(const char* n, const char* v) {
 Path SVGClipPath::resolveClip(const SVGRenderContext& ctx) const {
   auto clip = this->asPath(ctx);
 
-  const auto obbt = ctx.transformForCurrentOBB(fClipPathUnits);
+  const auto obbt = ctx.transformForCurrentOBB(ClipPathUnits);
   const auto m = Matrix::MakeTrans(obbt.offset.x, obbt.offset.y) *
                  Matrix::MakeScale(obbt.scale.x, obbt.scale.y);
   clip.transform(m);

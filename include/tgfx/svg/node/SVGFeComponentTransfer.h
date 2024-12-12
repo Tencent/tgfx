@@ -56,7 +56,7 @@ class SkSVGFeFunc final : public SVGHiddenContainer {
   SVG_ATTR(Offset, SVGNumberType, 0)
   SVG_ATTR(Slope, SVGNumberType, 1)
   SVG_ATTR(TableValues, std::vector<SVGNumberType>, {})
-  SVG_ATTR(Type, SVGFeFuncType, SVGFeFuncType::kIdentity)
+  SVG_ATTR(Type, SVGFeFuncType, SVGFeFuncType::Identity)
 
   std::vector<uint8_t> getTable() const;
 

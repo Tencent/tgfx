@@ -44,12 +44,12 @@ bool SkSVGMask::parseAndSetAttribute(const char* n, const char* v) {
 #ifndef RENDER_SVG
 Rect SkSVGMask::bounds(const SVGRenderContext& context) const {
   auto lengthContext = context.lengthContext();
-  lengthContext.setPatternUnits(fMaskUnits);
+  lengthContext.setPatternUnits(MaskUnits);
   SVGRenderContext resolveContext(context, lengthContext);
-  if (fWidth.has_value() && fHeight.has_value()) {
-    return resolveContext.resolveOBBRect(fX.value_or(SVGLength(0, SVGLength::Unit::Number)),
-                                         fY.value_or(SVGLength(0, SVGLength::Unit::Number)),
-                                         fWidth.value(), fHeight.value(), fMaskUnits);
+  if (Width.has_value() && Height.has_value()) {
+    return resolveContext.resolveOBBRect(X.value_or(SVGLength(0, SVGLength::Unit::Number)),
+                                         Y.value_or(SVGLength(0, SVGLength::Unit::Number)),
+                                         Width.value(), Height.value(), MaskUnits);
   }
   return Rect::MakeEmpty();
 }

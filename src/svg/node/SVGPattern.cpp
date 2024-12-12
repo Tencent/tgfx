@@ -51,11 +51,11 @@ bool SkSVGPattern::parseAndSetAttribute(const char* name, const char* value) {
 
 #ifndef RENDER_SVG
 const SkSVGPattern* SkSVGPattern::hrefTarget(const SVGRenderContext& ctx) const {
-  if (fHref.iri().empty()) {
+  if (Href.iri().empty()) {
     return nullptr;
   }
 
-  const auto href = ctx.findNodeById(fHref);
+  const auto href = ctx.findNodeById(Href);
   if (!href || href->tag() != SVGTag::Pattern) {
     return nullptr;
   }
@@ -90,11 +90,10 @@ const SkSVGPattern* SkSVGPattern::resolveHref(const SVGRenderContext& ctx,
   do {
     // Bitwise OR to avoid short-circuiting.
     const bool didInherit =
-        inherit_if_needed(currentNode->fX, attrs->fX) |
-        inherit_if_needed(currentNode->fY, attrs->fY) |
-        inherit_if_needed(currentNode->fWidth, attrs->fWidth) |
-        inherit_if_needed(currentNode->fHeight, attrs->fHeight) |
-        inherit_if_needed(currentNode->fPatternTransform, attrs->fPatternTransform);
+        inherit_if_needed(currentNode->X, attrs->x) | inherit_if_needed(currentNode->Y, attrs->y) |
+        inherit_if_needed(currentNode->Width, attrs->width) |
+        inherit_if_needed(currentNode->Height, attrs->height) |
+        inherit_if_needed(currentNode->PatternTransform, attrs->patternTransform);
 
     if (!contentNode->hasChildren()) {
       contentNode = currentNode;
@@ -111,19 +110,19 @@ const SkSVGPattern* SkSVGPattern::resolveHref(const SVGRenderContext& ctx,
 
   // To unify with Chrome and macOS preview, the width and height attributes here need to be
   // converted to percentages, direct numbers are not supported.
-  if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
-    if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::Percentage) {
-      attrs->fWidth = SVGLength(attrs->fWidth->value() / 100.f, SVGLength::Unit::Number);
+  if (PatternUnits.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
+    if (attrs->width.has_value() && attrs->width->unit() == SVGLength::Unit::Percentage) {
+      attrs->width = SVGLength(attrs->width->value() / 100.f, SVGLength::Unit::Number);
     }
-    if (attrs->fHeight.has_value() && attrs->fHeight->unit() == SVGLength::Unit::Percentage) {
-      attrs->fHeight = SVGLength(attrs->fHeight->value() / 100.f, SVGLength::Unit::Number);
+    if (attrs->height.has_value() && attrs->height->unit() == SVGLength::Unit::Percentage) {
+      attrs->height = SVGLength(attrs->height->value() / 100.f, SVGLength::Unit::Number);
     }
-  } else if (fPatternUnits.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-    if (attrs->fWidth.has_value() && attrs->fWidth->unit() == SVGLength::Unit::Number) {
-      attrs->fWidth = SVGLength(attrs->fWidth->value() * 100.f, SVGLength::Unit::Percentage);
+  } else if (PatternUnits.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+    if (attrs->width.has_value() && attrs->width->unit() == SVGLength::Unit::Number) {
+      attrs->width = SVGLength(attrs->width->value() * 100.f, SVGLength::Unit::Percentage);
     }
-    if (attrs->fHeight.has_value() && attrs->fHeight->unit() == SVGLength::Unit::Number) {
-      attrs->fHeight = SVGLength(attrs->fHeight->value() * 100.f, SVGLength::Unit::Percentage);
+    if (attrs->height.has_value() && attrs->height->unit() == SVGLength::Unit::Number) {
+      attrs->height = SVGLength(attrs->height->value() * 100.f, SVGLength::Unit::Percentage);
     }
   }
 
@@ -134,11 +133,11 @@ bool SkSVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   PatternAttributes attrs;
   const auto* contentNode = this->resolveHref(ctx, &attrs);
   auto lengthContext = ctx.lengthContext();
-  lengthContext.setPatternUnits(fPatternUnits);
-  Rect tile = lengthContext.resolveRect(attrs.fX.has_value() ? *attrs.fX : SVGLength(0),
-                                        attrs.fY.has_value() ? *attrs.fY : SVGLength(0),
-                                        attrs.fWidth.has_value() ? *attrs.fWidth : SVGLength(0),
-                                        attrs.fHeight.has_value() ? *attrs.fHeight : SVGLength(0));
+  lengthContext.setPatternUnits(PatternUnits);
+  Rect tile = lengthContext.resolveRect(attrs.x.has_value() ? *attrs.x : SVGLength(0),
+                                        attrs.y.has_value() ? *attrs.y : SVGLength(0),
+                                        attrs.width.has_value() ? *attrs.width : SVGLength(0),
+                                        attrs.height.has_value() ? *attrs.height : SVGLength(0));
 
   if (tile.isEmpty()) {
     return false;
@@ -146,7 +145,7 @@ bool SkSVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
 
   Recorder patternRecorder;
   auto* canvas = patternRecorder.beginRecording();
-  auto patternMatrix = attrs.fPatternTransform.value_or(Matrix::I());
+  auto patternMatrix = attrs.patternTransform.value_or(Matrix::I());
   canvas->concat(patternMatrix);
   {
     SVGRenderContext recordingContext(ctx, canvas, lengthContext);

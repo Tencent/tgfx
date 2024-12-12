@@ -33,7 +33,7 @@ class SkSVGPath final : public SVGShape {
     return std::shared_ptr<SkSVGPath>(new SkSVGPath());
   }
 
-  SVG_ATTR(Path, Path, Path())
+  SVG_ATTR(ShapePath, Path, Path())
 
  protected:
   bool parseAndSetAttribute(const char*, const char*) override;

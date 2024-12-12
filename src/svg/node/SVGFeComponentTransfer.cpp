@@ -74,7 +74,8 @@ std::vector<uint8_t> SkSVGFeFunc::getTable() const {
   // https://www.w3.org/TR/SVG11/filters.html#feComponentTransferTypeAttribute
   const auto make_linear = [this]() -> std::vector<uint8_t> {
     std::vector<uint8_t> tbl(256);
-    const float slope = this->getSlope(), intercept255 = this->getIntercept() * 255;
+    const float slope = this->getSlope();
+    const float intercept255 = this->getIntercept() * 255;
 
     for (size_t i = 0; i < 256; ++i) {
       tbl[i] = static_cast<uint8_t>(
@@ -86,7 +87,8 @@ std::vector<uint8_t> SkSVGFeFunc::getTable() const {
 
   const auto make_gamma = [this]() -> std::vector<uint8_t> {
     std::vector<uint8_t> tbl(256);
-    const float exponent = this->getExponent(), offset = this->getOffset();
+    const float exponent = this->getExponent();
+    const float offset = this->getOffset();
 
     for (size_t i = 0; i < 256; ++i) {
       const float component = offset + std::pow(static_cast<float>(i) * (1 / 255.f), exponent);
@@ -112,7 +114,8 @@ std::vector<uint8_t> SkSVGFeFunc::getTable() const {
       const SVGNumberType v1 = std::clamp(vals[k + 1], 0.f, 1.f);
 
       // start/end component table indices
-      const size_t c_start = k * 255 / n, c_end = (k + 1) * 255 / n;
+      const size_t c_start = k * 255 / n;
+      const size_t c_end = (k + 1) * 255 / n;
       ASSERT(c_end <= 255);
 
       for (size_t ci = c_start; ci < c_end; ++ci) {
@@ -138,15 +141,15 @@ std::vector<uint8_t> SkSVGFeFunc::getTable() const {
   };
 
   switch (this->getType()) {
-    case SVGFeFuncType::kIdentity:
+    case SVGFeFuncType::Identity:
       return {};
-    case SVGFeFuncType::kTable:
+    case SVGFeFuncType::Table:
       return make_table();
-    case SVGFeFuncType::kDiscrete:
+    case SVGFeFuncType::Discrete:
       return make_discrete();
-    case SVGFeFuncType::kLinear:
+    case SVGFeFuncType::Linear:
       return make_linear();
-    case SVGFeFuncType::kGamma:
+    case SVGFeFuncType::Gamma:
       return make_gamma();
   }
 
@@ -168,9 +171,9 @@ bool SkSVGFeFunc::parseAndSetAttribute(const char* name, const char* val) {
 template <>
 bool SVGAttributeParser::parse(SVGFeFuncType* type) {
   static constexpr std::tuple<const char*, SVGFeFuncType> gTypeMap[] = {
-      {"identity", SVGFeFuncType::kIdentity}, {"table", SVGFeFuncType::kTable},
-      {"discrete", SVGFeFuncType::kDiscrete}, {"linear", SVGFeFuncType::kLinear},
-      {"gamma", SVGFeFuncType::kGamma},
+      {"identity", SVGFeFuncType::Identity}, {"table", SVGFeFuncType::Table},
+      {"discrete", SVGFeFuncType::Discrete}, {"linear", SVGFeFuncType::Linear},
+      {"gamma", SVGFeFuncType::Gamma},
   };
 
   return this->parseEnumMap(gTypeMap, type) && this->parseEOSToken();

@@ -35,10 +35,10 @@ std::shared_ptr<ImageFilter> SkSVGFe::makeImageFilter(
 
 Rect SkSVGFe::resolveBoundaries(const SVGRenderContext& ctx,
                                 const SkSVGFilterContext& filterContext) const {
-  const auto x = fX.has_value() ? *fX : SVGLength(0, SVGLength::Unit::Percentage);
-  const auto y = fY.has_value() ? *fY : SVGLength(0, SVGLength::Unit::Percentage);
-  const auto w = fWidth.has_value() ? *fWidth : SVGLength(100, SVGLength::Unit::Percentage);
-  const auto h = fHeight.has_value() ? *fHeight : SVGLength(100, SVGLength::Unit::Percentage);
+  const auto x = X.has_value() ? *X : SVGLength(0, SVGLength::Unit::Percentage);
+  const auto y = Y.has_value() ? *Y : SVGLength(0, SVGLength::Unit::Percentage);
+  const auto w = Width.has_value() ? *Width : SVGLength(100, SVGLength::Unit::Percentage);
+  const auto h = Height.has_value() ? *Height : SVGLength(100, SVGLength::Unit::Percentage);
 
   return ctx.resolveOBBRect(x, y, w, h, filterContext.primitiveUnits());
 }
@@ -47,16 +47,16 @@ static bool AnyIsStandardInput(const SkSVGFilterContext& fctx,
                                const std::vector<SVGFeInputType>& inputs) {
   for (const auto& in : inputs) {
     switch (in.type()) {
-      case SVGFeInputType::Type::kFilterPrimitiveReference:
+      case SVGFeInputType::Type::FilterPrimitiveReference:
         break;
-      case SVGFeInputType::Type::kSourceGraphic:
-      case SVGFeInputType::Type::kSourceAlpha:
-      case SVGFeInputType::Type::kBackgroundImage:
-      case SVGFeInputType::Type::kBackgroundAlpha:
-      case SVGFeInputType::Type::kFillPaint:
-      case SVGFeInputType::Type::kStrokePaint:
+      case SVGFeInputType::Type::SourceGraphic:
+      case SVGFeInputType::Type::SourceAlpha:
+      case SVGFeInputType::Type::BackgroundImage:
+      case SVGFeInputType::Type::BackgroundAlpha:
+      case SVGFeInputType::Type::FillPaint:
+      case SVGFeInputType::Type::StrokePaint:
         return true;
-      case SVGFeInputType::Type::kUnspecified:
+      case SVGFeInputType::Type::Unspecified:
         // Unspecified means previous result (which may be SourceGraphic).
         if (fctx.previousResultIsSourceGraphic()) {
           return true;
@@ -92,17 +92,17 @@ Rect SkSVGFe::resolveFilterSubregion(const SVGRenderContext& ctx,
   const Rect boundaries = this->resolveBoundaries(ctx, fctx);
 
   // Compute and return the fully resolved subregion.
-  return Rect::MakeXYWH(fX.has_value() ? boundaries.left : defaultSubregion.left,
-                        fY.has_value() ? boundaries.top : defaultSubregion.top,
-                        fWidth.has_value() ? boundaries.width() : defaultSubregion.width(),
-                        fHeight.has_value() ? boundaries.height() : defaultSubregion.height());
+  return Rect::MakeXYWH(X.has_value() ? boundaries.left : defaultSubregion.left,
+                        Y.has_value() ? boundaries.top : defaultSubregion.top,
+                        Width.has_value() ? boundaries.width() : defaultSubregion.width(),
+                        Height.has_value() ? boundaries.height() : defaultSubregion.height());
 }
 
 SVGColorspace SkSVGFe::resolveColorspace(const SVGRenderContext& ctx,
                                          const SkSVGFilterContext&) const {
-  constexpr SVGColorspace kDefaultCS = SVGColorspace::kSRGB;
-  const SVGColorspace cs = *ctx.presentationContext()._inherited.fColorInterpolationFilters;
-  return cs == SVGColorspace::kAuto ? kDefaultCS : cs;
+  constexpr SVGColorspace kDefaultCS = SVGColorspace::SRGB;
+  const SVGColorspace cs = *ctx.presentationContext()._inherited.ColorInterpolationFilters;
+  return cs == SVGColorspace::Auto ? kDefaultCS : cs;
 }
 
 void SkSVGFe::applyProperties(SVGRenderContext* ctx) const {
@@ -123,12 +123,12 @@ bool SkSVGFe::parseAndSetAttribute(const char* name, const char* value) {
 template <>
 bool SVGAttributeParser::parse(SVGFeInputType* type) {
   static constexpr std::tuple<const char*, SVGFeInputType::Type> gTypeMap[] = {
-      {"SourceGraphic", SVGFeInputType::Type::kSourceGraphic},
-      {"SourceAlpha", SVGFeInputType::Type::kSourceAlpha},
-      {"BackgroundImage", SVGFeInputType::Type::kBackgroundImage},
-      {"BackgroundAlpha", SVGFeInputType::Type::kBackgroundAlpha},
-      {"FillPaint", SVGFeInputType::Type::kFillPaint},
-      {"StrokePaint", SVGFeInputType::Type::kStrokePaint},
+      {"SourceGraphic", SVGFeInputType::Type::SourceGraphic},
+      {"SourceAlpha", SVGFeInputType::Type::SourceAlpha},
+      {"BackgroundImage", SVGFeInputType::Type::BackgroundImage},
+      {"BackgroundAlpha", SVGFeInputType::Type::BackgroundAlpha},
+      {"FillPaint", SVGFeInputType::Type::FillPaint},
+      {"StrokePaint", SVGFeInputType::Type::StrokePaint},
   };
 
   SVGStringType resultId;

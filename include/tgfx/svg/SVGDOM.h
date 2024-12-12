@@ -68,7 +68,7 @@ class SVGDOM {
      * Returns the root (outermost) SVG element.
      */
   const std::shared_ptr<SVGSVG>& getRoot() const {
-    return _root;
+    return root;
   }
 
   /**
@@ -107,11 +107,11 @@ class SVGDOM {
  private:
   SVGDOM(std::shared_ptr<SVGSVG>, SVGIDMapper&&, std::shared_ptr<SVGFontManager> fontManager);
 
-  const std::shared_ptr<SVGSVG> _root;
-  const std::shared_ptr<SVGFontManager> _fontMgr;
+  const std::shared_ptr<SVGSVG> root;
+  const std::shared_ptr<SVGFontManager> fontManager;
   const SVGIDMapper _nodeIDMapper;
   Size _containerSize;
 
-  std::shared_ptr<Picture> _renderPicture;
+  std::shared_ptr<Picture> renderPicture;
 };
 }  // namespace tgfx

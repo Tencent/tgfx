@@ -37,7 +37,7 @@ class SkSVGFeColorMatrix final : public SkSVGFe {
     return std::shared_ptr<SkSVGFeColorMatrix>(new SkSVGFeColorMatrix());
   }
 
-  SVG_ATTR(Type, SVGFeColorMatrixType, SVGFeColorMatrixType(SVGFeColorMatrixType::kMatrix))
+  SVG_ATTR(Type, SVGFeColorMatrixType, SVGFeColorMatrixType(SVGFeColorMatrixType::Matrix))
   SVG_ATTR(Values, SVGFeColorMatrixValues, SVGFeColorMatrixValues())
 
  protected:

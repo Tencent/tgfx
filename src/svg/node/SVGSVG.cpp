@@ -43,15 +43,15 @@ void SVGSVG::renderNode(const SVGRenderContext& ctx, const SVGIRI& iri) const {
 
 bool SVGSVG::onPrepareToRender(SVGRenderContext* ctx) const {
   // x/y are ignored for outermost svg elements
-  const auto x = fType == Type::kInner ? fX : SVGLength(0);
-  const auto y = fType == Type::kInner ? fY : SVGLength(0);
+  const auto x = type == Type::kInner ? X : SVGLength(0);
+  const auto y = type == Type::kInner ? Y : SVGLength(0);
 
-  auto viewPortRect = ctx->lengthContext().resolveRect(x, y, fWidth, fHeight);
+  auto viewPortRect = ctx->lengthContext().resolveRect(x, y, Width, Height);
   auto contentMatrix = Matrix::MakeTrans(viewPortRect.x(), viewPortRect.y());
   auto viewPort = Size::Make(viewPortRect.width(), viewPortRect.height());
 
-  if (fViewBox.has_value()) {
-    const Rect& viewBox = *fViewBox;
+  if (ViewBox.has_value()) {
+    const Rect& viewBox = *ViewBox;
 
     // An empty viewbox disables rendering.
     if (viewBox.isEmpty()) {
@@ -61,7 +61,7 @@ bool SVGSVG::onPrepareToRender(SVGRenderContext* ctx) const {
     // A viewBox overrides the intrinsic viewport.
     viewPort = Size::Make(viewBox.width(), viewBox.height());
 
-    contentMatrix.preConcat(ComputeViewboxMatrix(viewBox, viewPortRect, fPreserveAspectRatio));
+    contentMatrix.preConcat(ComputeViewboxMatrix(viewBox, viewPortRect, PreserveAspectRatio));
   }
 
   if (!contentMatrix.isIdentity()) {
@@ -79,50 +79,49 @@ bool SVGSVG::onPrepareToRender(SVGRenderContext* ctx) const {
 // https://www.w3.org/TR/SVG11/coords.html#IntrinsicSizing
 Size SVGSVG::intrinsicSize(const SVGLengthContext& lctx) const {
   // Percentage values do not provide an intrinsic size.
-  if (fWidth.unit() == SVGLength::Unit::Percentage ||
-      fHeight.unit() == SVGLength::Unit::Percentage) {
+  if (Width.unit() == SVGLength::Unit::Percentage || Height.unit() == SVGLength::Unit::Percentage) {
     return Size::Make(0, 0);
   }
 
-  return Size::Make(lctx.resolve(fWidth, SVGLengthContext::LengthType::Horizontal),
-                    lctx.resolve(fHeight, SVGLengthContext::LengthType::Vertical));
+  return Size::Make(lctx.resolve(Width, SVGLengthContext::LengthType::Horizontal),
+                    lctx.resolve(Height, SVGLengthContext::LengthType::Vertical));
 }
 #endif
 
 void SVGSVG::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
-  if (fType != Type::kInner && fType != Type::kRoot) return;
+  if (type != Type::kInner && type != Type::kRoot) return;
   switch (attr) {
-    case SVGAttribute::kX:
+    case SVGAttribute::X:
       if (const auto* x = v.as<SVGLengthValue>()) {
         SVGLength xValue = *x;
         this->setX(xValue);
       }
       break;
-    case SVGAttribute::kY:
+    case SVGAttribute::Y:
       if (const auto* y = v.as<SVGLengthValue>()) {
         SVGLength yValue = *y;
         this->setY(yValue);
       }
       break;
-    case SVGAttribute::kWidth:
+    case SVGAttribute::Width:
       if (const auto* w = v.as<SVGLengthValue>()) {
         SVGLength wValue = *w;
         this->setWidth(wValue);
       }
       break;
-    case SVGAttribute::kHeight:
+    case SVGAttribute::Height:
       if (const auto* h = v.as<SVGLengthValue>()) {
         SVGLength hValue = *h;
         this->setHeight(hValue);
       }
       break;
-    case SVGAttribute::kViewBox:
+    case SVGAttribute::ViewBox:
       if (const auto* vb = v.as<SVGViewBoxValue>()) {
         SVGViewBoxType vbValue = *vb;
         this->setViewBox(vbValue);
       }
       break;
-    case SVGAttribute::kPreserveAspectRatio:
+    case SVGAttribute::PreserveAspectRatio:
       if (const auto* par = v.as<SVGPreserveAspectRatioValue>()) {
         SVGPreserveAspectRatio parValue = *par;
         this->setPreserveAspectRatio(parValue);

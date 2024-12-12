@@ -45,10 +45,10 @@ bool SVGAttributeParser::parse<SVGFeTurbulenceType>(SVGFeTurbulenceType* type) {
   bool parsedValue = false;
 
   if (this->parseExpectedStringToken("fractalNoise")) {
-    *type = SVGFeTurbulenceType(SVGFeTurbulenceType::kFractalNoise);
+    *type = SVGFeTurbulenceType(SVGFeTurbulenceType::FractalNoise);
     parsedValue = true;
   } else if (this->parseExpectedStringToken("turbulence")) {
-    *type = SVGFeTurbulenceType(SVGFeTurbulenceType::kTurbulence);
+    *type = SVGFeTurbulenceType(SVGFeTurbulenceType::Turbulence);
     parsedValue = true;
   }
 

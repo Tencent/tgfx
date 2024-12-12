@@ -41,17 +41,17 @@ bool SkSVGFeComposite::parseAndSetAttribute(const char* name, const char* value)
 #ifndef RENDER_SVG
 BlendMode SkSVGFeComposite::BlendModeForOperator(SVGFeCompositeOperator op) {
   switch (op) {
-    case SVGFeCompositeOperator::kOver:
+    case SVGFeCompositeOperator::Over:
       return BlendMode::SrcOver;
-    case SVGFeCompositeOperator::kIn:
+    case SVGFeCompositeOperator::In:
       return BlendMode::SrcIn;
-    case SVGFeCompositeOperator::kOut:
+    case SVGFeCompositeOperator::Out:
       return BlendMode::SrcOut;
-    case SVGFeCompositeOperator::kAtop:
+    case SVGFeCompositeOperator::Atop:
       return BlendMode::SrcATop;
-    case SVGFeCompositeOperator::kXor:
+    case SVGFeCompositeOperator::Xor:
       return BlendMode::Xor;
-    case SVGFeCompositeOperator::kArithmetic:
+    case SVGFeCompositeOperator::Arithmetic:
       // Arithmetic is not handled with a blend
       ASSERT(false);
       return BlendMode::SrcOver;
@@ -80,9 +80,9 @@ std::shared_ptr<ImageFilter> SkSVGFeComposite::onMakeImageFilter(
 template <>
 bool SVGAttributeParser::parse(SVGFeCompositeOperator* op) {
   static constexpr std::tuple<const char*, SVGFeCompositeOperator> gOpMap[] = {
-      {"over", SVGFeCompositeOperator::kOver}, {"in", SVGFeCompositeOperator::kIn},
-      {"out", SVGFeCompositeOperator::kOut},   {"atop", SVGFeCompositeOperator::kAtop},
-      {"xor", SVGFeCompositeOperator::kXor},   {"arithmetic", SVGFeCompositeOperator::kArithmetic},
+      {"over", SVGFeCompositeOperator::Over}, {"in", SVGFeCompositeOperator::In},
+      {"out", SVGFeCompositeOperator::Out},   {"atop", SVGFeCompositeOperator::Atop},
+      {"xor", SVGFeCompositeOperator::Xor},   {"arithmetic", SVGFeCompositeOperator::Arithmetic},
   };
 
   return this->parseEnumMap(gOpMap, op) && this->parseEOSToken();

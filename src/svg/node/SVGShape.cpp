@@ -32,7 +32,7 @@ SVGShape::SVGShape(SVGTag t) : INHERITED(t) {
 
 #ifndef RENDER_SVG
 void SVGShape::onRender(const SVGRenderContext& ctx) const {
-  const auto fillType = ctx.presentationContext()._inherited.fFillRule->asFillType();
+  const auto fillType = ctx.presentationContext()._inherited.FillRule->asFillType();
 
   auto selfRect = onObjectBoundingBox(ctx);
   auto lengthCtx = ctx.lengthContext();

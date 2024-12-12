@@ -74,8 +74,8 @@ std::tuple<float, float> ResolveOptionalRadii(const std::optional<SVGLength>& op
 }
 
 RRect SkSVGRect::resolve(const SVGLengthContext& lctx) const {
-  const auto rect = lctx.resolveRect(fX, fY, fWidth, fHeight);
-  const auto [rx, ry] = ResolveOptionalRadii(fRx, fRy, lctx);
+  const auto rect = lctx.resolveRect(X, Y, Width, Height);
+  const auto [rx, ry] = ResolveOptionalRadii(Rx, Ry, lctx);
 
   // https://www.w3.org/TR/SVG2/shapes.html#RectElement
   // ...
@@ -132,7 +132,7 @@ Path SkSVGRect::onAsPath(const SVGRenderContext& ctx) const {
 }
 
 Rect SkSVGRect::onObjectBoundingBox(const SVGRenderContext& ctx) const {
-  return ctx.lengthContext().resolveRect(fX, fY, fWidth, fHeight);
+  return ctx.lengthContext().resolveRect(X, Y, Width, Height);
 }
 #endif
 }  // namespace tgfx

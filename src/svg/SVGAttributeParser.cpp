@@ -1076,10 +1076,10 @@ bool SVGAttributeParser::parse(SVGFontWeight* weight) {
 template <>
 bool SVGAttributeParser::parse(SVGTextAnchor* anchor) {
   static constexpr std::tuple<const char*, SVGTextAnchor::Type> gAnchorMap[] = {
-      {"start", SVGTextAnchor::Type::kStart},
-      {"middle", SVGTextAnchor::Type::kMiddle},
-      {"end", SVGTextAnchor::Type::kEnd},
-      {"inherit", SVGTextAnchor::Type::kInherit},
+      {"start", SVGTextAnchor::Type::Start},
+      {"middle", SVGTextAnchor::Type::Middle},
+      {"end", SVGTextAnchor::Type::End},
+      {"inherit", SVGTextAnchor::Type::Inherit},
   };
 
   bool parsedValue = false;
@@ -1167,9 +1167,9 @@ bool SVGAttributeParser::parse(std::vector<SVGNumberType>* numbers) {
 template <>
 bool SVGAttributeParser::parse(SVGColorspace* colorspace) {
   static constexpr std::tuple<const char*, SVGColorspace> gColorspaceMap[] = {
-      {"auto", SVGColorspace::kAuto},
-      {"sRGB", SVGColorspace::kSRGB},
-      {"linearRGB", SVGColorspace::kLinearRGB},
+      {"auto", SVGColorspace::Auto},
+      {"sRGB", SVGColorspace::SRGB},
+      {"linearRGB", SVGColorspace::LinearRGB},
   };
 
   return this->parseEnumMap(gColorspaceMap, colorspace) && this->parseEOSToken();
@@ -1182,8 +1182,8 @@ bool SVGAttributeParser::parse(SVGDisplay* display) {
     SVGDisplay fType;
     const char* fName;
   } gDisplayInfo[] = {
-      {SVGDisplay::kInline, "inline"},
-      {SVGDisplay::kNone, "none"},
+      {SVGDisplay::Inline, "inline"},
+      {SVGDisplay::None, "none"},
   };
 
   bool parsedValue = false;

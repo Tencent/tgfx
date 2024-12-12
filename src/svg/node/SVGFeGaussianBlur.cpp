@@ -25,7 +25,7 @@ namespace tgfx {
 
 bool SkSVGFeGaussianBlur::parseAndSetAttribute(const char* name, const char* value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
-         this->setStdDeviation(SVGAttributeParser::parse<SkSVGFeGaussianBlur::StdDeviation>(
+         this->setstdDeviation(SVGAttributeParser::parse<SkSVGFeGaussianBlur::StdDeviation>(
              "stdDeviation", name, value));
 }
 
@@ -33,8 +33,8 @@ bool SkSVGFeGaussianBlur::parseAndSetAttribute(const char* name, const char* val
 std::shared_ptr<ImageFilter> SkSVGFeGaussianBlur::onMakeImageFilter(
     const SVGRenderContext& ctx, const SkSVGFilterContext& fctx) const {
   auto scale = ctx.transformForCurrentOBB(fctx.primitiveUnits()).scale;
-  const auto sigmaX = fStdDeviation.fX * scale.x * 4;
-  const auto sigmaY = fStdDeviation.fY * scale.y * 4;
+  const auto sigmaX = stdDeviation.fX * scale.x * 4;
+  const auto sigmaY = stdDeviation.fY * scale.y * 4;
   return ImageFilter::Blur(sigmaX, sigmaY);
 }
 #endif

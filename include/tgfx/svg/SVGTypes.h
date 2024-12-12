@@ -761,144 +761,144 @@ struct SVGPreserveAspectRatio {
 class SVGTextAnchor {
  public:
   enum class Type {
-    kStart,
-    kMiddle,
-    kEnd,
-    kInherit,
+    Start,
+    Middle,
+    End,
+    Inherit,
   };
 
-  SVGTextAnchor() : fType(Type::kInherit) {
+  SVGTextAnchor() : _type(Type::Inherit) {
   }
-  explicit SVGTextAnchor(Type t) : fType(t) {
+  explicit SVGTextAnchor(Type t) : _type(t) {
   }
 
   bool operator==(const SVGTextAnchor& other) const {
-    return fType == other.fType;
+    return _type == other._type;
   }
   bool operator!=(const SVGTextAnchor& other) const {
     return !(*this == other);
   }
 
   Type type() const {
-    return fType;
+    return _type;
   }
 
  private:
-  Type fType;
+  Type _type;
 };
 
 // https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveInAttribute
 class SVGFeInputType {
  public:
   enum class Type {
-    kSourceGraphic,
-    kSourceAlpha,
-    kBackgroundImage,
-    kBackgroundAlpha,
-    kFillPaint,
-    kStrokePaint,
-    kFilterPrimitiveReference,
-    kUnspecified,
+    SourceGraphic,
+    SourceAlpha,
+    BackgroundImage,
+    BackgroundAlpha,
+    FillPaint,
+    StrokePaint,
+    FilterPrimitiveReference,
+    Unspecified,
   };
 
-  SVGFeInputType() : fType(Type::kUnspecified) {
+  SVGFeInputType() : _type(Type::Unspecified) {
   }
-  explicit SVGFeInputType(Type t) : fType(t) {
+  explicit SVGFeInputType(Type t) : _type(t) {
   }
   explicit SVGFeInputType(SVGStringType id)
-      : fType(Type::kFilterPrimitiveReference), fId(std::move(id)) {
+      : _type(Type::FilterPrimitiveReference), _id(std::move(id)) {
   }
 
   bool operator==(const SVGFeInputType& other) const {
-    return fType == other.fType && fId == other.fId;
+    return _type == other._type && _id == other._id;
   }
   bool operator!=(const SVGFeInputType& other) const {
     return !(*this == other);
   }
 
   const std::string& id() const {
-    return fId;
+    return _id;
   }
 
   Type type() const {
-    return fType;
+    return _type;
   }
 
  private:
-  Type fType;
-  std::string fId;
+  Type _type;
+  std::string _id;
 };
 
 enum class SVGFeColorMatrixType {
-  kMatrix,
-  kSaturate,
-  kHueRotate,
-  kLuminanceToAlpha,
+  Matrix,
+  Saturate,
+  HueRotate,
+  LuminanceToAlpha,
 };
 
 using SVGFeColorMatrixValues = std::vector<SVGNumberType>;
 
 enum class SVGFeCompositeOperator {
-  kOver,
-  kIn,
-  kOut,
-  kAtop,
-  kXor,
-  kArithmetic,
+  Over,
+  In,
+  Out,
+  Atop,
+  Xor,
+  Arithmetic,
 };
 
 class SVGFeTurbulenceBaseFrequency {
  public:
-  SVGFeTurbulenceBaseFrequency() : fFreqX(0), fFreqY(0) {
+  SVGFeTurbulenceBaseFrequency() : _freqX(0), _freqY(0) {
   }
   SVGFeTurbulenceBaseFrequency(SVGNumberType freqX, SVGNumberType freqY)
-      : fFreqX(freqX), fFreqY(freqY) {
+      : _freqX(freqX), _freqY(freqY) {
   }
 
   SVGNumberType freqX() const {
-    return fFreqX;
+    return _freqX;
   }
   SVGNumberType freqY() const {
-    return fFreqY;
+    return _freqY;
   }
 
  private:
-  SVGNumberType fFreqX;
-  SVGNumberType fFreqY;
+  SVGNumberType _freqX;
+  SVGNumberType _freqY;
 };
 
 struct SVGFeTurbulenceType {
   enum Type {
-    kFractalNoise,
-    kTurbulence,
+    FractalNoise,
+    Turbulence,
   };
 
-  Type fType;
+  Type type;
 
-  SVGFeTurbulenceType() : fType(kTurbulence) {
+  SVGFeTurbulenceType() : type(Turbulence) {
   }
-  explicit SVGFeTurbulenceType(Type type) : fType(type) {
+  explicit SVGFeTurbulenceType(Type inputType) : type(inputType) {
   }
 };
 
 enum class SVGColorspace {
-  kAuto,
-  kSRGB,
-  kLinearRGB,
+  Auto,
+  SRGB,
+  LinearRGB,
 };
 
 // https://www.w3.org/TR/SVG11/painting.html#DisplayProperty
 enum class SVGDisplay {
-  kInline,
-  kNone,
+  Inline,
+  None,
 };
 
 // https://www.w3.org/TR/SVG11/filters.html#TransferFunctionElementAttributes
 enum class SVGFeFuncType {
-  kIdentity,
-  kTable,
-  kDiscrete,
-  kLinear,
-  kGamma,
+  Identity,
+  Table,
+  Discrete,
+  Linear,
+  Gamma,
 };
 }  // namespace tgfx

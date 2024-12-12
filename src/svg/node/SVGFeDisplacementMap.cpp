@@ -48,7 +48,7 @@ std::shared_ptr<ImageFilter> SkSVGFeDisplacementMap::onMakeImageFilter(
   std::shared_ptr<ImageFilter> in = fctx.resolveInput(ctx, this->getIn());
   std::shared_ptr<ImageFilter> in2 = fctx.resolveInput(ctx, this->getIn2(), colorspace);
 
-  float scale = fScale;
+  float scale = Scale;
   if (fctx.primitiveUnits().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
     const auto obbt = ctx.transformForCurrentOBB(fctx.primitiveUnits());
     scale = SVGLengthContext({obbt.scale.x, obbt.scale.y})

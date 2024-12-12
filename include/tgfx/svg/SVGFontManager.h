@@ -35,60 +35,60 @@ class FontStyle {
   };
 
   enum Weight {
-    kInvisible_Weight = 0,
-    kThin_Weight = 100,
-    kExtraLight_Weight = 200,
-    kLight_Weight = 300,
-    kNormal_Weight = 400,
-    kMedium_Weight = 500,
-    kSemiBold_Weight = 600,
-    kBold_Weight = 700,
-    kExtraBold_Weight = 800,
-    kBlack_Weight = 900,
-    kExtraBlack_Weight = 1000,
+    Invisible_Weight = 0,
+    Thin_Weight = 100,
+    ExtraLight_Weight = 200,
+    Light_Weight = 300,
+    Normal_Weight = 400,
+    Medium_Weight = 500,
+    SemiBold_Weight = 600,
+    Bold_Weight = 700,
+    ExtraBold_Weight = 800,
+    Black_Weight = 900,
+    ExtraBlack_Weight = 1000,
   };
 
   enum Width {
-    kUltraCondensed_Width = 1,
-    kExtraCondensed_Width = 2,
-    kCondensed_Width = 3,
-    kSemiCondensed_Width = 4,
-    kNormal_Width = 5,
-    kSemiExpanded_Width = 6,
-    kExpanded_Width = 7,
-    kExtraExpanded_Width = 8,
-    kUltraExpanded_Width = 9,
+    UltraCondensed_Width = 1,
+    ExtraCondensed_Width = 2,
+    Condensed_Width = 3,
+    SemiCondensed_Width = 4,
+    Normal_Width = 5,
+    SemiExpanded_Width = 6,
+    Expanded_Width = 7,
+    ExtraExpanded_Width = 8,
+    UltraExpanded_Width = 9,
   };
 
   enum Slant {
-    kUpright_Slant,
-    kItalic_Slant,
-    kOblique_Slant,
+    Upright_Slant,
+    Italic_Slant,
+    Oblique_Slant,
   };
 
   constexpr FontStyle(Weight weight, Width width, Slant slant)
-      : _value(weight + (width << 16) + (slant << 24)) {
+      : value(weight + (width << 16) + (slant << 24)) {
   }
 
-  constexpr FontStyle() : FontStyle{kNormal_Weight, kNormal_Width, kUpright_Slant} {
+  constexpr FontStyle() : FontStyle{Normal_Weight, Normal_Width, Upright_Slant} {
   }
 
   bool operator==(const FontStyle& rhs) const {
-    return _value == rhs._value;
+    return value == rhs.value;
   }
 
   int weight() const {
-    return _value & 0xFFFF;
+    return value & 0xFFFF;
   }
   int width() const {
-    return (_value >> 16) & 0xFF;
+    return (value >> 16) & 0xFF;
   }
   Slant slant() const {
-    return static_cast<Slant>((_value >> 24) & 0xFF);
+    return static_cast<Slant>((value >> 24) & 0xFF);
   }
 
  private:
-  int _value;
+  int value;
 };
 
 class SVGFontManager {
@@ -112,8 +112,8 @@ class SVGFontManager {
  private:
   std::unordered_map<std::string,
                      std::unordered_map<FontStyle, std::shared_ptr<Typeface>, FontStyle::Hash>>
-      _typefaces;
-  std::shared_ptr<Typeface> _defaultTypeface;
+      typefaceMap;
+  std::shared_ptr<Typeface> defaultTypeface;
 };
 
 }  // namespace tgfx

@@ -38,14 +38,14 @@ bool SkSVGEllipse::parseAndSetAttribute(const char* n, const char* v) {
 
 #ifndef RENDER_SVG
 Rect SkSVGEllipse::resolve(const SVGLengthContext& lctx) const {
-  const auto cx = lctx.resolve(fCx, SVGLengthContext::LengthType::Horizontal);
-  const auto cy = lctx.resolve(fCy, SVGLengthContext::LengthType::Vertical);
+  const auto cx = lctx.resolve(Cx, SVGLengthContext::LengthType::Horizontal);
+  const auto cy = lctx.resolve(Cy, SVGLengthContext::LengthType::Vertical);
 
   // https://www.w3.org/TR/SVG2/shapes.html#EllipseElement
   //
   // An auto value for either rx or ry is converted to a used value, following the rules given
   // above for rectangles (but without any clamping based on width or height).
-  const auto [rx, ry] = ResolveOptionalRadii(fRx, fRy, lctx);
+  const auto [rx, ry] = ResolveOptionalRadii(Rx, Ry, lctx);
 
   // A computed value of zero for either dimension, or a computed value of auto for both
   // dimensions, disables rendering of the element.

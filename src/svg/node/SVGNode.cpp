@@ -34,11 +34,11 @@ namespace tgfx {
 
 SVGNode::SVGNode(SVGTag t) : _tag(t) {
   // Uninherited presentation attributes need a non-null default value.
-  _presentationAttributes.fStopColor.set(SVGColor(Color::Black()));
-  _presentationAttributes.fStopOpacity.set(static_cast<SVGNumberType>(1.0f));
-  _presentationAttributes.fFloodColor.set(SVGColor(Color::Black()));
-  _presentationAttributes.fFloodOpacity.set(static_cast<SVGNumberType>(1.0f));
-  _presentationAttributes.fLightingColor.set(SVGColor(Color::White()));
+  _presentationAttributes.StopColor.set(SVGColor(Color::Black()));
+  _presentationAttributes.StopOpacity.set(static_cast<SVGNumberType>(1.0f));
+  _presentationAttributes.FloodColor.set(SVGColor(Color::Black()));
+  _presentationAttributes.FloodOpacity.set(static_cast<SVGNumberType>(1.0f));
+  _presentationAttributes.LightingColor.set(SVGColor(Color::White()));
 }
 
 SVGNode::~SVGNode() {
@@ -86,10 +86,10 @@ bool SVGNode::onPrepareToRender(SVGRenderContext* ctx) const {
   // visibility:hidden and display:none disable rendering.
   // TODO: if display is not a value (true when display="inherit"), we currently
   //   ignore it. Eventually we should be able to add SkASSERT(display.isValue()).
-  const auto visibility = ctx->presentationContext()._inherited.fVisibility->type();
-  const auto display = _presentationAttributes.fDisplay;  // display is uninherited
+  const auto visibility = ctx->presentationContext()._inherited.Visibility->type();
+  const auto display = _presentationAttributes.Display;  // display is uninherited
   return visibility != SVGVisibility::Type::Hidden &&
-         (!display.isValue() || *display != SVGDisplay::kNone);
+         (!display.isValue() || *display != SVGDisplay::None);
 }
 #endif
 
@@ -109,10 +109,10 @@ void SetInheritedByDefault(std::optional<T>& presentation_attribute, const T& va
 }
 
 bool SVGNode::parseAndSetAttribute(const char* n, const char* v) {
-#define PARSE_AND_SET(svgName, attrName)                                                           \
-  this->set##attrName(                                                                             \
-      SVGAttributeParser::parseProperty<decltype(_presentationAttributes.f##attrName)>(svgName, n, \
-                                                                                       v))
+#define PARSE_AND_SET(svgName, attrName)                                                        \
+  this->set##attrName(                                                                          \
+      SVGAttributeParser::parseProperty<decltype(_presentationAttributes.attrName)>(svgName, n, \
+                                                                                    v))
 
   return PARSE_AND_SET("clip-path", ClipPath) || PARSE_AND_SET("clip-rule", ClipRule) ||
          PARSE_AND_SET("color", Color) ||
@@ -156,7 +156,7 @@ Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
     }
 
     // isotropic scaling
-    const auto s = par.fScale == SVGPreserveAspectRatio::Meet ? std::min(sx, sy) : std::max(sx, sy);
+    const auto s = par.scale == SVGPreserveAspectRatio::Meet ? std::min(sx, sy) : std::max(sx, sy);
     return {s, s};
   };
 

@@ -38,7 +38,7 @@ class SkSVGFeComposite final : public SkSVGFe {
   SVG_ATTR(K2, SVGNumberType, SVGNumberType(0))
   SVG_ATTR(K3, SVGNumberType, SVGNumberType(0))
   SVG_ATTR(K4, SVGNumberType, SVGNumberType(0))
-  SVG_ATTR(Operator, SVGFeCompositeOperator, SVGFeCompositeOperator::kOver)
+  SVG_ATTR(Operator, SVGFeCompositeOperator, SVGFeCompositeOperator::Over)
 
  protected:
   std::vector<SVGFeInputType> getInputs() const override {

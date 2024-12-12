@@ -22,99 +22,97 @@
 
 namespace tgfx {
 enum class SVGAttribute {
-  kClipRule,
-  kColor,
-  kColorInterpolation,
-  kColorInterpolationFilters,
-  kCx,  // <circle>, <ellipse>, <radialGradient>: center x position
-  kCy,  // <circle>, <ellipse>, <radialGradient>: center y position
-  kFill,
-  kFillOpacity,
-  kFillRule,
-  kFilter,
-  kFilterUnits,
-  kFontFamily,
-  kFontSize,
-  kFontStyle,
-  kFontWeight,
-  kFx,  // <radialGradient>: focal point x position
-  kFy,  // <radialGradient>: focal point y position
-  kGradientUnits,
-  kGradientTransform,
-  kHeight,
-  kHref,
-  kOpacity,
-  kPoints,
-  kPreserveAspectRatio,
-  kR,   // <circle>, <radialGradient>: radius
-  kRx,  // <ellipse>,<rect>: horizontal (corner) radius
-  kRy,  // <ellipse>,<rect>: vertical (corner) radius
-  kSpreadMethod,
-  kStroke,
-  kStrokeDashArray,
-  kStrokeDashOffset,
-  kStrokeOpacity,
-  kStrokeLineCap,
-  kStrokeLineJoin,
-  kStrokeMiterLimit,
-  kStrokeWidth,
-  kTransform,
-  kText,
-  kTextAnchor,
-  kViewBox,
-  kVisibility,
-  kWidth,
-  kX,
-  kX1,  // <line>: first endpoint x
-  kX2,  // <line>: second endpoint x
-  kY,
-  kY1,  // <line>: first endpoint y
-  kY2,  // <line>: second endpoint y
+  ClipRule,
+  Color,
+  ColorInterpolation,
+  ColorInterpolationFilters,
+  Cx,  // <circle>, <ellipse>, <radialGradient>: center x position
+  Cy,  // <circle>, <ellipse>, <radialGradient>: center y position
+  Fill,
+  FillOpacity,
+  FillRule,
+  Filter,
+  FilterUnits,
+  FontFamily,
+  FontSize,
+  FontStyle,
+  FontWeight,
+  Fx,  // <radialGradient>: focal point x position
+  Fy,  // <radialGradient>: focal point y position
+  GradientUnits,
+  GradientTransform,
+  Height,
+  Href,
+  Opacity,
+  Points,
+  PreserveAspectRatio,
+  R,   // <circle>, <radialGradient>: radius
+  Rx,  // <ellipse>,<rect>: horizontal (corner) radius
+  Ry,  // <ellipse>,<rect>: vertical (corner) radius
+  SpreadMethod,
+  Stroke,
+  StrokeDashArray,
+  StrokeDashOffset,
+  StrokeOpacity,
+  StrokeLineCap,
+  StrokeLineJoin,
+  StrokeMiterLimit,
+  StrokeWidth,
+  Transform,
+  Text,
+  TextAnchor,
+  ViewBox,
+  Visibility,
+  Width,
+  X,
+  X1,  // <line>: first endpoint x
+  X2,  // <line>: second endpoint x
+  Y,
+  Y1,  // <line>: first endpoint y
+  Y2,  // <line>: second endpoint y
 
-  kUnknown,
+  Unknown,
 };
 
 struct SVGPresentationAttributes {
   static SVGPresentationAttributes MakeInitial();
 
-  // TODO: SVGProperty adds an extra ptr per attribute; refactor to reduce overhead.
+  SVGProperty<SVGPaint, true> Fill;
+  SVGProperty<SVGNumberType, true> FillOpacity;
+  SVGProperty<SVGFillRule, true> FillRule;
+  SVGProperty<SVGFillRule, true> ClipRule;
 
-  SVGProperty<SVGPaint, true> fFill;
-  SVGProperty<SVGNumberType, true> fFillOpacity;
-  SVGProperty<SVGFillRule, true> fFillRule;
-  SVGProperty<SVGFillRule, true> fClipRule;
+  SVGProperty<SVGPaint, true> Stroke;
+  SVGProperty<SVGDashArray, true> StrokeDashArray;
+  SVGProperty<SVGLength, true> StrokeDashOffset;
+  SVGProperty<SVGLineCap, true> StrokeLineCap;
+  SVGProperty<SVGLineJoin, true> StrokeLineJoin;
+  SVGProperty<SVGNumberType, true> StrokeMiterLimit;
+  SVGProperty<SVGNumberType, true> StrokeOpacity;
+  SVGProperty<SVGLength, true> StrokeWidth;
 
-  SVGProperty<SVGPaint, true> fStroke;
-  SVGProperty<SVGDashArray, true> fStrokeDashArray;
-  SVGProperty<SVGLength, true> fStrokeDashOffset;
-  SVGProperty<SVGLineCap, true> fStrokeLineCap;
-  SVGProperty<SVGLineJoin, true> fStrokeLineJoin;
-  SVGProperty<SVGNumberType, true> fStrokeMiterLimit;
-  SVGProperty<SVGNumberType, true> fStrokeOpacity;
-  SVGProperty<SVGLength, true> fStrokeWidth;
+  SVGProperty<SVGVisibility, true> Visibility;
 
-  SVGProperty<SVGVisibility, true> fVisibility;
+  SVGProperty<SVGColorType, true> Color;
+  SVGProperty<SVGColorspace, true> ColorInterpolation;
+  SVGProperty<SVGColorspace, true> ColorInterpolationFilters;
 
-  SVGProperty<SVGColorType, true> fColor;
-  SVGProperty<SVGColorspace, true> fColorInterpolation;
-  SVGProperty<SVGColorspace, true> fColorInterpolationFilters;
-
-  SVGProperty<SVGFontFamily, true> fFontFamily;
-  SVGProperty<SVGFontStyle, true> fFontStyle;
-  SVGProperty<SVGFontSize, true> fFontSize;
-  SVGProperty<SVGFontWeight, true> fFontWeight;
-  SVGProperty<SVGTextAnchor, true> fTextAnchor;
+  SVGProperty<SVGFontFamily, true> FontFamily;
+  SVGProperty<SVGFontStyle, true> FontStyle;
+  SVGProperty<SVGFontSize, true> FontSize;
+  SVGProperty<SVGFontWeight, true> FontWeight;
+  SVGProperty<SVGTextAnchor, true> TextAnchor;
 
   // uninherited
-  SVGProperty<SVGNumberType, false> fOpacity;
-  SVGProperty<SVGFuncIRI, false> fClipPath;
-  SVGProperty<SVGDisplay, false> fDisplay;
-  SVGProperty<SVGFuncIRI, false> fMask;
-  SVGProperty<SVGFuncIRI, false> fFilter;
-  SVGProperty<SVGColor, false> fStopColor;
-  SVGProperty<SVGNumberType, false> fStopOpacity;
-  SVGProperty<SVGColor, false> fFloodColor;
-  SVGProperty<SVGNumberType, false> fFloodOpacity;
-  SVGProperty<SVGColor, false> fLightingColor;
+  SVGProperty<SVGNumberType, false> Opacity;
+  SVGProperty<SVGFuncIRI, false> ClipPath;
+  SVGProperty<SVGDisplay, false> Display;
+  SVGProperty<SVGFuncIRI, false> Mask;
+  SVGProperty<SVGFuncIRI, false> Filter;
+  SVGProperty<SVGColor, false> StopColor;
+  SVGProperty<SVGNumberType, false> StopOpacity;
+  SVGProperty<SVGColor, false> FloodColor;
+  SVGProperty<SVGNumberType, false> FloodOpacity;
+  SVGProperty<SVGColor, false> LightingColor;
 };
 }  // namespace tgfx

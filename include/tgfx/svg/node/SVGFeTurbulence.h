@@ -36,7 +36,7 @@ class SkSVGFeTurbulence : public SkSVGFe {
   SVG_ATTR(NumOctaves, SVGIntegerType, SVGIntegerType(1))
   SVG_ATTR(Seed, SVGNumberType, SVGNumberType(0))
   SVG_ATTR(TurbulenceType, SVGFeTurbulenceType,
-           SVGFeTurbulenceType(SVGFeTurbulenceType::Type::kTurbulence))
+           SVGFeTurbulenceType(SVGFeTurbulenceType::Type::Turbulence))
 
  protected:
 #ifndef RENDER_SVG

@@ -77,9 +77,9 @@ constexpr float kCMMultiplier = kMMMultiplier * 10;
 float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
   switch (l.unit()) {
     case SVGLength::Unit::Number: {
-      if (_patternUnit.has_value()) {
-        if (_patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-          return l.value() * length_size_for_type(_viewport, t);
+      if (patternUnit.has_value()) {
+        if (patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+          return l.value() * length_size_for_type(_viewPort, t);
         } else {
           return l.value();
         }
@@ -90,17 +90,17 @@ float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
     case SVGLength::Unit::PX:
       return l.value();
     case SVGLength::Unit::Percentage:
-      return l.value() * length_size_for_type(_viewport, t) / 100;
+      return l.value() * length_size_for_type(_viewPort, t) / 100;
     case SVGLength::Unit::CM:
-      return l.value() * _dpi * kCMMultiplier;
+      return l.value() * dpi * kCMMultiplier;
     case SVGLength::Unit::MM:
-      return l.value() * _dpi * kMMMultiplier;
+      return l.value() * dpi * kMMMultiplier;
     case SVGLength::Unit::IN:
-      return l.value() * _dpi * kINMultiplier;
+      return l.value() * dpi * kINMultiplier;
     case SVGLength::Unit::PT:
-      return l.value() * _dpi * kPTMultiplier;
+      return l.value() * dpi * kPTMultiplier;
     case SVGLength::Unit::PC:
-      return l.value() * _dpi * kPCMultiplier;
+      return l.value() * dpi * kPCMultiplier;
     default:
       //unsupported unit type
       ASSERT(false);
@@ -145,11 +145,11 @@ LineJoin toSkJoin(const SVGLineJoin& join) {
 
 std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
                                         const SVGLengthContext& lctx) {
-  if (props.fStrokeDashArray->type() != SVGDashArray::Type::DashArray) {
+  if (props.StrokeDashArray->type() != SVGDashArray::Type::DashArray) {
     return nullptr;
   }
 
-  const auto& da = *props.fStrokeDashArray;
+  const auto& da = *props.StrokeDashArray;
   const auto count = da.dashArray().size();
   std::vector<float> intervals;
   intervals.reserve(count);
@@ -166,7 +166,7 @@ std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
 
   ASSERT((intervals.size() & 1) == 0);
 
-  const auto phase = lctx.resolve(*props.fStrokeDashOffset, SVGLengthContext::LengthType::Other);
+  const auto phase = lctx.resolve(*props.StrokeDashOffset, SVGLengthContext::LengthType::Other);
 
   return PathEffect::MakeDash(intervals.data(), static_cast<int>(intervals.size()), phase);
 }
@@ -182,60 +182,60 @@ SVGRenderContext::SVGRenderContext(Context* device, Canvas* canvas,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lctx,
                                    const SkSVGPresentationContext& pctx, const OBBScope& obbs,
                                    const Matrix& matrix)
-    : _fontMgr(fontManager), _nodeIDMapper(mapper), _lengthContext(lctx),
-      _presentationContext(pctx), _renderCanvas(canvas), _recorder(),
-      _canvas(_recorder.beginRecording()), _scope(obbs), _deviceContext(device), _matrix(matrix) {
+    : fontManager(fontManager), nodeIDMapper(mapper), _lengthContext(lctx),
+      _presentationContext(pctx), renderCanvas(canvas), recorder(),
+      _canvas(recorder.beginRecording()), scope(obbs), _deviceContext(device), matrix(matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
-    : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, other._scope,
-                       other._matrix) {
+    : SVGRenderContext(other._deviceContext, other._canvas, other.fontManager, other.nodeIDMapper,
+                       *other._lengthContext, *other._presentationContext, other.scope,
+                       other.matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
-    : SVGRenderContext(other._deviceContext, canvas, other._fontMgr, other._nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, other._scope,
-                       other._matrix) {
+    : SVGRenderContext(other._deviceContext, canvas, other.fontManager, other.nodeIDMapper,
+                       *other._lengthContext, *other._presentationContext, other.scope,
+                       other.matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGLengthContext& lengthCtx)
-    : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
-                       lengthCtx, *other._presentationContext, other._scope, other._matrix) {
+    : SVGRenderContext(other._deviceContext, other._canvas, other.fontManager, other.nodeIDMapper,
+                       lengthCtx, *other._presentationContext, other.scope, other.matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
                                    const SVGLengthContext& lengthCtx)
-    : SVGRenderContext(other._deviceContext, canvas, other._fontMgr, other._nodeIDMapper, lengthCtx,
-                       *other._presentationContext, other._scope, other._matrix) {
+    : SVGRenderContext(other._deviceContext, canvas, other.fontManager, other.nodeIDMapper,
+                       lengthCtx, *other._presentationContext, other.scope, other.matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
-    : SVGRenderContext(other._deviceContext, other._canvas, other._fontMgr, other._nodeIDMapper,
+    : SVGRenderContext(other._deviceContext, other._canvas, other.fontManager, other.nodeIDMapper,
                        *other._lengthContext, *other._presentationContext, OBBScope{node, this},
-                       other._matrix) {
+                       other.matrix) {
 }
 
 SVGRenderContext::~SVGRenderContext() {
   _canvas->restoreToCount(0);
-  auto picture = _recorder.finishRecordingAsPicture();
+  auto picture = recorder.finishRecordingAsPicture();
   if (!picture) {
     return;
   }
 
-  _renderCanvas->save();
+  renderCanvas->save();
   if (_clipPath.has_value()) {
-    _renderCanvas->clipPath(_clipPath.value());
+    renderCanvas->clipPath(_clipPath.value());
   }
   auto matrix = Matrix::I();
-  _renderCanvas->drawPicture(picture, &matrix, &_picturePaint);
-  _renderCanvas->restore();
+  renderCanvas->drawPicture(picture, &matrix, &picturePaint);
+  renderCanvas->restore();
 }
 
 SVGRenderContext SVGRenderContext::CopyForPaint(const SVGRenderContext& context, Canvas* canvas,
                                                 const SVGLengthContext& lengthCtx) {
   SVGRenderContext copyContext(context, canvas, lengthCtx);
-  copyContext._deferredPaintOpacity = context._deferredPaintOpacity;
+  copyContext.deferredPaintOpacity = context.deferredPaintOpacity;
   return copyContext;
 }
 
@@ -243,21 +243,21 @@ std::shared_ptr<SVGNode> SVGRenderContext::findNodeById(const SVGIRI& iri) const
   if (iri.type() != SVGIRI::Type::Local) {
     return nullptr;
   }
-  auto p = _nodeIDMapper.find(iri.iri())->second;
+  auto p = nodeIDMapper.find(iri.iri())->second;
   return p;
 }
 
 void SVGRenderContext::applyPresentationAttributes(const SVGPresentationAttributes& attrs,
                                                    uint32_t flags) {
-#define ApplyLazyInheritedAttribute(ATTR)                                       \
-  do {                                                                          \
-    /* All attributes should be defined on the inherited context. */            \
-    ASSERT(_presentationContext->_inherited.f##ATTR.isValue());                 \
-    const auto& attr = attrs.f##ATTR;                                           \
-    if (attr.isValue() && *attr != *_presentationContext->_inherited.f##ATTR) { \
-      /* Update the local attribute value */                                    \
-      _presentationContext.writable()->_inherited.f##ATTR.set(*attr);           \
-    }                                                                           \
+#define ApplyLazyInheritedAttribute(ATTR)                                    \
+  do {                                                                       \
+    /* All attributes should be defined on the inherited context. */         \
+    ASSERT(_presentationContext->_inherited.ATTR.isValue());                 \
+    const auto& attr = attrs.ATTR;                                           \
+    if (attr.isValue() && *attr != *_presentationContext->_inherited.ATTR) { \
+      /* Update the local attribute value */                                 \
+      _presentationContext.writable()->_inherited.ATTR.set(*attr);           \
+    }                                                                        \
   } while (false)
 
   ApplyLazyInheritedAttribute(Fill);
@@ -284,24 +284,24 @@ void SVGRenderContext::applyPresentationAttributes(const SVGPresentationAttribut
 
 #undef ApplyLazyInheritedAttribute
 
-  if (attrs.fClipPath.isValue()) {
-    _clipPath = this->applyClip(*attrs.fClipPath);
+  if (attrs.ClipPath.isValue()) {
+    _clipPath = this->applyClip(*attrs.ClipPath);
   }
 
-  const bool hasFilter = attrs.fFilter.isValue();
-  if (attrs.fOpacity.isValue()) {
-    _picturePaint.setAlpha(this->applyOpacity(*attrs.fOpacity, flags, hasFilter));
+  const bool hasFilter = attrs.Filter.isValue();
+  if (attrs.Opacity.isValue()) {
+    picturePaint.setAlpha(this->applyOpacity(*attrs.Opacity, flags, hasFilter));
   }
 
-  if (attrs.fMask.isValue()) {
-    if (auto maskFilter = this->applyMask(*attrs.fMask)) {
-      _picturePaint.setMaskFilter(maskFilter);
+  if (attrs.Mask.isValue()) {
+    if (auto maskFilter = this->applyMask(*attrs.Mask)) {
+      picturePaint.setMaskFilter(maskFilter);
     }
   }
 
   if (hasFilter) {
-    if (auto imageFilter = this->applyFilter(*attrs.fFilter)) {
-      _picturePaint.setImageFilter(imageFilter);
+    if (auto imageFilter = this->applyFilter(*attrs.Filter)) {
+      picturePaint.setImageFilter(imageFilter);
     }
   }
 }
@@ -309,8 +309,8 @@ void SVGRenderContext::applyPresentationAttributes(const SVGPresentationAttribut
 float SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilter) {
   opacity = std::clamp(opacity, 0.0f, 1.0f);
   const auto& props = _presentationContext->_inherited;
-  const bool hasFill = props.fFill->type() != SVGPaint::Type::None;
-  const bool hasStroke = props.fStroke->type() != SVGPaint::Type::None;
+  const bool hasFill = props.Fill->type() != SVGPaint::Type::None;
+  const bool hasStroke = props.Stroke->type() != SVGPaint::Type::None;
 
   // We can apply the opacity as paint alpha if it only affects one atomic draw.
   // For now, this means all of the following must be true:
@@ -319,14 +319,14 @@ float SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilt
   //   - it does not have a filter.
   // Going forward, we may needto refine this heuristic (e.g. to accommodate markers).
   if ((flags & kLeaf) && (hasFill ^ hasStroke) && !hasFilter) {
-    _deferredPaintOpacity *= opacity;
+    deferredPaintOpacity *= opacity;
     return 1.0f;
   } else {
     return opacity;
   }
 }
 
-std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& filter) {
+std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& filter) const {
   if (filter.type() != SVGFuncIRI::Type::IRI) {
     return nullptr;
   }
@@ -344,7 +344,7 @@ void SVGRenderContext::saveOnce() {
   _canvas->save();
 }
 
-Path SVGRenderContext::applyClip(const SVGFuncIRI& clip) {
+Path SVGRenderContext::applyClip(const SVGFuncIRI& clip) const {
   if (clip.type() != SVGFuncIRI::Type::IRI) {
     return Path();
   }
@@ -407,10 +407,10 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   // if (!shaderImage) {
   //   return nullptr;
   // }
-  auto matrix = _matrix * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
+  auto transMatrix = matrix * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
   auto shaderImage =
       Image::MakeFrom(picture, static_cast<int>(bound.width() * matrix.getScaleX()),
-                      static_cast<int>(bound.height() * matrix.getScaleY()), &matrix);
+                      static_cast<int>(bound.height() * matrix.getScaleY()), &transMatrix);
   // {
   //   auto tempSurface = Surface::Make(_deviceContext, static_cast<int>(bound.width()) * 2,
   //                                    static_cast<int>(bound.height()) * 2);
@@ -464,8 +464,8 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selecto
       // and node being rendered.
       SkSVGPresentationContext pctx;
       pctx._namedColors = _presentationContext->_namedColors;
-      SVGRenderContext local_ctx(_deviceContext, _canvas, _fontMgr, _nodeIDMapper, *_lengthContext,
-                                 pctx, _scope, Matrix::I());
+      SVGRenderContext local_ctx(_deviceContext, _canvas, fontManager, nodeIDMapper,
+                                 *_lengthContext, pctx, scope, Matrix::I());
 
       const auto node = this->findNodeById(paint_selector.iri());
       if (!node || !node->asPaint(local_ctx, &(p.value()))) {
@@ -476,19 +476,19 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selecto
     default:
       break;
   }
-  p->setAntiAlias(true);  // TODO: shape-rendering support
+  p->setAntiAlias(true);
 
   // We observe 3 opacity components:
   //   - initial paint server opacity (e.g. color stop opacity)
   //   - paint-specific opacity (e.g. 'fill-opacity', 'stroke-opacity')
   //   - deferred opacity override (optimization for leaf nodes 'opacity')
-  p->setAlpha(std::clamp(p->getAlpha() * paint_opacity * _deferredPaintOpacity, 0.0f, 1.0f));
+  p->setAlpha(std::clamp(p->getAlpha() * paint_opacity * deferredPaintOpacity, 0.0f, 1.0f));
   return p;
 }
 
 std::optional<Paint> SVGRenderContext::fillPaint() const {
   const auto& props = _presentationContext->_inherited;
-  auto p = this->commonPaint(*props.fFill, *props.fFillOpacity);
+  auto p = this->commonPaint(*props.Fill, *props.FillOpacity);
 
   if (p.has_value()) {
     p->setStyle(PaintStyle::Fill);
@@ -499,16 +499,16 @@ std::optional<Paint> SVGRenderContext::fillPaint() const {
 
 std::optional<Paint> SVGRenderContext::strokePaint() const {
   const auto& props = _presentationContext->_inherited;
-  auto p = this->commonPaint(*props.fStroke, *props.fStrokeOpacity);
+  auto p = this->commonPaint(*props.Stroke, *props.StrokeOpacity);
 
   if (p.has_value()) {
     p->setStyle(PaintStyle::Stroke);
     p->setStrokeWidth(
-        _lengthContext->resolve(*props.fStrokeWidth, SVGLengthContext::LengthType::Other));
+        _lengthContext->resolve(*props.StrokeWidth, SVGLengthContext::LengthType::Other));
     Stroke stroke;
-    stroke.cap = toSkCap(*props.fStrokeLineCap);
-    stroke.join = toSkJoin(*props.fStrokeLineJoin);
-    stroke.miterLimit = *props.fStrokeMiterLimit;
+    stroke.cap = toSkCap(*props.StrokeLineCap);
+    stroke.join = toSkJoin(*props.StrokeLineJoin);
+    stroke.miterLimit = *props.StrokeMiterLimit;
     p->setStroke(stroke);
 
     //TODO (YG)
@@ -532,7 +532,7 @@ SVGColorType SVGRenderContext::resolveSvgColor(const SVGColor& color) const {
     case SVGColor::Type::Color:
       return color.color();
     case SVGColor::Type::CurrentColor:
-      return *_presentationContext->_inherited.fColor;
+      return *_presentationContext->_inherited.Color;
     case SVGColor::Type::ICCColor:
       return Color::Black();
   }
@@ -540,25 +540,25 @@ SVGColorType SVGRenderContext::resolveSvgColor(const SVGColor& color) const {
 
 SVGRenderContext::OBBTransform SVGRenderContext::transformForCurrentOBB(
     SVGObjectBoundingBoxUnits u) const {
-  if (!_scope.node || u.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
+  if (!scope.node || u.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
     return {{0, 0}, {1, 1}};
   }
-  ASSERT(_scope.context);
+  ASSERT(scope.context);
 
-  const auto obb = _scope.node->objectBoundingBox(*_scope.context);
+  const auto obb = scope.node->objectBoundingBox(*scope.context);
   return {{obb.x(), obb.y()}, {obb.width(), obb.height()}};
 }
 
 Rect SVGRenderContext::resolveOBBRect(const SVGLength& x, const SVGLength& y, const SVGLength& w,
-                                      const SVGLength& h, SVGObjectBoundingBoxUnits obbu) const {
+                                      const SVGLength& h, SVGObjectBoundingBoxUnits unit) const {
   CopyOnWrite<SVGLengthContext> lctx(_lengthContext);
 
-  if (obbu.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+  if (unit.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
     *lctx.writable() = SVGLengthContext({1, 1});
   }
 
   auto r = lctx->resolveRect(x, y, w, h);
-  const auto obbt = this->transformForCurrentOBB(obbu);
+  const auto obbt = this->transformForCurrentOBB(unit);
 
   return Rect::MakeXYWH(obbt.scale.x * r.x() + obbt.offset.x, obbt.scale.y * r.y() + obbt.offset.y,
                         obbt.scale.x * r.width(), obbt.scale.y * r.height());
