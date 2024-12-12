@@ -46,8 +46,8 @@ SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun&
   bool hasConstY = true;
 
   for (uint32_t i = 0; i < unicodeChars.size(); i++) {
-    Unichar c = unicodeChars[i];
-    Point position = glyphRun.positions[i];
+    auto c = unicodeChars[i];
+    auto position = glyphRun.positions[i];
     bool discardPos = false;
     bool isWhitespace = false;
 
@@ -108,5 +108,4 @@ SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun&
   return {std::move(_text), std::move(posXString),
           std::move(hasConstY ? constYString : posYString)};
 }
-
 }  // namespace tgfx
