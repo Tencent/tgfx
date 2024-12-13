@@ -26,6 +26,13 @@
 #include "core/ScalerContext.h"
 
 namespace tgfx {
+
+struct FTScalerContextBits {
+  static const constexpr uint32_t COLRv0 = 1;
+  static const constexpr uint32_t COLRv1 = 2;
+  static const constexpr uint32_t SVG    = 3;
+};
+
 class FTScalerContext : public ScalerContext {
  public:
   FTScalerContext(std::shared_ptr<Typeface> typeFace, float textSize);
@@ -63,10 +70,15 @@ class FTScalerContext : public ScalerContext {
 
   FTTypeface* ftTypeface() const;
 
+  Rect getBoundsInternal(GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
+
   float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);
   FT_Size ftSize = nullptr;
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
+  std::unordered_map<GlyphID, FTScalerContextBits> glyphExtraBits = {};
+  std::vector<uint32_t> colorPlatte = {};
+
 };
 }  // namespace tgfx

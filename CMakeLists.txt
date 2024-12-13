@@ -22,7 +22,7 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
 endif ()
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
-    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)
+    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" ON)
 else ()
     option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" ON)
 endif ()

@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTScalerContext.h"
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Recorder.h>
 #include <cmath>
 #include "ft2build.h"
 #include FT_BITMAP_H
@@ -34,10 +36,14 @@ namespace tgfx {
 //  This value was chosen by eyeballing the result in Firefox and trying to match it.
 static constexpr FT_Pos BITMAP_EMBOLDEN_STRENGTH = 1 << 6;
 static constexpr int OUTLINE_EMBOLDEN_DIVISOR = 24;
+const uint16_t kForegroundColorPaletteIndex = 0xFFFF;
 
 static float FTFixedToFloat(FT_Fixed x) {
   return static_cast<float>(x) * 1.52587890625e-5f;
 }
+
+constexpr float kColorStopShift =
+    sizeof(FT_ColorStop::stop_offset) == sizeof(FT_F2Dot14) ? 1 << 14 : 1 << 16;
 
 static FT_Fixed FloatToFTFixed(float x) {
   static constexpr float MaxS32FitsInFloat = 2147483520.f;
@@ -46,6 +52,8 @@ static FT_Fixed FloatToFTFixed(float x) {
   x = x > MinS32FitsInFloat ? x : MinS32FitsInFloat;
   return static_cast<FT_Fixed>(x * (1 << 16));
 }
+
+
 
 std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
                                                         float size) {
@@ -102,6 +110,932 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
   return chosenStrikeIndex;
 }
 
+bool GenerateGlyphPath(FT_Face face, Path* path);
+bool colrv1_traverse_paint_bounds(Matrix* ctm, Rect* bounds, FT_Face face,
+                                  FT_OpaquePaint opaquePaint);
+
+bool colrv1_start_glyph_bounds(Matrix* ctm, Rect* bounds, FT_Face face, uint16_t glyphId,
+                               FT_Color_Root_Transform rootTransform) {
+  FT_OpaquePaint opaquePaint{nullptr, 1};
+  return FT_Get_Color_Glyph_Paint(face, glyphId, rootTransform, &opaquePaint) &&
+         colrv1_traverse_paint_bounds(ctm, bounds, face, opaquePaint);
+}
+
+bool generateFacePathCOLRv1(FT_Face face, GlyphID glyphID, Path* path) {
+  FT_Int32 flags = 0;
+  flags |= FT_LOAD_BITMAP_METRICS_ONLY;  // Don't decode any bitmaps.
+  flags |= FT_LOAD_NO_BITMAP;            // Ignore embedded bitmaps.
+  flags &= ~FT_LOAD_RENDER;              // Don't scan convert.
+  flags &= ~FT_LOAD_COLOR;               // Ignore SVG.
+  flags |= FT_LOAD_NO_HINTING;
+  flags |= FT_LOAD_NO_AUTOHINT;
+  flags |= FT_LOAD_IGNORE_TRANSFORM;
+
+  FT_Size size;
+  FT_Error err = FT_New_Size(face, &size);
+  if (err != 0) {
+    return false;
+  }
+
+  FT_Size oldSize = face->size;
+
+  auto tryGeneratePath = [face, &size, glyphID, flags, path]() {
+    FT_Error err = 0;
+
+    err = FT_Activate_Size(size);
+    if (err != 0) {
+      return false;
+    }
+
+    err = FT_Set_Char_Size(face, face->units_per_EM << 6, face->units_per_EM << 6, 72, 72);
+    if (err != 0) {
+      return false;
+    }
+
+    err = FT_Load_Glyph(face, glyphID, flags);
+    if (err != 0) {
+      path->reset();
+      return false;
+    }
+
+    if (!GenerateGlyphPath(face, path)) {
+      path->reset();
+      return false;
+    }
+
+    return true;
+  };
+
+  bool pathGenerationResult = tryGeneratePath();
+
+  FT_Activate_Size(oldSize);
+
+  return pathGenerationResult;
+}
+
+/* In drawing mode, concatenates the transforms directly on SkCanvas. In
+ * bounding box calculation mode, no SkCanvas is specified, but we only want to
+ * retrieve the transform from the FreeType paint object. */
+void colrv1_transform(FT_Face face, const FT_COLR_Paint& colrPaint, Canvas* canvas,
+                      Matrix* outTransform = nullptr) {
+  Matrix transform;
+
+  // SkASSERT(canvas || outTransform);
+
+  switch (colrPaint.format) {
+    case FT_COLR_PAINTFORMAT_TRANSFORM: {
+      auto affine = colrPaint.u.transform.affine;
+      transform = Matrix::MakeAll(FTFixedToFloat(affine.xx), -FTFixedToFloat(affine.xy),
+                                  FTFixedToFloat(affine.dx), -FTFixedToFloat(affine.yx),
+                                  FTFixedToFloat(affine.yy), -FTFixedToFloat(affine.dy));
+      break;
+    }
+    case FT_COLR_PAINTFORMAT_TRANSLATE: {
+      transform = Matrix::MakeTrans(FTFixedToFloat(colrPaint.u.translate.dx),
+                                    -FTFixedToFloat(colrPaint.u.translate.dy));
+      break;
+    }
+    case FT_COLR_PAINTFORMAT_SCALE: {
+      transform.setScale(
+          FTFixedToFloat(colrPaint.u.scale.scale_x), FTFixedToFloat(colrPaint.u.scale.scale_y),
+          FTFixedToFloat(colrPaint.u.scale.center_x), -FTFixedToFloat(colrPaint.u.scale.center_y));
+      break;
+    }
+    case FT_COLR_PAINTFORMAT_ROTATE: {
+      // COLRv1 angles are counter-clockwise, compare
+      // https://docs.microsoft.com/en-us/typography/opentype/spec/colr#formats-24-to-27-paintrotate-paintvarrotate-paintrotatearoundcenter-paintvarrotatearoundcenter
+      transform = Matrix::MakeRotate(-FTFixedToFloat(colrPaint.u.rotate.angle) * 180.0f,
+                                     FTFixedToFloat(colrPaint.u.rotate.center_x),
+                                     -FTFixedToFloat(colrPaint.u.rotate.center_y));
+      break;
+    }
+    case FT_COLR_PAINTFORMAT_SKEW: {
+      // In the PAINTFORMAT_ROTATE implementation, SkMatrix setRotate
+      // snaps to 0 for values very close to 0. Do the same here.
+
+      float xDeg = FTFixedToFloat(colrPaint.u.skew.x_skew_angle) * 180.0f;
+      float xRad = DegreesToRadians(xDeg);
+      float xTan = std::tan(xRad);
+      xTan = FloatNearlyZero(xTan) ? 0.0f : xTan;
+
+      float yDeg = FTFixedToFloat(colrPaint.u.skew.y_skew_angle) * 180.0f;
+      // Negate y_skew_angle due to Skia's y-down coordinate system to achieve
+      // counter-clockwise skew along the y-axis.
+      float yRad = DegreesToRadians(-yDeg);
+      float yTan = std::tan(yRad);
+      yTan = FloatNearlyZero(yTan) ? 0.0f : yTan;
+
+      transform.setSkew(xTan, yTan, FTFixedToFloat(colrPaint.u.skew.center_x),
+                        -FTFixedToFloat(colrPaint.u.skew.center_y));
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+  if (canvas) {
+    canvas->concat(transform);
+  }
+  if (outTransform) {
+    *outTransform = transform;
+  }
+}
+
+bool colrv1_traverse_paint_bounds(Matrix* ctm, Rect* bounds, FT_Face face,
+                                  FT_OpaquePaint opaquePaint) {
+  FT_COLR_Paint paint;
+  if (!FT_Get_Paint(face, opaquePaint, &paint)) {
+    return false;
+  }
+
+  Matrix restoreMatrix = *ctm;
+
+  switch (paint.format) {
+    case FT_COLR_PAINTFORMAT_COLR_LAYERS: {
+      FT_LayerIterator& layerIterator = paint.u.colr_layers.layer_iterator;
+      FT_OpaquePaint layerPaint{nullptr, 1};
+      while (FT_Get_Paint_Layers(face, &layerIterator, &layerPaint)) {
+        if (!colrv1_traverse_paint_bounds(ctm, bounds, face, layerPaint)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    case FT_COLR_PAINTFORMAT_GLYPH: {
+      FT_UInt glyphID = paint.u.glyph.glyphID;
+      Path path;
+      if (!generateFacePathCOLRv1(face, glyphID, &path)) {
+        return false;
+      }
+      path.transform(*ctm);
+      bounds->join(path.getBounds());
+      return true;
+    }
+    case FT_COLR_PAINTFORMAT_COLR_GLYPH: {
+      FT_UInt glyphID = paint.u.colr_glyph.glyphID;
+      return colrv1_start_glyph_bounds(ctm, bounds, face, glyphID, FT_COLOR_NO_ROOT_TRANSFORM);
+    }
+    case FT_COLR_PAINTFORMAT_TRANSFORM: {
+      Matrix transformMatrix;
+      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      ctm->preConcat(transformMatrix);
+      FT_OpaquePaint& transformPaint = paint.u.transform.paint;
+      return colrv1_traverse_paint_bounds(ctm, bounds, face, transformPaint);
+    }
+    case FT_COLR_PAINTFORMAT_TRANSLATE: {
+      Matrix transformMatrix;
+      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      ctm->preConcat(transformMatrix);
+      FT_OpaquePaint& translatePaint = paint.u.translate.paint;
+      return colrv1_traverse_paint_bounds(ctm, bounds, face, translatePaint);
+    }
+    case FT_COLR_PAINTFORMAT_SCALE: {
+      Matrix transformMatrix;
+      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      ctm->preConcat(transformMatrix);
+      FT_OpaquePaint& scalePaint = paint.u.scale.paint;
+      return colrv1_traverse_paint_bounds(ctm, bounds, face, scalePaint);
+    }
+    case FT_COLR_PAINTFORMAT_ROTATE: {
+      Matrix transformMatrix;
+      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      ctm->preConcat(transformMatrix);
+      FT_OpaquePaint& rotatePaint = paint.u.rotate.paint;
+      return colrv1_traverse_paint_bounds(ctm, bounds, face, rotatePaint);
+    }
+    case FT_COLR_PAINTFORMAT_SKEW: {
+      Matrix transformMatrix;
+      colrv1_transform(face, paint, nullptr, &transformMatrix);
+      ctm->preConcat(transformMatrix);
+      FT_OpaquePaint& skewPaint = paint.u.skew.paint;
+      return colrv1_traverse_paint_bounds(ctm, bounds, face, skewPaint);
+    }
+    case FT_COLR_PAINTFORMAT_COMPOSITE: {
+      FT_OpaquePaint& backdropPaint = paint.u.composite.backdrop_paint;
+      FT_OpaquePaint& sourcePaint = paint.u.composite.source_paint;
+      return colrv1_traverse_paint_bounds(ctm, bounds, face, backdropPaint) &&
+             colrv1_traverse_paint_bounds(ctm, bounds, face, sourcePaint);
+    }
+    case FT_COLR_PAINTFORMAT_SOLID:
+    case FT_COLR_PAINTFORMAT_LINEAR_GRADIENT:
+    case FT_COLR_PAINTFORMAT_RADIAL_GRADIENT:
+    case FT_COLR_PAINTFORMAT_SWEEP_GRADIENT: {
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+uint32_t multiplyAlpha(uint32_t color, float alphaMultiplier) {
+  uint8_t r = (color >> 16) & 0xFF;
+  uint8_t g = (color >> 8) & 0xFF;
+  uint8_t b =  color & 0xFF;
+  uint8_t a = (color >> 24) & 0xFF;
+
+  // 计算新的 alpha 值
+  uint8_t newAlpha = static_cast<uint8_t>(std::clamp(a * alphaMultiplier, 0.0f, 255.0f));
+
+  // 重新组合成 uint32_t 类型的颜色值
+  return (newAlpha << 24) | (r << 16) | (g << 8) | b;
+}
+
+Color Uint32ToColor(uint32_t color) {
+  float r = ((color >> 16) & 0xFF) / 255.0f;
+  float g = ((color >> 8) & 0xFF) / 255.0f;
+  float b = (color & 0xFF) / 255.0f;
+  float a = ((color >> 24) & 0xFF) / 255.0f;
+  return tgfx::Color{r, g, b, a};
+}
+
+bool computeColrV1GlyphBoundingBox(FT_Face face, GlyphID glyphID, Rect* bounds) {
+  Matrix ctm;
+  *bounds = Rect::MakeEmpty();
+  return colrv1_start_glyph_bounds(&ctm, bounds, face, glyphID, FT_COLOR_INCLUDE_ROOT_TRANSFORM);
+}
+
+bool getBoundsOfCurrentOutlineGlyph(FT_GlyphSlot glyph, Rect* bounds) {
+  if (glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+    return false;
+  }
+  if (0 == glyph->outline.n_contours) {
+    return false;
+  }
+
+  FT_BBox bbox;
+  FT_Outline_Get_CBox(&glyph->outline, &bbox);
+  *bounds = Rect::MakeLTRB(FDot6ToFloat(bbox.xMin), -FDot6ToFloat(bbox.yMax),
+                             FDot6ToFloat(bbox.xMax), -FDot6ToFloat(bbox.yMin));
+  return true;
+}
+
+bool colrv1_configure_skpaint(FT_Face face,
+                              const std::vector<uint32_t>& palette,
+                              const uint32_t foregroundColor,
+                              const FT_COLR_Paint& colrPaint,
+                              Paint* paint) {
+    auto fetchColorStops = [&face, &palette, &foregroundColor](
+                                               const FT_ColorStopIterator& colorStopIterator,
+                                               std::vector<float>& stops,
+                                               std::vector<uint32_t>& colors) -> bool {
+        const FT_UInt colorStopCount = colorStopIterator.num_color_stops;
+        if (colorStopCount == 0) {
+            return false;
+        }
+
+        // 5.7.11.2.4 ColorIndex, ColorStop and ColorLine
+        // "Applications shall apply the colorStops in increasing stopOffset order."
+        struct ColorStop {
+            float pos;
+            uint32_t color;
+        };
+        std::vector<ColorStop> colorStopsSorted;
+        colorStopsSorted.resize(colorStopCount);
+
+        FT_ColorStop ftStop;
+        FT_ColorStopIterator mutable_color_stop_iterator = colorStopIterator;
+        while (FT_Get_Colorline_Stops(face, &ftStop, &mutable_color_stop_iterator)) {
+            FT_UInt index = mutable_color_stop_iterator.current_color_stop - 1;
+            ColorStop& skStop = colorStopsSorted[index];
+            skStop.pos = ftStop.stop_offset / kColorStopShift;
+            FT_UInt16& palette_index = ftStop.color.palette_index;
+            if (palette_index == kForegroundColorPaletteIndex) {
+                skStop.color = foregroundColor;
+            } else if (palette_index >= palette.size()) {
+                return false;
+            } else {
+                skStop.color = palette[palette_index];
+            }
+            skStop.color = multiplyAlpha(skStop.color, ftStop.color.alpha / float(1 << 14));
+        }
+
+        std::stable_sort(colorStopsSorted.begin(), colorStopsSorted.end(),
+                         [](const ColorStop& a, const ColorStop& b) { return a.pos < b.pos; });
+
+        stops.resize(colorStopCount);
+        colors.resize(colorStopCount);
+        for (size_t i = 0; i < colorStopCount; ++i) {
+            stops[i] = colorStopsSorted[i].pos;
+            colors[i] = colorStopsSorted[i].color;
+        }
+        return true;
+    };
+
+    switch (colrPaint.format) {
+        case FT_COLR_PAINTFORMAT_SOLID: {
+        //     FT_PaintSolid solid = colrPaint.u.solid;
+        //
+        //     // Dont' draw anything with this color if the palette index is out of bounds.
+        //     uint32_t color = 0x00000000;
+        //     if (solid.color.palette_index == kForegroundColorPaletteIndex) {
+        //         color = foregroundColor;
+        //     } else if (solid.color.palette_index >= palette.size()) {
+        //         return false;
+        //     } else {
+        //         color = palette[solid.color.palette_index];
+        //     }
+        //     color = multiplyAlpha(color, solid.color.alpha / float(1 << 14));
+        //     paint->setShader(nullptr);
+        //     paint->setColor(Uint32ToColor(color));
+        //     return true;
+        // }
+        case FT_COLR_PAINTFORMAT_LINEAR_GRADIENT: {
+        //     const FT_PaintLinearGradient& linearGradient = colrPaint.u.linear_gradient;
+        //     std::vector<float> stops;
+        //     std::vector<SkColor4f> colors;
+        //
+        //     if (!fetchColorStops(linearGradient.colorline.color_stop_iterator, stops, colors)) {
+        //         return false;
+        //     }
+        //
+        //     if (stops.size() == 1) {
+        //         paint->setColor(colors[0]);
+        //         return true;
+        //     }
+        //
+        //     SkPoint linePositions[2] = {SkPoint::Make( SkFixedToScalar(linearGradient.p0.x),
+        //                                               -SkFixedToScalar(linearGradient.p0.y)),
+        //                                 SkPoint::Make( SkFixedToScalar(linearGradient.p1.x),
+        //                                               -SkFixedToScalar(linearGradient.p1.y))};
+        //     SkPoint p0 = linePositions[0];
+        //     SkPoint p1 = linePositions[1];
+        //     SkPoint p2 = SkPoint::Make( SkFixedToScalar(linearGradient.p2.x),
+        //                                -SkFixedToScalar(linearGradient.p2.y));
+        //
+        //     // If p0p1 or p0p2 are degenerate probably nothing should be drawn.
+        //     // If p0p1 and p0p2 are parallel then one side is the first color and the other side is
+        //     // the last color, depending on the direction.
+        //     // For now, just use the first color.
+        //     if (p1 == p0 || p2 == p0 || !SkPoint::CrossProduct(p1 - p0, p2 - p0)) {
+        //         paint->setColor(colors[0]);
+        //         return true;
+        //     }
+        //
+        //     // Follow implementation note in nanoemoji:
+        //     // https://github.com/googlefonts/nanoemoji/blob/0ac6e7bb4d8202db692574d8530a9b643f1b3b3c/src/nanoemoji/svg.py#L188
+        //     // to compute a new gradient end point P3 as the orthogonal
+        //     // projection of the vector from p0 to p1 onto a line perpendicular
+        //     // to line p0p2 and passing through p0.
+        //     SkVector perpendicularToP2P0 = (p2 - p0);
+        //     perpendicularToP2P0 = SkPoint::Make( perpendicularToP2P0.y(),
+        //                                         -perpendicularToP2P0.x());
+        //     SkVector p3 = p0 + SkVectorProjection((p1 - p0), perpendicularToP2P0);
+        //     linePositions[1] = p3;
+        //
+        //     // Project/scale points according to stop extrema along p0p3 line,
+        //     // p3 being the result of the projection above, then scale stops to
+        //     // to [0, 1] range so that repeat modes work.  The Skia linear
+        //     // gradient shader performs the repeat modes over the 0 to 1 range,
+        //     // that's why we need to scale the stops to within that range.
+        //     SkTileMode tileMode = ToSkTileMode(linearGradient.colorline.extend);
+        //     SkScalar colorStopRange = stops.back() - stops.front();
+        //     // If the color stops are all at the same offset position, repeat and reflect modes
+        //     // become meaningless.
+        //     if (colorStopRange == 0.f) {
+        //       if (tileMode != SkTileMode::kClamp) {
+        //         paint->setColor(SK_ColorTRANSPARENT);
+        //         return true;
+        //       } else {
+        //         // Insert duplicated fake color stop in pad case at +1.0f to enable the projection
+        //         // of circles for an originally 0-length color stop range. Adding this stop will
+        //         // paint the equivalent gradient, because: All font specified color stops are in the
+        //         // same spot, mode is pad, so everything before this spot is painted with the first
+        //         // color, everything after this spot is painted with the last color. Not adding this
+        //         // stop will skip the projection and result in specifying non-normalized color stops
+        //         // to the shader.
+        //         stops.push_back(stops.back() + 1.0f);
+        //         colors.push_back(colors.back());
+        //         colorStopRange = 1.0f;
+        //       }
+        //     }
+        //     SkASSERT(colorStopRange != 0.f);
+        //
+        //     // If the colorStopRange is 0 at this point, the default behavior of the shader is to
+        //     // clamp to 1 color stops that are above 1, clamp to 0 for color stops that are below 0,
+        //     // and repeat the outer color stops at 0 and 1 if the color stops are inside the
+        //     // range. That will result in the correct rendering.
+        //     if ((colorStopRange != 1 || stops.front() != 0.f)) {
+        //         SkVector p0p3 = p3 - p0;
+        //         SkVector p0Offset = p0p3;
+        //         p0Offset.scale(stops.front());
+        //         SkVector p1Offset = p0p3;
+        //         p1Offset.scale(stops.back());
+        //
+        //         linePositions[0] = p0 + p0Offset;
+        //         linePositions[1] = p0 + p1Offset;
+        //
+        //         SkScalar scaleFactor = 1 / colorStopRange;
+        //         SkScalar startOffset = stops.front();
+        //         for (SkScalar& stop : stops) {
+        //             stop = (stop - startOffset) * scaleFactor;
+        //         }
+        //     }
+        //
+        //     sk_sp<SkShader> shader(SkGradientShader::MakeLinear(
+        //         linePositions,
+        //         colors.data(), SkColorSpace::MakeSRGB(), stops.data(), stops.size(),
+        //         tileMode,
+        //         SkGradientShader::Interpolation{
+        //             SkGradientShader::Interpolation::InPremul::kNo,
+        //             SkGradientShader::Interpolation::ColorSpace::kSRGB,
+        //             SkGradientShader::Interpolation::HueMethod::kShorter
+        //         },
+        //         nullptr));
+        //
+        //     SkASSERT(shader);
+        //     // An opaque color is needed to ensure the gradient is not modulated by alpha.
+        //     paint->setColor(SK_ColorBLACK);
+        //     paint->setShader(shader);
+        //     return true;
+        // }
+        case FT_COLR_PAINTFORMAT_RADIAL_GRADIENT: {
+            const FT_PaintRadialGradient& radialGradient = colrPaint.u.radial_gradient;
+            Point start = Point::Make( FixedToFloat(radialGradient.c0.x),
+                                          -FixedToFloat(radialGradient.c0.y));
+            float startRadius = FixedToFloat(radialGradient.r0);
+            Point end = Point::Make( FixedToFloat(radialGradient.c1.x),
+                                        -FixedToFloat(radialGradient.c1.y));
+            float endRadius = FixedToFloat(radialGradient.r1);
+
+
+            std::vector<float> stops;
+            std::vector<Color> colors;
+            if (!fetchColorStops(radialGradient.colorline.color_stop_iterator, stops, colors)) {
+                return false;
+            }
+
+            if (stops.size() == 1) {
+                paint->setColor(colors[0]);
+                return true;
+            }
+
+            float colorStopRange = stops.back() - stops.front();
+            SkTileMode tileMode = ToSkTileMode(radialGradient.colorline.extend);
+
+            if (colorStopRange == 0.f) {
+              if (tileMode != SkTileMode::kClamp) {
+                paint->setColor(SK_ColorTRANSPARENT);
+                return true;
+              } else {
+                // Insert duplicated fake color stop in pad case at +1.0f to enable the projection
+                // of circles for an originally 0-length color stop range. Adding this stop will
+                // paint the equivalent gradient, because: All font specified color stops are in the
+                // same spot, mode is pad, so everything before this spot is painted with the first
+                // color, everything after this spot is painted with the last color. Not adding this
+                // stop will skip the projection and result in specifying non-normalized color stops
+                // to the shader.
+                stops.push_back(stops.back() + 1.0f);
+                colors.push_back(colors.back());
+                colorStopRange = 1.0f;
+              }
+            }
+            SkASSERT(colorStopRange != 0.f);
+
+            // If the colorStopRange is 0 at this point, the default behavior of the shader is to
+            // clamp to 1 color stops that are above 1, clamp to 0 for color stops that are below 0,
+            // and repeat the outer color stops at 0 and 1 if the color stops are inside the
+            // range. That will result in the correct rendering.
+            if (colorStopRange != 1 || stops.front() != 0.f) {
+                // For the Skia two-point caonical shader to understand the
+                // COLRv1 color stops we need to scale stops to 0 to 1 range and
+                // interpolate new centers and radii. Otherwise the shader
+                // clamps stops outside the range to 0 and 1 (larger interval)
+                // or repeats the outer stops at 0 and 1 if the (smaller
+                // interval).
+                SkVector startToEnd = end - start;
+                SkScalar radiusDiff = endRadius - startRadius;
+                SkScalar scaleFactor = 1 / colorStopRange;
+                SkScalar stopsStartOffset = stops.front();
+
+                SkVector startOffset = startToEnd;
+                startOffset.scale(stops.front());
+                SkVector endOffset = startToEnd;
+                endOffset.scale(stops.back());
+
+                // The order of the following computations is important in order to avoid
+                // overwriting start or startRadius before the second reassignment.
+                end = start + endOffset;
+                start = start + startOffset;
+                endRadius = startRadius + radiusDiff * stops.back();
+                startRadius = startRadius + radiusDiff * stops.front();
+
+                for (auto& stop : stops) {
+                    stop = (stop - stopsStartOffset) * scaleFactor;
+                }
+            }
+
+            // For negative radii, interpolation is needed to prepare parameters suitable
+            // for invoking the shader. Implementation below as resolution discussed in
+            // https://github.com/googlefonts/colr-gradients-spec/issues/367.
+            // Truncate to manually interpolated color for tile mode clamp, otherwise
+            // calculate positive projected circles.
+            if (startRadius < 0 || endRadius < 0) {
+                if (startRadius == endRadius && startRadius < 0) {
+                    paint->setColor(SK_ColorTRANSPARENT);
+                    return true;
+                }
+
+                if (tileMode == SkTileMode::kClamp) {
+                    SkVector startToEnd = end - start;
+                    SkScalar radiusDiff = endRadius - startRadius;
+                    SkScalar zeroRadiusStop = 0.f;
+                    TruncateStops truncateSide = TruncateStart;
+                    if (startRadius < 0) {
+                        truncateSide = TruncateStart;
+
+                        // Compute color stop position where radius is = 0.  After the scaling
+                        // of stop positions to the normal 0,1 range that we have done above,
+                        // the size of the radius as a function of the color stops is: r(x) = r0
+                        // + x*(r1-r0) Solving this function for r(x) = 0, we get: x = -r0 /
+                        // (r1-r0)
+                        zeroRadiusStop = -startRadius / (endRadius - startRadius);
+                        startRadius = 0.f;
+                        SkVector startEndDiff = end - start;
+                        startEndDiff.scale(zeroRadiusStop);
+                        start = start + startEndDiff;
+                    }
+
+                    if (endRadius < 0) {
+                        truncateSide = TruncateEnd;
+                        zeroRadiusStop = -startRadius / (endRadius - startRadius);
+                        endRadius = 0.f;
+                        SkVector startEndDiff = end - start;
+                        startEndDiff.scale(1 - zeroRadiusStop);
+                        end = end - startEndDiff;
+                    }
+
+                    if (!(startRadius == 0 && endRadius == 0)) {
+                        truncateToStopInterpolating(
+                                zeroRadiusStop, colors, stops, truncateSide);
+                    } else {
+                        // If both radii have become negative and where clamped to 0, we need to
+                        // produce a single color cone, otherwise the shader colors the whole
+                        // plane in a single color when two radii are specified as 0.
+                        if (radiusDiff > 0) {
+                            end = start + startToEnd;
+                            endRadius = radiusDiff;
+                            colors.erase(colors.begin(), colors.end() - 1);
+                            stops.erase(stops.begin(), stops.end() - 1);
+                        } else {
+                            start -= startToEnd;
+                            startRadius = -radiusDiff;
+                            colors.erase(colors.begin() + 1, colors.end());
+                            stops.erase(stops.begin() + 1, stops.end());
+                        }
+                    }
+                } else {
+                    if (startRadius < 0 || endRadius < 0) {
+                        auto roundIntegerMultiple = [](SkScalar factorZeroCrossing,
+                                                       SkTileMode tileMode) {
+                            int roundedMultiple = factorZeroCrossing > 0
+                                                          ? ceilf(factorZeroCrossing)
+                                                          : floorf(factorZeroCrossing) - 1;
+                            if (tileMode == SkTileMode::kMirror && roundedMultiple % 2 != 0) {
+                                roundedMultiple += roundedMultiple < 0 ? -1 : 1;
+                            }
+                            return roundedMultiple;
+                        };
+
+                        SkVector startToEnd = end - start;
+                        SkScalar radiusDiff = endRadius - startRadius;
+                        SkScalar factorZeroCrossing = (startRadius / (startRadius - endRadius));
+                        bool inRange = 0.f <= factorZeroCrossing && factorZeroCrossing <= 1.0f;
+                        SkScalar direction = inRange && radiusDiff < 0 ? -1.0f : 1.0f;
+                        SkScalar circleProjectionFactor =
+                                roundIntegerMultiple(factorZeroCrossing * direction, tileMode);
+                        startToEnd.scale(circleProjectionFactor);
+                        startRadius += circleProjectionFactor * radiusDiff;
+                        endRadius += circleProjectionFactor * radiusDiff;
+                        start += startToEnd;
+                        end += startToEnd;
+                    }
+                }
+            }
+
+            // An opaque color is needed to ensure the gradient is not modulated by alpha.
+            paint->setColor(SK_ColorBLACK);
+
+            paint->setShader(SkGradientShader::MakeTwoPointConical(
+                start, startRadius, end, endRadius,
+                colors.data(), SkColorSpace::MakeSRGB(), stops.data(), stops.size(),
+                tileMode,
+                SkGradientShader::Interpolation{
+                    SkGradientShader::Interpolation::InPremul::kNo,
+                    SkGradientShader::Interpolation::ColorSpace::kSRGB,
+                    SkGradientShader::Interpolation::HueMethod::kShorter
+                },
+                nullptr));
+
+            return true;
+        }
+        case FT_COLR_PAINTFORMAT_SWEEP_GRADIENT: {
+            const FT_PaintSweepGradient& sweepGradient = colrPaint.u.sweep_gradient;
+            Point center = Point::Make( FixedToFloat(sweepGradient.center.x),
+                                           -FixedToFloat(sweepGradient.center.y));
+
+
+            float startAngle = FixedToFloat(sweepGradient.start_angle * 180.0f);
+            float endAngle = FixedToFloat(sweepGradient.end_angle * 180.0f);
+            // OpenType 1.9.1 adds a shift to the angle to ease specification of a 0 to 360
+            // degree sweep.
+            startAngle += 180.0f;
+            endAngle += 180.0f;
+
+            std::vector<float> stops;
+            std::vector<Color> colors;
+            if (!fetchColorStops(sweepGradient.colorline.color_stop_iterator, stops, colors)) {
+                return false;
+            }
+
+            if (stops.size() == 1) {
+                paint->setColor(colors[0]);
+                return true;
+            }
+
+            // An opaque color is needed to ensure the gradient is not modulated by alpha.
+            paint->setColor(SK_ColorBLACK);
+
+            // New (Var)SweepGradient implementation compliant with OpenType 1.9.1 from here.
+
+            // The shader expects stops from 0 to 1, so we need to account for
+            // minimum and maximum stop positions being different from 0 and
+            // 1. We do that by scaling minimum and maximum stop positions to
+            // the 0 to 1 interval and scaling the angles inverse proportionally.
+
+            // 1) Scale angles to their equivalent positions if stops were from 0 to 1.
+
+            SkScalar sectorAngle = endAngle - startAngle;
+            SkTileMode tileMode = ToSkTileMode(sweepGradient.colorline.extend);
+            if (sectorAngle == 0 && tileMode != SkTileMode::kClamp) {
+                // "If the ColorLine's extend mode is reflect or repeat and start and end angle
+                // are equal, nothing is drawn.".
+                paint->setColor(SK_ColorTRANSPARENT);
+                return true;
+            }
+
+
+            SkScalar startAngleScaled = startAngle + sectorAngle * stops.front();
+            SkScalar endAngleScaled = startAngle + sectorAngle * stops.back();
+
+            // 2) Scale stops accordingly to 0 to 1 range.
+
+            float colorStopRange = stops.back() - stops.front();
+            if (colorStopRange == 0.f) {
+              if (tileMode != SkTileMode::kClamp) {
+                paint->setColor(SK_ColorTRANSPARENT);
+                return true;
+              } else {
+                // Insert duplicated fake color stop in pad case at +1.0f to feed the shader correct
+                // values and enable painting a pad sweep gradient with two colors. Adding this stop
+                // will paint the equivalent gradient, because: All font specified color stops are
+                // in the same spot, mode is pad, so everything before this spot is painted with the
+                // first color, everything after this spot is painted with the last color. Not
+                // adding this stop will skip the projection and result in specifying non-normalized
+                // color stops to the shader.
+                stops.push_back(stops.back() + 1.0f);
+                colors.push_back(colors.back());
+                colorStopRange = 1.0f;
+              }
+            }
+
+            SkScalar scaleFactor = 1 / colorStopRange;
+            SkScalar startOffset = stops.front();
+
+            for (SkScalar& stop : stops) {
+                stop = (stop - startOffset) * scaleFactor;
+            }
+
+            /* https://docs.microsoft.com/en-us/typography/opentype/spec/colr#sweep-gradients
+             * "The angles are expressed in counter-clockwise degrees from
+             * the direction of the positive x-axis on the design
+             * grid. [...]  The color line progresses from the start angle
+             * to the end angle in the counter-clockwise direction;" -
+             * Convert angles and stops from counter-clockwise to clockwise
+             * for the shader if the gradient is not already reversed due to
+             * start angle being larger than end angle. */
+            startAngleScaled = 360.f - startAngleScaled;
+            endAngleScaled = 360.f - endAngleScaled;
+            if (startAngleScaled >= endAngleScaled) {
+                std::swap(startAngleScaled, endAngleScaled);
+                std::reverse(stops.begin(), stops.end());
+                std::reverse(colors.begin(), colors.end());
+                for (auto& stop : stops) {
+                    stop = 1.0f - stop;
+                }
+            }
+
+            paint->setShader(SkGradientShader::MakeSweep(
+                center.x(), center.y(),
+                colors.data(), SkColorSpace::MakeSRGB(), stops.data(), stops.size(),
+                tileMode,
+                startAngleScaled, endAngleScaled,
+                SkGradientShader::Interpolation{
+                    SkGradientShader::Interpolation::InPremul::kNo,
+                    SkGradientShader::Interpolation::ColorSpace::kSRGB,
+                    SkGradientShader::Interpolation::HueMethod::kShorter
+                },
+                nullptr));
+
+            return true;
+        }
+        default: {
+            SkASSERT(false);
+            return false;
+        }
+    }
+    SkUNREACHABLE;
+}
+
+bool colrv1_draw_paint(SkCanvas* canvas,
+                       const SkSpan<SkColor>& palette,
+                       const SkColor foregroundColor,
+                       FT_Face face,
+                       const FT_COLR_Paint& colrPaint) {
+    switch (colrPaint.format) {
+        case FT_COLR_PAINTFORMAT_GLYPH: {
+            FT_UInt glyphID = colrPaint.u.glyph.glyphID;
+            SkPath path;
+            /* TODO: Currently this call retrieves the path at units_per_em size. If we want to get
+             * correct hinting for the scaled size under the transforms at this point in the color
+             * glyph graph, we need to extract at least the requested glyph width and height and
+             * pass that to the path generation. */
+            if (!generateFacePathCOLRv1(face, glyphID, &path)) {
+                return false;
+            }
+            if constexpr (kSkShowTextBlitCoverage) {
+                SkPaint highlight_paint;
+                highlight_paint.setColor(0x33FF0000);
+                canvas->drawRect(path.getBounds(), highlight_paint);
+            }
+            canvas->clipPath(path, true /* doAntiAlias */);
+            return true;
+        }
+        case FT_COLR_PAINTFORMAT_SOLID:
+        case FT_COLR_PAINTFORMAT_LINEAR_GRADIENT:
+        case FT_COLR_PAINTFORMAT_RADIAL_GRADIENT:
+        case FT_COLR_PAINTFORMAT_SWEEP_GRADIENT: {
+            SkPaint skPaint;
+            if (!colrv1_configure_skpaint(face, palette, foregroundColor, colrPaint, &skPaint)) {
+                return false;
+            }
+            canvas->drawPaint(skPaint);
+            return true;
+        }
+        case FT_COLR_PAINTFORMAT_TRANSFORM:
+        case FT_COLR_PAINTFORMAT_TRANSLATE:
+        case FT_COLR_PAINTFORMAT_SCALE:
+        case FT_COLR_PAINTFORMAT_ROTATE:
+        case FT_COLR_PAINTFORMAT_SKEW:
+            [[fallthrough]];  // Transforms handled in colrv1_transform.
+        default:
+            SkASSERT(false);
+            return false;
+    }
+    SkUNREACHABLE;
+}
+
+bool colrv1_draw_glyph_with_path(Canvas* canvas,
+                                 const SkSpan<SkColor>& palette, SkColor foregroundColor,
+                                 FT_Face face,
+                                 const FT_COLR_Paint& glyphPaint, const FT_COLR_Paint& fillPaint) {
+  SkASSERT(glyphPaint.format == FT_COLR_PAINTFORMAT_GLYPH);
+  SkASSERT(fillPaint.format == FT_COLR_PAINTFORMAT_SOLID ||
+           fillPaint.format == FT_COLR_PAINTFORMAT_LINEAR_GRADIENT ||
+           fillPaint.format == FT_COLR_PAINTFORMAT_RADIAL_GRADIENT ||
+           fillPaint.format == FT_COLR_PAINTFORMAT_SWEEP_GRADIENT);
+
+  Paint skiaFillPaint;
+  skiaFillPaint.setAntiAlias(true);
+  if (!colrv1_configure_skpaint(face, palette, foregroundColor, fillPaint, &skiaFillPaint)) {
+    return false;
+  }
+
+  FT_UInt glyphID = glyphPaint.u.glyph.glyphID;
+  Path path;
+  /* TODO: Currently this call retrieves the path at units_per_em size. If we want to get
+   * correct hinting for the scaled size under the transforms at this point in the color
+   * glyph graph, we need to extract at least the requested glyph width and height and
+   * pass that to the path generation. */
+  if (!generateFacePathCOLRv1(face, glyphID, &path)) {
+    return false;
+  }
+  // if constexpr (kSkShowTextBlitCoverage) {
+  //   SkPaint highlightPaint;
+  //   highlightPaint.setColor(0x33FF0000);
+  //   canvas->drawRect(path.getBounds(), highlightPaint);
+  // }
+  canvas->drawPath(path, skiaFillPaint);
+  return true;
+}
+
+bool colrv1_traverse_paint(Canvas* canvas,
+                           const SkSpan<SkColor>& palette,
+                           const SkColor foregroundColor,
+                           FT_Face face,
+                           FT_OpaquePaint opaquePaint) {
+    FT_COLR_Paint paint;
+    if (!FT_Get_Paint(face, opaquePaint, &paint)) {
+        return false;
+    }
+
+    // SkAutoCanvasRestore autoRestore(canvas, true /* doSave */);
+    switch (paint.format) {
+        case FT_COLR_PAINTFORMAT_COLR_LAYERS: {
+            FT_LayerIterator& layerIterator = paint.u.colr_layers.layer_iterator;
+            FT_OpaquePaint layerPaint{nullptr, 1};
+            while (FT_Get_Paint_Layers(face, &layerIterator, &layerPaint)) {
+                if (!colrv1_traverse_paint(canvas, palette, foregroundColor, face,
+                                           layerPaint)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        case FT_COLR_PAINTFORMAT_GLYPH:
+            // Special case paint graph leaf situations to improve
+            // performance. These are situations in the graph where a GlyphPaint
+            // is followed by either a solid or a gradient fill. Here we can use
+            // drawPath() + SkPaint directly which is faster than setting a
+            // clipPath() followed by a drawPaint().
+            FT_COLR_Paint fillPaint;
+            if (!FT_Get_Paint(face, paint.u.glyph.paint, &fillPaint)) {
+                return false;
+            }
+            if (fillPaint.format == FT_COLR_PAINTFORMAT_SOLID ||
+                fillPaint.format == FT_COLR_PAINTFORMAT_LINEAR_GRADIENT ||
+                fillPaint.format == FT_COLR_PAINTFORMAT_RADIAL_GRADIENT ||
+                fillPaint.format == FT_COLR_PAINTFORMAT_SWEEP_GRADIENT)
+            {
+                return colrv1_draw_glyph_with_path(canvas, palette, foregroundColor,
+                                                   face, paint, fillPaint);
+            }
+            if (!colrv1_draw_paint(canvas, palette, foregroundColor, face, paint)) {
+                return false;
+            }
+            return colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                         face, paint.u.glyph.paint);
+        case FT_COLR_PAINTFORMAT_COLR_GLYPH:
+            return colrv1_start_glyph(canvas, palette, foregroundColor,
+                                      face, paint.u.colr_glyph.glyphID, FT_COLOR_NO_ROOT_TRANSFORM);
+        case FT_COLR_PAINTFORMAT_TRANSFORM:
+            colrv1_transform(face, paint, canvas);
+            return colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                         face, paint.u.transform.paint);
+        case FT_COLR_PAINTFORMAT_TRANSLATE:
+            colrv1_transform(face, paint, canvas);
+            return colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                         face, paint.u.translate.paint);
+        case FT_COLR_PAINTFORMAT_SCALE:
+            colrv1_transform(face, paint, canvas);
+            return colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                         face, paint.u.scale.paint);
+        case FT_COLR_PAINTFORMAT_ROTATE:
+            colrv1_transform(face, paint, canvas);
+            return colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                         face, paint.u.rotate.paint);
+        case FT_COLR_PAINTFORMAT_SKEW:
+            colrv1_transform(face, paint, canvas);
+            return colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                         face, paint.u.skew.paint);
+        case FT_COLR_PAINTFORMAT_COMPOSITE: {
+            // SkAutoCanvasRestore acr(canvas, false);
+            canvas->saveLayer(nullptr, nullptr);
+            if (!colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                       face, paint.u.composite.backdrop_paint)) {
+                return false;
+            }
+            Paint blendModePaint;
+            blendModePaint.setBlendMode(ToSkBlendMode(paint.u.composite.composite_mode));
+            canvas->saveLayer(nullptr, &blendModePaint);
+            return colrv1_traverse_paint(canvas, palette, foregroundColor,
+                                         face, paint.u.composite.source_paint);
+        }
+        case FT_COLR_PAINTFORMAT_SOLID:
+        case FT_COLR_PAINTFORMAT_LINEAR_GRADIENT:
+        case FT_COLR_PAINTFORMAT_RADIAL_GRADIENT:
+        case FT_COLR_PAINTFORMAT_SWEEP_GRADIENT: {
+            return colrv1_draw_paint(canvas, palette, foregroundColor, face, paint);
+        }
+        default:
+            return false;
+    }
+}
+
+// using VisitedSet = THashSet<FT_OpaquePaint, OpaquePaintHasher>;
+//
+// void ComputeColrV1GlyphBoundingBox(FT_Face face, GlyphID glyphID,
+//                                                            Rect* bounds) {
+//   SkMatrix ctm;
+//   *bounds = SkRect::MakeEmpty();
+//   VisitedSet activePaints;
+//   return colrv1_start_glyph_bounds(&ctm, bounds, face, glyphID,
+//                                    FT_COLOR_INCLUDE_ROOT_TRANSFORM, &activePaints);
+// }
+
+uint32_t FTColorToUint32(FT_Color color) {
+  return (color.alpha << 24) | (color.red << 16) | (color.green << 8) | color.blue;
+}
+
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
     : ScalerContext(std::move(tf), size), textScale(size) {
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
@@ -112,6 +1046,20 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
   auto face = ftTypeface()->face;
   if (FT_HAS_COLOR(face)) {
     loadGlyphFlags |= FT_LOAD_COLOR;
+    FT_Palette_Data paletteData;
+    if (FT_Palette_Data_Get(face, &paletteData)) {
+      return;
+    }
+    FT_UShort basePaletteIndex = 0;
+    FT_Color* ftPalette = nullptr;
+    if (FT_Palette_Select(face, basePaletteIndex, &ftPalette)) {
+      return;
+    }
+    auto platteCount = paletteData.num_palette_entries;
+    colorPlatte.resize(platteCount);
+    for (size_t i = 0; i < platteCount; i++) {
+      colorPlatte[i] = FTColorToUint32(ftPalette[i]);
+    }
   }
 
   auto err = FT_New_Size(face, &ftSize);
@@ -172,6 +1120,9 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
     // However, in FreeType 2.5.1 color bitmap-only fonts do not ignore this flag.
     // Force this flag off for bitmap-only fonts.
     loadGlyphFlags &= ~FT_LOAD_NO_BITMAP;
+
+    // Color bitmaps are supported.
+    loadGlyphFlags |= FT_LOAD_COLOR;
   }
 }
 
@@ -444,62 +1395,119 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
 void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
   auto face = ftTypeface()->face;
   FT_Outline_Get_CBox(&face->glyph->outline, bbox);
-
-  // outset the box to integral boundaries
-  bbox->xMin &= ~63;
-  bbox->yMin &= ~63;
-  bbox->xMax = (bbox->xMax + 63) & ~63;
-  bbox->yMax = (bbox->yMax + 63) & ~63;
 }
 
-Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
+Rect FTScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  return getBoundsInternal(glyphID, fauxBold, fauxItalic);
+}
+
+Rect FTScalerContext::getBoundsInternal(GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
   auto bounds = Rect::MakeEmpty();
   if (setupSize(fauxItalic)) {
     return bounds;
   }
-  auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   auto face = ftTypeface()->face;
+  bool haveLayers = false;
+  if (FT_IS_SCALABLE(face)) {
+    FT_OpaquePaint opaqueLayerPaint{nullptr, 1};
+    if (FT_Get_Color_Glyph_Paint(face, glyphID, FT_COLOR_INCLUDE_ROOT_TRANSFORM,
+                                 &opaqueLayerPaint)) {
+      haveLayers = true;
+
+      // COLRv1 optionally provides a ClipBox.
+      FT_ClipBox clipBox;
+      if (FT_Get_Color_Glyph_ClipBox(face, glyphID, &clipBox)) {
+        // Find bounding box of clip box corner points, needed when clipbox is transformed.
+        FT_BBox bbox;
+        bbox.xMin = clipBox.bottom_left.x;
+        bbox.xMax = clipBox.bottom_left.x;
+        bbox.yMin = clipBox.bottom_left.y;
+        bbox.yMax = clipBox.bottom_left.y;
+        for (auto& corner : {clipBox.top_left, clipBox.top_right, clipBox.bottom_right}) {
+          bbox.xMin = std::min(bbox.xMin, corner.x);
+          bbox.yMin = std::min(bbox.yMin, corner.y);
+          bbox.xMax = std::max(bbox.xMax, corner.x);
+          bbox.yMax = std::max(bbox.yMax, corner.y);
+        }
+        bounds = Rect::MakeLTRB(FDot6ToFloat(bbox.xMin), -FDot6ToFloat(bbox.yMax),
+                                FDot6ToFloat(bbox.xMax), -FDot6ToFloat(bbox.yMin));
+      } else {
+        // Traverse the glyph graph with a focus on measuring the required bounding box.
+        // The call to computeColrV1GlyphBoundingBox may modify the face.
+        // Reset the face to load the base glyph for metrics.
+        if (computeColrV1GlyphBoundingBox(face, glyphID, &bounds) || setupSize(fauxItalic)) {
+          return bounds;
+        }
+      }
+    }
+    if (!haveLayers) {
+      FT_LayerIterator layerIterator = { 0, 0, nullptr };
+      FT_UInt layerGlyphIndex;
+      FT_UInt layerColorIndex;
+      FT_Int32 flags = loadGlyphFlags;
+      flags |= FT_LOAD_BITMAP_METRICS_ONLY;  // Don't decode any bitmaps.
+      flags |= FT_LOAD_NO_BITMAP; // Ignore embedded bitmaps.
+      flags &= ~FT_LOAD_RENDER;  // Don't scan convert.
+      flags &= ~FT_LOAD_COLOR;  // Ignore SVG.
+      // For COLRv0 compute the glyph bounding box from the union of layer bounding boxes.
+      while (FT_Get_Color_Glyph_Layer(face, glyphID, &layerGlyphIndex,
+                                      &layerColorIndex, &layerIterator)) {
+        haveLayers = true;
+        if (FT_Load_Glyph(face, layerGlyphIndex, flags)) {
+          return bounds;
+        }
+
+        Rect currentBounds;
+        if (getBoundsOfCurrentOutlineGlyph(face->glyph, &currentBounds)) {
+          bounds.join(currentBounds);
+        }
+      }
+      // if (haveLayers) {
+      //   mx.extraBits = ScalerContextBits::COLRv0;
+      // }
+    }
+    // if (haveLayers) {g
+    //   mx.maskFormat = SkMask::kARGB32_Format;
+    //   mx.neverRequestPath = true;
+    //   updateGlyphBoundsIfSubpixel(glyph, &bounds, this->isSubpixel());
+    //   mx.bounds = bounds;
+    // }
+  }
+
+  auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
   if (err != FT_Err_Ok) {
     return bounds;
   }
-  if (fauxBold) {
-    ApplyEmbolden(face, face->glyph, glyphID, glyphFlags);
-  }
-  if (face->glyph->format == FT_GLYPH_FORMAT_OUTLINE) {
-    using FT_PosLimits = std::numeric_limits<FT_Pos>;
-    FT_BBox rect = {FT_PosLimits::max(), FT_PosLimits::max(), FT_PosLimits::min(),
-                    FT_PosLimits::min()};
-    if (0 < face->glyph->outline.n_contours) {
-      getBBoxForCurrentGlyph(&rect);
-    } else {
-      rect = {0, 0, 0, 0};
+  if (!haveLayers) {
+    if (fauxBold) {
+      ApplyEmbolden(face, face->glyph, glyphID, glyphFlags);
     }
-    // Round out, no longer dot6.
-    rect.xMin = FDot6Floor(rect.xMin);
-    rect.yMin = FDot6Floor(rect.yMin);
-    rect.xMax = FDot6Ceil(rect.xMax);
-    rect.yMax = FDot6Ceil(rect.yMax);
-
-    FT_Pos width = rect.xMax - rect.xMin;
-    FT_Pos height = rect.yMax - rect.yMin;
-    FT_Pos top = -rect.yMax;  // Freetype y-up, We y-down.
-    FT_Pos left = rect.xMin;
-
-    bounds.setXYWH(static_cast<float>(left), static_cast<float>(top), static_cast<float>(width),
-                   static_cast<float>(height));
-  } else if (face->glyph->format == FT_GLYPH_FORMAT_BITMAP) {
-    bounds.setXYWH(static_cast<float>(face->glyph->bitmap_left),
-                   -static_cast<float>(face->glyph->bitmap_top),
-                   static_cast<float>(face->glyph->bitmap.width),
-                   static_cast<float>(face->glyph->bitmap.rows));
-    auto matrix = getExtraMatrix(fauxItalic);
-    matrix.mapRect(&bounds);
-    bounds.roundOut();
-  } else {
-    LOGE("FTScalerContext::getBounds() unknown glyph format!");
+    if (face->glyph->format == FT_GLYPH_FORMAT_OUTLINE) {
+      using FT_PosLimits = std::numeric_limits<FT_Pos>;
+      FT_BBox rect = {FT_PosLimits::max(), FT_PosLimits::max(), FT_PosLimits::min(),
+                      FT_PosLimits::min()};
+      if (0 < face->glyph->outline.n_contours) {
+        getBBoxForCurrentGlyph(&rect);
+      } else {
+        rect = {0, 0, 0, 0};
+      }
+      bounds.setLTRB(FDot6ToFloat(rect.xMin), -FDot6ToFloat(rect.yMax), FDot6ToFloat(rect.xMax),
+                     -FDot6ToFloat(rect.yMin));
+    } else if (face->glyph->format == FT_GLYPH_FORMAT_BITMAP) {
+      bounds.setXYWH(static_cast<float>(face->glyph->bitmap_left),
+                     -static_cast<float>(face->glyph->bitmap_top),
+                     static_cast<float>(face->glyph->bitmap.width),
+                     static_cast<float>(face->glyph->bitmap.rows));
+      auto matrix = getExtraMatrix(fauxItalic);
+      matrix.mapRect(&bounds);
+      bounds.roundOut();
+    } else {
+      LOGE("FTScalerContext::getBounds() unknown glyph format!");
+    }
   }
+
   return bounds;
 }
 
@@ -567,6 +1575,24 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
 std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID,
                                                             bool tryHardware) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  if (setupSize(false)) {
+    return nullptr;
+  }
+  // colrv1 字体处理
+  if (true) {
+    Recorder recorder;
+    auto canvas = recorder.beginRecording();
+    if (!canvas) {
+      return nullptr;
+    }
+    canvas->clear();
+    auto glyphBounds = getBoundsInternal(glyphID, false, false);
+    canvas->translate(-glyphBounds.left(), -glyphBounds.top());
+
+
+
+  }
+
   auto glyphFlags = loadGlyphFlags;
   glyphFlags |= FT_LOAD_RENDER;
   glyphFlags &= ~FT_LOAD_NO_BITMAP;

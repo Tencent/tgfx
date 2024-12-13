@@ -221,18 +221,13 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
 
 TGFX_TEST(CanvasTest, textShape) {
   auto serifTypeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+      Typeface::MakeFromPath("/Users/kevingpqi/Desktop/pag/font/NotoColorEmoji.ttf");
   ASSERT_TRUE(serifTypeface != nullptr);
   std::string text =
-      "ffi fl\n"
-      "x²-y²\n"
-      "🤡👨🏼‍🦱👨‍👨‍👧‍👦\n"
-      "🇨🇳🇫🇮\n"
-      "#️⃣#*️⃣*\n"
-      "1️⃣🔟";
+      "🥰";
   auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
 
-  float fontSize = 25.f;
+  float fontSize = 40.f;
   float lineHeight = fontSize * 1.2f;
   float height = 0;
   float width = 0;
@@ -280,16 +275,16 @@ TGFX_TEST(CanvasTest, textShape) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface =
-      Surface::Make(context, static_cast<int>(ceil(width)), static_cast<int>(ceil(height)));
+      Surface::Make(context, static_cast<int>(ceil(width) * 10), static_cast<int>(ceil(height) * 10));
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
 
-  Paint strokePaint;
-  strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
-  strokePaint.setStrokeWidth(2.f);
-  strokePaint.setStyle(PaintStyle::Stroke);
-  canvas->drawPath(path, strokePaint);
+  // Paint strokePaint;
+  // strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  // strokePaint.setStrokeWidth(2.f);
+  // strokePaint.setStyle(PaintStyle::Stroke);
+  // canvas->drawPath(path, strokePaint);
 
   Paint paint;
   paint.setColor(Color::Black());
@@ -298,7 +293,7 @@ TGFX_TEST(CanvasTest, textShape) {
                        textRun.font, paint);
   }
   context->flush();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape-1"));
 }
 
 TGFX_TEST(CanvasTest, filterMode) {
