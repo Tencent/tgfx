@@ -21,6 +21,18 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
+std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
+  auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
+  if (glyphRunLists == nullptr || glyphRunLists->size() != 1) {
+    return nullptr;
+  }
+  auto glyphRunList = (*glyphRunLists)[0];
+  if (!glyphRunList->hasOutlines()) {
+    return nullptr;
+  }
+  return std::make_shared<GlyphShape>(std::move(glyphRunList));
+}
+
 Rect GlyphShape::getBounds(float resolutionScale) const {
   return glyphRunList->getBounds(resolutionScale);
 }

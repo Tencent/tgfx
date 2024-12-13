@@ -296,7 +296,8 @@ std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Color color, const RRect& rRect,
 RRectDrawOp::RRectDrawOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
                          const Matrix& uvMatrix)
     : DrawOp(ClassID()), uvMatrix(uvMatrix) {
-  setTransformedBounds(rRect.rect, viewMatrix);
+  auto bounds = viewMatrix.mapRect(rRect.rect);
+  setBounds(bounds);
   auto rRectPaint = std::make_shared<RRectPaint>(color, 0.f, 0.f, rRect, viewMatrix);
   rRectPaints.push_back(std::move(rRectPaint));
 }

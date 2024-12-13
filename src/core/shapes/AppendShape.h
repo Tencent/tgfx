@@ -30,6 +30,8 @@ class AppendShape : public Shape {
   explicit AppendShape(std::vector<std::shared_ptr<Shape>> shapes) : shapes(std::move(shapes)) {
   }
 
+  bool isInverseFillType() const override;
+
   Rect getBounds(float resolutionScale = 1.0f) const override;
 
   Path getPath(float resolutionScale = 1.0f) const override;

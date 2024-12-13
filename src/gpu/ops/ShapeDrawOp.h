@@ -28,7 +28,7 @@ class ShapeDrawOp : public DrawOp {
   DEFINE_OP_CLASS_ID
 
   static std::unique_ptr<ShapeDrawOp> Make(Color color, std::shared_ptr<Shape> shape,
-                                           const Matrix& viewMatrix);
+                                           const Matrix& viewMatrix, const Rect& deviceClipBounds);
 
   void prepare(Context* context, uint32_t renderFlags) override;
 
@@ -40,12 +40,10 @@ class ShapeDrawOp : public DrawOp {
  private:
   Color color = Color::Transparent();
   std::shared_ptr<Shape> shape = nullptr;
-  Matrix viewMatrix = Matrix::I();
   Matrix uvMatrix = Matrix::I();
-  Matrix rasterizeMatrix = Matrix::I();
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
 
-  ShapeDrawOp(Color color, std::shared_ptr<Shape> shape, const Matrix& viewMatrix,
-              const Matrix& uvMatrix);
+  ShapeDrawOp(Color color, std::shared_ptr<Shape> shape, const Matrix& uvMatrix,
+              const Rect& bounds);
 };
 }  // namespace tgfx

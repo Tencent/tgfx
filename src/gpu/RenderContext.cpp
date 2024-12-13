@@ -58,20 +58,27 @@ Context* RenderContext::getContext() const {
   return opContext->renderTarget()->getContext();
 }
 
-Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& state) {
-  Matrix invert = {};
-  if (!state.matrix.invert(&invert)) {
-    return {};
+Rect RenderContext::getClipBounds(const Path& clip) {
+  if (clip.isInverseFillType()) {
+    return Rect::MakeWH(opContext->renderTarget()->width(), opContext->renderTarget()->height());
+  }
+  return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
+}
+
+Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& state, bool inverted) {
+  Matrix invertMatrix = {};
+  if (!state.matrix.invert(&invertMatrix)) {
+    return Rect::MakeEmpty();
+  }
+  auto& clip = state.clip;
+  auto clipBounds = getClipBounds(clip);
+  invertMatrix.mapRect(&clipBounds);
+  if (inverted) {
+    return clipBounds;
   }
   auto drawRect = localBounds;
-  auto& clip = state.clip;
-  auto wideOpen = clip.isEmpty() && clip.isInverseFillType();
-  if (!wideOpen) {
-    auto clipBounds = clip.getBounds();
-    invert.mapRect(&clipBounds);
-    if (!drawRect.intersect(clipBounds)) {
-      return {};
-    }
+  if (!drawRect.intersect(clipBounds)) {
+    return Rect::MakeEmpty();
   }
   return drawRect;
 }
@@ -113,7 +120,8 @@ bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const Fi
     if (useScissor) {
       addOp(ClearOp::Make(color, *clipRect), [] { return false; });
       return true;
-    } else if (clipRect->isEmpty()) {
+    }
+    if (clipRect->isEmpty()) {
       addOp(ClearOp::Make(color, bounds), [] { return true; });
       return true;
     }
@@ -140,11 +148,12 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     return;
   }
   auto localBounds = shape->getBounds(maxScale);
-  localBounds = clipLocalBounds(localBounds, state);
+  localBounds = clipLocalBounds(localBounds, state, shape->isInverseFillType());
   if (localBounds.isEmpty()) {
     return;
   }
-  auto drawOp = ShapeDrawOp::Make(style.color, std::move(shape), state.matrix);
+  auto clipBounds = getClipBounds(state.clip);
+  auto drawOp = ShapeDrawOp::Make(style.color, std::move(shape), state.matrix, clipBounds);
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
@@ -339,7 +348,7 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
   if (uniqueKey == clipKey) {
     return clipTexture;
   }
-  auto bounds = clip.getBounds();
+  auto bounds = getClipBounds(clip);
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -347,7 +356,9 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   if (PathTriangulator::ShouldTriangulatePath(clip)) {
-    auto drawOp = ShapeDrawOp::Make(Color::White(), Shape::MakeFrom(clip), rasterizeMatrix);
+    auto clipBounds = Rect::MakeWH(width, height);
+    auto drawOp =
+        ShapeDrawOp::Make(Color::White(), Shape::MakeFrom(clip), rasterizeMatrix, clipBounds);
     drawOp->setAA(aaType);
     auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true, 1, false,
                                                         ImageOrigin::TopLeft, true);
@@ -386,7 +397,7 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
     }
     return nullptr;
   }
-  auto clipBounds = clip.getBounds();
+  auto clipBounds = getClipBounds(clip);
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, opContext->renderTarget());
   scissorRect->roundOut();

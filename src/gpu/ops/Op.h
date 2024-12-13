@@ -61,10 +61,6 @@ class Op {
     _bounds = bounds;
   }
 
-  void setTransformedBounds(const Rect& srcBounds, const Matrix& matrix) {
-    _bounds = matrix.mapRect(srcBounds);
-  }
-
   virtual bool onCombineIfPossible(Op*) {
     return false;
   }

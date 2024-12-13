@@ -22,39 +22,50 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
-/**
- * Shape that applies a matrix transformation to another Shape.
- */
-class MatrixShape : public Shape {
+class InverseShape : public Shape {
  public:
-  MatrixShape(std::shared_ptr<Shape> shape, const Matrix& matrix)
-      : shape(std::move(shape)), matrix(matrix) {
+  explicit InverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
   }
 
-  bool isLine(Point line[2] = nullptr) const override;
+  bool isLine(Point line[2] = nullptr) const override {
+    return shape->isLine(line);
+  }
 
-  bool isRect(Rect* rect = nullptr) const override;
+  bool isRect(Rect* rect = nullptr) const override {
+    return shape->isRect(rect);
+  }
 
-  bool isOval(Rect* bounds = nullptr) const override;
+  bool isOval(Rect* bounds = nullptr) const override {
+    return shape->isOval(bounds);
+  }
 
-  bool isRRect(RRect* rRect = nullptr) const override;
+  bool isRRect(RRect* rRect = nullptr) const override {
+    return shape->isRRect(rRect);
+  }
 
   bool isInverseFillType() const override {
-    return shape->isInverseFillType();
+    return !shape->isInverseFillType();
   }
 
-  Rect getBounds(float resolutionScale = 1.0f) const override;
+  Rect getBounds(float resolutionScale = 1.0f) const override {
+    return shape->getBounds(resolutionScale);
+  }
 
   Path getPath(float resolutionScale = 1.0f) const override;
 
-  std::shared_ptr<Shape> shape = nullptr;
-  Matrix matrix = {};
-
  protected:
   Type type() const override {
-    return Type::Matrix;
+    return Type::Inverse;
   }
 
-  UniqueKey getUniqueKey() const override;
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
+
+ private:
+  LazyUniqueKey uniqueKey = {};
+  std::shared_ptr<Shape> shape = nullptr;
+
+  friend class Shape;
 };
 }  // namespace tgfx

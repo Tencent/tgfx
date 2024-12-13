@@ -141,8 +141,8 @@ class Font {
   Point getVerticalOffset(GlyphID glyphID) const;
 
   /**
-   * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path
-   * and returns true. If glyph is described by a bitmap, returns false and ignores path parameter.
+   * Creates a Path corresponding to glyph outline. If glyph has an outline, copies outline to the
+   * path and returns true. If glyph is described by a bitmap, returns false and ignores the path.
    */
   bool getPath(GlyphID glyphID, Path* path) const;
 
