@@ -100,11 +100,11 @@ void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool /*antiAlia
 
 static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::string>* texts,
                                  std::vector<Point>* points) {
-  auto& font = glyphRun->font;
-  auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
-  if (typeface == nullptr) {
+  Font font = {};
+  if (glyphRun->glyphFace->asFont(&font)) {
     return;
   }
+  auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
   auto& glyphIDs = glyphRun->glyphs;
   auto& positions = glyphRun->positions;
   for (size_t i = 0; i < glyphIDs.size(); ++i) {
@@ -129,14 +129,14 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     std::vector<std::string> texts = {};
     std::vector<Point> points = {};
     GetTextsAndPositions(&glyphRun, &texts, &points);
-    const auto& font = glyphRun.font;
-    const auto typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
-    if (typeFace == nullptr) {
+    Font font = {};
+    if (!glyphRun.glyphFace->asFont(&font)) {
       return false;
     }
+    auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
     auto webFont = val::object();
-    webFont.set("name", typeFace->fontFamily());
-    webFont.set("style", typeFace->fontStyle());
+    webFont.set("name", typeface->fontFamily());
+    webFont.set("style", typeface->fontStyle());
     webFont.set("size", font.getSize());
     webFont.set("bold", font.isFauxBold());
     webFont.set("italic", font.isFauxItalic());
