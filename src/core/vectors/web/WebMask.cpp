@@ -101,7 +101,7 @@ void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool /*antiAlia
 static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::string>* texts,
                                  std::vector<Point>* points) {
   Font font = {};
-  if (glyphRun->glyphFace->asFont(&font)) {
+  if (!glyphRun->glyphFace->asFont(&font)) {
     return;
   }
   auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
