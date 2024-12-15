@@ -296,21 +296,23 @@ To get started, open the `win/` directory in CLion. Then, go to `File->Settings`
 speed up the build process. You can set this in `Build, Execution, Deployment->CMake` by choosing 
 `Ninja` in the `Generator` row. Once done, you'll be able to build and run the `Hello2D` target.
 
-If you prefer using Visual Studio IDE, open the `x64 Native Tools Command Prompt for VS 2019` and run
-the following command in the `win/` directory:
+If you prefer using Visual Studio IDE, open the `x64 Native Tools Command Prompt for VS 2019` and 
+run the following command in the `win/` directory:
 
 ```
-cmake -G "Visual Studio 16 2019" -A x64 -B ./build-x64
+cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_CONFIGURATION_TYPES="Debug" -B ./Debug-x64
 ```
 
-This will generate a project for the `x64` architecture. To generate a project for the `x86` 
-architecture, open the `x86 Native Tools Command Prompt for VS 2019` and run the following command:
+This will generate a project for the `x64` architecture with the `Debug` configuration. To generate 
+a project for the `x86` architecture with the `Release` configuration, open the 
+`x86 Native Tools Command Prompt for VS 2019` and run the following command:
 
 ```
-cmake -G "Visual Studio 16 2019" -A Win32 -B ./build-x86
+cmake -G "Visual Studio 16 2019" -A Win32 -DCMAKE_CONFIGURATION_TYPES="Release" -B ./Release-x86
 ```
 
-Finally, open the `Hello2D.sln` file in the `build-x64/` or `build-x86/` directory, and you’re all set!
+Finally, open the `Hello2D.sln` file in the `Debug-x64/` or `Release-x86/` directory, and you’re all
+set!
 
 ### QT
 
