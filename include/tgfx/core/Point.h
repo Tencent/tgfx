@@ -163,5 +163,49 @@ struct Point {
   static float Distance(const Point& a, const Point& b) {
     return Length(a.x - b.x, a.y - b.y);
   }
+
+  /** Returns the cross product of vector a and vector b.
+
+        a and b form three-dimensional vectors with z-axis value equal to zero. The
+        cross product is a three-dimensional vector with x-axis and y-axis values equal
+        to zero. The cross product z-axis component is returned.
+
+        @param a  left side of cross product
+        @param b  right side of cross product
+        @return   area spanned by vectors signed by angle direction
+    */
+  static float CrossProduct(const Point& a, const Point& b) {
+    return a.x * b.y - a.y * b.x;
+  }
+
+  /** Returns the dot product of vector a and vector b.
+
+        @param a  left side of dot product
+        @param b  right side of dot product
+        @return   product of input magnitudes and cosine of the angle between them
+    */
+  static float DotProduct(const Point& a, const Point& b) {
+    return a.x * b.x + a.y * b.y;
+  }
+
+  bool normalize() {
+    if (isZero()) {
+      return false;
+    }
+    double xx = x;
+    double yy = y;
+    double length = sqrt(xx * xx + yy * yy);
+    double scale = 1.0 / length;
+    x = static_cast<float>(x * scale);
+    y = static_cast<float>(y * scale);
+    float prod = 0;
+    prod *= x;
+    prod *= y;
+    if (isZero() || prod != 0) {
+      set(0, 0);
+      return false;
+    }
+    return true;
+  }
 };
 }  // namespace tgfx
