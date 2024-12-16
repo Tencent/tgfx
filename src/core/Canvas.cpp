@@ -303,20 +303,22 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   }
   AutoLayerForImageFilter autoLayer(this, &paint);
   auto style = CreateFillStyle(paint);
-  Rect rect = {};
-  if (shape->isRect(&rect)) {
-    drawContext->drawRect(rect, *mcState, style);
-    return;
-  }
-  RRect rRect = {};
-  if (shape->isOval(&rect)) {
-    rRect.setOval(rect);
-    drawContext->drawRRect(rRect, *mcState, style);
-    return;
-  }
-  if (shape->isRRect(&rRect)) {
-    drawContext->drawRRect(rRect, *mcState, style);
-    return;
+  if (!shape->isInverseFillType()) {
+    Rect rect = {};
+    if (shape->isRect(&rect)) {
+      drawContext->drawRect(rect, *mcState, style);
+      return;
+    }
+    RRect rRect = {};
+    if (shape->isOval(&rect)) {
+      rRect.setOval(rect);
+      drawContext->drawRRect(rRect, *mcState, style);
+      return;
+    }
+    if (shape->isRRect(&rRect)) {
+      drawContext->drawRRect(rRect, *mcState, style);
+      return;
+    }
   }
   drawContext->drawShape(std::move(shape), *mcState, style);
 }

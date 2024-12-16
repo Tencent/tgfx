@@ -23,7 +23,7 @@
 namespace tgfx {
 using namespace pk;
 
-std::unique_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT) {
+std::shared_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT) {
   if (isnan(startT) || isnan(stopT)) {
     return nullptr;
   }
@@ -32,7 +32,7 @@ std::unique_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT) {
   }
   startT = std::max(0.f, std::min(startT, 1.f));
   stopT = std::max(0.f, std::min(stopT, 1.f));
-  return std::unique_ptr<PathEffect>(new TrimPathEffect(startT, stopT));
+  return std::shared_ptr<PathEffect>(new TrimPathEffect(startT, stopT));
 }
 
 bool TrimPathEffect::filterPath(Path* path) const {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/FillStyle.h"
+#include "core/PathRef.h"
 #include "core/images/ResourceImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
@@ -604,7 +605,7 @@ TGFX_TEST(CanvasTest, path) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
 }
 
-TGFX_TEST(CanvasTest, shape) {
+TGFX_TEST(CanvasTest, simpleShape) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -632,6 +633,76 @@ TGFX_TEST(CanvasTest, shape) {
   canvas->rotate(45, radius, radius);
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
+}
+
+static std::vector<Resource*> FindResourceByDomainID(Context* context, uint32_t domainID) {
+  std::vector<Resource*> resources = {};
+  auto resourceCache = context->resourceCache();
+  for (auto& item : resourceCache->uniqueKeyMap) {
+    auto resource = item.second;
+    if (resource->uniqueKey.domainID() == domainID) {
+      resources.push_back(resource);
+    }
+  }
+  return resources;
+}
+
+TGFX_TEST(CanvasTest, inversePath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 420, 100);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(Color::Red());
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 70.f);
+  font.setFauxBold(true);
+  auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
+  auto shape = Shape::MakeFrom(std::move(textBlob));
+  shape = Shape::ApplyInverse(std::move(shape));
+  ASSERT_TRUE(shape != nullptr);
+  EXPECT_TRUE(shape->isInverseFillType());
+  Path textPath = shape->getPath();
+  EXPECT_TRUE(!textPath.isEmpty());
+  EXPECT_TRUE(textPath.isInverseFillType());
+  textPath.transform(Matrix::MakeTrans(10, 75));
+  canvas->clipPath(textPath);
+  Path emptyPath = {};
+  emptyPath.toggleInverseFillType();
+  canvas->drawPath(emptyPath, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_text"));
+
+  surface = Surface::Make(context, 400, 400);
+  canvas = surface->getCanvas();
+  Path clipPath = {};
+  clipPath.addRect(Rect::MakeXYWH(50, 200, 300, 150));
+  clipPath.toggleInverseFillType();
+  canvas->save();
+  canvas->clipPath(clipPath);
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(50, 50, 170, 100));
+  path.addOval(Rect::MakeXYWH(180, 50, 170, 100));
+  path.setFillType(PathFillType::InverseEvenOdd);
+  paint.setColor(Color::Red());
+  canvas->drawPath(path, paint);
+  canvas->restore();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_rect"));
+  auto uniqueKey = PathRef::GetUniqueKey(path);
+  auto cachesBefore = FindResourceByDomainID(context, uniqueKey.domainID());
+  EXPECT_EQ(cachesBefore.size(), 1u);
+  canvas->clear();
+  canvas->clipPath(clipPath);
+  shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(50, 50));
+  canvas->translate(-50, -50);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_rect"));
+  auto cachesAfter = FindResourceByDomainID(context, uniqueKey.domainID());
+  EXPECT_EQ(cachesAfter.size(), 1u);
+  EXPECT_TRUE(cachesBefore.front() == cachesAfter.front());
 }
 
 TGFX_TEST(CanvasTest, saveLayer) {
@@ -731,6 +802,59 @@ TGFX_TEST(CanvasTest, drawShape) {
   canvas->setMatrix(matrix);
   canvas->drawShape(textShape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawShape"));
+}
+
+TGFX_TEST(CanvasTest, inverseFillType) {
+  Path firstPath = {};
+  firstPath.addRect(Rect::MakeXYWH(50, 50, 170, 100));
+  auto firstShape = Shape::MakeFrom(firstPath);
+  EXPECT_FALSE(firstShape->isInverseFillType());
+  Path secondPath = {};
+  secondPath.addOval(Rect::MakeXYWH(180, 50, 170, 100));
+  secondPath.toggleInverseFillType();
+  auto secondShape = Shape::MakeFrom(secondPath);
+  EXPECT_TRUE(secondShape->isInverseFillType());
+  auto shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Difference);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(secondShape, firstShape, PathOp::Difference);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Intersect);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Union);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::XOR);
+  EXPECT_TRUE(shape->isInverseFillType());
+
+  auto pathEffect = PathEffect::MakeCorner(10);
+  shape = Shape::ApplyEffect(firstShape, pathEffect);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
+  EXPECT_FALSE(shape->isInverseFillType());
+  Stroke stroke(10);
+  shape = Shape::ApplyStroke(firstShape, &stroke);
+  EXPECT_FALSE(shape->isInverseFillType());
+
+  firstShape = Shape::ApplyInverse(firstShape);
+  EXPECT_TRUE(firstShape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Difference);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Intersect);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Union);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::XOR);
+  EXPECT_FALSE(shape->isInverseFillType());
+
+  shape = Shape::ApplyEffect(firstShape, pathEffect);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::ApplyStroke(firstShape, &stroke);
+  EXPECT_TRUE(shape->isInverseFillType());
 }
 
 TGFX_TEST(CanvasTest, image) {

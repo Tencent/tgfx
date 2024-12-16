@@ -76,10 +76,11 @@ class GlyphRunList {
   Rect getBounds(float resolutionScale = 1.0f) const;
 
   /**
-   * Creates a path corresponding to the glyphs in this run. The resolutionScale parameter is used
-   * to scale the glyphs before creating the path. However, the resolutionScale is not applied to
-   * the returned path; it just affects the precision of the path. Returns true if the path was
-   * successfully created. Otherwise, returns false and leaves the path unchanged.
+   * Creates a Path for the glyphs in this run. Since text outlines can change with different
+   * scale factors, it's best to use the final drawing scale factor in the resolutionScale for
+   * accuracy. Note that the resolutionScale is not applied to the returned Path; it only affects
+   * the precision of the Path. Returns true if the path was successfully created. Otherwise,
+   * returns false and leaves the path unchanged.
    */
   bool getPath(Path* path, float resolutionScale = 1.0f) const;
 

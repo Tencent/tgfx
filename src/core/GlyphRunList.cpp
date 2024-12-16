@@ -77,7 +77,7 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
 }
 
 bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
-  if (resolutionScale <= 0.0f || hasColor()) {
+  if (resolutionScale <= 0.0f || !hasOutlines()) {
     return false;
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);

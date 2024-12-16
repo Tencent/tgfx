@@ -40,19 +40,19 @@ class SkPathEffectWrapper : public PathEffect {
   sk_sp<SkPathEffect> pathEffect = nullptr;
 };
 
-std::unique_ptr<PathEffect> PathEffect::MakeDash(const float* intervals, int count, float phase) {
+std::shared_ptr<PathEffect> PathEffect::MakeDash(const float* intervals, int count, float phase) {
   auto effect = SkDashPathEffect::Make(intervals, count, phase);
   if (effect == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<PathEffect>(new SkPathEffectWrapper(std::move(effect)));
+  return std::shared_ptr<PathEffect>(new SkPathEffectWrapper(std::move(effect)));
 }
 
-std::unique_ptr<PathEffect> PathEffect::MakeCorner(float radius) {
+std::shared_ptr<PathEffect> PathEffect::MakeCorner(float radius) {
   auto effect = SkCornerPathEffect::Make(radius);
   if (effect == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<PathEffect>(new SkPathEffectWrapper(std::move(effect)));
+  return std::shared_ptr<PathEffect>(new SkPathEffectWrapper(std::move(effect)));
 }
 }  // namespace tgfx

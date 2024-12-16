@@ -21,17 +21,20 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
-class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<CustomPathGlyphFace> {
+class CustomPathGlyphFace : public GlyphFace {
  public:
+  explicit CustomPathGlyphFace(float scale = 1.0f) : _scale(scale) {
+  }
+
   bool hasColor() const override {
     return false;
   }
   bool hasOutlines() const override {
-    return false;
+    return true;
   }
-  std::shared_ptr<GlyphFace> makeScaled(float scale) override {
-    _scale = scale;
-    return shared_from_this();
+
+  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
+    return std::make_shared<CustomPathGlyphFace>(_scale * scale);
   }
 
   bool getPath(GlyphID glyphID, Path* path) const override {
@@ -82,20 +85,21 @@ class CustomPathGlyphFace : public GlyphFace, std::enable_shared_from_this<Custo
   float _scale = 1.0f;
 };
 
-class CustomImageGlyphFace : public GlyphFace, std::enable_shared_from_this<CustomImageGlyphFace> {
+class CustomImageGlyphFace : public GlyphFace {
  public:
+  explicit CustomImageGlyphFace(float scale = 1.0f) : _scale(scale) {
+  }
+
   bool hasColor() const override {
     return true;
   }
+
   bool hasOutlines() const override {
     return false;
   }
-  std::shared_ptr<GlyphFace> makeScaled(float scale) override {
-    if (FloatNearlyZero(scale)) {
-      return nullptr;
-    }
-    _scale = scale;
-    return shared_from_this();
+
+  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
+    return std::make_shared<CustomImageGlyphFace>(_scale * scale);
   }
 
   bool getPath(GlyphID /*glyphID*/, Path* /*path*/) const override {
@@ -171,35 +175,21 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceSimple) {
   EXPECT_TRUE(Baseline::Compare(surface, "GlyphFaceTest/GlyphFaceSimple"));
 }
 
-auto typeface1 = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-Font font20(typeface1, 20);
-Font font40(typeface1, 40);
-Font font60(typeface1, 60);
-
-auto typeface2 = Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
-Font fontEmoji(typeface2, 50);
-
 class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<CustomPathGlyphFace2> {
  public:
+  CustomPathGlyphFace2(std::shared_ptr<Typeface> typeface, float scale)
+      : _scale(scale), font20(typeface, 20 * scale), font40(typeface, 40 * scale),
+        font60(typeface, 60 * scale) {
+  }
+
   bool hasColor() const override {
     return false;
   }
   bool hasOutlines() const override {
-    return false;
+    return true;
   }
-  std::shared_ptr<GlyphFace> makeScaled(float scale) override {
-    if (FloatNearlyZero(scale)) {
-      return nullptr;
-    }
-
-    if (!FloatNearlyEqual(scale, _scale)) {
-      _scale = scale;
-      font20 = font20.makeWithSize(font20.getSize() * scale);
-      font40 = font40.makeWithSize(font40.getSize() * scale);
-      font60 = font60.makeWithSize(font60.getSize() * scale);
-    }
-
-    return shared_from_this();
+  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
+    return std::make_shared<CustomPathGlyphFace2>(font20.getTypeface(), _scale * scale);
   }
 
   bool getPath(GlyphID glyphID, Path* path) const override {
@@ -232,28 +222,26 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
 
  private:
   float _scale = 1.0f;
+  Font font20 = {};
+  Font font40 = {};
+  Font font60 = {};
 };
 
 class CustomImageGlyphFace2 : public GlyphFace,
                               std::enable_shared_from_this<CustomImageGlyphFace2> {
  public:
+  CustomImageGlyphFace2(std::shared_ptr<Typeface> typeface, float scale)
+      : _scale(scale), fontEmoji(typeface, 50 * scale) {
+  }
+
   bool hasColor() const override {
     return true;
   }
   bool hasOutlines() const override {
     return false;
   }
-  std::shared_ptr<GlyphFace> makeScaled(float scale) override {
-    if (FloatNearlyZero(scale)) {
-      return nullptr;
-    }
-
-    if (!FloatNearlyEqual(scale, _scale)) {
-      _scale = scale;
-      fontEmoji = fontEmoji.makeWithSize(fontEmoji.getSize() * scale);
-    }
-
-    return shared_from_this();
+  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
+    return std::make_shared<CustomImageGlyphFace2>(fontEmoji.getTypeface(), _scale * scale);
   }
 
   bool getPath(GlyphID /*glyphID*/, Path* /*path*/) const override {
@@ -274,9 +262,15 @@ class CustomImageGlyphFace2 : public GlyphFace,
 
  private:
   float _scale = 1.0f;
+  Font fontEmoji = {};
 };
 
 TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
+  auto typeface1 = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  Font font20(typeface1, 20);
+  Font font40(typeface1, 40);
+  Font font60(typeface1, 60);
+
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -286,7 +280,7 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
 
   // GlyphID:25483 14857 8699 16266 16671 24458 14689 15107 29702 41 70 77 77 80 29702 53 40 39 57 95
   // Text:这是一段测试文本，Hello，TGFX~
-  auto glyphFace1 = std::make_shared<CustomPathGlyphFace2>();
+  auto glyphFace1 = std::make_shared<CustomPathGlyphFace2>(typeface1, 1.0f);
 
   float scaleFactor = 1.0f;
   canvas->scale(scaleFactor, scaleFactor);
@@ -325,6 +319,10 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
   }
   canvas->drawGlyphs(glyphIDs4.data(), positions4.data(), glyphIDs4.size(), glyphFace1, paint);
 
+  auto typeface2 =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  Font fontEmoji(typeface2, 50);
+
   // 1109 886 1110 888
   // 🤩😃🤪😅
   std::vector<GlyphID> emojiGlyphIDs = {1109, 886, 1110, 888};
@@ -334,7 +332,7 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {
   emojiPositions.push_back(Point::Make(570.0f, 100.0f));
   emojiPositions.push_back(Point::Make(630.0f, 100.0f));
   canvas->drawGlyphs(emojiGlyphIDs.data(), emojiPositions.data(), emojiGlyphIDs.size(),
-                     std::make_shared<CustomImageGlyphFace2>(), paint);
+                     std::make_shared<CustomImageGlyphFace2>(typeface2, 1.0f), paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "GlyphFaceTest/GlyphFaceWithStyle"));
 }

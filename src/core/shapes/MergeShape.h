@@ -33,6 +33,8 @@ class MergeShape : public Shape {
 
   bool isRect(Rect* rect = nullptr) const override;
 
+  bool isInverseFillType() const override;
+
   Rect getBounds(float resolutionScale = 1.0f) const override;
 
   Path getPath(float resolutionScale = 1.0f) const override;

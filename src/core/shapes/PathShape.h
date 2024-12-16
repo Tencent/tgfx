@@ -39,9 +39,13 @@ class PathShape : public Shape {
 
   bool isSimplePath(Path* path) const override;
 
+  bool isInverseFillType() const override;
+
   Rect getBounds(float resolutionScale = 1.0f) const override;
 
   Path getPath(float resolutionScale = 1.0f) const override;
+
+  Path path = {};
 
  protected:
   Type type() const override {
@@ -49,8 +53,5 @@ class PathShape : public Shape {
   }
 
   UniqueKey getUniqueKey() const override;
-
- private:
-  Path path = {};
 };
 }  // namespace tgfx
