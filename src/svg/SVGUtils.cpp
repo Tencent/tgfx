@@ -246,21 +246,6 @@ void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret) 
   }
 }
 
-Pixmap ImageToBitmap(Context* context, const std::shared_ptr<Image>& image) {
-  auto surface = Surface::Make(context, image->width(), image->height());
-  auto* canvas = surface->getCanvas();
-  canvas->drawImage(image);
-
-  Bitmap bitmap(surface->width(), surface->height(), false, false);
-  Pixmap pixmap(bitmap);
-  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-  if (result) {
-    return pixmap;
-  } else {
-    return Pixmap();
-  }
-}
-
 // Returns data uri from bytes.
 // it will use any cached data if available, otherwise will
 // encode as png.

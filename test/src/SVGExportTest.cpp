@@ -333,6 +333,16 @@ TGFX_TEST(SVGExportTest, EmojiText) {
 }
 
 TGFX_TEST(SVGExportTest, ClipState) {
+  std::string compareString =
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"300\" height=\"300\"><clipPath "
+      "id=\"clip_0\"><rect width=\"100\" height=\"100\"/></clipPath><g "
+      "clip-path=\"url(#clip_0)\"><rect fill=\"#F00\" width=\"200\" height=\"200\"/></g><clipPath "
+      "id=\"clip_1\"><circle cx=\"150\" cy=\"150\" r=\"50\"/></clipPath><g "
+      "clip-path=\"url(#clip_1)\"><rect fill=\"#0F0\" x=\"100\" y=\"100\" width=\"200\" "
+      "height=\"200\"/></g><rect fill=\"#00F\" x=\"200\" y=\"200\" width=\"100\" "
+      "height=\"100\"/></svg>";
+
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -366,8 +376,7 @@ TGFX_TEST(SVGExportTest, ClipState) {
 
   exporter->close();
   std::string SVGString = SVGStream.str();
-  std::cout << SVGString << std::endl;
-  //   ASSERT_EQ(SVGString, compareString);
+  ASSERT_EQ(SVGString, compareString);
 }
 
 }  // namespace tgfx

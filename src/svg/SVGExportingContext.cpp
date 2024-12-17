@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGExportingContext.h"
+#include <_types/_uint32_t.h>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -80,11 +81,12 @@ void SVGExportingContext::drawRect(const Rect& rect, const MCState& mc, const Fi
 
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(fill)) {
-    svg = std::make_unique<ElementWriter>("svg", context, this, resourceBucket.get(), mc, fill);
+    svg = std::make_unique<ElementWriter>("svg", context, writer, resourceBucket.get(), mc, fill);
     svg->addRectAttributes(rect);
   }
 
-  ElementWriter rectElement("rect", context, this, resourceBucket.get(), mc, fill);
+  dumpClipGroup();
+  ElementWriter rectElement("rect", context, writer, resourceBucket.get(), mc, fill);
 
   if (svg) {
     rectElement.addAttribute("x", 0);
@@ -98,25 +100,27 @@ void SVGExportingContext::drawRect(const Rect& rect, const MCState& mc, const Fi
 
 void SVGExportingContext::drawRRect(const RRect& roundRect, const MCState& state,
                                     const FillStyle& fill) {
+  dumpClipGroup();
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
-      ElementWriter circleElement("circle", context, this, resourceBucket.get(), state, fill);
+      ElementWriter circleElement("circle", context, writer, resourceBucket.get(), state, fill);
       circleElement.addCircleAttributes(roundRect.rect);
       return;
     } else {
-      ElementWriter ovalElement("ellipse", context, this, resourceBucket.get(), state, fill);
+      ElementWriter ovalElement("ellipse", context, writer, resourceBucket.get(), state, fill);
       ovalElement.addEllipseAttributes(roundRect.rect);
     }
   } else {
-    ElementWriter rrectElement("rect", context, this, resourceBucket.get(), state, fill);
+    ElementWriter rrectElement("rect", context, writer, resourceBucket.get(), state, fill);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
 
 void SVGExportingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                     const FillStyle& style) {
+  dumpClipGroup();
   auto path = shape->getPath();
-  ElementWriter pathElement("path", context, this, resourceBucket.get(), state, style);
+  ElementWriter pathElement("path", context, writer, resourceBucket.get(), state, style);
   pathElement.addPathAttributes(path, tgfx::SVGExportingContext::PathEncoding());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -174,7 +178,8 @@ void SVGExportingContext::exportPixmap(const Pixmap& pixmap, const MCState& stat
     }
   }
   {
-    ElementWriter imageUse("use", context, this, resourceBucket.get(), state, style);
+    dumpClipGroup();
+    ElementWriter imageUse("use", context, writer, resourceBucket.get(), state, style);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
@@ -190,6 +195,7 @@ void SVGExportingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRu
 
   // If conversion to path is required but the font does not have outlines (e.g.,emoji font,web
   // font), it cannot be converted to a path.
+  dumpClipGroup();
   if (hasFont) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() && options.convertTextToPaths) {
       exportGlyphsAsPath(glyphRunList, state, style, stroke);
@@ -197,8 +203,8 @@ void SVGExportingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRu
       exportGlyphsAsText(glyphRunList, state, style, stroke);
     }
   } else {
-    if (glyphRunList->hasOutlines() && !glyphRunList->hasColor()) {
-      exportGlyphsAsPath(glyphRunList, state, style, stroke);
+    if (glyphRunList->hasColor()) {
+      exportGlyphsAsText(glyphRunList, state, style, stroke);
     } else {
       exportGlyphsAsImage(glyphRunList, state, style);
     }
@@ -209,7 +215,7 @@ void SVGExportingContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>
                                              const MCState& state, const FillStyle& style,
                                              const Stroke* stroke) {
   if (Path path; glyphRunList->getPath(&path)) {
-    ElementWriter pathElement("path", context, this, resourceBucket.get(), state, style, stroke);
+    ElementWriter pathElement("path", context, writer, resourceBucket.get(), state, style, stroke);
     pathElement.addPathAttributes(path, tgfx::SVGExportingContext::PathEncoding());
     if (path.getFillType() == PathFillType::EvenOdd) {
       pathElement.addAttribute("fill-rule", "evenodd");
@@ -221,7 +227,7 @@ void SVGExportingContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>
                                              const MCState& state, const FillStyle& style,
                                              const Stroke* stroke) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    ElementWriter textElement("text", context, this, resourceBucket.get(), state, style, stroke);
+    ElementWriter textElement("text", context, writer, resourceBucket.get(), state, style, stroke);
 
     if (Font font; glyphRun.glyphFace->asFont(&font)) {
       textElement.addFontAttributes(font);
@@ -286,6 +292,7 @@ void SVGExportingContext::drawLayer(std::shared_ptr<Picture> picture, const MCSt
     resources = defs.addImageFilterResource(imageFilter, bound);
   }
   {
+    dumpClipGroup();
     auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);
@@ -310,27 +317,16 @@ PathEncoding SVGExportingContext::PathEncoding() {
   return PathEncoding::Absolute;
 }
 
-void SVGExportingContext::syncMCState(const MCState& state) {
-  auto saveCount = canvas->getSaveCount();
-  if (!groupElementStack.empty()) {
-    if (groupElementStack.top().first >= saveCount) {
-      while (groupElementStack.top().first > saveCount) {
-        groupElementStack.pop();
-      }
-      return;
-    }
-  }
+void SVGExportingContext::onClipPath(const MCState& state) {
+  savedPaths.push_back(state.clip);
+};
 
-  if (state.clip.isEmpty()) {
-    return;
-  }
-
-  auto defineClip = [this](const MCState& insertState) -> std::string {
-    std::string clipID = "clip_" + resourceBucket->addClip();
-    ElementWriter clipPath("clipPath", writer);
-    clipPath.addAttribute("id", clipID);
+void SVGExportingContext::dumpClipGroup() {
+  auto defineClip = [this](const Path& clipPath) -> std::string {
+    std::string clipID = resourceBucket->addClip();
+    ElementWriter clipPathElement("clipPath", writer);
+    clipPathElement.addAttribute("id", clipID);
     {
-      auto clipPath = insertState.clip;
       std::unique_ptr<ElementWriter> element;
       if (Rect rect; clipPath.isRect(&rect)) {
         element = std::make_unique<ElementWriter>("rect", writer);
@@ -357,58 +353,42 @@ void SVGExportingContext::syncMCState(const MCState& state) {
     return clipID;
   };
 
-  auto clipID = defineClip(state);
-  auto clipElement = std::make_unique<ElementWriter>("g", writer);
-  clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
-  groupElementStack.emplace(saveCount, std::move(clipElement));
+  hasPushedClip = true;
+
+  for (const auto& path : savedPaths) {
+    if (path.isEmpty()) {
+      return;
+    }
+    auto clipID = defineClip(path);
+    auto groupElement = std::make_unique<ElementWriter>("g", writer);
+    groupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+    groupStack.emplace(std::move(groupElement));
+  }
 }
 
-// void SVGExportingContext::syncStateStackPush(const MCState& state) {
+void SVGExportingContext::onRestore() {
+  if (hasPushedClip) {
+    for (uint32_t i = 0; i < savedPaths.size(); i++) {
+      groupStack.pop();
+    }
+  }
+  hasPushedClip = false;
+  savedPaths.clear();
+}
 
-//   auto defineClip = [this](const MCState& insertState) -> std::string {
-//     std::string clipID = "clip_" + resourceBucket->addClip();
-//     ElementWriter clipPath("clipPath", writer);
-//     clipPath.addAttribute("id", clipID);
-//     {
-//       auto clipPath = insertState.clip;
-//       std::unique_ptr<ElementWriter> element;
-//       if (Rect rect; clipPath.isRect(&rect)) {
-//         element = std::make_unique<ElementWriter>("rect", writer);
-//         element->addRectAttributes(rect);
-//       } else if (RRect rrect; clipPath.isRRect(&rrect)) {
-//         element = std::make_unique<ElementWriter>("rect", writer);
-//         element->addRoundRectAttributes(rrect);
-//       } else if (Rect bound; clipPath.isOval(&bound)) {
-//         if (FloatNearlyEqual(bound.width(), bound.height())) {
-//           element = std::make_unique<ElementWriter>("circle", writer);
-//           element->addCircleAttributes(bound);
-//         } else {
-//           element = std::make_unique<ElementWriter>("ellipse", writer);
-//           element->addEllipseAttributes(bound);
-//         }
-//       } else {
-//         element = std::make_unique<ElementWriter>("path", writer);
-//         element->addPathAttributes(clipPath, tgfx::SVGExportingContext::PathEncoding());
-//         if (clipPath.getFillType() == PathFillType::EvenOdd) {
-//           element->addAttribute("clip-rule", "evenodd");
-//         }
-//       }
-//     }
-//     return clipID;
-//   };
+Pixmap SVGExportingContext::ImageToBitmap(Context* context, const std::shared_ptr<Image>& image) {
+  auto surface = Surface::Make(context, image->width(), image->height());
+  auto* canvas = surface->getCanvas();
+  canvas->drawImage(image);
 
-//   if (state.clip.isEmpty()) {
-//     groupElementStack.emplace(nullptr);
-//   } else {
-//     auto clipID = defineClip(state);
-//     auto clipElement = std::make_unique<ElementWriter>("g", writer);
-//     clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
-//     groupElementStack.push(std::move(clipElement));
-//   }
-// }
-
-// void SVGExportingContext::syncStateStackPop() {
-//   groupElementStack.pop();
-// }
+  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  Pixmap pixmap(bitmap);
+  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+  if (result) {
+    return pixmap;
+  } else {
+    return Pixmap();
+  }
+}
 
 }  // namespace tgfx

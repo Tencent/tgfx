@@ -110,6 +110,7 @@ void Canvas::restore() {
   *mcState = canvasState->mcState;
   auto layer = std::move(canvasState->savedLayer);
   stateStack.pop();
+  drawContext->onRestore();
   if (layer != nullptr) {
     drawContext = layer->drawContext;
     auto layerContext = reinterpret_cast<RecordingContext*>(layer->layerContext.get());
@@ -188,6 +189,7 @@ void Canvas::clipPath(const Path& path) {
   auto clipPath = path;
   clipPath.transform(mcState->matrix);
   mcState->clip.addPath(clipPath, PathOp::Intersect);
+  drawContext->onClipPath(*mcState);
 }
 
 void Canvas::resetStateStack() {

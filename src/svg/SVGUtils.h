@@ -70,11 +70,6 @@ std::string FloatToString(float value);
 void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret);
 
 /**
- * Draws a image onto a surface and reads the pixels from the surface.
- */
-Pixmap ImageToBitmap(Context* context, const std::shared_ptr<Image>& image);
-
-/**
  * Returns data uri from bytes.
  * it will use any cached data if available, otherwise will encode as png.
  */

@@ -30,6 +30,7 @@
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
@@ -74,15 +75,18 @@ class SVGExportingContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture>, const MCState&, const FillStyle&,
                  std::shared_ptr<ImageFilter>) override;
 
-  void syncMCState(const MCState& state);
+  void onClipPath(const MCState&) override;
 
-  // void syncStateStackPush(const MCState&) override;
-
-  // void syncStateStackPop() override;
+  void onRestore() override;
 
   XMLWriter* getWriter() const {
     return writer.get();
   }
+
+  /**
+ * Draws a image onto a surface and reads the pixels from the surface.
+ */
+  static Pixmap ImageToBitmap(Context* context, const std::shared_ptr<Image>& image);
 
  private:
   /**
@@ -102,6 +106,8 @@ class SVGExportingContext : public DrawContext {
   void exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                            const FillStyle& style);
 
+  void dumpClipGroup();
+
   static PathEncoding PathEncoding();
 
   ExportingOptions options;
@@ -110,7 +116,10 @@ class SVGExportingContext : public DrawContext {
   const std::unique_ptr<XMLWriter> writer;
   const std::unique_ptr<ResourceStore> resourceBucket;
   std::unique_ptr<ElementWriter> rootElement;
-  std::stack<std::pair<int, std::unique_ptr<ElementWriter>>> groupElementStack;
   SVGTextBuilder textBuilder;
+
+  std::vector<Path> savedPaths;
+  bool hasPushedClip = false;
+  std::stack<std::unique_ptr<ElementWriter>> groupStack;
 };
 }  // namespace tgfx

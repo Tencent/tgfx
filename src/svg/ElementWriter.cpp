@@ -53,11 +53,9 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
 }
 
 ElementWriter::ElementWriter(const std::string& name, Context* context,
-                             SVGExportingContext* svgContext, ResourceStore* bucket,
+                             const std::unique_ptr<XMLWriter>& writer, ResourceStore* bucket,
                              const MCState& state, const FillStyle& fill, const Stroke* stroke)
-    : writer(svgContext->getWriter()), resourceStore(bucket) {
-  svgContext->syncMCState(state);
-
+    : writer(writer.get()), resourceStore(bucket) {
   Resources res = this->addResources(fill, context);
 
   writer->startElement(name);
@@ -461,7 +459,7 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageSha
   DEBUG_ASSERT(shader->image);
 
   DEBUG_ASSERT(context);
-  auto bitmap = ImageToBitmap(context, image);
+  auto bitmap = SVGExportingContext::ImageToBitmap(context, image);
   auto dataUri = AsDataUri(bitmap);
   if (!dataUri) {
     return;

@@ -43,7 +43,7 @@ class ElementWriter {
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket);
-  ElementWriter(const std::string& name, Context* context, SVGExportingContext* svgContext,
+  ElementWriter(const std::string& name, Context* context, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket, const MCState& state, const FillStyle& fill,
                 const Stroke* stroke = nullptr);
   ~ElementWriter();
