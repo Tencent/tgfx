@@ -19,6 +19,8 @@
 #include "FTScalerContext.h"
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/Recorder.h>
+#include <tgfx/core/Surface.h>
+#include <tgfx/gpu/opengl/GLDevice.h>
 #include <cmath>
 #include "ft2build.h"
 #include FT_BITMAP_H
@@ -531,7 +533,7 @@ void truncateToStopInterpolating(float zeroRadiusStop, std::vector<uint32_t>& co
 Point SkVectorProjection(Point a, Point b) {
   float length = b.length();
   if (length <= 0) {
-    return Point();
+    return Point::Zero();
   }
   Point bNormalized = b;
   bNormalized.normalize();
@@ -952,6 +954,14 @@ bool colrv1_configure_skpaint(FT_Face face, const std::vector<uint32_t>& palette
       // An opaque color is needed to ensure the gradient is not modulated by alpha.
       paint->setColor(Color::Black());
 
+      Point center = Point::Make((start.x + end.x) / 2.0f, (start.x + end.y) / 2.0f);
+      std::vector<Color> colorDatas;
+      for (auto color : colors) {
+        colorDatas.push_back(Uint32ToColor(color));
+      }
+      auto shader = Shader::MakeConicGradient(center, startRadius, endRadius, colorDatas, stops);
+      paint->setShader(shader);
+
       // paint->setShader(SkGradientShader::MakeTwoPointConical(
       //     start, startRadius, end, endRadius, colors.data(), SkColorSpace::MakeSRGB(), stops.data(),
       //     stops.size(), tileMode,
@@ -1107,6 +1117,7 @@ bool colrv1_draw_paint(Canvas* canvas, const std::vector<uint32_t>& palette,
       if (!colrv1_configure_skpaint(face, palette, foregroundColor, colrPaint, &skPaint)) {
         return false;
       }
+      canvas->saveLayer(&skPaint);
       // canvas->drawPaint(skPaint);
       return true;
     }
@@ -1772,6 +1783,8 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  auto bounds = getBoundsInternal(glyphID, false, false);
+  return bounds;
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
   if (!loadBitmapGlyph(glyphID, glyphFlags)) {
@@ -1796,14 +1809,34 @@ std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID,
   }
   // colrv1 字体处理
   if (true) {
-    Recorder recorder;
-    auto canvas = recorder.beginRecording();
-    if (!canvas) {
+    auto glyphBounds = getBoundsInternal(glyphID, false, false);
+    auto device = GLDevice::MakeWithFallback();
+    if (!device) {
       return nullptr;
     }
+    auto context = device->lockContext();
+    if (!context) {
+      return nullptr;
+    }
+    int width = static_cast<int>(ceilf(glyphBounds.width()));
+    int height = static_cast<int>(ceilf(glyphBounds.height()));
+    auto surface = Surface::Make(context, width, height);
+    if (!surface) {
+      device->unlock();
+      return nullptr;
+    }
+    auto canvas = surface->getCanvas();
     canvas->clear();
-    auto glyphBounds = getBoundsInternal(glyphID, false, false);
     canvas->translate(-glyphBounds.left, -glyphBounds.top);
+    colrv1_start_glyph(canvas, colorPlatte, 0x000000FF, ftTypeface()->face, glyphID, FT_COLOR_INCLUDE_ROOT_TRANSFORM);
+    Bitmap bitmap(width, height);
+    auto imageInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888);
+    if (!surface->readPixels(imageInfo, bitmap.lockPixels())) {
+      device->unlock();
+      return nullptr;
+    }
+    device->unlock();
+    return bitmap.makeBuffer();
   }
 
   auto glyphFlags = loadGlyphFlags;
