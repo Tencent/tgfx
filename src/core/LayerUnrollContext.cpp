@@ -102,13 +102,14 @@ void LayerUnrollContext::drawImageWidthFilter(std::shared_ptr<Image> image,
   if (!viewMatrix.isTranslate()) {
     return;
   }
+  auto clipOffset = Point::Zero();
   auto& clip = state.clip;
   if (clip.isInverseFillType()) {
     if (!clip.isEmpty()) {
       return;
     }
   } else {
-    Rect clipRect = {};
+    auto clipRect = Rect::MakeEmpty();
     if (!clip.isRect(&clipRect)) {
       return;
     }
@@ -117,6 +118,7 @@ void LayerUnrollContext::drawImageWidthFilter(std::shared_ptr<Image> image,
     if (image == nullptr) {
       return;
     }
+    clipOffset = Point::Make(clipRect.left, clipRect.top);
   }
   auto offset = Point::Zero();
   image = image->makeWithFilter(std::move(imageFilter), &offset);
@@ -124,7 +126,7 @@ void LayerUnrollContext::drawImageWidthFilter(std::shared_ptr<Image> image,
     return;
   }
   auto mcState = state;
-  mcState.matrix.preTranslate(offset.x, offset.y);
+  mcState.matrix.preTranslate(offset.x + clipOffset.x, offset.y + clipOffset.y);
   drawContext->drawImage(std::move(image), sampling, mcState, merge(style));
   unrolled = true;
 }
