@@ -23,7 +23,8 @@
 namespace tgfx {
 class LayerUnrollContext : public DrawContext {
  public:
-  LayerUnrollContext(DrawContext* drawContext, FillStyle fillStyle);
+  LayerUnrollContext(DrawContext* drawContext, FillStyle fillStyle,
+                     std::shared_ptr<ImageFilter> imageFilter);
 
   bool hasUnrolled() const {
     return unrolled;
@@ -59,6 +60,10 @@ class LayerUnrollContext : public DrawContext {
  private:
   DrawContext* drawContext = nullptr;
   FillStyle fillStyle = {};
+  std::shared_ptr<ImageFilter> imageFilter = nullptr;
   bool unrolled = false;
+
+  void drawImageWidthFilter(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                            const MCState& state, const FillStyle& style);
 };
 }  // namespace tgfx

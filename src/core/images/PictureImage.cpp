@@ -60,8 +60,11 @@ static std::shared_ptr<Image> GetEquivalentImage(const Record* record, int width
     return nullptr;
   }
   auto clip = imageRecord->state.clip;
-  if (clip.isEmpty() && clip.isInverseFillType()) {
-    return image->makeSubset(subset);
+  if (clip.isInverseFillType()) {
+    if (clip.isEmpty()) {
+      return image->makeSubset(subset);
+    }
+    return nullptr;
   }
   Rect clipRect = {};
   if (!clip.isRect(&clipRect)) {
@@ -85,8 +88,8 @@ static bool CheckStyleAndClip(const FillStyle& style, const Path& clip, int widt
   if (!style.isOpaque()) {
     return false;
   }
-  if (clip.isEmpty() && clip.isInverseFillType()) {
-    return true;
+  if (clip.isInverseFillType()) {
+    return clip.isEmpty();
   }
   Rect clipRect = {};
   if (!clip.isRect(&clipRect)) {

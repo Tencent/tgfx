@@ -19,32 +19,42 @@
 #include "LayerUnrollContext.h"
 #include "core/PathRef.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 using namespace pk;
 
-LayerUnrollContext::LayerUnrollContext(DrawContext* drawContext, FillStyle fillStyle)
-    : drawContext(drawContext), fillStyle(std::move(fillStyle)) {
+LayerUnrollContext::LayerUnrollContext(DrawContext* drawContext, FillStyle fillStyle,
+                                       std::shared_ptr<ImageFilter> imageFilter)
+    : drawContext(drawContext), fillStyle(std::move(fillStyle)),
+      imageFilter(std::move(imageFilter)) {
 }
 
 void LayerUnrollContext::clear() {
 }
 
 void LayerUnrollContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
-  drawContext->drawRect(rect, state, merge(style));
-  unrolled = true;
+  TRACE_EVENT;
+  if (imageFilter == nullptr) {
+    drawContext->drawRect(rect, state, merge(style));
+    unrolled = true;
+  }
 }
 
 void LayerUnrollContext::drawRRect(const RRect& rRect, const MCState& state,
                                    const FillStyle& style) {
-  drawContext->drawRRect(rRect, state, merge(style));
-  unrolled = true;
+  TRACE_EVENT;
+  if (imageFilter == nullptr) {
+    drawContext->drawRRect(rRect, state, merge(style));
+    unrolled = true;
+  }
 }
 
 void LayerUnrollContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                    const FillStyle& style) {
+  TRACE_EVENT;
   // The shape might have multiple contours and could overlap, so we can't unroll it directly.
-  if (style.isOpaque() && fillStyle.isOpaque()) {
+  if (imageFilter == nullptr && style.isOpaque() && fillStyle.isOpaque()) {
     drawContext->drawShape(std::move(shape), state, merge(style));
     unrolled = true;
   }
@@ -52,6 +62,11 @@ void LayerUnrollContext::drawShape(std::shared_ptr<Shape> shape, const MCState& 
 
 void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                    const MCState& state, const FillStyle& style) {
+  TRACE_EVENT;
+  if (imageFilter != nullptr) {
+    drawImageWidthFilter(std::move(image), sampling, state, style);
+    return;
+  }
   drawContext->drawImage(std::move(image), sampling, state, merge(style));
   unrolled = true;
 }
@@ -59,28 +74,86 @@ void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingO
 void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                        const SamplingOptions& sampling, const MCState& state,
                                        const FillStyle& style) {
+  TRACE_EVENT;
+  if (imageFilter != nullptr) {
+    image = image->makeSubset(rect);
+    // the rect should always be contained in the image bounds.
+    DEBUG_ASSERT(image != nullptr);
+    drawImageWidthFilter(std::move(image), sampling, state, style);
+    return;
+  }
   drawContext->drawImageRect(std::move(image), rect, sampling, state, merge(style));
+  unrolled = true;
+}
+
+void LayerUnrollContext::drawImageWidthFilter(std::shared_ptr<Image> image,
+                                              const SamplingOptions& sampling, const MCState& state,
+                                              const FillStyle& style) {
+  TRACE_EVENT;
+  if (style.colorFilter || style.maskFilter) {
+    return;
+  }
+  if (image->isAlphaOnly()) {
+    if (style.shader || !style.color.isOpaque()) {
+      return;
+    }
+  }
+  auto& viewMatrix = state.matrix;
+  if (!viewMatrix.isTranslate()) {
+    return;
+  }
+  auto& clip = state.clip;
+  if (clip.isInverseFillType()) {
+    if (!clip.isEmpty()) {
+      return;
+    }
+  } else {
+    Rect clipRect = {};
+    if (!clip.isRect(&clipRect)) {
+      return;
+    }
+    clipRect.offset(-viewMatrix.getTranslateX(), -viewMatrix.getTranslateY());
+    image = image->makeSubset(clipRect);
+    if (image == nullptr) {
+      return;
+    }
+  }
+  auto offset = Point::Zero();
+  image = image->makeWithFilter(std::move(imageFilter), &offset);
+  if (image == nullptr) {
+    return;
+  }
+  auto mcState = state;
+  mcState.matrix.preTranslate(offset.x, offset.y);
+  drawContext->drawImage(std::move(image), sampling, mcState, merge(style));
   unrolled = true;
 }
 
 void LayerUnrollContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                           const MCState& state, const FillStyle& style,
                                           const Stroke* stroke) {
-  // We assume that glyphs within a single GlyphRunList usually do not overlap.
-  drawContext->drawGlyphRunList(std::move(glyphRunList), state, merge(style), stroke);
-  unrolled = true;
+  TRACE_EVENT;
+  if (imageFilter == nullptr) {
+    // We assume that glyphs within a single GlyphRunList usually do not overlap.
+    drawContext->drawGlyphRunList(std::move(glyphRunList), state, merge(style), stroke);
+    unrolled = true;
+  }
 }
 
 void LayerUnrollContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                                    const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  drawContext->drawLayer(std::move(picture), state, merge(style), std::move(filter));
-  unrolled = true;
+  TRACE_EVENT;
+  if (imageFilter == nullptr) {
+    drawContext->drawLayer(std::move(picture), state, merge(style), std::move(filter));
+    unrolled = true;
+  }
 }
 
 void LayerUnrollContext::drawPicture(std::shared_ptr<Picture>, const MCState&) {
 }
 
 FillStyle LayerUnrollContext::merge(const FillStyle& style) {
+  TRACE_EVENT;
   auto newStyle = style;
   newStyle.color.alpha *= fillStyle.color.alpha;
   newStyle.blendMode = fillStyle.blendMode;
