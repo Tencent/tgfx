@@ -30,7 +30,7 @@
 namespace tgfx {
 
 std::string ToSVGTransform(const Matrix& matrix) {
-  ASSERT(!matrix.isIdentity());
+  DEBUG_ASSERT(!matrix.isIdentity());
 
   std::stringstream strStream;
   // http://www.w3.org/TR/SVG/coords.html#TransformMatrixDefined
@@ -76,7 +76,7 @@ std::string ToSVGCap(LineCap cap) {
   };
 
   auto index = static_cast<size_t>(cap);
-  ASSERT(index < capMap.size());
+  DEBUG_ASSERT(index < capMap.size());
   return capMap[index];
 }
 
@@ -88,7 +88,7 @@ std::string ToSVGJoin(LineJoin join) {
   };
 
   auto index = static_cast<size_t>(join);
-  ASSERT(index < joinMap.size());
+  DEBUG_ASSERT(index < joinMap.size());
   return joinMap[index];
 }
 
@@ -129,7 +129,7 @@ std::string ToSVGBlendMode(BlendMode mode) {
       "plus-darker"    // PlusDarker
   };
   auto index = static_cast<size_t>(mode);
-  ASSERT(index < blendModeCount);
+  DEBUG_ASSERT(index < blendModeCount);
   auto blendStr = blendModeMap[index];
   if (blendStr.empty()) {
     blendStr = "normal";
@@ -154,7 +154,7 @@ std::string ToSVGPath(const Path& path, PathEncoding encoding) {
       inputString.append(FloatToString(pt.x) + " " + FloatToString(pt.y));
     }
 
-    ASSERT(count > 0);
+    DEBUG_ASSERT(count > 0);
     // For relative encoding, track the current point (otherwise == origin).
     currentPoint = {points[offset + count - 1].x * static_cast<float>(relSelector),
                     points[offset + count - 1].y * static_cast<float>(relSelector)};
