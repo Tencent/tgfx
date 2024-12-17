@@ -35,14 +35,14 @@ class PathEffect {
    * @param count number of elements in the interval array
    * @param phase  offset into the interval array (mod the sum of all of the intervals).
    */
-  static std::unique_ptr<PathEffect> MakeDash(const float intervals[], int count, float phase);
+  static std::shared_ptr<PathEffect> MakeDash(const float intervals[], int count, float phase);
 
   /**
    * Create a corner path effect.
    * @param radius  must be > 0 to have an effect. It specifies the distance from each corner that
    * should be "rounded".
    */
-  static std::unique_ptr<PathEffect> MakeCorner(float radius);
+  static std::shared_ptr<PathEffect> MakeCorner(float radius);
 
   /**
    * Creates a path effect that returns a segment of the input path based on the given start and
@@ -52,7 +52,7 @@ class PathEffect {
    * @param startT The starting point of the path segment to be returned.
    * @param stopT The ending point of the path segment to be returned.
    */
-  static std::unique_ptr<PathEffect> MakeTrim(float startT, float stopT);
+  static std::shared_ptr<PathEffect> MakeTrim(float startT, float stopT);
 
   virtual ~PathEffect() = default;
 

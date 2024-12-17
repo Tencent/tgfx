@@ -20,6 +20,19 @@
 #include "MergeShape.h"
 
 namespace tgfx {
+void Shape::Append(std::vector<std::shared_ptr<Shape>>* shapes, std::shared_ptr<Shape> shape) {
+  if (shape->type() == Type::Append) {
+    auto appendShape = std::static_pointer_cast<AppendShape>(shape);
+    shapes->insert(shapes->end(), appendShape->shapes.end(), appendShape->shapes.begin());
+  } else {
+    shapes->push_back(std::move(shape));
+  }
+}
+
+bool AppendShape::isInverseFillType() const {
+  return shapes.front()->isInverseFillType();
+}
+
 Rect AppendShape::getBounds(float resolutionScale) const {
   auto bounds = Rect::MakeEmpty();
   for (const auto& shape : shapes) {
@@ -29,9 +42,11 @@ Rect AppendShape::getBounds(float resolutionScale) const {
 }
 
 Path AppendShape::getPath(float resolutionScale) const {
-  Path path = {};
-  for (const auto& shape : shapes) {
-    path.addPath(shape->getPath(resolutionScale));
+  auto firstShape = shapes.front();
+  // the first path determines the fill type
+  auto path = firstShape->getPath(resolutionScale);
+  for (size_t i = 1; i < shapes.size(); ++i) {
+    path.addPath(shapes[i]->getPath(resolutionScale));
   }
   return path;
 }

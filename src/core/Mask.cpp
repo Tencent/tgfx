@@ -23,6 +23,11 @@
 namespace tgfx {
 void Mask::fillPath(const Path& path, const Stroke* stroke) {
   if (path.isEmpty()) {
+    if (path.isInverseFillType()) {
+      Path tempPath = {};
+      tempPath.addRect(Rect::MakeWH(width(), height()));
+      onFillPath(tempPath, Matrix::I());
+    }
     return;
   }
   if (stroke != nullptr) {

@@ -65,21 +65,20 @@ bool TextContent::HitTestPointInternal(float localX, float localY,
     }
     const auto& positions = glyphRun.positions;
     size_t index = 0;
-
     for (const auto& glyphID : glyphRun.glyphs) {
       const auto& position = positions[index];
-      if (glyphFace->hasColor()) {
-        auto bounds = glyphFace->getBounds(glyphID);
-        bounds.offset(position.x, position.y);
-        if (bounds.contains(localX, localY)) {
-          return true;
-        }
-      } else {
+      if (glyphFace->hasOutlines()) {
         Path glyphPath = {};
         if (glyphFace->getPath(glyphID, &glyphPath)) {
           if (glyphPath.contains(localX - position.x, localY - position.y)) {
             return true;
           }
+        }
+      } else {
+        auto bounds = glyphFace->getBounds(glyphID);
+        bounds.offset(position.x, position.y);
+        if (bounds.contains(localX, localY)) {
+          return true;
         }
       }
       index++;

@@ -193,7 +193,7 @@ jobs:
         run: |
           cd web
           emsdk/emsdk_env
-          npm run build:mt:debug
+          npm run build:debug
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}

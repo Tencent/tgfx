@@ -20,6 +20,28 @@
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
+std::shared_ptr<Shape> Shape::ApplyMatrix(std::shared_ptr<Shape> shape, const Matrix& matrix) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  if (matrix.isIdentity()) {
+    return shape;
+  }
+  auto maxScale = matrix.getMaxScale();
+  if (maxScale <= 0) {
+    return nullptr;
+  }
+  if (shape->type() != Type::Matrix) {
+    return std::make_shared<MatrixShape>(std::move(shape), matrix);
+  }
+  auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+  auto totalMatrix = matrix * matrixShape->matrix;
+  if (totalMatrix.isIdentity()) {
+    return matrixShape->shape;
+  }
+  return std::make_shared<MatrixShape>(matrixShape->shape, totalMatrix);
+}
+
 Rect MatrixShape::getBounds(float resolutionScale) const {
   resolutionScale *= matrix.getMaxScale();
   auto bounds = shape->getBounds(resolutionScale);

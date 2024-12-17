@@ -247,8 +247,8 @@ class Canvas {
 
   /**
    * Draws a circle using the current clip, matrix, and specified paint.
-   * @param centerX  the x-coordinate of the center of the circle.
-   * @param centerY  the y-coordinate of the center of the circle.
+   * @param centerX  the x-coordinate of the circle's center.
+   * @param centerY  the y-coordinate of the circle's center.
    * @param radius  the radius of the circle.
    * @param paint  the paint to use for stroke, blend, color, etc.
    */
@@ -301,8 +301,8 @@ class Canvas {
    * MipmapMode::Linear as the sampling options. Otherwise, it uses FilterMode::Linear and
    * MipmapMode::None.
    * @param image  the image to draw.
-   * @param left  the x-coordinate of the top-left corner of the image.
-   * @param top  the y-coordinate of the top-left corner of the image.
+   * @param left  the x-coordinate of the image's top-left corner.
+   * @param top  the y-coordinate of the image's top-left corner.
    * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
    */
   void drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint = nullptr);
