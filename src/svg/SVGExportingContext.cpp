@@ -85,7 +85,7 @@ void SVGExportingContext::drawRect(const Rect& rect, const MCState& mc, const Fi
     svg->addRectAttributes(rect);
   }
 
-  dumpClipGroup();
+  applyClipPath();
   ElementWriter rectElement("rect", context, writer, resourceBucket.get(), mc, fill);
 
   if (svg) {
@@ -100,7 +100,7 @@ void SVGExportingContext::drawRect(const Rect& rect, const MCState& mc, const Fi
 
 void SVGExportingContext::drawRRect(const RRect& roundRect, const MCState& state,
                                     const FillStyle& fill) {
-  dumpClipGroup();
+  applyClipPath();
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
       ElementWriter circleElement("circle", context, writer, resourceBucket.get(), state, fill);
@@ -118,7 +118,7 @@ void SVGExportingContext::drawRRect(const RRect& roundRect, const MCState& state
 
 void SVGExportingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                     const FillStyle& style) {
-  dumpClipGroup();
+  applyClipPath();
   auto path = shape->getPath();
   ElementWriter pathElement("path", context, writer, resourceBucket.get(), state, style);
   pathElement.addPathAttributes(path, tgfx::SVGExportingContext::PathEncoding());
@@ -178,7 +178,7 @@ void SVGExportingContext::exportPixmap(const Pixmap& pixmap, const MCState& stat
     }
   }
   {
-    dumpClipGroup();
+    applyClipPath();
     ElementWriter imageUse("use", context, writer, resourceBucket.get(), state, style);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
@@ -195,7 +195,7 @@ void SVGExportingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRu
 
   // If conversion to path is required but the font does not have outlines (e.g.,emoji font,web
   // font), it cannot be converted to a path.
-  dumpClipGroup();
+  applyClipPath();
   if (hasFont) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() && options.convertTextToPaths) {
       exportGlyphsAsPath(glyphRunList, state, style, stroke);
@@ -292,7 +292,7 @@ void SVGExportingContext::drawLayer(std::shared_ptr<Picture> picture, const MCSt
     resources = defs.addImageFilterResource(imageFilter, bound);
   }
   {
-    dumpClipGroup();
+    applyClipPath();
     auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);
@@ -321,7 +321,7 @@ void SVGExportingContext::onClipPath(const MCState& state) {
   savedPaths.push_back(state.clip);
 };
 
-void SVGExportingContext::dumpClipGroup() {
+void SVGExportingContext::applyClipPath() {
   auto defineClip = [this](const Path& clipPath) -> std::string {
     std::string clipID = resourceBucket->addClip();
     ElementWriter clipPathElement("clipPath", writer);

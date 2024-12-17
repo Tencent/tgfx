@@ -106,7 +106,7 @@ class SVGExportingContext : public DrawContext {
   void exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                            const FillStyle& style);
 
-  void dumpClipGroup();
+  void applyClipPath();
 
   static PathEncoding PathEncoding();
 
