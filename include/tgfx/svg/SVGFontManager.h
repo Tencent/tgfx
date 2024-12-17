@@ -29,12 +29,13 @@ class FontStyle {
  public:
   struct Hash {
     std::size_t operator()(const FontStyle& style) const {
-      return std::hash<int>()(style.weight()) ^ std::hash<int>()(style.width()) ^
-             std::hash<int>()(style.slant());
+      return std::hash<int>()(static_cast<int>(style.weight())) ^
+             std::hash<int>()(static_cast<int>(style.width())) ^
+             std::hash<int>()(static_cast<int>(style.slant()));
     }
   };
 
-  enum Weight {
+  enum class Weight {
     Invisible_Weight = 0,
     Thin_Weight = 100,
     ExtraLight_Weight = 200,
@@ -48,7 +49,7 @@ class FontStyle {
     ExtraBlack_Weight = 1000,
   };
 
-  enum Width {
+  enum class Width {
     UltraCondensed_Width = 1,
     ExtraCondensed_Width = 2,
     Condensed_Width = 3,
@@ -60,28 +61,30 @@ class FontStyle {
     UltraExpanded_Width = 9,
   };
 
-  enum Slant {
+  enum class Slant {
     Upright_Slant,
     Italic_Slant,
     Oblique_Slant,
   };
 
   constexpr FontStyle(Weight weight, Width width, Slant slant)
-      : value(weight + (width << 16) + (slant << 24)) {
+      : value(static_cast<int>(weight) + (static_cast<int>(width) << 16) +
+              (static_cast<int>(slant) << 24)) {
   }
 
-  constexpr FontStyle() : FontStyle{Normal_Weight, Normal_Width, Upright_Slant} {
+  constexpr FontStyle()
+      : FontStyle{Weight::Normal_Weight, Width::Normal_Width, Slant::Upright_Slant} {
   }
 
   bool operator==(const FontStyle& rhs) const {
     return value == rhs.value;
   }
 
-  int weight() const {
-    return value & 0xFFFF;
+  Weight weight() const {
+    return static_cast<Weight>(value & 0xFFFF);
   }
-  int width() const {
-    return (value >> 16) & 0xFF;
+  Width width() const {
+    return static_cast<Width>((value >> 16) & 0xFF);
   }
   Slant slant() const {
     return static_cast<Slant>((value >> 24) & 0xFF);
@@ -96,16 +99,26 @@ class SVGFontManager {
   SVGFontManager() = default;
   ~SVGFontManager() = default;
 
+  /**
+   * Set the Default Typeface object
+   * @param typeface 
+   * @return true 
+   * @return false 
+   */
   bool setDefaultTypeface(const std::shared_ptr<Typeface>& typeface);
 
   void addFontStyle(const std::string& fontFamily, FontStyle style);
+
   void setTypeface(const std::string& fontFamily, FontStyle style,
                    const std::shared_ptr<Typeface>& typeface);
+
   std::vector<std::string> getFontFamilies() const;
+
   std::vector<FontStyle> getFontStyles(const std::string& fontFamily) const;
 
   std::shared_ptr<Typeface> getTypefaceForConfig(const std::string& fontFamily,
                                                  FontStyle style) const;
+
   std::shared_ptr<Typeface> getTypefaceForRender(const std::string& fontFamily,
                                                  FontStyle style) const;
 

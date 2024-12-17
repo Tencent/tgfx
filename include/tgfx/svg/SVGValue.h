@@ -59,18 +59,18 @@ class SVGWrapperValue final : public SVGValue {
  public:
   static constexpr Type _type = ValueType;
 
-  explicit SVGWrapperValue(const T& v) : INHERITED(ValueType), _wrappedValue(v) {
+  explicit SVGWrapperValue(const T& v) : INHERITED(ValueType), wrappedValue(v) {
   }
 
   // NOLINTBEGIN
   // Allow implicit conversion to the wrapped type operator.
   operator const T&() const {
-    return _wrappedValue;
+    return wrappedValue;
   }
   // NOLINTEND
 
   const T* operator->() const {
-    return &_wrappedValue;
+    return &wrappedValue;
   }
 
   // Stack-only
@@ -78,7 +78,7 @@ class SVGWrapperValue final : public SVGValue {
   void* operator new(size_t, void*) = delete;
 
  private:
-  const T& _wrappedValue;
+  const T& wrappedValue;
 
   using INHERITED = SVGValue;
 };

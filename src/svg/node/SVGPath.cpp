@@ -37,7 +37,7 @@ bool SVGPath::parseAndSetAttribute(const std::string& n, const std::string& v) {
 
 template <>
 bool SVGAttributeParser::parse<Path>(Path* path) {
-  auto [success, parsePath] = PathParse::FromSVGString(fCurPos);
+  auto [success, parsePath] = PathParse::FromSVGString(currentPos);
   if (success) {
     *path = *parsePath;
   }
@@ -52,10 +52,10 @@ void SVGPath::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint
   canvas->drawPath(path, paint);
 }
 
-Path SVGPath::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGPath::onAsPath(const SVGRenderContext& context) const {
   Path path = ShapePath;
   // clip-rule can be inherited and needs to be applied at clip time.
-  path.setFillType(ctx.presentationContext()._inherited.ClipRule->asFillType());
+  path.setFillType(context.presentationContext()._inherited.ClipRule->asFillType());
   this->mapToParent(&path);
   return path;
 }

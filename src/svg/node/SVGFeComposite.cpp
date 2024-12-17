@@ -55,32 +55,20 @@ BlendMode SVGFeComposite::BlendModeForOperator(SVGFeCompositeOperator op) {
   }
 }
 
-std::shared_ptr<ImageFilter> SVGFeComposite::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SVGFilterContext& /*fctx*/) const {
-  // const Rect cropRect = this->resolveFilterSubregion(ctx, fctx);
-  // const SVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
-  // const std::shared_ptr<ImageFilter> background = fctx.resolveInput(ctx, fIn2, colorspace);
-  // const std::shared_ptr<ImageFilter> foreground = fctx.resolveInput(ctx, this->getIn(), colorspace);
-  // if (fOperator == SVGFeCompositeOperator::kArithmetic) {
-  //   constexpr bool enforcePMColor = true;
-  //   return ImageFilter::Arithmetic(fK1, fK2, fK3, fK4, enforcePMColor, background, foreground,
-  //                                     cropRect);
-  // } else {
-  //   return ImageFilter::Blend(BlendModeForOperator(fOperator), background, foreground, cropRect);
-  // }
-
-  //TODO (YG)
+std::shared_ptr<ImageFilter> SVGFeComposite::onMakeImageFilter(const SVGRenderContext&,
+                                                               const SVGFilterContext&) const {
+  //TODO (YGAurora) Implement this by filter blending
   return nullptr;
 }
 
 template <>
 bool SVGAttributeParser::parse(SVGFeCompositeOperator* op) {
-  static constexpr std::tuple<const char*, SVGFeCompositeOperator> gOpMap[] = {
+  static constexpr std::tuple<const char*, SVGFeCompositeOperator> opMap[] = {
       {"over", SVGFeCompositeOperator::Over}, {"in", SVGFeCompositeOperator::In},
       {"out", SVGFeCompositeOperator::Out},   {"atop", SVGFeCompositeOperator::Atop},
       {"xor", SVGFeCompositeOperator::Xor},   {"arithmetic", SVGFeCompositeOperator::Arithmetic},
   };
 
-  return this->parseEnumMap(gOpMap, op) && this->parseEOSToken();
+  return this->parseEnumMap(opMap, op) && this->parseEOSToken();
 }
 }  // namespace tgfx

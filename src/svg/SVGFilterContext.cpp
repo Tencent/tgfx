@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/node/SVGFilterContext.h"
+#include "SVGFilterContext.h"
 #include <memory>
 #include "core/utils/Log.h"
 #include "svg/SVGRenderContext.h"
@@ -61,7 +61,7 @@ bool SVGFilterContext::previousResultIsSourceGraphic() const {
 
 // https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveInAttribute
 std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SVGFilterContext::getInput(
-    const SVGRenderContext& ctx, const SVGFeInputType& inputType) const {
+    const SVGRenderContext& context, const SVGFeInputType& inputType) const {
   SVGColorspace inputCS = SVGColorspace::SRGB;
   std::shared_ptr<ImageFilter> result;
   switch (inputType.type()) {
@@ -75,14 +75,14 @@ std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SVGFilterContext::getInp
       // Do nothing.
       break;
     case SVGFeInputType::Type::FillPaint: {
-      const auto& fillPaint = ctx.fillPaint();
+      const auto& fillPaint = context.fillPaint();
       if (fillPaint.has_value()) {
         //TODO (YGAurora) - Implement shader image filter by paint
       }
       break;
     }
     case SVGFeInputType::Type::StrokePaint: {
-      const auto& strokePaint = ctx.strokePaint();
+      const auto& strokePaint = context.strokePaint();
       if (strokePaint.has_value()) {
         //TODO (YGAurora) - Implement shader image filter by paint
       }
@@ -118,9 +118,9 @@ std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(const SVGRenderConte
   return std::get<0>(this->getInput(context, inputType));
 }
 
-std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(const SVGRenderContext& /*ctx*/,
-                                                            const SVGFeInputType& /*inputType*/,
-                                                            SVGColorspace /*colorspace*/) const {
+std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(const SVGRenderContext&,
+                                                            const SVGFeInputType&,
+                                                            SVGColorspace) const {
   //TODO (YGAurora) - ConvertFilterColorspace
   return nullptr;
 }

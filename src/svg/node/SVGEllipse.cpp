@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "tgfx/svg/node/SVGEllipse.h"
-#include "SVGRectPriv.h"
+// #include "SVGRectPriv.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Rect.h"
@@ -33,35 +33,32 @@ bool SVGEllipse::parseAndSetAttribute(const std::string& n, const std::string& v
          this->setCy(SVGAttributeParser::parse<SVGLength>("cy", n, v)) ||
          this->setRx(SVGAttributeParser::parse<SVGLength>("rx", n, v)) ||
          this->setRy(SVGAttributeParser::parse<SVGLength>("ry", n, v));
-  std::optional<int> s;
-  s = 10;
 }
 
-Rect SVGEllipse::resolve(const SVGLengthContext& lctx) const {
-  const auto cx = lctx.resolve(Cx, SVGLengthContext::LengthType::Horizontal);
-  const auto cy = lctx.resolve(Cy, SVGLengthContext::LengthType::Vertical);
+Rect SVGEllipse::resolve(const SVGLengthContext& lengthContext) const {
+  const auto cx = lengthContext.resolve(Cx, SVGLengthContext::LengthType::Horizontal);
+  const auto cy = lengthContext.resolve(Cy, SVGLengthContext::LengthType::Vertical);
 
   // https://www.w3.org/TR/SVG2/shapes.html#EllipseElement
   //
   // An auto value for either rx or ry is converted to a used value, following the rules given
   // above for rectangles (but without any clamping based on width or height).
-  const auto [rx, ry] = ResolveOptionalRadii(Rx, Ry, lctx);
+  const auto [rx, ry] = lengthContext.resolveOptionalRadii(Rx, Ry);
 
   // A computed value of zero for either dimension, or a computed value of auto for both
   // dimensions, disables rendering of the element.
   return (rx > 0 && ry > 0) ? Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2) : Rect::MakeEmpty();
 }
 
-void SVGEllipse::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
+void SVGEllipse::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
                         PathFillType) const {
-  canvas->drawOval(this->resolve(lctx), paint);
+  canvas->drawOval(this->resolve(lengthContext), paint);
 }
 
-Path SVGEllipse::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGEllipse::onAsPath(const SVGRenderContext& context) const {
   Path path;
-  path.addOval(this->resolve(ctx.lengthContext()));
+  path.addOval(this->resolve(context.lengthContext()));
   this->mapToParent(&path);
-
   return path;
 }
 

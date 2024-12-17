@@ -20,13 +20,13 @@
 
 #include <memory>
 #include <unordered_map>
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
-class SVGRenderContext;
 class SVGFilterContext {
  public:
   SVGFilterContext(const Rect& filterEffectsRegion, const SVGObjectBoundingBoxUnits& primitiveUnits)

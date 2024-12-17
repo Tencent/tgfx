@@ -30,8 +30,9 @@ bool SVGFeMorphology::parseAndSetAttribute(const std::string& name, const std::s
              SVGAttributeParser::parse<SVGFeMorphology::Radius>("radius", name, value));
 }
 
-std::shared_ptr<ImageFilter> SVGFeMorphology::onMakeImageFilter(
-    const SVGRenderContext& /*ctx*/, const SVGFilterContext& /*fctx*/) const {
+std::shared_ptr<ImageFilter> SVGFeMorphology::onMakeImageFilter(const SVGRenderContext&,
+                                                                const SVGFilterContext&) const {
+  //TODO (YGAurora)
   return nullptr;
 }
 

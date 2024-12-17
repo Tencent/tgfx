@@ -35,7 +35,7 @@ namespace {
 
 inline bool is_between(char c, char min, char max) {
   ASSERT(min <= max);
-  return (unsigned)(c - min) <= (unsigned)(max - min);
+  return static_cast<unsigned>(c - min) <= static_cast<unsigned>(max - min);
 }
 
 inline bool is_ws(char c) {
@@ -59,22 +59,22 @@ inline bool is_hex(char c) {
 namespace tgfx {
 
 SVGAttributeParser::SVGAttributeParser(std::string attributeString)
-    : fCurPos(attributeString.data()), fEndPos(fCurPos + attributeString.size()) {
+    : currentPos(attributeString.data()), endPos(currentPos + attributeString.size()) {
 }
 
 template <typename F>
 inline bool SVGAttributeParser::advanceWhile(F f) {
-  const auto* initial = fCurPos;
-  while (fCurPos < fEndPos && f(*fCurPos)) {
-    fCurPos++;
+  const auto* initial = currentPos;
+  while (currentPos < endPos && f(*currentPos)) {
+    currentPos++;
   }
-  return fCurPos != initial;
+  return currentPos != initial;
 }
 
 bool SVGAttributeParser::matchStringToken(const char* token, const char** newPos) const {
-  const char* c = fCurPos;
+  const char* c = currentPos;
 
-  while (c < fEndPos && *token && *c == *token) {
+  while (c < endPos && *token && *c == *token) {
     c++;
     token++;
   }
@@ -91,7 +91,7 @@ bool SVGAttributeParser::matchStringToken(const char* token, const char** newPos
 }
 
 bool SVGAttributeParser::parseEOSToken() {
-  return fCurPos == fEndPos;
+  return currentPos == endPos;
 }
 
 bool SVGAttributeParser::parseSepToken() {
@@ -114,32 +114,32 @@ bool SVGAttributeParser::parseExpectedStringToken(const char* expected) {
     return false;
   }
 
-  fCurPos = newPos;
+  currentPos = newPos;
   return true;
 }
 
 bool SVGAttributeParser::parseScalarToken(float* res) {
-  if (const char* next = SVGParse::FindScalar(fCurPos, res)) {
-    fCurPos = next;
+  if (const char* next = SVGParse::FindScalar(currentPos, res)) {
+    currentPos = next;
     return true;
   }
   return false;
 }
 
 bool SVGAttributeParser::parseInt32Token(int32_t* res) {
-  if (const char* next = SVGParse::FindS32(fCurPos, res)) {
-    fCurPos = next;
+  if (const char* next = SVGParse::FindS32(currentPos, res)) {
+    currentPos = next;
     return true;
   }
   return false;
 }
 
 bool SVGAttributeParser::matchHexToken(const char** newPos) const {
-  *newPos = fCurPos;
-  while (*newPos < fEndPos && is_hex(**newPos)) {
+  *newPos = currentPos;
+  while (*newPos < endPos && is_hex(**newPos)) {
     ++*newPos;
   }
-  return *newPos != fCurPos;
+  return *newPos != currentPos;
 }
 
 bool SVGAttributeParser::parseEscape(Unichar* c) {
@@ -151,12 +151,12 @@ bool SVGAttributeParser::parseEscape(Unichar* c) {
   }
   const char* hexEnd;
   if (this->matchHexToken(&hexEnd)) {
-    if (hexEnd - fCurPos > 6) {
-      hexEnd = fCurPos + 6;
+    if (hexEnd - currentPos > 6) {
+      hexEnd = currentPos + 6;
     }
     char hexString[7];
-    auto hexSize = static_cast<uint32_t>(hexEnd - fCurPos);
-    memcpy(hexString, fCurPos, hexSize);
+    auto hexSize = static_cast<uint32_t>(hexEnd - currentPos);
+    memcpy(hexString, currentPos, hexSize);
     hexString[hexSize] = '\0';
     uint32_t cp;
     const char* hexFound = SVGParse::FindHex(hexString, &cp);
@@ -164,13 +164,13 @@ bool SVGAttributeParser::parseEscape(Unichar* c) {
       cp = 0xFFFD;
     }
     *c = static_cast<Unichar>(cp);
-    fCurPos = hexEnd;
+    currentPos = hexEnd;
     this->parseWSToken();
-  } else if (this->parseEOSToken() || is_nl(*fCurPos)) {
+  } else if (this->parseEOSToken() || is_nl(*currentPos)) {
     *c = 0xFFFD;
     return false;
   } else {
-    if (*c = UTF::NextUTF8(&fCurPos, fEndPos); *c < 0) {
+    if (*c = UTF::NextUTF8(&currentPos, endPos); *c < 0) {
       return false;
     }
   }
@@ -194,7 +194,7 @@ bool SVGAttributeParser::parseIdentToken(std::string* ident) {
     if (this->parseEscape(&c)) {
       // ident->appendUnichar(c);
     } else {
-      if (c = UTF::NextUTF8(&fCurPos, fEndPos); c < 0) {
+      if (c = UTF::NextUTF8(&currentPos, endPos); c < 0) {
         return false;
       }
       if ((c < 'a' || 'z' < c) && (c < 'A' || 'Z' < c) && (c != '_') &&
@@ -204,13 +204,13 @@ bool SVGAttributeParser::parseIdentToken(std::string* ident) {
       ident->append(UTF::ToUTF8(c));
     }
   }
-  while (fCurPos < fEndPos) {
+  while (currentPos < endPos) {
     if (this->parseEscape(&c)) {
       ident->append(UTF::ToUTF8(c));
       continue;
     }
-    const char* next = fCurPos;
-    if (c = UTF::NextUTF8(&next, fEndPos); c < 0) {
+    const char* next = currentPos;
+    if (c = UTF::NextUTF8(&next, endPos); c < 0) {
       break;
     }
     if ((c < 'a' || 'z' < c) && (c < 'A' || 'Z' < c) && (c < '0' || '9' < c) && (c != '_') &&
@@ -218,7 +218,7 @@ bool SVGAttributeParser::parseIdentToken(std::string* ident) {
       break;
     }
     ident->append(UTF::ToUTF8(c));
-    fCurPos = next;
+    currentPos = next;
   }
 
   restoreCurPos.clear();
@@ -274,7 +274,7 @@ bool SVGAttributeParser::parseHexColorToken(Color* c) {
   }
 
   uint32_t v;
-  std::string hexString(fCurPos, static_cast<uint32_t>(hexEnd - fCurPos));
+  std::string hexString(currentPos, static_cast<uint32_t>(hexEnd - currentPos));
   SVGParse::FindHex(hexString.c_str(), &v);
 
   switch (hexString.size()) {
@@ -291,14 +291,14 @@ bool SVGAttributeParser::parseHexColorToken(Color* c) {
   }
 
   *c = SVGParse::Uint32ToColor(v | 0xff000000);
-  fCurPos = hexEnd;
+  currentPos = hexEnd;
 
   restoreCurPos.clear();
   return true;
 }
 
 bool SVGAttributeParser::parseColorComponentIntegralToken(int32_t* c) {
-  const char* p = SVGParse::FindS32(fCurPos, c);
+  const char* p = SVGParse::FindS32(currentPos, c);
   if (!p || *p == '.') {
     // No value parsed, or fractional value.
     return false;
@@ -310,13 +310,13 @@ bool SVGAttributeParser::parseColorComponentIntegralToken(int32_t* c) {
     p++;
   }
 
-  fCurPos = p;
+  currentPos = p;
   return true;
 }
 
 bool SVGAttributeParser::parseColorComponentFractionalToken(int32_t* c) {
   float s;
-  const char* p = SVGParse::FindScalar(fCurPos, &s);
+  const char* p = SVGParse::FindScalar(currentPos, &s);
   if (!p || *p != '%') {
     // Floating point must be a percentage (CSS2 rgb-percent syntax).
     return false;
@@ -325,16 +325,16 @@ bool SVGAttributeParser::parseColorComponentFractionalToken(int32_t* c) {
 
   *c = static_cast<int32_t>(std::round(s * 255.0f / 100));
   *c = std::clamp(*c, 0, 255);
-  fCurPos = p;
+  currentPos = p;
   return true;
 }
 
 bool SVGAttributeParser::parseColorComponentScalarToken(int32_t* c) {
   float s;
-  if (const char* p = SVGParse::FindScalar(fCurPos, &s)) {
+  if (const char* p = SVGParse::FindScalar(currentPos, &s)) {
     *c = static_cast<int32_t>(std::round(s * 255.0f));
     *c = std::clamp(*c, 0, 255);
-    fCurPos = p;
+    currentPos = p;
     return true;
   }
   return false;
@@ -479,11 +479,11 @@ bool SVGAttributeParser::parse(SVGIRI* iri) {
     iriType = SVGIRI::Type::Nonlocal;
   }
 
-  const auto* start = fCurPos;
+  const auto* start = currentPos;
   if (!this->advanceWhile([](char c) -> bool { return c != ')'; })) {
     return false;
   }
-  *iri = SVGIRI(iriType, std::string(start, static_cast<uint32_t>(fCurPos - start)));
+  *iri = SVGIRI(iriType, std::string(start, static_cast<uint32_t>(currentPos - start)));
   return true;
 }
 
@@ -507,8 +507,8 @@ bool SVGAttributeParser::parse(SVGStringType* result) {
   if (this->parseEOSToken()) {
     return false;
   }
-  *result = SVGStringType(fCurPos);
-  fCurPos += result->size();
+  *result = SVGStringType(currentPos);
+  currentPos += result->size();
   return this->parseEOSToken();
 }
 
@@ -578,7 +578,7 @@ bool SVGAttributeParser::parseViewBox(SVGViewBoxType* vb) {
       this->parseSepToken() && this->parseScalarToken(&w) && this->parseSepToken() &&
       this->parseScalarToken(&h)) {
 
-    *vb = SVGViewBoxType(Rect::MakeXYWH(x, y, w, h));
+    *vb = static_cast<SVGViewBoxType>(Rect::MakeXYWH(x, y, w, h));
     parsedValue = true;
     // consume trailing whitespace
     this->parseWSToken();
@@ -782,14 +782,14 @@ bool SVGAttributeParser::parse(SVGPaint* paint) {
 // https://www.w3.org/TR/SVG11/masking.html#MaskProperty
 // https://www.w3.org/TR/SVG11/filters.html#FilterProperty
 template <>
-bool SVGAttributeParser::parse(SVGFuncIRI* firi) {
+bool SVGAttributeParser::parse(SVGFuncIRI* funcIRI) {
   SVGStringType iri;
   bool parsedValue = false;
 
   if (this->parseExpectedStringToken("none")) {
-    *firi = SVGFuncIRI();
+    *funcIRI = SVGFuncIRI();
     parsedValue = true;
-  } else if (this->parseFuncIRI(firi)) {
+  } else if (this->parseFuncIRI(funcIRI)) {
     parsedValue = true;
   }
 
@@ -809,9 +809,9 @@ bool SVGAttributeParser::parse(SVGLineCap* cap) {
   };
 
   bool parsedValue = false;
-  for (size_t i = 0; i < std::size(gCapInfo); ++i) {
-    if (this->parseExpectedStringToken(gCapInfo[i].fName)) {
-      *cap = SVGLineCap(gCapInfo[i].fType);
+  for (auto i : gCapInfo) {
+    if (this->parseExpectedStringToken(i.fName)) {
+      *cap = (i.fType);
       parsedValue = true;
       break;
     }
@@ -881,7 +881,8 @@ bool SVGAttributeParser::parse(SVGPointsType* points) {
       break;
     }
 
-    float x, y;
+    float x;
+    float y;
     if (!this->parseScalarToken(&x)) {
       break;
     }
@@ -890,7 +891,7 @@ bool SVGAttributeParser::parse(SVGPointsType* points) {
     // coordinate-pair:
     //     coordinate comma-wsp coordinate
     //     | coordinate negative-coordinate
-    if (!this->parseCommaWspToken() && !this->parseEOSToken() && *fCurPos != '-') {
+    if (!this->parseCommaWspToken() && !this->parseEOSToken() && *currentPos != '-') {
       break;
     }
 
@@ -1000,11 +1001,11 @@ bool SVGAttributeParser::parse(SVGFontFamily* family) {
   } else {
     // The spec allows specifying a comma-separated list for explicit fallback order.
     // For now, we only use the first entry and rely on the font manager to handle fallback.
-    const auto* comma = strchr(fCurPos, ',');
-    auto family_name =
-        comma ? std::string(fCurPos, static_cast<uint32_t>(comma - fCurPos)) : std::string(fCurPos);
-    *family = SVGFontFamily(family_name.c_str());
-    fCurPos += strlen(fCurPos);
+    const auto* comma = strchr(currentPos, ',');
+    auto family_name = comma ? std::string(currentPos, static_cast<uint32_t>(comma - currentPos))
+                             : std::string(currentPos);
+    *family = SVGFontFamily(family_name);
+    currentPos += strlen(currentPos);
     parsedValue = true;
   }
 
@@ -1032,7 +1033,7 @@ bool SVGAttributeParser::parse(SVGFontSize* size) {
 // https://www.w3.org/TR/SVG11/text.html#FontStyleProperty
 template <>
 bool SVGAttributeParser::parse(SVGFontStyle* style) {
-  static constexpr std::tuple<const char*, SVGFontStyle::Type> gStyleMap[] = {
+  static constexpr std::tuple<const char*, SVGFontStyle::Type> styleMap[] = {
       {"normal", SVGFontStyle::Type::Normal},
       {"italic", SVGFontStyle::Type::Italic},
       {"oblique", SVGFontStyle::Type::Oblique},
@@ -1042,7 +1043,7 @@ bool SVGAttributeParser::parse(SVGFontStyle* style) {
   bool parsedValue = false;
   SVGFontStyle::Type type;
 
-  if (this->parseEnumMap(gStyleMap, &type)) {
+  if (this->parseEnumMap(styleMap, &type)) {
     *style = SVGFontStyle(type);
     parsedValue = true;
   }
@@ -1053,7 +1054,7 @@ bool SVGAttributeParser::parse(SVGFontStyle* style) {
 // https://www.w3.org/TR/SVG11/text.html#FontWeightProperty
 template <>
 bool SVGAttributeParser::parse(SVGFontWeight* weight) {
-  static constexpr std::tuple<const char*, SVGFontWeight::Type> gWeightMap[] = {
+  static constexpr std::tuple<const char*, SVGFontWeight::Type> weightMap[] = {
       {"normal", SVGFontWeight::Type::Normal}, {"bold", SVGFontWeight::Type::Bold},
       {"bolder", SVGFontWeight::Type::Bolder}, {"lighter", SVGFontWeight::Type::Lighter},
       {"100", SVGFontWeight::Type::W100},      {"200", SVGFontWeight::Type::W200},
@@ -1066,7 +1067,7 @@ bool SVGAttributeParser::parse(SVGFontWeight* weight) {
   bool parsedValue = false;
   SVGFontWeight::Type type;
 
-  if (this->parseEnumMap(gWeightMap, &type)) {
+  if (this->parseEnumMap(weightMap, &type)) {
     *weight = SVGFontWeight(type);
     parsedValue = true;
   }
@@ -1077,7 +1078,7 @@ bool SVGAttributeParser::parse(SVGFontWeight* weight) {
 // https://www.w3.org/TR/SVG11/text.html#TextAnchorProperty
 template <>
 bool SVGAttributeParser::parse(SVGTextAnchor* anchor) {
-  static constexpr std::tuple<const char*, SVGTextAnchor::Type> gAnchorMap[] = {
+  static constexpr std::tuple<const char*, SVGTextAnchor::Type> anchorMap[] = {
       {"start", SVGTextAnchor::Type::Start},
       {"middle", SVGTextAnchor::Type::Middle},
       {"end", SVGTextAnchor::Type::End},
@@ -1087,7 +1088,7 @@ bool SVGAttributeParser::parse(SVGTextAnchor* anchor) {
   bool parsedValue = false;
   SVGTextAnchor::Type type;
 
-  if (this->parseEnumMap(gAnchorMap, &type)) {
+  if (this->parseEnumMap(anchorMap, &type)) {
     *anchor = SVGTextAnchor(type);
     parsedValue = true;
   }
@@ -1097,7 +1098,7 @@ bool SVGAttributeParser::parse(SVGTextAnchor* anchor) {
 
 // https://www.w3.org/TR/SVG11/coords.html#PreserveAspectRatioAttribute
 bool SVGAttributeParser::parsePreserveAspectRatio(SVGPreserveAspectRatio* par) {
-  static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Align> gAlignMap[] = {
+  static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Align> alignMap[] = {
       {"none", SVGPreserveAspectRatio::None},
       {"xMinYMin", SVGPreserveAspectRatio::XMinYMin},
       {"xMidYMin", SVGPreserveAspectRatio::XMidYMin},
@@ -1110,7 +1111,7 @@ bool SVGAttributeParser::parsePreserveAspectRatio(SVGPreserveAspectRatio* par) {
       {"xMaxYMax", SVGPreserveAspectRatio::XMaxYMax},
   };
 
-  static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Scale> gScaleMap[] = {
+  static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Scale> scaleMap[] = {
       {"meet", SVGPreserveAspectRatio::Meet},
       {"slice", SVGPreserveAspectRatio::Slice},
   };
@@ -1121,12 +1122,12 @@ bool SVGAttributeParser::parsePreserveAspectRatio(SVGPreserveAspectRatio* par) {
   this->parseExpectedStringToken("defer");
   this->parseWSToken();
 
-  if (this->parseEnumMap(gAlignMap, &par->align)) {
+  if (this->parseEnumMap(alignMap, &par->align)) {
     parsedValue = true;
 
     // optional scaling selector
     this->parseWSToken();
-    this->parseEnumMap(gScaleMap, &par->scale);
+    this->parseEnumMap(scaleMap, &par->scale);
   }
 
   return parsedValue && this->parseEOSToken();
@@ -1168,13 +1169,13 @@ bool SVGAttributeParser::parse(std::vector<SVGNumberType>* numbers) {
 
 template <>
 bool SVGAttributeParser::parse(SVGColorspace* colorspace) {
-  static constexpr std::tuple<const char*, SVGColorspace> gColorspaceMap[] = {
+  static constexpr std::tuple<const char*, SVGColorspace> colorspaceMap[] = {
       {"auto", SVGColorspace::Auto},
       {"sRGB", SVGColorspace::SRGB},
       {"linearRGB", SVGColorspace::LinearRGB},
   };
 
-  return this->parseEnumMap(gColorspaceMap, colorspace) && this->parseEOSToken();
+  return this->parseEnumMap(colorspaceMap, colorspace) && this->parseEOSToken();
 }
 
 // https://www.w3.org/TR/SVG11/painting.html#DisplayProperty
@@ -1191,7 +1192,7 @@ bool SVGAttributeParser::parse(SVGDisplay* display) {
   bool parsedValue = false;
   for (const auto& parseInfo : gDisplayInfo) {
     if (this->parseExpectedStringToken(parseInfo.fName)) {
-      *display = SVGDisplay(parseInfo.fType);
+      *display = parseInfo.fType;
       parsedValue = true;
       break;
     }

@@ -18,7 +18,7 @@
 
 #include "tgfx/svg/node/SVGRect.h"
 #include <optional>
-#include "SVGRectPriv.h"
+// #include "SVGRectPriv.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
@@ -41,39 +41,9 @@ bool SVGRect::parseAndSetAttribute(const std::string& n, const std::string& v) {
          this->setRy(SVGAttributeParser::parse<SVGLength>("ry", n, v));
 }
 
-std::tuple<float, float> ResolveOptionalRadii(const std::optional<SVGLength>& opt_rx,
-                                              const std::optional<SVGLength>& opt_ry,
-                                              const SVGLengthContext& lctx) {
-  // https://www.w3.org/TR/SVG2/shapes.html#RectElement
-  //
-  // The used values for rx and ry are determined from the computed values by following these
-  // steps in order:
-  //
-  // 1. If both rx and ry have a computed value of auto (since auto is the initial value for both
-  //    properties, this will also occur if neither are specified by the author or if all
-  //    author-supplied values are invalid), then the used value of both rx and ry is 0.
-  //    (This will result in square corners.)
-  // 2. Otherwise, convert specified values to absolute values as follows:
-  //     1. If rx is set to a length value or a percentage, but ry is auto, calculate an absolute
-  //        length equivalent for rx, resolving percentages against the used width of the
-  //        rectangle; the absolute value for ry is the same.
-  //     2. If ry is set to a length value or a percentage, but rx is auto, calculate the absolute
-  //        length equivalent for ry, resolving percentages against the used height of the
-  //        rectangle; the absolute value for rx is the same.
-  //     3. If both rx and ry were set to lengths or percentages, absolute values are generated
-  //        individually, resolving rx percentages against the used width, and resolving ry
-  //        percentages against the used height.
-  const float rx =
-      opt_rx.has_value() ? lctx.resolve(*opt_rx, SVGLengthContext::LengthType::Horizontal) : 0;
-  const float ry =
-      opt_ry.has_value() ? lctx.resolve(*opt_ry, SVGLengthContext::LengthType::Vertical) : 0;
-
-  return {opt_rx.has_value() ? rx : ry, opt_ry.has_value() ? ry : rx};
-}
-
-RRect SVGRect::resolve(const SVGLengthContext& lctx) const {
-  const auto rect = lctx.resolveRect(X, Y, Width, Height);
-  const auto [rx, ry] = ResolveOptionalRadii(Rx, Ry, lctx);
+RRect SVGRect::resolve(const SVGLengthContext& lengthContext) const {
+  const auto rect = lengthContext.resolveRect(X, Y, Width, Height);
+  const auto [rx, ry] = lengthContext.resolveOptionalRadii(Rx, Ry);
 
   // https://www.w3.org/TR/SVG2/shapes.html#RectElement
   // ...
@@ -89,9 +59,9 @@ RRect SVGRect::resolve(const SVGLengthContext& lctx) const {
   return rrect;
 }
 
-void SVGRect::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
+void SVGRect::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
                      PathFillType) const {
-  auto rect = this->resolve(lctx);
+  auto rect = this->resolve(lengthContext);
   auto offset = Point::Make(rect.rect.left, rect.rect.top);
   rect.rect = rect.rect.makeOffset(-offset.x, -offset.y);
   canvas->save();
@@ -100,16 +70,16 @@ void SVGRect::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& 
   canvas->restore();
 }
 
-Path SVGRect::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGRect::onAsPath(const SVGRenderContext& context) const {
   Path path;
-  path.addRRect(this->resolve(ctx.lengthContext()));
+  path.addRRect(this->resolve(context.lengthContext()));
   this->mapToParent(&path);
 
   return path;
 }
 
-Rect SVGRect::onObjectBoundingBox(const SVGRenderContext& ctx) const {
-  return ctx.lengthContext().resolveRect(X, Y, Width, Height);
+Rect SVGRect::onObjectBoundingBox(const SVGRenderContext& context) const {
+  return context.lengthContext().resolveRect(X, Y, Width, Height);
 }
 
 }  // namespace tgfx

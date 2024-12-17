@@ -39,11 +39,11 @@ bool SVGImage::parseAndSetAttribute(const std::string& n, const std::string& v) 
              SVGAttributeParser::parse<SVGPreserveAspectRatio>("preserveAspectRatio", n, v));
 }
 
-bool SVGImage::onPrepareToRender(SVGRenderContext* ctx) const {
+bool SVGImage::onPrepareToRender(SVGRenderContext* context) const {
   // Width or height of 0 disables rendering per spec:
   // https://www.w3.org/TR/SVG11/struct.html#ImageElement
   return !Href.iri().empty() && Width.value() > 0 && Height.value() > 0 &&
-         INHERITED::onPrepareToRender(ctx);
+         INHERITED::onPrepareToRender(context);
 }
 
 std::vector<unsigned char> base64_decode(const std::string& encoded_string) {
@@ -118,10 +118,10 @@ SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
   return {std::move(image), dst};
 }
 
-void SVGImage::onRender(const SVGRenderContext& ctx) const {
+void SVGImage::onRender(const SVGRenderContext& context) const {
   // Per spec: x, w, width, height attributes establish the new viewport.
-  const SVGLengthContext& lctx = ctx.lengthContext();
-  const Rect viewPort = lctx.resolveRect(X, Y, Width, Height);
+  const SVGLengthContext& lengthContext = context.lengthContext();
+  const Rect viewPort = lengthContext.resolveRect(X, Y, Width, Height);
 
   ImageInfo image;
   const auto imgInfo = LoadImage(Href, viewPort, PreserveAspectRatio);
@@ -134,18 +134,16 @@ void SVGImage::onRender(const SVGRenderContext& ctx) const {
                                   viewPort.height() / imgInfo.fDst.height());
   matrix.preTranslate(imgInfo.fDst.x(), imgInfo.fDst.y());
 
-  ctx.canvas()->drawImage(imgInfo.fImage, matrix);
-
-  // drawImageRect(imgInfo.fImage, imgInfo.fDst, SkSamplingOptions(SkFilterMode::kLinear));
+  context.canvas()->drawImage(imgInfo.fImage, matrix);
 }
 
 Path SVGImage::onAsPath(const SVGRenderContext&) const {
   return {};
 }
 
-Rect SVGImage::onObjectBoundingBox(const SVGRenderContext& ctx) const {
-  const SVGLengthContext& lctx = ctx.lengthContext();
-  return lctx.resolveRect(X, Y, Width, Height);
+Rect SVGImage::onObjectBoundingBox(const SVGRenderContext& context) const {
+  const SVGLengthContext& lengthContext = context.lengthContext();
+  return lengthContext.resolveRect(X, Y, Width, Height);
 }
 
 }  // namespace tgfx

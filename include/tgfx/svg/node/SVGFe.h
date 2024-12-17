@@ -23,15 +23,12 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
-#include "tgfx/svg/node/SVGFilterContext.h"
 #include "tgfx/svg/node/SVGHiddenContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-class SVGFilterContext;
-class SVGRenderContext;
-
 namespace tgfx {
 
+class SVGFilterContext;
 class SVGFe : public SVGHiddenContainer {
  public:
   static bool IsFilterEffect(const std::shared_ptr<SVGNode>& node) {
@@ -56,7 +53,7 @@ class SVGFe : public SVGHiddenContainer {
     }
   }
 
-  std::shared_ptr<ImageFilter> makeImageFilter(const SVGRenderContext& ctx,
+  std::shared_ptr<ImageFilter> makeImageFilter(const SVGRenderContext& context,
                                                const SVGFilterContext& filterContext) const;
 
   // https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveSubRegion

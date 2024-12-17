@@ -19,11 +19,11 @@
 #include "tgfx/svg/node/SVGFeBlend.h"
 #include <tuple>
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGFilterContext.h"
+#include "svg/SVGRenderContext.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-
-class SVGRenderContext;
 
 bool SVGFeBlend::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
@@ -31,11 +31,13 @@ bool SVGFeBlend::parseAndSetAttribute(const std::string& name, const std::string
          this->setBlendMode(SVGAttributeParser::parse<SVGFeBlend::Mode>("mode", name, value));
 }
 
-std::shared_ptr<ImageFilter> SVGFeBlend::onMakeImageFilter(const SVGRenderContext& ctx,
-                                                           const SVGFilterContext& fctx) const {
-  const SVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
-  const std::shared_ptr<ImageFilter> background = fctx.resolveInput(ctx, In2, colorspace);
-  const std::shared_ptr<ImageFilter> foreground = fctx.resolveInput(ctx, this->getIn(), colorspace);
+std::shared_ptr<ImageFilter> SVGFeBlend::onMakeImageFilter(
+    const SVGRenderContext& context, const SVGFilterContext& filterContext) const {
+  const SVGColorspace colorspace = this->resolveColorspace(context, filterContext);
+  const std::shared_ptr<ImageFilter> background =
+      filterContext.resolveInput(context, In2, colorspace);
+  const std::shared_ptr<ImageFilter> foreground =
+      filterContext.resolveInput(context, this->getIn(), colorspace);
   return ImageFilter::Compose(background, foreground);
   // TODO (YG),relay on ImageFilters::Blend to implement this
 }

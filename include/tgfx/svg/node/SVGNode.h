@@ -91,10 +91,10 @@ enum class SVGTag {
                                                                                       \
  public:                                                                              \
   const SVGProperty<attr_type, attr_inherited>& get##attr_name() const {              \
-    return _presentationAttributes.attr_name;                                         \
+    return presentationAttributes.attr_name;                                          \
   }                                                                                   \
   void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {              \
-    auto* dest = &_presentationAttributes.attr_name;                                  \
+    auto* dest = &presentationAttributes.attr_name;                                   \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = v;                                                                      \
@@ -103,7 +103,7 @@ enum class SVGTag {
     }                                                                                 \
   }                                                                                   \
   void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                   \
-    auto* dest = &_presentationAttributes.attr_name;                                  \
+    auto* dest = &presentationAttributes.attr_name;                                   \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = std::move(v);                                                           \
@@ -119,25 +119,6 @@ class SVGNode {
   SVGTag tag() const {
     return _tag;
   }
-
-  const SVGPresentationAttributes* presentationAttributes() const {
-    return &_presentationAttributes;
-  }
-
-  virtual void appendChild(std::shared_ptr<SVGNode>) = 0;
-
-  virtual bool hasChildren() const {
-    return false;
-  }
-
-  void render(const SVGRenderContext&) const;
-  bool asPaint(const SVGRenderContext&, Paint*) const;
-  Path asPath(const SVGRenderContext&) const;
-  Rect objectBoundingBox(const SVGRenderContext&) const;
-
-  void setAttribute(SVGAttribute, const SVGValue&);
-  bool setAttribute(const std::string& attributeName, const std::string& attributeValue);
-  virtual bool parseAndSetAttribute(const std::string& name, const std::string& value);
 
   SVG_PRES_ATTR(ClipRule, SVGFillRule, true)
   SVG_PRES_ATTR(Color, SVGColorType, true)
@@ -173,8 +154,28 @@ class SVGNode {
   SVG_PRES_ATTR(FloodOpacity, SVGNumberType, false)
   SVG_PRES_ATTR(LightingColor, SVGColor, false)
 
+  virtual bool hasChildren() const {
+    return false;
+  }
+
  protected:
   explicit SVGNode(SVGTag);
+
+  virtual void appendChild(std::shared_ptr<SVGNode>) = 0;
+
+  void render(const SVGRenderContext&) const;
+
+  bool asPaint(const SVGRenderContext&, Paint*) const;
+
+  Path asPath(const SVGRenderContext&) const;
+
+  Rect objectBoundingBox(const SVGRenderContext&) const;
+
+  void setAttribute(SVGAttribute, const SVGValue&);
+
+  bool setAttribute(const std::string& attributeName, const std::string& attributeValue);
+
+  virtual bool parseAndSetAttribute(const std::string& name, const std::string& value);
 
   static Matrix ComputeViewboxMatrix(const Rect&, const Rect&, SVGPreserveAspectRatio);
 
@@ -203,8 +204,15 @@ class SVGNode {
 
  private:
   SVGTag _tag;
+  SVGPresentationAttributes presentationAttributes;
 
-  SVGPresentationAttributes _presentationAttributes;
+  friend class SVGDOM;
+  friend class SVGMask;
+  friend class SVGUse;
+  friend class SVGSVG;
+  friend class SVGContainer;
+  friend class SVGNodeConstructor;
+  friend class SVGRenderContext;
 };
 
 //NOLINTBEGIN

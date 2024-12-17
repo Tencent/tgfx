@@ -49,12 +49,12 @@ bool SVGPattern::parseAndSetAttribute(const std::string& name, const std::string
              "patternContentUnits", name, value));
 }
 
-const SVGPattern* SVGPattern::hrefTarget(const SVGRenderContext& ctx) const {
+const SVGPattern* SVGPattern::hrefTarget(const SVGRenderContext& context) const {
   if (Href.iri().empty()) {
     return nullptr;
   }
 
-  const auto href = ctx.findNodeById(Href);
+  const auto href = context.findNodeById(Href);
   if (!href || href->tag() != SVGTag::Pattern) {
     return nullptr;
   }
@@ -81,7 +81,7 @@ int inherit_if_needed(const std::optional<T>& src, std::optional<T>& dst) {
  * referenced element inherits attributes or children due to its own ‘xlink:href’ attribute, then
  * the current element can inherit those attributes or children.
  */
-const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& ctx,
+const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& context,
                                           PatternAttributes* attrs) const {
   const SVGPattern* currentNode = this;
   const SVGPattern* contentNode = this;
@@ -104,7 +104,7 @@ const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& ctx,
       break;
     }
 
-    currentNode = currentNode->hrefTarget(ctx);
+    currentNode = currentNode->hrefTarget(context);
   } while (currentNode);
 
   // To unify with Chrome and macOS preview, the width and height attributes here need to be
@@ -128,10 +128,10 @@ const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& ctx,
   return contentNode;
 }
 
-bool SVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
+bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const {
   PatternAttributes attrs;
-  const auto* contentNode = this->resolveHref(ctx, &attrs);
-  auto lengthContext = ctx.lengthContext();
+  const auto* contentNode = this->resolveHref(context, &attrs);
+  auto lengthContext = context.lengthContext();
   lengthContext.setPatternUnits(PatternUnits);
   Rect tile = lengthContext.resolveRect(attrs.x.has_value() ? *attrs.x : SVGLength(0),
                                         attrs.y.has_value() ? *attrs.y : SVGLength(0),
@@ -147,7 +147,7 @@ bool SVGPattern::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
   auto patternMatrix = attrs.patternTransform.value_or(Matrix::I());
   canvas->concat(patternMatrix);
   {
-    SVGRenderContext recordingContext(ctx, canvas, lengthContext);
+    SVGRenderContext recordingContext(context, canvas, lengthContext);
     contentNode->SVGContainer::onRender(recordingContext);
   }
   auto picture = patternRecorder.finishRecordingAsPicture();

@@ -33,12 +33,12 @@ bool SVGClipPath::parseAndSetAttribute(const std::string& n, const std::string& 
              SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("clipPathUnits", n, v));
 }
 
-Path SVGClipPath::resolveClip(const SVGRenderContext& ctx) const {
-  auto clip = this->asPath(ctx);
+Path SVGClipPath::resolveClip(const SVGRenderContext& context) const {
+  auto clip = this->asPath(context);
 
-  const auto obbt = ctx.transformForCurrentOBB(ClipPathUnits);
-  const auto m = Matrix::MakeTrans(obbt.offset.x, obbt.offset.y) *
-                 Matrix::MakeScale(obbt.scale.x, obbt.scale.y);
+  const auto transform = context.transformForCurrentBoundBox(ClipPathUnits);
+  const auto m = Matrix::MakeTrans(transform.offset.x, transform.offset.y) *
+                 Matrix::MakeScale(transform.scale.x, transform.scale.y);
   clip.transform(m);
 
   return clip;

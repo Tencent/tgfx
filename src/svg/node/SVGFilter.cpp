@@ -18,11 +18,11 @@
 
 #include "tgfx/svg/node/SVGFilter.h"
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGFilterContext.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/node/SVGFe.h"
-#include "tgfx/svg/node/SVGFilterContext.h"
 
 namespace tgfx {
 
@@ -38,15 +38,16 @@ bool SVGFilter::parseAndSetAttribute(const std::string& name, const std::string&
              SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("primitiveUnits", name, value));
 }
 
-void SVGFilter::applyProperties(SVGRenderContext* ctx) const {
-  this->onPrepareToRender(ctx);
+void SVGFilter::applyProperties(SVGRenderContext* context) const {
+  this->onPrepareToRender(context);
 }
 
-std::shared_ptr<ImageFilter> SVGFilter::buildFilterDAG(const SVGRenderContext& ctx) const {
+std::shared_ptr<ImageFilter> SVGFilter::buildFilterDAG(const SVGRenderContext& context) const {
   std::shared_ptr<ImageFilter> filter;
-  SVGFilterContext fctx(ctx.resolveOBBRect(X, Y, Width, Height, FilterUnits), PrimitiveUnits);
-  SVGRenderContext localCtx(ctx);
-  this->applyProperties(&localCtx);
+  SVGFilterContext filterContext(context.resolveOBBRect(X, Y, Width, Height, FilterUnits),
+                                 PrimitiveUnits);
+  SVGRenderContext localContext(context);
+  this->applyProperties(&localContext);
   SVGColorspace cs = SVGColorspace::SRGB;
   for (const auto& child : children) {
     if (!SVGFe::IsFilterEffect(child)) {
@@ -60,19 +61,19 @@ std::shared_ptr<ImageFilter> SVGFilter::buildFilterDAG(const SVGRenderContext& c
     // color-interpolation-filters). We call this explicitly here because the SVGFe
     // nodes do not participate in the normal onRender path, which is when property
     // propagation currently occurs.
-    SVGRenderContext localChildCtx(localCtx);
+    SVGRenderContext localChildCtx(localContext);
     feNode.applyProperties(&localChildCtx);
 
-    const Rect filterSubregion = feNode.resolveFilterSubregion(localChildCtx, fctx);
-    cs = feNode.resolveColorspace(localChildCtx, fctx);
-    filter = feNode.makeImageFilter(localChildCtx, fctx);
+    const Rect filterSubregion = feNode.resolveFilterSubregion(localChildCtx, filterContext);
+    cs = feNode.resolveColorspace(localChildCtx, filterContext);
+    filter = feNode.makeImageFilter(localChildCtx, filterContext);
 
     if (!feResultType.empty()) {
-      fctx.registerResult(feResultType, filter, filterSubregion, cs);
+      filterContext.registerResult(feResultType, filter, filterSubregion, cs);
     }
 
     // Unspecified 'in' and 'in2' inputs implicitly resolve to the previous filter's result.
-    fctx.setPreviousResult(filter, filterSubregion, cs);
+    filterContext.setPreviousResult(filter, filterSubregion, cs);
   }
 
   // Convert to final destination colorspace

@@ -40,78 +40,6 @@
 #include "tgfx/svg/node/SVGNode.h"
 
 namespace tgfx {
-
-namespace {
-
-float length_size_for_type(const Size& viewport, SVGLengthContext::LengthType t) {
-  switch (t) {
-    case SVGLengthContext::LengthType::Horizontal:
-      return viewport.width;
-    case SVGLengthContext::LengthType::Vertical:
-      return viewport.height;
-    case SVGLengthContext::LengthType::Other: {
-      // https://www.w3.org/TR/SVG11/coords.html#Units_viewport_percentage
-      const float rsqrt2 = 1.0f / std::sqrt(2.0f);
-      const float w = viewport.width;
-      const float h = viewport.height;
-      return rsqrt2 * std::sqrt(w * w + h * h);
-    }
-  }
-  ASSERT(false);  // Not reached.
-  return 0;
-}
-
-// Multipliers for DPI-relative units.
-constexpr float kINMultiplier = 1.00f;
-constexpr float kPTMultiplier = kINMultiplier / 72.272f;
-constexpr float kPCMultiplier = kPTMultiplier * 12;
-constexpr float kMMMultiplier = kINMultiplier / 25.4f;
-constexpr float kCMMultiplier = kMMMultiplier * 10;
-
-}  // namespace
-
-float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
-  switch (l.unit()) {
-    case SVGLength::Unit::Number: {
-      if (patternUnit.has_value()) {
-        if (patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-          return l.value() * length_size_for_type(_viewPort, t);
-        } else {
-          return l.value();
-        }
-      } else {
-        return l.value();
-      }
-    }
-    case SVGLength::Unit::PX:
-      return l.value();
-    case SVGLength::Unit::Percentage:
-      return l.value() * length_size_for_type(_viewPort, t) / 100;
-    case SVGLength::Unit::CM:
-      return l.value() * dpi * kCMMultiplier;
-    case SVGLength::Unit::MM:
-      return l.value() * dpi * kMMMultiplier;
-    case SVGLength::Unit::IN:
-      return l.value() * dpi * kINMultiplier;
-    case SVGLength::Unit::PT:
-      return l.value() * dpi * kPTMultiplier;
-    case SVGLength::Unit::PC:
-      return l.value() * dpi * kPCMultiplier;
-    default:
-      //unsupported unit type
-      ASSERT(false);
-      return 0;
-  }
-}
-
-Rect SVGLengthContext::resolveRect(const SVGLength& x, const SVGLength& y, const SVGLength& width,
-                                   const SVGLength& height) const {
-  return Rect::MakeXYWH(this->resolve(x, SVGLengthContext::LengthType::Horizontal),
-                        this->resolve(y, SVGLengthContext::LengthType::Vertical),
-                        this->resolve(width, SVGLengthContext::LengthType::Horizontal),
-                        this->resolve(height, SVGLengthContext::LengthType::Vertical));
-}
-
 namespace {
 
 LineCap toCap(const SVGLineCap& cap) {
@@ -140,7 +68,7 @@ LineJoin toJoin(const SVGLineJoin& join) {
 }
 
 std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
-                                        const SVGLengthContext& lctx) {
+                                        const SVGLengthContext& lengthContext) {
   if (props.StrokeDashArray->type() != SVGDashArray::Type::DashArray) {
     return nullptr;
   }
@@ -150,7 +78,7 @@ std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
   std::vector<float> intervals;
   intervals.reserve(count);
   for (const auto& dash : da.dashArray()) {
-    intervals.push_back(lctx.resolve(dash, SVGLengthContext::LengthType::Other));
+    intervals.push_back(lengthContext.resolve(dash, SVGLengthContext::LengthType::Other));
   }
 
   if (count & 1) {
@@ -162,7 +90,8 @@ std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
 
   ASSERT((intervals.size() & 1) == 0);
 
-  const auto phase = lctx.resolve(*props.StrokeDashOffset, SVGLengthContext::LengthType::Other);
+  const auto phase =
+      lengthContext.resolve(*props.StrokeDashOffset, SVGLengthContext::LengthType::Other);
 
   return PathEffect::MakeDash(intervals.data(), static_cast<int>(intervals.size()), phase);
 }
@@ -175,11 +104,11 @@ SVGPresentationContext::SVGPresentationContext()
 
 SVGRenderContext::SVGRenderContext(Context* device, Canvas* canvas,
                                    const std::shared_ptr<SVGFontManager>& fontManager,
-                                   const SVGIDMapper& mapper, const SVGLengthContext& lctx,
-                                   const SVGPresentationContext& pctx, const OBBScope& obbs,
-                                   const Matrix& matrix)
-    : fontManager(fontManager), nodeIDMapper(mapper), _lengthContext(lctx),
-      _presentationContext(pctx), renderCanvas(canvas), recorder(),
+                                   const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
+                                   const SVGPresentationContext& presentContext,
+                                   const OBBScope& obbs, const Matrix& matrix)
+    : fontManager(fontManager), nodeIDMapper(mapper), _lengthContext(lengthContext),
+      _presentationContext(presentContext), renderCanvas(canvas), recorder(),
       _canvas(recorder.beginRecording()), scope(obbs), _deviceContext(device), matrix(matrix) {
 }
 
@@ -392,16 +321,15 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   return MaskFilter::MakeShader(shader);
 }
 
-std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selector,
-                                                   float paint_opacity) const {
-  if (paint_selector.type() == SVGPaint::Type::None) {
+std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, float opacity) const {
+  if (svgPaint.type() == SVGPaint::Type::None) {
     return std::optional<Paint>();
   }
 
-  std::optional<Paint> p = Paint();
-  switch (paint_selector.type()) {
+  std::optional<Paint> paint = Paint();
+  switch (svgPaint.type()) {
     case SVGPaint::Type::Color:
-      p->setColor(this->resolveSvgColor(paint_selector.color()));
+      paint->setColor(this->resolveSVGColor(svgPaint.color()));
       break;
     case SVGPaint::Type::IRI: {
       // Our property inheritance is borked as it follows the render path and not the tree
@@ -412,64 +340,63 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& paint_selecto
       // Preserve the OBB scope because some paints use object bounding box coords
       // (e.g. gradient control points), which requires access to the render context
       // and node being rendered.
-      SVGPresentationContext pctx;
-      pctx._namedColors = _presentationContext->_namedColors;
-      SVGRenderContext local_ctx(_deviceContext, _canvas, fontManager, nodeIDMapper,
-                                 *_lengthContext, pctx, scope, Matrix::I());
+      SVGPresentationContext presentContext;
+      presentContext._namedColors = _presentationContext->_namedColors;
+      SVGRenderContext localContext(_deviceContext, _canvas, fontManager, nodeIDMapper,
+                                    *_lengthContext, presentContext, scope, Matrix::I());
 
-      const auto node = this->findNodeById(paint_selector.iri());
-      if (!node || !node->asPaint(local_ctx, &(p.value()))) {
+      const auto node = this->findNodeById(svgPaint.iri());
+      if (!node || !node->asPaint(localContext, &(paint.value()))) {
         // Use the fallback color.
-        p->setColor(this->resolveSvgColor(paint_selector.color()));
+        paint->setColor(this->resolveSVGColor(svgPaint.color()));
       }
     } break;
     default:
       break;
   }
-  p->setAntiAlias(true);
+  paint->setAntiAlias(true);
 
   // We observe 3 opacity components:
   //   - initial paint server opacity (e.g. color stop opacity)
   //   - paint-specific opacity (e.g. 'fill-opacity', 'stroke-opacity')
   //   - deferred opacity override (optimization for leaf nodes 'opacity')
-  p->setAlpha(std::clamp(p->getAlpha() * paint_opacity * deferredPaintOpacity, 0.0f, 1.0f));
-  return p;
+  paint->setAlpha(std::clamp(paint->getAlpha() * opacity * deferredPaintOpacity, 0.0f, 1.0f));
+  return paint;
 }
 
 std::optional<Paint> SVGRenderContext::fillPaint() const {
   const auto& props = _presentationContext->_inherited;
-  auto p = this->commonPaint(*props.Fill, *props.FillOpacity);
+  auto paint = this->commonPaint(*props.Fill, *props.FillOpacity);
 
-  if (p.has_value()) {
-    p->setStyle(PaintStyle::Fill);
+  if (paint.has_value()) {
+    paint->setStyle(PaintStyle::Fill);
   }
 
-  return p;
+  return paint;
 }
 
 std::optional<Paint> SVGRenderContext::strokePaint() const {
   const auto& props = _presentationContext->_inherited;
-  auto p = this->commonPaint(*props.Stroke, *props.StrokeOpacity);
+  auto paint = this->commonPaint(*props.Stroke, *props.StrokeOpacity);
 
-  if (p.has_value()) {
-    p->setStyle(PaintStyle::Stroke);
-    p->setStrokeWidth(
+  if (paint.has_value()) {
+    paint->setStyle(PaintStyle::Stroke);
+    paint->setStrokeWidth(
         _lengthContext->resolve(*props.StrokeWidth, SVGLengthContext::LengthType::Other));
     Stroke stroke;
     stroke.cap = toCap(*props.StrokeLineCap);
     stroke.join = toJoin(*props.StrokeLineJoin);
     stroke.miterLimit = *props.StrokeMiterLimit;
-    p->setStroke(stroke);
+    paint->setStroke(stroke);
 
-    //TODO (YG)
-    // p->setPathEffect(dash_effect(props, *fLengthContext));
+    //TODO (YGAurora): Implement stroke dash array use PathEffect
     dash_effect(props, *_lengthContext);
   }
 
-  return p;
+  return paint;
 }
 
-SVGColorType SVGRenderContext::resolveSvgColor(const SVGColor& color) const {
+SVGColorType SVGRenderContext::resolveSVGColor(const SVGColor& color) const {
   if (_presentationContext->_namedColors) {
     for (auto&& ident : *color.vars()) {
       auto iter = _presentationContext->_namedColors->find(ident);
@@ -488,9 +415,9 @@ SVGColorType SVGRenderContext::resolveSvgColor(const SVGColor& color) const {
   }
 }
 
-SVGRenderContext::OBBTransform SVGRenderContext::transformForCurrentOBB(
-    SVGObjectBoundingBoxUnits u) const {
-  if (!scope.node || u.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
+SVGRenderContext::OBBTransform SVGRenderContext::transformForCurrentBoundBox(
+    SVGObjectBoundingBoxUnits unit) const {
+  if (!scope.node || unit.type() == SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
     return {{0, 0}, {1, 1}};
   }
   ASSERT(scope.context);
@@ -501,16 +428,17 @@ SVGRenderContext::OBBTransform SVGRenderContext::transformForCurrentOBB(
 
 Rect SVGRenderContext::resolveOBBRect(const SVGLength& x, const SVGLength& y, const SVGLength& w,
                                       const SVGLength& h, SVGObjectBoundingBoxUnits unit) const {
-  CopyOnWrite<SVGLengthContext> lctx(_lengthContext);
+  CopyOnWrite<SVGLengthContext> lengthContext(_lengthContext);
 
   if (unit.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-    *lctx.writable() = SVGLengthContext({1, 1});
+    *lengthContext.writable() = SVGLengthContext({1, 1});
   }
 
-  auto r = lctx->resolveRect(x, y, w, h);
-  const auto obbt = this->transformForCurrentOBB(unit);
+  auto r = lengthContext->resolveRect(x, y, w, h);
+  const auto transform = this->transformForCurrentBoundBox(unit);
 
-  return Rect::MakeXYWH(obbt.scale.x * r.x() + obbt.offset.x, obbt.scale.y * r.y() + obbt.offset.y,
-                        obbt.scale.x * r.width(), obbt.scale.y * r.height());
+  return Rect::MakeXYWH(transform.scale.x * r.x() + transform.offset.x,
+                        transform.scale.y * r.y() + transform.offset.y,
+                        transform.scale.x * r.width(), transform.scale.y * r.height());
 }
 }  // namespace tgfx

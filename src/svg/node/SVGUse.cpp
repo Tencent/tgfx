@@ -35,56 +35,56 @@ bool SVGUse::parseAndSetAttribute(const std::string& n, const std::string& v) {
          this->setHref(SVGAttributeParser::parse<SVGIRI>("xlink:href", n, v));
 }
 
-bool SVGUse::onPrepareToRender(SVGRenderContext* ctx) const {
-  if (Href.iri().empty() || !INHERITED::onPrepareToRender(ctx)) {
+bool SVGUse::onPrepareToRender(SVGRenderContext* context) const {
+  if (Href.iri().empty() || !INHERITED::onPrepareToRender(context)) {
     return false;
   }
 
   if (!FloatNearlyZero(X.value()) || !FloatNearlyZero(Y.value())) {
     // Restored when the local SVGRenderContext leaves scope.
-    ctx->saveOnce();
-    ctx->canvas()->translate(X.value(), Y.value());
+    context->saveOnce();
+    context->canvas()->translate(X.value(), Y.value());
   }
 
   return true;
 }
 
-void SVGUse::onRender(const SVGRenderContext& ctx) const {
-  const auto ref = ctx.findNodeById(Href);
+void SVGUse::onRender(const SVGRenderContext& context) const {
+  const auto ref = context.findNodeById(Href);
   if (!ref) {
     return;
   }
 
-  auto lengthContext = ctx.lengthContext();
+  auto lengthContext = context.lengthContext();
   lengthContext.clearPatternUnits();
-  SVGRenderContext localContext(ctx, lengthContext);
+  SVGRenderContext localContext(context, lengthContext);
   ref->render(localContext);
 }
 
-Path SVGUse::onAsPath(const SVGRenderContext& ctx) const {
-  const auto ref = ctx.findNodeById(Href);
+Path SVGUse::onAsPath(const SVGRenderContext& context) const {
+  const auto ref = context.findNodeById(Href);
   if (!ref) {
     return Path();
   }
 
-  auto lengthContext = ctx.lengthContext();
+  auto lengthContext = context.lengthContext();
   lengthContext.clearPatternUnits();
-  SVGRenderContext localContext(ctx, lengthContext);
+  SVGRenderContext localContext(context, lengthContext);
   return ref->asPath(localContext);
 }
 
-Rect SVGUse::onObjectBoundingBox(const SVGRenderContext& ctx) const {
-  const auto ref = ctx.findNodeById(Href);
+Rect SVGUse::onObjectBoundingBox(const SVGRenderContext& context) const {
+  const auto ref = context.findNodeById(Href);
   if (!ref) {
     return Rect::MakeEmpty();
   }
 
-  auto lengthContext = ctx.lengthContext();
+  auto lengthContext = context.lengthContext();
   lengthContext.clearPatternUnits();
   float x = lengthContext.resolve(X, SVGLengthContext::LengthType::Horizontal);
   float y = lengthContext.resolve(Y, SVGLengthContext::LengthType::Vertical);
 
-  Rect bounds = ref->objectBoundingBox(ctx);
+  Rect bounds = ref->objectBoundingBox(context);
   bounds.offset(x, y);
 
   return bounds;

@@ -19,6 +19,7 @@
 #include "tgfx/svg/node/SVGFeDisplacementMap.h"
 #include <tuple>
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGFilterContext.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Rect.h"
 
@@ -35,33 +36,17 @@ bool SVGFeDisplacementMap::parseAndSetAttribute(const std::string& name, const s
 }
 
 std::shared_ptr<ImageFilter> SVGFeDisplacementMap::onMakeImageFilter(
-    const SVGRenderContext& ctx, const SVGFilterContext& fctx) const {
-  const Rect cropRect = this->resolveFilterSubregion(ctx, fctx);
-  cropRect.centerX();
-  const SVGColorspace colorspace = this->resolveColorspace(ctx, fctx);
-
-  // According to spec https://www.w3.org/TR/SVG11/filters.html#feDisplacementMapElement,
-  // the 'in' source image must remain in its current colorspace.
-  std::shared_ptr<ImageFilter> in = fctx.resolveInput(ctx, this->getIn());
-  std::shared_ptr<ImageFilter> in2 = fctx.resolveInput(ctx, this->getIn2(), colorspace);
-
-  float scale = Scale;
-  if (fctx.primitiveUnits().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-    const auto obbt = ctx.transformForCurrentOBB(fctx.primitiveUnits());
-    scale = SVGLengthContext({obbt.scale.x, obbt.scale.y})
-                .resolve(SVGLength(scale, SVGLength::Unit::Percentage),
-                         SVGLengthContext::LengthType::Other);
-  }
-
+    const SVGRenderContext&, const SVGFilterContext&) const {
+  //TODO (YGAurora): Implement DisplacementMap image filter.
   return nullptr;
 }
 
-SVGColorspace SVGFeDisplacementMap::resolveColorspace(const SVGRenderContext& ctx,
-                                                      const SVGFilterContext& fctx) const {
+SVGColorspace SVGFeDisplacementMap::resolveColorspace(const SVGRenderContext& context,
+                                                      const SVGFilterContext& filterContext) const {
   // According to spec https://www.w3.org/TR/SVG11/filters.html#feDisplacementMapElement,
   // the 'in' source image must remain in its current colorspace, which means the colorspace of
   // this FE node is the same as the input.
-  return fctx.resolveInputColorspace(ctx, this->getIn());
+  return filterContext.resolveInputColorspace(context, this->getIn());
 }
 
 template <>

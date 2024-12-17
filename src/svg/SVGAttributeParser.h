@@ -93,12 +93,12 @@ class SVGAttributeParser {
  private:
   class RestoreCurPos {
    public:
-    explicit RestoreCurPos(SVGAttributeParser* self) : self(self), currentPos(self->fCurPos) {
+    explicit RestoreCurPos(SVGAttributeParser* self) : self(self), currentPos(self->currentPos) {
     }
 
     ~RestoreCurPos() {
       if (self) {
-        self->fCurPos = this->currentPos;
+        self->currentPos = this->currentPos;
       }
     }
 
@@ -175,7 +175,7 @@ class SVGAttributeParser {
   }
 
   // The current position in the input string.
-  const char* fCurPos;
-  const char* fEndPos;
+  const char* currentPos;
+  const char* endPos;
 };
 }  // namespace tgfx

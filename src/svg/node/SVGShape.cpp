@@ -22,31 +22,28 @@
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Size.h"
 
-class SkSVGNode;
-enum class SkSVGTag;
-
 namespace tgfx {
 
 SVGShape::SVGShape(SVGTag t) : INHERITED(t) {
 }
 
-void SVGShape::onRender(const SVGRenderContext& ctx) const {
-  const auto fillType = ctx.presentationContext()._inherited.FillRule->asFillType();
+void SVGShape::onRender(const SVGRenderContext& context) const {
+  const auto fillType = context.presentationContext()._inherited.FillRule->asFillType();
 
-  auto selfRect = onObjectBoundingBox(ctx);
-  auto lengthCtx = ctx.lengthContext();
+  auto selfRect = onObjectBoundingBox(context);
+  auto lengthCtx = context.lengthContext();
   lengthCtx.setViewPort(Size::Make(selfRect.width(), selfRect.height()));
-  auto paintCtx = SVGRenderContext::CopyForPaint(ctx, ctx.canvas(), lengthCtx);
+  auto paintCtx = SVGRenderContext::CopyForPaint(context, context.canvas(), lengthCtx);
 
   const auto fillPaint = paintCtx.fillPaint();
   const auto strokePaint = paintCtx.strokePaint();
 
   if (fillPaint.has_value()) {
-    this->onDraw(ctx.canvas(), ctx.lengthContext(), fillPaint.value(), fillType);
+    this->onDraw(context.canvas(), context.lengthContext(), fillPaint.value(), fillType);
   }
 
   if (strokePaint.has_value()) {
-    this->onDraw(ctx.canvas(), ctx.lengthContext(), strokePaint.value(), fillType);
+    this->onDraw(context.canvas(), context.lengthContext(), strokePaint.value(), fillType);
   }
 }
 

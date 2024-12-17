@@ -37,17 +37,17 @@ bool SVGLinearGradient::parseAndSetAttribute(const std::string& name, const std:
          this->setY2(SVGAttributeParser::parse<SVGLength>("y2", name, value));
 }
 
-std::shared_ptr<Shader> SVGLinearGradient::onMakeShader(const SVGRenderContext& ctx,
+std::shared_ptr<Shader> SVGLinearGradient::onMakeShader(const SVGRenderContext& context,
                                                         const std::vector<Color>& colors,
                                                         const std::vector<float>& positions,
                                                         TileMode, const Matrix&) const {
-  SVGLengthContext lctx = ctx.lengthContext();
-  lctx.setPatternUnits(getGradientUnits());
+  SVGLengthContext lengthContext = context.lengthContext();
+  lengthContext.setPatternUnits(getGradientUnits());
 
-  auto startPoint = Point::Make(lctx.resolve(X1, SVGLengthContext::LengthType::Horizontal),
-                                lctx.resolve(Y1, SVGLengthContext::LengthType::Vertical));
-  auto endPoint = Point::Make(lctx.resolve(X2, SVGLengthContext::LengthType::Horizontal),
-                              lctx.resolve(Y2, SVGLengthContext::LengthType::Vertical));
+  auto startPoint = Point::Make(lengthContext.resolve(X1, SVGLengthContext::LengthType::Horizontal),
+                                lengthContext.resolve(Y1, SVGLengthContext::LengthType::Vertical));
+  auto endPoint = Point::Make(lengthContext.resolve(X2, SVGLengthContext::LengthType::Horizontal),
+                              lengthContext.resolve(Y2, SVGLengthContext::LengthType::Vertical));
 
   return Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
 }

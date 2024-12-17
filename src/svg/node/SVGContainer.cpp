@@ -43,17 +43,17 @@ bool SVGContainer::hasChildren() const {
   return !children.empty();
 }
 
-void SVGContainer::onRender(const SVGRenderContext& ctx) const {
+void SVGContainer::onRender(const SVGRenderContext& context) const {
   for (const auto& i : children) {
-    i->render(ctx);
+    i->render(context);
   }
 }
 
-Path SVGContainer::onAsPath(const SVGRenderContext& ctx) const {
+Path SVGContainer::onAsPath(const SVGRenderContext& context) const {
   Path path;
 
   for (const auto& i : children) {
-    const Path childPath = i->asPath(ctx);
+    const Path childPath = i->asPath(context);
     path.addPath(childPath, PathOp::Union);
   }
 
@@ -61,11 +61,11 @@ Path SVGContainer::onAsPath(const SVGRenderContext& ctx) const {
   return path;
 }
 
-Rect SVGContainer::onObjectBoundingBox(const SVGRenderContext& ctx) const {
+Rect SVGContainer::onObjectBoundingBox(const SVGRenderContext& context) const {
   Rect bounds = Rect::MakeEmpty();
 
   for (const auto& i : children) {
-    const Rect childBounds = i->objectBoundingBox(ctx);
+    const Rect childBounds = i->objectBoundingBox(context);
     bounds.join(childBounds);
   }
 

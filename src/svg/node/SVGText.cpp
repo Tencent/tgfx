@@ -225,7 +225,7 @@ void SVGText::onRender(const SVGRenderContext& context) const {
   this->onShapeText(context, renderer);
 }
 
-Rect SVGText::onObjectBoundingBox(const SVGRenderContext& ctx) const {
+Rect SVGText::onObjectBoundingBox(const SVGRenderContext& context) const {
   Rect bounds = Rect::MakeEmpty();
 
   auto boundCollector = [&bounds](const SVGRenderContext&,
@@ -237,7 +237,7 @@ Rect SVGText::onObjectBoundingBox(const SVGRenderContext& ctx) const {
     bounds.join(textBound);
   };
 
-  this->onShapeText(ctx, boundCollector);
+  this->onShapeText(context, boundCollector);
   return bounds;
 }
 
@@ -246,9 +246,9 @@ Path SVGText::onAsPath(const SVGRenderContext&) const {
   return Path();
 }
 
-void SVGTextPath::onShapeText(const SVGRenderContext& ctx,
+void SVGTextPath::onShapeText(const SVGRenderContext& context,
                               const ShapedTextCallback& function) const {
-  this->INHERITED::onShapeText(ctx, function);
+  this->INHERITED::onShapeText(context, function);
 }
 
 bool SVGTextPath::parseAndSetAttribute(const std::string& name, const std::string& value) {

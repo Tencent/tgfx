@@ -39,13 +39,13 @@ bool SVGGradient::parseAndSetAttribute(const std::string& name, const std::strin
 }
 
 // https://www.w3.org/TR/SVG11/pservers.html#LinearGradientElementHrefAttribute
-void SVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<Color>& colors,
+void SVGGradient::collectColorStops(const SVGRenderContext& context, std::vector<Color>& colors,
                                     std::vector<float>& positions) const {
   // Used to resolve percentage offsets.
   const SVGLengthContext ltx(Size::Make(1, 1));
 
   this->forEachChild<SVGStop>([&](const SVGStop* stop) {
-    colors.push_back(this->resolveStopColor(ctx, *stop));
+    colors.push_back(this->resolveStopColor(context, *stop));
     positions.push_back(
         std::clamp(ltx.resolve(stop->getOffset(), SVGLengthContext::LengthType::Other), 0.f, 1.f));
   });
@@ -53,14 +53,14 @@ void SVGGradient::collectColorStops(const SVGRenderContext& ctx, std::vector<Col
   ASSERT(colors.size() == positions.size());
 
   if (positions.empty() && !Href.iri().empty()) {
-    const auto ref = ctx.findNodeById(Href);
+    const auto ref = context.findNodeById(Href);
     if (ref && (ref->tag() == SVGTag::LinearGradient || ref->tag() == SVGTag::RadialGradient)) {
-      static_cast<const SVGGradient*>(ref.get())->collectColorStops(ctx, colors, positions);
+      static_cast<const SVGGradient*>(ref.get())->collectColorStops(context, colors, positions);
     }
   }
 }
 
-Color SVGGradient::resolveStopColor(const SVGRenderContext& ctx, const SVGStop& stop) const {
+Color SVGGradient::resolveStopColor(const SVGRenderContext& context, const SVGStop& stop) const {
   const auto& stopColor = stop.getStopColor();
   const auto& stopOpacity = stop.getStopOpacity();
   // Uninherited presentation attrs should have a concrete value at this point.
@@ -68,36 +68,25 @@ Color SVGGradient::resolveStopColor(const SVGRenderContext& ctx, const SVGStop& 
     return Color::Black();
   }
 
-  const auto color = ctx.resolveSvgColor(*stopColor);
+  const auto color = context.resolveSVGColor(*stopColor);
 
   return {color.red, color.green, color.blue, *stopOpacity * color.alpha};
 }
 
-bool SVGGradient::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
+bool SVGGradient::onAsPaint(const SVGRenderContext& context, Paint* paint) const {
   std::vector<Color> colors;
   std::vector<float> positions;
 
-  this->collectColorStops(ctx, colors, positions);
+  this->collectColorStops(context, colors, positions);
 
-  // TODO:
-  //       * stop (lazy?) sorting
-  //       * href loop detection
-  //       * href attribute inheritance (not just color stops)
-  //       * objectBoundingBox units support
-
-  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::Pad) == TileMode::Clamp,
-                "SkSVGSpreadMethod::Type is out of sync");
-  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::Repeat) == TileMode::Repeat,
-                "SkSVGSpreadMethod::Type is out of sync");
-  static_assert(static_cast<TileMode>(SVGSpreadMethod::Type::Reflect) == TileMode::Mirror,
-                "SkSVGSpreadMethod::Type is out of sync");
   const auto tileMode = static_cast<TileMode>(SpreadMethod.type());
 
-  const auto obbt = ctx.transformForCurrentOBB(GradientUnits);
-  const auto localMatrix = Matrix::MakeTrans(obbt.offset.x, obbt.offset.y) *
-                           Matrix::MakeScale(obbt.scale.x, obbt.scale.y) * GradientTransform;
+  const auto transform = context.transformForCurrentBoundBox(GradientUnits);
+  const auto localMatrix = Matrix::MakeTrans(transform.offset.x, transform.offset.y) *
+                           Matrix::MakeScale(transform.scale.x, transform.scale.y) *
+                           GradientTransform;
 
-  paint->setShader(this->onMakeShader(ctx, colors, positions, tileMode, localMatrix));
+  paint->setShader(this->onMakeShader(context, colors, positions, tileMode, localMatrix));
   return true;
 }
 
@@ -105,8 +94,8 @@ bool SVGGradient::onAsPaint(const SVGRenderContext& ctx, Paint* paint) const {
 template <>
 bool SVGAttributeParser::parse(SVGSpreadMethod* spread) {
   struct TileInfo {
-    SVGSpreadMethod::Type fType;
-    const char* fName;
+    SVGSpreadMethod::Type type;
+    const char* name;
   };
   static const TileInfo spreadInfoSet[] = {
       {SVGSpreadMethod::Type::Pad, "pad"},
@@ -116,8 +105,8 @@ bool SVGAttributeParser::parse(SVGSpreadMethod* spread) {
 
   bool parsedValue = false;
   for (auto info : spreadInfoSet) {
-    if (this->parseExpectedStringToken(info.fName)) {
-      *spread = SVGSpreadMethod(info.fType);
+    if (this->parseExpectedStringToken(info.name)) {
+      *spread = SVGSpreadMethod(info.type);
       parsedValue = true;
       break;
     }

@@ -18,6 +18,7 @@
 
 #include "tgfx/svg/node/SVGFeGaussianBlur.h"
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGFilterContext.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Point.h"
@@ -31,8 +32,8 @@ bool SVGFeGaussianBlur::parseAndSetAttribute(const std::string& name, const std:
 }
 
 std::shared_ptr<ImageFilter> SVGFeGaussianBlur::onMakeImageFilter(
-    const SVGRenderContext& ctx, const SVGFilterContext& fctx) const {
-  auto scale = ctx.transformForCurrentOBB(fctx.primitiveUnits()).scale;
+    const SVGRenderContext& context, const SVGFilterContext& filterContext) const {
+  auto scale = context.transformForCurrentBoundBox(filterContext.primitiveUnits()).scale;
   const auto sigmaX = stdDeviation.fX * scale.x * 4;
   const auto sigmaY = stdDeviation.fY * scale.y * 4;
   return ImageFilter::Blur(sigmaX, sigmaY);

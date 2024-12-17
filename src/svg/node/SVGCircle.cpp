@@ -36,25 +36,25 @@ bool SVGCircle::parseAndSetAttribute(const std::string& n, const std::string& v)
          this->setR(SVGAttributeParser::parse<SVGLength>("r", n, v));
 }
 
-std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lctx) const {
-  const auto cx = lctx.resolve(Cx, SVGLengthContext::LengthType::Horizontal);
-  const auto cy = lctx.resolve(Cy, SVGLengthContext::LengthType::Vertical);
-  const auto r = lctx.resolve(R, SVGLengthContext::LengthType::Other);
+std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lengthContext) const {
+  const auto cx = lengthContext.resolve(Cx, SVGLengthContext::LengthType::Horizontal);
+  const auto cy = lengthContext.resolve(Cy, SVGLengthContext::LengthType::Vertical);
+  const auto r = lengthContext.resolve(R, SVGLengthContext::LengthType::Other);
 
   return std::make_tuple(Point::Make(cx, cy), r);
 }
 
-void SVGCircle::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
+void SVGCircle::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
                        PathFillType) const {
-  auto [pos, r] = this->resolve(lctx);
+  auto [pos, r] = this->resolve(lengthContext);
 
   if (r > 0) {
     canvas->drawCircle(pos.x, pos.y, r, paint);
   }
 }
 
-Path SVGCircle::onAsPath(const SVGRenderContext& ctx) const {
-  auto [pos, r] = this->resolve(ctx.lengthContext());
+Path SVGCircle::onAsPath(const SVGRenderContext& context) const {
+  auto [pos, r] = this->resolve(context.lengthContext());
 
   Path path;
   path.addOval(Rect::MakeXYWH(pos.x - r, pos.y - r, 2 * r, 2 * r));
@@ -62,8 +62,8 @@ Path SVGCircle::onAsPath(const SVGRenderContext& ctx) const {
   return path;
 }
 
-Rect SVGCircle::onObjectBoundingBox(const SVGRenderContext& ctx) const {
-  const auto [pos, r] = this->resolve(ctx.lengthContext());
+Rect SVGCircle::onObjectBoundingBox(const SVGRenderContext& context) const {
+  const auto [pos, r] = this->resolve(context.lengthContext());
   return Rect::MakeXYWH(pos.x - r, pos.y - r, 2 * r, 2 * r);
 }
 }  // namespace tgfx

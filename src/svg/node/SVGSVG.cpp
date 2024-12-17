@@ -25,8 +25,8 @@
 
 namespace tgfx {
 
-void SVGSVG::renderNode(const SVGRenderContext& ctx, const SVGIRI& iri) const {
-  SVGRenderContext localContext(ctx, this);
+void SVGSVG::renderNode(const SVGRenderContext& context, const SVGIRI& iri) const {
+  SVGRenderContext localContext(context, this);
   auto node = localContext.findNodeById(iri);
   if (!node) {
     return;
@@ -34,19 +34,19 @@ void SVGSVG::renderNode(const SVGRenderContext& ctx, const SVGIRI& iri) const {
 
   if (this->onPrepareToRender(&localContext)) {
     if (this == node.get()) {
-      this->onRender(ctx);
+      this->onRender(context);
     } else {
       node->render(localContext);
     }
   }
 }
 
-bool SVGSVG::onPrepareToRender(SVGRenderContext* ctx) const {
+bool SVGSVG::onPrepareToRender(SVGRenderContext* context) const {
   // x/y are ignored for outermost svg elements
   const auto x = type == Type::kInner ? X : SVGLength(0);
   const auto y = type == Type::kInner ? Y : SVGLength(0);
 
-  auto viewPortRect = ctx->lengthContext().resolveRect(x, y, Width, Height);
+  auto viewPortRect = context->lengthContext().resolveRect(x, y, Width, Height);
   auto contentMatrix = Matrix::MakeTrans(viewPortRect.x(), viewPortRect.y());
   auto viewPort = Size::Make(viewPortRect.width(), viewPortRect.height());
 
@@ -65,26 +65,26 @@ bool SVGSVG::onPrepareToRender(SVGRenderContext* ctx) const {
   }
 
   if (!contentMatrix.isIdentity()) {
-    ctx->saveOnce();
-    ctx->canvas()->concat(contentMatrix);
+    context->saveOnce();
+    context->canvas()->concat(contentMatrix);
   }
 
-  if (viewPort != ctx->lengthContext().viewPort()) {
-    ctx->writableLengthContext()->setViewPort(viewPort);
+  if (viewPort != context->lengthContext().viewPort()) {
+    context->writableLengthContext()->setViewPort(viewPort);
   }
 
-  return this->INHERITED::onPrepareToRender(ctx);
+  return this->INHERITED::onPrepareToRender(context);
 }
 
 // https://www.w3.org/TR/SVG11/coords.html#IntrinsicSizing
-Size SVGSVG::intrinsicSize(const SVGLengthContext& lctx) const {
+Size SVGSVG::intrinsicSize(const SVGLengthContext& lengthContext) const {
   // Percentage values do not provide an intrinsic size.
   if (Width.unit() == SVGLength::Unit::Percentage || Height.unit() == SVGLength::Unit::Percentage) {
     return Size::Make(0, 0);
   }
 
-  return Size::Make(lctx.resolve(Width, SVGLengthContext::LengthType::Horizontal),
-                    lctx.resolve(Height, SVGLengthContext::LengthType::Vertical));
+  return Size::Make(lengthContext.resolve(Width, SVGLengthContext::LengthType::Horizontal),
+                    lengthContext.resolve(Height, SVGLengthContext::LengthType::Vertical));
 }
 
 void SVGSVG::onSetAttribute(SVGAttribute attr, const SVGValue& v) {

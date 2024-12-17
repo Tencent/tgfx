@@ -35,32 +35,31 @@ namespace tgfx {
 
 SVGNode::SVGNode(SVGTag t) : _tag(t) {
   // Uninherited presentation attributes need a non-null default value.
-  _presentationAttributes.StopColor.set(SVGColor(Color::Black()));
-  _presentationAttributes.StopOpacity.set(static_cast<SVGNumberType>(1.0f));
-  _presentationAttributes.FloodColor.set(SVGColor(Color::Black()));
-  _presentationAttributes.FloodOpacity.set(static_cast<SVGNumberType>(1.0f));
-  _presentationAttributes.LightingColor.set(SVGColor(Color::White()));
+  presentationAttributes.StopColor.set(SVGColor(Color::Black()));
+  presentationAttributes.StopOpacity.set(static_cast<SVGNumberType>(1.0f));
+  presentationAttributes.FloodColor.set(SVGColor(Color::Black()));
+  presentationAttributes.FloodOpacity.set(static_cast<SVGNumberType>(1.0f));
+  presentationAttributes.LightingColor.set(SVGColor(Color::White()));
 }
 
-SVGNode::~SVGNode() {
-}
+SVGNode::~SVGNode() = default;
 
-void SVGNode::render(const SVGRenderContext& ctx) const {
-  SVGRenderContext localContext(ctx, this);
+void SVGNode::render(const SVGRenderContext& context) const {
+  SVGRenderContext localContext(context, this);
 
   if (this->onPrepareToRender(&localContext)) {
     this->onRender(localContext);
   }
 }
 
-bool SVGNode::asPaint(const SVGRenderContext& ctx, Paint* paint) const {
-  SVGRenderContext localContext(ctx);
+bool SVGNode::asPaint(const SVGRenderContext& context, Paint* paint) const {
+  SVGRenderContext localContext(context);
 
   return this->onPrepareToRender(&localContext) && this->onAsPaint(localContext, paint);
 }
 
-Path SVGNode::asPath(const SVGRenderContext& ctx) const {
-  SVGRenderContext localContext(ctx);
+Path SVGNode::asPath(const SVGRenderContext& context) const {
+  SVGRenderContext localContext(context);
   if (!this->onPrepareToRender(&localContext)) {
     return Path();
   }
@@ -75,19 +74,17 @@ Path SVGNode::asPath(const SVGRenderContext& ctx) const {
   return path;
 }
 
-Rect SVGNode::objectBoundingBox(const SVGRenderContext& ctx) const {
-  return this->onObjectBoundingBox(ctx);
+Rect SVGNode::objectBoundingBox(const SVGRenderContext& context) const {
+  return this->onObjectBoundingBox(context);
 }
 
-bool SVGNode::onPrepareToRender(SVGRenderContext* ctx) const {
-  ctx->applyPresentationAttributes(_presentationAttributes,
-                                   this->hasChildren() ? 0 : SVGRenderContext::kLeaf);
+bool SVGNode::onPrepareToRender(SVGRenderContext* context) const {
+  context->applyPresentationAttributes(presentationAttributes,
+                                       this->hasChildren() ? 0 : SVGRenderContext::kLeaf);
 
   // visibility:hidden and display:none disable rendering.
-  // TODO: if display is not a value (true when display="inherit"), we currently
-  //   ignore it. Eventually we should be able to add SkASSERT(display.isValue()).
-  const auto visibility = ctx->presentationContext()._inherited.Visibility->type();
-  const auto display = _presentationAttributes.Display;  // display is uninherited
+  const auto visibility = context->presentationContext()._inherited.Visibility->type();
+  const auto display = presentationAttributes.Display;  // display is uninherited
   return visibility != SVGVisibility::Type::Hidden &&
          (!display.isValue() || *display != SVGDisplay::None);
 }
@@ -108,10 +105,9 @@ void SetInheritedByDefault(std::optional<T>& presentation_attribute, const T& va
 }
 
 bool SVGNode::parseAndSetAttribute(const std::string& n, const std::string& v) {
-#define PARSE_AND_SET(svgName, attrName)                                                        \
-  this->set##attrName(                                                                          \
-      SVGAttributeParser::parseProperty<decltype(_presentationAttributes.attrName)>(svgName, n, \
-                                                                                    v))
+#define PARSE_AND_SET(svgName, attrName) \
+  this->set##attrName(                   \
+      SVGAttributeParser::parseProperty<decltype(presentationAttributes.attrName)>(svgName, n, v))
 
   return PARSE_AND_SET("clip-path", ClipPath) || PARSE_AND_SET("clip-rule", ClipRule) ||
          PARSE_AND_SET("color", Color) ||

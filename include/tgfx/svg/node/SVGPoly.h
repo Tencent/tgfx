@@ -53,7 +53,7 @@ class SVGPoly final : public SVGShape {
  private:
   SVGPoly(SVGTag);
 
-  mutable Path fPath;  // mutated in onDraw(), to apply inherited fill types.
+  mutable Path path;  // mutated in onDraw(), to apply inherited fill types.
 
   using INHERITED = SVGShape;
 };

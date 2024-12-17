@@ -20,6 +20,7 @@
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 
@@ -32,35 +33,30 @@ bool SVGPoly::parseAndSetAttribute(const std::string& n, const std::string& v) {
   }
 
   if (this->setPoints(SVGAttributeParser::parse<SVGPointsType>("points", n, v))) {
-    // TODO: we can likely just keep the points array and create the SkPath when needed.
-    // fPath = SkPath::Polygon(
-    //         fPoints.data(), fPoints.size(),
-    //         this->tag() == SkSVGTag::kPolygon);  // only polygons are auto-closed
+    // TODO (YGAurora): construct the polygon path by points.
   }
-
-  // No other attributes on this node
   return false;
 }
 
 void SVGPoly::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
                      PathFillType fillType) const {
   // the passed fillType follows inheritance rules and needs to be applied at draw time.
-  fPath.setFillType(fillType);
-  canvas->drawPath(fPath, paint);
+  path.setFillType(fillType);
+  canvas->drawPath(path, paint);
 }
 
-Path SVGPoly::onAsPath(const SVGRenderContext& ctx) const {
-  Path path = fPath;
+Path SVGPoly::onAsPath(const SVGRenderContext& context) const {
+  Path resultPath = path;
 
   // clip-rule can be inherited and needs to be applied at clip time.
-  path.setFillType(ctx.presentationContext()._inherited.ClipRule->asFillType());
+  resultPath.setFillType(context.presentationContext()._inherited.ClipRule->asFillType());
 
-  this->mapToParent(&path);
-  return path;
+  this->mapToParent(&resultPath);
+  return resultPath;
 }
 
 Rect SVGPoly::onObjectBoundingBox(const SVGRenderContext&) const {
-  return fPath.getBounds();
+  return path.getBounds();
 }
 
 }  // namespace tgfx

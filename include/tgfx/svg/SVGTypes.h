@@ -101,26 +101,18 @@ class SVGProperty {
   }
 
   T* operator->() {
-    // ASSERT(fState == SVGPropertyState::kValue);
-    // ASSERT(fValue.has_value());
     return &_value.value();
   }
 
   const T* operator->() const {
-    // ASSERT(fState == SVGPropertyState::kValue);
-    // ASSERT(fValue.has_value());
     return &_value.value();
   }
 
   T& operator*() {
-    // ASSERT(fState == SVGPropertyState::kValue);
-    // ASSERT(fValue.has_value());
     return *_value;
   }
 
   const T& operator*() const {
-    // ASSERT(fState == SVGPropertyState::kValue);
-    // ASSERT(fValue.has_value());
     return *_value;
   }
 

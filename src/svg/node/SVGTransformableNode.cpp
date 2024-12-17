@@ -30,21 +30,21 @@ namespace tgfx {
 SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag), fTransform(Matrix::I()) {
 }
 
-bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* ctx) const {
+bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
   if (!fTransform.isIdentity()) {
     auto transform = fTransform;
-    if (auto unit = ctx->lengthContext().getPatternUnits();
+    if (auto unit = context->lengthContext().getPatternUnits();
         unit.has_value() &&
         unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-      transform.postScale(ctx->lengthContext().viewPort().width,
-                          ctx->lengthContext().viewPort().height);
+      transform.postScale(context->lengthContext().viewPort().width,
+                          context->lengthContext().viewPort().height);
     }
-    ctx->saveOnce();
-    ctx->canvas()->concat(transform);
-    ctx->concat(transform);
+    context->saveOnce();
+    context->canvas()->concat(transform);
+    context->concat(transform);
   }
 
-  return this->INHERITED::onPrepareToRender(ctx);
+  return this->INHERITED::onPrepareToRender(context);
 }
 
 void SVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) {

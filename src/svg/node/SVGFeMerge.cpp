@@ -29,9 +29,9 @@ bool SVGFeMergeNode::parseAndSetAttribute(const std::string& name, const std::st
          this->setIn(SVGAttributeParser::parse<SVGFeInputType>("in", name, value));
 }
 
-std::shared_ptr<ImageFilter> SVGFeMerge::onMakeImageFilter(const SVGRenderContext& /*ctx*/,
-                                                           const SVGFilterContext& /*fctx*/) const {
-  //TODO (YGAurora): Implement this
+std::shared_ptr<ImageFilter> SVGFeMerge::onMakeImageFilter(const SVGRenderContext&,
+                                                           const SVGFilterContext&) const {
+  //TODO (YGAurora): Implement relying on ImageFilters::Merge to implement this
   return nullptr;
 }
 

@@ -36,21 +36,22 @@ bool SVGLine::parseAndSetAttribute(const std::string& n, const std::string& v) {
          this->setY2(SVGAttributeParser::parse<SVGLength>("y2", n, v));
 }
 
-std::tuple<Point, Point> SVGLine::resolve(const SVGLengthContext& lctx) const {
-  return std::make_tuple(Point::Make(lctx.resolve(X1, SVGLengthContext::LengthType::Horizontal),
-                                     lctx.resolve(Y1, SVGLengthContext::LengthType::Vertical)),
-                         Point::Make(lctx.resolve(X2, SVGLengthContext::LengthType::Horizontal),
-                                     lctx.resolve(Y2, SVGLengthContext::LengthType::Vertical)));
+std::tuple<Point, Point> SVGLine::resolve(const SVGLengthContext& lengthContext) const {
+  return std::make_tuple(
+      Point::Make(lengthContext.resolve(X1, SVGLengthContext::LengthType::Horizontal),
+                  lengthContext.resolve(Y1, SVGLengthContext::LengthType::Vertical)),
+      Point::Make(lengthContext.resolve(X2, SVGLengthContext::LengthType::Horizontal),
+                  lengthContext.resolve(Y2, SVGLengthContext::LengthType::Vertical)));
 }
 
-void SVGLine::onDraw(Canvas* canvas, const SVGLengthContext& lctx, const Paint& paint,
+void SVGLine::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
                      PathFillType) const {
-  auto [p0, p1] = this->resolve(lctx);
+  auto [p0, p1] = this->resolve(lengthContext);
   canvas->drawLine(p0, p1, paint);
 }
 
-Path SVGLine::onAsPath(const SVGRenderContext& ctx) const {
-  auto [p0, p1] = this->resolve(ctx.lengthContext());
+Path SVGLine::onAsPath(const SVGRenderContext& context) const {
+  auto [p0, p1] = this->resolve(context.lengthContext());
 
   //TODO (YG) path add methods to support line
   Path path;

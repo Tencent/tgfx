@@ -23,6 +23,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include "svg/SVGLengthContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
@@ -107,46 +108,6 @@ class CopyOnWrite {
   std::optional<T> optional;
 };
 
-class SVGLengthContext {
- public:
-  explicit SVGLengthContext(const Size& viewport, float dpi = 90) : _viewPort(viewport), dpi(dpi) {
-  }
-
-  enum class LengthType {
-    Horizontal,
-    Vertical,
-    Other,
-  };
-
-  const Size& viewPort() const {
-    return _viewPort;
-  }
-  void setViewPort(const Size& viewPort) {
-    _viewPort = viewPort;
-  }
-
-  float resolve(const SVGLength&, LengthType) const;
-  Rect resolveRect(const SVGLength& x, const SVGLength& y, const SVGLength& w,
-                   const SVGLength& h) const;
-
-  void setPatternUnits(SVGObjectBoundingBoxUnits unit) {
-    patternUnit = unit;
-  }
-
-  void clearPatternUnits() {
-    patternUnit.reset();
-  }
-
-  std::optional<SVGObjectBoundingBoxUnits> getPatternUnits() const {
-    return patternUnit;
-  }
-
- private:
-  Size _viewPort;
-  float dpi;
-  std::optional<SVGObjectBoundingBoxUnits> patternUnit;
-};
-
 struct SVGPresentationContext {
   SVGPresentationContext();
   SVGPresentationContext(const SVGPresentationContext&) = default;
@@ -214,7 +175,7 @@ class SVGRenderContext {
   std::optional<Paint> fillPaint() const;
   std::optional<Paint> strokePaint() const;
 
-  SVGColorType resolveSvgColor(const SVGColor&) const;
+  SVGColorType resolveSVGColor(const SVGColor&) const;
 
   // The local computed clip path (not inherited).
   Path clipPath() const {
@@ -237,7 +198,7 @@ class SVGRenderContext {
     Point offset, scale;
   };
 
-  OBBTransform transformForCurrentOBB(SVGObjectBoundingBoxUnits) const;
+  OBBTransform transformForCurrentBoundBox(SVGObjectBoundingBoxUnits) const;
 
   Rect resolveOBBRect(const SVGLength& x, const SVGLength& y, const SVGLength& w,
                       const SVGLength& h, SVGObjectBoundingBoxUnits unit) const;

@@ -24,7 +24,6 @@
 #include "tgfx/svg/node/SVGFe.h"
 #include "tgfx/svg/node/SVGNode.h"
 
-class SVGFilterContext;
 class SVGRenderContext;
 
 namespace tgfx {

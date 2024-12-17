@@ -28,8 +28,8 @@ bool SVGFeImage::parseAndSetAttribute(const std::string& name, const std::string
              SVGAttributeParser::parse<SVGPreserveAspectRatio>("preserveAspectRatio", name, value));
 }
 
-std::shared_ptr<ImageFilter> SVGFeImage::onMakeImageFilter(const SVGRenderContext& /*ctx*/,
-                                                           const SVGFilterContext& /*fctx*/) const {
+std::shared_ptr<ImageFilter> SVGFeImage::onMakeImageFilter(const SVGRenderContext&,
+                                                           const SVGFilterContext&) const {
   return nullptr;
 }
 
