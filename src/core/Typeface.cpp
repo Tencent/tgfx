@@ -65,11 +65,9 @@ class EmptyTypeface : public Typeface {
   }
 
  protected:
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override {
-    return std::vector<Unichar>();
+    return {};
   }
-#endif
 
  private:
   uint32_t _uniqueID = UniqueID::Next();

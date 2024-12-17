@@ -28,49 +28,38 @@
 
 namespace tgfx {
 
-SVGExporter::~SVGExporter() {
-  delete canvas;
-  delete context;
-};
-
-Canvas* SVGExporter::beginExporting(Context* gpuContext, const ISize& size,
-                                    uint32_t exportingOptions) {
-  ASSERT(gpuContext)
-  if (canvas == nullptr) {
-    uint32_t xmlOptions = exportingOptions & NoPrettyXML ? XMLStreamWriter::NoPretty : 0;
-    auto writer = std::make_unique<XMLStreamWriter>(svgStream, xmlOptions);
-    context = new SVGExportingContext(gpuContext, size, std::move(writer), exportingOptions);
-    canvas = new Canvas(context);
-    context->setCanvas(canvas);
+std::shared_ptr<SVGExporter> SVGExporter::Make(std::stringstream& svgStream, Context* context,
+                                               const Rect& viewBox, ExportingOptions options) {
+  if (!context) {
+    return nullptr;
   }
-
-  if (actively) {
-    canvas->resetStateStack();
-  } else {
-    actively = true;
-  }
-  return getCanvas();
+  return std::shared_ptr<SVGExporter>(new SVGExporter(svgStream, context, viewBox, options));
 }
 
-Canvas* SVGExporter::getCanvas() const {
-  return actively ? canvas : nullptr;
+SVGExporter::SVGExporter(std::stringstream& svgStream, Context* context, const Rect& viewBox,
+                         ExportingOptions options) {
+  closed = false;
+  auto writer = std::make_unique<XMLStreamWriter>(svgStream, options.prettyXML);
+  drawContext = new SVGExportingContext(context, viewBox, std::move(writer), options);
+  canvas = new Canvas(drawContext);
+  drawContext->setCanvas(canvas);
 };
 
-std::string SVGExporter::finishExportingAsString() {
-  if (!actively || context == nullptr) {
-    return "";
-  }
-  actively = false;
-  canvas->resetStateStack();
+SVGExporter::~SVGExporter() {
+  delete canvas;
+  delete drawContext;
+};
+
+Canvas* SVGExporter::getCanvas() const {
+  return closed ? nullptr : canvas;
+};
+
+void SVGExporter::close() {
+  closed = true;
   delete canvas;
   canvas = nullptr;
-  delete context;
-  context = nullptr;
-
-  auto svgString = svgStream.str();
-  svgStream.str("");
-  svgStream.clear();
-  return svgString;
+  delete drawContext;
+  drawContext = nullptr;
 };
 
 }  // namespace tgfx

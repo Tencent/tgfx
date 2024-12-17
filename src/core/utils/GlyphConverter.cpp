@@ -28,12 +28,12 @@ std::vector<Unichar> GlyphConverter::glyphsToUnichars(const Font& font,
   if (!typeface) {
     return {};
   }
-  std::vector<Unichar> ret(glyphs.size(), 0);
+  std::vector<Unichar> result(glyphs.size(), 0);
   auto glyphMap = this->getGlyphToUnicodeMap(typeface);
   for (size_t i = 0; i < glyphs.size(); i++) {
-    ret[i] = glyphMap[glyphs[i]];
+    result[i] = glyphMap[glyphs[i]];
   }
-  return ret;
+  return result;
 }
 
 const std::vector<Unichar>& GlyphConverter::getGlyphToUnicodeMap(

@@ -30,9 +30,11 @@
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/SVGExporter.h"
 
 namespace tgfx {
 
@@ -41,8 +43,8 @@ class ElementWriter;
 
 class SVGExportingContext : public DrawContext {
  public:
-  SVGExportingContext(Context* gpuContext, const ISize& size, std::unique_ptr<XMLWriter> writer,
-                      uint32_t options);
+  SVGExportingContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
+                      ExportingOptions options);
   ~SVGExportingContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
@@ -74,6 +76,10 @@ class SVGExportingContext : public DrawContext {
 
   void syncMCState(const MCState& state);
 
+  // void syncStateStackPush(const MCState&) override;
+
+  // void syncStateStackPop() override;
+
   XMLWriter* getWriter() const {
     return writer.get();
   }
@@ -85,27 +91,26 @@ class SVGExportingContext : public DrawContext {
    */
   static bool RequiresViewportReset(const FillStyle& fill);
 
-  void drawBitmap(const Bitmap& bitmap, const MCState& state, const FillStyle& style);
+  void exportPixmap(const Pixmap& pixmap, const MCState& state, const FillStyle& style);
 
   void exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                           const FillStyle& style, const Stroke* stroke);
 
   void exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
-                          const FillStyle& style);
+                          const FillStyle& style, const Stroke* stroke);
 
   void exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                            const FillStyle& style);
 
   static PathEncoding PathEncoding();
 
-  uint32_t options;
-  ISize size;
+  ExportingOptions options;
   Context* context = nullptr;
   Canvas* canvas = nullptr;
   const std::unique_ptr<XMLWriter> writer;
   const std::unique_ptr<ResourceStore> resourceBucket;
   std::unique_ptr<ElementWriter> rootElement;
-  std::stack<std::pair<int, std::unique_ptr<ElementWriter>>> stateStack;
+  std::stack<std::pair<int, std::unique_ptr<ElementWriter>>> groupElementStack;
   SVGTextBuilder textBuilder;
 };
 }  // namespace tgfx

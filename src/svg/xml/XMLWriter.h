@@ -92,11 +92,7 @@ class XMLWriter {
  */
 class XMLStreamWriter : public XMLWriter {
  public:
-  enum : uint32_t {
-    NoPretty = 0x01,
-  };
-
-  explicit XMLStreamWriter(std::stringstream& stream, uint32_t flags = 0);
+  explicit XMLStreamWriter(std::stringstream& stream, bool isPretty = true);
   ~XMLStreamWriter() override;
   void clear() override;
   void writeHeader() override;
@@ -112,7 +108,7 @@ class XMLStreamWriter : public XMLWriter {
   void tab(int level);
 
   std::stringstream& _stream;
-  const uint32_t _flags;
+  const bool prettyFlag;
 };
 
 /**

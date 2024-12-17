@@ -246,25 +246,31 @@ void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret) 
   }
 }
 
-Bitmap ImageToBitmap(Context* gpuContext, const std::shared_ptr<Image>& image) {
-  auto surface = Surface::Make(gpuContext, image->width(), image->height());
+Pixmap ImageToBitmap(Context* context, const std::shared_ptr<Image>& image) {
+  auto surface = Surface::Make(context, image->width(), image->height());
   auto* canvas = surface->getCanvas();
-  canvas->clear();
-  auto textureImage = image->makeTextureImage(gpuContext);
-  canvas->drawImage(textureImage);
+  canvas->drawImage(image);
 
   Bitmap bitmap(surface->width(), surface->height(), false, false);
-  return bitmap;
+  Pixmap pixmap(bitmap);
+  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+  if (result) {
+    return pixmap;
+  } else {
+    return Pixmap();
+  }
 }
 
 // Returns data uri from bytes.
 // it will use any cached data if available, otherwise will
 // encode as png.
-std::shared_ptr<Data> AsDataUri(const Bitmap& bitmap) {
+std::shared_ptr<Data> AsDataUri(const Pixmap& pixmap) {
+  if (pixmap.isEmpty()) {
+    return nullptr;
+  }
   static constexpr auto pngPrefix = "data:image/png;base64,";
   size_t prefixLength = strlen(pngPrefix);
 
-  Pixmap pixmap(bitmap);
   auto imageData = ImageCodec::Encode(pixmap, EncodedFormat::PNG, 100);
   if (!imageData) {
     return nullptr;

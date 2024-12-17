@@ -18,12 +18,30 @@
 
 #pragma once
 
+#include <memory>
 #include <sstream>
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class SVGExportingContext;
+
+struct ExportingOptions {
+  ExportingOptions() = default;
+  ExportingOptions(bool convertTextToPaths, bool prettyXML)
+      : convertTextToPaths(convertTextToPaths), prettyXML(prettyXML) {
+  }
+  /**
+   * Convert text to paths in the exported SVG text, only applicable to outline fonts. Emoji and
+   * web fonts will only be exported as text.
+   */
+  bool convertTextToPaths = false;
+  /**
+   * Format SVG text with spaces('/t') and newlines('/n').
+   */
+  bool prettyXML = true;
+};
 
 /**
  * SVGExporter is a class used to export SVG text, converting drawing commands in the Canvas to
@@ -31,47 +49,43 @@ class SVGExportingContext;
  */
 class SVGExporter {
  public:
-  enum ExportingOptions {
-    /**
-     * Convert text to paths in the exported SVG text, only applicable to outline fonts. Emoji and
-     * web fonts will only be exported as text.
-     */
-    ConvertTextToPaths = 0x01,
-    /**
-     * Do not format SVG text with spaces('/t') and newlines('/n').
-     */
-    NoPrettyXML = 0x02,
-  };
+  /**
+   * Creates an SVGExporter object pointer, which can be used to export SVG text.
+   *
+   * @param svgStream The string stream to store the SVG text.
+   * @param context used to convert some rendering commands into image data.
+   * @param viewBox viewBox of SVG, and content that exceeds the display area in the
+   * SVG will be clipped.
+   * @param options Options for exporting SVG text.
+   */
+  static std::shared_ptr<SVGExporter> Make(std::stringstream& svgStream, Context* context,
+                                           const Rect& viewBox, ExportingOptions options);
 
-  SVGExporter() = default;
+  /**
+   * Destroys the SVGExporter object, equivalent to calling close().
+   */
   ~SVGExporter();
 
   /**
-   * Begin exporting SVG text and return a Canvas object for drawing SVG graphics.
-   *
-   * @param gpuContext used to convert some rendering commands into image data.
-   * @param size The size sets the size of the SVG, and content that exceeds the display area in the
-   * SVG will be clipped.
-   * @param exportingOptions Options for exporting SVG text.
-   * @return Canvas* 
-   */
-  Canvas* beginExporting(Context* gpuContext, const ISize& size, uint32_t exportingOptions = 0);
-
-  /**
-   * Returns the canvas if it is active, or nullptr.
+   * Get the canvas if the SVGExporter is not closed.if closed, return nullptr.
    */
   Canvas* getCanvas() const;
 
   /**
-   * Finish exporting and return the SVG text. If the canvas is not active, return an empty string.
+   * Closes the SVGExporter.Finalizing any unfinished drawing commands and writing the SVG end tag.
    */
-  std::string finishExportingAsString();
+  void close();
 
  private:
-  bool actively = false;
-  SVGExportingContext* context = nullptr;
+  /**
+   * Construct a SVGExporter object
+   */
+  SVGExporter(std::stringstream& svgStream, Context* context, const Rect& viewBox,
+              ExportingOptions options);
+
+  bool closed = false;
+  SVGExportingContext* drawContext = nullptr;
   Canvas* canvas = nullptr;
-  std::stringstream svgStream;
 };
 
 }  // namespace tgfx

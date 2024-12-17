@@ -43,36 +43,37 @@
 
 namespace tgfx {
 
-SVGExportingContext::SVGExportingContext(Context* gpuContext, const ISize& size,
-                                         std::unique_ptr<XMLWriter> xmlWriter, uint32_t options)
-    : options(options), size(size), context(gpuContext), writer(std::move(xmlWriter)),
+SVGExportingContext::SVGExportingContext(Context* context, const Rect& viewBox,
+                                         std::unique_ptr<XMLWriter> xmlWriter,
+                                         ExportingOptions options)
+    : options(options), context(context), writer(std::move(xmlWriter)),
       resourceBucket(new ResourceStore) {
-  ASSERT(writer);
-  writer->writeHeader();
-
-  if (size.width == 0 || size.height == 0) {
+  if (viewBox.isEmpty()) {
     return;
   }
 
+  writer->writeHeader();
   // The root <svg> tag gets closed by the destructor.
   rootElement = std::make_unique<ElementWriter>("svg", writer);
 
   rootElement->addAttribute("xmlns", "http://www.w3.org/2000/svg");
   rootElement->addAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-  rootElement->addAttribute("width", size.width);
-  rootElement->addAttribute("height", size.height);
+  if (viewBox.x() == 0.0f && viewBox.y() == 0.0f) {
+    rootElement->addAttribute("width", viewBox.width());
+    rootElement->addAttribute("height", viewBox.height());
+  } else {
+    std::string viewBoxString = FloatToString(viewBox.x()) + " " + FloatToString(viewBox.y()) +
+                                " " + FloatToString(viewBox.width()) + " " +
+                                FloatToString(viewBox.height());
+    rootElement->addAttribute("viewBox", viewBoxString);
+  }
 }
 
 void SVGExportingContext::clear() {
-  rootElement = nullptr;
-  writer->clear();
-  writer->writeHeader();
-
-  rootElement = std::make_unique<ElementWriter>("svg", writer);
-  rootElement->addAttribute("xmlns", "http://www.w3.org/2000/svg");
-  rootElement->addAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-  rootElement->addAttribute("width", size.width);
-  rootElement->addAttribute("height", size.height);
+  ElementWriter rectElement("rect", writer);
+  rectElement.addAttribute("opacity", 0);
+  rectElement.addAttribute("width", "100%");
+  rectElement.addAttribute("height", "100%");
 };
 
 void SVGExportingContext::drawRect(const Rect& rect, const MCState& mc, const FillStyle& fill) {
@@ -138,7 +139,7 @@ void SVGExportingContext::drawImageRect(std::shared_ptr<Image> image, const Rect
     return;
   }
 
-  auto bitmap = ImageToBitmap(this->context, image);
+  auto bitmap = ImageToBitmap(context, image);
 
   Rect srcRect = Rect::MakeWH(image->width(), image->height());
   float scaleX = rect.width() / srcRect.width();
@@ -151,12 +152,12 @@ void SVGExportingContext::drawImageRect(std::shared_ptr<Image> image, const Rect
   newState.matrix.postScale(scaleX, scaleY);
   newState.matrix.postTranslate(transX, transY);
 
-  drawBitmap(bitmap, newState, style);
+  exportPixmap(bitmap, newState, style);
 }
 
-void SVGExportingContext::drawBitmap(const Bitmap& bitmap, const MCState& state,
-                                     const FillStyle& style) {
-  auto dataUri = AsDataUri(bitmap);
+void SVGExportingContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
+                                       const FillStyle& style) {
+  auto dataUri = AsDataUri(pixmap);
   if (!dataUri) {
     return;
   }
@@ -167,8 +168,8 @@ void SVGExportingContext::drawBitmap(const Bitmap& bitmap, const MCState& state,
     {
       ElementWriter imageElement("image", writer);
       imageElement.addAttribute("id", imageID);
-      imageElement.addAttribute("width", bitmap.width());
-      imageElement.addAttribute("height", bitmap.height());
+      imageElement.addAttribute("width", pixmap.width());
+      imageElement.addAttribute("height", pixmap.height());
       imageElement.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
     }
   }
@@ -185,28 +186,21 @@ void SVGExportingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRu
     return;
   }
 
-  if (glyphRunList->glyphRuns().empty()) {
-    return;
-  }
-  bool hasEntityFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
+  bool hasFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
 
-  // If the font has color (emoji) or does not have outlines (web font), it cannot be converted to
-  // a path.
-  // If the options do not require converting text to paths and there is no stroke, do not convert
-  // to a path.
-  if (hasEntityFont) {
-    if ((!glyphRunList->hasOutlines()) ||
-        (!(options & SVGExporter::ConvertTextToPaths) && stroke == nullptr)) {
-      exportGlyphsAsText(glyphRunList, state, style);
-    } else {
-      // If the options require converting text to paths or there is a stroke, convert to a path.
+  // If conversion to path is required but the font does not have outlines (e.g.,emoji font,web
+  // font), it cannot be converted to a path.
+  if (hasFont) {
+    if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() && options.convertTextToPaths) {
       exportGlyphsAsPath(glyphRunList, state, style, stroke);
+    } else {
+      exportGlyphsAsText(glyphRunList, state, style, stroke);
     }
   } else {
-    if (!glyphRunList->hasOutlines()) {
-      exportGlyphsAsImage(glyphRunList, state, style);
-    } else {
+    if (glyphRunList->hasOutlines() && !glyphRunList->hasColor()) {
       exportGlyphsAsPath(glyphRunList, state, style, stroke);
+    } else {
+      exportGlyphsAsImage(glyphRunList, state, style);
     }
   }
 }
@@ -224,9 +218,10 @@ void SVGExportingContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>
 }
 
 void SVGExportingContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& glyphRunList,
-                                             const MCState& state, const FillStyle& style) {
+                                             const MCState& state, const FillStyle& style,
+                                             const Stroke* stroke) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    ElementWriter textElement("text", context, this, resourceBucket.get(), state, style);
+    ElementWriter textElement("text", context, this, resourceBucket.get(), state, style, stroke);
 
     if (Font font; glyphRun.glyphFace->asFont(&font)) {
       textElement.addFontAttributes(font);
@@ -250,7 +245,9 @@ void SVGExportingContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     auto glyphFace = glyphRun.glyphFace;
     glyphFace = glyphFace->makeScaled(scale);
-    DEBUG_ASSERT(glyphFace != nullptr);
+    if (glyphFace == nullptr) {
+      continue;
+    }
     const auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
     const auto& positions = glyphRun.positions;
@@ -265,7 +262,7 @@ void SVGExportingContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      SVGExportingContext::drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
     }
   }
 }
@@ -315,10 +312,10 @@ PathEncoding SVGExportingContext::PathEncoding() {
 
 void SVGExportingContext::syncMCState(const MCState& state) {
   auto saveCount = canvas->getSaveCount();
-  if (!stateStack.empty()) {
-    if (stateStack.top().first >= saveCount) {
-      while (stateStack.top().first > saveCount) {
-        stateStack.pop();
+  if (!groupElementStack.empty()) {
+    if (groupElementStack.top().first >= saveCount) {
+      while (groupElementStack.top().first > saveCount) {
+        groupElementStack.pop();
       }
       return;
     }
@@ -363,7 +360,55 @@ void SVGExportingContext::syncMCState(const MCState& state) {
   auto clipID = defineClip(state);
   auto clipElement = std::make_unique<ElementWriter>("g", writer);
   clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
-  stateStack.emplace(saveCount, std::move(clipElement));
+  groupElementStack.emplace(saveCount, std::move(clipElement));
 }
+
+// void SVGExportingContext::syncStateStackPush(const MCState& state) {
+
+//   auto defineClip = [this](const MCState& insertState) -> std::string {
+//     std::string clipID = "clip_" + resourceBucket->addClip();
+//     ElementWriter clipPath("clipPath", writer);
+//     clipPath.addAttribute("id", clipID);
+//     {
+//       auto clipPath = insertState.clip;
+//       std::unique_ptr<ElementWriter> element;
+//       if (Rect rect; clipPath.isRect(&rect)) {
+//         element = std::make_unique<ElementWriter>("rect", writer);
+//         element->addRectAttributes(rect);
+//       } else if (RRect rrect; clipPath.isRRect(&rrect)) {
+//         element = std::make_unique<ElementWriter>("rect", writer);
+//         element->addRoundRectAttributes(rrect);
+//       } else if (Rect bound; clipPath.isOval(&bound)) {
+//         if (FloatNearlyEqual(bound.width(), bound.height())) {
+//           element = std::make_unique<ElementWriter>("circle", writer);
+//           element->addCircleAttributes(bound);
+//         } else {
+//           element = std::make_unique<ElementWriter>("ellipse", writer);
+//           element->addEllipseAttributes(bound);
+//         }
+//       } else {
+//         element = std::make_unique<ElementWriter>("path", writer);
+//         element->addPathAttributes(clipPath, tgfx::SVGExportingContext::PathEncoding());
+//         if (clipPath.getFillType() == PathFillType::EvenOdd) {
+//           element->addAttribute("clip-rule", "evenodd");
+//         }
+//       }
+//     }
+//     return clipID;
+//   };
+
+//   if (state.clip.isEmpty()) {
+//     groupElementStack.emplace(nullptr);
+//   } else {
+//     auto clipID = defineClip(state);
+//     auto clipElement = std::make_unique<ElementWriter>("g", writer);
+//     clipElement->addAttribute("clip-path", "url(#" + clipID + ")");
+//     groupElementStack.push(std::move(clipElement));
+//   }
+// }
+
+// void SVGExportingContext::syncStateStackPop() {
+//   groupElementStack.pop();
+// }
 
 }  // namespace tgfx

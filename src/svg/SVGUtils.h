@@ -72,12 +72,12 @@ void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret);
 /**
  * Draws a image onto a surface and reads the pixels from the surface.
  */
-Bitmap ImageToBitmap(Context* gpuContext, const std::shared_ptr<Image>& image);
+Pixmap ImageToBitmap(Context* context, const std::shared_ptr<Image>& image);
 
 /**
  * Returns data uri from bytes.
  * it will use any cached data if available, otherwise will encode as png.
  */
-std::shared_ptr<Data> AsDataUri(const Bitmap& bitmap);
+std::shared_ptr<Data> AsDataUri(const Pixmap& pixmap);
 
 }  // namespace tgfx

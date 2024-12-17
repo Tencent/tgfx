@@ -43,7 +43,7 @@ class ElementWriter {
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket);
-  ElementWriter(const std::string& name, Context* gpuContext, SVGExportingContext* svgContext,
+  ElementWriter(const std::string& name, Context* context, SVGExportingContext* svgContext,
                 ResourceStore* bucket, const MCState& state, const FillStyle& fill,
                 const Stroke* stroke = nullptr);
   ~ElementWriter();
@@ -63,16 +63,16 @@ class ElementWriter {
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
 
  private:
-  Resources addResources(const FillStyle& fill, Context* gpuContext);
+  Resources addResources(const FillStyle& fill, Context* context);
 
-  void addShaderResources(const std::shared_ptr<Shader>& shader, Context* gpuContext,
+  void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
   void addColorShaderResources(const std::shared_ptr<const ColorShader>& shader,
                                Resources* resources);
   void addGradientShaderResources(const std::shared_ptr<const GradientShader>& shader,
                                   Resources* resources);
-  void addImageShaderResources(const std::shared_ptr<const ImageShader>& shader,
-                               Context* gpuContext, Resources* resources);
+  void addImageShaderResources(const std::shared_ptr<const ImageShader>& shader, Context* context,
+                               Resources* resources);
 
   void addColorFilterResources(const ColorFilter& colorFilter, Resources* resources);
 

@@ -52,13 +52,13 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
   writer->startElement(name);
 }
 
-ElementWriter::ElementWriter(const std::string& name, Context* gpuContext,
+ElementWriter::ElementWriter(const std::string& name, Context* context,
                              SVGExportingContext* svgContext, ResourceStore* bucket,
                              const MCState& state, const FillStyle& fill, const Stroke* stroke)
     : writer(svgContext->getWriter()), resourceStore(bucket) {
-
   svgContext->syncMCState(state);
-  Resources res = this->addResources(fill, gpuContext);
+
+  Resources res = this->addResources(fill, context);
 
   writer->startElement(name);
 
@@ -143,7 +143,9 @@ void ElementWriter::addFontAttributes(const Font& font) {
   this->addAttribute("font-size", font.getSize());
 
   auto typeface = font.getTypeface();
-  ASSERT(typeface);
+  if (typeface == nullptr) {
+    return;
+  }
   auto familyName = typeface->fontFamily();
   if (!familyName.empty()) {
     this->addAttribute("font-family", familyName);
@@ -330,12 +332,12 @@ void ElementWriter::addInnerShadowImageFilter(
   }
 }
 
-Resources ElementWriter::addResources(const FillStyle& fill, Context* gpuContext) {
+Resources ElementWriter::addResources(const FillStyle& fill, Context* context) {
   Resources resources(fill);
 
   if (auto shader = fill.shader) {
     ElementWriter defs("defs", writer);
-    this->addShaderResources(shader, gpuContext, &resources);
+    this->addShaderResources(shader, context, &resources);
   }
 
   if (auto colorFilter = fill.colorFilter) {
@@ -349,14 +351,14 @@ Resources ElementWriter::addResources(const FillStyle& fill, Context* gpuContext
   return resources;
 }
 
-void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* gpuContext,
+void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                                        Resources* resources) {
   if (auto colorShader = ShaderCaster::AsColorShader(shader)) {
     this->addColorShaderResources(colorShader, resources);
   } else if (auto gradientShader = ShaderCaster::AsGradientShader(shader)) {
     this->addGradientShaderResources(gradientShader, resources);
   } else if (auto imageShader = ShaderCaster::AsImageShader(shader)) {
-    this->addImageShaderResources(imageShader, gpuContext, resources);
+    this->addImageShaderResources(imageShader, context, resources);
   }
   // TODO(YGAurora): other shader types
 }
@@ -374,7 +376,7 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<const Gradi
   GradientInfo info;
   GradientType type = shader->asGradient(&info);
 
-  ASSERT(info.colors.size() == info.positions.size());
+  DEBUG_ASSERT(info.colors.size() == info.positions.size());
   if (type == GradientType::Linear) {
     resources->paintColor = "url(#" + addLinearGradientDef(info) + ")";
   } else if (type == GradientType::Radial) {
@@ -385,7 +387,7 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<const Gradi
 }
 
 void ElementWriter::addGradientColors(const GradientInfo& info) {
-  ASSERT(info.colors.size() >= 2);
+  DEBUG_ASSERT(info.colors.size() >= 2);
   for (uint32_t i = 0; i < info.colors.size(); ++i) {
     auto color = info.colors[i];
     auto colorStr = ToSVGColor(color);
@@ -401,7 +403,7 @@ void ElementWriter::addGradientColors(const GradientInfo& info) {
 }
 
 std::string ElementWriter::addLinearGradientDef(const GradientInfo& info) {
-  ASSERT(resourceStore);
+  DEBUG_ASSERT(resourceStore);
   auto id = resourceStore->addGradient();
 
   {
@@ -419,7 +421,7 @@ std::string ElementWriter::addLinearGradientDef(const GradientInfo& info) {
 }
 
 std::string ElementWriter::addRadialGradientDef(const GradientInfo& info) {
-  ASSERT(resourceStore);
+  DEBUG_ASSERT(resourceStore);
   auto id = resourceStore->addGradient();
 
   {
@@ -436,7 +438,7 @@ std::string ElementWriter::addRadialGradientDef(const GradientInfo& info) {
 }
 
 std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info) {
-  ASSERT(resourceStore);
+  DEBUG_ASSERT(resourceStore);
   auto id = resourceStore->addGradient();
 
   {
@@ -454,12 +456,12 @@ std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info) {
 };
 
 void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageShader>& shader,
-                                            Context* gpuContext, Resources* resources) {
+                                            Context* context, Resources* resources) {
   auto image = shader->image;
-  ASSERT(shader->image);
+  DEBUG_ASSERT(shader->image);
 
-  ASSERT(gpuContext);
-  auto bitmap = ImageToBitmap(gpuContext, image);
+  DEBUG_ASSERT(context);
+  auto bitmap = ImageToBitmap(context, image);
   auto dataUri = AsDataUri(bitmap);
   if (!dataUri) {
     return;
@@ -515,7 +517,7 @@ void ElementWriter::addColorFilterResources(const ColorFilter& colorFilter, Reso
     Color filterColor;
     BlendMode mode;
     colorFilter.asColorMode(&filterColor, &mode);
-    ASSERT(mode == BlendMode::SrcIn);
+    DEBUG_ASSERT(mode == BlendMode::SrcIn);
 
     {
       // first flood with filter color

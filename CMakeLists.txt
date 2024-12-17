@@ -205,7 +205,7 @@ if (TGFX_USE_ZLIB)
 endif ()
 
 if (TGFX_BUILD_SVG)
-    # SVG and PDF export requires glyph translation to Unicode.
+    # SVG and PDF exports require glyphs to be convertible back to Unicode.
     list(APPEND TGFX_DEFINES TGFX_USE_GLYPH_TO_UNICODE)
 endif ()
 

@@ -172,7 +172,7 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
   auto numGlyphs = static_cast<size_t>(face->num_glyphs);
   std::vector<Unichar> returnMap(numGlyphs, 0);
 
-  FT_UInt glyphIndex;
+  FT_UInt glyphIndex = 0;
   auto charCode = FT_Get_First_Char(face, &glyphIndex);
   while (glyphIndex) {
     if (0 == returnMap[glyphIndex]) {
@@ -181,6 +181,10 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
     charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
   }
   return returnMap;
+}
+#else
+std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
+  return {};
 }
 #endif
 

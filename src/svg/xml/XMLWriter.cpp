@@ -188,8 +188,8 @@ void XMLWriter::clear() {
 void XMLWriter::writeHeader() {
 }
 
-XMLStreamWriter::XMLStreamWriter(std::stringstream& stream, uint32_t flags)
-    : _stream(stream), _flags(flags) {
+XMLStreamWriter::XMLStreamWriter(std::stringstream& stream, bool isPretty)
+    : _stream(stream), prettyFlag(isPretty) {
 }
 
 XMLStreamWriter::~XMLStreamWriter() {
@@ -251,13 +251,13 @@ void XMLStreamWriter::clear() {
 }
 
 void XMLStreamWriter::newline() {
-  if (!(_flags & NoPretty)) {
+  if (prettyFlag) {
     _stream << std::endl;
   }
 }
 
 void XMLStreamWriter::tab(int level) {
-  if (!(_flags & NoPretty)) {
+  if (prettyFlag) {
     for (int i = 0; i < level; i++) {
       _stream << "\t";
     }
