@@ -126,7 +126,7 @@ class SVGRenderContext {
     const SVGRenderContext* context;
   };
 
-  SVGRenderContext(Context*, Canvas*, const std::shared_ptr<SVGFontManager>&, const SVGIDMapper&,
+  SVGRenderContext(Canvas*, const std::shared_ptr<SVGFontManager>&, const SVGIDMapper&,
                    const SVGLengthContext&, const SVGPresentationContext&, const OBBScope&,
                    const Matrix& matrix);
   SVGRenderContext(const SVGRenderContext&);
@@ -142,6 +142,7 @@ class SVGRenderContext {
   const SVGLengthContext& lengthContext() const {
     return *_lengthContext;
   }
+
   SVGLengthContext* writableLengthContext() {
     return _lengthContext.writable();
   }
@@ -150,13 +151,10 @@ class SVGRenderContext {
     return *_presentationContext;
   }
 
-  Context* deviceContext() const {
-    return _deviceContext;
-  }
-
   Canvas* canvas() const {
     return _canvas;
   }
+
   void saveOnce();
 
   void concat(const Matrix& inputMatrix) {
@@ -166,6 +164,7 @@ class SVGRenderContext {
   enum ApplyFlags {
     kLeaf = 1 << 0,  // the target node doesn't have descendants
   };
+
   void applyPresentationAttributes(const SVGPresentationAttributes& attrs, uint32_t flags);
 
   // Note: the id->node association is cleared for the lifetime of the returned value
@@ -173,24 +172,17 @@ class SVGRenderContext {
   std::shared_ptr<SVGNode> findNodeById(const SVGIRI&) const;
 
   std::optional<Paint> fillPaint() const;
+
   std::optional<Paint> strokePaint() const;
 
   SVGColorType resolveSVGColor(const SVGColor&) const;
+
+  std::tuple<bool, Font> ResolveFont() const;
 
   // The local computed clip path (not inherited).
   Path clipPath() const {
     return _clipPath.value_or(Path());
   };
-
-  const std::shared_ptr<SVGFontManager>& fontMgr() const {
-    return fontManager;
-  }
-
-  std::shared_ptr<SVGFontManager>& fontMgr() {
-    // It is probably an oversight to try to render <text> without having set the SVGFontManager.
-    // We will assert this in debug mode, but fallback to an empty _fontMgr in release builds.
-    return fontManager;
-  }
 
   // Returns the translate/scale transformation required to map into the current OBB scope,
   // with the specified units.
@@ -234,7 +226,6 @@ class SVGRenderContext {
   // Current object bounding box scope.
   const OBBScope scope;
 
-  Context* _deviceContext;
   Paint picturePaint;
 
   Matrix matrix = Matrix::I();

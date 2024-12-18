@@ -20,21 +20,21 @@
 
 namespace tgfx {
 
-bool SVGFontManager::setDefaultTypeface(const std::shared_ptr<Typeface>& typeface) {
-  if (typeface) {
-    defaultTypeface = typeface;
-    return true;
-  }
-  return false;
-};
+SVGFontManager::SVGFontManager(const std::shared_ptr<Typeface>& defaultTypeface)
+    : defaultTypeface(defaultTypeface) {
+}
 
-void SVGFontManager::addFontStyle(const std::string& fontFamily, FontStyle style) {
+std::shared_ptr<SVGFontManager> SVGFontManager::Make(const std::shared_ptr<Typeface>& typeface) {
+  return std::shared_ptr<SVGFontManager>(new SVGFontManager(typeface));
+}
+
+void SVGFontManager::addFontStyle(const std::string& fontFamily, SVGFontInfo style) {
   if (typefaceMap.at(fontFamily).find(style) == typefaceMap.at(fontFamily).end()) {
     typefaceMap[fontFamily][style] = nullptr;
   }
 }
 
-void SVGFontManager::setTypeface(const std::string& fontFamily, FontStyle style,
+void SVGFontManager::setTypeface(const std::string& fontFamily, SVGFontInfo style,
                                  const std::shared_ptr<Typeface>& typeface) {
   typefaceMap[fontFamily][style] = typeface;
 }
@@ -48,9 +48,9 @@ std::vector<std::string> SVGFontManager::getFontFamilies() const {
   return families;
 }
 
-std::vector<FontStyle> SVGFontManager::getFontStyles(const std::string& fontFamily) const {
+std::vector<SVGFontInfo> SVGFontManager::getFontStyles(const std::string& fontFamily) const {
   if (auto iter = typefaceMap.find(fontFamily); iter != typefaceMap.end()) {
-    std::vector<FontStyle> styles;
+    std::vector<SVGFontInfo> styles;
     styles.reserve(iter->second.size());
     for (const auto& [style, _] : iter->second) {
       styles.push_back(style);
@@ -61,22 +61,8 @@ std::vector<FontStyle> SVGFontManager::getFontStyles(const std::string& fontFami
   }
 }
 
-std::shared_ptr<Typeface> SVGFontManager::getTypefaceForConfig(const std::string& fontFamily,
-                                                               FontStyle style) const {
-  auto familyIter = typefaceMap.find(fontFamily);
-  if (familyIter == typefaceMap.end()) {
-    return nullptr;
-  }
-  auto styleIter = familyIter->second.find(style);
-  if (styleIter == familyIter->second.end()) {
-    return nullptr;
-  } else {
-    return styleIter->second;
-  }
-}
-
 std::shared_ptr<Typeface> SVGFontManager::getTypefaceForRender(const std::string& fontFamily,
-                                                               FontStyle style) const {
+                                                               SVGFontInfo style) const {
   auto familyIter = typefaceMap.find(fontFamily);
   if (familyIter == typefaceMap.end()) {
     return defaultTypeface;

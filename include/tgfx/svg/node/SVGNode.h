@@ -154,6 +154,14 @@ class SVGNode {
   SVG_PRES_ATTR(FloodOpacity, SVGNumberType, false)
   SVG_PRES_ATTR(LightingColor, SVGColor, false)
 
+  void render(const SVGRenderContext&) const;
+
+  bool asPaint(const SVGRenderContext&, Paint*) const;
+
+  Path asPath(const SVGRenderContext&) const;
+
+  Rect objectBoundingBox(const SVGRenderContext&) const;
+
   virtual bool hasChildren() const {
     return false;
   }
@@ -162,14 +170,6 @@ class SVGNode {
   explicit SVGNode(SVGTag);
 
   virtual void appendChild(std::shared_ptr<SVGNode>) = 0;
-
-  void render(const SVGRenderContext&) const;
-
-  bool asPaint(const SVGRenderContext&, Paint*) const;
-
-  Path asPath(const SVGRenderContext&) const;
-
-  Rect objectBoundingBox(const SVGRenderContext&) const;
 
   void setAttribute(SVGAttribute, const SVGValue&);
 
@@ -206,11 +206,6 @@ class SVGNode {
   SVGTag _tag;
   SVGPresentationAttributes presentationAttributes;
 
-  friend class SVGDOM;
-  friend class SVGMask;
-  friend class SVGUse;
-  friend class SVGSVG;
-  friend class SVGContainer;
   friend class SVGNodeConstructor;
   friend class SVGRenderContext;
 };

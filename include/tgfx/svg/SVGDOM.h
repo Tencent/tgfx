@@ -32,8 +32,7 @@ class SVGNode;
 using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
 class SVGDOM {
  public:
-  static std::shared_ptr<SVGDOM> Make(const std::shared_ptr<Data>&,
-                                      std::shared_ptr<SVGFontManager>);
+  static std::shared_ptr<SVGDOM> Make(const std::shared_ptr<Data>&);
 
   /**
    * Returns the root SVG node.
@@ -42,10 +41,11 @@ class SVGDOM {
     return root;
   }
 
+  void collectRenderFonts(const std::shared_ptr<SVGFontManager>&);
   /**
    * Renders the SVG to the provided canvas.
    */
-  void render(Canvas*);
+  void render(Canvas*, const std::shared_ptr<SVGFontManager>&);
 
   /**
    * Specify a "container size" for the SVG dom.
@@ -61,10 +61,9 @@ class SVGDOM {
   const Size& getContainerSize() const;
 
  private:
-  SVGDOM(std::shared_ptr<SVGSVG>, SVGIDMapper&&, std::shared_ptr<SVGFontManager> fontManager);
+  SVGDOM(std::shared_ptr<SVGSVG>, SVGIDMapper&&);
 
   const std::shared_ptr<SVGSVG> root;
-  const std::shared_ptr<SVGFontManager> fontManager;
   const SVGIDMapper _nodeIDMapper;
   Size containerSize;
   std::shared_ptr<Picture> renderPicture;

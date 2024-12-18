@@ -31,75 +31,6 @@
 
 namespace tgfx {
 namespace {
-std::tuple<bool, Font> ResolveFont(const SVGRenderContext& context) {
-  auto weight = [](const SVGFontWeight& w) {
-    switch (w.type()) {
-      case SVGFontWeight::Type::W100:
-        return FontStyle::Weight::Thin_Weight;
-      case SVGFontWeight::Type::W200:
-        return FontStyle::Weight::ExtraLight_Weight;
-      case SVGFontWeight::Type::W300:
-        return FontStyle::Weight::Light_Weight;
-      case SVGFontWeight::Type::W400:
-        return FontStyle::Weight::Normal_Weight;
-      case SVGFontWeight::Type::W500:
-        return FontStyle::Weight::Medium_Weight;
-      case SVGFontWeight::Type::W600:
-        return FontStyle::Weight::SemiBold_Weight;
-      case SVGFontWeight::Type::W700:
-        return FontStyle::Weight::Bold_Weight;
-      case SVGFontWeight::Type::W800:
-        return FontStyle::Weight::ExtraBold_Weight;
-      case SVGFontWeight::Type::W900:
-        return FontStyle::Weight::Black_Weight;
-      case SVGFontWeight::Type::Normal:
-        return FontStyle::Weight::Normal_Weight;
-      case SVGFontWeight::Type::Bold:
-        return FontStyle::Weight::Bold_Weight;
-      case SVGFontWeight::Type::Bolder:
-        return FontStyle::Weight::ExtraBold_Weight;
-      case SVGFontWeight::Type::Lighter:
-        return FontStyle::Weight::Light_Weight;
-      case SVGFontWeight::Type::Inherit: {
-        ASSERT(false);
-        return FontStyle::Weight::Normal_Weight;
-      }
-    }
-  };
-
-  auto slant = [](const SVGFontStyle& style) {
-    switch (style.type()) {
-      case SVGFontStyle::Type::Normal:
-        return FontStyle::Slant::Upright_Slant;
-      case SVGFontStyle::Type::Italic:
-        return FontStyle::Slant::Italic_Slant;
-      case SVGFontStyle::Type::Oblique:
-        return FontStyle::Slant::Oblique_Slant;
-      case SVGFontStyle::Type::Inherit: {
-        ASSERT(false);
-        return FontStyle::Slant::Upright_Slant;
-      }
-    }
-  };
-
-  const std::string& family = context.presentationContext()._inherited.FontFamily->family();
-
-  auto fontWeight = weight(*context.presentationContext()._inherited.FontWeight);
-  auto fontWidth = FontStyle::Width::Normal_Width;
-  auto fontSlant = slant(*context.presentationContext()._inherited.FontStyle);
-  FontStyle style(fontWeight, fontWidth, fontSlant);
-
-  auto typeface = context.fontMgr()->getTypefaceForRender(family, style);
-  ASSERT(typeface);
-  if (!typeface) {
-    return {false, Font()};
-  }
-
-  float size =
-      context.lengthContext().resolve(context.presentationContext()._inherited.FontSize->size(),
-                                      SVGLengthContext::LengthType::Vertical);
-  return {true, Font(typeface, size)};
-}
 
 std::vector<float> ResolveLengths(const SVGLengthContext& lengthCtx,
                                   const std::vector<SVGLength>& lengths,
@@ -188,7 +119,7 @@ bool SVGTextContainer::parseAndSetAttribute(const std::string& name, const std::
 void SVGTextLiteral::onShapeText(const SVGRenderContext& context,
                                  const ShapedTextCallback& function) const {
 
-  auto [success, font] = ResolveFont(context);
+  auto [success, font] = context.ResolveFont();
   if (!success) {
     return;
   }
