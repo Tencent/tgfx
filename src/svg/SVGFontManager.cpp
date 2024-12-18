@@ -29,9 +29,13 @@ std::shared_ptr<SVGFontManager> SVGFontManager::Make(const std::shared_ptr<Typef
 }
 
 void SVGFontManager::addFontStyle(const std::string& fontFamily, SVGFontInfo style) {
-  if (typefaceMap.at(fontFamily).find(style) == typefaceMap.at(fontFamily).end()) {
-    typefaceMap[fontFamily][style] = nullptr;
+  if (typefaceMap.find(fontFamily) != typefaceMap.end()) {
+    return;
   }
+  if (typefaceMap[fontFamily].find(style) != typefaceMap[fontFamily].end()) {
+    return;
+  }
+  typefaceMap[fontFamily][style] = nullptr;
 }
 
 void SVGFontManager::setTypeface(const std::string& fontFamily, SVGFontInfo style,
@@ -48,7 +52,7 @@ std::vector<std::string> SVGFontManager::getFontFamilies() const {
   return families;
 }
 
-std::vector<SVGFontInfo> SVGFontManager::getFontStyles(const std::string& fontFamily) const {
+std::vector<SVGFontInfo> SVGFontManager::getFontInfos(const std::string& fontFamily) const {
   if (auto iter = typefaceMap.find(fontFamily); iter != typefaceMap.end()) {
     std::vector<SVGFontInfo> styles;
     styles.reserve(iter->second.size());
@@ -61,8 +65,8 @@ std::vector<SVGFontInfo> SVGFontManager::getFontStyles(const std::string& fontFa
   }
 }
 
-std::shared_ptr<Typeface> SVGFontManager::getTypefaceForRender(const std::string& fontFamily,
-                                                               SVGFontInfo style) const {
+std::shared_ptr<Typeface> SVGFontManager::getTypefaceForRendering(const std::string& fontFamily,
+                                                                  SVGFontInfo style) const {
   auto familyIter = typefaceMap.find(fontFamily);
   if (familyIter == typefaceMap.end()) {
     return defaultTypeface;

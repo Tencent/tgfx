@@ -34,6 +34,7 @@
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGAttribute.h"
+#include "tgfx/svg/SVGFontManager.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
 #include "tgfx/svg/node/SVGContainer.h"
@@ -77,11 +78,15 @@ void SVGDOM::collectRenderFonts(const std::shared_ptr<SVGFontManager>& fontManag
     if (!node) {
       return;
     }
-    if (node->tag() <= SVGTag::Text && node->tag() >= SVGTag::TSpan) {
-      if (node->getFontFamily()->type() == SVGFontFamily::Type::Family) {
-        fontManager->addFontStyle(
-            node->getFontFamily()->family(),
-            SVGFontInfo(node->getFontWeight()->type(), node->getFontStyle()->type()));
+    if (node->tag() >= SVGTag::Text && node->tag() <= SVGTag::TSpan) {
+      if (node->getFontFamily().isValue()) {
+        auto family = node->getFontFamily()->family();
+        SVGFontWeight::Type weight = node->getFontWeight().isValue() ? node->getFontWeight()->type()
+                                                                     : SVGFontWeight::Type::Normal;
+        SVGFontStyle::Type style = node->getFontStyle().isValue() ? node->getFontStyle()->type()
+                                                                  : SVGFontStyle::Type::Normal;
+        SVGFontInfo fontStyle(weight, style);
+        fontManager->addFontStyle(family, fontStyle);
       }
     } else if (node->hasChildren()) {
       if (auto container = std::static_pointer_cast<SVGContainer>(node)) {
@@ -91,7 +96,6 @@ void SVGDOM::collectRenderFonts(const std::shared_ptr<SVGFontManager>& fontManag
       }
     }
   };
-
   fontCollector(fontCollector, std::static_pointer_cast<SVGContainer>(root), fontManager);
 }
 

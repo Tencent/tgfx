@@ -67,13 +67,13 @@ class SVGFontManager {
 
   std::vector<std::string> getFontFamilies() const;
 
-  std::vector<SVGFontInfo> getFontStyles(const std::string& fontFamily) const;
+  std::vector<SVGFontInfo> getFontInfos(const std::string& fontFamily) const;
 
  protected:
   void addFontStyle(const std::string& fontFamily, SVGFontInfo style);
 
-  std::shared_ptr<Typeface> getTypefaceForRender(const std::string& fontFamily,
-                                                 SVGFontInfo style) const;
+  std::shared_ptr<Typeface> getTypefaceForRendering(const std::string& fontFamily,
+                                                    SVGFontInfo style) const;
 
  private:
   explicit SVGFontManager(const std::shared_ptr<Typeface>& typeface);

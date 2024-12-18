@@ -177,7 +177,7 @@ class SVGRenderContext {
 
   SVGColorType resolveSVGColor(const SVGColor&) const;
 
-  std::tuple<bool, Font> ResolveFont() const;
+  std::tuple<bool, Font> resolveFont() const;
 
   // The local computed clip path (not inherited).
   Path clipPath() const {

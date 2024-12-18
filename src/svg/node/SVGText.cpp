@@ -119,7 +119,7 @@ bool SVGTextContainer::parseAndSetAttribute(const std::string& name, const std::
 void SVGTextLiteral::onShapeText(const SVGRenderContext& context,
                                  const ShapedTextCallback& function) const {
 
-  auto [success, font] = context.ResolveFont();
+  auto [success, font] = context.resolveFont();
   if (!success) {
     return;
   }

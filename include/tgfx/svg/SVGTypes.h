@@ -80,7 +80,7 @@ class SVGProperty {
   }
 
   T* getMaybeNull() const {
-    return _value.has_value() ? &_value.value() : nullptr;
+    return _value.value_or(nullptr);
   }
 
   void set(SVGPropertyState state) {

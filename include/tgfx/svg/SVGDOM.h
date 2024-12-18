@@ -45,7 +45,7 @@ class SVGDOM {
   /**
    * Renders the SVG to the provided canvas.
    */
-  void render(Canvas*, const std::shared_ptr<SVGFontManager>&);
+  void render(Canvas*, const std::shared_ptr<SVGFontManager>& fontManager = nullptr);
 
   /**
    * Specify a "container size" for the SVG dom.

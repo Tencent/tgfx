@@ -67,7 +67,7 @@ LineJoin toJoin(const SVGLineJoin& join) {
   }
 }
 
-std::unique_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
+std::shared_ptr<PathEffect> dash_effect(const SVGPresentationAttributes& props,
                                         const SVGLengthContext& lengthContext) {
   if (props.StrokeDashArray->type() != SVGDashArray::Type::DashArray) {
     return nullptr;
@@ -412,13 +412,18 @@ SVGColorType SVGRenderContext::resolveSVGColor(const SVGColor& color) const {
   }
 }
 
-std::tuple<bool, Font> SVGRenderContext::ResolveFont() const {
+std::tuple<bool, Font> SVGRenderContext::resolveFont() const {
+  // Since there may be SVGs without any text, we accept the absence of a font manager.
+  // However, this will result in the inability to render text.
+  if (!fontManager) {
+    return {false, Font()};
+  }
   const auto& family = _presentationContext->_inherited.FontFamily->family();
   auto fontWeight = _presentationContext->_inherited.FontWeight->type();
   auto fontStyle = _presentationContext->_inherited.FontStyle->type();
 
   SVGFontInfo info(fontWeight, fontStyle);
-  auto typeface = fontManager->getTypefaceForRender(family, info);
+  auto typeface = fontManager->getTypefaceForRendering(family, info);
   if (!typeface) {
     return {false, Font()};
   }
