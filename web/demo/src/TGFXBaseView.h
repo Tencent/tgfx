@@ -24,9 +24,18 @@
 
 namespace hello2d {
 
+struct Item {
+  float x;
+  float y;
+  float width;
+  float speed;
+};
+
 class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
+
+  void setDrawItemsCount(size_t count);
 
   void setImagePath(const std::string& imagePath);
 
@@ -40,6 +49,19 @@ class TGFXBaseView {
  private:
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
+  std::vector<Item> items = {};
+  int width = 0;
+  int height = 0;
+  tgfx::Paint redPaint = {};
+  tgfx::Paint greenPaint = {};
+  tgfx::Paint bluePaint = {};
+  size_t itemCount = 0;
+
+  void initItemData();
+
+  void updateItemData();
+
+  void drawContents(tgfx::Canvas* canvas);
 };
 
 }  // namespace hello2d
