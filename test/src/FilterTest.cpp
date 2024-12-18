@@ -554,4 +554,19 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     EXPECT_EQ(info.radiuses[1], endAngle);
   }
 }
+
+TGFX_TEST(FilterTest, OpacityFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  auto paint = Paint();
+  paint.setColor(Color::FromRGBA(100, 0, 0, 1));
+  auto opacityFilter = ColorFilter::Opacity();
+  paint.setColorFilter(opacityFilter);
+  auto rect = Rect::MakeWH(100, 100);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/OpacityFilter"));
+}
 }  // namespace tgfx

@@ -65,6 +65,11 @@ class ColorFilter {
    */
   static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
 
+  /**
+    * Creates a new ColorFilter that convert semi-transparent colors to solid colors.
+    */
+  static std::shared_ptr<ColorFilter> Opacity();
+
   virtual ~ColorFilter() = default;
 
   /**
