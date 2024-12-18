@@ -17,46 +17,121 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
+#include "core/CanvasState.h"
 #include "core/DrawContext.h"
 #include "core/LayerUnrollContext.h"
-#include "core/Records.h"
+#include "core/RecordingContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
-Canvas::Canvas(DrawContext* drawContext) : drawContext(drawContext) {
+class AutoLayerForImageFilter {
+ public:
+  AutoLayerForImageFilter(Canvas* canvas, const Paint* paint) : canvas(canvas) {
+    auto imageFilter = paint ? paint->getImageFilter() : nullptr;
+    if (imageFilter != nullptr) {
+      Paint layerPaint = {};
+      layerPaint.setImageFilter(std::move(imageFilter));
+      savedCount = canvas->saveLayer(&layerPaint);
+    }
+  }
+
+  ~AutoLayerForImageFilter() {
+    if (savedCount >= 0) {
+      canvas->restoreToCount(savedCount);
+    }
+  }
+
+ private:
+  Canvas* canvas = nullptr;
+  int savedCount = -1;
+};
+
+static FillStyle CreateFillStyle(const Paint& paint) {
+  TRACE_EVENT;
+  FillStyle style = {};
+  auto shader = paint.getShader();
+  Color color = {};
+  if (shader && shader->asColor(&color)) {
+    color.alpha *= paint.getAlpha();
+    style.color = color.premultiply();
+    shader = nullptr;
+  } else {
+    style.color = paint.getColor().premultiply();
+  }
+  style.shader = shader;
+  style.antiAlias = paint.isAntiAlias();
+  style.colorFilter = paint.getColorFilter();
+  style.maskFilter = paint.getMaskFilter();
+  style.blendMode = paint.getBlendMode();
+  return style;
+}
+
+static FillStyle CreateFillStyle(const Paint* paint) {
+  return paint ? CreateFillStyle(*paint) : FillStyle();
+}
+
+Canvas::Canvas(DrawContext* drawContext)
+    : surface(drawContext->getSurface()), drawContext(drawContext) {
   mcState = std::make_unique<MCState>();
 }
 
-Canvas::Canvas(DrawContext* drawContext, const Path& initClip) : drawContext(drawContext) {
+Canvas::Canvas(DrawContext* drawContext, const Path& initClip)
+    : surface(drawContext->getSurface()), drawContext(drawContext) {
   mcState = std::make_unique<MCState>(initClip);
 }
 
-Surface* Canvas::getSurface() const {
-  return drawContext->getSurface();
+int Canvas::save() {
+  stateStack.push(std::make_unique<CanvasState>(*mcState));
+  return static_cast<int>(stateStack.size()) - 1;
 }
 
-void Canvas::save() {
-  mcStack.push(std::make_unique<MCState>(*mcState));
+int Canvas::saveLayer(const Paint* paint) {
+  TRACE_EVENT;
+  auto layer = std::make_unique<CanvasLayer>(drawContext, paint);
+  drawContext = layer->layerContext.get();
+  stateStack.push(std::make_unique<CanvasState>(*mcState, std::move(layer)));
+  return static_cast<int>(stateStack.size()) - 1;
+}
+
+int Canvas::saveLayerAlpha(float alpha) {
+  Paint paint = {};
+  paint.setAlpha(alpha);
+  return saveLayer(&paint);
 }
 
 void Canvas::restore() {
-  if (mcStack.empty()) {
+  TRACE_EVENT;
+  if (stateStack.empty()) {
     return;
   }
-  *mcState = *mcStack.top();
-  mcStack.pop();
+  auto& canvasState = stateStack.top();
+  *mcState = canvasState->mcState;
+  auto layer = std::move(canvasState->savedLayer);
+  stateStack.pop();
+  if (layer != nullptr) {
+    drawContext = layer->drawContext;
+    auto layerContext = reinterpret_cast<RecordingContext*>(layer->layerContext.get());
+    auto picture = layerContext->finishRecordingAsPicture();
+    if (picture != nullptr) {
+      auto style = CreateFillStyle(layer->layerPaint);
+      drawLayer(picture, {}, style, layer->layerPaint.getImageFilter());
+    }
+  }
 }
 
-size_t Canvas::getSaveCount() const {
-  return mcStack.size();
+int Canvas::getSaveCount() const {
+  return static_cast<int>(stateStack.size());
 }
 
-void Canvas::restoreToCount(size_t saveCount) {
-  auto n = mcStack.size() - saveCount;
-  for (size_t i = 0; i < n; i++) {
+void Canvas::restoreToCount(int saveCount) {
+  TRACE_EVENT;
+  if (saveCount < 0) {
+    saveCount = 0;
+  }
+  auto count = stateStack.size() - static_cast<size_t>(saveCount);
+  for (size_t i = 0; i < count; i++) {
     restore();
   }
 }
@@ -115,9 +190,9 @@ void Canvas::clipPath(const Path& path) {
   mcState->clip.addPath(clipPath, PathOp::Intersect);
 }
 
-void Canvas::resetMCState() {
+void Canvas::resetStateStack() {
   mcState = std::make_unique<MCState>();
-  std::stack<std::unique_ptr<MCState>>().swap(mcStack);
+  std::stack<std::unique_ptr<CanvasState>>().swap(stateStack);
 }
 
 void Canvas::clear() {
@@ -143,29 +218,6 @@ void Canvas::clearRect(const Rect& rect, const Color& color) {
   drawRect(rect, paint);
 }
 
-static FillStyle CreateFillStyle(const Paint& paint) {
-  FillStyle style = {};
-  auto shader = paint.getShader();
-  Color color = {};
-  if (shader && shader->asColor(&color)) {
-    color.alpha *= paint.getAlpha();
-    style.color = color.premultiply();
-    shader = nullptr;
-  } else {
-    style.color = paint.getColor().premultiply();
-  }
-  style.shader = shader;
-  style.antiAlias = paint.isAntiAlias();
-  style.colorFilter = paint.getColorFilter();
-  style.maskFilter = paint.getMaskFilter();
-  style.blendMode = paint.getBlendMode();
-  return style;
-}
-
-static FillStyle CreateFillStyle(const Paint* paint) {
-  return paint ? CreateFillStyle(*paint) : FillStyle();
-}
-
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
   TRACE_EVENT;
   Path path = {};
@@ -187,6 +239,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty() || paint.nothingToDraw()) {
     return;
   }
+  AutoLayerForImageFilter autoLayer(this, &paint);
   auto style = CreateFillStyle(paint);
   drawContext->drawRect(rect, *mcState, style);
 }
@@ -227,6 +280,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   if (rRect.rect.isEmpty() || paint.nothingToDraw()) {
     return;
   }
+  AutoLayerForImageFilter autoLayer(this, &paint);
   auto style = CreateFillStyle(paint);
   drawContext->drawRRect(rRect, *mcState, style);
 }
@@ -247,21 +301,24 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     // a line has no fill to draw.
     return;
   }
+  AutoLayerForImageFilter autoLayer(this, &paint);
   auto style = CreateFillStyle(paint);
-  Rect rect = {};
-  if (shape->isRect(&rect)) {
-    drawContext->drawRect(rect, *mcState, style);
-    return;
-  }
-  RRect rRect = {};
-  if (shape->isOval(&rect)) {
-    rRect.setOval(rect);
-    drawContext->drawRRect(rRect, *mcState, style);
-    return;
-  }
-  if (shape->isRRect(&rRect)) {
-    drawContext->drawRRect(rRect, *mcState, style);
-    return;
+  if (!shape->isInverseFillType()) {
+    Rect rect = {};
+    if (shape->isRect(&rect)) {
+      drawContext->drawRect(rect, *mcState, style);
+      return;
+    }
+    RRect rRect = {};
+    if (shape->isOval(&rect)) {
+      rRect.setOval(rect);
+      drawContext->drawRRect(rRect, *mcState, style);
+      return;
+    }
+    if (shape->isRRect(&rRect)) {
+      drawContext->drawRRect(rRect, *mcState, style);
+      return;
+    }
   }
   drawContext->drawShape(std::move(shape), *mcState, style);
 }
@@ -330,10 +387,17 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
   TRACE_EVENT;
-  if (glyphCount == 0 || paint.nothingToDraw()) {
+  drawGlyphs(glyphs, positions, glyphCount, GlyphFace::Wrap(font), paint);
+}
+
+void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
+                        std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) {
+  TRACE_EVENT;
+  if (glyphCount == 0 || glyphFace == nullptr || paint.nothingToDraw()) {
     return;
   }
-  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  AutoLayerForImageFilter autoLayer(this, &paint);
+  GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   auto style = CreateFillStyle(paint);
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, style, paint.getStroke());
@@ -345,6 +409,7 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
   if (textBlob == nullptr || paint.nothingToDraw()) {
     return;
   }
+  AutoLayerForImageFilter autoLayer(this, &paint);
   auto state = *mcState;
   state.matrix.preTranslate(x, y);
   auto style = CreateFillStyle(paint);
@@ -397,6 +462,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   if (atlas == nullptr || count == 0 || (paint && paint->nothingToDraw())) {
     return;
   }
+  AutoLayerForImageFilter autoLayer(this, paint);
   auto style = CreateFillStyle(paint);
   auto state = *mcState;
   auto atlasRect = Rect::MakeWH(atlas->width(), atlas->height());

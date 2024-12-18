@@ -43,20 +43,12 @@ class TextureImage : public ResourceImage {
     return textureProxy->isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return textureProxy->isYUV();
-  }
-
   bool hasMipmaps() const override {
     return textureProxy->hasMipmaps();
   }
 
   bool isTextureBacked() const override {
     return true;
-  }
-
-  bool isFlat() const override {
-    return !textureProxy->isYUV();
   }
 
   BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const override;
@@ -68,7 +60,8 @@ class TextureImage : public ResourceImage {
     return nullptr;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
+                                                   const UniqueKey& key) const override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;

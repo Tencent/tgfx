@@ -26,7 +26,16 @@ class BlurImageFilter : public ImageFilter {
  public:
   BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
 
+  Point blurOffset;
+  float downScaling;
+  int iteration;
+  TileMode tileMode;
+
  protected:
+  Type type() const override {
+    return Type::Blur;
+  };
+
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
@@ -41,11 +50,5 @@ class BlurImageFilter : public ImageFilter {
   void draw(std::shared_ptr<RenderTargetProxy> renderTarget,
             std::unique_ptr<FragmentProcessor> imageProcessor, const Rect& imageBounds, bool isDown,
             uint32_t renderFlags) const;
-
- private:
-  Point blurOffset;
-  float downScaling;
-  int iteration;
-  TileMode tileMode;
 };
 }  // namespace tgfx

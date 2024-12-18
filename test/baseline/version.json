@@ -18,21 +18,22 @@
         "Path_addArc_reversed6": "4802e56",
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
-        "Picture": "d069eb4",
+        "Picture": "b062b9a",
         "PictureImage": "8a2ac4d",
         "PictureImage_Path": "2212c4e",
-        "PictureImage_Text": "2212c4e",
+        "PictureImage_Text": "b062b9a",
         "TileModeFallback": "af2e3ff",
         "YUVImage": "bc64712",
         "YUVImage_RGBAA": "bc64712",
         "altas": "b1cfcd4",
         "blendMode": "b3076a3",
         "drawImage": "8cb853c",
-        "drawShape": "fb9a840",
+        "drawShape": "b062b9a",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
-        "flattenImage": "2028a1b",
         "hardware_render_target_blend": "d010fb8",
+        "inversePath_rect": "6fd4617",
+        "inversePath_text": "6fd4617",
         "merge_draw_call_rect": "d010fb8",
         "merge_draw_call_rrect": "d010fb8",
         "merge_draw_clear_op": "d010fb8",
@@ -41,24 +42,25 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "2486bd8",
+        "path": "6fd4617",
+        "saveLayer": "3888c19",
         "scaleImage": "2028a1b",
         "scaleImage_mipmap": "2028a1b",
         "scaleImage_scale_up": "2028a1b",
         "shape": "bc64712",
-        "text_shape": "74f94c4",
+        "text_shape": "b062b9a",
         "tile_mode_normal": "8cb853c",
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "8cb853c"
     },
     "DrawersTest": {
         "ConicGradient": "5a1fb11",
-        "CustomLayerTreeDrawer": "83c88bb",
+        "CustomLayerTreeDrawer": "b062b9a",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "72edd24",
-        "SimpleLayerTreeDrawer": "0ee494a",
-        "SimpleText": "0ee494a"
+        "SimpleLayerTreeDrawer": "4513df8",
+        "SimpleText": "b062b9a"
     },
     "FilterTest": {
         "ComposeColorFilter": "f710e29",
@@ -74,35 +76,39 @@
         "innerShadow": "01cce38",
         "shaderMaskFilter": "ded3c91"
     },
+    "GlyphFaceTest": {
+        "GlyphFaceSimple": "4032de2",
+        "GlyphFaceWithStyle": "4032de2"
+    },
     "ImageReaderTest": {
         "update_bitmap": "d010fb8",
         "update_mask": "d010fb8"
     },
     "LayerTest": {
         "Layer_hitTestPoint": "50c58e6",
-        "Layer_hitTestPointNested": "0ee494a",
+        "Layer_hitTestPointNested": "b062b9a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
         "draw_shape": "738fc92",
         "draw_solid": "b4a1231",
-        "draw_text": "612c09e",
+        "draw_text": "b062b9a",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "43cd416",
-        "getBounds": "febf424",
-        "getLayersUnderPoint": "0ee494a",
+        "getBounds": "3888c19",
+        "getLayersUnderPoint": "b062b9a",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
         "imageMask": "af2e3ff",
         "innerShadow": "01cce38",
         "shapeMask": "612c09e",
-        "textMask": "febf424"
+        "textMask": "b062b9a"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
-        "rasterize_path": "d010fb8",
-        "rasterize_path_texture": "d010fb8"
+        "rasterize_path": "b062b9a",
+        "rasterize_path_texture": "b062b9a"
     },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "d010fb8",
@@ -183,13 +189,13 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "110c3ee",
-        "SingleLineTextAlign": "7683ec5",
-        "TextAlign": "7683ec5",
-        "TextAlignBlankLineTest": "110c3ee",
-        "TextAlignSimulateVerticalTextLayout": "110c3ee",
-        "TextAlignWidth0Height0": "7683ec5",
-        "TextAlignWidth1Height10": "110c3ee",
-        "TruncateTextLineTest": "110c3ee"
+        "FontFallbackTest": "b062b9a",
+        "SingleLineTextAlign": "b062b9a",
+        "TextAlign": "b062b9a",
+        "TextAlignBlankLineTest": "b062b9a",
+        "TextAlignSimulateVerticalTextLayout": "b062b9a",
+        "TextAlignWidth0Height0": "b062b9a",
+        "TextAlignWidth1Height10": "b062b9a",
+        "TruncateTextLineTest": "b062b9a"
     }
 }

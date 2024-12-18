@@ -126,6 +126,13 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect) const;
 
  protected:
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+
+  /**
+   * Returns the type of this image filter.
+   */
+  virtual Type type() const = 0;
+
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.
@@ -150,20 +157,6 @@ class ImageFilter {
                                                                  const FPArgs& args,
                                                                  const SamplingOptions& sampling,
                                                                  const Matrix* uvMatrix) const = 0;
-
-  /**
-   * Returns true if this filter is a ComposeImageFilter.
-   */
-  virtual bool isComposeFilter() const {
-    return false;
-  }
-
-  /**
-   * Returns true if this filter requires the source image to be flattened.
-   */
-  virtual bool requireFlatSource() const {
-    return false;
-  }
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 

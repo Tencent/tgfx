@@ -69,6 +69,7 @@ class ProxyProvider {
    * the GPU.
    */
   std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 
   /*
@@ -106,6 +107,11 @@ class ProxyProvider {
                                                    uint32_t renderFlags = 0);
 
   /**
+   * Creates a flattened TextureProxy for the given TextureProxy.
+   */
+  std::shared_ptr<TextureProxy> flattenTextureProxy(std::shared_ptr<TextureProxy> source);
+
+  /**
    * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend
    * texture will be destroyed at a later point after the proxy is released.
    */
@@ -126,12 +132,6 @@ class ProxyProvider {
    */
   std::shared_ptr<RenderTargetProxy> wrapBackendRenderTarget(
       const BackendRenderTarget& backendRenderTarget, ImageOrigin origin = ImageOrigin::TopLeft);
-
-  /**
-   * Changes the key of the given proxy to the new key. So that the proxy can be found with the new
-   * key. This does not change the key of the resource that the proxy wraps.
-   */
-  void changeProxyKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& newKey);
 
   /*
    * Purges all unreferenced proxies.

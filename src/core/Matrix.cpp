@@ -35,27 +35,17 @@ bool operator==(const Matrix& a, const Matrix& b) {
 }
 
 Matrix operator*(const Matrix& a, const Matrix& b) {
-  Matrix result = {};
+  Matrix result;
   result.setConcat(a, b);
   return result;
 }
 
-void Matrix::setAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
-                    float transY) {
-  values[SCALE_X] = scaleX;
-  values[SKEW_X] = skewX;
-  values[TRANS_X] = transX;
-  values[SKEW_Y] = skewY;
-  values[SCALE_Y] = scaleY;
-  values[TRANS_Y] = transY;
-}
-
-void Matrix::setAffine(float a, float b, float c, float d, float tx, float ty) {
-  values[SCALE_X] = a;
-  values[SKEW_X] = c;
+void Matrix::setAll(float sx, float kx, float tx, float ky, float sy, float ty) {
+  values[SCALE_X] = sx;
+  values[SKEW_X] = kx;
   values[TRANS_X] = tx;
-  values[SKEW_Y] = b;
-  values[SCALE_Y] = d;
+  values[SKEW_Y] = ky;
+  values[SCALE_Y] = sy;
   values[TRANS_Y] = ty;
 }
 
@@ -91,26 +81,16 @@ void Matrix::postTranslate(float tx, float ty) {
   values[TRANS_Y] += ty;
 }
 
-void Matrix::setScaleTranslate(float sx, float sy, float tx, float ty) {
-  values[SCALE_X] = sx;
-  values[SKEW_X] = 0;
-  values[TRANS_X] = tx;
-  values[SKEW_Y] = 0;
-  values[SCALE_Y] = sy;
-  values[TRANS_Y] = ty;
-}
-
 void Matrix::setScale(float sx, float sy, float px, float py) {
   if (1 == sx && 1 == sy) {
     this->reset();
   } else {
     values[SCALE_X] = sx;
     values[SKEW_X] = 0;
-    values[TRANS_X] = 0;
+    values[TRANS_X] = px - sx * px;
     values[SKEW_Y] = 0;
     values[SCALE_Y] = sy;
-    values[TRANS_Y] = 0;
-    this->setScaleTranslate(sx, sy, px - sx * px, py - sy * py);
+    values[TRANS_Y] = py - sy * py;
   }
 }
 
@@ -128,10 +108,7 @@ void Matrix::preScale(float sx, float sy, float px, float py) {
   if (1 == sx && 1 == sy) {
     return;
   }
-
-  Matrix m = {};
-  m.setScale(sx, sy, px, py);
-  this->preConcat(m);
+  this->preConcat({sx, 0, px - sx * px, 0, sy, py - sy * py});
 }
 
 void Matrix::preScale(float sx, float sy) {
@@ -148,18 +125,14 @@ void Matrix::postScale(float sx, float sy, float px, float py) {
   if (1 == sx && 1 == sy) {
     return;
   }
-  Matrix m = {};
-  m.setScale(sx, sy, px, py);
-  this->postConcat(m);
+  this->postConcat({sx, 0, px - sx * px, 0, sy, py - sy * py});
 }
 
 void Matrix::postScale(float sx, float sy) {
   if (1 == sx && 1 == sy) {
     return;
   }
-  Matrix m = {};
-  m.setScale(sx, sy);
-  this->postConcat(m);
+  this->postConcat({sx, 0, 0, 0, sy, 0});
 }
 
 void Matrix::setSinCos(float sinV, float cosV, float px, float py) {
@@ -192,105 +165,98 @@ void Matrix::setRotate(float degrees) {
 }
 
 void Matrix::preRotate(float degrees, float px, float py) {
-  Matrix m = {};
+  Matrix m;
   m.setRotate(degrees, px, py);
   this->preConcat(m);
 }
 
 void Matrix::preRotate(float degrees) {
-  Matrix m = {};
+  Matrix m;
   m.setRotate(degrees);
   this->preConcat(m);
 }
 
 void Matrix::postRotate(float degrees, float px, float py) {
-  Matrix m = {};
+  Matrix m;
   m.setRotate(degrees, px, py);
   this->postConcat(m);
 }
 
 void Matrix::postRotate(float degrees) {
-  Matrix m = {};
+  Matrix m;
   m.setRotate(degrees);
   this->postConcat(m);
 }
 
-void Matrix::setSkew(float sx, float sy, float px, float py) {
+void Matrix::setSkew(float kx, float ky, float px, float py) {
   values[SCALE_X] = 1;
-  values[SKEW_X] = sx;
-  values[TRANS_X] = -sx * py;
-  values[SKEW_Y] = sy;
+  values[SKEW_X] = kx;
+  values[TRANS_X] = -kx * py;
+  values[SKEW_Y] = ky;
   values[SCALE_Y] = 1;
-  values[TRANS_Y] = -sy * px;
+  values[TRANS_Y] = -ky * px;
 }
 
-void Matrix::setSkew(float sx, float sy) {
+void Matrix::setSkew(float kx, float ky) {
   values[SCALE_X] = 1;
-  values[SKEW_X] = sx;
+  values[SKEW_X] = kx;
   values[TRANS_X] = 0;
-  values[SKEW_Y] = sy;
+  values[SKEW_Y] = ky;
   values[SCALE_Y] = 1;
   values[TRANS_Y] = 0;
 }
 
-void Matrix::preSkew(float sx, float sy, float px, float py) {
-  Matrix m = {};
-  m.setSkew(sx, sy, px, py);
-  this->preConcat(m);
+void Matrix::preSkew(float kx, float ky, float px, float py) {
+  this->preConcat({1, kx, -kx * py, ky, 1, -ky * px});
 }
 
-void Matrix::preSkew(float sx, float sy) {
-  Matrix m = {};
-  m.setSkew(sx, sy);
-  this->preConcat(m);
+void Matrix::preSkew(float kx, float ky) {
+  this->preConcat({1, kx, 0, ky, 1, 0});
 }
 
-void Matrix::postSkew(float sx, float sy, float px, float py) {
-  Matrix m = {};
-  m.setSkew(sx, sy, px, py);
-  this->postConcat(m);
+void Matrix::postSkew(float kx, float ky, float px, float py) {
+  this->postConcat({1, kx, -kx * py, ky, 1, -ky * px});
 }
 
-void Matrix::postSkew(float sx, float sy) {
-  Matrix m = {};
-  m.setSkew(sx, sy);
-  this->postConcat(m);
+void Matrix::postSkew(float kx, float ky) {
+  this->postConcat({1, kx, 0, ky, 1, 0});
 }
 
 void Matrix::setConcat(const Matrix& first, const Matrix& second) {
-  auto& matA = first.values;
-  auto& matB = second.values;
-  auto a = matB[SCALE_X] * matA[SCALE_X];
-  auto b = 0.0f;
-  auto c = 0.0f;
-  auto d = matB[SCALE_Y] * matA[SCALE_Y];
-  auto tx = matB[TRANS_X] * matA[SCALE_X] + matA[TRANS_X];
-  auto ty = matB[TRANS_Y] * matA[SCALE_Y] + matA[TRANS_Y];
+  auto& matrixA = first.values;
+  auto& matrixB = second.values;
+  auto sx = matrixB[SCALE_X] * matrixA[SCALE_X];
+  auto kx = 0.0f;
+  auto ky = 0.0f;
+  auto sy = matrixB[SCALE_Y] * matrixA[SCALE_Y];
+  auto tx = matrixB[TRANS_X] * matrixA[SCALE_X] + matrixA[TRANS_X];
+  auto ty = matrixB[TRANS_Y] * matrixA[SCALE_Y] + matrixA[TRANS_Y];
 
-  if (matB[SKEW_Y] != 0.0 || matB[SKEW_X] != 0.0 || matA[SKEW_Y] != 0.0 || matA[SKEW_X] != 0.0) {
-    a += matB[SKEW_Y] * matA[SKEW_X];
-    d += matB[SKEW_X] * matA[SKEW_Y];
-    b += matB[SCALE_X] * matA[SKEW_Y] + matB[SKEW_Y] * matA[SCALE_Y];
-    c += matB[SKEW_X] * matA[SCALE_X] + matB[SCALE_Y] * matA[SKEW_X];
-    tx += matB[TRANS_Y] * matA[SKEW_X];
-    ty += matB[TRANS_X] * matA[SKEW_Y];
+  if (matrixB[SKEW_Y] != 0.0 || matrixB[SKEW_X] != 0.0 || matrixA[SKEW_Y] != 0.0 ||
+      matrixA[SKEW_X] != 0.0) {
+    sx += matrixB[SKEW_Y] * matrixA[SKEW_X];
+    sy += matrixB[SKEW_X] * matrixA[SKEW_Y];
+    ky += matrixB[SCALE_X] * matrixA[SKEW_Y] + matrixB[SKEW_Y] * matrixA[SCALE_Y];
+    kx += matrixB[SKEW_X] * matrixA[SCALE_X] + matrixB[SCALE_Y] * matrixA[SKEW_X];
+    tx += matrixB[TRANS_Y] * matrixA[SKEW_X];
+    ty += matrixB[TRANS_X] * matrixA[SKEW_Y];
   }
-  setAffine(a, b, c, d, tx, ty);
+  setAll(sx, kx, tx, ky, sy, ty);
 }
 
-void Matrix::preConcat(const Matrix& mat) {
+void Matrix::preConcat(const Matrix& matrix) {
   // check for identity first, so we don't do a needless copy of ourselves
   // to ourselves inside setConcat()
-  if (!mat.isIdentity()) {
-    this->setConcat(*this, mat);
+  if (!matrix.isIdentity()) {
+    this->setConcat(*this, matrix);
   }
 }
 
-void Matrix::postConcat(const Matrix& mat) {
+void Matrix::postConcat(const Matrix& matrix) {
   // check for identity first, so we don't do a needless copy of ourselves
   // to ourselves inside setConcat()
-  if (!mat.isIdentity()) {
-    this->setConcat(mat, *this);
+  if (!matrix.isIdentity()) {
+    this->setConcat(matrix, *this);
   }
 }
 
@@ -300,36 +266,36 @@ bool Matrix::invertible() const {
 }
 
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
-  auto a = values[SCALE_X];
-  auto d = values[SCALE_Y];
-  auto c = values[SKEW_X];
-  auto b = values[SKEW_Y];
+  auto sx = values[SCALE_X];
+  auto kx = values[SKEW_X];
+  auto ky = values[SKEW_Y];
+  auto sy = values[SCALE_Y];
   auto tx = values[TRANS_X];
   auto ty = values[TRANS_Y];
 
-  if (b == 0 && c == 0) {
-    if (a == 0 || d == 0) {
+  if (ky == 0 && kx == 0) {
+    if (sx == 0 || sy == 0) {
       return false;
     }
-    a = 1 / a;
-    d = 1 / d;
-    tx = -a * tx;
-    ty = -d * ty;
-    inverse->setAffine(a, b, c, d, tx, ty);
+    sx = 1 / sx;
+    sy = 1 / sy;
+    tx = -sx * tx;
+    ty = -sy * ty;
+    inverse->setAll(sx, kx, tx, ky, sy, ty);
     return true;
   }
-  float determinant = a * d - b * c;
+  float determinant = sx * sy - ky * kx;
   if (FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO)) {
     return false;
   }
   determinant = 1 / determinant;
-  a = d * determinant;
-  b = -b * determinant;
-  c = -c * determinant;
-  d = values[SCALE_X] * determinant;
-  tx = -(a * values[TRANS_X] + c * values[TRANS_Y]);
-  ty = -(b * values[TRANS_X] + d * values[TRANS_Y]);
-  inverse->setAffine(a, b, c, d, tx, ty);
+  sx = sy * determinant;
+  ky = -ky * determinant;
+  kx = -kx * determinant;
+  sy = values[SCALE_X] * determinant;
+  tx = -(sx * values[TRANS_X] + kx * values[TRANS_Y]);
+  ty = -(ky * values[TRANS_X] + sy * values[TRANS_Y]);
+  inverse->setAll(sx, kx, tx, ky, sy, ty);
   return true;
 }
 
@@ -358,14 +324,14 @@ void Matrix::mapXY(float x, float y, Point* result) const {
 }
 
 bool Matrix::rectStaysRect() const {
-  float m00 = values[SCALE_X];
-  float m01 = values[SKEW_X];
-  float m10 = values[SKEW_Y];
-  float m11 = values[SCALE_Y];
-  if (m01 != 0 || m10 != 0) {
-    return m00 == 0 && m11 == 0 && m10 != 0 && m01 != 0;
+  float sx = values[SCALE_X];
+  float kx = values[SKEW_X];
+  float ky = values[SKEW_Y];
+  float sy = values[SCALE_Y];
+  if (kx != 0 || ky != 0) {
+    return sx == 0 && sy == 0 && ky != 0 && kx != 0;
   }
-  return m00 != 0 && m11 != 0;
+  return sx != 0 && sy != 0;
 }
 
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
@@ -396,12 +362,12 @@ float Matrix::getMaxScale() const {
 
 Point Matrix::getAxisScales() const {
   Point scale = {};
-  double a = values[SCALE_X];
-  double c = values[SKEW_X];
-  double b = values[SKEW_Y];
-  double d = values[SCALE_Y];
-  scale.x = static_cast<float>(sqrt(a * a + b * b));
-  scale.y = static_cast<float>(sqrt(c * c + d * d));
+  double sx = values[SCALE_X];
+  double kx = values[SKEW_X];
+  double ky = values[SKEW_Y];
+  double sy = values[SCALE_Y];
+  scale.x = static_cast<float>(sqrt(sx * sx + ky * ky));
+  scale.y = static_cast<float>(sqrt(kx * kx + sy * sy));
   return scale;
 }
 
@@ -444,14 +410,14 @@ bool Matrix::getMinMaxScaleFactors(float* results) const {
 }
 
 bool Matrix::hasNonIdentityScale() const {
-  double a = values[SCALE_X];
-  double b = values[SKEW_Y];
-  if (sqrt(a * a + b * b) != 1.0) {
+  double sx = values[SCALE_X];
+  double ky = values[SKEW_Y];
+  if (sqrt(sx * sx + ky * ky) != 1.0) {
     return true;
   }
-  double c = values[SKEW_X];
-  double d = values[SCALE_Y];
-  if (sqrt(c * c + d * d) != 1.0) {
+  double kx = values[SKEW_X];
+  double sy = values[SCALE_Y];
+  if (sqrt(kx * kx + sy * sy) != 1.0) {
     return true;
   }
   return false;

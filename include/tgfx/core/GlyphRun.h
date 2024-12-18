@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
 /**
@@ -34,13 +35,22 @@ struct GlyphRun {
    * Constructs a GlyphRun using a font, a list of glyph IDs, and their positions.
    */
   GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
-      : font(font), glyphs(glyphIDs), positions(positions) {
+      : GlyphRun(GlyphFace::Wrap(std::move(font)), std::move(glyphIDs), std::move(positions)) {
   }
 
   /**
-   * Returns the font used to render the glyphs in this run.
+   * Constructs a GlyphRun using a GlyphFace, a list of glyph IDs, and their positions.
    */
-  Font font = {};
+  GlyphRun(std::shared_ptr<GlyphFace> glyphFace, std::vector<GlyphID> glyphIDs,
+           std::vector<Point> positions)
+      : glyphFace(std::move(glyphFace)), glyphs(std::move(glyphIDs)),
+        positions(std::move(positions)) {
+  }
+
+  /**
+   * Returns the GlyphFace used to render the glyphs in this run.
+   */
+  std::shared_ptr<GlyphFace> glyphFace = nullptr;
 
   /**
    * Returns the sequence of glyph IDs in this run.

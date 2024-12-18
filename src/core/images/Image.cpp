@@ -19,7 +19,6 @@
 #include "tgfx/core/Image.h"
 #include "core/images/BufferImage.h"
 #include "core/images/FilterImage.h"
-#include "core/images/FlattenImage.h"
 #include "core/images/OrientImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/ScaleImage.h"
@@ -43,12 +42,9 @@ class PixelDataConverter : public ImageGenerator {
     return info.isAlphaOnly();
   }
 
-  bool isYUV() const override {
-    return false;
-  }
-
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
+    TRACE_EVENT;
     Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);
     if (bitmap.isEmpty()) {
       return nullptr;
@@ -151,14 +147,6 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   return TextureImage::Wrap(std::move(textureProxy));
 }
 
-std::shared_ptr<Image> Image::makeFlattened() const {
-  TRACE_EVENT;
-  if (isFlat()) {
-    return weakThis.lock();
-  }
-  return FlattenImage::MakeFrom(weakThis.lock());
-}
-
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   TRACE_EVENT;
   TPArgs args(context, 0, hasMipmaps());
@@ -253,15 +241,9 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 }
 
 std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
-  auto context = args.context;
-  auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto proxyProvider = context->proxyProvider();
-  // Don't pass args.renderFlags to this method. It's meant for creating the fragment processor.
-  // The caller should decide whether to disable the cache by setting args.uniqueKey.
-  auto textureProxy =
-      proxyProvider->createTextureProxy(args.uniqueKey, width(), height(), format, args.mipmapped);
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
+  TRACE_EVENT;
+  auto renderTarget = RenderTargetProxy::MakeFallback(args.context, width(), height(),
+                                                      isAlphaOnly(), 1, args.mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -274,6 +256,6 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const 
   }
   OpContext opContext(renderTarget, args.renderFlags);
   opContext.fillWithFP(std::move(processor), Matrix::I(), true);
-  return textureProxy;
+  return renderTarget->getTextureProxy();
 }
 }  // namespace tgfx

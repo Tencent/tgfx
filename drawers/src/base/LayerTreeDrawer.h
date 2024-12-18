@@ -32,17 +32,14 @@ class LayerTreeDrawer : public Drawer {
  protected:
   virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
-  virtual void prepare(const AppHost* host) = 0;
-
   void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
 
  private:
   void updateRootMatrix(const AppHost* host);
 
-  // use to updateMatrix
-  std::shared_ptr<tgfx::Layer> root;
-
-  tgfx::DisplayList displayList;
+  // used to update matrix
+  std::shared_ptr<tgfx::Layer> root = nullptr;
+  tgfx::DisplayList displayList = {};
 };
 
 }  // namespace drawers

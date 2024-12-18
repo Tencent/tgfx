@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "b3125b9cf13bcc70e63212de1d0ed95e7beaa2a9",
+        "commit": "ef445edee3335b3ee30bd79afea76c0419947401",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -42,7 +42,7 @@
       },
       {
         "url": "https://github.com/freetype/freetype.git",
-        "commit": "86bc8a95056c97a810986434a3f268cbe67f2902",
+        "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
         "dir": "third_party/freetype"
       },
       {
@@ -67,7 +67,7 @@
       },
       {
         "url": "https://github.com/libpag/tracy.git",
-        "commit": "93fdee0238f74b95fdf18b7cc712e423c71497a3",
+        "commit": "1444b3e0546089181144c97ef5b3d0e798ddbe1c",
         "dir": "third_party/tracy"
       }
     ]

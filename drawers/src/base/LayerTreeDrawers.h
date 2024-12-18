@@ -29,7 +29,6 @@ namespace drawers {
                                                                                         \
    protected:                                                                           \
     std::shared_ptr<tgfx::Layer> buildLayerTree(const drawers::AppHost* host) override; \
-    void prepare(const drawers::AppHost*) override{};                                   \
   }
 
 DEFINE_LAYER_DRAWER(CustomLayerTree);

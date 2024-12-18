@@ -23,16 +23,26 @@
 #include <vector>
 
 namespace tgfx {
+/**
+ * EGLGlobals defines the global attributes for initializing EGL.
+ */
 class EGLGlobals {
  public:
-  static void Set(const EGLGlobals* globals);
-
+  /**
+   * Returns the current EGLGlobals instance.
+   */
   static const EGLGlobals* Get();
+
+  /**
+   * Sets the EGLGlobals instance to user-defined value. The caller is responsible for managing the
+   * lifetime of the EGLGlobals instance.
+   */
+  static void Set(const EGLGlobals* globals);
 
   EGLDisplay display = nullptr;
   EGLConfig windowConfig = nullptr;
   EGLConfig pbufferConfig = nullptr;
-  std::vector<EGLint> windowSurfaceAttributes;
-  std::vector<EGLint> pbufferSurfaceAttributes;
+  std::vector<EGLint> windowSurfaceAttributes = {};
+  std::vector<EGLint> pbufferSurfaceAttributes = {};
 };
 }  // namespace tgfx

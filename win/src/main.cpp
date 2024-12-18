@@ -22,12 +22,15 @@
 
 #include <windows.h>
 #include "TGFXWindow.h"
+#if WINVER >= 0x0603  // Windows 8.1
+#include <shellscalingapi.h>
+#endif
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
 #if WINVER >= 0x0603  // Windows 8.1
-  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+  SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 #else
   SetProcessDPIAware();
 #endif

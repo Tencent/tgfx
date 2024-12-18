@@ -23,25 +23,24 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(UniqueKey uniqueKey,
-                                                                         UniqueKey textureKey,
-                                                                         PixelFormat pixelFormat,
-                                                                         int sampleCount,
-                                                                         bool clearAll) {
+std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(
+    UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy, PixelFormat pixelFormat,
+    int sampleCount, bool clearAll) {
   return std::shared_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
-      std::move(uniqueKey), std::move(textureKey), pixelFormat, sampleCount, clearAll));
+      std::move(uniqueKey), std::move(textureProxy), pixelFormat, sampleCount, clearAll));
 }
 
-RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey, UniqueKey textureKey,
+RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey,
+                                               std::shared_ptr<TextureProxy> textureProxy,
                                                PixelFormat pixelFormat, int sampleCount,
                                                bool clearAll)
-    : ResourceTask(std::move(uniqueKey)), textureKey(std::move(textureKey)),
+    : ResourceTask(std::move(uniqueKey)), textureProxy(std::move(textureProxy)),
       pixelFormat(pixelFormat), sampleCount(sampleCount), clearAll(clearAll) {
 }
 
-std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context* context) {
+std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
   TRACE_EVENT;
-  auto texture = Resource::Find<Texture>(context, textureKey);
+  auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");
     return nullptr;

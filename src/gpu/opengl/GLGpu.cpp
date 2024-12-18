@@ -278,10 +278,6 @@ bool GLGpu::submitToGpu(bool syncCpu) {
   return true;
 }
 
-void GLGpu::submit(RenderPass*) {
-  // does nothing for opengl.
-}
-
 void GLGpu::onRegenerateMipmapLevels(const TextureSampler* sampler) {
   auto gl = GLFunctions::Get(context);
   auto glSampler = static_cast<const GLSampler*>(sampler);

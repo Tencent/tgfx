@@ -17,28 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
-class MCState {
+class FontGlyphFace final : public GlyphFace {
  public:
-  explicit MCState(const Matrix& matrix) : matrix(matrix) {
-    clip.toggleInverseFillType();
+  bool hasColor() const override;
+
+  bool hasOutlines() const override;
+
+  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
+
+  bool getPath(GlyphID glyphID, Path* path) const override;
+
+  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
+
+  Rect getBounds(GlyphID glyphID) const override;
+
+  bool asFont(Font* font) const override;
+
+ private:
+  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
   }
 
-  explicit MCState(Path initClip) : clip(std::move(initClip)) {
-  }
+  Font _font = {};
 
-  MCState(const Matrix& matrix, Path clip) : matrix(matrix), clip(std::move(clip)) {
-  }
-
-  MCState() {
-    clip.toggleInverseFillType();
-  }
-
-  Matrix matrix = Matrix::I();
-  Path clip = {};
+  friend class GlyphFace;
 };
 }  // namespace tgfx
