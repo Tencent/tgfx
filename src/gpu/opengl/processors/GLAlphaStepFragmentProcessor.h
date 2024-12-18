@@ -16,17 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpacityColorFilter.h"
-#include "gpu/processors/OpacityFragmentProcessor.h"
+#pragma once
+
+#include "gpu/processors/AlphaStepFragmentProcessor.h"
 
 namespace tgfx {
+class GLAlphaStepFragmentProcessor : public AlphaStepFragmentProcessor {
+ public:
+  explicit GLAlphaStepFragmentProcessor(float threshold) : AlphaStepFragmentProcessor(threshold) {
+  }
 
-std::shared_ptr<ColorFilter> ColorFilter::Opacity() {
-  return std::make_shared<OpacityColorFilter>();
-}
+  void emitCode(EmitArgs& args) const override;
 
-std::unique_ptr<FragmentProcessor> OpacityColorFilter::asFragmentProcessor() const {
-  return OpacityFragmentProcessor::Make();
-}
-
+  void onSetData(UniformBuffer* uniformBuffer) const override;
+};
 }  // namespace tgfx

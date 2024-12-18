@@ -18,14 +18,26 @@
 
 #pragma once
 
-#include "tgfx/core/ColorFilter.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-class OpacityColorFilter : public ColorFilter {
+class AlphaStepFragmentProcessor : public FragmentProcessor {
  public:
-  OpacityColorFilter() = default;
+  static std::unique_ptr<AlphaStepFragmentProcessor> Make(float threshold);
 
- private:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  std::string name() const override {
+    return "AlphaStepFragmentProcessor";
+  }
+
+ protected:
+  DEFINE_PROCESSOR_CLASS_ID
+
+  explicit AlphaStepFragmentProcessor(float threshold)
+      : FragmentProcessor(ClassID()), threshold(threshold) {
+  }
+
+  bool onIsEqual(const FragmentProcessor& other) const override;
+
+  float threshold = 0.0f;
 };
 }  // namespace tgfx

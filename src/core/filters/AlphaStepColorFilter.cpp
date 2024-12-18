@@ -16,27 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/FragmentProcessor.h"
+#include "AlphaStepColorFilter.h"
+#include "gpu/processors/AlphaStepFragmentProcessor.h"
 
 namespace tgfx {
-class OpacityFragmentProcessor : public FragmentProcessor {
- public:
-  static std::unique_ptr<OpacityFragmentProcessor> Make();
 
-  std::string name() const override {
-    return "OpactiyFragmentProcessor";
-  }
+std::shared_ptr<ColorFilter> ColorFilter::AlphaStep(float threshold) {
+  return std::make_shared<AlphaStepColorFilter>(threshold);
+}
 
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
+std::unique_ptr<FragmentProcessor> AlphaStepColorFilter::asFragmentProcessor() const {
+  return AlphaStepFragmentProcessor::Make(threshold);
+}
 
-  OpacityFragmentProcessor() : FragmentProcessor(ClassID()) {
-  }
-
-  bool onIsEqual(const FragmentProcessor&) const override {
-    return true;
-  }
-};
 }  // namespace tgfx

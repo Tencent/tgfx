@@ -16,20 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLOpacityFragmentProcessor.h"
+#include "GLAlphaStepFragmentProcessor.h"
 
 namespace tgfx {
-void GLOpacityFragmentProcessor::emitCode(EmitArgs& args) const {
+void GLAlphaStepFragmentProcessor::emitCode(EmitArgs& args) const {
+  auto* uniformHandler = args.uniformHandler;
+  auto thresholdUniformName =
+      uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Threshold");
+
   auto* fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("%s = vec4(%s.rgb, %s.a);", args.outputColor.c_str(),
-                           args.inputColor.c_str(), args.inputColor.c_str());
-  fragBuilder->codeAppendf("if (%s.a != 0.0)", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), args.inputColor.c_str());
+  fragBuilder->codeAppendf("if (%s.a > %s)", args.outputColor.c_str(),
+                           thresholdUniformName.c_str());
   fragBuilder->codeAppend("{");
   fragBuilder->codeAppendf("%s.rgb /= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
-  fragBuilder->codeAppendf("%s.a = 1.0f;", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s.a = 1.0;", args.outputColor.c_str());
   fragBuilder->codeAppend("}");
   fragBuilder->codeAppendf("%s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
                            args.outputColor.c_str());
+}
+
+void GLAlphaStepFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+  uniformBuffer->setData("Threshold", threshold);
 }
 
 }  // namespace tgfx
