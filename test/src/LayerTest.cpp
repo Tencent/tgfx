@@ -18,6 +18,7 @@
 
 #include <math.h>
 #include <vector>
+#include "LayerShadowFilter.h"
 #include "core/filters/BlurImageFilter.h"
 #include "core/utils/Profiling.h"
 #include "tgfx/core/PathEffect.h"
@@ -1740,5 +1741,37 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
   EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
   EXPECT_TRUE(root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+}
+
+TGFX_TEST(LayerTest, LayerShadowFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ImageLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(30, 30));
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
+  layer->setImage(image);
+  auto filter = LayerShadowFilter::Make({});
+  layer->setFilters({filter});
+  LayerShadowParam param0 = {};
+  param0.offsetX = 10;
+  param0.offsetY = 10;
+  LayerShadowParam param1 = {};
+  param1.offsetX = -10;
+  param1.offsetY = -10;
+  param1.color = Color::White();
+  filter->setShadowParams({param0, param1});
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/layerShadowFilter"));
+
+  param1.offsetX = 0;
+  param1.offsetY = -20;
+  filter->setShadowParams({param0, param1});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/layerShadowFilter1"));
 }
 }  // namespace tgfx

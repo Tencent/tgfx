@@ -86,8 +86,8 @@ std::shared_ptr<ImageFilter> InnerShadowFilter::onCreateImageFilter(float scale)
 
 InnerShadowFilter::InnerShadowFilter(float offsetX, float offsetY, float blurrinessX,
                                      float blurrinessY, const Color& color, bool innerShadowOnly)
-    : LayerFilter(), _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX),
-      _blurrinessY(blurrinessY), _color(std::move(color)), _innerShadowOnly(innerShadowOnly) {
+    : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
+      _color(std::move(color)), _innerShadowOnly(innerShadowOnly) {
 }
 
 }  // namespace tgfx

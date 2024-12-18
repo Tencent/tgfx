@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
-class DropShadowFilter : public LayerFilter {
+class DropShadowFilter : public LayerImageFilter {
  public:
-  virtual ~DropShadowFilter() = default;
+  ~DropShadowFilter() override = default;
 
   /**
    * Create a filter that draws a drop shadow under the input content.

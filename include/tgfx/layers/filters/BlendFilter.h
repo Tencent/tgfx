@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
-class BlendFilter : public LayerFilter {
+class BlendFilter : public LayerImageFilter {
  public:
-  virtual ~BlendFilter() = default;
+  ~BlendFilter() override = default;
 
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color

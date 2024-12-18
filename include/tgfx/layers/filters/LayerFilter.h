@@ -28,35 +28,18 @@ namespace tgfx {
  */
 class LayerFilter : public LayerProperty {
  public:
-  /**
-   * Returns the current image filter for the given scale factor. If the filter has not been
-   * created yet, it will be created and cached.
+  /*
+   * Applies the filter to the given picture and draws it to the canvas.
    * @param scale The scale factor to apply to the filter.
-   * @return The current image filter.
+   * @return True if the filter was applied and drawn, false otherwise.
    */
-  std::shared_ptr<ImageFilter> getImageFilter(float scale);
+  virtual bool drawWithFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) = 0;
 
- protected:
-  /**
-   * Creates a new image filter for the given scale factor. When it is necessary to recreate the
-   * ImageFilter, the onCreateImageFilter method will be called.
+  /*
+   * Return the bounds of after applying the filter to the given bounds.
    * @param scale The scale factor to apply to the filter.
-   * @return A new image filter.
+   * @return The bounds of the filtered image.
    */
-  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
-
-  /**
-   * Marks the filter as dirty and invalidates the cached filter.
-   */
-  void invalidateFilter();
-
- private:
-  bool dirty = true;
-
-  float lastScale = 1.0f;
-
-  std::unique_ptr<Rect> _clipBounds = nullptr;
-
-  std::shared_ptr<ImageFilter> lastFilter;
+  virtual Rect filterBounds(const Rect& srcRect, float scale) = 0;
 };
 }  // namespace tgfx
