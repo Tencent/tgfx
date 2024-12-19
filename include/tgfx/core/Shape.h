@@ -159,9 +159,7 @@ class Shape {
    */
   virtual UniqueKey getUniqueKey() const = 0;
 
- private:
-  static void Append(std::vector<std::shared_ptr<Shape>>* shapes, std::shared_ptr<Shape> shape);
-
+  friend class AppendShape;
   friend class StrokeShape;
   friend class MatrixShape;
   friend class ShapeDrawOp;
