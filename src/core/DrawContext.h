@@ -95,9 +95,5 @@ class DrawContext {
    */
   virtual void drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                          const FillStyle& style, std::shared_ptr<ImageFilter> filter) = 0;
-
-  virtual void onClipPath(const MCState&){};
-
-  virtual void onRestore(){};
 };
 }  // namespace tgfx

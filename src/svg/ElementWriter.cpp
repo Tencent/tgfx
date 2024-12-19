@@ -95,11 +95,13 @@ void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const
     }
     this->addAttribute("stroke-width", strokeWidth);
 
-    if (auto cap = ToSVGCap(stroke->cap); !cap.empty()) {
+    auto cap = ToSVGCap(stroke->cap);
+    if (!cap.empty()) {
       this->addAttribute("stroke-linecap", cap);
     }
 
-    if (auto join = ToSVGJoin(stroke->join); !join.empty()) {
+    auto join = ToSVGJoin(stroke->join);
+    if (!join.empty()) {
       this->addAttribute("stroke-linejoin", join);
     }
 
@@ -459,8 +461,12 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageSha
   DEBUG_ASSERT(shader->image);
 
   DEBUG_ASSERT(context);
-  auto bitmap = SVGExportingContext::ImageToBitmap(context, image);
-  auto dataUri = AsDataUri(bitmap);
+  Bitmap bitmap(image->width(), image->height(), false, false);
+  Pixmap pixmap(bitmap);
+  if (!SVGExportingContext::exportToPixmap(context, image, pixmap)) {
+    return;
+  }
+  auto dataUri = AsDataUri(pixmap);
   if (!dataUri) {
     return;
   }

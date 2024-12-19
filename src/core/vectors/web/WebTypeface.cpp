@@ -102,14 +102,12 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   return UTF::ToUTF8(unichar);
 }
 
+std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
   return GlyphsMap()[webFontFamily];
-}
 #else
-std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
   return {};
-}
 #endif
+}
 
 }  // namespace tgfx

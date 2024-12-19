@@ -27,14 +27,19 @@
 namespace tgfx {
 class SVGExportingContext;
 
-struct ExportingOptions {
-  ExportingOptions() = default;
-  ExportingOptions(bool convertTextToPaths, bool prettyXML)
+/**
+ * Options for exporting SVG text.
+ */
+struct SVGExportingOptions {
+  /**
+   * Construct Exporting Options object,default convertTextToPaths is false, prettyXML is true.
+   */
+  explicit SVGExportingOptions(bool convertTextToPaths = false, bool prettyXML = true)
       : convertTextToPaths(convertTextToPaths), prettyXML(prettyXML) {
   }
   /**
-   * Convert text to paths in the exported SVG text, only applicable to outline fonts. Emoji and
-   * web fonts will only be exported as text.
+   * Convert text to paths in the exported SVG. This only applies to fonts with outlines. Fonts
+   * without outlines, like emoji and web fonts, will be exported as text.
    */
   bool convertTextToPaths = false;
   /**
@@ -50,7 +55,7 @@ struct ExportingOptions {
 class SVGExporter {
  public:
   /**
-   * Creates an SVGExporter object pointer, which can be used to export SVG text.
+   * Creates an SVG exporter object pointer, which can be used to export SVG text.
    *
    * @param svgStream The string stream to store the SVG text.
    * @param context used to convert some rendering commands into image data.
@@ -59,29 +64,30 @@ class SVGExporter {
    * @param options Options for exporting SVG text.
    */
   static std::shared_ptr<SVGExporter> Make(std::stringstream& svgStream, Context* context,
-                                           const Rect& viewBox, ExportingOptions options);
+                                           const Rect& viewBox, SVGExportingOptions options);
 
   /**
-   * Destroys the SVGExporter object, equivalent to calling close().
+   * Destroys the SVG exporter object. If close() has not been called, it will automatically finalize
+   * any unfinished drawing commands and write the SVG end tag.
    */
   ~SVGExporter();
 
   /**
-   * Get the canvas if the SVGExporter is not closed.if closed, return nullptr.
+   * Returns the canvas for exporting if the SVGExporter is not closed; otherwise, returns nullptr.
    */
   Canvas* getCanvas() const;
 
   /**
-   * Closes the SVGExporter.Finalizing any unfinished drawing commands and writing the SVG end tag.
+   * Closes the SVG exporter,finalizing any unfinished drawing commands and writing the SVG end tag.
    */
   void close();
 
  private:
   /**
-   * Construct a SVGExporter object
+   * Construct a SVG exporter object
    */
   SVGExporter(std::stringstream& svgStream, Context* context, const Rect& viewBox,
-              ExportingOptions options);
+              SVGExportingOptions options);
 
   bool closed = false;
   SVGExportingContext* drawContext = nullptr;

@@ -45,14 +45,14 @@ class ElementWriter;
 class SVGExportingContext : public DrawContext {
  public:
   SVGExportingContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
-                      ExportingOptions options);
+                      SVGExportingOptions options);
   ~SVGExportingContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
     canvas = inputCanvas;
   }
 
-  void clear() override;
+  void clear() override{};
 
   void drawRect(const Rect&, const MCState&, const FillStyle&) override;
 
@@ -75,18 +75,14 @@ class SVGExportingContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture>, const MCState&, const FillStyle&,
                  std::shared_ptr<ImageFilter>) override;
 
-  void onClipPath(const MCState&) override;
-
-  void onRestore() override;
-
   XMLWriter* getWriter() const {
     return writer.get();
   }
 
   /**
- * Draws a image onto a surface and reads the pixels from the surface.
- */
-  static Pixmap ImageToBitmap(Context* context, const std::shared_ptr<Image>& image);
+   * Draws a image onto a surface and reads the pixels from the surface.
+   */
+  static bool exportToPixmap(Context* context, const std::shared_ptr<Image>& image, Pixmap& pixmap);
 
  private:
   /**
@@ -106,11 +102,11 @@ class SVGExportingContext : public DrawContext {
   void exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
                            const FillStyle& style);
 
-  void applyClipPath();
+  void applyClipPath(const Path& clipPath);
 
   static PathEncoding PathEncoding();
 
-  ExportingOptions options;
+  SVGExportingOptions options;
   Context* context = nullptr;
   Canvas* canvas = nullptr;
   const std::unique_ptr<XMLWriter> writer;
@@ -118,8 +114,11 @@ class SVGExportingContext : public DrawContext {
   std::unique_ptr<ElementWriter> rootElement;
   SVGTextBuilder textBuilder;
 
-  std::vector<Path> savedPaths;
-  bool hasPushedClip = false;
-  std::stack<std::unique_ptr<ElementWriter>> groupStack;
+  // std::vector<Path> savedPaths;
+  // bool hasPushedClip = false;
+  // std::stack<std::unique_ptr<ElementWriter>> groupStack;
+
+  Path currentClipPath = {};
+  std::unique_ptr<ElementWriter> clipGroupElement = nullptr;
 };
 }  // namespace tgfx

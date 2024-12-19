@@ -29,7 +29,7 @@
 namespace tgfx {
 
 std::shared_ptr<SVGExporter> SVGExporter::Make(std::stringstream& svgStream, Context* context,
-                                               const Rect& viewBox, ExportingOptions options) {
+                                               const Rect& viewBox, SVGExportingOptions options) {
   if (!context) {
     return nullptr;
   }
@@ -37,7 +37,7 @@ std::shared_ptr<SVGExporter> SVGExporter::Make(std::stringstream& svgStream, Con
 }
 
 SVGExporter::SVGExporter(std::stringstream& svgStream, Context* context, const Rect& viewBox,
-                         ExportingOptions options) {
+                         SVGExportingOptions options) {
   closed = false;
   auto writer = std::make_unique<XMLStreamWriter>(svgStream, options.prettyXML);
   drawContext = new SVGExportingContext(context, viewBox, std::move(writer), options);
