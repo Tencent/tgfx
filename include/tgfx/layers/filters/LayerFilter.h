@@ -29,17 +29,19 @@ namespace tgfx {
 class LayerFilter : public LayerProperty {
  public:
   /**
-    * Applies the filter to the given picture and draws it to the canvas.
-    * @param scale The scale factor to apply to the filter.
-    * @return True if the filter was applied and drawn, false otherwise.
-    */
-  virtual bool applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) = 0;
+   * Applies the filter to the given picture and draws it to the canvas.
+   * @param contentScale The scale factor of the source Image relative to its original size.
+   * Some filters have size-related parameters that must be adjusted with this scale factor.
+   * @return True if the filter was applied and drawn, false otherwise.
+   */
+  virtual bool applyFilter(Canvas* canvas, std::shared_ptr<Image> image, float contentScale) = 0;
 
   /**
-    * Return the bounds of after applying the filter to the given bounds.
-    * @param scale The scale factor to apply to the filter.
-    * @return The bounds of the filtered image.
-    */
-  virtual Rect filterBounds(const Rect& srcRect, float scale) = 0;
+   * Return the bounds of after applying the filter to the given bounds.
+   * @param contentScale The scale factor of the source bounds relative to its original size.
+   * Some filters have size-related parameters that must be adjusted with this scale factor
+   * @return The bounds of the filtered image.
+   */
+  virtual Rect filterBounds(const Rect& srcRect, float contentScale) = 0;
 };
 }  // namespace tgfx

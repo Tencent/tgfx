@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerShadowFilter.h"
+#include <utility>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
@@ -48,60 +49,22 @@ void LayerShadowFilter::setShowBehindTransparent(bool showBehindTransparent) {
   invalidate();
 }
 
-bool LayerShadowFilter::applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) {
-  auto bounds = picture->getBounds();
-  bounds.roundOut();
-  Matrix matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(picture, static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix);
+bool LayerShadowFilter::applyFilter(Canvas* canvas, std::shared_ptr<Image> image,
+                                    float contentScale) {
   if (!image) {
     return false;
   }
 
-  // create opaque image
-  Recorder opaqueRecorder;
-  auto opaqueCanvas = opaqueRecorder.beginRecording();
-  auto opaquePaint = Paint();
-  opaquePaint.setColorFilter(ColorFilter::AlphaThreshold(0));
-  opaqueCanvas->drawImage(image, &opaquePaint);
-  auto opaquePicture = opaqueRecorder.finishRecordingAsPicture();
-  auto opaqueImage = Image::MakeFrom(opaquePicture, image->width(), image->height());
+  drawShadows(canvas, image, contentScale);
 
-  // create shadow picture
-  Recorder shadowRecorder;
-  auto shadowCanvas = shadowRecorder.beginRecording();
-  for (const auto& param : params) {
-    auto filter = createShadowFilter(param, scale);
-    if (!filter) {
-      continue;
-    }
-    Paint paint;
-    paint.setImageFilter(filter);
-    shadowCanvas->drawImage(opaqueImage, bounds.x(), bounds.y(), &paint);
-  }
-  auto shadowPicture = shadowRecorder.finishRecordingAsPicture();
-
-  Paint shadowPaint;
-  // Draw shadow beside the original picture area
-  if (!_showBehindTransparent) {
-    auto boundsAfterFilter = filterBounds(bounds, scale);
-    auto shader = Shader::MakeImageShader(opaqueImage, TileMode::Decal, TileMode::Decal);
-    shader =
-        shader->makeWithMatrix(Matrix::MakeTrans(-boundsAfterFilter.left, -boundsAfterFilter.top));
-    auto maskFilter = MaskFilter::MakeShader(shader, true);
-    shadowPaint.setMaskFilter(maskFilter);
-  }
-  canvas->drawPicture(shadowPicture, nullptr, &shadowPaint);
-
-  // draw original image
-  canvas->drawImage(image, bounds.x(), bounds.y());
+  canvas->drawImage(image);
   return true;
 }
 
 Rect LayerShadowFilter::filterBounds(const Rect& srcRect, float scale) {
   auto maxRect = srcRect;
   for (const auto& param : params) {
-    auto filter = createShadowFilter(param, scale);
+    auto filter = CreateShadowFilter(param, scale);
     if (!filter) {
       continue;
     }
@@ -110,11 +73,53 @@ Rect LayerShadowFilter::filterBounds(const Rect& srcRect, float scale) {
   return maxRect;
 }
 
-std::shared_ptr<ImageFilter> LayerShadowFilter::createShadowFilter(const LayerShadowParam& param,
+std::shared_ptr<ImageFilter> LayerShadowFilter::CreateShadowFilter(const LayerShadowParam& param,
                                                                    float scale) {
   return ImageFilter::DropShadowOnly(param.offsetX * scale, param.offsetY * scale,
                                      param.blurrinessX * scale, param.blurrinessY * scale,
                                      param.color);
+}
+
+void LayerShadowFilter::drawShadows(Canvas* canvas, std::shared_ptr<Image> image,
+                                    float contentScale) {
+  // create opaque image
+  auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
+  auto opaqueImage = image->makeWithFilter(opaqueFilter);
+
+  // collect drop shadows into a picture, and then we can apply a mask filter to the picture
+  Recorder recorder;
+  auto shadowCanvas = recorder.beginRecording();
+  collectDropShadows(shadowCanvas, opaqueImage, contentScale);
+  auto shadowsPicture = recorder.finishRecordingAsPicture();
+
+  Paint shadowPaint;
+  if (!_showBehindTransparent) {
+    shadowPaint.setMaskFilter(createMask(opaqueImage, contentScale));
+  }
+  canvas->drawPicture(shadowsPicture, nullptr, &shadowPaint);
+}
+
+void LayerShadowFilter::collectDropShadows(Canvas* canvas, std::shared_ptr<Image> opaqueSource,
+                                           float contentScale) {
+  for (const auto& param : params) {
+    if (auto filter = CreateShadowFilter(param, contentScale)) {
+      Paint paint;
+      paint.setImageFilter(filter);
+      canvas->drawImage(opaqueSource, &paint);
+    }
+  }
+}
+
+std::shared_ptr<MaskFilter> LayerShadowFilter::createMask(std::shared_ptr<Image> opaqueImage,
+                                                          float contentScale) {
+  auto shader = Shader::MakeImageShader(opaqueImage, TileMode::Decal, TileMode::Decal);
+  // get bounds after applying the filter, so that the mask filter can be applied to the
+  // correct area
+  auto boundsAfterFilter =
+      filterBounds(Rect::MakeWH(opaqueImage->width(), opaqueImage->height()), contentScale);
+  shader =
+      shader->makeWithMatrix(Matrix::MakeTrans(-boundsAfterFilter.left, -boundsAfterFilter.top));
+  return MaskFilter::MakeShader(shader, true);
 }
 
 }  // namespace tgfx

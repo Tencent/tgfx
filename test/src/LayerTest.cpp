@@ -1777,4 +1777,26 @@ TGFX_TEST(LayerTest, LayerShadowFilter) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/layerShadowFilter1"));
 }
+
+TGFX_TEST(LayerTest, Filters) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(30, 30));
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  layer->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  layer->setFillStyle(fillStyle);
+  auto filter = BlurFilter::Make(10, 10);
+  auto filter2 = DropShadowFilter::Make(10, 10, 0, 0, Color::Black());
+  auto filter3 = InnerShadowFilter::Make(10, 10, 0, 0, Color::White());
+  layer->setFilters({filter, filter2, filter3});
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filters"));
+}
 }  // namespace tgfx

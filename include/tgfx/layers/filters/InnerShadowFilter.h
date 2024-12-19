@@ -21,10 +21,12 @@
 #include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
+
+/**
+ * A filter draws an inner shadow over the input content.
+ */
 class InnerShadowFilter : public LayerImageFilter {
  public:
-  ~InnerShadowFilter() override = default;
-
   /**
    * Create a filter that draws an inner shadow over the input content.
    */

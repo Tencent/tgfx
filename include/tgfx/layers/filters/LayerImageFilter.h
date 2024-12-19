@@ -22,34 +22,40 @@
 
 namespace tgfx {
 
+/**
+ * LayerImageFilter is a filter that applies an image filter to a layer.
+ */
 class LayerImageFilter : public LayerFilter {
  public:
   /**
-    * Applies the filter to the given picture and draws it to the canvas.
-    * @param scale The scale factor to apply to the filter.
-    * @return True if the filter was applied and drawn, false otherwise.
-    */
-  bool applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) override;
+   * Applies the filter to the given picture and draws it to the canvas.
+   * @param contentScale The scale factor of the source Image relative to its original size.
+   * Some filters have size-related parameters that must be adjusted with this scale factor.
+   * @return True if the filter was applied and drawn, false otherwise.
+   */
+  bool applyFilter(Canvas* canvas, std::shared_ptr<Image> image, float contentScale) override;
 
   /**
-    * Return the bounds of after applying the filter to the given bounds.
-    * @param scale The scale factor to apply to the filter.
-    * @return The bounds of the filtered image.
-    */
-  Rect filterBounds(const Rect& srcRect, float scale) override;
+   * Return the bounds of after applying the filter to the given bounds.
+   * @param contentScale The scale factor of the source Image relative to its original size.
+   * Some filters have size-related parameters that must be adjusted with this scale factor.
+   * @return The bounds of the filtered image.
+   */
+  Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
  protected:
   /**
-    * Creates a new image filter for the given scale factor. When it is necessary to recreate the
-    * ImageFilter, the onCreateImageFilter method will be called.
-    * @param scale The scale factor to apply to the filter.
-    * @return A new image filter.
-    */
-  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
+   * Creates a new image filter for the given scale factor. When it is necessary to recreate the
+   * ImageFilter, the onCreateImageFilter method will be called.
+   * @param contentScale The scale factor of the source Image relative to its original size.
+   * Some filters have size-related parameters that must be adjusted with this scale factor.
+   * @return A new image filter.
+   */
+  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float contentScale) = 0;
 
   /**
-    * Marks the filter as dirty and invalidates the cached filter.
-    */
+   * Marks the filter as dirty and invalidates the cached filter.
+   */
   void invalidateFilter();
 
  private:

@@ -18,16 +18,21 @@
 
 #pragma once
 
+#include <tgfx/core/MaskFilter.h>
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
 
+/**
+ * Parameters for the drop shadow.
+ */
 struct LayerShadowParam {
   float offsetX = 0.0f;
   float offsetY = 0.0f;
   float blurrinessX = 0.0f;
   float blurrinessY = 0.0f;
   Color color = Color::Black();
+
   bool operator==(const LayerShadowParam& value) const {
     return offsetX == value.offsetX && offsetY == value.offsetY &&
            blurrinessX == value.blurrinessX && blurrinessY == value.blurrinessY &&
@@ -38,31 +43,43 @@ struct LayerShadowParam {
 class LayerShadowFilter : public LayerFilter {
  public:
   /**
-     * Create a filter that draws drop shadows under the input content.
-     */
+   * Create a filter that draws drop shadows under the input content.
+   */
   static std::shared_ptr<LayerShadowFilter> Make(const std::vector<LayerShadowParam>& params);
 
+  /**
+   * The parameters for the drop shadows.
+   */
   std::vector<LayerShadowParam> shadowParams() const {
     return params;
   }
 
   void setShadowParams(const std::vector<LayerShadowParam>& params);
 
+  /**
+   * Whether to show shadows behind transparent regions of the input content.
+   */
   bool showBehindTransparent() const {
     return _showBehindTransparent;
   }
 
   void setShowBehindTransparent(bool showBehindTransparent);
 
-  bool applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) override;
+  bool applyFilter(Canvas* canvas, std::shared_ptr<Image> image, float scale) override;
 
   Rect filterBounds(const Rect& srcRect, float scale) override;
 
  private:
-  static std::shared_ptr<ImageFilter> createShadowFilter(const LayerShadowParam& param,
+  static std::shared_ptr<ImageFilter> CreateShadowFilter(const LayerShadowParam& param,
                                                          float scale);
 
   explicit LayerShadowFilter(const std::vector<LayerShadowParam>& params);
+
+  void drawShadows(Canvas* canvas, std::shared_ptr<Image> image, float contentScale);
+
+  void collectDropShadows(Canvas* canvas, std::shared_ptr<Image> opaqueSource, float contentScale);
+
+  std::shared_ptr<MaskFilter> createMask(std::shared_ptr<Image> opaqueImage, float contentScale);
 
   std::vector<LayerShadowParam> params = {};
 

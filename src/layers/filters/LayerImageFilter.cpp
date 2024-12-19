@@ -20,19 +20,20 @@
 #include "tgfx/layers/Layer.h"
 namespace tgfx {
 
-bool LayerImageFilter::applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) {
-  auto filter = getImageFilter(scale);
+bool LayerImageFilter::applyFilter(Canvas* canvas, std::shared_ptr<Image> image,
+                                   float contentScale) {
+  auto filter = getImageFilter(contentScale);
   if (!filter) {
     return false;
   }
   Paint paint;
   paint.setImageFilter(filter);
-  canvas->drawPicture(picture, nullptr, &paint);
+  canvas->drawImage(image, &paint);
   return true;
 }
 
-Rect LayerImageFilter::filterBounds(const Rect& srcRect, float scale) {
-  auto filter = getImageFilter(scale);
+Rect LayerImageFilter::filterBounds(const Rect& srcRect, float contentScale) {
+  auto filter = getImageFilter(contentScale);
   if (!filter) {
     return srcRect;
   }

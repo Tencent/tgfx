@@ -22,10 +22,11 @@
 
 namespace tgfx {
 
+/**
+ * A filter that blurs its input by the separate X and Y blurriness.
+ */
 class BlurFilter : public LayerImageFilter {
  public:
-  ~BlurFilter() override = default;
-
   /**
    * Create a filter that blurs its input by the separate X and Y blurriness. The provided tile mode
    * is used when the blur kernel goes outside the input image.

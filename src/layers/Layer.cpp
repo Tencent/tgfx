@@ -534,23 +534,39 @@ Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
   return paint;
 }
 
-std::shared_ptr<Picture> Layer::applyFilter(std::shared_ptr<Picture> source, float contentScale) {
+std::shared_ptr<Picture> Layer::applyFilters(std::shared_ptr<Picture> source, float contentScale) {
   if (source == nullptr) {
     return nullptr;
   }
   if (_filters.empty() || FloatNearlyZero(contentScale)) {
     return source;
   }
-  auto picture = source;
+  auto sourceBounds = source->getBounds();
+  sourceBounds.roundOut();
+  auto pictureMatrix = Matrix::MakeTrans(-sourceBounds.x(), -sourceBounds.y());
+  auto image = Image::MakeFrom(source, static_cast<int>(sourceBounds.width()),
+                               static_cast<int>(sourceBounds.height()), &pictureMatrix);
+  Recorder recorder;
+  Point offset = Point::Make(sourceBounds.x(), sourceBounds.y());
   for (const auto& filter : _filters) {
-    Recorder recorder;
     auto canvas = recorder.beginRecording();
-    if (!filter->applyFilter(canvas, picture, contentScale)) {
+    if (!filter->applyFilter(canvas, image, contentScale)) {
       continue;
     }
-    picture = recorder.finishRecordingAsPicture();
+    auto picture = recorder.finishRecordingAsPicture();
+    if (picture == nullptr) {
+      return nullptr;
+    }
+    auto bounds = picture->getBounds();
+    bounds.roundOut();
+    auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+    image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
+                            static_cast<int>(bounds.height()), &matrix);
+    offset.offset(bounds.x(), bounds.y());
   }
-  return picture;
+  auto canvas = recorder.beginRecording();
+  canvas->drawImage(image, offset.x, offset.y);
+  return recorder.finishRecordingAsPicture();
 }
 
 LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
@@ -583,7 +599,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
                                                  Matrix* drawingMatrix) {
   DEBUG_ASSERT(drawingMatrix != nullptr);
   auto picture = getLayerContents(args, contentScale);
-  picture = applyFilter(std::move(picture), contentScale);
+  picture = applyFilters(std::move(picture), contentScale);
   if (!picture) {
     return nullptr;
   }
@@ -670,7 +686,7 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto picture = getLayerContents(args, contentScale);
-  picture = applyFilter(std::move(picture), contentScale);
+  picture = applyFilters(std::move(picture), contentScale);
   if (picture == nullptr) {
     return;
   }

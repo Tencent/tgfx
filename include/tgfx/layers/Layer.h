@@ -502,7 +502,7 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
-  std::shared_ptr<Picture> applyFilter(std::shared_ptr<Picture> source, float contentScale);
+  std::shared_ptr<Picture> applyFilters(std::shared_ptr<Picture> source, float contentScale);
 
   LayerContent* getRasterizedCache(const DrawArgs& args);
 

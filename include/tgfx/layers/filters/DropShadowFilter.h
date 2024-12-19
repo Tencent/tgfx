@@ -21,10 +21,11 @@
 #include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
+/**
+ * A filter draws a drop shadow under the input content.
+ */
 class DropShadowFilter : public LayerImageFilter {
  public:
-  ~DropShadowFilter() override = default;
-
   /**
    * Create a filter that draws a drop shadow under the input content.
    */
