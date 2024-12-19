@@ -53,6 +53,12 @@ class Shape {
                                       PathOp pathOp = PathOp::Append);
 
   /**
+   * Merges multiple Shapes into a new Shape using the PathOp::Append operation. Returns nullptr if
+   * the shape vector is empty.
+   */
+  static std::shared_ptr<Shape> Merge(std::vector<std::shared_ptr<Shape>> shapes);
+
+  /**
    * Applies the specified stroke to the given Shape. If the stroke is nullptr, the original Shape
    * is returned. Returns nullptr if the Shape is nullptr.
    */

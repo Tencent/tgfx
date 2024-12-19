@@ -40,6 +40,20 @@ void AppendShape::Append(std::vector<std::shared_ptr<Shape>>* shapes,
   shapes->push_back(std::move(shape));
 }
 
+std::shared_ptr<Shape> Shape::Merge(std::vector<std::shared_ptr<Shape>> shapes) {
+  if (shapes.empty()) {
+    return nullptr;
+  }
+  std::vector<std::shared_ptr<Shape>> list = {};
+  for (auto& shape : shapes) {
+    AppendShape::Append(&list, std::move(shape));
+  }
+  if (list.size() == 1) {
+    return list.front();
+  }
+  return std::shared_ptr<AppendShape>(new AppendShape(std::move(shapes)));
+}
+
 std::shared_ptr<Shape> AppendShape::MakeFrom(std::shared_ptr<Shape> first,
                                              std::shared_ptr<Shape> second) {
   std::vector<std::shared_ptr<Shape>> shapes = {};
