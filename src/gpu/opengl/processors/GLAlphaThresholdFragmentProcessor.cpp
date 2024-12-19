@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLAlphaStepFragmentProcessor.h"
+#include "GLAlphaThresholdFragmentProcessor.h"
 
 namespace tgfx {
-void GLAlphaStepFragmentProcessor::emitCode(EmitArgs& args) const {
+void GLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
   auto thresholdUniformName =
       uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Threshold");
@@ -32,11 +32,15 @@ void GLAlphaStepFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s.rgb /= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
   fragBuilder->codeAppendf("%s.a = 1.0;", args.outputColor.c_str());
   fragBuilder->codeAppend("}");
+  fragBuilder->codeAppend("else");
+  fragBuilder->codeAppend("{");
+  fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
+  fragBuilder->codeAppend("}");
   fragBuilder->codeAppendf("%s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
                            args.outputColor.c_str());
 }
 
-void GLAlphaStepFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+void GLAlphaThresholdFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
   uniformBuffer->setData("Threshold", threshold);
 }
 

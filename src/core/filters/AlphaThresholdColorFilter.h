@@ -18,16 +18,16 @@
 
 #pragma once
 
-#include "gpu/processors/AlphaStepFragmentProcessor.h"
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
-class GLAlphaStepFragmentProcessor : public AlphaStepFragmentProcessor {
+class AlphaThresholdColorFilter : public ColorFilter {
  public:
-  explicit GLAlphaStepFragmentProcessor(float threshold) : AlphaStepFragmentProcessor(threshold) {
-  }
+  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
-  void emitCode(EmitArgs& args) const override;
+ private:
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 
-  void onSetData(UniformBuffer* uniformBuffer) const override;
+  float threshold = 0.0f;
 };
 }  // namespace tgfx

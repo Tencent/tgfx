@@ -16,17 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AlphaStepColorFilter.h"
-#include "gpu/processors/AlphaStepFragmentProcessor.h"
+#include "AlphaThresholdColorFilter.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 
 namespace tgfx {
 
-std::shared_ptr<ColorFilter> ColorFilter::AlphaStep(float threshold) {
-  return std::make_shared<AlphaStepColorFilter>(threshold);
+std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
+  return std::make_shared<AlphaThresholdColorFilter>(threshold);
 }
 
-std::unique_ptr<FragmentProcessor> AlphaStepColorFilter::asFragmentProcessor() const {
-  return AlphaStepFragmentProcessor::Make(threshold);
+std::unique_ptr<FragmentProcessor> AlphaThresholdColorFilter::asFragmentProcessor() const {
+  return AlphaThresholdFragmentProcessor::Make(threshold);
 }
 
 }  // namespace tgfx

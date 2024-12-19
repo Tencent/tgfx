@@ -555,22 +555,22 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
   }
 }
 
-TGFX_TEST(FilterTest, AlphaStep) {
+TGFX_TEST(FilterTest, AlphaThreshold) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
+  auto surface = Surface::Make(context, 100, 100);
   auto canvas = surface->getCanvas();
   auto paint = Paint();
-  paint.setColor(Color::FromRGBA(100, 0, 0, 1));
-  auto opacityFilter = ColorFilter::AlphaStep(1.01f / 255.f);
+  paint.setColor(Color::FromRGBA(100, 0, 0, 128));
+  auto opacityFilter = ColorFilter::AlphaThreshold(129.f / 255.f);
   paint.setColorFilter(opacityFilter);
   auto rect = Rect::MakeWH(100, 100);
   canvas->drawRect(rect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaStep_empty"));
-  opacityFilter = ColorFilter::AlphaStep(0);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold_empty"));
+  opacityFilter = ColorFilter::AlphaThreshold(0);
   paint.setColorFilter(opacityFilter);
   canvas->drawRect(rect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaStep"));
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold"));
 }
 }  // namespace tgfx

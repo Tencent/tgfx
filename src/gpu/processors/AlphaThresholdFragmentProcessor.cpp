@@ -16,28 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/FragmentProcessor.h"
+#include "AlphaThresholdFragmentProcessor.h"
+#include "gpu/opengl/processors/GLAlphaThresholdFragmentProcessor.h"
 
 namespace tgfx {
-class AlphaStepFragmentProcessor : public FragmentProcessor {
- public:
-  static std::unique_ptr<AlphaStepFragmentProcessor> Make(float threshold);
+std::unique_ptr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
+    float threshold) {
+  return std::make_unique<GLAlphaThresholdFragmentProcessor>(threshold);
+}
 
-  std::string name() const override {
-    return "AlphaStepFragmentProcessor";
-  }
-
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  explicit AlphaStepFragmentProcessor(float threshold)
-      : FragmentProcessor(ClassID()), threshold(threshold) {
-  }
-
-  bool onIsEqual(const FragmentProcessor& other) const override;
-
-  float threshold = 0.0f;
-};
+bool AlphaThresholdFragmentProcessor::onIsEqual(const FragmentProcessor& other) const {
+  return threshold == static_cast<const AlphaThresholdFragmentProcessor&>(other).threshold;
+}
 }  // namespace tgfx
