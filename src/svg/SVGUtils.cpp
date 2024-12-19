@@ -130,9 +130,9 @@ std::string ToSVGBlendMode(BlendMode mode) {
   };
   auto index = static_cast<size_t>(mode);
   DEBUG_ASSERT(index < blendModeCount);
-  auto blendStr = blendModeMap[index];
+  const auto& blendStr = blendModeMap[index];
   if (blendStr.empty()) {
-    blendStr = "normal";
+    return "";
   }
   return "mix-blend-mode:" + blendStr;
 }

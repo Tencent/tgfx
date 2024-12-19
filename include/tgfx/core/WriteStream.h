@@ -23,10 +23,11 @@
 #include <cstddef>
 #include <cstring>
 #include <istream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
-#include "core/utils/Log.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 
@@ -52,9 +53,6 @@ class FileWriteStream : public WriteStream {
   explicit FileWriteStream(const std::string& path);
   ~FileWriteStream() override;
 
-  /** 
-   * Returns weather the current path could be opened.
-   */
   bool isValid() const {
     return file != nullptr;
   }
@@ -82,6 +80,8 @@ class DynamicMemoryWriteStream : public WriteStream {
   size_t bytesWritten() const override;
 
   bool read(char* data, size_t size, size_t offset);
+
+  std::shared_ptr<Data> dumpAsData();
 
  private:
   std::vector<char> buffer;

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <_types/_uint32_t.h>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -45,7 +46,7 @@ class ElementWriter;
 class SVGExportingContext : public DrawContext {
  public:
   SVGExportingContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
-                      SVGExportingOptions options);
+                      uint32_t exportingFlags);
   ~SVGExportingContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
@@ -106,17 +107,14 @@ class SVGExportingContext : public DrawContext {
 
   static PathEncoding PathEncoding();
 
-  SVGExportingOptions options;
+  bool convertTextToPaths = false;
+  bool disableWarnings = false;
   Context* context = nullptr;
   Canvas* canvas = nullptr;
   const std::unique_ptr<XMLWriter> writer;
   const std::unique_ptr<ResourceStore> resourceBucket;
   std::unique_ptr<ElementWriter> rootElement;
   SVGTextBuilder textBuilder;
-
-  // std::vector<Path> savedPaths;
-  // bool hasPushedClip = false;
-  // std::stack<std::unique_ptr<ElementWriter>> groupStack;
 
   Path currentClipPath = {};
   std::unique_ptr<ElementWriter> clipGroupElement = nullptr;

@@ -19,33 +19,57 @@
 #pragma once
 
 #include <memory>
-#include <sstream>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class SVGExportingContext;
 
 /**
- * Options for exporting SVG text.
+ * Defines flags for SVG exporting that influence the readability and functionality of the exported
+ * SVG.
+ * By default:
+ * - Text is exported as text elements.
+ * - The exported SVG text includes spaces ('\t') and newlines ('\n') for improved readability.
+ * - Warnings are issued when exporting attributes that are not supported by the SVG standard.
+ * 
+ * SVG standard not supported attributes:
+ * - Blend modes: 
+ * Clear, Src, Dst, DstOver, SrcIn, DstIn, SrcOut, DstOut, SrcATop, DstATop, Xor,Modulate are
+ * not supported.
+ *
+ * - Image filters:
+ * Only Blur, DropShadow, and InnerShadow types are supported.
+ *
+ * - Color filters:
+ * Only the SrcIn blend mode is supported.
+ *
+ * - Shaders:
+ * Only Color, Gradient, and Image types are supported.
+ * 
+ * - Gradient shaders:
+ * Not all gradient shaders are supported; only Linear and Radial types are supported.
  */
-struct SVGExportingOptions {
+class SVGExportingFlags {
+ public:
   /**
-   * Construct Exporting Options object,default convertTextToPaths is false, prettyXML is true.
+   * Convert text to paths in the exported SVG. 
+   * This only applies to fonts with outlines. Fonts without outlines, like emoji and web fonts,
+   * will be exported as text.
    */
-  explicit SVGExportingOptions(bool convertTextToPaths = false, bool prettyXML = true)
-      : convertTextToPaths(convertTextToPaths), prettyXML(prettyXML) {
-  }
+  static constexpr uint32_t ConvertTextToPaths = 1 << 0;
+
   /**
-   * Convert text to paths in the exported SVG. This only applies to fonts with outlines. Fonts
-   * without outlines, like emoji and web fonts, will be exported as text.
+   * Disable pretty XML formatting in the exported SVG.
    */
-  bool convertTextToPaths = false;
+  static constexpr uint32_t DisablePrettyXML = 1 << 1;
+
   /**
-   * Format SVG text with spaces('/t') and newlines('/n').
+   * Disable unsupported attribute warnings.
    */
-  bool prettyXML = true;
+  static constexpr uint32_t DisableWarnings = 1 << 2;
 };
 
 /**
@@ -63,8 +87,8 @@ class SVGExporter {
    * SVG will be clipped.
    * @param options Options for exporting SVG text.
    */
-  static std::shared_ptr<SVGExporter> Make(std::stringstream& svgStream, Context* context,
-                                           const Rect& viewBox, SVGExportingOptions options);
+  static std::shared_ptr<SVGExporter> Make(WriteStream* svgStream, Context* context,
+                                           const Rect& viewBox, uint32_t exportingFlags = 0);
 
   /**
    * Destroys the SVG exporter object. If close() has not been called, it will automatically finalize
@@ -86,8 +110,8 @@ class SVGExporter {
   /**
    * Construct a SVG exporter object
    */
-  SVGExporter(std::stringstream& svgStream, Context* context, const Rect& viewBox,
-              SVGExportingOptions options);
+  SVGExporter(WriteStream* svgStream, Context* context, const Rect& viewBox,
+              uint32_t exportingFlags);
 
   bool closed = false;
   SVGExportingContext* drawContext = nullptr;

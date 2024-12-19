@@ -54,8 +54,9 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
 
 ElementWriter::ElementWriter(const std::string& name, Context* context,
                              const std::unique_ptr<XMLWriter>& writer, ResourceStore* bucket,
-                             const MCState& state, const FillStyle& fill, const Stroke* stroke)
-    : writer(writer.get()), resourceStore(bucket) {
+                             bool disableWarning, const MCState& state, const FillStyle& fill,
+                             const Stroke* stroke)
+    : writer(writer.get()), resourceStore(bucket), disableWarning(disableWarning) {
   Resources res = this->addResources(fill, context);
 
   writer->startElement(name);
@@ -72,8 +73,14 @@ ElementWriter::~ElementWriter() {
   resourceStore = nullptr;
 }
 
-void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const Stroke* stroke,
-                                                    const Resources& resources) {
+void ElementWriter::reportUnsupportedElement(const char* message) const {
+  if (!disableWarning) {
+    LOGE("[SVG exporting]:Unsupported %s", message);
+  }
+}
+
+void ElementWriter::addFillAndStroke(const FillStyle& fill, const Stroke* stroke,
+                                     const Resources& resources) {
   if (!stroke) {  //fill draw
     static const std::string defaultFill = "black";
     if (resources.paintColor != defaultFill) {
@@ -115,7 +122,12 @@ void ElementWriter::ElementWriter::addFillAndStroke(const FillStyle& fill, const
   }
 
   if (fill.blendMode != BlendMode::SrcOver) {
-    this->addAttribute("style", ToSVGBlendMode(fill.blendMode));
+    auto blendModeString = ToSVGBlendMode(fill.blendMode);
+    if (!blendModeString.empty()) {
+      this->addAttribute("style", blendModeString);
+    } else {
+      reportUnsupportedElement("blend mode");
+    }
   }
 
   if (!resources.filter.empty()) {
@@ -228,6 +240,8 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
       filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
       addInnerShadowImageFilter(innerShadowFilter);
+    } else {
+      reportUnsupportedElement("image filter");
     }
   }
   Resources resources;
@@ -345,6 +359,8 @@ Resources ElementWriter::addResources(const FillStyle& fill, Context* context) {
     BlendMode mode;
     if (colorFilter->asColorMode(nullptr, &mode) && mode == BlendMode::SrcIn) {
       this->addColorFilterResources(*colorFilter, &resources);
+    } else {
+      reportUnsupportedElement("blend mode in color filter");
     }
   }
 
@@ -359,6 +375,8 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
     this->addGradientShaderResources(gradientShader, resources);
   } else if (auto imageShader = ShaderCaster::AsImageShader(shader)) {
     this->addImageShaderResources(imageShader, context, resources);
+  } else {
+    reportUnsupportedElement("shader");
   }
   // TODO(YGAurora): other shader types
 }
@@ -383,6 +401,7 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<const Gradi
     resources->paintColor = "url(#" + addRadialGradientDef(info) + ")";
   } else {
     resources->paintColor = "url(#" + addUnsupportedGradientDef(info) + ")";
+    reportUnsupportedElement("gradient type");
   }
 }
 
@@ -521,7 +540,6 @@ void ElementWriter::addColorFilterResources(const ColorFilter& colorFilter, Reso
     Color filterColor;
     BlendMode mode;
     colorFilter.asColorMode(&filterColor, &mode);
-    DEBUG_ASSERT(mode == BlendMode::SrcIn);
 
     {
       // first flood with filter color

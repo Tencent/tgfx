@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 
@@ -93,6 +94,10 @@ bool DynamicMemoryWriteStream::read(char* data, size_t size, size_t offset) {
   std::copy(buffer.begin() + static_cast<std::ptrdiff_t>(offset),
             buffer.begin() + static_cast<std::ptrdiff_t>(offset + size), data);
   return true;
+}
+
+std::shared_ptr<Data> DynamicMemoryWriteStream::dumpAsData() {
+  return Data::MakeWithCopy(buffer.data(), buffer.size());
 }
 
 }  // namespace tgfx

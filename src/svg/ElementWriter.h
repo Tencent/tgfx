@@ -44,8 +44,8 @@ class ElementWriter {
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket);
   ElementWriter(const std::string& name, Context* context, const std::unique_ptr<XMLWriter>& writer,
-                ResourceStore* bucket, const MCState& state, const FillStyle& fill,
-                const Stroke* stroke = nullptr);
+                ResourceStore* bucket, bool disableWarning, const MCState& state,
+                const FillStyle& fill, const Stroke* stroke = nullptr);
   ~ElementWriter();
 
   void addAttribute(const std::string& name, const std::string& val);
@@ -87,8 +87,11 @@ class ElementWriter {
   void addDropShadowImageFilter(const std::shared_ptr<const DropShadowImageFilter>& filter);
   void addInnerShadowImageFilter(const std::shared_ptr<const InnerShadowImageFilter>& filter);
 
+  void reportUnsupportedElement(const char* message) const;
+
   XMLWriter* writer = nullptr;
   ResourceStore* resourceStore = nullptr;
+  bool disableWarning = false;
 };
 
 }  // namespace tgfx

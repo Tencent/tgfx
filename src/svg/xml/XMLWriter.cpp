@@ -182,14 +182,11 @@ void XMLWriter::writeDOM(const std::shared_ptr<DOM>& DOM, bool skipRoot) {
   }
 }
 
-void XMLWriter::clear() {
-}
-
 void XMLWriter::writeHeader() {
 }
 
-XMLStreamWriter::XMLStreamWriter(std::stringstream& stream, bool isPretty)
-    : _stream(stream), prettyFlag(isPretty) {
+XMLStreamWriter::XMLStreamWriter(WriteStream* stream, bool disablePretty)
+    : _stream(stream), disablePrettyXML(disablePretty) {
 }
 
 XMLStreamWriter::~XMLStreamWriter() {
@@ -197,20 +194,20 @@ XMLStreamWriter::~XMLStreamWriter() {
 }
 
 void XMLStreamWriter::onAddAttribute(const std::string& name, const std::string& value) {
-  ASSERT(!_elementsStack.top().hasChildren && !_elementsStack.top().hasText);
-  _stream << " " << name << "=\"" << value << "\"";
+  DEBUG_ASSERT(!_elementsStack.top().hasChildren && !_elementsStack.top().hasText);
+  _stream->writeText(" " + name + "=\"" + value + "\"");
 }
 
 void XMLStreamWriter::onAddText(const std::string& text) {
   auto elem = _elementsStack.top();
 
   if (!elem.hasChildren && !elem.hasText) {
-    _stream << ">";
+    _stream->writeText(">");
     this->newline();
   }
 
   this->tab(static_cast<int>(_elementsStack.size()) + 1);
-  _stream << text;
+  _stream->writeText(text);
   this->newline();
 }
 
@@ -218,9 +215,9 @@ void XMLStreamWriter::onEndElement() {
   auto element = getEnd();
   if (element.hasChildren || element.hasText) {
     this->tab(static_cast<int>(_elementsStack.size()));
-    _stream << "</" << element.name << ">";
+    _stream->writeText("</" + element.name + ">");
   } else {
-    _stream << "/>";
+    _stream->writeText("/>");
   }
   this->newline();
   doEnd();
@@ -230,36 +227,30 @@ void XMLStreamWriter::onStartElement(const std::string& element) {
   auto level = _elementsStack.size();
   if (this->doStart(element)) {
     // the first child, need to close with '>'
-    _stream << ">";
+    _stream->writeChar('>');
     this->newline();
   }
 
   this->tab(static_cast<int>(level));
-  _stream << "<";
-  _stream << element;
+  _stream->writeText("<" + element);
 }
 
 void XMLStreamWriter::writeHeader() {
   auto header = getHeader();
-  _stream << header;
+  _stream->writeText(std::string(header));
   this->newline();
 }
 
-void XMLStreamWriter::clear() {
-  _stream.str("");
-  _stream.clear();
-}
-
 void XMLStreamWriter::newline() {
-  if (prettyFlag) {
-    _stream << std::endl;
+  if (!disablePrettyXML) {
+    _stream->writeText("\n");
   }
 }
 
 void XMLStreamWriter::tab(int level) {
-  if (prettyFlag) {
+  if (!disablePrettyXML) {
     for (int i = 0; i < level; i++) {
-      _stream << "\t";
+      _stream->writeText("\t");
     }
   }
 }
@@ -273,8 +264,8 @@ XMLParserWriter::~XMLParserWriter() {
 }
 
 void XMLParserWriter::onAddAttribute(const std::string& name, const std::string& value) {
-  ASSERT(_elementsStack.empty() ||
-         (!_elementsStack.top().hasChildren && !_elementsStack.top().hasText));
+  DEBUG_ASSERT(_elementsStack.empty() ||
+               (!_elementsStack.top().hasChildren && !_elementsStack.top().hasText));
   _parser.addAttribute(name, value);
 }
 
