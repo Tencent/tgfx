@@ -66,7 +66,7 @@ class ColorFilter {
   static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
 
   /**
-    * Creates a new ColorFilter that converts semi-transparent colors to solid colors
+    * Creates a new ColorFilter that converts translucent colors to opaque colors
     * based on the specified alpha threshold.
     *
     * Colors with alpha values equal to or below this threshold will be converted to fully
