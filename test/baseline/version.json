@@ -96,16 +96,18 @@
         "draw_text": "b062b9a",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
-        "filterTest": "43cd416",
+        "filterTest": "21bb34f",
         "getBounds": "3888c19",
         "getLayersUnderPoint": "b062b9a",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
-        "imageMask": "af2e3ff",
+        "imageMask": "21bb34f",
         "innerShadow": "01cce38",
+        "layerShadowFilter": "21bb34f",
+        "layerShadowFilter1": "21bb34f",
         "shapeMask": "612c09e",
-        "textMask": "b062b9a"
+        "textMask": "21bb34f"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
