@@ -322,28 +322,28 @@ TGFX_TEST(CanvasTest, filterMode) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_linear"));
 }
 
-TGFX_TEST(CanvasTest, scaleImage) {
+TGFX_TEST(CanvasTest, rasterizedImage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto defaultCacheLimit = context->cacheLimit();
   context->setCacheLimit(0);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto scaleImage = image->makeScaled(1.0f);
-  EXPECT_TRUE(scaleImage == image);
+  auto rasterImage = image->makeRasterized();
+  EXPECT_TRUE(rasterImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
-  auto scaledImage = image->makeScaled(0.15f);
-  EXPECT_FALSE(scaledImage->hasMipmaps());
-  EXPECT_FALSE(scaledImage == image);
-  EXPECT_EQ(scaledImage->width(), 454);
-  EXPECT_EQ(scaledImage->height(), 605);
+  rasterImage = image->makeRasterized(0.15f);
+  EXPECT_FALSE(rasterImage->hasMipmaps());
+  EXPECT_FALSE(rasterImage == image);
+  EXPECT_EQ(rasterImage->width(), 454);
+  EXPECT_EQ(rasterImage->height(), 605);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, 1100, 1400);
   auto canvas = surface->getCanvas();
-  canvas->drawImage(scaledImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
-  auto scaleImageUniqueKey = std::static_pointer_cast<ResourceImage>(scaledImage)->uniqueKey;
-  auto texture = Resource::Find<Texture>(context, scaleImageUniqueKey);
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
+  auto rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
+  auto texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
@@ -355,26 +355,25 @@ TGFX_TEST(CanvasTest, scaleImage) {
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  image = image->makeScaled(0.15f, sampling);
-  scaledImage = image->makeMipmapped(true);
-  EXPECT_TRUE(scaledImage->hasMipmaps());
-  canvas->drawImage(scaledImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage_mipmap"));
-  texture = Resource::Find<Texture>(context, scaleImageUniqueKey);
+  rasterImage = image->makeRasterized(0.15f, sampling);
+  EXPECT_TRUE(rasterImage->hasMipmaps());
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
+  texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture == nullptr);
-  scaleImageUniqueKey = std::static_pointer_cast<ResourceImage>(scaledImage)->uniqueKey;
-  texture = Resource::Find<Texture>(context, scaleImageUniqueKey);
+  rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
+  texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();
-  scaledImage = image->makeMipmapped(false);
-  EXPECT_FALSE(scaledImage->hasMipmaps());
-  scaledImage = scaledImage->makeScaled(2.0f, sampling);
-  EXPECT_FALSE(scaledImage->hasMipmaps());
-  scaledImage = scaledImage->makeMipmapped(true);
-  EXPECT_EQ(scaledImage->width(), 907);
-  EXPECT_EQ(scaledImage->height(), 1210);
-  canvas->drawImage(scaledImage, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage_scale_up"));
+  rasterImage = rasterImage->makeMipmapped(false);
+  EXPECT_FALSE(rasterImage->hasMipmaps());
+  rasterImage = rasterImage->makeRasterized(2.0f, sampling);
+  EXPECT_FALSE(rasterImage->hasMipmaps());
+  rasterImage = rasterImage->makeMipmapped(true);
+  EXPECT_EQ(rasterImage->width(), 907);
+  EXPECT_EQ(rasterImage->height(), 1210);
+  canvas->drawImage(rasterImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
   context->setCacheLimit(defaultCacheLimit);
 }
 
