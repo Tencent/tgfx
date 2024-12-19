@@ -43,9 +43,7 @@ class Matrix {
    *  @return    Matrix with scale factors.
    */
   static Matrix MakeScale(float sx, float sy) {
-    Matrix m = {};
-    m.setScale(sx, sy);
-    return m;
+    return {sx, 0, 0, 0, sy, 0};
   }
 
   /**
@@ -59,9 +57,7 @@ class Matrix {
    * @return       Matrix with scale factors.
    */
   static Matrix MakeScale(float scale) {
-    Matrix m = {};
-    m.setScale(scale, scale);
-    return m;
+    return {scale, 0, 0, 0, scale, 0};
   }
 
   /**
@@ -76,9 +72,7 @@ class Matrix {
    * @return    Matrix with translation
    */
   static Matrix MakeTrans(float tx, float ty) {
-    Matrix m = {};
-    m.setTranslate(tx, ty);
-    return m;
+    return {1, 0, tx, 0, 1, ty};
   }
 
   /**
@@ -88,9 +82,7 @@ class Matrix {
    * @return    Matrix with skew
    */
   static Matrix MakeSkew(float kx, float ky) {
-    Matrix m = {};
-    m.setSkew(kx, ky);
-    return m;
+    return {1, kx, 0, ky, 1, 0};
   }
 
   /**
@@ -99,7 +91,7 @@ class Matrix {
    * @return     Matrix with rotation
    */
   static Matrix MakeRotate(float degrees) {
-    Matrix m = {};
+    Matrix m;
     m.setRotate(degrees);
     return m;
   }
@@ -112,7 +104,7 @@ class Matrix {
    * @return         Matrix with rotation
    */
   static Matrix MakeRotate(float degrees, float px, float py) {
-    Matrix m = {};
+    Matrix m;
     m.setRotate(degrees, px, py);
     return m;
   }
@@ -134,9 +126,7 @@ class Matrix {
    */
   static Matrix MakeAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
                         float transY) {
-    Matrix m = {};
-    m.setAll(scaleX, skewX, transX, skewY, scaleY, transY);
-    return m;
+    return {scaleX, skewX, transX, skewY, scaleY, transY};
   }
 
   /**
@@ -149,6 +139,15 @@ class Matrix {
    *   @return  const identity Matrix
    */
   static const Matrix& I();
+
+  /**
+   * Creates an identity Matrix:
+   *    | 1 0 0 |
+   *    | 0 1 0 |
+   *    | 0 0 1 |
+   */
+  constexpr Matrix() : Matrix(1, 0, 0, 0, 1, 0) {
+  }
 
   /**
    * Returns true if Matrix is identity. The identity matrix is:
@@ -321,22 +320,6 @@ class Matrix {
    * @param transY  vertical translation to store
    */
   void setAll(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY);
-
-  /**
-   * Sets the Matrix to affine values, passed in column major order:
-   *
-   *      | a c tx |
-   *      | b d ty |
-   *      | 0    1 |
-   *
-   * @param a  horizontal scale factor
-   * @param b  vertical skew factor
-   * @param c  horizontal skew factor
-   * @param d  vertical scale factor
-   * @param tx horizontal translation
-   * @param ty vertical translation
-   */
-  void setAffine(float a, float b, float c, float d, float tx, float ty);
 
   /**
    * Sets Matrix to identity; which has no effect on mapped Point. Sets Matrix to:
@@ -761,7 +744,10 @@ class Matrix {
   static constexpr int SCALE_Y = 4;  //!< vertical scale factor
   static constexpr int TRANS_Y = 5;  //!< vertical translation
 
-  void setScaleTranslate(float sx, float sy, float tx, float ty);
+  constexpr Matrix(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY)
+      : values{scaleX, skewX, transX, skewY, scaleY, transY} {
+  }
+
   bool invertNonIdentity(Matrix* inverse) const;
   bool getMinMaxScaleFactors(float results[2]) const;
 };
