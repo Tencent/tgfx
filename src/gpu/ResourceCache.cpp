@@ -230,7 +230,7 @@ void ResourceCache::processUnreferencedResources() {
   auto currentTime = std::chrono::steady_clock::now();
   for (auto& resource : needToPurge) {
     RemoveFromList(nonpurgeableResources, resource);
-    if (!resource->scratchKey.empty()) {
+    if (!resource->scratchKey.empty() || resource->hasExternalReferences()) {
       AddToList(purgeableResources, resource);
       purgeableBytes += resource->memoryUsage();
       resource->lastUsedTime = currentTime;

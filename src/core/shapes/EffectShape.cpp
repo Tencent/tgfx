@@ -19,6 +19,18 @@
 #include "EffectShape.h"
 
 namespace tgfx {
+std::shared_ptr<Shape> Shape::ApplyEffect(std::shared_ptr<Shape> shape,
+                                          std::shared_ptr<PathEffect> effect) {
+
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  if (effect == nullptr) {
+    return shape;
+  }
+  return std::make_shared<EffectShape>(std::move(shape), std::move(effect));
+}
+
 Rect EffectShape::getBounds(float resolutionScale) const {
   auto bounds = shape->getBounds(resolutionScale);
   return effect->filterBounds(bounds);

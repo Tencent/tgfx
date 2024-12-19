@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 #include <EGL/eglext.h>
-#include <mutex>
+#include <atomic>
 #if defined(_WIN32)
 #include "EGLDisplayWrapper.h"
 #endif
@@ -78,20 +78,18 @@ EGLGlobals InitializeEGL() {
   return globals;
 }
 
-static std::mutex eglGlobalsLocker = {};
-static const EGLGlobals* eglGlobals = nullptr;
+static std::atomic<const EGLGlobals*> externalGlobals = {nullptr};
 
 void EGLGlobals::Set(const EGLGlobals* globals) {
-  std::lock_guard<std::mutex> lock(eglGlobalsLocker);
-  eglGlobals = globals;
+  externalGlobals.store(globals, std::memory_order_relaxed);
 }
 
 const EGLGlobals* EGLGlobals::Get() {
-  std::lock_guard<std::mutex> lock(eglGlobalsLocker);
-  if (eglGlobals) {
-    return eglGlobals;
+  auto globals = externalGlobals.load(std::memory_order_relaxed);
+  if (!globals) {
+    static const EGLGlobals eglGlobals = InitializeEGL();
+    globals = &eglGlobals;
   }
-  static const EGLGlobals globals = InitializeEGL();
-  return &globals;
+  return globals;
 }
 }  // namespace tgfx

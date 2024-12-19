@@ -85,16 +85,15 @@ void TGFXView::createAppHost() {
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
   appHost->addImage("bridge", image);
 #ifdef __APPLE__
-  std::string DefaultFont = "PingFang SC";
-  std::string DefualtEmojiFont = "Apple Color Emoji";
+  auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
+  auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
 #else
-  std::string DefaultFont = "Microsoft YaHei";
-  std::string DefualtEmojiFont = "Segoe UI Emoji";
+  auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
+  auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
+  auto emojiTypeface = tgfx::Typeface::MakeFromPath(std::string(emojiPath.toLocal8Bit()));
 #endif
-  auto typeface = tgfx::Typeface::MakeFromName(DefaultFont, "");
-  appHost->addTypeface("default", typeface);
-  typeface = tgfx::Typeface::MakeFromName(DefualtEmojiFont, "");
-  appHost->addTypeface("emoji", typeface);
+  appHost->addTypeface("default", defaultTypeface);
+  appHost->addTypeface("emoji", emojiTypeface);
 }
 
 void TGFXView::draw() {

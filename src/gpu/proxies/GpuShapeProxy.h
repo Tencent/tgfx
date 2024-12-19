@@ -24,13 +24,16 @@
 namespace tgfx {
 class GpuShapeProxy {
  public:
-  GpuShapeProxy(const Rect& bounds, std::shared_ptr<GpuBufferProxy> triangles,
+  GpuShapeProxy(const Matrix& drawingMatrix, std::shared_ptr<GpuBufferProxy> triangles,
                 std::shared_ptr<TextureProxy> texture)
-      : bounds(bounds), triangles(std::move(triangles)), texture(std::move(texture)) {
+      : drawingMatrix(drawingMatrix), triangles(std::move(triangles)), texture(std::move(texture)) {
   }
 
-  const Rect& getBounds() const {
-    return bounds;
+  /**
+   * Returns the additional matrix needed to apply to the shape cache when drawing.
+   */
+  const Matrix& getDrawingMatrix() const {
+    return drawingMatrix;
   }
 
   std::shared_ptr<GpuBuffer> getTriangles() const {
@@ -42,7 +45,7 @@ class GpuShapeProxy {
   }
 
  private:
-  Rect bounds = Rect::MakeEmpty();
+  Matrix drawingMatrix = Matrix::I();
   std::shared_ptr<GpuBufferProxy> triangles = nullptr;
   std::shared_ptr<TextureProxy> texture = nullptr;
 };

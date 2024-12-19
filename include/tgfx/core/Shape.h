@@ -41,7 +41,7 @@ class Shape {
 
   /**
    * Creates a new Shape from the given text blob. Returns nullptr if the text blob is nullptr or
-   * contains a typeface that can't generate a path, such as color emoji typefaces.
+   * contains a typeface that can't generate a path, such as bitmap typefaces.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
@@ -70,6 +70,12 @@ class Shape {
    */
   static std::shared_ptr<Shape> ApplyEffect(std::shared_ptr<Shape> shape,
                                             std::shared_ptr<PathEffect> effect);
+
+  /**
+   * Creates a new Shape by applying the inverse fill type to the given Shape. Returns nullptr if
+   * the shape is nullptr.
+   */
+  static std::shared_ptr<Shape> ApplyInverse(std::shared_ptr<Shape> shape);
 
   virtual ~Shape() = default;
 
@@ -106,6 +112,11 @@ class Shape {
   virtual bool isSimplePath(Path* path = nullptr) const;
 
   /**
+   * Returns true if the PathFillType of the computed path is InverseWinding or InverseEvenOdd.
+   */
+  virtual bool isInverseFillType() const;
+
+  /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
    * the exact bounds can't be determined until the shape is computed. Note: Since the Shape may
    * contain strokes or text glyphs whose outlines can change with different scale factors, it's
@@ -135,7 +146,7 @@ class Shape {
   virtual Path getPath(float resolutionScale = 1.0f) const;
 
  protected:
-  enum class Type { Append, Effect, Glyph, Matrix, Merge, Path, Stroke };
+  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke };
 
   /**
    * Returns the type of the Shape.

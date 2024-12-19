@@ -26,17 +26,20 @@ class InnerShadowImageFilter : public ImageFilter {
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                          const Color& color, bool shadowOnly);
 
- protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
-
- private:
   float dx = 0.0f;
   float dy = 0.0f;
   std::shared_ptr<ImageFilter> blurFilter = nullptr;
   Color color = Color::Black();
   bool shadowOnly = false;
+
+ protected:
+  Type type() const override {
+    return Type::InnerShadow;
+  };
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                         const FPArgs& args,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

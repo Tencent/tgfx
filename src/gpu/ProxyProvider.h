@@ -69,6 +69,7 @@ class ProxyProvider {
    * the GPU.
    */
   std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 
   /*

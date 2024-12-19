@@ -20,17 +20,6 @@
 #include "gpu/Blend.h"
 
 namespace tgfx {
-enum class OpacityType {
-  // The opacity is unknown
-  Unknown,
-  // The src color is known to be opaque (alpha == 255)
-  Opaque,
-  // The src color is known to be fully transparent (color == 0)
-  TransparentBlack,
-  // The src alpha is known to be fully transparent (alpha == 0)
-  TransparentAlpha,
-};
-
 static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
   auto alpha = color.alpha;
   if (alpha == 1.0f && (!shader || shader->isOpaque())) {
@@ -43,35 +32,6 @@ static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
     return OpacityType::TransparentBlack;
   }
   return OpacityType::Unknown;
-}
-
-static bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
-  BlendInfo blendInfo = {};
-  if (!BlendModeAsCoeff(mode, &blendInfo)) {
-    return false;
-  }
-  switch (blendInfo.srcBlend) {
-    case BlendModeCoeff::DA:
-    case BlendModeCoeff::DC:
-    case BlendModeCoeff::IDA:
-    case BlendModeCoeff::IDC:
-      return false;
-    default:
-      break;
-  }
-  switch (blendInfo.dstBlend) {
-    case BlendModeCoeff::Zero:
-      return true;
-    case BlendModeCoeff::ISA:
-      return srcColorOpacity == OpacityType::Opaque;
-    case BlendModeCoeff::SA:
-      return srcColorOpacity == OpacityType::TransparentBlack ||
-             srcColorOpacity == OpacityType::TransparentAlpha;
-    case BlendModeCoeff::SC:
-      return srcColorOpacity == OpacityType::TransparentBlack;
-    default:
-      return false;
-  }
 }
 
 bool FillStyle::isOpaque() const {

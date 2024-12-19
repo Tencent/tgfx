@@ -58,20 +58,27 @@ Context* RenderContext::getContext() const {
   return opContext->renderTarget()->getContext();
 }
 
-Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& state) {
-  Matrix invert = {};
-  if (!state.matrix.invert(&invert)) {
-    return {};
+Rect RenderContext::getClipBounds(const Path& clip) {
+  if (clip.isInverseFillType()) {
+    return Rect::MakeWH(opContext->renderTarget()->width(), opContext->renderTarget()->height());
+  }
+  return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
+}
+
+Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& state, bool inverted) {
+  Matrix invertMatrix = {};
+  if (!state.matrix.invert(&invertMatrix)) {
+    return Rect::MakeEmpty();
+  }
+  auto& clip = state.clip;
+  auto clipBounds = getClipBounds(clip);
+  invertMatrix.mapRect(&clipBounds);
+  if (inverted) {
+    return clipBounds;
   }
   auto drawRect = localBounds;
-  auto& clip = state.clip;
-  auto wideOpen = clip.isEmpty() && clip.isInverseFillType();
-  if (!wideOpen) {
-    auto clipBounds = clip.getBounds();
-    invert.mapRect(&clipBounds);
-    if (!drawRect.intersect(clipBounds)) {
-      return {};
-    }
+  if (!drawRect.intersect(clipBounds)) {
+    return Rect::MakeEmpty();
   }
   return drawRect;
 }
@@ -113,7 +120,8 @@ bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const Fi
     if (useScissor) {
       addOp(ClearOp::Make(color, *clipRect), [] { return false; });
       return true;
-    } else if (clipRect->isEmpty()) {
+    }
+    if (clipRect->isEmpty()) {
       addOp(ClearOp::Make(color, bounds), [] { return true; });
       return true;
     }
@@ -140,11 +148,12 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     return;
   }
   auto localBounds = shape->getBounds(maxScale);
-  localBounds = clipLocalBounds(localBounds, state);
+  localBounds = clipLocalBounds(localBounds, state, shape->isInverseFillType());
   if (localBounds.isEmpty()) {
     return;
   }
-  auto drawOp = ShapeDrawOp::Make(style.color, std::move(shape), state.matrix);
+  auto clipBounds = getClipBounds(state.clip);
+  auto drawOp = ShapeDrawOp::Make(style.color, std::move(shape), state.matrix, clipBounds);
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
@@ -239,8 +248,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& s
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto alphaOnly = opContext->renderTarget()->format() == PixelFormat::ALPHA_8;
-  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, alphaOnly);
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
   Matrix invertMatrix = {};
   if (!viewMatrix.invert(&invertMatrix)) {
     return;
@@ -262,10 +270,14 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
                                     const MCState& state, const FillStyle& style) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
+  if (scale <= 0) {
+    return;
+  }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto font = glyphRun.font;
-    font = font.makeWithSize(font.getSize() * scale);
+    auto glyphFace = glyphRun.glyphFace;
+    glyphFace = glyphFace->makeScaled(scale);
+    DEBUG_ASSERT(glyphFace != nullptr);
     auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
     auto& positions = glyphRun.positions;
@@ -273,7 +285,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = font.getImage(glyphID, &glyphState.matrix);
+      auto glyphImage = glyphFace->getImage(glyphID, &glyphState.matrix);
       if (glyphImage == nullptr) {
         continue;
       }
@@ -327,11 +339,15 @@ std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip
 }
 
 std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AAType aaType) {
-  auto domainID = PathRef::GetUniqueKey(clip).domainID();
-  if (domainID == clipID) {
+  auto uniqueKey = PathRef::GetUniqueKey(clip);
+  if (aaType == AAType::Coverage) {
+    static const auto AntialiasFlag = UniqueID::Next();
+    uniqueKey = UniqueKey::Append(uniqueKey, &AntialiasFlag, 1);
+  }
+  if (uniqueKey == clipKey) {
     return clipTexture;
   }
-  auto bounds = clip.getBounds();
+  auto bounds = getClipBounds(clip);
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -339,7 +355,9 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   if (PathTriangulator::ShouldTriangulatePath(clip)) {
-    auto drawOp = ShapeDrawOp::Make(Color::White(), Shape::MakeFrom(clip), rasterizeMatrix);
+    auto clipBounds = Rect::MakeWH(width, height);
+    auto drawOp =
+        ShapeDrawOp::Make(Color::White(), Shape::MakeFrom(clip), rasterizeMatrix, clipBounds);
     drawOp->setAA(aaType);
     auto renderTarget = RenderTargetProxy::MakeFallback(getContext(), width, height, true, 1, false,
                                                         ImageOrigin::TopLeft, true);
@@ -355,7 +373,7 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
     auto proxyProvider = getContext()->proxyProvider();
     clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
   }
-  clipID = domainID;
+  clipKey = uniqueKey;
   return clipTexture;
 }
 
@@ -378,7 +396,7 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
     }
     return nullptr;
   }
-  auto clipBounds = clip.getBounds();
+  auto clipBounds = getClipBounds(clip);
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, opContext->renderTarget());
   scissorRect->roundOut();

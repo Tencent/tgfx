@@ -16,9 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <memory>
 #include <vector>
 #include "CornerPinEffect.h"
-#include "core/shaders/ShaderBase.h"
+#include "core/filters/BlurImageFilter.h"
+#include "core/filters/ColorImageFilter.h"
+#include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/InnerShadowImageFilter.h"
+#include "core/shaders/GradientShader.h"
+#include "core/shaders/ImageShader.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
@@ -26,10 +32,13 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/GradientType.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/RuntimeEffect.h"
@@ -364,139 +373,204 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   auto filter = ColorFilter::Compose(modeColorFilter, lumaFilter);
   ret = filter->asColorMode(nullptr, nullptr);
   EXPECT_FALSE(ret);
+
+  {
+    auto imageFilter = ImageFilter::Blur(20, 30);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
+    auto blurFilter = std::static_pointer_cast<BlurImageFilter>(imageFilter);
+    Size blurSize = blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    EXPECT_EQ(blurSize.width, 18);
+    EXPECT_EQ(blurSize.height, 36);
+  }
+
+  {
+    auto imageFilter = ImageFilter::DropShadow(15.f, 15.f, 20.f, 30.f, Color::White());
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
+    auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
+    Size blurSize = dropShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    EXPECT_EQ(blurSize.width, 18);
+    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(dropShadowFilter->dx, 15.f);
+    EXPECT_EQ(dropShadowFilter->dy, 15.f);
+    EXPECT_EQ(dropShadowFilter->color, Color::White());
+    EXPECT_EQ(dropShadowFilter->shadowOnly, false);
+  }
+
+  {
+    auto imageFilter = ImageFilter::DropShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
+    auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
+    Size blurSize = dropShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    EXPECT_EQ(blurSize.width, 18);
+    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(dropShadowFilter->dx, 15.f);
+    EXPECT_EQ(dropShadowFilter->dy, 15.f);
+    EXPECT_EQ(dropShadowFilter->color, Color::White());
+    EXPECT_EQ(dropShadowFilter->shadowOnly, true);
+  }
+
+  {
+    auto imageFilter = ImageFilter::InnerShadow(15.f, 15.f, 20.f, 30.f, Color::White());
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
+    auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
+    Size blurSize = innerShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    EXPECT_EQ(blurSize.width, 18);
+    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(innerShadowFilter->dx, 15.f);
+    EXPECT_EQ(innerShadowFilter->dy, 15.f);
+    EXPECT_EQ(innerShadowFilter->color, Color::White());
+    EXPECT_EQ(innerShadowFilter->shadowOnly, false);
+  }
+
+  {
+    auto imageFilter = ImageFilter::InnerShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
+    auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
+    Size blurSize = innerShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    EXPECT_EQ(blurSize.width, 18);
+    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(innerShadowFilter->dx, 15.f);
+    EXPECT_EQ(innerShadowFilter->dy, 15.f);
+    EXPECT_EQ(innerShadowFilter->color, Color::White());
+    EXPECT_EQ(innerShadowFilter->shadowOnly, true);
+  }
+
+  {
+    auto imageFilter = ImageFilter::ColorFilter(modeColorFilter);
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Color);
+    auto colorFilter = std::static_pointer_cast<ColorImageFilter>(imageFilter);
+    Color color;
+    BlendMode mode;
+    bool ret = colorFilter->filter->asColorMode(&color, &mode);
+    EXPECT_TRUE(ret);
+    EXPECT_EQ(color, Color::Red());
+    EXPECT_EQ(mode, BlendMode::Multiply);
+  }
+
+  {
+    auto blueFilter = ImageFilter::DropShadow(100, 100, 0, 0, Color::Blue());
+    auto greenFilter = ImageFilter::DropShadow(-100, -100, 0, 0, Color::Green());
+    auto blackFilter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
+    auto imageFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Compose);
+  }
+
+  {
+    auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+    auto imageFilter = ImageFilter::Runtime(std::move(effect));
+    EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Runtime);
+  }
 }
 
 TGFX_TEST(FilterTest, GetShaderProperties) {
-  auto colorShader = Shader::MakeColorShader(Color::Red());
-  ASSERT_TRUE(colorShader != nullptr);
+
   {
-    EXPECT_TRUE(asShaderBase(colorShader)->type() == ShaderType::Color);
+    auto colorShader = Shader::MakeColorShader(Color::Red());
+    ASSERT_TRUE(colorShader != nullptr);
+    EXPECT_EQ(colorShader->type(), Shader::Type::Color);
 
     Color color = Color::White();
     bool ret = colorShader->asColor(&color);
     EXPECT_TRUE(ret);
     EXPECT_EQ(color, Color::Red());
-
-    auto gradientType = asShaderBase(colorShader)->asGradient(nullptr);
-    EXPECT_EQ(gradientType, GradientType::None);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(colorShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
 
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  auto imageShader = Shader::MakeImageShader(image, TileMode::Mirror, TileMode::Repeat);
-  ASSERT_TRUE(imageShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(imageShader)->type(), ShaderType::Image);
+    auto inputImage = MakeImage("resources/apitest/imageReplacement.png");
+    ASSERT_TRUE(inputImage != nullptr);
+    auto shader = Shader::MakeImageShader(inputImage, TileMode::Mirror, TileMode::Repeat);
+    ASSERT_TRUE(shader != nullptr);
 
-    bool ret = imageShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    EXPECT_EQ(shader->type(), Shader::Type::Image);
 
-    auto gradientType = asShaderBase(imageShader)->asGradient(nullptr);
-    EXPECT_EQ(gradientType, GradientType::None);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(imageShader)->asImage();
-    EXPECT_EQ(image, image);
-    EXPECT_EQ(tileModeX, TileMode::Mirror);
-    EXPECT_EQ(tileModeY, TileMode::Repeat);
+    auto imageShader = std::static_pointer_cast<ImageShader>(shader);
+    EXPECT_TRUE(imageShader != nullptr);
+    EXPECT_EQ(imageShader->tileModeX, TileMode::Mirror);
+    EXPECT_EQ(imageShader->tileModeY, TileMode::Repeat);
   }
 
-  auto blendShader = Shader::MakeBlend(BlendMode::SrcOut, imageShader, colorShader);
-  ASSERT_TRUE(blendShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(blendShader)->type(), ShaderType::Blend);
-
-    bool ret = blendShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
-
-    auto gradientType = asShaderBase(blendShader)->asGradient(nullptr);
-    EXPECT_EQ(gradientType, GradientType::None);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(blendShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
+    auto redShader = Shader::MakeColorShader(Color::Red());
+    auto greenShader = Shader::MakeColorShader(Color::Green());
+    auto blendShader = Shader::MakeBlend(BlendMode::SrcOut, redShader, greenShader);
+    ASSERT_TRUE(blendShader != nullptr);
+    EXPECT_EQ(blendShader->type(), Shader::Type::Blend);
   }
 
   std::vector<Color> colors = {Color::Red(), Color::Green(), Color::Blue()};
   std::vector<float> positions = {0.f, 0.5f, 1.f};
-
   auto startPoint = Point::Make(0, 0);
   auto endPoint = Point::Make(100, 100);
-  auto linearGradientShader = Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
-  ASSERT_TRUE(linearGradientShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(linearGradientShader)->type(), ShaderType::Gradient);
+    auto shader = Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
+    ASSERT_TRUE(shader != nullptr);
+    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
 
-    bool ret = linearGradientShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
     GradientInfo info;
-    auto gradientType = asShaderBase(linearGradientShader)->asGradient(&info);
+    auto gradientType = gradientShader->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Linear);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], startPoint);
     EXPECT_EQ(info.points[1], endPoint);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(linearGradientShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
 
   auto center = Point::Make(50, 50);
   float radius = 50;
-  auto radialGradientShader = Shader::MakeRadialGradient(center, radius, colors, positions);
-  ASSERT_TRUE(radialGradientShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(radialGradientShader)->type(), ShaderType::Gradient);
+    auto shader = Shader::MakeRadialGradient(center, radius, colors, positions);
+    ASSERT_TRUE(shader != nullptr);
+    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
 
-    bool ret = radialGradientShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
     GradientInfo info;
-    auto gradientType = asShaderBase(radialGradientShader)->asGradient(&info);
+    auto gradientType = gradientShader->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Radial);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], center);
     EXPECT_EQ(info.radiuses[0], radius);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(radialGradientShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
 
-  float startAngle = 0.f;
-  float endAngle = 360.f;
-  auto conicGradientShader =
-      Shader::MakeConicGradient(center, startAngle, endAngle, colors, positions);
-  ASSERT_TRUE(conicGradientShader != nullptr);
   {
-    EXPECT_EQ(asShaderBase(conicGradientShader)->type(), ShaderType::Gradient);
+    float startAngle = 0.f;
+    float endAngle = 360.f;
+    auto shader = Shader::MakeConicGradient(center, startAngle, endAngle, colors, positions);
+    ASSERT_TRUE(shader != nullptr);
+    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
 
-    bool ret = conicGradientShader->asColor(nullptr);
-    EXPECT_FALSE(ret);
+    auto gradientShader = std::static_pointer_cast<LinearGradientShader>(shader);
 
     GradientInfo info;
-    auto gradientType = asShaderBase(conicGradientShader)->asGradient(&info);
+    auto gradientType = gradientShader->asGradient(&info);
     EXPECT_EQ(gradientType, GradientType::Conic);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
     EXPECT_EQ(info.points[0], center);
     EXPECT_EQ(info.radiuses[0], startAngle);
     EXPECT_EQ(info.radiuses[1], endAngle);
-
-    auto [image, tileModeX, tileModeY] = asShaderBase(conicGradientShader)->asImage();
-    EXPECT_EQ(image, nullptr);
-    EXPECT_EQ(tileModeX, TileMode::Clamp);
-    EXPECT_EQ(tileModeY, TileMode::Clamp);
   }
+}
+
+TGFX_TEST(FilterTest, AlphaThreshold) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  auto canvas = surface->getCanvas();
+  auto paint = Paint();
+  paint.setColor(Color::FromRGBA(100, 0, 0, 128));
+  auto opacityFilter = ColorFilter::AlphaThreshold(129.f / 255.f);
+  paint.setColorFilter(opacityFilter);
+  auto rect = Rect::MakeWH(100, 100);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold_empty"));
+  opacityFilter = ColorFilter::AlphaThreshold(-1.f);
+  paint.setColorFilter(opacityFilter);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold"));
 }
 }  // namespace tgfx

@@ -33,90 +33,127 @@ class Surface;
 class FillStyle;
 class DrawContext;
 class MCState;
+class CanvasState;
 
 /**
- * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
- * contains a stack of opacity, blend mode, matrix and clip values. Each Canvas draw call transforms
- * the geometry of the object by the concatenation of all matrix values in the stack. The
- * transformed geometry is clipped by the intersection of all the clip values in the stack.
+ * Canvas provides an interface for drawing, including how the drawing is clipped and transformed.
+ * It maintains a stack of matrix and clip values. Each draw call on the Canvas transforms the
+ * geometry of the object by combining all the matrix values in the stack. The transformed geometry
+ * is then clipped by the intersection of all the clip values in the stack.
  */
 class Canvas {
  public:
   /**
-   * Returns the associated Surface if the Canvas is backed by one, otherwise returns nullptr.
+   * Returns the associated Surface if the Canvas has one, otherwise returns nullptr.
    */
-  Surface* getSurface() const;
+  Surface* getSurface() const {
+    return surface;
+  }
 
   /**
-   * Saves matrix and clip. Calling restore() discards changes to them, restoring them to their state
-   * when save() was called. Saved Canvas state is put on a stack, multiple calls to save() should
-   * be balanced by an equal number of calls to restore().
+   * Saves the current matrix and clip state. Calling restore() will revert any changes made to
+   * them, returning them to their state when save() was called. The saved Canvas state is pushed
+   * onto a stack, so multiple calls to save() should be matched with an equal number of calls to
+   * restore(). Use restoreToCount() with the returned depth to restore this and any subsequent
+   * saves.
+   * @return the depth of previously saved stack states.
    */
-  void save();
+  int save();
 
   /**
-   * Removes changes to matrix and clip since Canvas state was last saved. The state is removed from
-   * the stack. Does nothing if the stack is empty.
+   * Saves the current matrix and clip state, and allocates an offscreen layer for subsequent
+   * drawing. When restore() is called, it discards changes to the matrix and clip, and draws the
+   * offscreen layer as if it were an Image with the specified Paint. The optional paint applies
+   * alpha, ColorFilter, ImageFilter, MaskFilter, and BlendMode when restore() is called. Use
+   * restoreToCount() with the returned depth to restore this and any subsequent saves.
+   * @param paint the Paint to apply when drawing the offscreen layer.
+   * @return the depth of the previously saved stack states.
+   */
+  int saveLayer(const Paint* paint);
+
+  /**
+   * Saves the current matrix and clip state, and allocates an offscreen layer for subsequent
+   * drawing. When restore() is called, it discards changes to the matrix and clip, and draws the
+   * offscreen layer with the specified alpha. Use restoreToCount() with the returned depth to
+   * restore this and any subsequent saves.
+   * @param alpha the alpha value to apply when drawing the offscreen layer.
+   * @return the depth of the previously saved stack states.
+   */
+  int saveLayerAlpha(float alpha);
+
+  /**
+   * Reverts changes to the matrix and clip made since the last save. Removes the state from the
+   * stack. If the stack is empty, it does nothing.
    */
   void restore();
 
   /**
-   * Returns the number of saved states. This is the number of times save() has been called minus
-   * the number of times restore() has been called. The save count of a new canvas is zero.
+   * Returns the number of saved stack states. This is the difference between the number of times
+   * save() and restore() have been called. A new canvas starts with a save count of zero.
    */
-  size_t getSaveCount() const;
+  int getSaveCount() const;
 
   /**
    * Restores state to the specified saveCount. If saveCount is greater than the number of saved
    * states, this method does nothing.
+   * @param saveCount  the save count to restore to.
    */
-  void restoreToCount(size_t saveCount);
+  void restoreToCount(int saveCount);
 
   /**
-   * Translates the current matrix by dx along the x-axis and dy along the y-axis. Mathematically,
-   * it replaces the current matrix with a translation matrix premultiplied with the current matrix.
-   * This has the effect of moving the drawing by (dx, dy) before transforming the result with the
-   * current matrix.
+   * Translates the current matrix by dx along the x-axis and dy along the y-axis. This means the
+   * current matrix is replaced with a translation matrix that is premultiplied with the current
+   * matrix. As a result, the drawing is moved by (dx, dy) before being transformed by the current
+   * matrix.
+   * @param dx  the distance to translate along the x-axis.
+   * @param dy  the distance to translate along the y-axis.
    */
   void translate(float dx, float dy);
 
   /**
-   * Scales the current matrix by sx along the x-axis and sy along the y-axis. Mathematically, it
-   * replaces the current matrix with a scale matrix premultiplied with the current matrix. This has
-   * the effect of scaling the drawing by (sx, sy) before transforming the result with the current
-   * matrix.
+   * Scales the current matrix by sx along the x-axis and sy along the y-axis. This replaces the
+   * current matrix with a scale matrix premultiplied with the current matrix, effectively scaling
+   * the drawing by (sx, sy) before applying the current matrix transformation.
+   * @param sx  the scale factor along the x-axis.
+   * @param sy  the scale factor along the y-axis.
    */
   void scale(float sx, float sy);
 
   /**
-   * Rotates the current matrix by degrees. Positive values rotate the drawing clockwise.
-   * Mathematically, it replaces the current matrix with a rotation matrix premultiplied with the
-   * current matrix. This has the effect of rotating the drawing by degrees before transforming the
-   * result with the current matrix.
+   * Rotates the current matrix by the specified degrees. Positive values rotate the drawing
+   * clockwise. This replaces the current matrix with a rotation matrix premultiplied with the
+   * existing matrix. As a result, the drawing is rotated by the specified degrees before being
+   * transformed by the current matrix.
+   * @param degrees  the angle of rotation in degrees.
    */
   void rotate(float degrees);
 
   /**
-   * Rotates the current matrix by degrees around the point (px, py). Positive values rotate the
-   * drawing clockwise. Mathematically, it replaces the current matrix with a rotation matrix
-   * premultiplied with the current matrix. This has the effect of rotating the drawing around the
-   * point (px, py) by degrees before transforming the result with the current matrix.
+   * Rotates the current matrix by the specified degrees around the point (px, py). Positive values
+   * rotate the drawing clockwise. This replaces the current matrix with a rotation matrix
+   * premultiplied with the existing matrix. As a result, the drawing is rotated around the point
+   * (px, py) by the specified degrees before being transformed by the current matrix.
+   * @param degrees  the angle of rotation in degrees.
+   * @param px  the x-coordinate of the point to rotate around.
+   * @param py  the y-coordinate of the point to rotate around.
    */
   void rotate(float degrees, float px, float py);
 
   /**
-   * Skews the current matrix by sx along the x-axis and sy along the y-axis. A positive value of sx
-   * skews the drawing right as y-axis values increase; a positive value of sy skews the drawing
-   * down as x-axis values increase. Mathematically, it replaces the current matrix with a skew
-   * matrix premultiplied with the current matrix. This has the effect of skewing the drawing by
-   * (sx, sy) before transforming the result with the current matrix.
+   * Skews the current matrix by sx along the x-axis and sy along the y-axis. A positive sx skews
+   * the drawing to the right as the y-axis values increase; a positive sy skews the drawing
+   * downward as the x-axis values increase. This replaces the current matrix with a skew matrix
+   * premultiplied with the existing matrix, effectively skewing the drawing by (sx, sy) before
+   * applying the current matrix transformation.
+   * @param sx  the skew factor along the x-axis.
+   * @param sy  the skew factor along the y-axis.
    */
   void skew(float sx, float sy);
 
   /**
-   * Replaces the current Matrix with matrix premultiplied with the existing one. This has the
-   * effect of transforming the drawn geometry by matrix, before transforming the result with the
-   * existing Matrix.
+   * Multiplies the current matrix with the given matrix. This transforms the drawn geometry by the
+   * given matrix first, followed by the current matrix.
+   * @param matrix  the matrix to multiply with the current matrix.
    */
   void concat(const Matrix& matrix);
 
@@ -126,14 +163,14 @@ class Canvas {
   const Matrix& getMatrix() const;
 
   /**
-   * Replaces transformation with specified matrix. Unlike concat(), any prior matrix state is
-   * overwritten.
-   * @param matrix  matrix to copy, replacing existing Matrix
+   * Replaces the current transformation with the specified matrix. Unlike concat(), this overwrites
+   * any existing matrix state.
+   * @param matrix  the matrix to copy, replacing the existing matrix
    */
   void setMatrix(const Matrix& matrix);
 
   /**
-   * Sets Matrix to the identity matrix. Any prior matrix state is overwritten.
+   * Resets the matrix to the identity matrix, overwriting any previous matrix state.
    */
   void resetMatrix();
 
@@ -143,39 +180,51 @@ class Canvas {
   const Path& getTotalClip() const;
 
   /**
-   * Replaces clip with the intersection of clip and rect. The resulting clip is aliased; pixels are
-   * fully contained by the clip. The rect is transformed by the current Matrix before it is
-   * combined with clip.
+   * Replaces the current clip with the intersection of the clip and the rectangle. The resulting
+   * clip is aliased, meaning pixels are fully contained by the clip. The rectangle is transformed
+   * by the current matrix before being combined with the clip.
+   * @param rect  the rectangle to clip to.
    */
   void clipRect(const Rect& rect);
 
   /**
-   * Replaces clip with the intersection of clip and path. The path is transformed by Matrix before
-   * it is combined with clip.
+   * Replaces the current clip with the intersection of the clip and the path. The path is
+   * transformed by the Matrix before being combined with the clip.
+   * @param path  the path to clip to.
    */
   void clipPath(const Path& path);
 
   /**
-   * Fills the entire clip region to a transparent color using BlendMode::Src. This has the effect
-   * of replacing all pixels within the clip region with a transparent color.
+   * Clears the entire clip region, making it fully transparent using BlendMode::Src. This
+   * effectively replaces all pixels within the clip region with a transparent color.
    */
   void clear();
 
   /**
-   * Fills a specified rectangle with a given color using the current clip and BlendMode::Src. This
-   * has the effect of replacing all pixels within the rectangle with the specified color.
+   * Fills the specified rectangle with the given color, using the current clip and BlendMode::Src.
+   * This replaces all pixels within the rectangle with the specified color.
+   * @param rect  the rect to fill.
+   * @param color  the color to fill the rect with.
    */
   void clearRect(const Rect& rect, const Color& color = Color::Transparent());
 
   /**
    * Draws a line from (x0, y0) to (x1, y1) using the current clip, matrix, and specified paint.
-   * The Paint::style is ignored, as if set to PaintStyle::Stroke.
+   * The Paint::style is always treated as PaintStyle::Stroke.
+   * @param x0  the x-coordinate of the start point.
+   * @param y0  the y-coordinate of the start point.
+   * @param x1  the x-coordinate of the end point.
+   * @param y1  the y-coordinate of the end point.
+   * @param paint  stroke, blend, color, and so on, used to draw.
    */
   void drawLine(float x0, float y0, float x1, float y1, const Paint& paint);
 
   /**
    * Draws a line from p0 to p1 using the current clip, matrix, and specified paint. The
-   * Paint::style is ignored, as if it were set to PaintStyle::Stroke.
+   * Paint::style is always treated as PaintStyle::Stroke.
+   * @param p0  the start point.
+   * @param p1  the end point.
+   * @param paint  stroke, blend, color, and so on, used to draw.
    */
   void drawLine(const Point& p0, const Point& p1, const Paint& paint) {
     drawLine(p0.x, p0.y, p1.x, p1.y, paint);
@@ -183,21 +232,32 @@ class Canvas {
 
   /**
    * Draws a rectangle using the current clip, matrix, and specified paint.
+   * @param rect  the rectangle to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawRect(const Rect& rect, const Paint& paint);
 
   /**
    * Draws an oval using the current clip, matrix, and specified paint.
+   * @param oval  the bounds of the oval to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawOval(const Rect& oval, const Paint& paint);
 
   /**
    * Draws a circle using the current clip, matrix, and specified paint.
+   * @param centerX  the x-coordinate of the circle's center.
+   * @param centerY  the y-coordinate of the circle's center.
+   * @param radius  the radius of the circle.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawCircle(float centerX, float centerY, float radius, const Paint& paint);
 
   /**
    * Draws a circle using the current clip, matrix, and specified paint.
+   * @param center  the center of the circle.
+   * @param radius  the radius of the circle.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawCircle(const Point& center, float radius, const Paint& paint) {
     drawCircle(center.x, center.y, radius, paint);
@@ -213,116 +273,151 @@ class Canvas {
   void drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint);
 
   /**
-   * Draws a RRect using the current clip, matrix, and specified paint. The rrect may represent a
-   * rectangle, circle, oval, rounded rectangle.
+   * Draws an RRect using the current clip, matrix, and specified paint. The RRect can represent a
+   * rectangle, circle, oval, or rounded rectangle.
+   * @param rRect  the rounded rectangle to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawRRect(const RRect& rRect, const Paint& paint);
 
   /**
    * Draws a path using the current clip, matrix, and specified paint.
+   * @param path  the path to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawPath(const Path& path, const Paint& paint);
 
   /**
    * Draws a shape using the current clip, matrix, and specified paint.
+   * @param shape  the shape to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
 
   /**
-   * Draws an image, with its top-left corner at (left, top), using current clip, matrix and
+   * Draws an image with its top-left corner at (left, top), using the current clip, matrix, and
    * optional paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and
    * MipmapMode::Linear as the sampling options. Otherwise, it uses FilterMode::Linear and
-   * MipmapMode::None as the sampling options.
+   * MipmapMode::None.
+   * @param image  the image to draw.
+   * @param left  the x-coordinate of the image's top-left corner.
+   * @param top  the y-coordinate of the image's top-left corner.
+   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
    */
   void drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint = nullptr);
 
   /**
-   * Draws an Image, with its top-left corner at (0, 0), using current clip and matrix premultiplied
-   * with existing Matrix. If image->hasMipmaps() is true, it uses FilterMode::Linear and
-   * MipmapMode::Linear as the sampling options. Otherwise, it uses FilterMode::Linear and
-   * MipmapMode::None as the sampling options.
+   * Draws an image with its top-left corner at (0, 0), using the current clip and matrix combined
+   * with the existing matrix. If `image->hasMipmaps()` is true, it uses FilterMode::Linear and
+   * MipmapMode::Linear for sampling. Otherwise, it uses FilterMode::Linear and MipmapMode::None.
+   * @param image  the image to draw.
+   * @param matrix  the matrix to rotate, scale, translate, etc.; can be nullptr.
+   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
    */
   void drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint = nullptr);
 
   /**
-   * Draws an image, with its top-left corner at (0, 0), using current clip, matrix and optional
-   * paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and MipmapMode::Linear as the
-   * sampling options. Otherwise, it uses FilterMode::Linear and MipmapMode::None as the sampling
-   * options.
+   * Draws an image with its top-left corner at (0, 0), using the current clip, matrix, and optional
+   * paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and MipmapMode::Linear for
+   * sampling. Otherwise, it uses FilterMode::Linear and MipmapMode::None.
+   * @param image  the image to draw.
+   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
    */
   void drawImage(std::shared_ptr<Image> image, const Paint* paint = nullptr);
 
   /**
-   * Draws an image, with its top-left corner at (0, 0), using current clip, matrix, sampling
-   * options and optional paint.
+   * Draws an image with its top-left corner at (0, 0), using the current clip, matrix, sampling
+   * options, and optional paint.
+   * @param image  the image to draw.
+   * @param sampling  the sampling options used to sample the image.
+   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
    */
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const Paint* paint = nullptr);
 
   /**
-   * Draws text, with origin at (x, y), using clip, matrix, font, and paint. The text must be in
-   * utf-8 encoding. This function uses the default character-to-glyph mapping from the Typeface in
-   * font. It does not perform typeface fallback for characters not found in the Typeface. Glyphs
-   * are positioned based on their default advances.
+   * Draws text at the specified (x, y) coordinates using the current clip, matrix, font, and paint.
+   * The text must be in UTF-8 encoding. This function uses the default character-to-glyph mapping
+   * from the Typeface in the font and does not perform typeface fallback for missing characters.
+   * Glyphs are positioned based on their default advances.
+   * @param text  the text to draw.
+   * @param x  the x-coordinate of the text.
+   * @param y  the y-coordinate of the text.
+   * @param font  the font to use for drawing.
+   * @param paint  the paint to use for blending, coloring, etc.
    */
   void drawSimpleText(const std::string& text, float x, float y, const Font& font,
                       const Paint& paint);
 
   /**
-    * Draws an array of glyphs from glyphIDs at positions using clip, matrix, font, and paint.
-    * @param glyphs the array of glyphIDs to draw.
-    * @param positions where to draw each glyph.
-    * @param glyphCount number of glyphs to draw.
-    * @param font typeface and size to draw the glyphs.
-    * @param paint blend, color, and so on, used to draw.
-    */
+   * Draws an array of glyphs at specified positions using the current clip, matrix, font, and paint.
+   * @param glyphs the array of glyph IDs to draw.
+   * @param positions the positions where each glyph should be drawn.
+   * @param glyphCount the number of glyphs to draw.
+   * @param font the font to use for drawing.
+   * @param paint The paint to use for blending, coloring, etc.
+   */
   void drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint);
 
   /**
-   * Draws a TextBlob at (x, y) using clip, matrix, and paint.
-   * @param textBlob the text blob to draw.
-   * @param x horizontal offset applied to the text blob.
-   * @param y vertical offset applied to the text blob.
-   * @param paint blend, color, and so on, used to draw.
+   * Draws an array of glyphs at specified positions using the current clip, matrix, glyphFace, and
+   * paint.
+   * @param glyphs The array of GlyphIDs to draw.
+   * @param positions The positions to draw each glyph.
+   * @param glyphCount The number of glyphs to draw.
+   * @param glyphFace The custom GlyphFace used for rendering glyphs.
+   * @param paint The paint used for blending, coloring, etc.
+   */
+  void drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
+                  std::shared_ptr<GlyphFace> glyphFace, const Paint& paint);
+
+  /**
+   * Draws a TextBlob at the specified (x, y) coordinates using the current clip, matrix, and paint.
+   * @param textBlob The TextBlob to draw.
+   * @param x The horizontal offset to apply to the TextBlob.
+   * @param y The vertical offset to apply to the TextBlob.
+   * @param paint The paint to use for blending, coloring, etc.
    */
   void drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y, const Paint& paint);
 
   /**
-   * Draws a Picture using the current clip and matrix. Clip and matrix are unchanged by picture
-   * contents, as if save() was called before and restore() was called after drawPicture().
+   * Draws a Picture using the current clip and matrix. The clip and matrix remain unchanged by the
+   * picture's contents, as if save() was called before and restore() was called after drawPicture().
+   * @param picture The recorded drawing commands to play back.
    */
   void drawPicture(std::shared_ptr<Picture> picture);
 
   /**
-   * Draws a Picture using the current clip, and matrix premultiplied with existing Matrix. If paint
-   * is non-null, then the picture is always drawn into a temporary layer before actually landing on
-   * the canvas. Note that drawing into a layer can also change its appearance if there are any
-   * non-associative blendModes inside any of the picture elements.
-   * @param picture recorded drawing commands to play back.
-   * @param matrix Matrix to rotate, scale, translate, and so on; may be nullptr.
-   * @param paint Paint to apply transparency, filtering, and so on; may be nullptr.
+   * Draws a Picture using the current clip and matrix, combined with the existing Matrix. If paint
+   * is provided, the picture is always drawn into a temporary layer before being rendered on the
+   * canvas. Note that drawing into a layer can alter its appearance if there are any
+   * non-associative blendModes within the picture elements.
+   * @param picture The recorded drawing commands to play back.
+   * @param matrix The matrix to rotate, scale, translate, etc.; can be nullptr.
+   * @param paint The paint to apply transparency, filtering, etc.; can be nullptr.
    */
   void drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix, const Paint* paint);
 
   /**
-   * Draws a set of sprites from the atlas using the current clip, matrix, and specified paint.
-   * @param atlas Image containing the sprites.
-   * @param matrix Matrix mappings for sprites in atlas.
-   * @param tex Rect locations of sprites in the atlas.
-   * @param colors one per sprite, may be nullptr.
-   * @param count number of sprites to draw.
-   * @param sampling SamplingOptions used to sample the atlas image.
-   * @param paint blend, alpha, and so on, used to draw.
+   * Draws multiple sprites from the atlas using the current clip, matrix, and specified paint.
+   * @param atlas The image containing the sprites.
+   * @param matrix The matrix transformations for the sprites in the atlas.
+   * @param tex The rectangle locations of the sprites in the atlas.
+   * @param colors An array of colors for each sprite; can be nullptr.
+   * @param count The number of sprites to draw.
+   * @param sampling The sampling options used to sample the atlas image.
+   * @param paint The paint used for blending, alpha, etc.
    */
   void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count, const SamplingOptions& sampling = {},
                  const Paint* paint = nullptr);
 
  private:
+  Surface* surface = nullptr;
   DrawContext* drawContext = nullptr;
   std::unique_ptr<MCState> mcState;
-  std::stack<std::unique_ptr<MCState>> mcStack;
+  std::stack<std::unique_ptr<CanvasState>> stateStack;
 
   explicit Canvas(DrawContext* drawContext);
   Canvas(DrawContext* drawContext, const Path& initClip);
@@ -330,7 +425,7 @@ class Canvas {
                  const Matrix* extraMatrix);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
-  void resetMCState();
+  void resetStateStack();
 
   friend class Surface;
   friend class Picture;

@@ -20,12 +20,11 @@
 #include "core/PathRef.h"
 
 namespace tgfx {
-Rect PathShape::getBounds(float) const {
-  return path.getBounds();
-}
-
-Path PathShape::getPath(float) const {
-  return path;
+std::shared_ptr<Shape> Shape::MakeFrom(Path path) {
+  if (path.isEmpty() && !path.isInverseFillType()) {
+    return nullptr;
+  }
+  return std::make_shared<PathShape>(std::move(path));
 }
 
 bool PathShape::isLine(Point line[2]) const {
@@ -47,6 +46,18 @@ bool PathShape::isRRect(RRect* rRect) const {
 bool PathShape::isSimplePath(Path* result) const {
   *result = path;
   return true;
+}
+
+bool PathShape::isInverseFillType() const {
+  return path.isInverseFillType();
+}
+
+Rect PathShape::getBounds(float) const {
+  return path.getBounds();
+}
+
+Path PathShape::getPath(float) const {
+  return path;
 }
 
 UniqueKey PathShape::getUniqueKey() const {

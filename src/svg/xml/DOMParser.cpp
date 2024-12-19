@@ -87,9 +87,11 @@ bool DOMParser::onEndElement(const std::string& /*element*/) {
 }
 
 bool DOMParser::onText(const std::string& text) {
-  this->startCommon(text, DOMNodeType::Text);
-  this->DOMParser::onEndElement(_elementName);
-
+  // Ignore text if it is empty or contains only whitespace and newlines
+  if (text.find_first_not_of(" \n") != std::string::npos) {
+    this->startCommon(text, DOMNodeType::Text);
+    this->DOMParser::onEndElement(_elementName);
+  }
   return false;
 }
 

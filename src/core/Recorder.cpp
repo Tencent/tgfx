@@ -31,7 +31,7 @@ Canvas* Recorder::beginRecording() {
     canvas = new Canvas(recordingContext);
   }
   if (activelyRecording) {
-    canvas->resetMCState();
+    canvas->resetStateStack();
     recordingContext->clear();
   } else {
     activelyRecording = true;
@@ -48,7 +48,7 @@ std::shared_ptr<Picture> Recorder::finishRecordingAsPicture() {
     return nullptr;
   }
   activelyRecording = false;
-  canvas->resetMCState();
+  canvas->resetStateStack();
   return recordingContext->finishRecordingAsPicture();
 }
 }  // namespace tgfx

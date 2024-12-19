@@ -29,12 +29,6 @@ class SimpleLayerTree : public drawers::LayerTreeDrawer {
 
  protected:
   std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override;
-  void prepare(const AppHost* host) override;
-
- private:
-  void changeMode();
-  // update blendmode
-  std::shared_ptr<tgfx::Layer> progressBar;
 };
 
 }  // namespace drawers

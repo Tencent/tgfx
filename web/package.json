@@ -49,6 +49,7 @@
   "license": "BSD-3-Clause",
   "author": "Tencent",
   "dependencies": {
+    "@jridgewell/gen-mapping": "^0.3.5",
     "express": "^4.21.1"
   }
 }

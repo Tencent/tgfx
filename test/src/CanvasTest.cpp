@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/FillStyle.h"
+#include "core/PathRef.h"
+#include "core/Records.h"
 #include "core/images/ResourceImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
@@ -31,9 +33,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Recorder.h"
-#include "tgfx/core/Stream.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
@@ -606,7 +606,7 @@ TGFX_TEST(CanvasTest, path) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/path"));
 }
 
-TGFX_TEST(CanvasTest, shape) {
+TGFX_TEST(CanvasTest, simpleShape) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -634,6 +634,123 @@ TGFX_TEST(CanvasTest, shape) {
   canvas->rotate(45, radius, radius);
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
+}
+
+static std::vector<Resource*> FindResourceByDomainID(Context* context, uint32_t domainID) {
+  std::vector<Resource*> resources = {};
+  auto resourceCache = context->resourceCache();
+  for (auto& item : resourceCache->uniqueKeyMap) {
+    auto resource = item.second;
+    if (resource->uniqueKey.domainID() == domainID) {
+      resources.push_back(resource);
+    }
+  }
+  return resources;
+}
+
+TGFX_TEST(CanvasTest, inversePath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 420, 100);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(Color::Red());
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 70.f);
+  font.setFauxBold(true);
+  auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
+  auto shape = Shape::MakeFrom(std::move(textBlob));
+  shape = Shape::ApplyInverse(std::move(shape));
+  ASSERT_TRUE(shape != nullptr);
+  EXPECT_TRUE(shape->isInverseFillType());
+  Path textPath = shape->getPath();
+  EXPECT_TRUE(!textPath.isEmpty());
+  EXPECT_TRUE(textPath.isInverseFillType());
+  textPath.transform(Matrix::MakeTrans(10, 75));
+  canvas->clipPath(textPath);
+  Path emptyPath = {};
+  emptyPath.toggleInverseFillType();
+  canvas->drawPath(emptyPath, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_text"));
+
+  surface = Surface::Make(context, 400, 400);
+  canvas = surface->getCanvas();
+  Path clipPath = {};
+  clipPath.addRect(Rect::MakeXYWH(50, 200, 300, 150));
+  clipPath.toggleInverseFillType();
+  canvas->save();
+  canvas->clipPath(clipPath);
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(50, 50, 170, 100));
+  path.addOval(Rect::MakeXYWH(180, 50, 170, 100));
+  path.setFillType(PathFillType::InverseEvenOdd);
+  paint.setColor(Color::Red());
+  canvas->drawPath(path, paint);
+  canvas->restore();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_rect"));
+  auto uniqueKey = PathRef::GetUniqueKey(path);
+  auto cachesBefore = FindResourceByDomainID(context, uniqueKey.domainID());
+  EXPECT_EQ(cachesBefore.size(), 1u);
+  canvas->clear();
+  canvas->clipPath(clipPath);
+  shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(50, 50));
+  canvas->translate(-50, -50);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_rect"));
+  auto cachesAfter = FindResourceByDomainID(context, uniqueKey.domainID());
+  EXPECT_EQ(cachesAfter.size(), 1u);
+  EXPECT_TRUE(cachesBefore.front() == cachesAfter.front());
+}
+
+TGFX_TEST(CanvasTest, saveLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 600;
+  auto height = 500;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  auto saveCount = canvas->saveLayerAlpha(0.8f);
+  Paint layerPaint = {};
+  layerPaint.setImageFilter(ImageFilter::Blur(30, 30));
+  canvas->saveLayer(&layerPaint);
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  auto rect = Rect::MakeXYWH(50, 50, 100, 100);
+  canvas->drawRoundRect(rect, 30, 30, paint);
+  canvas->restoreToCount(saveCount);
+  auto dropShadowFilter = ImageFilter::DropShadow(10, 10, 20, 20, Color::Black());
+  paint.setImageFilter(dropShadowFilter);
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(200, 50, 100, 100), paint);
+  paint.setStrokeWidth(20);
+  canvas->drawLine(350, 50, 400, 150, paint);
+  canvas->drawRoundRect(Rect::MakeXYWH(450, 50, 100, 100), 30, 30, paint);
+  canvas->drawCircle(100, 250, 50, paint);
+  canvas->drawOval(Rect::MakeXYWH(200, 200, 150, 100), paint);
+  Path path = {};
+  path.addArc({0, 0, 150, 100}, 0, 180);
+  canvas->translate(400, 180);
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawPath(path, paint);
+  paint.setStyle(PaintStyle::Fill);
+  canvas->resetMatrix();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 30.f);
+  font.setFauxBold(true);
+  canvas->drawSimpleText("Hello TGFX", 50, 400, font, paint);
+  auto atlas = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(atlas != nullptr);
+  Matrix matrix[2] = {Matrix::I(), Matrix::MakeTrans(150, 0)};
+  Rect rects[2] = {Rect::MakeXYWH(0, 0, 110, 50), Rect::MakeXYWH(0, 60, 110, 50)};
+  canvas->translate(280, 360);
+  canvas->drawAtlas(atlas, matrix, rects, nullptr, 2, {}, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/saveLayer"));
 }
 
 TGFX_TEST(CanvasTest, drawShape) {
@@ -686,6 +803,59 @@ TGFX_TEST(CanvasTest, drawShape) {
   canvas->setMatrix(matrix);
   canvas->drawShape(textShape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawShape"));
+}
+
+TGFX_TEST(CanvasTest, inverseFillType) {
+  Path firstPath = {};
+  firstPath.addRect(Rect::MakeXYWH(50, 50, 170, 100));
+  auto firstShape = Shape::MakeFrom(firstPath);
+  EXPECT_FALSE(firstShape->isInverseFillType());
+  Path secondPath = {};
+  secondPath.addOval(Rect::MakeXYWH(180, 50, 170, 100));
+  secondPath.toggleInverseFillType();
+  auto secondShape = Shape::MakeFrom(secondPath);
+  EXPECT_TRUE(secondShape->isInverseFillType());
+  auto shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Difference);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(secondShape, firstShape, PathOp::Difference);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Intersect);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Union);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::XOR);
+  EXPECT_TRUE(shape->isInverseFillType());
+
+  auto pathEffect = PathEffect::MakeCorner(10);
+  shape = Shape::ApplyEffect(firstShape, pathEffect);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
+  EXPECT_FALSE(shape->isInverseFillType());
+  Stroke stroke(10);
+  shape = Shape::ApplyStroke(firstShape, &stroke);
+  EXPECT_FALSE(shape->isInverseFillType());
+
+  firstShape = Shape::ApplyInverse(firstShape);
+  EXPECT_TRUE(firstShape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Difference);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Intersect);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::Union);
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::Merge(firstShape, secondShape, PathOp::XOR);
+  EXPECT_FALSE(shape->isInverseFillType());
+
+  shape = Shape::ApplyEffect(firstShape, pathEffect);
+  EXPECT_FALSE(shape->isInverseFillType());
+  shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
+  EXPECT_TRUE(shape->isInverseFillType());
+  shape = Shape::ApplyStroke(firstShape, &stroke);
+  EXPECT_TRUE(shape->isInverseFillType());
 }
 
 TGFX_TEST(CanvasTest, image) {
@@ -1012,6 +1182,22 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, image->width() - 200, image->height() - 200));
   canvas->drawImage(image);
   singleImageRecord = recorder.finishRecordingAsPicture();
+  canvas = recorder.beginRecording();
+  auto imageFilter = ImageFilter::Blur(10, 10);
+  paint.setImageFilter(imageFilter);
+  canvas->drawPicture(singleImageRecord, nullptr, &paint);
+  paint.setImageFilter(nullptr);
+  auto imagePicture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(imagePicture != nullptr);
+  ASSERT_TRUE(imagePicture->records.size() == 1);
+  EXPECT_EQ(imagePicture->records[0]->type(), RecordType::DrawImage);
+
+  surface = Surface::Make(context, image->width() - 200, image->height() - 200);
+  canvas = surface->getCanvas();
+  canvas->translate(-100, -100);
+  canvas->drawPicture(imagePicture);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
+
   matrix = Matrix::MakeTrans(-100, -100);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 200, image->height() - 200, &matrix);
@@ -1036,13 +1222,6 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix.postTranslate(-100, -100);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix);
   EXPECT_TRUE(pictureImage == image);
-  pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, true);
-  EXPECT_FALSE(pictureImage == image);
-
-  surface = Surface::Make(context, pictureImage->width(), pictureImage->height());
-  canvas = surface->getCanvas();
-  canvas->drawImage(pictureImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
 
   canvas = recorder.beginRecording();
   paint.reset();
@@ -1052,7 +1231,7 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
-  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
+  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix);
   EXPECT_EQ(textRecord.use_count(), 1);
   ASSERT_TRUE(textImage != nullptr);
 
@@ -1073,7 +1252,7 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   width = static_cast<int>(bounds.width());
   height = static_cast<int>(bounds.height());
-  auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
+  auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix);
   EXPECT_EQ(patRecord.use_count(), 1);
   ASSERT_TRUE(pathImage != nullptr);
 

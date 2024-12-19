@@ -74,4 +74,20 @@ struct BlendInfo {
  * dst coefficient functions are set in 'src' and 'dst'.
  */
 bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo = nullptr);
+
+enum class OpacityType {
+  // The opacity is unknown
+  Unknown,
+  // The src color is known to be opaque (alpha == 255)
+  Opaque,
+  // The src color is known to be fully transparent (color == 0)
+  TransparentBlack,
+  // The src alpha is known to be fully transparent (alpha == 0)
+  TransparentAlpha,
+};
+
+/**
+ * Returns true if 'mode' is opaque given the src color opacity.
+ */
+bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity);
 }  // namespace tgfx

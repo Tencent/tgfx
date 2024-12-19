@@ -48,6 +48,7 @@ std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOn
 void Window::invalidSize() {
   std::lock_guard<std::mutex> autoLock(locker);
   sizeInvalid = true;
+  onInvalidSize();
 }
 
 void Window::freeSurface() {
@@ -62,6 +63,9 @@ void Window::present(Context* context, int64_t presentationTime) {
   }
   context->flush();
   onPresent(context, presentationTime);
+}
+
+void Window::onInvalidSize() {
 }
 
 void Window::onFreeSurface() {

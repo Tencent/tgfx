@@ -39,9 +39,16 @@ class MatrixShape : public Shape {
 
   bool isRRect(RRect* rRect = nullptr) const override;
 
+  bool isInverseFillType() const override {
+    return shape->isInverseFillType();
+  }
+
   Rect getBounds(float resolutionScale = 1.0f) const override;
 
   Path getPath(float resolutionScale = 1.0f) const override;
+
+  std::shared_ptr<Shape> shape = nullptr;
+  Matrix matrix = {};
 
  protected:
   Type type() const override {
@@ -49,12 +56,5 @@ class MatrixShape : public Shape {
   }
 
   UniqueKey getUniqueKey() const override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-  Matrix matrix = {};
-
-  friend class Shape;
-  friend class ShapeDrawOp;
 };
 }  // namespace tgfx

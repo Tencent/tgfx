@@ -17,10 +17,34 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StrokeShape.h"
-#include "core/shapes/PathShape.h"
+#include "core/shapes/MatrixShape.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
+
+std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  if (stroke == nullptr) {
+    return shape;
+  }
+  if (shape->type() != Type::Matrix) {
+    return std::make_shared<StrokeShape>(std::move(shape), *stroke);
+  }
+  // Always apply stroke to the shape before the matrix, so that the outer matrix can be used to
+  // do some optimization.
+  auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+  auto scales = matrixShape->matrix.getAxisScales();
+  if (scales.x != scales.y) {
+    return std::make_shared<StrokeShape>(std::move(shape), *stroke);
+  }
+  auto scaleStroke = *stroke;
+  scaleStroke.width *= scales.x;
+  shape = std::make_shared<StrokeShape>(matrixShape->shape, scaleStroke);
+  return std::make_shared<MatrixShape>(std::move(shape), matrixShape->matrix);
+}
+
 Rect StrokeShape::getBounds(float resolutionScale) const {
   auto bounds = shape->getBounds(resolutionScale);
   stroke.applyToBounds(&bounds);
