@@ -1749,11 +1749,13 @@ TGFX_TEST(LayerTest, LayerShadowFilter) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 150, 150);
   auto displayList = std::make_unique<DisplayList>();
-  auto layer = ImageLayer::Make();
+  auto layer = ShapeLayer::Make();
   layer->setMatrix(Matrix::MakeTrans(30, 30));
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  EXPECT_TRUE(image != nullptr);
-  layer->setImage(image);
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  layer->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  layer->setFillStyle(fillStyle);
   auto filter = LayerShadowFilter::Make({});
   layer->setFilters({filter});
   LayerShadowParam param0 = {};
@@ -1771,6 +1773,7 @@ TGFX_TEST(LayerTest, LayerShadowFilter) {
   param1.offsetX = 0;
   param1.offsetY = -20;
   filter->setShadowParams({param0, param1});
+  filter->setShowBehindTransparent(true);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/layerShadowFilter1"));
 }

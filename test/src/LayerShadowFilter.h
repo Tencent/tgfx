@@ -28,6 +28,11 @@ struct LayerShadowParam {
   float blurrinessX = 0.0f;
   float blurrinessY = 0.0f;
   Color color = Color::Black();
+  bool operator==(const LayerShadowParam& value) const {
+    return offsetX == value.offsetX && offsetY == value.offsetY &&
+           blurrinessX == value.blurrinessX && blurrinessY == value.blurrinessY &&
+           color == value.color;
+  }
 };
 
 class LayerShadowFilter : public LayerFilter {
@@ -43,7 +48,13 @@ class LayerShadowFilter : public LayerFilter {
 
   void setShadowParams(const std::vector<LayerShadowParam>& params);
 
-  bool drawWithFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) override;
+  bool showBehindTransparent() const {
+    return _showBehindTransparent;
+  }
+
+  void setShowBehindTransparent(bool showBehindTransparent);
+
+  bool applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) override;
 
   Rect filterBounds(const Rect& srcRect, float scale) override;
 
@@ -54,6 +65,8 @@ class LayerShadowFilter : public LayerFilter {
   explicit LayerShadowFilter(const std::vector<LayerShadowParam>& params);
 
   std::vector<LayerShadowParam> params = {};
+
+  bool _showBehindTransparent = false;
 };
 
 }  // namespace tgfx

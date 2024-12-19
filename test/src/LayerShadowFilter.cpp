@@ -33,12 +33,22 @@ LayerShadowFilter::LayerShadowFilter(const std::vector<LayerShadowParam>& params
 }
 
 void LayerShadowFilter::setShadowParams(const std::vector<LayerShadowParam>& shadowParams) {
+  if (shadowParams == params) {
+    return;
+  }
   params = shadowParams;
   invalidate();
 }
 
-bool LayerShadowFilter::drawWithFilter(Canvas* canvas, std::shared_ptr<Picture> picture,
-                                       float scale) {
+void LayerShadowFilter::setShowBehindTransparent(bool showBehindTransparent) {
+  if (showBehindTransparent == _showBehindTransparent) {
+    return;
+  }
+  _showBehindTransparent = showBehindTransparent;
+  invalidate();
+}
+
+bool LayerShadowFilter::applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) {
   auto bounds = picture->getBounds();
   bounds.roundOut();
   Matrix matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
@@ -48,7 +58,16 @@ bool LayerShadowFilter::drawWithFilter(Canvas* canvas, std::shared_ptr<Picture> 
     return false;
   }
 
-  // record shadow picture
+  // create opaque image
+  Recorder opaqueRecorder;
+  auto opaqueCanvas = opaqueRecorder.beginRecording();
+  auto opaquePaint = Paint();
+  opaquePaint.setColorFilter(ColorFilter::AlphaThreshold(0));
+  opaqueCanvas->drawImage(image, &opaquePaint);
+  auto opaquePicture = opaqueRecorder.finishRecordingAsPicture();
+  auto opaqueImage = Image::MakeFrom(opaquePicture, image->width(), image->height());
+
+  // create shadow picture
   Recorder shadowRecorder;
   auto shadowCanvas = shadowRecorder.beginRecording();
   for (const auto& param : params) {
@@ -58,17 +77,20 @@ bool LayerShadowFilter::drawWithFilter(Canvas* canvas, std::shared_ptr<Picture> 
     }
     Paint paint;
     paint.setImageFilter(filter);
-    shadowCanvas->drawImage(image, bounds.x(), bounds.y(), &paint);
+    shadowCanvas->drawImage(opaqueImage, bounds.x(), bounds.y(), &paint);
   }
   auto shadowPicture = shadowRecorder.finishRecordingAsPicture();
 
-  // Draw shadow beside the original picture area
-  auto boundsAfterFilter = filterBounds(bounds, scale);
-  auto shader = Shader::MakeImageShader(image, TileMode::Decal, TileMode::Decal);
-  shader = shader->makeWithMatrix(Matrix::MakeTrans(-boundsAfterFilter.left, -boundsAfterFilter.top));
-  auto maskFilter = MaskFilter::MakeShader(shader, true);
   Paint shadowPaint;
-  shadowPaint.setMaskFilter(maskFilter);
+  // Draw shadow beside the original picture area
+  if (!_showBehindTransparent) {
+    auto boundsAfterFilter = filterBounds(bounds, scale);
+    auto shader = Shader::MakeImageShader(opaqueImage, TileMode::Decal, TileMode::Decal);
+    shader =
+        shader->makeWithMatrix(Matrix::MakeTrans(-boundsAfterFilter.left, -boundsAfterFilter.top));
+    auto maskFilter = MaskFilter::MakeShader(shader, true);
+    shadowPaint.setMaskFilter(maskFilter);
+  }
   canvas->drawPicture(shadowPicture, nullptr, &shadowPaint);
 
   // draw original image

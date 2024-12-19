@@ -545,7 +545,7 @@ std::shared_ptr<Picture> Layer::applyFilter(std::shared_ptr<Picture> source, flo
   for (const auto& filter : _filters) {
     Recorder recorder;
     auto canvas = recorder.beginRecording();
-    if (!filter->drawWithFilter(canvas, picture, contentScale)) {
+    if (!filter->applyFilter(canvas, picture, contentScale)) {
       continue;
     }
     picture = recorder.finishRecordingAsPicture();

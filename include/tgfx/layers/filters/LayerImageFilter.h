@@ -25,10 +25,11 @@ namespace tgfx {
 class LayerImageFilter : public LayerFilter {
  public:
   /**
-    * Applies the filter to the given picture.
+    * Applies the filter to the given picture and draws it to the canvas.
     * @param scale The scale factor to apply to the filter.
+    * @return True if the filter was applied and drawn, false otherwise.
     */
-  bool drawWithFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) override;
+  bool applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) override;
 
   /**
     * Return the bounds of after applying the filter to the given bounds.

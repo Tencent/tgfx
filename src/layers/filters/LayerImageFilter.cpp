@@ -20,8 +20,7 @@
 #include "tgfx/layers/Layer.h"
 namespace tgfx {
 
-bool LayerImageFilter::drawWithFilter(Canvas* canvas, std::shared_ptr<Picture> picture,
-                                      float scale) {
+bool LayerImageFilter::applyFilter(Canvas* canvas, std::shared_ptr<Picture> picture, float scale) {
   auto filter = getImageFilter(scale);
   if (!filter) {
     return false;
