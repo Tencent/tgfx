@@ -27,5 +27,8 @@
 @interface TGFXView : NSView
 
 - (void)draw:(int)index;
+- (NSString*)fpsInfo;
+
+
 
 @end
