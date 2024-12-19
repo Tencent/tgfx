@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerShadowFilter.h"
-#include <tgfx/core/Recorder.h>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Recorder.h"
 
 namespace tgfx {
 
