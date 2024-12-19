@@ -44,7 +44,9 @@ bool PathShape::isRRect(RRect* rRect) const {
 }
 
 bool PathShape::isSimplePath(Path* result) const {
-  *result = path;
+  if (result) {
+    *result = path;
+  }
   return true;
 }
 
