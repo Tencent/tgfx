@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
+  threshold = std::max(threshold, 0.0f);
   return std::make_shared<AlphaThresholdColorFilter>(threshold);
 }
 

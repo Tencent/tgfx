@@ -568,9 +568,9 @@ TGFX_TEST(FilterTest, AlphaThreshold) {
   auto rect = Rect::MakeWH(100, 100);
   canvas->drawRect(rect, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold_empty"));
-  opacityFilter = ColorFilter::AlphaThreshold(0);
+  opacityFilter = ColorFilter::AlphaThreshold(-1.f);
   paint.setColorFilter(opacityFilter);
   canvas->drawRect(rect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold"));
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold2"));
 }
 }  // namespace tgfx
