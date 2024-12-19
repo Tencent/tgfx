@@ -24,69 +24,17 @@
 #include "gpu/RenderContext.h"
 
 namespace tgfx {
-static std::shared_ptr<Image> GetEquivalentImage(const Record* record, int width, int height,
-                                                 bool alphaOnly, const Matrix* matrix) {
+static bool CheckStyleAndClipForMask(const FillStyle& style, const Path& clip, int width,
+                                     int height, const Matrix* matrix) {
   TRACE_EVENT;
-  if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
-    return nullptr;
-  }
-  auto imageRecord = static_cast<const DrawImage*>(record);
-  auto image = imageRecord->image;
-  if (image->isAlphaOnly() != alphaOnly) {
-    return nullptr;
-  }
-  auto& style = imageRecord->style;
-  if (style.colorFilter || style.maskFilter) {
-    return nullptr;
-  }
-  auto imageMatrix = imageRecord->state.matrix;
-  if (matrix) {
-    imageMatrix.postConcat(*matrix);
-  }
-  if (!imageMatrix.isTranslate()) {
-    return nullptr;
-  }
-  auto offsetX = imageMatrix.getTranslateX();
-  auto offsetY = imageMatrix.getTranslateY();
-  if (roundf(offsetX) != offsetX || roundf(offsetY) != offsetY) {
-    return nullptr;
-  }
-  auto subset =
-      Rect::MakeXYWH(-offsetX, -offsetY, static_cast<float>(width), static_cast<float>(height));
-  auto imageBounds = record->type() == RecordType::DrawImageRect
-                         ? static_cast<const DrawImageRect*>(imageRecord)->rect
-                         : Rect::MakeWH(image->width(), image->height());
-  if (!imageBounds.contains(subset)) {
-    return nullptr;
-  }
-  auto clip = imageRecord->state.clip;
-  if (clip.isEmpty() && clip.isInverseFillType()) {
-    return image->makeSubset(subset);
-  }
-  Rect clipRect = {};
-  if (!clip.isRect(&clipRect)) {
-    return nullptr;
-  }
-  if (matrix) {
-    if (!matrix->rectStaysRect()) {
-      return nullptr;
-    }
-    matrix->mapRect(&clipRect);
-  }
-  if (!clipRect.contains(Rect::MakeWH(width, height))) {
-    return nullptr;
-  }
-  return image->makeSubset(subset);
-}
-
-static bool CheckStyleAndClip(const FillStyle& style, const Path& clip, int width, int height,
-                              const Matrix* matrix) {
-  TRACE_EVENT;
-  if (!style.isOpaque()) {
+  if (style.colorFilter || style.maskFilter || style.shader || style.color != Color::White()) {
     return false;
   }
-  if (clip.isEmpty() && clip.isInverseFillType()) {
-    return true;
+  if (!BlendModeIsOpaque(style.blendMode, OpacityType::Opaque)) {
+    return false;
+  }
+  if (clip.isInverseFillType()) {
+    return clip.isEmpty();
   }
   Rect clipRect = {};
   if (!clip.isRect(&clipRect)) {
@@ -114,7 +62,8 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
   TRACE_EVENT;
   if (record->type() == RecordType::DrawShape) {
     auto shapeRecord = static_cast<const DrawShape*>(record);
-    if (!CheckStyleAndClip(shapeRecord->style, shapeRecord->state.clip, width, height, matrix)) {
+    if (!CheckStyleAndClipForMask(shapeRecord->style, shapeRecord->state.clip, width, height,
+                                  matrix)) {
       return nullptr;
     }
     auto shape = Shape::ApplyMatrix(shapeRecord->shape, GetMaskMatrix(shapeRecord->state, matrix));
@@ -122,7 +71,8 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
   }
   if (record->type() == RecordType::DrawGlyphRunList) {
     auto glyphRecord = static_cast<const DrawGlyphRunList*>(record);
-    if (!CheckStyleAndClip(glyphRecord->style, glyphRecord->state.clip, width, height, matrix)) {
+    if (!CheckStyleAndClipForMask(glyphRecord->style, glyphRecord->state.clip, width, height,
+                                  matrix)) {
       return nullptr;
     }
     return Rasterizer::MakeFrom(width, height, glyphRecord->glyphRunList,
@@ -131,8 +81,8 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
   }
   if (record->type() == RecordType::StrokeGlyphRunList) {
     auto strokeGlyphRecord = static_cast<const StrokeGlyphRunList*>(record);
-    if (!CheckStyleAndClip(strokeGlyphRecord->style, strokeGlyphRecord->state.clip, width, height,
-                           matrix)) {
+    if (!CheckStyleAndClipForMask(strokeGlyphRecord->style, strokeGlyphRecord->state.clip, width,
+                                  height, matrix)) {
       return nullptr;
     }
     return Rasterizer::MakeFrom(
@@ -143,7 +93,7 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                       const Matrix* matrix, bool alphaOnly) {
+                                       const Matrix* matrix) {
   TRACE_EVENT;
   if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
@@ -152,28 +102,27 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
     return nullptr;
   }
   if (picture->records.size() == 1) {
-    auto image = GetEquivalentImage(picture->records[0], width, height, alphaOnly, matrix);
+    ISize clipSize = {width, height};
+    auto image = picture->asImage(nullptr, matrix, &clipSize);
     if (image) {
       return image;
     }
-    if (alphaOnly) {
-      auto rasterizer = GetEquivalentRasterizer(picture->records[0], width, height, matrix);
-      image = Image::MakeFrom(std::move(rasterizer));
-      if (image) {
-        return image;
-      }
+    auto rasterizer = GetEquivalentRasterizer(picture->records[0], width, height, matrix);
+    image = Image::MakeFrom(std::move(rasterizer));
+    if (image) {
+      return image;
     }
   }
-  auto image = std::make_shared<PictureImage>(UniqueKey::Make(), std::move(picture), width, height,
-                                              matrix, alphaOnly);
+  auto image =
+      std::make_shared<PictureImage>(UniqueKey::Make(), std::move(picture), width, height, matrix);
   image->weakThis = image;
   return image;
 }
 
 PictureImage::PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width,
-                           int height, const Matrix* matrix, bool alphaOnly)
+                           int height, const Matrix* matrix)
     : OffscreenImage(std::move(uniqueKey)), picture(std::move(picture)), _width(width),
-      _height(height), alphaOnly(alphaOnly) {
+      _height(height) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }

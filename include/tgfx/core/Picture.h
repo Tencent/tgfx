@@ -59,6 +59,9 @@ class Picture {
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 
+  std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
+                                 const ISize* clipSize = nullptr) const;
+
   friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;

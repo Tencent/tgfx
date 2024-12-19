@@ -18,6 +18,7 @@
 
 #include "core/FillStyle.h"
 #include "core/PathRef.h"
+#include "core/Records.h"
 #include "core/images/ResourceImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
@@ -1181,6 +1182,22 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, image->width() - 200, image->height() - 200));
   canvas->drawImage(image);
   singleImageRecord = recorder.finishRecordingAsPicture();
+  canvas = recorder.beginRecording();
+  auto imageFilter = ImageFilter::Blur(10, 10);
+  paint.setImageFilter(imageFilter);
+  canvas->drawPicture(singleImageRecord, nullptr, &paint);
+  paint.setImageFilter(nullptr);
+  auto imagePicture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(imagePicture != nullptr);
+  ASSERT_TRUE(imagePicture->records.size() == 1);
+  EXPECT_EQ(imagePicture->records[0]->type(), RecordType::DrawImage);
+
+  surface = Surface::Make(context, image->width() - 200, image->height() - 200);
+  canvas = surface->getCanvas();
+  canvas->translate(-100, -100);
+  canvas->drawPicture(imagePicture);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
+
   matrix = Matrix::MakeTrans(-100, -100);
   pictureImage =
       Image::MakeFrom(singleImageRecord, image->width() - 200, image->height() - 200, &matrix);
@@ -1205,13 +1222,6 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix.postTranslate(-100, -100);
   pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix);
   EXPECT_TRUE(pictureImage == image);
-  pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height(), &matrix, true);
-  EXPECT_FALSE(pictureImage == image);
-
-  surface = Surface::Make(context, pictureImage->width(), pictureImage->height());
-  canvas = surface->getCanvas();
-  canvas->drawImage(pictureImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage"));
 
   canvas = recorder.beginRecording();
   paint.reset();
@@ -1221,7 +1231,7 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
-  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix, true);
+  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix);
   EXPECT_EQ(textRecord.use_count(), 1);
   ASSERT_TRUE(textImage != nullptr);
 
@@ -1242,7 +1252,7 @@ TGFX_TEST(CanvasTest, Picture) {
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   width = static_cast<int>(bounds.width());
   height = static_cast<int>(bounds.height());
-  auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix, true);
+  auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix);
   EXPECT_EQ(patRecord.use_count(), 1);
   ASSERT_TRUE(pathImage != nullptr);
 

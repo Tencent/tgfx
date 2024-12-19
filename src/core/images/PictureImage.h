@@ -27,7 +27,7 @@ namespace tgfx {
 class PictureImage : public OffscreenImage {
  public:
   PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width, int height,
-               const Matrix* matrix = nullptr, bool alphaOnly = false);
+               const Matrix* matrix = nullptr);
 
   ~PictureImage() override;
 
@@ -40,7 +40,7 @@ class PictureImage : public OffscreenImage {
   }
 
   bool isAlphaOnly() const override {
-    return alphaOnly;
+    return false;
   }
 
  protected:
@@ -51,6 +51,5 @@ class PictureImage : public OffscreenImage {
   int _width = 0;
   int _height = 0;
   Matrix* matrix = nullptr;
-  bool alphaOnly = false;
 };
 }  // namespace tgfx
