@@ -68,4 +68,93 @@ void Picture::playback(DrawContext* drawContext, const MCState& state) const {
     record->playback(drawContext);
   }
 }
+
+static bool GetClipRect(const Path& clip, const Matrix* matrix, Rect* clipRect) {
+  if (clip.isInverseFillType()) {
+    if (clip.isEmpty()) {
+      clipRect->setEmpty();
+      return true;
+    }
+    return false;
+  }
+  Rect rect = {};
+  if (!clip.isRect(&rect)) {
+    return false;
+  }
+  if (matrix != nullptr) {
+    if (!matrix->rectStaysRect()) {
+      return false;
+    }
+    matrix->mapRect(&rect);
+  }
+  *clipRect = rect;
+  return true;
+}
+
+std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
+                                        const ISize* clipSize) const {
+  if (records.size() != 1) {
+    return nullptr;
+  }
+  auto record = records[0];
+  if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
+    return nullptr;
+  }
+  auto imageRecord = static_cast<const DrawImage*>(record);
+  auto& style = imageRecord->style;
+  if (style.maskFilter || style.colorFilter) {
+    return nullptr;
+  }
+  auto image = imageRecord->image;
+  if (image->isAlphaOnly()) {
+    if (style.shader || style.color != Color::White()) {
+      return nullptr;
+    }
+  }
+  auto imageMatrix = imageRecord->state.matrix;
+  if (matrix) {
+    imageMatrix.postConcat(*matrix);
+  }
+  if (!imageMatrix.isTranslate()) {
+    return nullptr;
+  }
+  auto clipRect = Rect::MakeEmpty();
+  if (!GetClipRect(imageRecord->state.clip, matrix, &clipRect)) {
+    return nullptr;
+  }
+  auto subset = Rect::MakeEmpty();
+  if (clipSize != nullptr) {
+    subset = Rect::MakeWH(clipSize->width, clipSize->height);
+    if (!clipRect.isEmpty() && !clipRect.contains(subset)) {
+      return nullptr;
+    }
+  } else if (!clipRect.isEmpty()) {
+    subset = clipRect;
+  }
+  if (record->type() == RecordType::DrawImageRect) {
+    image = image->makeSubset(static_cast<const DrawImageRect*>(imageRecord)->rect);
+    DEBUG_ASSERT(image != nullptr);
+  }
+  auto offsetX = imageMatrix.getTranslateX();
+  auto offsetY = imageMatrix.getTranslateY();
+  if (!subset.isEmpty()) {
+    subset.offset(-offsetX, -offsetY);
+    auto roundSubset = subset;
+    roundSubset.round();
+    if (roundSubset != subset) {
+      return nullptr;
+    }
+    image = image->makeSubset(subset);
+    if (image == nullptr) {
+      return nullptr;
+    }
+    offsetX += subset.left;
+    offsetY += subset.top;
+  }
+  if (offset) {
+    offset->set(offsetX, offsetY);
+  }
+  return image;
+}
+
 }  // namespace tgfx

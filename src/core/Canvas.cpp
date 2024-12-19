@@ -444,7 +444,21 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
                        const FillStyle& style, std::shared_ptr<ImageFilter> imageFilter) {
   TRACE_EVENT;
-  if (imageFilter == nullptr && picture->records.size() == 1 && style.maskFilter == nullptr) {
+  if (imageFilter != nullptr) {
+    Point offset = {};
+    if (auto image = picture->asImage(&offset)) {
+      Point filterOffset = {};
+      image = image->makeWithFilter(std::move(imageFilter), &filterOffset);
+      if (image == nullptr) {
+        LOGE("Canvas::drawLayer() Failed to apply filter to image!");
+        return;
+      }
+      auto drawState = state;
+      drawState.matrix.preTranslate(offset.x + filterOffset.x, offset.y + filterOffset.y);
+      drawContext->drawImage(std::move(image), {}, drawState, style);
+      return;
+    }
+  } else if (picture->records.size() == 1 && style.maskFilter == nullptr) {
     LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
     if (layerContext.hasUnrolled()) {

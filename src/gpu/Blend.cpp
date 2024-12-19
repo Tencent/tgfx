@@ -53,4 +53,33 @@ bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo) {
   }
   return true;
 }
+
+bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
+  BlendInfo blendInfo = {};
+  if (!BlendModeAsCoeff(mode, &blendInfo)) {
+    return false;
+  }
+  switch (blendInfo.srcBlend) {
+    case BlendModeCoeff::DA:
+    case BlendModeCoeff::DC:
+    case BlendModeCoeff::IDA:
+    case BlendModeCoeff::IDC:
+      return false;
+    default:
+      break;
+  }
+  switch (blendInfo.dstBlend) {
+    case BlendModeCoeff::Zero:
+      return true;
+    case BlendModeCoeff::ISA:
+      return srcColorOpacity == OpacityType::Opaque;
+    case BlendModeCoeff::SA:
+      return srcColorOpacity == OpacityType::TransparentBlack ||
+             srcColorOpacity == OpacityType::TransparentAlpha;
+    case BlendModeCoeff::SC:
+      return srcColorOpacity == OpacityType::TransparentBlack;
+    default:
+      return false;
+  }
+}
 }  // namespace tgfx
