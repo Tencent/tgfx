@@ -362,11 +362,9 @@ TGFX_TEST(SVGExportTest, ClipState) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // DynamicMemoryWriteStream SVGStream;
-  // auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(300, 300),
-  //                                   SVGExportingFlags::DisablePrettyXML);
-  FileWriteStream SVGStream("/Users/yg/code/c++_space/tgfx/qt/SVG.svg");
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(300, 300));
+  DynamicMemoryWriteStream SVGStream;
+  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(300, 300),
+                                    SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   {
@@ -392,10 +390,9 @@ TGFX_TEST(SVGExportTest, ClipState) {
   }
 
   exporter->close();
-  // auto data = SVGStream.dumpAsData();
-  // std::string SVGString(static_cast<const char*>(data->data()), data->size());
-  // ASSERT_EQ(SVGString, compareString);
-  SVGStream.sync();
+  auto data = SVGStream.dumpAsData();
+  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  ASSERT_EQ(SVGString, compareString);
 }
 
 }  // namespace tgfx
