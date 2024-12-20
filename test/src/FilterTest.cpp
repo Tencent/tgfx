@@ -123,7 +123,7 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   image = image->makeOriented(Orientation::LeftBottom);
   image = image->makeMipmapped(true);
-  image = image->makeScaled(0.25f);
+  image = image->makeRasterized(0.25f);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -315,8 +315,7 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  image = image->makeScaled(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
-  image = image->makeMipmapped(true);
+  image = image->makeRasterized(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter = ImageFilter::Runtime(std::move(effect));
   image = image->makeWithFilter(std::move(filter));

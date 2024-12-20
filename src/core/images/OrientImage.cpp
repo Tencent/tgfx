@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OrientImage.h"
-#include "core/images/ScaleImage.h"
+#include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
 #include "gpu/ops/DrawOp.h"
