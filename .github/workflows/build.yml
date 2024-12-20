@@ -282,9 +282,10 @@ jobs:
           depsync
         shell: bash
 
-      - name: Install x11
-        run: |
-            sudo apt install -y libx11-dev
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libx11-dev
+          version: 1.0
 
       - name: Build Linux
         run: |
