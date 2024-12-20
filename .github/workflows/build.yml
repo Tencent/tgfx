@@ -106,6 +106,12 @@ jobs:
 
       - uses: seanmiddleditch/gha-setup-ninja@master
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
       - name: Build Android
         run: |
           cd android
@@ -325,7 +331,7 @@ jobs:
         shell: bash
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           host: 'linux'
           target: 'desktop'
