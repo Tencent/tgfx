@@ -77,7 +77,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ios_build
           path: ios
@@ -106,19 +106,6 @@ jobs:
 
       - uses: seanmiddleditch/gha-setup-ninja@master
 
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r19c
-          link-to-sdk: true
-          local-cache: true
-          
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
-
       - name: Build Android
         run: |
           cd android
@@ -134,7 +121,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android_build
           path: android
@@ -214,7 +201,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web_build
           path: |
@@ -259,7 +246,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: win_build
           path: out
@@ -303,7 +290,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_build
           path: out
@@ -358,7 +345,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: qt_build
           path: out
