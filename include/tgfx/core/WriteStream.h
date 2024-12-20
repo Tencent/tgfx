@@ -33,6 +33,13 @@ namespace tgfx {
 class WriteStream {
  public:
   /**
+   * Creates a new WriteStream object for writing data to the specified file path. If the return 
+   * value is nullptr, it may indicate that the directory path is incorrect or that there are
+   * insufficient permissions for the directory path.
+   */
+  static std::unique_ptr<WriteStream> MakeFromPath(const std::string& outputPath);
+
+  /**
    * Destroy the Write Stream object
    */
   virtual ~WriteStream() = default;
@@ -46,7 +53,9 @@ class WriteStream {
   /**
    * Writes text to the stream. Returns true if the write was successful.
    */
-  bool writeText(const std::string& text);
+  bool writeText(const std::string& text) {
+    return this->write(text.data(), text.size());
+  };
 
   /**
    * Returns the current size of the written bytes.
@@ -57,63 +66,6 @@ class WriteStream {
    * Flushes the data in the buffer to the target storage.
    */
   virtual void flush() = 0;
-};
-
-/**
- * FileWriteStream allows writing data to a disk file. The data written does not need to remain in
- * memory and can be flushed to disk using the flush method.
- */
-class FileWriteStream : public WriteStream {
- public:
-  /**
-   * Creates a new FileWriteStream object with the specified file path. If the return value is
-   * nullptr, it may indicate that the directory path is incorrect or that there are insufficient
-   * permissions for the directory path.
-   */
-  static std::unique_ptr<FileWriteStream> MakeFromPath(const std::string& outputPath);
-
-  /**
-   * Destroy the FileWriteStream object
-   */
-  ~FileWriteStream() override;
-
-  /**
-   * Returns true if the file is valid and open.
-   */
-  bool isValid() const {
-    return file != nullptr;
-  }
-
-  /**
-   * Writes bytes to the file stream. Returns true if the write was successful.
-   */
-  bool write(const void* data, size_t size) override;
-
-  /**
-   * Returns the current size of the written bytes.
-   */
-  size_t size() const override;
-
-  /**
-   * Flushes the data in the buffer to the target storage. Note that the data is not guaranteed to
-   * be immediately written to the storage device; it is only flushed to the system buffer.
-   */
-  void flush() override;
-
-  /**
-   * Synchronizes the file's in-memory state with the underlying storage device. This method is
-   * useful when the file needs to be read by another process or when the file is critical and
-   * cannot be lost.
-   */
-  void sync();
-
- private:
-  /**
-   * Creates a new FileWriteStream object with the specified file path.
-   */
-  explicit FileWriteStream(const std::string& outputPath);
-
-  FILE* file;
 };
 
 /**
@@ -158,6 +110,11 @@ class MemoryWriteStream : public WriteStream {
    * Copies all the buffer bytes into a Data object.
    */
   std::shared_ptr<Data> copy();
+
+  /** 
+   * Return the contents as string.
+   */
+  std::string detachAsString();
 
  private:
   /**

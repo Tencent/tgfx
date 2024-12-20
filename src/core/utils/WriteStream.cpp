@@ -17,59 +17,63 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/WriteStream.h"
-#include <unistd.h>
 #include <memory>
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
 
-bool WriteStream::writeText(const std::string& text) {
-  return this->write(text.data(), static_cast<uint32_t>(text.size()));
-}
+/**
+ * FileWriteStream allows writing data to a disk file. The data written does not need to remain in
+ * memory and can be flushed to disk using the flush method.
+ */
+class FileWriteStream : public WriteStream {
+ public:
+  explicit FileWriteStream(const std::string& outputPath) {
+    file = fopen(outputPath.c_str(), "wb");
+  };
+
+  ~FileWriteStream() override {
+    if (file) {
+      fclose(file);
+    }
+  };
+
+  bool write(const void* data, size_t size) override {
+    if (file == nullptr) {
+      return false;
+    }
+
+    if (fwrite(data, 1, size, file) != size) {
+      file = nullptr;
+      return false;
+    }
+    return true;
+  }
+
+  size_t size() const override {
+    return static_cast<size_t>(ftell(file));
+  }
+
+  /**
+   * Flushes the data in the buffer to the target storage. Note that the data is not guaranteed to
+   * be immediately written to the storage device; it is only flushed to the system buffer.
+   */
+  void flush() override {
+    if (file) {
+      fflush(file);
+    }
+  }
+
+  FILE* file = nullptr;
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-std::unique_ptr<FileWriteStream> FileWriteStream::MakeFromPath(const std::string& outputPath) {
-  return std::unique_ptr<FileWriteStream>(new FileWriteStream(outputPath));
-}
-
-FileWriteStream::FileWriteStream(const std::string& outputPath) : file(nullptr) {
-  file = fopen(outputPath.c_str(), "wb");
-}
-
-FileWriteStream::~FileWriteStream() {
-  if (file) {
-    fclose(file);
+std::unique_ptr<WriteStream> WriteStream::MakeFromPath(const std::string& outputPath) {
+  auto* stream = new FileWriteStream(outputPath);
+  if (stream->file == nullptr) {
+    return nullptr;
   }
-}
-
-size_t FileWriteStream::size() const {
-  return static_cast<size_t>(ftell(file));
-}
-
-bool FileWriteStream::write(const void* data, size_t size) {
-  if (file == nullptr) {
-    return false;
-  }
-
-  if (fwrite(data, 1, size, file) != size) {
-    file = nullptr;
-    return false;
-  }
-  return true;
-}
-
-void FileWriteStream::flush() {
-  if (file) {
-    fflush(file);
-  }
-}
-
-void FileWriteStream::sync() {
-  flush();
-  if (file) {
-    auto fd = fileno(file);
-    fsync(fd);
-  }
+  return std::unique_ptr<WriteStream>(stream);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,6 +105,10 @@ std::shared_ptr<Data> MemoryWriteStream::copyRange(size_t offset, size_t length)
 
 std::shared_ptr<Data> MemoryWriteStream::copy() {
   return Data::MakeWithCopy(buffer.data(), buffer.size());
+}
+
+std::string MemoryWriteStream::detachAsString() {
+  return std::string(buffer.begin(), buffer.end());
 }
 
 }  // namespace tgfx

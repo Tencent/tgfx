@@ -20,6 +20,7 @@
 #include <tgfx/core/UTF.h>
 #include <cstring>
 #include <filesystem>
+#include <sstream>
 #include "base/TGFXTest.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
@@ -110,19 +111,21 @@ TGFX_TEST(DataViewTest, MemoryWriteStream) {
 
   data = stream->copyRange(10, 10);
   ASSERT_TRUE(data == nullptr);
+
+  auto str = stream->detachAsString();
+  EXPECT_EQ(str, "Hello\nTGFX");
 }
 
 TGFX_TEST(DataViewTest, FileWriteStream) {
   auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
 
-  auto writeStream = FileWriteStream::MakeFromPath(path);
+  auto writeStream = WriteStream::MakeFromPath(path);
   ASSERT_TRUE(writeStream != nullptr);
-  ASSERT_TRUE(writeStream->isValid());
   writeStream->writeText("Hello");
   writeStream->writeText("\n");
   const char* text = "TGFX";
   writeStream->write(text, std::strlen(text));
-  writeStream->sync();
+  writeStream->flush();
 
   auto readStream = Stream::MakeFromFile(path);
   ASSERT_TRUE(readStream != nullptr);
