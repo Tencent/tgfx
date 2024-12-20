@@ -97,6 +97,7 @@
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
         "filterTest": "44166b7",
+        "filters": "9000907",
         "getBounds": "3888c19",
         "getLayersUnderPoint": "b062b9a",
         "greyColorMatrix": "a1605b2",
@@ -104,8 +105,10 @@
         "imageLayer": "99a5cd9",
         "imageMask": "af2e3ff",
         "innerShadow": "01cce38",
+        "layerShadowFilter": "9000907",
+        "layerShadowFilter1": "9000907",
         "shapeMask": "612c09e",
-        "textMask": "b062b9a"
+        "textMask": "9000907"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
