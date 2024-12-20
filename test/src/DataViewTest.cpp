@@ -118,6 +118,8 @@ TGFX_TEST(DataViewTest, MemoryWriteStream) {
 
 TGFX_TEST(DataViewTest, FileWriteStream) {
   auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
+  std::filesystem::path filePath = path;
+  std::filesystem::create_directories(filePath.parent_path());
 
   auto writeStream = WriteStream::MakeFromPath(path);
   ASSERT_TRUE(writeStream != nullptr);
