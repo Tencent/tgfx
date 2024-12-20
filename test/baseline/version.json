@@ -1,4 +1,7 @@
 {
+    "Canvas": {
+        "Path_complex": "f37b222"
+    },
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
@@ -28,7 +31,7 @@
         "altas": "b1cfcd4",
         "blendMode": "b3076a3",
         "drawImage": "8cb853c",
-        "drawShape": "b062b9a",
+        "drawShape": "f37b222",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "d010fb8",
@@ -42,7 +45,7 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "6fd4617",
+        "path": "f37b222",
         "rasterized": "5a971dd",
         "rasterized_mipmap": "5a971dd",
         "rasterized_scale_up": "5a971dd",
@@ -91,7 +94,7 @@
         "Layer_hitTestPointNested": "b062b9a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "draw_shape": "738fc92",
+        "draw_shape": "f37b222",
         "draw_solid": "b4a1231",
         "draw_text": "b062b9a",
         "dropShadow": "43cd416",
