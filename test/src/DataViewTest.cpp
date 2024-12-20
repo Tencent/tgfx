@@ -18,7 +18,12 @@
 #include <tgfx/core/DataView.h>
 #include <tgfx/core/Stream.h>
 #include <tgfx/core/UTF.h>
+#include <cstring>
+#include <filesystem>
+#include "base/TGFXTest.h"
+#include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/WriteStream.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -84,4 +89,41 @@ TGFX_TEST(DataViewTest, ReadWriteData) {
   dataView.setByteOrder(ByteOrder::LittleEndian);
   EXPECT_TRUE(dataView.getUint16(0) == 0x3412);
 }
+
+TGFX_TEST(DataViewTest, MemoryWriteStream) {
+  auto stream = MemoryWriteStream::Make();
+  ASSERT_TRUE(stream != nullptr);
+  stream->writeText("Hello");
+  stream->writeText("\n");
+  const char* text = "TGFX";
+  stream->write(text, std::strlen(text));
+
+  auto data = stream->dumpAsData();
+  ASSERT_TRUE(data != nullptr);
+  EXPECT_EQ(data->size(), 10U);
+  EXPECT_EQ(std::string((char*)data->bytes(), data->size()), "Hello\nTGFX");
+}
+
+TGFX_TEST(DataViewTest, FileWriteStream) {
+  auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
+
+  auto writeStream = FileWriteStream::MakeFromPath(path);
+  ASSERT_TRUE(writeStream != nullptr);
+  ASSERT_TRUE(writeStream->isValid());
+  writeStream->writeText("Hello");
+  writeStream->writeText("\n");
+  const char* text = "TGFX";
+  writeStream->write(text, std::strlen(text));
+  writeStream->sync();
+
+  auto readStream = Stream::MakeFromFile(path);
+  ASSERT_TRUE(readStream != nullptr);
+  EXPECT_EQ(readStream->size(), 10U);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), "Hello\nTGFX");
+
+  std::filesystem::remove(path);
+}
+
 }  // namespace tgfx
