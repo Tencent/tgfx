@@ -22,6 +22,7 @@
 #include "core/images/ResourceImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
+#include "core/shapes/AppendShape.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Texture.h"
 #include "gpu/opengl/GLCaps.h"
@@ -762,14 +763,25 @@ TGFX_TEST(CanvasTest, drawShape) {
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
   canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
-  Paint paint;
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setColor(Color::Red());
+
   Path path = {};
   auto rect = Rect::MakeWH(50, 50);
   path.addRect(rect);
   auto shape = Shape::MakeFrom(path);
+  path.reset();
+  path.addOval(Rect::MakeWH(100, 100));
+  auto shape2 = Shape::MakeFrom(path);
+  auto mergedShape = Shape::Merge(shape, shape2, PathOp::Append);
+  EXPECT_TRUE(mergedShape->isSimplePath());
   auto transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
+  mergedShape = Shape::Merge({transShape, shape, shape2});
+  EXPECT_EQ(mergedShape->type(), Shape::Type::Append);
+  auto appendShape = std::static_pointer_cast<AppendShape>(mergedShape);
+  EXPECT_EQ(appendShape->shapes.size(), 2u);
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setColor(Color::Red());
   canvas->drawShape(transShape, paint);
   auto sacaleShape = Shape::ApplyMatrix(shape, Matrix::MakeScale(1.5, 0.5));
   sacaleShape = Shape::ApplyMatrix(sacaleShape, Matrix::MakeTrans(10, 70));
