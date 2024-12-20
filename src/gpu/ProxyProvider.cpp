@@ -153,12 +153,12 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
     uniqueKey =
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
   }
-  if (!antiAlias) {
+  if (antiAlias) {
+    // Add a 1-pixel outset to preserve anti-aliasing results.
+    shapeBounds.outset(1.0f, 1.0f);
+  } else {
     static const auto NonAntialiasShapeType = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &NonAntialiasShapeType, 1);
-  } else {
-    // Add a small offset to prevent anti-aliasing result loss.
-    shapeBounds.outset(1.0f, 1.0f);
   }
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
   drawingMatrix.preTranslate(bounds.x(), bounds.y());
