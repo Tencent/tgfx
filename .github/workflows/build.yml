@@ -276,6 +276,10 @@ jobs:
           depsync
         shell: bash
 
+      - name: Install x11
+        run: |
+            sudo apt install -y libx11-dev
+
       - name: Build Linux
         run: |
           node build_tgfx -s ./linux Hello2D -o ./out/release/linux -a x64 -d
