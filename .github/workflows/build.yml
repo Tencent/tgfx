@@ -77,7 +77,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ios_build
           path: ios
@@ -106,13 +106,6 @@ jobs:
 
       - uses: seanmiddleditch/gha-setup-ninja@master
 
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r19c
-          link-to-sdk: true
-          local-cache: true
-          
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -134,7 +127,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android_build
           path: android
@@ -214,7 +207,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: web_build
           path: |
@@ -259,7 +252,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: win_build
           path: out
@@ -289,6 +282,11 @@ jobs:
           depsync
         shell: bash
 
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libx11-dev
+          version: 1.0
+
       - name: Build Linux
         run: |
           node build_tgfx -s ./linux Hello2D -o ./out/release/linux -a x64 -d
@@ -303,7 +301,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_build
           path: out
@@ -334,11 +332,11 @@ jobs:
         shell: bash
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           host: 'linux'
           target: 'desktop'
-          version: '6.6.1'
+          version: '6.8.1'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
           cache: 'true'
@@ -358,7 +356,7 @@ jobs:
 
       - name: Job Failed
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: qt_build
           path: out
