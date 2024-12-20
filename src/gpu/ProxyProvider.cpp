@@ -156,6 +156,9 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   if (!antiAlias) {
     static const auto NonAntialiasShapeType = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &NonAntialiasShapeType, 1);
+  } else {
+    // Add a small offset to prevent anti-aliasing result loss.
+    shapeBounds.outset(1.0f, 1.0f);
   }
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
   drawingMatrix.preTranslate(bounds.x(), bounds.y());
