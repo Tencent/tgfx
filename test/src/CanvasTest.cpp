@@ -1374,7 +1374,7 @@ TGFX_TEST(CanvasTest, Path_complex) {
   path.addRect(rect);
   auto strokeMatrix = Matrix::MakeAll(0.528697968f, 0, -9.44108581f, 0, 0.422670752f, -9.34423828f);
   path.transform(strokeMatrix);
-  float dashList[] = {10.f,17.f,10.f,10.f,17.f,10.f};
+  float dashList[] = {10.f, 17.f, 10.f, 10.f, 17.f, 10.f};
   auto pathEffect = PathEffect::MakeDash(dashList, 6, 0);
   pathEffect->filterPath(&path);
   auto stroke = Stroke();
