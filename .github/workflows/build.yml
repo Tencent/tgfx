@@ -24,7 +24,7 @@ jobs:
           key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-ios-
 
-      - uses: tecolicom/actions-use-homebrew-tools@latest
+      - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
           tools: ninja yasm
 

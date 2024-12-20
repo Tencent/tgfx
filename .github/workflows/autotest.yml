@@ -27,7 +27,7 @@ jobs:
           key: third-party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third-party-autotest-
 
-      - uses: tecolicom/actions-use-homebrew-tools@latest
+      - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
           tools: ninja yasm gcovr
 
