@@ -336,7 +336,7 @@ jobs:
         with:
           host: 'linux'
           target: 'desktop'
-          version: '6.6.1'
+          version: '6.8.1'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
           cache: 'true'
