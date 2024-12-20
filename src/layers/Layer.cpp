@@ -31,6 +31,21 @@ namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
+static std::shared_ptr<Image> CreatePictureImage(std::shared_ptr<Picture> picture, Point* offset) {
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  auto bounds = picture->getBounds();
+  bounds.roundOut();
+  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height()), &matrix);
+  if (offset) {
+    *offset = Point::Make(bounds.x(), bounds.y());
+  }
+  return image;
+}
+
 bool Layer::DefaultAllowsEdgeAntialiasing() {
   return AllowsEdgeAntialiasing;
 }
@@ -534,37 +549,23 @@ Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
   return paint;
 }
 
-std::shared_ptr<Image> Layer::createPictureImage(std::shared_ptr<Picture> picture, Point* offset) {
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  auto bounds = picture->getBounds();
-  bounds.roundOut();
-  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix);
-  if (offset) {
-    *offset = Point::Make(bounds.x(), bounds.y());
-  }
-  return image;
-}
 std::shared_ptr<Picture> Layer::applyFilters(std::shared_ptr<Picture> source, float contentScale) {
   if (source == nullptr) {
     return nullptr;
   }
-  if (_filters.empty() || FloatNearlyZero(contentScale)) {
+  if (_filters.empty()) {
     return source;
   }
   Point offset = Point::Zero();
-  auto image = createPictureImage(std::move(source), &offset);
-  Recorder recorder{};
+  auto image = CreatePictureImage(std::move(source), &offset);
+  Recorder recorder = {};
   for (const auto& filter : _filters) {
     auto canvas = recorder.beginRecording();
     if (!filter->applyFilter(canvas, image, contentScale)) {
       continue;
     }
     Point filterOffset = Point::Zero();
-    image = createPictureImage(recorder.finishRecordingAsPicture(), &filterOffset);
+    image = CreatePictureImage(recorder.finishRecordingAsPicture(), &filterOffset);
     if (image == nullptr) {
       return nullptr;
     }
@@ -604,13 +605,16 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
 std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float contentScale,
                                                  Matrix* drawingMatrix) {
   DEBUG_ASSERT(drawingMatrix != nullptr);
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
   auto picture = getLayerContents(args, contentScale);
   picture = applyFilters(std::move(picture), contentScale);
   if (!picture) {
     return nullptr;
   }
   Point offset = Point::Zero();
-  auto image = createPictureImage(std::move(picture), &offset);
+  auto image = CreatePictureImage(std::move(picture), &offset);
   if (image == nullptr) {
     return nullptr;
   }
@@ -620,10 +624,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 }
 
 std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float contentScale) {
-  if (FloatNearlyZero(contentScale)) {
-    return nullptr;
-  }
-  Recorder recorder{};
+  Recorder recorder = {};
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
   drawContents(args, contentCanvas, 1.0f);
@@ -688,6 +689,9 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   auto contentScale = canvas->getMatrix().getMaxScale();
+  if (FloatNearlyZero(contentScale)) {
+    return;
+  }
   auto picture = getLayerContents(args, contentScale);
   picture = applyFilters(std::move(picture), contentScale);
   if (picture == nullptr) {

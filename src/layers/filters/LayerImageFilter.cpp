@@ -26,7 +26,7 @@ bool LayerImageFilter::applyFilter(Canvas* canvas, std::shared_ptr<Image> image,
   if (!filter) {
     return false;
   }
-  Paint paint;
+  Paint paint = {};
   paint.setImageFilter(filter);
   canvas->drawImage(image, &paint);
   return true;
