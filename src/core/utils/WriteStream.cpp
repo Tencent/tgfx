@@ -17,11 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/WriteStream.h"
-#include <_types/_uint32_t.h>
 #include <unistd.h>
-#include <cstddef>
-#include <cstdio>
-#include <cstring>
 #include <memory>
 #include "tgfx/core/Data.h"
 
