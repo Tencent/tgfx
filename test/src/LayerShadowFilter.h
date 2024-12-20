@@ -77,10 +77,6 @@ class LayerShadowFilter : public LayerFilter {
 
   void drawShadows(Canvas* canvas, std::shared_ptr<Image> image, float contentScale);
 
-  void collectDropShadows(Canvas* canvas, std::shared_ptr<Image> opaqueSource, float contentScale);
-
-  std::shared_ptr<MaskFilter> createMask(std::shared_ptr<Image> opaqueImage, float contentScale);
-
   std::vector<LayerShadowParam> params = {};
 
   bool _showBehindTransparent = false;

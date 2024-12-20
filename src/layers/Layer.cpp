@@ -534,6 +534,20 @@ Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
   return paint;
 }
 
+std::shared_ptr<Image> Layer::createPictureImage(std::shared_ptr<Picture> picture, Point* offset) {
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  auto bounds = picture->getBounds();
+  bounds.roundOut();
+  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height()), &matrix);
+  if (offset) {
+    *offset = Point::Make(bounds.x(), bounds.y());
+  }
+  return image;
+}
 std::shared_ptr<Picture> Layer::applyFilters(std::shared_ptr<Picture> source, float contentScale) {
   if (source == nullptr) {
     return nullptr;
@@ -541,28 +555,20 @@ std::shared_ptr<Picture> Layer::applyFilters(std::shared_ptr<Picture> source, fl
   if (_filters.empty() || FloatNearlyZero(contentScale)) {
     return source;
   }
-  auto sourceBounds = source->getBounds();
-  sourceBounds.roundOut();
-  auto pictureMatrix = Matrix::MakeTrans(-sourceBounds.x(), -sourceBounds.y());
-  auto image = Image::MakeFrom(source, static_cast<int>(sourceBounds.width()),
-                               static_cast<int>(sourceBounds.height()), &pictureMatrix);
-  Recorder recorder;
-  Point offset = Point::Make(sourceBounds.x(), sourceBounds.y());
+  Point offset = Point::Zero();
+  auto image = createPictureImage(std::move(source), &offset);
+  Recorder recorder{};
   for (const auto& filter : _filters) {
     auto canvas = recorder.beginRecording();
     if (!filter->applyFilter(canvas, image, contentScale)) {
       continue;
     }
-    auto picture = recorder.finishRecordingAsPicture();
-    if (picture == nullptr) {
+    Point filterOffset = Point::Zero();
+    image = createPictureImage(recorder.finishRecordingAsPicture(), &filterOffset);
+    if (image == nullptr) {
       return nullptr;
     }
-    auto bounds = picture->getBounds();
-    bounds.roundOut();
-    auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-    image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                            static_cast<int>(bounds.height()), &matrix);
-    offset.offset(bounds.x(), bounds.y());
+    offset += filterOffset;
   }
   auto canvas = recorder.beginRecording();
   canvas->drawImage(image, offset.x, offset.y);
@@ -603,16 +609,13 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (!picture) {
     return nullptr;
   }
-  auto bounds = picture->getBounds();
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  auto matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  auto image = Image::MakeFrom(std::move(picture), width, height, &matrix);
+  Point offset = Point::Zero();
+  auto image = createPictureImage(std::move(picture), &offset);
   if (image == nullptr) {
     return nullptr;
   }
   drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
-  drawingMatrix->preTranslate(bounds.left, bounds.top);
+  drawingMatrix->preTranslate(offset.x, offset.y);
   return image;
 }
 
@@ -620,7 +623,7 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
-  Recorder recorder;
+  Recorder recorder{};
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
   drawContents(args, contentCanvas, 1.0f);

@@ -86,40 +86,20 @@ void LayerShadowFilter::drawShadows(Canvas* canvas, std::shared_ptr<Image> image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = image->makeWithFilter(opaqueFilter);
 
-  // collect drop shadows into a picture, and then we can apply a mask filter to the picture
-  Recorder recorder;
-  auto shadowCanvas = recorder.beginRecording();
-  collectDropShadows(shadowCanvas, opaqueImage, contentScale);
-  auto shadowsPicture = recorder.finishRecordingAsPicture();
+  auto shader = Shader::MakeImageShader(opaqueImage, TileMode::Decal, TileMode::Decal);
+  Point offset = Point::Zero();
 
-  Paint shadowPaint;
-  if (!_showBehindTransparent) {
-    shadowPaint.setMaskFilter(createMask(opaqueImage, contentScale));
-  }
-  canvas->drawPicture(shadowsPicture, nullptr, &shadowPaint);
-}
-
-void LayerShadowFilter::collectDropShadows(Canvas* canvas, std::shared_ptr<Image> opaqueSource,
-                                           float contentScale) {
   for (const auto& param : params) {
     if (auto filter = CreateShadowFilter(param, contentScale)) {
-      Paint paint;
-      paint.setImageFilter(filter);
-      canvas->drawImage(opaqueSource, &paint);
+      auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
+      Paint paint{};
+      if (!_showBehindTransparent) {
+        auto matrixShader = shader->makeWithMatrix(Matrix::MakeTrans(-offset.x, -offset.y));
+        paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
+      }
+      canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
     }
   }
-}
-
-std::shared_ptr<MaskFilter> LayerShadowFilter::createMask(std::shared_ptr<Image> opaqueImage,
-                                                          float contentScale) {
-  auto shader = Shader::MakeImageShader(opaqueImage, TileMode::Decal, TileMode::Decal);
-  // get bounds after applying the filter, so that the mask filter can be applied to the
-  // correct area
-  auto boundsAfterFilter =
-      filterBounds(Rect::MakeWH(opaqueImage->width(), opaqueImage->height()), contentScale);
-  shader =
-      shader->makeWithMatrix(Matrix::MakeTrans(-boundsAfterFilter.left, -boundsAfterFilter.top));
-  return MaskFilter::MakeShader(shader, true);
 }
 
 }  // namespace tgfx
