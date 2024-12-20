@@ -1361,4 +1361,40 @@ TGFX_TEST(CanvasTest, Path_addArc) {
     EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc_reversed" + std::to_string(i)));
   }
 }
+
+TGFX_TEST(CanvasTest, Path_complex) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->translate(200, 200);
+  Path path;
+  auto rect = Rect::MakeLTRB(-167.200867f, -100.890869f, 167.200867f, 100.890869f);
+  path.addRect(rect);
+  auto strokeMatrix = Matrix::MakeAll(0.528697968f, 0, -9.44108581f, 0, 0.422670752f, -9.34423828f);
+  path.transform(strokeMatrix);
+  float dashList[] = {10.f,17.f,10.f,10.f,17.f,10.f};
+  auto pathEffect = PathEffect::MakeDash(dashList, 6, 0);
+  pathEffect->filterPath(&path);
+  auto stroke = Stroke();
+  stroke.width = 8;
+  stroke.cap = LineCap::Round;
+  stroke.join = LineJoin::Miter;
+  stroke.miterLimit = 4;
+  stroke.applyToPath(&path);
+
+  auto invertMatrix = Matrix::I();
+  strokeMatrix.invert(&invertMatrix);
+  path.transform(invertMatrix);
+  path.setFillType(PathFillType::Winding);
+  auto shader = Shader::MakeColorShader(Color::Black());
+  auto paint = Paint();
+  paint.setShader(shader);
+
+  canvas->scale(0.5f, 0.5f);
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "Canvas/Path_complex"));
+}
 }  // namespace tgfx
