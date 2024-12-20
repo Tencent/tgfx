@@ -16,22 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 #include "tgfx/layers/Layer.h"
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float filterScale) {
-  if (dirty || lastScale != filterScale) {
-    lastFilter = onCreateImageFilter(filterScale);
-    lastScale = filterScale;
+bool LayerImageFilter::applyFilter(Canvas* canvas, std::shared_ptr<Image> image,
+                                   float contentScale) {
+  auto filter = getImageFilter(contentScale);
+  if (!filter) {
+    return false;
+  }
+  Paint paint = {};
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  return true;
+}
+
+Rect LayerImageFilter::filterBounds(const Rect& srcRect, float contentScale) {
+  auto filter = getImageFilter(contentScale);
+  if (!filter) {
+    return srcRect;
+  }
+  return filter->filterBounds(srcRect);
+}
+
+void LayerImageFilter::invalidateFilter() {
+  dirty = true;
+  invalidate();
+}
+
+std::shared_ptr<ImageFilter> LayerImageFilter::getImageFilter(float scale) {
+  if (dirty || lastScale != scale) {
+    lastFilter = onCreateImageFilter(scale);
+    lastScale = scale;
     dirty = false;
   }
   return lastFilter;
-}
-
-void LayerFilter::invalidateFilter() {
-  dirty = true;
-  invalidate();
 }
 
 }  // namespace tgfx

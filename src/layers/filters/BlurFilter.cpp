@@ -50,7 +50,7 @@ void BlurFilter::setTileMode(TileMode tileMode) {
 }
 
 BlurFilter::BlurFilter(float blurrinessX, float blurrinessY, TileMode tileMode)
-    : LayerFilter(), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY), _tileMode(tileMode) {
+    : _blurrinessX(blurrinessX), _blurrinessY(blurrinessY), _tileMode(tileMode) {
 }
 
 std::shared_ptr<ImageFilter> BlurFilter::onCreateImageFilter(float scale) {

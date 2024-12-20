@@ -18,14 +18,15 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
-class ColorMatrixFilter : public LayerFilter {
+/**
+ * A filter that transforms the color using the given 4x5 matrix.
+ */
+class ColorMatrixFilter : public LayerImageFilter {
  public:
-  virtual ~ColorMatrixFilter() = default;
-
   /**
    * Creates a new ColorMatrixFilter that transforms the color using the given 4x5 matrix. The matrix can
    * be passed as a single array, and is treated as follows:
