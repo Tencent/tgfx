@@ -33,11 +33,10 @@ namespace tgfx {
 class WriteStream {
  public:
   /**
-   * Creates a new WriteStream object for writing data to the specified file path. If the return 
-   * value is nullptr, it may indicate that the directory path is incorrect or that there are
-   * insufficient permissions for the directory path.
+   * Creates a new WriteStream object to write data to the specified file path. Returns nullptr if
+   * the file path is invalid or if there are insufficient permissions to write to the file.
    */
-  static std::unique_ptr<WriteStream> MakeFromPath(const std::string& outputPath);
+  static std::shared_ptr<WriteStream> MakeFromFile(const std::string& filePath);
 
   /**
    * Destroy the Write Stream object
@@ -60,7 +59,7 @@ class WriteStream {
   /**
    * Returns the current size of the written bytes.
    */
-  virtual size_t size() const = 0;
+  virtual size_t bytesWritten() const = 0;
 
   /**
    * Flushes the data in the buffer to the target storage.
@@ -69,15 +68,15 @@ class WriteStream {
 };
 
 /**
- * MemoryWriteStream allows writing data to memory. The data written is stored in a buffer and can be
- * read back using the read method. The buffer can be dumped as a Data object.
+ * MemoryWriteStream allows writing data to memory. The data written is stored in a buffer and can
+ * be read back using the read method. The buffer can be dumped as a Data object.
  */
 class MemoryWriteStream : public WriteStream {
  public:
   /**
    * Creates a new MemoryWriteStream object.
    */
-  static std::unique_ptr<MemoryWriteStream> Make();
+  static std::shared_ptr<MemoryWriteStream> Make();
 
   /**
    * Destroy the MemoryWriteStream object
@@ -92,7 +91,7 @@ class MemoryWriteStream : public WriteStream {
   /**
    * Returns the current size of the written bytes.
    */
-  size_t size() const override;
+  size_t bytesWritten() const override;
 
   /**
    * The flush operation is a no-op for memory writes, so this is an empty implementation.
@@ -100,21 +99,20 @@ class MemoryWriteStream : public WriteStream {
   void flush() override{};
 
   /**
-   * Copies a range of the buffer bytes into a Data object. If offset or length is out of range,
-   * they are clamped to the beginning and end of the buffer. Returns nullptr if the clamped length
-   * is 0.
+   * Reads a segment of the buffer into the provided data. Returns false if the offset and size 
+   * exceed the buffer's range.
    */
-  std::shared_ptr<Data> copyRange(size_t offset, size_t length);
+  bool read(void* data, size_t offset, size_t size);
 
   /**
    * Copies all the buffer bytes into a Data object.
    */
-  std::shared_ptr<Data> copy();
+  std::shared_ptr<Data> readData();
 
   /** 
    * Return the contents as string.
    */
-  std::string detachAsString();
+  std::string readString();
 
  private:
   /**
@@ -122,7 +120,7 @@ class MemoryWriteStream : public WriteStream {
    */
   MemoryWriteStream() = default;
 
-  std::vector<uint8_t> buffer;
+  std::vector<uint8_t> buffer{};
 };
 
 }  // namespace tgfx

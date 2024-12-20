@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/WriteStream.h"
-#include <memory>
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
@@ -28,9 +27,7 @@ namespace tgfx {
  */
 class FileWriteStream : public WriteStream {
  public:
-  explicit FileWriteStream(const std::string& outputPath) {
-    file = fopen(outputPath.c_str(), "wb");
-  };
+  explicit FileWriteStream(FILE* file) : file(file){};
 
   ~FileWriteStream() override {
     if (file) {
@@ -50,7 +47,7 @@ class FileWriteStream : public WriteStream {
     return true;
   }
 
-  size_t size() const override {
+  size_t bytesWritten() const override {
     return static_cast<size_t>(ftell(file));
   }
 
@@ -64,22 +61,27 @@ class FileWriteStream : public WriteStream {
     }
   }
 
+ private:
   FILE* file = nullptr;
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-std::unique_ptr<WriteStream> WriteStream::MakeFromPath(const std::string& outputPath) {
-  auto* stream = new FileWriteStream(outputPath);
-  if (stream->file == nullptr) {
+
+std::shared_ptr<WriteStream> WriteStream::MakeFromFile(const std::string& filePath) {
+  if (filePath.empty()) {
     return nullptr;
   }
-  return std::unique_ptr<WriteStream>(stream);
+  auto* file = fopen(filePath.c_str(), "wb");
+  if (file == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<WriteStream>(new FileWriteStream(file));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::unique_ptr<MemoryWriteStream> MemoryWriteStream::Make() {
-  return std::unique_ptr<MemoryWriteStream>(new MemoryWriteStream());
+std::shared_ptr<MemoryWriteStream> MemoryWriteStream::Make() {
+  return std::shared_ptr<MemoryWriteStream>(new MemoryWriteStream());
 }
 
 bool MemoryWriteStream::write(const void* data, size_t size) {
@@ -88,26 +90,24 @@ bool MemoryWriteStream::write(const void* data, size_t size) {
   return true;
 }
 
-size_t MemoryWriteStream::size() const {
+size_t MemoryWriteStream::bytesWritten() const {
   return buffer.size();
 }
 
-std::shared_ptr<Data> MemoryWriteStream::copyRange(size_t offset, size_t length) {
-  if (offset >= buffer.size()) {
-    return nullptr;
+bool MemoryWriteStream::read(void* data, size_t offset, size_t size) {
+  if (offset + size > buffer.size()) {
+    return false;
   }
-  length = std::min(length, buffer.size() - offset);
-  if (length == 0) {
-    return nullptr;
-  }
-  return Data::MakeWithCopy(buffer.data() + offset, length);
+  const auto* bytes = buffer.data() + offset;
+  memcpy(data, bytes, size);
+  return true;
 }
 
-std::shared_ptr<Data> MemoryWriteStream::copy() {
+std::shared_ptr<Data> MemoryWriteStream::readData() {
   return Data::MakeWithCopy(buffer.data(), buffer.size());
 }
 
-std::string MemoryWriteStream::detachAsString() {
+std::string MemoryWriteStream::readString() {
   return std::string(buffer.begin(), buffer.end());
 }
 
