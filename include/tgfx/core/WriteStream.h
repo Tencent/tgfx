@@ -41,7 +41,7 @@ class WriteStream {
    * Writes bytes to the stream. Returns true if the write was successful. The actual write
    * operation is implemented in the subclasses.
    */
-  virtual bool write(const char* data, size_t size) = 0;
+  virtual bool write(const void* data, size_t size) = 0;
 
   /**
    * Writes text to the stream. Returns true if the write was successful.
@@ -87,7 +87,7 @@ class FileWriteStream : public WriteStream {
   /**
    * Writes bytes to the file stream. Returns true if the write was successful.
    */
-  bool write(const char* data, size_t size) override;
+  bool write(const void* data, size_t size) override;
 
   /**
    * Returns the current size of the written bytes.
@@ -135,7 +135,7 @@ class MemoryWriteStream : public WriteStream {
   /**
    * Writes bytes to the memory stream. Returns true if the write was successful.
    */
-  bool write(const char* data, size_t size) override;
+  bool write(const void* data, size_t size) override;
 
   /**
    * Returns the current size of the written bytes.
@@ -148,16 +148,16 @@ class MemoryWriteStream : public WriteStream {
   void flush() override{};
 
   /**
-   * Reads data from the stream at the specified offset and size. Returns true if the read was
-   * successful.
+   * Copies a range of the buffer bytes into a Data object. If offset or length is out of range,
+   * they are clamped to the beginning and end of the buffer. Returns nullptr if the clamped length
+   * is 0.
    */
-  bool read(char* data, size_t size, size_t offset);
+  std::shared_ptr<Data> copyRange(size_t offset, size_t length);
 
   /**
-   * Dumps all the written data as a Data object. The Data object is a copy of the current buffer
-   * and its lifecycle is independent of the MemoryWriteStream.
+   * Copies all the buffer bytes into a Data object.
    */
-  std::shared_ptr<Data> dumpAsData();
+  std::shared_ptr<Data> copy();
 
  private:
   /**
@@ -165,7 +165,7 @@ class MemoryWriteStream : public WriteStream {
    */
   MemoryWriteStream() = default;
 
-  std::vector<char> buffer;
+  std::vector<uint8_t> buffer;
 };
 
 }  // namespace tgfx

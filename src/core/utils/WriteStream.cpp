@@ -46,7 +46,7 @@ size_t FileWriteStream::size() const {
   return static_cast<size_t>(ftell(file));
 }
 
-bool FileWriteStream::write(const char* data, size_t size) {
+bool FileWriteStream::write(const void* data, size_t size) {
   if (file == nullptr) {
     return false;
   }
@@ -78,8 +78,9 @@ std::unique_ptr<MemoryWriteStream> MemoryWriteStream::Make() {
   return std::unique_ptr<MemoryWriteStream>(new MemoryWriteStream());
 }
 
-bool MemoryWriteStream::write(const char* data, size_t size) {
-  buffer.insert(buffer.end(), data, data + size);
+bool MemoryWriteStream::write(const void* data, size_t size) {
+  const auto* bytes = static_cast<const uint8_t*>(data);
+  buffer.insert(buffer.end(), bytes, bytes + size);
   return true;
 }
 
@@ -87,16 +88,18 @@ size_t MemoryWriteStream::size() const {
   return buffer.size();
 }
 
-bool MemoryWriteStream::read(char* data, size_t size, size_t offset) {
-  if (offset + size > buffer.size()) {
-    return false;
+std::shared_ptr<Data> MemoryWriteStream::copyRange(size_t offset, size_t length) {
+  if (offset >= buffer.size()) {
+    return nullptr;
   }
-  std::copy(buffer.begin() + static_cast<std::ptrdiff_t>(offset),
-            buffer.begin() + static_cast<std::ptrdiff_t>(offset + size), data);
-  return true;
+  length = std::min(length, buffer.size() - offset);
+  if (length == 0) {
+    return nullptr;
+  }
+  return Data::MakeWithCopy(buffer.data() + offset, length);
 }
 
-std::shared_ptr<Data> MemoryWriteStream::dumpAsData() {
+std::shared_ptr<Data> MemoryWriteStream::copy() {
   return Data::MakeWithCopy(buffer.data(), buffer.size());
 }
 

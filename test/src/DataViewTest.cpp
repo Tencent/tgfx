@@ -98,10 +98,18 @@ TGFX_TEST(DataViewTest, MemoryWriteStream) {
   const char* text = "TGFX";
   stream->write(text, std::strlen(text));
 
-  auto data = stream->dumpAsData();
+  auto data = stream->copy();
   ASSERT_TRUE(data != nullptr);
   EXPECT_EQ(data->size(), 10U);
   EXPECT_EQ(std::string((char*)data->bytes(), data->size()), "Hello\nTGFX");
+
+  data = stream->copyRange(6, 4);
+  ASSERT_TRUE(data != nullptr);
+  EXPECT_EQ(data->size(), 4U);
+  EXPECT_EQ(std::string((char*)data->bytes(), data->size()), "TGFX");
+
+  data = stream->copyRange(10, 10);
+  ASSERT_TRUE(data == nullptr);
 }
 
 TGFX_TEST(DataViewTest, FileWriteStream) {
