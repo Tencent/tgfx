@@ -22,11 +22,14 @@
 
 namespace tgfx {
 /**
- * ScaleImage is an image that scales another image.
+ * RasterizedImage is an image that rasterizes another image with a scale and sampling options.
  */
-class ScaleImage : public OffscreenImage {
+class RasterizedImage : public OffscreenImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, float scale,
+  /**
+   * Note that this method always returns a non-mipmapped image.
+   */
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, float rasterizationScale,
                                          const SamplingOptions& sampling);
 
   int width() const override;
@@ -41,7 +44,8 @@ class ScaleImage : public OffscreenImage {
     return source->isFullyDecoded();
   }
 
-  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
+                                        const SamplingOptions& sampling = {}) const override;
 
  protected:
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
@@ -50,10 +54,10 @@ class ScaleImage : public OffscreenImage {
 
  private:
   std::shared_ptr<Image> source = nullptr;
-  float scale = 1.0f;
+  float rasterizationScale = 1.0f;
   SamplingOptions sampling = {};
 
-  ScaleImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, float scale,
-             const SamplingOptions& sampling);
+  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, float rasterizationScale,
+                  const SamplingOptions& sampling);
 };
 }  // namespace tgfx

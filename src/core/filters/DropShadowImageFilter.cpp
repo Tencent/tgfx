@@ -59,7 +59,7 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  source = source->makeTextureImage(args.context);
+  source = source->makeRasterized();
   std::unique_ptr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix != nullptr) {
