@@ -19,7 +19,7 @@
 #pragma once
 
 #include <atomic>
-#include <mutex>
+// #include <mutex>
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Mask.h"
@@ -82,7 +82,7 @@ class ImageReader {
   virtual std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
  protected:
-  std::mutex locker = {};
+  // std::mutex locker = {};
   std::weak_ptr<ImageReader> weakThis;
   std::shared_ptr<ImageStream> stream = nullptr;
 

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <mutex>
+//#include <mutex>
 
 namespace tgfx {
 class Semaphore {
@@ -32,7 +32,7 @@ class Semaphore {
 
  private:
   int count = 0;
-  std::mutex locker = {};
+//  std::mutex locker = {};
   std::condition_variable condition = {};
 };
 }  // namespace tgfx

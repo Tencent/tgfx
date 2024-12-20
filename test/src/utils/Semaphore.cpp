@@ -20,15 +20,15 @@
 
 namespace tgfx {
 void Semaphore::signal() {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   count++;
   condition.notify_one();
 }
 
 void Semaphore::wait() {
-  std::unique_lock<std::mutex> autoLock(locker);
+//  std::unique_lock<std::mutex> autoLock(locker);
   if (count <= 0) {
-    condition.wait(autoLock);
+//    condition.wait(autoLock);
   }
   count--;
 }

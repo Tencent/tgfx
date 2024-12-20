@@ -25,16 +25,16 @@
 
 namespace tgfx {
 
-static std::mutex& TypefaceMutex = *new std::mutex;
+// static std::mutex& TypefaceMutex = *new std::mutex;
 static std::vector<std::shared_ptr<Typeface>> FallbackTypefaces = {};
 
 void TextLayer::SetFallbackTypefaces(std::vector<std::shared_ptr<Typeface>> typefaces) {
-  std::lock_guard<std::mutex> lock(TypefaceMutex);
+  // std::lock_guard<std::mutex> lock(TypefaceMutex);
   FallbackTypefaces = std::move(typefaces);
 }
 
 std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
-  std::lock_guard<std::mutex> lock(TypefaceMutex);
+  // std::lock_guard<std::mutex> lock(TypefaceMutex);
   return FallbackTypefaces;
 }
 

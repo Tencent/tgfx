@@ -19,7 +19,7 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
+// #include <mutex>
 #include <vector>
 #include "tgfx/core/Rect.h"
 
@@ -79,7 +79,7 @@ class ImageStream {
   virtual bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) = 0;
 
  private:
-  std::mutex locker = {};
+  // std::mutex locker = {};
   std::vector<ImageReader*> readers = {};
 
   void attachToStream(ImageReader* imageReader);

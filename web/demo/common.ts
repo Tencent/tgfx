@@ -112,6 +112,7 @@ export function ShowFPS(shareData: ShareData) {
         if (timeOffset >= 1000) {
             const fps = renderFrames * 1000.0 / timeOffset;
             textElement.textContent = `Count: ${ItemCount}, FPS: ${fps.toFixed(2)}`;
+            console.log(`----averageTimeCost: ${timeOffset / renderFrames} ms----`);
             renderFrames = 0;
             startTime = currentTimestamp;
         }

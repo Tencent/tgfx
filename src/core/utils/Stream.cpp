@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Stream.h"
-#include <mutex>
+// #include <mutex>
 #include <regex>
 #include <unordered_map>
 #include "core/utils/Log.h"
 
 namespace tgfx {
-static std::mutex& locker = *new std::mutex;
+// static std::mutex& locker = *new std::mutex;
 static std::unordered_map<std::string, std::shared_ptr<StreamFactory>>& customProtocolsMap =
     *new std::unordered_map<std::string, std::shared_ptr<StreamFactory>>();
 
@@ -75,9 +75,9 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   }
   auto protocol = GetProtocolFromPath(filePath);
   if (!protocol.empty()) {
-    locker.lock();
+    // locker.lock();
     auto streamFactory = customProtocolsMap[protocol];
-    locker.unlock();
+    // locker.unlock();
     if (streamFactory) {
       auto stream = streamFactory->createStream(filePath);
       if (stream) {
@@ -104,7 +104,7 @@ void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,
   if (customProtocol.empty() || factory == nullptr) {
     return;
   }
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   customProtocolsMap[customProtocol] = factory;
 }
 
@@ -112,7 +112,7 @@ void StreamFactory::UnRegisterCustomProtocol(const std::string& customProtocol) 
   if (customProtocol.empty()) {
     return;
   }
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   customProtocolsMap.erase(customProtocol);
 }
 

@@ -75,7 +75,7 @@ class SurfaceTexture : public ImageStream {
   bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
 
  private:
-  std::mutex locker = {};
+  //std::mutex locker = {};
   int _width = 0;
   int _height = 0;
   std::condition_variable condition = {};

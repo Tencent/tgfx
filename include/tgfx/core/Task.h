@@ -21,7 +21,7 @@
 #include <condition_variable>
 #include <functional>
 #include <memory>
-#include <mutex>
+// #include <mutex>
 
 namespace tgfx {
 class TaskGroup;
@@ -67,7 +67,7 @@ class Task {
   void wait();
 
  private:
-  std::mutex locker = {};
+  // std::mutex locker = {};
   std::condition_variable condition = {};
   bool _executing = true;
   bool _cancelled = false;

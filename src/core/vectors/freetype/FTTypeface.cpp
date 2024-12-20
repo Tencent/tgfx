@@ -46,13 +46,13 @@ std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int
   return FTTypeface::Make(FTFontData(std::move(data), ttcIndex));
 }
 
-static std::mutex& FTMutex() {
-  static std::mutex& mutex = *new std::mutex;
-  return mutex;
-}
+//static std::mutex& FTMutex() {
+//  static std::mutex& mutex = *new std::mutex;
+//  return mutex;
+//}
 
 static FT_Face CreateFTFace(const FTFontData& data) {
-  std::lock_guard<std::mutex> autoLock(FTMutex());
+//  std::lock_guard<std::mutex> autoLock(FTMutex());
   FT_Open_Args args;
   memset(&args, 0, sizeof(args));
   if (data.data) {
@@ -92,27 +92,27 @@ FTTypeface::FTTypeface(FTFontData data, FT_Face face)
 }
 
 FTTypeface::~FTTypeface() {
-  std::lock_guard<std::mutex> autoLock(FTMutex());
+//  std::lock_guard<std::mutex> autoLock(FTMutex());
   FT_Done_Face(face);
 }
 
 std::string FTTypeface::fontFamily() const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   return face->family_name ? face->family_name : "";
 }
 
 std::string FTTypeface::fontStyle() const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   return face->style_name ? face->style_name : "";
 }
 
 size_t FTTypeface::glyphsCount() const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   return static_cast<size_t>(face->num_glyphs);
 }
 
 int FTTypeface::unitsPerEm() const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   return unitsPerEmInternal();
 }
 
@@ -129,17 +129,17 @@ int FTTypeface::unitsPerEmInternal() const {
 }
 
 bool FTTypeface::hasColor() const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   return FT_HAS_COLOR(face);
 }
 
 bool FTTypeface::hasOutlines() const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   return FT_IS_SCALABLE(face);
 }
 
 GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   return static_cast<GlyphID>(FT_Get_Char_Index(face, static_cast<FT_ULong>(unichar)));
 }
 
@@ -148,7 +148,7 @@ std::shared_ptr<Data> FTTypeface::getBytes() const {
 }
 
 std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   FT_ULong tableLength = 0;
   auto error = FT_Load_Sfnt_Table(face, tag, 0, nullptr, &tableLength);
   if (error) {

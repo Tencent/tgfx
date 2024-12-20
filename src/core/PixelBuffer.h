@@ -97,7 +97,7 @@ class PixelBuffer : public ImageBuffer {
   virtual std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const = 0;
 
  private:
-  mutable std::mutex locker = {};
+  // mutable std::mutex locker = {};
   ImageInfo _info = {};
 };
 }  // namespace tgfx

@@ -34,10 +34,10 @@ Device::~Device() {
 
 Context* Device::lockContext() {
   TRACE_EVENT_COLOR(TRACY_COLOR_GREENYELLOW);
-  locker.lock();
+  // locker.lock();
   contextLocked = onLockContext();
   if (!contextLocked) {
-    locker.unlock();
+    // locker.unlock();
     return nullptr;
   }
   return context;
@@ -48,11 +48,11 @@ void Device::unlock() {
     contextLocked = false;
     onUnlockContext();
   }
-  locker.unlock();
+  // locker.unlock();
 }
 
 void Device::releaseAll() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   if (context == nullptr) {
     return;
   }

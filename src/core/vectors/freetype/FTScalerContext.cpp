@@ -177,7 +177,7 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
 
 FTScalerContext::~FTScalerContext() {
   if (ftSize) {
-    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
     FT_Done_Size(ftSize);
   }
 }
@@ -199,7 +199,7 @@ int FTScalerContext::setupSize(bool fauxItalic) const {
 }
 
 FontMetrics FTScalerContext::getFontMetrics() const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   FontMetrics metrics = {};
   if (setupSize(false)) {
     return metrics;
@@ -415,7 +415,7 @@ static bool GenerateGlyphPath(FT_Face face, Path* path) {
 
 bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,
                                    Path* path) const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto face = ftTypeface()->face;
   // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
   if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
@@ -453,7 +453,7 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto bounds = Rect::MakeEmpty();
   if (setupSize(fauxItalic)) {
     return bounds;
@@ -504,7 +504,7 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
 }
 
 float FTScalerContext::getAdvance(GlyphID glyphID, bool verticalText) const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (setupSize(false)) {
     return 0;
   }
@@ -525,7 +525,7 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
 }
 
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (glyphID == 0 || setupSize(false)) {
     return Point::Zero();
   }
@@ -547,7 +547,7 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
 }
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
   if (!loadBitmapGlyph(glyphID, glyphFlags)) {
@@ -566,7 +566,7 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
 
 std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID,
                                                             bool tryHardware) const {
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+//  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags;
   glyphFlags |= FT_LOAD_RENDER;
   glyphFlags &= ~FT_LOAD_NO_BITMAP;

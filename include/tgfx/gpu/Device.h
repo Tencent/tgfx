@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <mutex>
+// #include <mutex>
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -52,7 +52,7 @@ class Device {
   void unlock();
 
  protected:
-  std::mutex locker = {};
+  // std::mutex locker = {};
   Context* context = nullptr;
   std::weak_ptr<Device> weakThis;
 

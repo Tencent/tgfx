@@ -116,7 +116,7 @@ std::shared_ptr<ImageDecoder> ImageDecoder::MakeFrom(std::shared_ptr<ImageGenera
   if (generator == nullptr) {
     return nullptr;
   }
-  if (asyncDecoding && generator->asyncSupport()) {
+  if (asyncDecoding && generator->asyncSupport() && false) {
     return std::make_shared<AsyncImageDecoder>(std::move(generator), tryHardware);
   }
   return std::make_shared<ImageGeneratorWrapper>(std::move(generator), tryHardware);

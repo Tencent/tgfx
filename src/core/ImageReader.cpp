@@ -91,7 +91,7 @@ int ImageReader::height() const {
 }
 
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   DEBUG_ASSERT(!weakThis.expired());
   if (!hasPendingChanges) {
     return nullptr;
@@ -102,13 +102,13 @@ std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
 }
 
 bool ImageReader::checkExpired(uint64_t contentVersion) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   return contentVersion != textureVersion && contentVersion < bufferVersion;
 }
 
 std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Context* context,
                                                   bool mipmapped) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   if (contentVersion == textureVersion) {
     return texture;
   }
@@ -134,7 +134,7 @@ std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Conte
 }
 
 void ImageReader::onContentDirty(const Rect& bounds) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   hasPendingChanges = true;
   dirtyBounds.join(bounds);
   if (stream->isHardwareBacked() && texture != nullptr) {

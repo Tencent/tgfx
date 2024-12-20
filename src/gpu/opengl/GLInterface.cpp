@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLInterface.h"
-#include <mutex>
+// #include <mutex>
 #include <unordered_map>
 #include "GLAssembledGLESInterface.h"
 #include "GLAssembledGLInterface.h"
@@ -25,7 +25,7 @@
 #include "GLUtil.h"
 
 namespace tgfx {
-static std::mutex interfaceLocker = {};
+// static std::mutex interfaceLocker = {};
 static std::unordered_map<int, std::unique_ptr<const GLInterface>> glInterfaceMap = {};
 
 static int GetGLVersion(const GLProcGetter* getter) {
@@ -53,7 +53,7 @@ const GLInterface* GLInterface::GetNative() {
   if (version <= 0) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> autoLock(interfaceLocker);
+  // std::lock_guard<std::mutex> autoLock(interfaceLocker);
   auto result = glInterfaceMap.find(version);
   if (result != glInterfaceMap.end()) {
     return result->second.get();

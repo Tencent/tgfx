@@ -21,7 +21,7 @@
 #include "gpu/opengl/GLContext.h"
 
 namespace tgfx {
-static std::mutex deviceMapLocker = {};
+// static std::mutex deviceMapLocker = {};
 static std::unordered_map<void*, GLDevice*> deviceMap = {};
 
 std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
@@ -47,7 +47,7 @@ std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
   if (nativeHandle == nullptr) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  // std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   auto result = deviceMap.find(nativeHandle);
   if (result != deviceMap.end()) {
     auto device = result->second->weakThis.lock();
@@ -60,12 +60,12 @@ std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
 }
 
 GLDevice::GLDevice(void* nativeHandle) : nativeHandle(nativeHandle) {
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  // std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap[nativeHandle] = this;
 }
 
 GLDevice::~GLDevice() {
-  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  // std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap.erase(nativeHandle);
 }
 

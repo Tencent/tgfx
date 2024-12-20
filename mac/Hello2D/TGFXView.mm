@@ -30,7 +30,7 @@
 #include <deque>
 
 
-constexpr int kTotalRectCount = 24800;
+constexpr int kTotalRectCount = 6;
 static int frames = 0;
 static uint64_t startMs = 0;
 bool fAnimateEnabled = true;

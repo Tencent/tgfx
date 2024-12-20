@@ -25,12 +25,12 @@ Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
 }
 
 std::shared_ptr<Device> Window::getDevice() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   return device;
 }
 
 std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOnly) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   if (!checkContext(context)) {
     return nullptr;
   }
@@ -46,18 +46,18 @@ std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOn
 }
 
 void Window::invalidSize() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   sizeInvalid = true;
   onInvalidSize();
 }
 
 void Window::freeSurface() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   onFreeSurface();
 }
 
 void Window::present(Context* context, int64_t presentationTime) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   if (!checkContext(context)) {
     return;
   }

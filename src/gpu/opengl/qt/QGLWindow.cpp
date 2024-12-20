@@ -125,7 +125,7 @@ QGLWindow::~QGLWindow() {
 }
 
 void QGLWindow::moveToThread(QThread* thread) {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
   renderThread = thread;
   if (device != nullptr) {
     static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);

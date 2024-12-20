@@ -28,7 +28,7 @@
 #endif
 
 namespace tgfx {
-static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
+// static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t InvalidThreadNumber = 0;
 
 int GetCPUCores() {
@@ -122,7 +122,7 @@ bool TaskGroup::checkThreads() {
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
 #if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
   return false;
 #endif
@@ -135,32 +135,32 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 }
 
 std::shared_ptr<Task> TaskGroup::popTask() {
-  std::unique_lock<std::mutex> autoLock(locker);
+  // std::unique_lock<std::mutex> autoLock(locker);
   activeThreads--;
-  while (!exited) {
-    if (tasks.empty()) {
-      auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-      if (exited || status == std::cv_status::timeout) {
-        auto threadID = std::this_thread::get_id();
-        timeoutThreads.push_back(threadID);
-        //        LOGI("TaskGroup: A task thread is exited, the current number of threads : %lld",
-        //             threads.size() - expiredThreads.size());
-        return nullptr;
-      }
-    } else {
-      auto task = tasks.front();
-      tasks.pop_front();
-      activeThreads++;
-      //      LOGI("TaskGroup: A task is running, the current active threads : %lld",
-      //      activeThreads);
-      return task;
-    }
-  }
+  // while (!exited) {
+  //   if (tasks.empty()) {
+  //     auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
+  //     if (exited || status == std::cv_status::timeout) {
+  //       auto threadID = std::this_thread::get_id();
+  //       timeoutThreads.push_back(threadID);
+  //       //        LOGI("TaskGroup: A task thread is exited, the current number of threads : %lld",
+  //       //             threads.size() - expiredThreads.size());
+  //       return nullptr;
+  //     }
+  //   } else {
+  //     auto task = tasks.front();
+  //     tasks.pop_front();
+  //     activeThreads++;
+  //     //      LOGI("TaskGroup: A task is running, the current active threads : %lld",
+  //     //      activeThreads);
+  //     return task;
+  //   }
+  // }
   return nullptr;
 }
 
 bool TaskGroup::removeTask(Task* target) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   auto position = std::find_if(tasks.begin(), tasks.end(),
                                [=](std::shared_ptr<Task> task) { return task.get() == target; });
   if (position == tasks.end()) {
@@ -171,11 +171,11 @@ bool TaskGroup::removeTask(Task* target) {
 }
 
 void TaskGroup::exit() {
-  locker.lock();
+  // locker.lock();
   exited = true;
   tasks.clear();
   condition.notify_all();
-  locker.unlock();
+  // locker.unlock();
   for (auto& thread : threads) {
     ReleaseThread(thread);
   }

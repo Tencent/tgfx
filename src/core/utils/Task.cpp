@@ -36,22 +36,22 @@ Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
 bool Task::executing() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   return _executing;
 }
 
 bool Task::cancelled() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   return _cancelled;
 }
 
 bool Task::finished() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   return !_executing && !_cancelled;
 }
 
 void Task::wait() {
-  std::unique_lock<std::mutex> autoLock(locker);
+  // std::unique_lock<std::mutex> autoLock(locker);
   if (!_executing) {
     return;
   }
@@ -63,11 +63,11 @@ void Task::wait() {
     condition.notify_all();
     return;
   }
-  condition.wait(autoLock);
+  // condition.wait(autoLock);
 }
 
 void Task::cancel() {
-  std::unique_lock<std::mutex> autoLock(locker);
+  // std::unique_lock<std::mutex> autoLock(locker);
   if (!_executing) {
     return;
   }
@@ -83,7 +83,7 @@ bool Task::removeTask() {
 
 void Task::execute() {
   block();
-  std::lock_guard<std::mutex> auoLock(locker);
+  // std::lock_guard<std::mutex> auoLock(locker);
   _executing = false;
   condition.notify_all();
 }

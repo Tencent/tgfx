@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <mutex>
+// #include <mutex>
 #include <unordered_map>
 #include "tgfx/core/Data.h"
 
@@ -131,7 +131,7 @@ class Typeface {
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
  protected:
-  mutable std::mutex locker = {};
+  // mutable std::mutex locker = {};
 
  private:
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};

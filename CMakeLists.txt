@@ -20,6 +20,7 @@ option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
 endif ()
+SET(TGFX_ENABLE_PROFILING OFF)
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
     option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)

@@ -20,7 +20,7 @@
 
 #include <condition_variable>
 #include <list>
-#include <mutex>
+// #include <mutex>
 #include <thread>
 #include <vector>
 #include "tgfx/core/Task.h"
@@ -28,7 +28,7 @@
 namespace tgfx {
 class TaskGroup {
  private:
-  std::mutex locker = {};
+  //std::mutex locker = {};
   std::condition_variable condition = {};
   int activeThreads = 0;
   bool exited = false;

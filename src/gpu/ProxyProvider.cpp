@@ -74,7 +74,7 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   if (provider == nullptr) {
     return nullptr;
   }
-  if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
+  if (!(renderFlags & RenderFlags::DisableAsyncTask) && false) {
     provider = std::make_shared<AsyncDataProvider>(std::move(provider));
   }
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);

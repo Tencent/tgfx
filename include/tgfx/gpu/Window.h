@@ -62,7 +62,7 @@ class Window {
   void freeSurface();
 
  protected:
-  std::mutex locker = {};
+  // std::mutex locker = {};
   bool sizeInvalid = false;
   std::shared_ptr<Device> device = nullptr;
   std::shared_ptr<Surface> surface = nullptr;

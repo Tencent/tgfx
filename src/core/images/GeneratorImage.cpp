@@ -46,7 +46,7 @@ std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryH
       return nullptr;
     }
   }
-  auto decoder = ImageDecoder::MakeFrom(generator, tryHardware, true);
+  auto decoder = ImageDecoder::MakeFrom(generator, tryHardware, false);
   return DecoderImage::MakeFrom(uniqueKey, std::move(decoder));
 }
 

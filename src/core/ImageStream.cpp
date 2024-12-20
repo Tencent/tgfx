@@ -21,19 +21,19 @@
 
 namespace tgfx {
 void ImageStream::markContentDirty(const Rect& bounds) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   for (auto& reader : readers) {
     reader->onContentDirty(bounds);
   }
 }
 
 void ImageStream::attachToStream(ImageReader* imageReader) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   readers.push_back(imageReader);
 }
 
 void ImageStream::detachFromStream(ImageReader* imageReader) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   auto result = std::find(readers.begin(), readers.end(), imageReader);
   if (result != readers.end()) {
     readers.erase(result);

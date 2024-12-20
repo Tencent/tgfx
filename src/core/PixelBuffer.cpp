@@ -123,21 +123,21 @@ PixelBuffer::PixelBuffer(const ImageInfo& info) : _info(info) {
 }
 
 void* PixelBuffer::lockPixels() {
-  locker.lock();
+  // locker.lock();
   auto pixels = onLockPixels();
   if (pixels == nullptr) {
-    locker.unlock();
+    // locker.unlock();
   }
   return pixels;
 }
 
 void PixelBuffer::unlockPixels() {
   onUnlockPixels();
-  locker.unlock();
+  // locker.unlock();
 }
 
 std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
-  std::lock_guard<std::mutex> autoLock(locker);
+  // std::lock_guard<std::mutex> autoLock(locker);
   if (!mipmapped && isHardwareBacked()) {
     return onBindToHardwareTexture(context);
   }
