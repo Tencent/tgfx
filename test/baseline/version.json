@@ -70,13 +70,13 @@
         "ComposeImageFilter2": "2028a1b",
         "ImageFilterShader": "2028a1b",
         "ModeColorFilter": "c2b0b18",
-        "RuntimeEffect": "6f4a968",
+        "RuntimeEffect": "d93c573",
         "blur": "4d6ab20",
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
         "innerShadow": "01cce38",
-        "shaderMaskFilter": "ded3c91"
+        "shaderMaskFilter": "d93c573"
     },
     "GlyphFaceTest": {
         "GlyphFaceSimple": "4032de2",
