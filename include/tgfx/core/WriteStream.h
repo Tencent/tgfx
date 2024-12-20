@@ -99,18 +99,18 @@ class MemoryWriteStream : public WriteStream {
   void flush() override{};
 
   /**
-   * Reads a segment of the buffer into the provided data. Returns false if the offset and size 
-   * exceed the buffer's range.
+   * Reads a segment of the buffer and copies it into the provided data pointer. Returns false if
+   * the offset and size exceed the buffer's range.
    */
   bool read(void* data, size_t offset, size_t size);
 
   /**
-   * Copies all the buffer bytes into a Data object.
+   * Reads all bytes from the buffer and copies them into a Data object.
    */
   std::shared_ptr<Data> readData();
 
   /** 
-   * Return the contents as string.
+   * Return the buffer as string.
    */
   std::string readString();
 
