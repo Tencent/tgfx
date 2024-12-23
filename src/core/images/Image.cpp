@@ -21,7 +21,7 @@
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
 #include "core/images/RGBAAAImage.h"
-#include "core/images/ScaleImage.h"
+#include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Profiling.h"
@@ -195,9 +195,13 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeScaled(float scale, const SamplingOptions& sampling) const {
-  TRACE_EVENT;
-  return ScaleImage::MakeFrom(weakThis.lock(), scale, sampling);
+std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
+                                             const SamplingOptions& sampling) const {
+  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
+  if (rasterImage != nullptr && hasMipmaps()) {
+    return rasterImage->makeMipmapped(true);
+  }
+  return rasterImage;
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {

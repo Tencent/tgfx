@@ -45,7 +45,7 @@ std::shared_ptr<ImageFilter> BlendFilter::onCreateImageFilter(float) {
 }
 
 BlendFilter::BlendFilter(const Color& color, BlendMode blendMode)
-    : LayerFilter(), _color(std::move(color)), _blendMode(blendMode) {
+    : _color(std::move(color)), _blendMode(blendMode) {
 }
 
 }  // namespace tgfx

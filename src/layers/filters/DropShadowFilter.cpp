@@ -86,8 +86,8 @@ std::shared_ptr<ImageFilter> DropShadowFilter::onCreateImageFilter(float scale) 
 
 DropShadowFilter::DropShadowFilter(float offsetX, float offsetY, float blurrinessX,
                                    float blurrinessY, const Color& color, bool dropsShadowOnly)
-    : LayerFilter(), _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX),
-      _blurrinessY(blurrinessY), _color(std::move(color)), _dropsShadowOnly(dropsShadowOnly) {
+    : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
+      _color(std::move(color)), _dropsShadowOnly(dropsShadowOnly) {
 }
 
 }  // namespace tgfx
