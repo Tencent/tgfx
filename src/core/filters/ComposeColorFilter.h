@@ -28,6 +28,11 @@ class ComposeColorFilter : public ColorFilter {
 
   bool isAlphaUnchanged() const override;
 
+ protected:
+  Type type() const override {
+    return Type::Compose;
+  };
+
  private:
   std::shared_ptr<ColorFilter> inner = nullptr;
   std::shared_ptr<ColorFilter> outer = nullptr;

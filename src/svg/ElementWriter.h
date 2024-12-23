@@ -26,6 +26,8 @@
 #include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
+#include "core/filters/MatrixColorFilter.h"
+#include "core/filters/ModeColorFilter.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
@@ -74,7 +76,10 @@ class ElementWriter {
   void addImageShaderResources(const std::shared_ptr<const ImageShader>& shader, Context* context,
                                Resources* resources);
 
-  void addColorFilterResources(const ColorFilter& colorFilter, Resources* resources);
+  void addBlendColorFilterResources(const ModeColorFilter& modeColorFilter, Resources* resources);
+
+  void addMatrixColorFilterResources(const MatrixColorFilter& matrixColorFilter,
+                                     Resources* resources);
 
   void addFillAndStroke(const FillStyle& fill, const Stroke* stroke, const Resources& resources);
 

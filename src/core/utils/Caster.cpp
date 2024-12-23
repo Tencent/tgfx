@@ -66,4 +66,19 @@ std::shared_ptr<const InnerShadowImageFilter> ImageFilterCaster::AsInnerShadowIm
   return nullptr;
 }
 
+std::shared_ptr<const ModeColorFilter> ColorFilterCaster::AsModeColorFilter(
+    const std::shared_ptr<ColorFilter>& colorFilter) {
+  if (colorFilter->type() == ColorFilter::Type::Blend) {
+    return std::static_pointer_cast<const ModeColorFilter>(colorFilter);
+  }
+  return nullptr;
+}
+
+std::shared_ptr<const MatrixColorFilter> ColorFilterCaster::AsMatrixColorFilter(
+    const std::shared_ptr<ColorFilter>& colorFilter) {
+  if (colorFilter->type() == ColorFilter::Type::Matrix) {
+    return std::static_pointer_cast<const MatrixColorFilter>(colorFilter);
+  }
+  return nullptr;
+}
 }  // namespace tgfx

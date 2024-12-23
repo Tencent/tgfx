@@ -91,6 +91,14 @@ class ColorFilter {
     return false;
   }
 
+ protected:
+  enum class Type { Blend, Matrix, AlphaThreshold, Compose };
+
+  /**
+   * Returns the type of this color filter.
+   */
+  virtual Type type() const = 0;
+
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
 
@@ -98,5 +106,6 @@ class ColorFilter {
   friend class ColorFilterShader;
   friend class ComposeColorFilter;
   friend class ColorImageFilter;
+  friend class ColorFilterCaster;
 };
 }  // namespace tgfx

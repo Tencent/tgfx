@@ -35,22 +35,22 @@ class SVGExportingContext;
  * - The exported SVG text includes spaces ('\t') and newlines ('\n') for improved readability.
  * - Warnings are issued when exporting attributes that are not supported by the SVG standard.
  * 
- * SVG standard not supported attributes:
+ * Unsupported SVG standard attributes:
  * - Blend modes: 
- * Clear, Src, Dst, DstOver, SrcIn, DstIn, SrcOut, DstOut, SrcATop, DstATop, Xor,Modulate are
+ * Clear, Src, Dst, DstOver, SrcIn, DstIn, SrcOut, DstOut, SrcATop, DstATop, Xor, and Modulate are
  * not supported.
  *
  * - Image filters:
- * Only Blur, DropShadow, and InnerShadow types are supported.
+ * Compose and Runtime are not supported.
  *
  * - Color filters:
- * Only the SrcIn blend mode is supported.
+ * Blend is partially supported, similar to blend modes.
  *
  * - Shaders:
- * Only Color, Gradient, and Image types are supported.
+ * ColorFilter,Blend,Matrix are not supported.Gradient shaders are partially supported.
  * 
  * - Gradient shaders:
- * Not all gradient shaders are supported; only Linear and Radial types are supported.
+ * Conic gradients are not supported.
  */
 class SVGExportingFlags {
  public:

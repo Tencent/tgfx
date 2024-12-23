@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
+#include <_types/_uint32_t.h>
 #include <string>
 #include <unordered_set>
 #include "SVGExportingContext.h"
@@ -75,7 +76,7 @@ ElementWriter::~ElementWriter() {
 
 void ElementWriter::reportUnsupportedElement(const char* message) const {
   if (!disableWarning) {
-    LOGE("[SVG exporting]:Unsupported %s", message);
+    LOGE("[SVG exporting]:%s", message);
   }
 }
 
@@ -126,7 +127,7 @@ void ElementWriter::addFillAndStroke(const FillStyle& fill, const Stroke* stroke
     if (!blendModeString.empty()) {
       this->addAttribute("style", blendModeString);
     } else {
-      reportUnsupportedElement("blend mode");
+      reportUnsupportedElement("Unsupported blend mode");
     }
   }
 
@@ -241,7 +242,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
       addInnerShadowImageFilter(innerShadowFilter);
     } else {
-      reportUnsupportedElement("image filter");
+      reportUnsupportedElement("Unsupported image filter");
     }
   }
   Resources resources;
@@ -355,12 +356,12 @@ Resources ElementWriter::addResources(const FillStyle& fill, Context* context) {
   }
 
   if (auto colorFilter = fill.colorFilter) {
-    // TODO(YGAurora): Implement skia color filters for blend modes other than SrcIn
-    BlendMode mode;
-    if (colorFilter->asColorMode(nullptr, &mode) && mode == BlendMode::SrcIn) {
-      this->addColorFilterResources(*colorFilter, &resources);
+    if (auto blendFilter = ColorFilterCaster::AsModeColorFilter(colorFilter)) {
+      this->addBlendColorFilterResources(*blendFilter, &resources);
+    } else if (auto matrixFilter = ColorFilterCaster::AsMatrixColorFilter(colorFilter)) {
+      this->addMatrixColorFilterResources(*matrixFilter, &resources);
     } else {
-      reportUnsupportedElement("blend mode in color filter");
+      reportUnsupportedElement("Unsupported color filter");
     }
   }
 
@@ -401,7 +402,7 @@ void ElementWriter::addGradientShaderResources(const std::shared_ptr<const Gradi
     resources->paintColor = "url(#" + addRadialGradientDef(info) + ")";
   } else {
     resources->paintColor = "url(#" + addUnsupportedGradientDef(info) + ")";
-    reportUnsupportedElement("gradient type");
+    reportUnsupportedElement("Unsupported gradient type");
   }
 }
 
@@ -527,7 +528,15 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageSha
   resources->paintColor = "url(#" + patternID + ")";
 }
 
-void ElementWriter::addColorFilterResources(const ColorFilter& colorFilter, Resources* resources) {
+void ElementWriter::addBlendColorFilterResources(const ModeColorFilter& modeColorFilter,
+                                                 Resources* resources) {
+
+  auto BlendModeString = ToSVGBlendMode(modeColorFilter.mode);
+  if (BlendModeString.empty()) {
+    reportUnsupportedElement("Unsupported blend mode in color filter");
+    return;
+  }
+
   std::string filterID = resourceStore->addFilter();
   {
     ElementWriter filterElement("filter", writer);
@@ -537,25 +546,59 @@ void ElementWriter::addColorFilterResources(const ColorFilter& colorFilter, Reso
     filterElement.addAttribute("width", "100%");
     filterElement.addAttribute("height", "100%");
 
-    Color filterColor;
-    BlendMode mode;
-    colorFilter.asColorMode(&filterColor, &mode);
-
     {
       // first flood with filter color
       ElementWriter floodElement("feFlood", writer);
-      floodElement.addAttribute("flood-color", ToSVGColor(filterColor));
-      floodElement.addAttribute("flood-opacity", filterColor.alpha);
+      floodElement.addAttribute("flood-color", ToSVGColor(modeColorFilter.color));
+      floodElement.addAttribute("flood-opacity", modeColorFilter.color.alpha);
       floodElement.addAttribute("result", "flood");
+    }
+
+    {
+      ElementWriter blendElement("feBlend", writer);
+      blendElement.addAttribute("in", "SourceGraphic");
+      blendElement.addAttribute("in2", "flood");
+      blendElement.addAttribute("mode", BlendModeString);
+      blendElement.addAttribute("result", "blend");
     }
 
     {
       // apply the transform to filter color
       ElementWriter compositeElement("feComposite", writer);
-      compositeElement.addAttribute("in", "flood");
+      compositeElement.addAttribute("in", "blend");
       compositeElement.addAttribute("operator", "in");
     }
   }
   resources->filter = "url(#" + filterID + ")";
 }
+
+void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter& matrixColorFilter,
+                                                  Resources* resources) {
+  std::string filterID = resourceStore->addFilter();
+  {
+    ElementWriter filterElement("filter", writer);
+    filterElement.addAttribute("id", filterID);
+    filterElement.addAttribute("x", "0%");
+    filterElement.addAttribute("y", "0%");
+    filterElement.addAttribute("width", "100%");
+    filterElement.addAttribute("height", "100%");
+
+    {
+      ElementWriter colorMatrixElement("feColorMatrix", writer);
+      colorMatrixElement.addAttribute("in", "SourceGraphic");
+      colorMatrixElement.addAttribute("type", "matrix");
+      auto colorMatrix = matrixColorFilter.matrix;
+      std::string matrixString;
+      for (uint32_t i = 0; i < colorMatrix.size(); i++) {
+        matrixString += FloatToString(colorMatrix[i]);
+        if (i != 19) {
+          matrixString += " ";
+        }
+      }
+      colorMatrixElement.addAttribute("values", matrixString);
+    }
+  }
+  resources->filter = "url(#" + filterID + ")";
+}
+
 }  // namespace tgfx

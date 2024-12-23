@@ -20,6 +20,8 @@
 #include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
+#include "core/filters/MatrixColorFilter.h"
+#include "core/filters/ModeColorFilter.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
@@ -48,6 +50,15 @@ class ImageFilterCaster {
 
   static std::shared_ptr<const InnerShadowImageFilter> AsInnerShadowImageFilter(
       const std::shared_ptr<ImageFilter>& imageFilter);
+};
+
+class ColorFilterCaster {
+ public:
+  static std::shared_ptr<const ModeColorFilter> AsModeColorFilter(
+      const std::shared_ptr<ColorFilter>& colorFilter);
+
+  static std::shared_ptr<const MatrixColorFilter> AsMatrixColorFilter(
+      const std::shared_ptr<ColorFilter>& colorFilter);
 };
 
 }  // namespace tgfx
