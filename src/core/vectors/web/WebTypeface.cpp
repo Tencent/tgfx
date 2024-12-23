@@ -105,9 +105,6 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
 std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
   return GlyphsMap()[webFontFamily];
-#else
-  return {};
-#endif
 }
 
 }  // namespace tgfx

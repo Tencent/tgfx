@@ -61,7 +61,9 @@ class CGTypeface : public Typeface {
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
  protected:
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
+#endif
 
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);

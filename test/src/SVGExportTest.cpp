@@ -54,7 +54,7 @@ TGFX_TEST(SVGExportTest, PureColor) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
@@ -83,7 +83,7 @@ TGFX_TEST(SVGExportTest, PureColorFile) {
 
   auto SVGStream = WriteStream::MakeFromFile(path);
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
@@ -116,7 +116,7 @@ TGFX_TEST(SVGExportTest, OpacityColor) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
@@ -146,7 +146,7 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
 
   auto SVGStream = WriteStream::MakeFromFile(path);
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
@@ -184,7 +184,7 @@ TGFX_TEST(SVGExportTest, LinearGradient) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
@@ -215,7 +215,7 @@ TGFX_TEST(SVGExportTest, RadialGradient) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
@@ -249,7 +249,7 @@ TGFX_TEST(SVGExportTest, UnsupportedGradient) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
@@ -279,7 +279,7 @@ TGFX_TEST(SVGExportTest, BlendMode) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(tgfx::Rect::MakeXYWH(0, 0, 100, 100), paintBackground);
@@ -308,7 +308,7 @@ TGFX_TEST(SVGExportTest, StrokeWidth) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(tgfx::Rect::MakeXYWH(50, 50, 100, 100), paint);
@@ -337,7 +337,7 @@ TGFX_TEST(SVGExportTest, SimpleTextAsText) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("Hello TGFX", 0, 80, font, paint);
@@ -369,9 +369,9 @@ TGFX_TEST(SVGExportTest, SimpleTextAsPath) {
   paint.setColor(Color::Red());
 
   auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(
-      SVGStream, context, Rect::MakeWH(400, 200),
-      SVGExportingFlags::ConvertTextToPaths | SVGExportingFlags::DisablePrettyXML);
+  auto exporter =
+      SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
+                        SVGExportFlags::ConvertTextToPaths | SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("Hi", 0, 80, font, paint);
@@ -401,7 +401,7 @@ TGFX_TEST(SVGExportTest, EmojiText) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
@@ -435,7 +435,7 @@ TGFX_TEST(SVGExportTest, EmojiTextFile) {
 
   auto SVGStream = WriteStream::MakeFromFile(path);
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
@@ -469,7 +469,7 @@ TGFX_TEST(SVGExportTest, ClipState) {
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300),
-                                    SVGExportingFlags::DisablePrettyXML);
+                                    SVGExportFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   {

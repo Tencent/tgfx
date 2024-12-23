@@ -90,4 +90,9 @@ GlyphID Typeface::getGlyphID(const std::string& name) const {
   auto unichar = UTF::NextUTF8(&start, start + name.size());
   return getGlyphID(unichar);
 }
+
+std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
+  return {};
+};
+
 }  // namespace tgfx

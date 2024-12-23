@@ -29,11 +29,13 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGTextBuilder.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
@@ -45,10 +47,9 @@
 namespace tgfx {
 
 SVGExportingContext::SVGExportingContext(Context* context, const Rect& viewBox,
-                                         std::unique_ptr<XMLWriter> xmlWriter,
-                                         uint32_t exportingFlags)
-    : convertTextToPaths(exportingFlags & SVGExportingFlags::ConvertTextToPaths),
-      disableWarnings(exportingFlags & SVGExportingFlags::DisableWarnings), context(context),
+                                         std::unique_ptr<XMLWriter> xmlWriter, uint32_t exportFlags)
+    : convertTextToPaths(exportFlags & SVGExportFlags::ConvertTextToPaths),
+      disableWarnings(exportFlags & SVGExportFlags::DisableWarnings), context(context),
       writer(std::move(xmlWriter)), resourceBucket(new ResourceStore) {
   if (viewBox.isEmpty()) {
     return;
@@ -144,8 +145,7 @@ void SVGExportingContext::drawImageRect(std::shared_ptr<Image> image, const Rect
   }
 
   Bitmap bitmap(image->width(), image->height(), false, false);
-  Pixmap pixmap(bitmap);
-  if (exportToPixmap(context, image, pixmap)) {
+  if (ImageExportToBitmap(context, image, bitmap)) {
     Rect srcRect = Rect::MakeWH(image->width(), image->height());
     float scaleX = rect.width() / srcRect.width();
     float scaleY = rect.height() / srcRect.height();
@@ -157,7 +157,7 @@ void SVGExportingContext::drawImageRect(std::shared_ptr<Image> image, const Rect
     newState.matrix.postScale(scaleX, scaleY);
     newState.matrix.postTranslate(transX, transY);
 
-    exportPixmap(pixmap, newState, style);
+    exportPixmap(Pixmap(bitmap), newState, style);
   }
 }
 
@@ -372,12 +372,13 @@ void SVGExportingContext::applyClipPath(const Path& clipPath) {
   clipGroupElement->addAttribute("clip-path", "url(#" + clipID + ")");
 }
 
-bool SVGExportingContext::exportToPixmap(Context* context, const std::shared_ptr<Image>& image,
-                                         Pixmap& pixmap) {
+bool SVGExportingContext::ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
+                                              Bitmap& bitmap) {
   auto surface = Surface::Make(context, image->width(), image->height());
   auto* canvas = surface->getCanvas();
   canvas->drawImage(image);
 
+  Pixmap pixmap(bitmap);
   return surface->readPixels(pixmap.info(), pixmap.writablePixels());
 }
 

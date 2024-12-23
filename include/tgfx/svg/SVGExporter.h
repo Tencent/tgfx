@@ -30,10 +30,37 @@ class SVGExportingContext;
 /**
  * Defines flags for SVG exporting that influence the readability and functionality of the exported
  * SVG.
- * By default:
- * - Text is exported as text elements.
- * - The exported SVG text includes spaces ('\t') and newlines ('\n') for improved readability.
- * - Warnings are issued when exporting attributes that are not supported by the SVG standard.
+ */
+class SVGExportFlags {
+ public:
+  /**
+   * Converts text to paths in the exported SVG. 
+   * By default, text is exported as text elements.
+   * 
+   * Note:
+   * This only applies to fonts with outlines. Fonts without outlines, such as emoji and web fonts,
+   * will still be exported as text.
+   */
+  static constexpr uint32_t ConvertTextToPaths = 1 << 0;
+
+  /**
+   * Disable pretty XML formatting in the exported SVG.
+   * By default, spaces ('\t') and newlines ('\n') are included in the exported SVG text for
+   * improved
+   */
+  static constexpr uint32_t DisablePrettyXML = 1 << 1;
+
+  /**
+   * Disable unsupported attribute warnings.
+   * By default, warnings are logged to the console when exporting attributes that are not supported
+   * by the SVG standard.
+   */
+  static constexpr uint32_t DisableWarnings = 1 << 2;
+};
+
+/**
+ * SVGExporter is a class used to export SVG text, converting drawing commands in the Canvas to
+ * SVG text.
  * 
  * Unsupported SVG standard attributes:
  * - Blend modes: 
@@ -52,48 +79,25 @@ class SVGExportingContext;
  * - Gradient shaders:
  * Conic gradients are not supported.
  */
-class SVGExportingFlags {
- public:
-  /**
-   * Convert text to paths in the exported SVG. 
-   * This only applies to fonts with outlines. Fonts without outlines, like emoji and web fonts,
-   * will be exported as text.
-   */
-  static constexpr uint32_t ConvertTextToPaths = 1 << 0;
-
-  /**
-   * Disable pretty XML formatting in the exported SVG.
-   */
-  static constexpr uint32_t DisablePrettyXML = 1 << 1;
-
-  /**
-   * Disable unsupported attribute warnings.
-   */
-  static constexpr uint32_t DisableWarnings = 1 << 2;
-};
-
-/**
- * SVGExporter is a class used to export SVG text, converting drawing commands in the Canvas to
- * SVG text.
- */
 class SVGExporter {
  public:
   /**
-   * Creates an SVG exporter object pointer, which can be used to export SVG text.
+   * Creates a shared pointer to an SVG exporter object, which can be used to export SVG text.
    *
-   * @param svgStream The string stream to store the SVG text.
-   * @param context used to convert some rendering commands into image data.
-   * @param viewBox viewBox of SVG, and content that exceeds the display area in the
-   * SVG will be clipped.
-   * @param options Options for exporting SVG text.
+   * @param svgStream The stream to store the SVG text.
+   * @param context The context used to convert some rendering commands into image data.
+   * @param viewBox The viewBox of the SVG. Content that exceeds this area will be clipped.
+   * @param exportFlags Flags for exporting SVG text.
+   * @return A shared pointer to the SVG exporter object. If svgStream is nullptr, context is
+   * nullptr, or viewBox is empty, nullptr is returned.
    */
   static std::shared_ptr<SVGExporter> Make(const std::shared_ptr<WriteStream>& svgStream,
                                            Context* context, const Rect& viewBox,
-                                           uint32_t exportingFlags = 0);
+                                           uint32_t exportFlags = 0);
 
   /**
-   * Destroys the SVG exporter object. If close() has not been called, it will automatically finalize
-   * any unfinished drawing commands and write the SVG end tag.
+   * Destroys the SVG exporter object. If close() hasn't been called, it will be invoked 
+   * automatically.It will finalize any unfinished drawing commands and write the SVG end tag.
    */
   ~SVGExporter();
 
@@ -112,9 +116,8 @@ class SVGExporter {
    * Construct a SVG exporter object
    */
   SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
-              uint32_t exportingFlags);
+              uint32_t exportFlags);
 
-  bool closed = false;
   SVGExportingContext* drawContext = nullptr;
   Canvas* canvas = nullptr;
 };

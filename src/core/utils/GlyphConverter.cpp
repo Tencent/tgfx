@@ -29,7 +29,7 @@ std::vector<Unichar> GlyphConverter::glyphsToUnichars(const Font& font,
     return {};
   }
   std::vector<Unichar> result(glyphs.size(), 0);
-  auto glyphMap = this->getGlyphToUnicodeMap(typeface);
+  auto glyphMap = getGlyphToUnicodeMap(typeface);
   for (size_t i = 0; i < glyphs.size(); i++) {
     result[i] = glyphMap[glyphs[i]];
   }
@@ -38,10 +38,11 @@ std::vector<Unichar> GlyphConverter::glyphsToUnichars(const Font& font,
 
 const std::vector<Unichar>& GlyphConverter::getGlyphToUnicodeMap(
     const std::shared_ptr<Typeface>& typeface) {
-  if (fontToGlyphMap.find(typeface->uniqueID()) == fontToGlyphMap.end()) {
+  auto iter = fontToGlyphMap.find(typeface->uniqueID());
+  if (iter == fontToGlyphMap.end()) {
     fontToGlyphMap[typeface->uniqueID()] = typeface->getGlyphToUnicodeMap();
   }
-  return fontToGlyphMap[typeface->uniqueID()];
+  return iter->second;
 }
 
 #endif

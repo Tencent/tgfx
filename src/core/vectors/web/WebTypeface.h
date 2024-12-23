@@ -68,7 +68,9 @@ class WebTypeface : public Typeface {
   }
 
  protected:
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
+#endif
 
  private:
   explicit WebTypeface(std::string name, std::string style);

@@ -56,6 +56,10 @@ if (MACOS AND CLION_IDE AND NOT HasParent)
     option(TGFX_BUILD_TESTS "Build tgfx tests" ON)
 endif ()
 
+if (TGFX_BUILD_SVG)
+    set(TGFX_USE_PNG_ENCODE ON)
+endif ()
+
 if (TGFX_BUILD_TESTS)
     set(TGFX_USE_FREETYPE ON)
     set(TGFX_BUILD_DRAWERS ON)

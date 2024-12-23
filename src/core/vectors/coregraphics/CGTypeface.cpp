@@ -317,10 +317,6 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
   }
   return returnMap;
 }
-#else
-std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
-  return {};
-}
 #endif
 
 }  // namespace tgfx

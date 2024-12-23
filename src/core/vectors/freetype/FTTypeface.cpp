@@ -182,10 +182,6 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
   }
   return returnMap;
 }
-#else
-std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
-  return {};
-}
 #endif
 
 }  // namespace tgfx

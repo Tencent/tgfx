@@ -46,7 +46,7 @@ class ElementWriter;
 class SVGExportingContext : public DrawContext {
  public:
   SVGExportingContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
-                      uint32_t exportingFlags);
+                      uint32_t exportFlags);
   ~SVGExportingContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
@@ -83,7 +83,8 @@ class SVGExportingContext : public DrawContext {
   /**
    * Draws a image onto a surface and reads the pixels from the surface.
    */
-  static bool exportToPixmap(Context* context, const std::shared_ptr<Image>& image, Pixmap& pixmap);
+  static bool ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
+                                  Bitmap& bitmap);
 
  private:
   /**

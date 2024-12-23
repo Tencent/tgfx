@@ -136,9 +136,8 @@ class Typeface {
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
    * unicode. The array length is glyphsCount(). 
    * This method is only implemented when compiling the SVG or PDF export module.
-   * The length of the array is not required, it will be resized within the method.
    */
-  virtual std::vector<Unichar> getGlyphToUnicodeMap() const = 0;
+  virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
   mutable std::mutex locker = {};
 

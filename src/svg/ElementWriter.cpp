@@ -28,6 +28,7 @@
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/GradientType.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
@@ -58,14 +59,14 @@ ElementWriter::ElementWriter(const std::string& name, Context* context,
                              bool disableWarning, const MCState& state, const FillStyle& fill,
                              const Stroke* stroke)
     : writer(writer.get()), resourceStore(bucket), disableWarning(disableWarning) {
-  Resources res = this->addResources(fill, context);
+  Resources res = addResources(fill, context);
 
   writer->startElement(name);
 
-  this->addFillAndStroke(fill, stroke, res);
+  addFillAndStroke(fill, stroke, res);
 
   if (!state.matrix.isIdentity()) {
-    this->addAttribute("transform", ToSVGTransform(state.matrix));
+    addAttribute("transform", ToSVGTransform(state.matrix));
   }
 }
 
@@ -85,54 +86,54 @@ void ElementWriter::addFillAndStroke(const FillStyle& fill, const Stroke* stroke
   if (!stroke) {  //fill draw
     static const std::string defaultFill = "black";
     if (resources.paintColor != defaultFill) {
-      this->addAttribute("fill", resources.paintColor);
+      addAttribute("fill", resources.paintColor);
     }
     if (!fill.isOpaque()) {
-      this->addAttribute("fill-opacity", fill.color.alpha);
+      addAttribute("fill-opacity", fill.color.alpha);
     }
   } else {  //stroke draw
-    this->addAttribute("fill", "none");
+    addAttribute("fill", "none");
 
-    this->addAttribute("stroke", resources.paintColor);
+    addAttribute("stroke", resources.paintColor);
 
     float strokeWidth = stroke->width;
     if (strokeWidth == 0) {
       // Hairline stroke
       strokeWidth = 1;
-      this->addAttribute("vector-effect", "non-scaling-stroke");
+      addAttribute("vector-effect", "non-scaling-stroke");
     }
-    this->addAttribute("stroke-width", strokeWidth);
+    addAttribute("stroke-width", strokeWidth);
 
     auto cap = ToSVGCap(stroke->cap);
     if (!cap.empty()) {
-      this->addAttribute("stroke-linecap", cap);
+       addAttribute("stroke-linecap", cap);
     }
 
     auto join = ToSVGJoin(stroke->join);
     if (!join.empty()) {
-      this->addAttribute("stroke-linejoin", join);
+      addAttribute("stroke-linejoin", join);
     }
 
     if (stroke->join == LineJoin::Miter && !FloatNearlyEqual(stroke->miterLimit, 4.f)) {
-      this->addAttribute("stroke-miterlimit", stroke->miterLimit);
+       addAttribute("stroke-miterlimit", stroke->miterLimit);
     }
 
     if (!fill.isOpaque()) {
-      this->addAttribute("stroke-opacity", fill.color.alpha);
+       addAttribute("stroke-opacity", fill.color.alpha);
     }
   }
 
   if (fill.blendMode != BlendMode::SrcOver) {
     auto blendModeString = ToSVGBlendMode(fill.blendMode);
     if (!blendModeString.empty()) {
-      this->addAttribute("style", blendModeString);
+       addAttribute("style", blendModeString);
     } else {
       reportUnsupportedElement("Unsupported blend mode");
     }
   }
 
   if (!resources.filter.empty()) {
-    this->addAttribute("filter", resources.filter);
+    addAttribute("filter", resources.filter);
   }
 }
 
@@ -153,7 +154,7 @@ void ElementWriter::addText(const std::string& text) {
 }
 
 void ElementWriter::addFontAttributes(const Font& font) {
-  this->addAttribute("font-size", font.getSize());
+  addAttribute("font-size", font.getSize());
 
   auto typeface = font.getTypeface();
   if (typeface == nullptr) {
@@ -161,54 +162,54 @@ void ElementWriter::addFontAttributes(const Font& font) {
   }
   auto familyName = typeface->fontFamily();
   if (!familyName.empty()) {
-    this->addAttribute("font-family", familyName);
+    addAttribute("font-family", familyName);
   }
 
   if (font.isFauxItalic()) {
-    this->addAttribute("font-style", "italic");
+    addAttribute("font-style", "italic");
   }
   if (font.isFauxBold()) {
-    this->addAttribute("font-weight", "bold");
+    addAttribute("font-weight", "bold");
   }
 }
 
 void ElementWriter::addRectAttributes(const Rect& rect) {
   // x, y default to 0
   if (rect.x() != 0) {
-    this->addAttribute("x", rect.x());
+     addAttribute("x", rect.x());
   }
   if (rect.y() != 0) {
-    this->addAttribute("y", rect.y());
+     addAttribute("y", rect.y());
   }
 
-  this->addAttribute("width", rect.width());
-  this->addAttribute("height", rect.height());
+  addAttribute("width", rect.width());
+  addAttribute("height", rect.height());
 }
 
 void ElementWriter::addRoundRectAttributes(const RRect& roundRect) {
-  this->addRectAttributes(roundRect.rect);
+  addRectAttributes(roundRect.rect);
   if (FloatNearlyZero(roundRect.radii.x) && FloatNearlyZero(roundRect.radii.y)) {
-    return;
+     return;
   }
-  this->addAttribute("rx", roundRect.radii.x);
-  this->addAttribute("ry", roundRect.radii.y);
+  addAttribute("rx", roundRect.radii.x);
+  addAttribute("ry", roundRect.radii.y);
 }
 
 void ElementWriter::addCircleAttributes(const Rect& bound) {
-  this->addAttribute("cx", bound.centerX());
-  this->addAttribute("cy", bound.centerY());
-  this->addAttribute("r", bound.width() * 0.5f);
+  addAttribute("cx", bound.centerX());
+  addAttribute("cy", bound.centerY());
+  addAttribute("r", bound.width() * 0.5f);
 }
 
 void ElementWriter::addEllipseAttributes(const Rect& bound) {
-  this->addAttribute("cx", bound.centerX());
-  this->addAttribute("cy", bound.centerY());
-  this->addAttribute("rx", bound.width() * 0.5f);
-  this->addAttribute("ry", bound.height() * 0.5f);
+  addAttribute("cx", bound.centerX());
+  addAttribute("cy", bound.centerY());
+  addAttribute("rx", bound.width() * 0.5f);
+  addAttribute("ry", bound.height() * 0.5f);
 }
 
 void ElementWriter::addPathAttributes(const Path& path, PathEncoding encoding) {
-  this->addAttribute("d", ToSVGPath(path, encoding));
+   addAttribute("d", ToSVGPath(path, encoding));
 }
 
 Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
@@ -352,14 +353,14 @@ Resources ElementWriter::addResources(const FillStyle& fill, Context* context) {
 
   if (auto shader = fill.shader) {
     ElementWriter defs("defs", writer);
-    this->addShaderResources(shader, context, &resources);
+    addShaderResources(shader, context, &resources);
   }
 
   if (auto colorFilter = fill.colorFilter) {
     if (auto blendFilter = ColorFilterCaster::AsModeColorFilter(colorFilter)) {
-      this->addBlendColorFilterResources(*blendFilter, &resources);
+      addBlendColorFilterResources(*blendFilter, &resources);
     } else if (auto matrixFilter = ColorFilterCaster::AsMatrixColorFilter(colorFilter)) {
-      this->addMatrixColorFilterResources(*matrixFilter, &resources);
+      addMatrixColorFilterResources(*matrixFilter, &resources);
     } else {
       reportUnsupportedElement("Unsupported color filter");
     }
@@ -371,11 +372,11 @@ Resources ElementWriter::addResources(const FillStyle& fill, Context* context) {
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                                        Resources* resources) {
   if (auto colorShader = ShaderCaster::AsColorShader(shader)) {
-    this->addColorShaderResources(colorShader, resources);
+    addColorShaderResources(colorShader, resources);
   } else if (auto gradientShader = ShaderCaster::AsGradientShader(shader)) {
-    this->addGradientShaderResources(gradientShader, resources);
+    addGradientShaderResources(gradientShader, resources);
   } else if (auto imageShader = ShaderCaster::AsImageShader(shader)) {
-    this->addImageShaderResources(imageShader, context, resources);
+    addImageShaderResources(imageShader, context, resources);
   } else {
     reportUnsupportedElement("shader");
   }
@@ -482,11 +483,10 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageSha
 
   DEBUG_ASSERT(context);
   Bitmap bitmap(image->width(), image->height(), false, false);
-  Pixmap pixmap(bitmap);
-  if (!SVGExportingContext::exportToPixmap(context, image, pixmap)) {
+  if (!SVGExportingContext::ImageExportToBitmap(context, image, bitmap)) {
     return;
   }
-  auto dataUri = AsDataUri(pixmap);
+  auto dataUri = AsDataUri(Pixmap(bitmap));
   if (!dataUri) {
     return;
   }
