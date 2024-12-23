@@ -1,4 +1,7 @@
 {
+    "Canvas": {
+        "Path_complex": "f37b222"
+    },
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
@@ -19,7 +22,7 @@
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
         "Picture": "b062b9a",
-        "PictureImage": "8a2ac4d",
+        "PictureImage": "c28a93c",
         "PictureImage_Path": "2212c4e",
         "PictureImage_Text": "b062b9a",
         "TileModeFallback": "af2e3ff",
@@ -28,7 +31,7 @@
         "altas": "b1cfcd4",
         "blendMode": "b3076a3",
         "drawImage": "8cb853c",
-        "drawShape": "b062b9a",
+        "drawShape": "f37b222",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "d010fb8",
@@ -42,11 +45,11 @@
         "mipmap_linear_texture_effect": "d010fb8",
         "mipmap_nearest": "d010fb8",
         "mipmap_none": "d010fb8",
-        "path": "6fd4617",
+        "path": "f37b222",
+        "rasterized": "5a971dd",
+        "rasterized_mipmap": "5a971dd",
+        "rasterized_scale_up": "5a971dd",
         "saveLayer": "3888c19",
-        "scaleImage": "2028a1b",
-        "scaleImage_mipmap": "2028a1b",
-        "scaleImage_scale_up": "2028a1b",
         "shape": "bc64712",
         "text_shape": "b062b9a",
         "tile_mode_normal": "8cb853c",
@@ -63,18 +66,20 @@
         "SimpleText": "b062b9a"
     },
     "FilterTest": {
+        "AlphaThreshold": "5012d73",
+        "AlphaThreshold_empty": "5012d73",
         "ComposeColorFilter": "f710e29",
         "ComposeImageFilter": "2028a1b",
         "ComposeImageFilter2": "2028a1b",
         "ImageFilterShader": "2028a1b",
         "ModeColorFilter": "c2b0b18",
-        "RuntimeEffect": "6f4a968",
+        "RuntimeEffect": "d93c573",
         "blur": "4d6ab20",
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
         "innerShadow": "01cce38",
-        "shaderMaskFilter": "ded3c91"
+        "shaderMaskFilter": "d93c573"
     },
     "GlyphFaceTest": {
         "GlyphFaceSimple": "4032de2",
@@ -89,12 +94,13 @@
         "Layer_hitTestPointNested": "b062b9a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "draw_shape": "738fc92",
+        "draw_shape": "f37b222",
         "draw_solid": "b4a1231",
         "draw_text": "b062b9a",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
-        "filterTest": "43cd416",
+        "filterTest": "44166b7",
+        "filters": "9000907",
         "getBounds": "3888c19",
         "getLayersUnderPoint": "b062b9a",
         "greyColorMatrix": "a1605b2",
@@ -102,8 +108,10 @@
         "imageLayer": "99a5cd9",
         "imageMask": "af2e3ff",
         "innerShadow": "01cce38",
+        "layerShadowFilter": "9000907",
+        "layerShadowFilter1": "9000907",
         "shapeMask": "612c09e",
-        "textMask": "b062b9a"
+        "textMask": "9000907"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

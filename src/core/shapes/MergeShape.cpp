@@ -32,10 +32,7 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
     return first;
   }
   if (pathOp == PathOp::Append) {
-    std::vector<std::shared_ptr<Shape>> shapes = {};
-    Append(&shapes, std::move(first));
-    Append(&shapes, std::move(second));
-    return std::make_shared<AppendShape>(std::move(shapes));
+    return AppendShape::MakeFrom(std::move(first), std::move(second));
   }
   return std::make_shared<MergeShape>(std::move(first), std::move(second), pathOp);
 }

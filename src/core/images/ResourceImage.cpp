@@ -25,6 +25,14 @@ namespace tgfx {
 ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
+std::shared_ptr<Image> ResourceImage::makeRasterized(float rasterizationScale,
+                                                     const SamplingOptions& sampling) const {
+  if (rasterizationScale == 1.0f) {
+    return weakThis.lock();
+  }
+  return Image::makeRasterized(rasterizationScale, sampling);
+}
+
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
   TRACE_EVENT;
   auto newArgs = args;

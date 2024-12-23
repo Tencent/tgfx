@@ -18,14 +18,16 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/LayerImageFilter.h"
 
 namespace tgfx {
 
-class BlendFilter : public LayerFilter {
+/**
+ * A filter that applies blends between the constant color (src) and input color (dst) based on the
+ * BlendMode.
+ */
+class BlendFilter : public LayerImageFilter {
  public:
-  virtual ~BlendFilter() = default;
-
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
    * (dst) based on the BlendMode.

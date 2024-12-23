@@ -248,8 +248,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& s
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto alphaOnly = opContext->renderTarget()->format() == PixelFormat::ALPHA_8;
-  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, alphaOnly);
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
   Matrix invertMatrix = {};
   if (!viewMatrix.invert(&invertMatrix)) {
     return;

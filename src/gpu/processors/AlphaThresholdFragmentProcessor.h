@@ -16,22 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/LayerFilter.h"
-#include "tgfx/layers/Layer.h"
+#pragma once
+
+#include "gpu/processors/FragmentProcessor.h"
+
 namespace tgfx {
+class AlphaThresholdFragmentProcessor : public FragmentProcessor {
+ public:
+  static std::unique_ptr<AlphaThresholdFragmentProcessor> Make(float threshold);
 
-std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float filterScale) {
-  if (dirty || lastScale != filterScale) {
-    lastFilter = onCreateImageFilter(filterScale);
-    lastScale = filterScale;
-    dirty = false;
+  std::string name() const override {
+    return "AlphaStepFragmentProcessor";
   }
-  return lastFilter;
-}
 
-void LayerFilter::invalidateFilter() {
-  dirty = true;
-  invalidate();
-}
+ protected:
+  DEFINE_PROCESSOR_CLASS_ID
 
+  explicit AlphaThresholdFragmentProcessor(float threshold)
+      : FragmentProcessor(ClassID()), threshold(threshold) {
+  }
+
+  bool onIsEqual(const FragmentProcessor& other) const override;
+
+  float threshold = 0.0f;
+};
 }  // namespace tgfx

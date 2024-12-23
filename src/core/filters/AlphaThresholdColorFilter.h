@@ -16,32 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillStyle.h"
-#include "gpu/Blend.h"
+#pragma once
+
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
-static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
-  auto alpha = color.alpha;
-  if (alpha == 1.0f && (!shader || shader->isOpaque())) {
-    return OpacityType::Opaque;
-  }
-  if (alpha == 0.0f) {
-    if (shader || color.red != 0.0f || color.green != 0.0f || color.blue != 0.0f) {
-      return OpacityType::TransparentAlpha;
-    }
-    return OpacityType::TransparentBlack;
-  }
-  return OpacityType::Unknown;
-}
+class AlphaThresholdColorFilter : public ColorFilter {
+ public:
+  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
-bool FillStyle::isOpaque() const {
-  if (maskFilter) {
-    return false;
-  }
-  if (colorFilter && !colorFilter->isAlphaUnchanged()) {
-    return false;
-  }
-  return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
-}
+ private:
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 
+  float threshold = 0.0f;
+};
 }  // namespace tgfx

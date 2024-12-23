@@ -16,32 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillStyle.h"
-#include "gpu/Blend.h"
-
+#include "tgfx/layers/filters/LayerImageFilter.h"
+#include "tgfx/layers/Layer.h"
 namespace tgfx {
-static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
-  auto alpha = color.alpha;
-  if (alpha == 1.0f && (!shader || shader->isOpaque())) {
-    return OpacityType::Opaque;
+
+bool LayerImageFilter::applyFilter(Canvas* canvas, std::shared_ptr<Image> image,
+                                   float contentScale) {
+  auto filter = getImageFilter(contentScale);
+  if (!filter) {
+    return false;
   }
-  if (alpha == 0.0f) {
-    if (shader || color.red != 0.0f || color.green != 0.0f || color.blue != 0.0f) {
-      return OpacityType::TransparentAlpha;
-    }
-    return OpacityType::TransparentBlack;
-  }
-  return OpacityType::Unknown;
+  Paint paint = {};
+  paint.setImageFilter(filter);
+  canvas->drawImage(image, &paint);
+  return true;
 }
 
-bool FillStyle::isOpaque() const {
-  if (maskFilter) {
-    return false;
+Rect LayerImageFilter::filterBounds(const Rect& srcRect, float contentScale) {
+  auto filter = getImageFilter(contentScale);
+  if (!filter) {
+    return srcRect;
   }
-  if (colorFilter && !colorFilter->isAlphaUnchanged()) {
-    return false;
+  return filter->filterBounds(srcRect);
+}
+
+void LayerImageFilter::invalidateFilter() {
+  dirty = true;
+  invalidate();
+}
+
+std::shared_ptr<ImageFilter> LayerImageFilter::getImageFilter(float scale) {
+  if (dirty || lastScale != scale) {
+    lastFilter = onCreateImageFilter(scale);
+    lastScale = scale;
+    dirty = false;
   }
-  return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
+  return lastFilter;
 }
 
 }  // namespace tgfx
