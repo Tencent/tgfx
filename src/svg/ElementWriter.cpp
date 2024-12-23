@@ -106,7 +106,7 @@ void ElementWriter::addFillAndStroke(const FillStyle& fill, const Stroke* stroke
 
     auto cap = ToSVGCap(stroke->cap);
     if (!cap.empty()) {
-       addAttribute("stroke-linecap", cap);
+      addAttribute("stroke-linecap", cap);
     }
 
     auto join = ToSVGJoin(stroke->join);
@@ -115,18 +115,18 @@ void ElementWriter::addFillAndStroke(const FillStyle& fill, const Stroke* stroke
     }
 
     if (stroke->join == LineJoin::Miter && !FloatNearlyEqual(stroke->miterLimit, 4.f)) {
-       addAttribute("stroke-miterlimit", stroke->miterLimit);
+      addAttribute("stroke-miterlimit", stroke->miterLimit);
     }
 
     if (!fill.isOpaque()) {
-       addAttribute("stroke-opacity", fill.color.alpha);
+      addAttribute("stroke-opacity", fill.color.alpha);
     }
   }
 
   if (fill.blendMode != BlendMode::SrcOver) {
     auto blendModeString = ToSVGBlendMode(fill.blendMode);
     if (!blendModeString.empty()) {
-       addAttribute("style", blendModeString);
+      addAttribute("style", blendModeString);
     } else {
       reportUnsupportedElement("Unsupported blend mode");
     }
@@ -176,10 +176,10 @@ void ElementWriter::addFontAttributes(const Font& font) {
 void ElementWriter::addRectAttributes(const Rect& rect) {
   // x, y default to 0
   if (rect.x() != 0) {
-     addAttribute("x", rect.x());
+    addAttribute("x", rect.x());
   }
   if (rect.y() != 0) {
-     addAttribute("y", rect.y());
+    addAttribute("y", rect.y());
   }
 
   addAttribute("width", rect.width());
@@ -189,7 +189,7 @@ void ElementWriter::addRectAttributes(const Rect& rect) {
 void ElementWriter::addRoundRectAttributes(const RRect& roundRect) {
   addRectAttributes(roundRect.rect);
   if (FloatNearlyZero(roundRect.radii.x) && FloatNearlyZero(roundRect.radii.y)) {
-     return;
+    return;
   }
   addAttribute("rx", roundRect.radii.x);
   addAttribute("ry", roundRect.radii.y);
