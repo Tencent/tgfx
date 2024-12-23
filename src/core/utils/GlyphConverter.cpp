@@ -39,10 +39,11 @@ std::vector<Unichar> GlyphConverter::glyphsToUnichars(const Font& font,
 const std::vector<Unichar>& GlyphConverter::getGlyphToUnicodeMap(
     const std::shared_ptr<Typeface>& typeface) {
   auto iter = fontToGlyphMap.find(typeface->uniqueID());
-  if (iter == fontToGlyphMap.end()) {
-    fontToGlyphMap[typeface->uniqueID()] = typeface->getGlyphToUnicodeMap();
+  if (iter != fontToGlyphMap.end()) {
+    return iter->second;
   }
-  return iter->second;
+  fontToGlyphMap[typeface->uniqueID()] = typeface->getGlyphToUnicodeMap();
+  return fontToGlyphMap[typeface->uniqueID()];
 }
 
 #endif
