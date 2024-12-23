@@ -87,8 +87,9 @@ class SVGExporter {
    * SVG will be clipped.
    * @param options Options for exporting SVG text.
    */
-  static std::shared_ptr<SVGExporter> Make(WriteStream* svgStream, Context* context,
-                                           const Rect& viewBox, uint32_t exportingFlags = 0);
+  static std::shared_ptr<SVGExporter> Make(const std::shared_ptr<WriteStream>& svgStream,
+                                           Context* context, const Rect& viewBox,
+                                           uint32_t exportingFlags = 0);
 
   /**
    * Destroys the SVG exporter object. If close() has not been called, it will automatically finalize
@@ -110,7 +111,7 @@ class SVGExporter {
   /**
    * Construct a SVG exporter object
    */
-  SVGExporter(WriteStream* svgStream, Context* context, const Rect& viewBox,
+  SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
               uint32_t exportingFlags);
 
   bool closed = false;

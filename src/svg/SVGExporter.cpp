@@ -19,6 +19,7 @@
 #include "tgfx/svg/SVGExporter.h"
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include "ElementWriter.h"
 #include "core/utils/Log.h"
 #include "svg/SVGExportingContext.h"
@@ -28,16 +29,17 @@
 
 namespace tgfx {
 
-std::shared_ptr<SVGExporter> SVGExporter::Make(WriteStream* svgStream, Context* context,
-                                               const Rect& viewBox, uint32_t exportingFlags) {
+std::shared_ptr<SVGExporter> SVGExporter::Make(const std::shared_ptr<WriteStream>& svgStream,
+                                               Context* context, const Rect& viewBox,
+                                               uint32_t exportingFlags) {
   if (!context) {
     return nullptr;
   }
   return std::shared_ptr<SVGExporter>(new SVGExporter(svgStream, context, viewBox, exportingFlags));
 }
 
-SVGExporter::SVGExporter(WriteStream* svgStream, Context* context, const Rect& viewBox,
-                         uint32_t exportingFlags) {
+SVGExporter::SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context,
+                         const Rect& viewBox, uint32_t exportingFlags) {
   closed = false;
   auto writer = std::make_unique<XMLStreamWriter>(
       svgStream, exportingFlags & SVGExportingFlags::DisablePrettyXML);

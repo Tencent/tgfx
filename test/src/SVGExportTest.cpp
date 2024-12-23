@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -24,11 +25,13 @@
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/svg/SVGExporter.h"
@@ -49,17 +52,52 @@ TGFX_TEST(SVGExportTest, PureColor) {
   tgfx::Paint paint;
   paint.setColor(Color::Blue());
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(200, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
+}
+
+TGFX_TEST(SVGExportTest, PureColorFile) {
+  std::string compareString =
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><rect "
+      "fill=\"#00F\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
+
+  auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
+  std::filesystem::path filePath = path;
+  std::filesystem::create_directories(filePath.parent_path());
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  tgfx::Paint paint;
+  paint.setColor(Color::Blue());
+
+  auto SVGStream = WriteStream::MakeFromFile(path);
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportingFlags::DisablePrettyXML);
+  auto* canvas = exporter->getCanvas();
+
+  canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
+
+  exporter->close();
+
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  EXPECT_EQ(readStream->size(), 211U);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+
+  std::filesystem::remove(path);
 }
 
 TGFX_TEST(SVGExportTest, OpacityColor) {
@@ -76,17 +114,53 @@ TGFX_TEST(SVGExportTest, OpacityColor) {
   paint.setColor(Color::Blue());
   paint.setAlpha(0.5f);
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(200, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
+}
+
+TGFX_TEST(SVGExportTest, OpacityColorFile) {
+  std::string compareString =
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><circle "
+      "fill=\"#00007F\" fill-opacity=\"0.5\" cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
+  std::filesystem::path filePath = path;
+  std::filesystem::create_directories(filePath.parent_path());
+
+  tgfx::Paint paint;
+  paint.setColor(Color::Blue());
+  paint.setAlpha(0.5f);
+
+  auto SVGStream = WriteStream::MakeFromFile(path);
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportingFlags::DisablePrettyXML);
+  auto* canvas = exporter->getCanvas();
+
+  canvas->drawCircle(100, 100, 100, paint);
+
+  exporter->close();
+
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  EXPECT_EQ(readStream->size(), 222U);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+
+  std::filesystem::remove(path);
 }
 
 TGFX_TEST(SVGExportTest, LinearGradient) {
@@ -108,16 +182,15 @@ TGFX_TEST(SVGExportTest, LinearGradient) {
       {tgfx::Color{0.f, 1.f, 0.f, 1.f}, tgfx::Color{0.f, 0.f, 0.f, 1.f}}, {});
   paint.setShader(shader);
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(200, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -140,16 +213,15 @@ TGFX_TEST(SVGExportTest, RadialGradient) {
       center, 50, {tgfx::Color::Red(), tgfx::Color::Blue(), tgfx::Color::Black()}, {0, 0.5, 1.0});
   paint.setShader(shader);
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(200, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -175,16 +247,15 @@ TGFX_TEST(SVGExportTest, UnsupportedGradient) {
       {0, 0.5, 1.0});
   paint.setShader(shader);
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(200, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -206,8 +277,8 @@ TGFX_TEST(SVGExportTest, BlendMode) {
   paint.setColor(Color::Red());
   paint.setBlendMode(BlendMode::Difference);
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(200, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
@@ -215,8 +286,7 @@ TGFX_TEST(SVGExportTest, BlendMode) {
   canvas->drawRect(tgfx::Rect::MakeXYWH(50, 50, 100, 100), paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -236,16 +306,15 @@ TGFX_TEST(SVGExportTest, StrokeWidth) {
   paint.setStyle(PaintStyle::Stroke);
   paint.setStrokeWidth(5);
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(200, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawRect(tgfx::Rect::MakeXYWH(50, 50, 100, 100), paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -266,18 +335,15 @@ TGFX_TEST(SVGExportTest, SimpleTextAsText) {
   Paint paint;
   paint.setColor(Color::Red());
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(400, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("Hello TGFX", 0, 80, font, paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
-  std::cout << SVGString << std::endl;
-  std::cout << compareString << std::endl;
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -302,17 +368,16 @@ TGFX_TEST(SVGExportTest, SimpleTextAsPath) {
   Paint paint;
   paint.setColor(Color::Red());
 
-  DynamicMemoryWriteStream SVGStream;
+  auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(
-      &SVGStream, context, Rect::MakeWH(400, 200),
+      SVGStream, context, Rect::MakeWH(400, 200),
       SVGExportingFlags::ConvertTextToPaths | SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("Hi", 0, 80, font, paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 
@@ -334,17 +399,57 @@ TGFX_TEST(SVGExportTest, EmojiText) {
   Paint paint;
   paint.setColor(Color::Red());
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(400, 200),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
+}
+
+TGFX_TEST(SVGExportTest, EmojiTextFile) {
+  std::string compareString =
+      "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"400\" height=\"200\"><text "
+      "fill=\"#F00\" transform=\"matrix(1 0 0 1 0 80)\" font-size=\"50\" font-family=\"Noto Color "
+      "Emoji\" x=\"0, 62.3906, 124.7812, 187.1719, 249.5625, 311.9531, \" y=\"0, "
+      "\">🤡👻🐠🤩😃🤪</text></svg>";
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
+  std::filesystem::path filePath = path;
+  std::filesystem::create_directories(filePath.parent_path());
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  Font font(typeface, 50.f);
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  auto SVGStream = WriteStream::MakeFromFile(path);
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
+                                    SVGExportingFlags::DisablePrettyXML);
+  auto* canvas = exporter->getCanvas();
+
+  canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
+
+  exporter->close();
+
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  EXPECT_EQ(readStream->size(), 346U);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
+
+  std::filesystem::remove(path);
 }
 
 TGFX_TEST(SVGExportTest, ClipState) {
@@ -362,8 +467,8 @@ TGFX_TEST(SVGExportTest, ClipState) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  DynamicMemoryWriteStream SVGStream;
-  auto exporter = SVGExporter::Make(&SVGStream, context, Rect::MakeWH(300, 300),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300),
                                     SVGExportingFlags::DisablePrettyXML);
   auto* canvas = exporter->getCanvas();
 
@@ -390,8 +495,7 @@ TGFX_TEST(SVGExportTest, ClipState) {
   }
 
   exporter->close();
-  auto data = SVGStream.dumpAsData();
-  std::string SVGString(static_cast<const char*>(data->data()), data->size());
+  auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
 }
 

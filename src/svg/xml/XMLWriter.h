@@ -92,7 +92,7 @@ class XMLWriter {
  */
 class XMLStreamWriter : public XMLWriter {
  public:
-  explicit XMLStreamWriter(WriteStream* stream, bool disablePretty = false);
+  explicit XMLStreamWriter(std::shared_ptr<WriteStream> writeStream, bool disablePretty = false);
   ~XMLStreamWriter() override;
   void writeHeader() override;
 
@@ -106,7 +106,7 @@ class XMLStreamWriter : public XMLWriter {
   void newline();
   void tab(int level);
 
-  WriteStream* _stream;
+  std::shared_ptr<WriteStream> stream;
   const bool disablePrettyXML;
 };
 
