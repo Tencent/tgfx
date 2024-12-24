@@ -8,10 +8,6 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
-#if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-#    add_definitions(-Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type)
-#endif ()
-
 if (MSVC)
     add_compile_options("/utf-8")
 endif (MSVC)
@@ -86,8 +82,6 @@ elseif (WIN32)
     find_library(ws2_32_LIB ws2_32)
     list(APPEND TGFX_PROFILER_LIBS ${ws2_32_LIB})
 endif ()
-
-#set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 list(APPEND TGFX_PROFILER_INCLUDE
         profiler/include

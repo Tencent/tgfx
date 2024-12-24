@@ -21,6 +21,7 @@
 #include <TracyPrint.hpp>
 #include <cinttypes>
 #include <iterator>
+#include <iostream>
 #include <src/profiler/TracyColor.hpp>
 #include "TimelineItemThread.h"
 
@@ -45,6 +46,7 @@ TimelineView::TimelineView(tracy::Worker& worker, ViewData& viewData, bool threa
   , viewData(viewData)
   , frameData(worker.GetFramesBase())
   , timelineController(*this, worker, threadedRendering)
+  , redraw(true)
   , QGraphicsView(parent) {
 
   // QGraphicsScene *scene = new QGraphicsScene(this);
@@ -242,7 +244,7 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tracy::FrameData& fd, i
       if (!fd.continuous && prev != -1) {
         if((fbegin - prevEnd) * pxns >= MinFrameSize)
         {
-          // drawImage(wpos + ImVec2(0, ty05), (prev - m_vd.zvStart) * pxns, (prevEnd - m_vd.zvStart) * pxns, ty025, inactiveColor);
+          // drawImage(wpos + ImVec2(0, ty05), (prev - viewData.zvStart) * pxns, (prevEnd - viewData.zvStart) * pxns, ty025, inactiveColor);
           prev = -1;
         }
         else
@@ -272,11 +274,11 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tracy::FrameData& fd, i
     {
       if(fd.continuous)
       {
-        // drawImage(draw, wpos + ImVec2(0, ty05), (prev - m_vd.zvStart) * pxns, (fbegin - m_vd.zvStart) * pxns, ty025, inactiveColor);
+        // drawImage(draw, wpos + ImVec2(0, ty05), (prev - viewData.zvStart) * pxns, (fbegin - viewData.zvStart) * pxns, ty025, inactiveColor);
       }
       else
       {
-        // drawImage(draw, wpos + ImVec2(0, ty05), (prev - m_vd.zvStart) * pxns, (prevEnd - m_vd.zvStart) * pxns, ty025, inactiveColor);
+        // drawImage(draw, wpos + ImVec2(0, ty05), (prev - viewData.zvStart) * pxns, (prevEnd - viewData.zvStart) * pxns, ty025, inactiveColor);
       }
       prev = -1;
     }
@@ -551,14 +553,68 @@ void TimelineView::drawTimeline(QPainter* painter) {
 }
 
 void TimelineView::paintEvent(QPaintEvent* event) {
+  auto start = std::chrono::high_resolution_clock::now();
   auto painter = QPainter(this->viewport());
   drawTimeline(&painter);
   QGraphicsView::paintEvent(event);
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  std::cout << "当前花费时间: " << elapsed.count() << "second" << std::endl;
 }
 
 void TimelineView::mouseMoveEvent(QMouseEvent* event) {
+  if (moveData.isDragging) {
+    viewMode = ViewMode::Paused;
+    const auto timespan = viewData.zvEnd - viewData.zvStart;
+    const auto w = width();
+    const auto nspx = double(timespan) / w;
+    auto delta = event->globalPos() - moveData.pos;
+    auto yDelta = delta.y();
+    const auto dpx = int64_t((delta.x() * nspx / 5) + (moveData.hwheelDelta * nspx));
+    if (dpx != 0) {
+      viewData.zvStart -= dpx;
+      viewData.zvEnd -= dpx;
+      if( viewData.zvStart < -1000ll * 1000 * 1000 * 60 * 60 * 24 * 5 )
+      {
+        const auto range = viewData.zvEnd - viewData.zvStart;
+        viewData.zvStart = -1000ll * 1000 * 1000 * 60 * 60 * 24 * 5;
+        viewData.zvEnd = viewData.zvStart + range;
+      }
+      else if( viewData.zvEnd > 1000ll * 1000 * 1000 * 60 * 60 * 24 * 5 )
+      {
+        const auto range = viewData.zvEnd - viewData.zvStart;
+        viewData.zvEnd = 1000ll * 1000 * 1000 * 60 * 60 * 24 * 5;
+        viewData.zvStart = viewData.zvEnd - range;
+      }
+    }
+    event->accept();
+    update();
+    redraw = true;
+  }
+  else {
+    QWidget::mouseMoveEvent(event);
+  }
+}
 
-  QWidget::mouseMoveEvent(event);
+void TimelineView::mousePressEvent(QMouseEvent* event) {
+  if (event->button() == Qt::RightButton) {
+    moveData.isDragging = true;
+    moveData.pos = event->globalPos() - frameGeometry().topLeft();
+    event->accept();
+  }
+  else {
+    QWidget::mousePressEvent(event);
+  }
+}
+
+void TimelineView::mouseReleaseEvent(QMouseEvent* event)  {
+  if (event->button() == Qt::RightButton) {
+    moveData.isDragging = false;
+    event->accept();
+  }
+  else {
+    QWidget::mouseReleaseEvent(event);
+  }
 }
 
 void TimelineView::wheelEvent(QWheelEvent* event) {

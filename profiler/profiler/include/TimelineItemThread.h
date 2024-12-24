@@ -32,6 +32,7 @@ public:
   uint32_t headlineColor() const override;
   const char* headerLable() const override;
 protected:
+  void drawFinished() override;
   bool drawContent(const TimelineContext& ctx, int& offset, QPainter* painter) override;
 
 private:

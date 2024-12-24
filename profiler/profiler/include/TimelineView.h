@@ -41,6 +41,18 @@ public:
     QPointF pos;
   };
 
+  struct MoveData {
+    bool isDragging = false;
+    QPointF pos;
+    double hwheelDelta = 0;
+  };
+
+  enum class ViewMode
+  {
+    Paused,
+    LastFrames,
+    LastRange
+};
   TimelineView(tracy::Worker& worker, ViewData& viewData, bool threadedRendering, QWidget* parent = nullptr);
   ~TimelineView();
 
@@ -58,6 +70,8 @@ public:
   void paintEvent(QPaintEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
 
   const char* getFrameText(const tracy::FrameData& fd, int i, uint64_t ftime) const;
   const char* getFrameSetName(const tracy::FrameData& fd) const;
@@ -83,6 +97,9 @@ private:
   ViewData& viewData;
   TimelineController timelineController;
 
+  ViewMode viewMode;
   HoverData hoverData;
   const tracy::FrameData* frameData;
+  MoveData moveData;
+  bool redraw;
 };

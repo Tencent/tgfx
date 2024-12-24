@@ -150,6 +150,10 @@ void TimelineItemThread::preprocess(const TimelineContext& ctx, tracy::TaskDispa
   }
 }
 
+void TimelineItemThread::drawFinished() {
+  draws.clear();
+}
+
 bool TimelineItemThread::drawContent(const TimelineContext& ctx, int& offset, QPainter* painter) {
   timelineView.drawThread(ctx, *threadData, draws, offset, depth, painter);
   return true;
