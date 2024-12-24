@@ -83,8 +83,7 @@ class SVGExportingContext : public DrawContext {
   /**
    * Draws a image onto a surface and reads the pixels from the surface.
    */
-  static bool ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
-                                  Bitmap& bitmap);
+  static Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image);
 
  private:
   /**
@@ -108,15 +107,13 @@ class SVGExportingContext : public DrawContext {
 
   static PathEncoding PathEncoding();
 
-  bool convertTextToPaths = false;
-  bool disableWarnings = false;
+  uint32_t exportFlags = {};
   Context* context = nullptr;
   Canvas* canvas = nullptr;
-  const std::unique_ptr<XMLWriter> writer;
-  const std::unique_ptr<ResourceStore> resourceBucket;
-  std::unique_ptr<ElementWriter> rootElement;
-  SVGTextBuilder textBuilder;
-
+  const std::unique_ptr<XMLWriter> writer = nullptr;
+  const std::unique_ptr<ResourceStore> resourceBucket = nullptr;
+  std::unique_ptr<ElementWriter> rootElement = nullptr;
+  SVGTextBuilder textBuilder = {};
   Path currentClipPath = {};
   std::unique_ptr<ElementWriter> clipGroupElement = nullptr;
 };

@@ -27,7 +27,7 @@ namespace tgfx {
 
 /**
  * The glyph converter can convert glyphs to Unicode characters and cache the mapping of glyphs to
- * Unicode.The cache is released when the converter is destructed.
+ * Unicode. The cache is released when the converter is destructed.
  */
 class GlyphConverter {
  public:

@@ -34,47 +34,41 @@ class SVGExportingContext;
 class SVGExportFlags {
  public:
   /**
-   * Converts text to paths in the exported SVG. 
-   * By default, text is exported as text elements.
-   * 
-   * Note:
-   * This only applies to fonts with outlines. Fonts without outlines, such as emoji and web fonts,
-   * will still be exported as text.
+   * Forces text to be converted to paths in the exported SVG. By default, text is exported as is.
+   * Note that this only applies to fonts with outlines. Fonts without outlines, such as emoji and
+   * web fonts, will still be exported as text.
    */
   static constexpr uint32_t ConvertTextToPaths = 1 << 0;
 
   /**
-   * Disable pretty XML formatting in the exported SVG.
-   * By default, spaces ('\t') and newlines ('\n') are included in the exported SVG text for
-   * improved
+   * Disable pretty XML formatting in the exported SVG. By default, spaces ('\t') and 
+   * newlines ('\n') are added to the exported SVG text for better readability.
    */
   static constexpr uint32_t DisablePrettyXML = 1 << 1;
 
   /**
-   * Disable unsupported attribute warnings.
-   * By default, warnings are logged to the console when exporting attributes that are not supported
-   * by the SVG standard.
+   * Disable warnings for unsupported attributes. By default, warnings are logged to the console
+   * when exporting attributes that the SVG standard does not support.
    */
   static constexpr uint32_t DisableWarnings = 1 << 2;
 };
 
 /**
- * SVGExporter is a class used to export SVG text, converting drawing commands in the Canvas to
- * SVG text.
- * 
- * Unsupported SVG standard attributes:
- * - Blend modes: 
+ * SVGExporter is used to convert drawing commands from the Canvas into SVG text.
+ *  
+ * Some features are not supported when exporting to SVG:
+ * - Blend modes:
  * Clear, Src, Dst, DstOver, SrcIn, DstIn, SrcOut, DstOut, SrcATop, DstATop, Xor, and Modulate are
  * not supported.
- *
+ * 
  * - Image filters:
  * Compose and Runtime are not supported.
  *
- * - Color filters:
+ *  - Color filters:
  * Blend is partially supported, similar to blend modes.
  *
- * - Shaders:
- * ColorFilter,Blend,Matrix are not supported.Gradient shaders are partially supported.
+ *  - Shaders:
+ * ColorFilter, Blend, and Matrix are not supported. Gradient shaders are partially supported.
  * 
  * - Gradient shaders:
  * Conic gradients are not supported.
@@ -97,17 +91,18 @@ class SVGExporter {
 
   /**
    * Destroys the SVG exporter object. If close() hasn't been called, it will be invoked 
-   * automatically.It will finalize any unfinished drawing commands and write the SVG end tag.
+   * automatically. 
    */
   ~SVGExporter();
 
   /**
-   * Returns the canvas for exporting if the SVGExporter is not closed; otherwise, returns nullptr.
+   * Returns the canvas for exporting if the SVGExporter is not closed; otherwise, returns nullptr. 
    */
   Canvas* getCanvas() const;
 
   /**
-   * Closes the SVG exporter,finalizing any unfinished drawing commands and writing the SVG end tag.
+   * Closes the SVG exporter, finalizing any unfinished drawing commands and writing the SVG end 
+   * tag.
    */
   void close();
 

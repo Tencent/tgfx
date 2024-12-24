@@ -243,6 +243,8 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
       addInnerShadowImageFilter(innerShadowFilter);
     } else {
+      // TODO (YGaurora): The compose filter can be expanded into multiple filters for export. This
+      // can be implemented.
       reportUnsupportedElement("Unsupported image filter");
     }
   }
@@ -378,9 +380,13 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
   } else if (auto imageShader = ShaderCaster::AsImageShader(shader)) {
     addImageShaderResources(imageShader, context, resources);
   } else {
+    // TODO(YGaurora):
+    // Export color filter shaders as color filters.
+    // Export blend shaders as a combination of a shader and blend mode.
+    // Export matrix shaders as a combination of a shader and matrix. The SVG standard allows
+    // writing the matrix into <pattern> using patternTransform.
     reportUnsupportedElement("shader");
   }
-  // TODO(YGAurora): other shader types
 }
 
 void ElementWriter::addColorShaderResources(const std::shared_ptr<const ColorShader>& shader,
@@ -482,8 +488,8 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageSha
   DEBUG_ASSERT(shader->image);
 
   DEBUG_ASSERT(context);
-  Bitmap bitmap(image->width(), image->height(), false, false);
-  if (!SVGExportingContext::ImageExportToBitmap(context, image, bitmap)) {
+  Bitmap bitmap = SVGExportingContext::ImageExportToBitmap(context, image);
+  if (bitmap.isEmpty()) {
     return;
   }
   auto dataUri = AsDataUri(Pixmap(bitmap));
