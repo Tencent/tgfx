@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <optional>
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -89,8 +90,12 @@ bool SVGNode::onPrepareToRender(SVGRenderContext* context) const {
          (!display.isValue() || *display != SVGDisplay::None);
 }
 
-void SVGNode::setAttribute(SVGAttribute attr, const SVGValue& v) {
-  this->onSetAttribute(attr, v);
+void SVGNode::setAttribute(SVGAttribute attribute, const SVGValue& value) {
+  this->onSetAttribute(attribute, value);
+}
+
+bool SVGNode::setAttribute(const std::string& attributeName, const std::string& attributeValue) {
+  return SVGNodeConstructor::SetAttribute(*this, attributeName, attributeValue);
 }
 
 template <typename T>

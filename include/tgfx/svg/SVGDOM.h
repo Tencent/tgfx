@@ -30,6 +30,10 @@ namespace tgfx {
 
 class SVGNode;
 using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
+
+/**
+ * 
+ */
 class SVGDOM {
  public:
   static std::shared_ptr<SVGDOM> Make(const std::shared_ptr<Data>&);
@@ -37,24 +41,20 @@ class SVGDOM {
   /**
    * Returns the root SVG node.
    */
-  const std::shared_ptr<SVGSVG>& getRoot() const {
-    return root;
-  }
+  const std::shared_ptr<SVGSVG>& getRoot() const;
 
   void collectRenderFonts(const std::shared_ptr<SVGFontManager>&);
-  /**
-   * Renders the SVG to the provided canvas.
-   */
-  void render(Canvas*, const std::shared_ptr<SVGFontManager>& fontManager = nullptr);
 
   /**
-   * Specify a "container size" for the SVG dom.
-   *
-   * This is used to resolve the initial viewport when the root SVG width/height are specified
-   * in relative units.
-   *
-   * If the root dimensions are in absolute units, then the container size has no effect since
-   * the initial viewport is fixed.
+   * Renders the SVG to the provided canvas.
+   * @param canvas The canvas to render to.
+   * @param fontManager The font manager for rendering SVG text. If no text rendering is needed, 
+   * this can be nullptr, and text will not be rendered.
+   */
+  void render(Canvas* canvas, const std::shared_ptr<SVGFontManager>& fontManager = nullptr);
+
+  /**
+   * Sets the size of the container that the SVG will be rendered into.
    */
   void setContainerSize(const Size&);
 
@@ -62,10 +62,8 @@ class SVGDOM {
 
  private:
   SVGDOM(std::shared_ptr<SVGSVG>, SVGIDMapper&&);
-
-  const std::shared_ptr<SVGSVG> root;
-  const SVGIDMapper _nodeIDMapper;
-  Size containerSize;
-  std::shared_ptr<Picture> renderPicture;
+  const std::shared_ptr<SVGSVG> root = nullptr;
+  const SVGIDMapper nodeIDMapper = {};
+  Size containerSize = Size::MakeEmpty();
 };
 }  // namespace tgfx

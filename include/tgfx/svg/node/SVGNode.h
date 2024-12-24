@@ -171,7 +171,7 @@ class SVGNode {
 
   virtual void appendChild(std::shared_ptr<SVGNode>) = 0;
 
-  void setAttribute(SVGAttribute, const SVGValue&);
+  void setAttribute(SVGAttribute attribute, const SVGValue& value);
 
   bool setAttribute(const std::string& attributeName, const std::string& attributeValue);
 

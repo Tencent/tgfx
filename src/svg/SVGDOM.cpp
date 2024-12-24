@@ -32,6 +32,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Recorder.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGFontManager.h"
@@ -65,11 +66,15 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(const std::shared_ptr<Data>& data) {
 }
 
 SVGDOM::SVGDOM(std::shared_ptr<SVGSVG> root, SVGIDMapper&& mapper)
-    : root(std::move(root)), _nodeIDMapper(std::move(mapper)) {
+    : root(std::move(root)), nodeIDMapper(std::move(mapper)) {
+}
+
+const std::shared_ptr<SVGSVG>& SVGDOM::getRoot() const {
+  return root;
 }
 
 void SVGDOM::collectRenderFonts(const std::shared_ptr<SVGFontManager>& fontManager) {
-  if (!root) {
+  if (!root || !fontManager) {
     return;
   }
 
@@ -100,23 +105,25 @@ void SVGDOM::collectRenderFonts(const std::shared_ptr<SVGFontManager>& fontManag
 }
 
 void SVGDOM::render(Canvas* canvas, const std::shared_ptr<SVGFontManager>& fontManager) {
-  if (!root) {
+  // If the container size is not set, use the size of the root SVG element.
+  auto drawSize = containerSize;
+  if (drawSize.isEmpty()) {
+    if (root->getViewBox().has_value()) {
+      drawSize = root->getViewBox()->size();
+    } else {
+      drawSize = Size::Make(root->getWidth().value(), root->getHeight().value());
+    }
+  }
+  if (!canvas || !root || drawSize.isEmpty()) {
     return;
   }
-  if (!renderPicture) {
-    SVGLengthContext lengthContext(containerSize);
-    SVGPresentationContext presentationContext;
 
-    Recorder recorder;
-    auto* drawCanvas = recorder.beginRecording();
-    {
-      SVGRenderContext renderContext(drawCanvas, fontManager, _nodeIDMapper, lengthContext,
-                                     presentationContext, {nullptr, nullptr}, canvas->getMatrix());
-      root->render(renderContext);
-    }
-    renderPicture = recorder.finishRecordingAsPicture();
-  }
-  canvas->drawPicture(renderPicture);
+  SVGLengthContext lengthContext(containerSize);
+  SVGPresentationContext presentationContext;
+  SVGRenderContext renderContext(canvas, fontManager, nodeIDMapper, lengthContext,
+                                 presentationContext, {nullptr, nullptr}, canvas->getMatrix());
+
+  root->render(renderContext);
 }
 
 const Size& SVGDOM::getContainerSize() const {
@@ -127,7 +134,4 @@ void SVGDOM::setContainerSize(const Size& size) {
   containerSize = size;
 }
 
-bool SVGNode::setAttribute(const std::string& attributeName, const std::string& attributeValue) {
-  return SVGNodeConstructor::SetAttribute(*this, attributeName, attributeValue);
-}
 }  // namespace tgfx
