@@ -30,6 +30,10 @@ class PatternedIndexBufferProvider : public DataProvider {
       : pattern(pattern), patternSize(patternSize), reps(reps), vertCount(vertCount) {
   }
 
+  std::string getName() const override {
+    return "PatternedIndexBufferProvider";
+  }
+
   std::shared_ptr<Data> getData() const override {
     TRACE_EVENT;
     auto size = static_cast<size_t>(reps * patternSize * sizeof(uint16_t));

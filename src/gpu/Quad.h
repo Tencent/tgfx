@@ -36,10 +36,16 @@ class Quad {
    */
   std::shared_ptr<Data> toTriangleStrips() const;
 
+
  private:
-  explicit Quad(std::vector<Point> points) : points(std::move(points)) {
+  explicit Quad(Point points[4]) {
+    for (size_t i = 0; i < 4; ++i) {
+      this->points[i] = points[i];
+    }
   }
 
-  std::vector<Point> points = {};
+  explicit Quad(const Rect& rect, const Matrix* matrix = nullptr);
+  Point points[4] = {};
+
 };
 }  // namespace tgfx

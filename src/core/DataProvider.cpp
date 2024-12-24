@@ -29,6 +29,10 @@ class DataWrapper : public DataProvider {
     return data;
   }
 
+  std::string getName() const override {
+    return "DataWrapper";
+  }
+
  private:
   std::shared_ptr<Data> data = nullptr;
 };

@@ -21,15 +21,17 @@
 
 namespace tgfx {
 Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
-  std::vector<Point> points;
-  points.push_back(Point::Make(rect.left, rect.top));
-  points.push_back(Point::Make(rect.left, rect.bottom));
-  points.push_back(Point::Make(rect.right, rect.top));
-  points.push_back(Point::Make(rect.right, rect.bottom));
+  return Quad(rect, matrix);
+}
+
+Quad::Quad(const tgfx::Rect& rect, const tgfx::Matrix* matrix) {
+  points[0] = Point::Make(rect.left, rect.top);
+  points[1] = Point::Make(rect.right, rect.top);
+  points[2] = Point::Make(rect.left, rect.bottom);
+  points[3] = Point::Make(rect.right, rect.bottom);
   if (matrix) {
-    matrix->mapPoints(points.data(), 4);
+    matrix->mapPoints(points, 4);
   }
-  return Quad(points);
 }
 
 std::shared_ptr<Data> Quad::toTriangleStrips() const {

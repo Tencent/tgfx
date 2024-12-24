@@ -60,6 +60,10 @@ class AsyncDataProvider : public DataProvider {
     return task->wait();
   }
 
+ std::string getName() const override {
+   return "AsyncDataProvider";
+ }
+
  private:
   std::shared_ptr<DataTask<Data>> task = nullptr;
 };
@@ -75,7 +79,10 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
     return nullptr;
   }
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
-    provider = std::make_shared<AsyncDataProvider>(std::move(provider));
+    if (provider->getName() == "PatternedIndexBufferProvider-1" || provider->getName() == "RectCoverageVerticesProvider-1"
+        || provider->getName() == "RectNonCoverageVerticesProvider-1") {
+      provider = std::make_shared<AsyncDataProvider>(std::move(provider));
+    }
   }
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
   auto task = GpuBufferUploadTask::MakeFrom(proxyKey, bufferType, std::move(provider));

@@ -22,9 +22,9 @@ if (DEFINED EMSCRIPTEN)
             -sUSE_WEBGL2=1 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify'] -sMODULARIZE=1
             -sENVIRONMENT='web,worker' -sEXPORT_ES6=1 -sUSE_ES6_IMPORT_META=0)
     if (EMSCRIPTEN_PTHREADS)
-        list(APPEND H2D_LINK_OPTIONS -sTOTAL_MEMORY=512MB -sUSE_PTHREADS=1
+        list(APPEND H2D_LINK_OPTIONS -sTOTAL_MEMORY=4000MB -sUSE_PTHREADS=1
                 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sPROXY_TO_PTHREAD=1
-                -sEXIT_RUNTIME=0 -sINVOKE_RUN=0
+                -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=mimalloc
                 )
         list(APPEND H2D_COMPILE_OPTIONS -fPIC -pthread)
     else()

@@ -38,5 +38,11 @@ class DataProvider {
    * generate a new data.
    */
   virtual std::shared_ptr<Data> getData() const = 0;
+
+  virtual std::string getName() const = 0;
+
+ protected:
+  size_t bufferSize = 0;
+
 };
 }  // namespace tgfx

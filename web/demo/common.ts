@@ -18,7 +18,7 @@
 
 import * as types from '../types/types';
 
-export const ItemCount: number = 20000;
+export const ItemCount: number = 80000;
 const Width: number = 720 * 2;
 const Height: number = 1024 * 2;
 let startStatus = false;
@@ -112,6 +112,7 @@ export function ShowFPS(shareData: ShareData) {
         if (timeOffset >= 1000) {
             const fps = renderFrames * 1000.0 / timeOffset;
             textElement.textContent = `Count: ${ItemCount}, FPS: ${fps.toFixed(2)}`;
+            console.log(`----averageTimeCost: ${timeOffset / renderFrames} ms----`);
             renderFrames = 0;
             startTime = currentTimestamp;
         }

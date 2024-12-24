@@ -130,6 +130,10 @@ class RRectVerticesProvider : public DataProvider {
       : rRectPaints(std::move(rRectPaints)), aaType(aaType), useScale(useScale) {
   }
 
+  std::string getName() const override {
+    return "RRectVerticesProvider";
+  }
+
   std::shared_ptr<Data> getData() const override {
     TRACE_EVENT;
     auto floatCount = rRectPaints.size() * 4 * 48;
@@ -259,6 +263,10 @@ class RRectIndicesProvider : public DataProvider {
  public:
   explicit RRectIndicesProvider(std::vector<std::shared_ptr<RRectPaint>> rRectPaints)
       : rRectPaints(std::move(rRectPaints)) {
+  }
+
+  std::string getName() const override {
+    return "RRectIndicesProvider";
   }
 
   std::shared_ptr<Data> getData() const override {

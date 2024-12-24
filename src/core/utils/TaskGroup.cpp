@@ -122,6 +122,7 @@ bool TaskGroup::checkThreads() {
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
+//    return false;
   std::lock_guard<std::mutex> autoLock(locker);
 #if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
   return false;

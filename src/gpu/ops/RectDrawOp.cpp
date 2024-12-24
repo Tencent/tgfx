@@ -46,6 +46,10 @@ class RectCoverageVerticesProvider : public DataProvider {
       : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
   }
 
+  std::string getName() const override {
+    return "RectCoverageVerticesProvider";
+  }
+
   std::shared_ptr<Data> getData() const override {
     TRACE_EVENT;
     auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 9 : 5);
@@ -100,17 +104,23 @@ class RectNonCoverageVerticesProvider : public DataProvider {
  public:
   RectNonCoverageVerticesProvider(std::vector<std::shared_ptr<RectPaint>> rectPaints, bool hasColor)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
+    bufferSize = 4 * (hasColor ? 8 : 4) * sizeof(float);
+  }
+
+  std::string getName() const override {
+    return "RectNonCoverageVerticesProvider";
   }
 
   std::shared_ptr<Data> getData() const override {
     TRACE_EVENT;
-    auto floatCount = rectPaints.size() * 4 * (hasColor ? 8 : 4);
-    Buffer buffer(floatCount * sizeof(float));
+//    auto floatCount = rectPaints.size() * 4 * (hasColor ? 8 : 4);
+//    Buffer buffer(floatCount * sizeof(float));
+    Buffer buffer(bufferSize * rectPaints.size());
     auto vertices = reinterpret_cast<float*>(buffer.data());
     auto index = 0;
     for (auto& rectPaint : rectPaints) {
       auto& viewMatrix = rectPaint->viewMatrix;
-      auto& rect = rectPaint->rect;
+      auto rect = rectPaint->rect;
       auto& uvMatrix = rectPaint->uvMatrix;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto localQuad = Quad::MakeFrom(rect, &uvMatrix);

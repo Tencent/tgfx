@@ -18,10 +18,116 @@
 
 #include "TGFXBaseView.h"
 #include <random>
+#include <thread>
+#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
 namespace hello2d {
+
+static const int iterations = 3e6;
+static const int num_threads = 6;
+std::atomic<double> counter(0);
+
+
+class Test {
+  public:
+   Test(int id, int iterations): id(id), iterations(iterations) {}
+
+  double singleCaculate(int i) {
+     // std::unique_lock<std::mutex> autoLock(locker);
+     return std::sin(i) * std::cos(i);
+   }
+
+   void caculate() {
+     double result = 0.0;
+     for (int i = 0; i < iterations; ++i) {
+       counter = singleCaculate(i);
+       result += counter;
+     }
+     printf("---result:%f\n", result);
+     printf("ID %d finished computation.\n", id);
+   }
+
+  private:
+    // std::mutex locker = {};
+    int id = 0;
+    int iterations = 0;
+};
+
+ void HeavyComputation(int id, int iterations1) {
+   double result = 0.0;
+   size_t bufferSize = 1024000;
+   for (int i = 0; i < iterations1; ++i) {
+     tgfx::Buffer buffer(bufferSize);
+     result += std::sin(i) * std::cos(i);
+     auto data = buffer.release();
+     if (data) {
+
+     }
+   }
+   printf("---result:%f\n", result);
+   printf("ID %d finished computation.\n", id);
+ }
+
+ void HeavyComputationSigleThread(int id, int iterations2) {
+   double result = 0.0;
+   for (int i = 0; i < iterations2; ++i) {
+     result += std::sin(i) * std::cos(i);
+   }
+   printf("---result:%f\n", result);
+   printf("ID %d finished computation.\n", id);
+ }
+
+
+// void DisableThreads() {
+//   for (int i = 0; i < num_threads; ++i) {
+//     HeavyComputation(i, iterations);
+//   }
+// }
+//
+ void EnableThreads() {
+   std::vector<std::thread> threads;
+   for (int i = 0; i < num_threads; ++i) {
+     threads.push_back(std::thread(HeavyComputation, i, iterations));
+   }
+
+   for (auto& thread : threads) {
+     thread.join();
+   }
+ }
+
+void DisableThreads() {
+  for (int i = 0; i < num_threads; ++i) {
+    HeavyComputationSigleThread(i, iterations);
+  }
+}
+
+//void EnableThreads() {
+//  std::vector<std::thread> threads;
+//  for (int i = 0; i < num_threads; ++i) {
+//    auto test = std::make_shared<Test>(i, iterations);
+//    threads.push_back(std::thread(&Test::caculate, test));
+//  }
+//
+//  for (auto& thread : threads) {
+//    thread.join();
+//  }
+//}
+
+void ThreadTest(bool enableThreads) {
+  auto start_time = std::chrono::high_resolution_clock::now();
+  if (enableThreads) {
+    EnableThreads();
+  } else {
+    DisableThreads();
+  }
+  auto end_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = end_time - start_time;
+  printf("--Total elapsed time: %f seconds, enbaleThreads:%d \n", elapsed.count(), enableThreads);
+}
+
+
 TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   appHost = std::make_shared<drawers::AppHost>();
   redPaint.setColor(tgfx::Color::Red());
@@ -93,12 +199,6 @@ void TGFXBaseView::drawContents(tgfx::Canvas* canvas) {
   }
 }
 
-uint64_t GetCurrentTimestamp() {
-  auto now = std::chrono::system_clock::now();
-  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  return static_cast<uint64_t>(time);
-}
-
 void TGFXBaseView::draw(int) {
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
@@ -123,6 +223,8 @@ void TGFXBaseView::draw(int) {
   canvas->clear();
 
   drawContents(canvas);
+//  ThreadTest(false);
+
 
   // auto numDrawers = drawers::Drawer::Count() - 1;
   // auto index = (drawIndex % numDrawers) + 1;
@@ -131,7 +233,7 @@ void TGFXBaseView::draw(int) {
   // drawer = drawers::Drawer::GetByIndex(index);
   // drawer->draw(canvas, appHost.get());
   context->flushAndSubmit();
-  window->present(context);
+//  window->present(context);
   device->unlock();
   updateItemData();
 }
