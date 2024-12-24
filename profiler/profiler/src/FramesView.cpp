@@ -22,8 +22,9 @@
 #include "FramesView.h"
 #include "TracyPrint.hpp"
 
-FramesView::FramesView(tracy::Worker& worker, int width, const tracy::FrameData* frames, QWidget* parent)
+FramesView::FramesView(tracy::Worker& worker, ViewData& viewData, int width, const tracy::FrameData* frames, QWidget* parent)
   : worker(worker)
+  , viewData(viewData)
   , height(FRAME_VIEW_HEIGHT)
   , width(width)
   , frames(frames)
@@ -95,7 +96,6 @@ const int GetFrameGroup(int frameScale) {
 };
 
 void FramesView::paintEvent(QPaintEvent* event) {
-  resize(width, height);
   QGraphicsView::paintEvent(event);
 
   auto painter = QPainter(this->viewport());

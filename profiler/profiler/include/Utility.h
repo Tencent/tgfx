@@ -17,37 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <QGraphicsView>
-#include "TracyWorker.hpp"
-#include "ViewData.h"
+#include <stdint.h>
+#include <QFont>
+#include <QRect>
+#include <QColor>
+#include <QPainter>
+#include "TracyEvent.hpp"
+class Worker;
 
-#define FRAME_VIEW_HEIGHT 50
-
-constexpr uint64_t MaxFrameTime = 50 * 1000 * 1000;
-
-class FramesView : public QGraphicsView {
-public:
-  FramesView(tracy::Worker& worker, ViewData& viewData, int width, const tracy::FrameData* frames, QWidget* parent = nullptr);
-  ~FramesView();
-
-  void drawBackground(QPainter* painter, const QRectF& rect) override;
-  void wheelEvent(QWheelEvent* event) override;
-  void mouseMoveEvent(QMouseEvent* event) override;
-
-  uint64_t getFrameNumber(const tracy::FrameData& frameData, int i);
-protected:
-  void paintEvent(QPaintEvent* event) override;
-  void initView();
-  void scaleView(qreal scaleFactor);
-
-
-private:
-  tracy::Worker& worker;
-  ViewData& viewData;
-  const tracy::FrameData* frames;
-  int height;
-  int width;
-  int frameHover = -1;
-
-  uint64_t frameTarget;
+enum class ShortenName : uint8_t
+{
+  Never,
+  Always,
+  OnlyNormalize,
+  NoSpace,
+  NoSpaceAndNormalize,
 };
+
+QFont& getFont();
+QRect getFontSize(const char* text, size_t textSize = 0);
+QColor getColor(uint32_t color);
+
+void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, QColor color, float thickness = 1.f);
+void drawTextContrast(QPainter* painter, QPointF pos, QColor color, const char* test);
+
+uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic );
+uint32_t getPlotColor( const tracy::PlotData& plot, const Worker& worker );
+const char* shortenZoneName(ShortenName type, const char* name, QRect tsz, float zsz);

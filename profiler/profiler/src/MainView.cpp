@@ -54,7 +54,8 @@ void MainView::openFile() {
   tracy::Fileselector::OpenFile( "tracy", "Tracy Profiler trace file", [&]( const char* fn ) {
     auto file = std::shared_ptr<tracy::FileRead>(tracy::FileRead::Open(fn));
     if (file) {
-      centorView = new View(*file, this->width(), this);
+      tracy::Config config;
+      centorView = new View(*file, this->width(), config, this);
       layout->addWidget(centorView);
       // loadThread = std::thread([file] {
       //

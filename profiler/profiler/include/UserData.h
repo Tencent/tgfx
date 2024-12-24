@@ -17,37 +17,33 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <QGraphicsView>
-#include "TracyWorker.hpp"
+
+#include <memory>
+#include <stdint.h>
+#include <stdio.h>
+#include <string>
+#include <vector>
 #include "ViewData.h"
 
-#define FRAME_VIEW_HEIGHT 50
-
-constexpr uint64_t MaxFrameTime = 50 * 1000 * 1000;
-
-class FramesView : public QGraphicsView {
+class UserData{
 public:
-  FramesView(tracy::Worker& worker, ViewData& viewData, int width, const tracy::FrameData* frames, QWidget* parent = nullptr);
-  ~FramesView();
+  UserData();
+  UserData( const char* program, uint64_t time );
 
-  void drawBackground(QPainter* painter, const QRectF& rect) override;
-  void wheelEvent(QWheelEvent* event) override;
-  void mouseMoveEvent(QMouseEvent* event) override;
+  bool Valid() const { return !program.empty(); }
 
-  uint64_t getFrameNumber(const tracy::FrameData& frameData, int i);
-protected:
-  void paintEvent(QPaintEvent* event) override;
-  void initView();
-  void scaleView(qreal scaleFactor);
-
+  void LoadState( ViewData& data );
+  void SaveState( const ViewData& data );
+  void StateShouldBePreserved();
 
 private:
-  tracy::Worker& worker;
-  ViewData& viewData;
-  const tracy::FrameData* frames;
-  int height;
-  int width;
-  int frameHover = -1;
+  FILE* OpenFile( const char* filename, bool write );
+  void Remove( const char* filename );
 
-  uint64_t frameTarget;
+  std::string program;
+  uint64_t time;
+
+  std::string description;
+
+  bool preserveState;
 };

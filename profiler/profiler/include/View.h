@@ -20,22 +20,33 @@
 #include <QPushButton>
 #include <QWidget>
 #include "FramesView.h"
+#include "TimelineView.h"
 #include "TracyFileRead.hpp"
 #include "TracyWorker.hpp"
+#include "UserData.h"
+#include "TimelineController.h"
 #include "src/profiler/TracyConfig.hpp"
+#include "src/profiler/TracyUserData.hpp"
 
 class View : public QWidget{
 public:
   View(const char* addr, uint16_t port, const tracy::Config& config, int width, QWidget* parent = nullptr);
-  View(tracy::FileRead& file, int width, QWidget* parent = nullptr);
+  View(tracy::FileRead& file, int width, const tracy::Config& config, QWidget* parent = nullptr);
 
+  ~View();
+
+  ViewData& getViewData() {return viewData;}
   void initView();
   void ViewImpl();
 private:
+  int width;
   tracy::Worker worker;
 
-  int width;
+  ViewData viewData;
+  UserData userData;
   const tracy::FrameData* frames;
 
+  const tracy::Config& config;
   FramesView* framesView;
+  TimelineView* timelineView;
 };

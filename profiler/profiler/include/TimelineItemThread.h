@@ -18,17 +18,35 @@
 
 #pragma once
 #include <QGraphicsView>
+#include <src/profiler/TracyTimelineDraw.hpp>
 #include "TimelineItem.h"
 
-class TimelineItemThread: TimelineItem {
+class TimelineItemThread: public TimelineItem {
 public:
-  TimelineItemThread(View& view, tracy::Worker& worker, const tracy::ThreadData* key);
+  TimelineItemThread(TimelineView& view, tracy::Worker& worker, const tracy::ThreadData* key);
 
   void preprocess(const TimelineContext& ctx, tracy::TaskDispatch& td, bool visible, int yPos) override;
-protected:
-  void drawContent(const TimelineContext& ctx, int& offset) override;
 
+  uint32_t headerColor() const override;
+  uint32_t headerColorInactive() const override;
+  uint32_t headlineColor() const override;
+  const char* headerLable() const override;
+protected:
+  bool drawContent(const TimelineContext& ctx, int& offset, QPainter* painter) override;
+
+private:
+  int preprocessZoneLevel(const TimelineContext& ctx, const tracy::Vector<tracy::short_ptr<tracy::ZoneEvent>>& vec,
+      int depth, bool visible, const uint32_t inheritedColor);
+
+  template<typename Adapter, typename V>
+  int preprocessZoneLevel(const TimelineContext& ctx, const V& vec, int depth, bool visible, const uint32_t inheritedColor);
+
+  const tracy::ThreadData* threadData;
+  std::vector<tracy::TimelineDraw> draws;
+  int depth;
   bool showFull;
+  bool hasSamples;
+  bool hasMessage;
 private:
 
 };

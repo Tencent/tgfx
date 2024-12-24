@@ -62,7 +62,6 @@ if (${QT_VERSION} VERSION_LESS "5.15")
 endif ()
 
 if (APPLE)
-    message("test")
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
     list(APPEND TGFX_PROFILER_LIBS ${APPLICATION_SERVICES_FRAMEWORK})
     find_library(QUARTZ_CORE QuartzCore REQUIRED)
@@ -104,7 +103,10 @@ file(GLOB TGFX_PROFILER_FILES
         profiler/src/TimelineView.cpp
         profiler/src/TimelineItem.cpp
         profiler/src/TimelineItemThread.cpp
+        profiler/src/TimelineController.cpp
         profiler/src/FramesView.cpp
+        profiler/src/Utility.cpp
+        profiler/src/UserData.cpp
         profiler/src/ProfilerWindow.cpp)
 
 add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${SERVER_FILES} ${PROFILER_FILES} ${COMMON_FILES})

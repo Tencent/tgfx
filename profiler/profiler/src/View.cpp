@@ -20,20 +20,37 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include "FramesView.h"
+#include "TimelineView.h"
 #include "TracySysUtil.hpp"
 
-View::View(const char* addr, uint16_t port, const tracy::Config& config, int width, QWidget* parent):
-  worker(addr, port, config.memoryLimit == 0 ? -1 : ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ) ), width(width), QWidget(parent){
+View::View(const char* addr, uint16_t port, const tracy::Config& config, int width, QWidget* parent)
+  : width(width)
+  , worker(addr, port, config.memoryLimit == 0 ? -1 :
+    ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ) )
+  , frames(nullptr)
+  , config(config)
+  , QWidget(parent)
+{
   initView();
 }
 
-View::View(tracy::FileRead& file, int width, QWidget* parent):
-  worker(file), frames(worker.GetFramesBase()), width(width), QWidget(parent) {
+View::View(tracy::FileRead& file, int width, const tracy::Config& config, QWidget* parent)
+  : width(width)
+  , worker(file)
+  , userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime())
+  , frames(worker.GetFramesBase())
+  , config(config)
+  , QWidget(parent) {
   initView();
+  userData.StateShouldBePreserved();
+  userData.LoadState(viewData);
+}
+
+View::~View() {
+  userData.SaveState(viewData);
 }
 
 void View::initView() {
-  // setStyleSheet("background-color: red");
   ViewImpl();
 }
 
@@ -41,9 +58,10 @@ void View::ViewImpl() {
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
-  framesView = new FramesView(worker, width, frames, this);
-  auto timelineLayout = new QHBoxLayout;
+  framesView = new FramesView(worker, viewData, width, frames, this);
+  framesView->setFixedHeight(50);
+  timelineView = new TimelineView(worker, viewData, config.threadedRendering, this);
   layout->addWidget(framesView);
-  layout->addLayout(timelineLayout);
+  layout->addWidget(timelineView);
   this->setLayout(layout);
 }

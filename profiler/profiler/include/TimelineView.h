@@ -21,17 +21,56 @@
 #include <QGraphicsView>
 #include <QPushButton>
 #include <QWidget>
+#include "TimelineController.h"
+#include "src/profiler/TracyTimelineDraw.hpp"
 #include "TracyWorker.hpp"
+#include "ViewData.h"
 
 class TimelineView: public QGraphicsView {
 public:
-  TimelineView(tracy::Worker& worker, QWidget* parent = nullptr);
+  struct ZoneColorData
+  {
+    uint32_t color;
+    uint32_t accentColor;
+    float thickness;
+    bool highlight;
+  };
+
+  TimelineView(tracy::Worker& worker, ViewData& viewData, bool threadedRendering, QWidget* parent = nullptr);
   ~TimelineView();
 
-  void drawMouseLine();
-  void drawTimeline();
+  ViewData& getViewData() {return viewData;}
+
+  void drawThread(const TimelineContext& context, const tracy::ThreadData& thread,
+      const std::vector<tracy::TimelineDraw>& draw, int& _offset, int depth, QPainter* painter);
+  void drawZonelist(const TimelineContext& ctx, const std::vector<tracy::TimelineDraw>& drawList,
+    int offset, uint64_t tid, QPainter* painter);
+  void drawMouseLine(QPainter* painter);
+  void drawTimeline(QPainter* painter);
+  void drawTimelineFrames(QPainter* painter);
+
+
   void paintEvent(QPaintEvent* event) override;
+  void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
+
+  uint32_t getZoneColor(const tracy::ZoneEvent& ev, uint64_t thread, int depth);
+  uint32_t getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth);
+  ZoneColorData getZoneColorData(const tracy::ZoneEvent& ev, uint64_t thread, int depth, uint32_t inheritedColor);
+protected:
+  tracy_force_inline bool& vis(const void* ptr) {
+    auto it = visMap.find(ptr);
+    if(it == visMap.end()) {
+      it = visMap.emplace(ptr, true).first;
+    }
+    return it->second;
+  }
 private:
+  tracy::unordered_flat_map<const void*, bool> visMap;
+  tracy::Vector<const tracy::ThreadData*> threadOrder;
+  tracy::Vector<const tracy::ThreadData*> threadReinsert;
+
   tracy::Worker& worker;
+  ViewData& viewData;
+  TimelineController timelineController;
 };
