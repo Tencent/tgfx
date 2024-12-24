@@ -25,6 +25,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include "tgfx/core/WriteStream.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
 class XMLParser;
@@ -53,7 +54,11 @@ class XMLWriter {
     this->onEndElement();
   }
   void writeDOM(const std::shared_ptr<DOM>& DOM, bool skipRoot);
+
   virtual void writeHeader();
+
+  // illegal operator
+  XMLWriter& operator=(const XMLWriter&) = delete;
 
  protected:
   virtual void onStartElement(const std::string& element) = 0;
@@ -80,8 +85,6 @@ class XMLWriter {
 
  private:
   bool _doEscapeFlag = true;
-  // illegal operator
-  XMLWriter& operator=(const XMLWriter&) = delete;
 };
 
 /**
@@ -89,11 +92,7 @@ class XMLWriter {
  */
 class XMLStreamWriter : public XMLWriter {
  public:
-  enum : uint32_t {
-    NoPretty_Flag = 0x01,
-  };
-
-  explicit XMLStreamWriter(std::stringstream& stream, uint32_t flags = 0);
+  explicit XMLStreamWriter(std::shared_ptr<WriteStream> writeStream, bool disablePretty = false);
   ~XMLStreamWriter() override;
   void writeHeader() override;
 
@@ -107,8 +106,8 @@ class XMLStreamWriter : public XMLWriter {
   void newline();
   void tab(int level);
 
-  std::stringstream& _stream;
-  const uint32_t _flags;
+  std::shared_ptr<WriteStream> stream;
+  const bool disablePrettyXML;
 };
 
 /**

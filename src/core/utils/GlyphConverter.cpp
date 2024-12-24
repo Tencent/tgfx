@@ -16,23 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ColorFilter.h"
+#include "GlyphConverter.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class AlphaThresholdColorFilter : public ColorFilter {
- public:
-  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
- protected:
-  Type type() const override {
-    return Type::AlphaThreshold;
-  };
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> GlyphConverter::glyphsToUnichars(const Font& font,
+                                                      const std::vector<GlyphID>& glyphs) {
+  auto typeface = font.getTypeface();
+  if (!typeface) {
+    return {};
+  }
+  std::vector<Unichar> result(glyphs.size(), 0);
+  auto glyphMap = getGlyphToUnicodeMap(typeface);
+  for (size_t i = 0; i < glyphs.size(); i++) {
+    result[i] = glyphMap[glyphs[i]];
+  }
+  return result;
+}
 
- private:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+const std::vector<Unichar>& GlyphConverter::getGlyphToUnicodeMap(
+    const std::shared_ptr<Typeface>& typeface) {
+  auto iter = fontToGlyphMap.find(typeface->uniqueID());
+  if (iter != fontToGlyphMap.end()) {
+    return iter->second;
+  }
+  fontToGlyphMap[typeface->uniqueID()] = typeface->getGlyphToUnicodeMap();
+  return fontToGlyphMap[typeface->uniqueID()];
+}
 
-  float threshold = 0.0f;
-};
+#endif
+
 }  // namespace tgfx

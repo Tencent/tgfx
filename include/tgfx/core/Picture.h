@@ -25,6 +25,7 @@ namespace tgfx {
 class Record;
 class Canvas;
 class DrawContext;
+class SVGExportingContext;
 class MCState;
 class Image;
 
@@ -64,6 +65,7 @@ class Picture {
   friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
+  friend class SVGExportingContext;
   friend class Image;
   friend class PictureImage;
   friend class Canvas;

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,29 @@
 
 #pragma once
 
-#include "tgfx/core/ColorFilter.h"
-
+#include <unordered_map>
+#include "tgfx/core/Font.h"
+#include "tgfx/core/Typeface.h"
 namespace tgfx {
-class ComposeColorFilter : public ColorFilter {
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+
+/**
+ * The glyph converter can convert glyphs to Unicode characters and cache the mapping of glyphs to
+ * Unicode. The cache is released when the converter is destructed.
+ */
+class GlyphConverter {
  public:
-  explicit ComposeColorFilter(std::shared_ptr<ColorFilter> inner,
-                              std::shared_ptr<ColorFilter> outer);
+  GlyphConverter() = default;
+  ~GlyphConverter() = default;
 
-  bool isAlphaUnchanged() const override;
-
- protected:
-  Type type() const override {
-    return Type::Compose;
-  };
+  std::vector<Unichar> glyphsToUnichars(const Font& font, const std::vector<GlyphID>& glyphs);
 
  private:
-  std::shared_ptr<ColorFilter> inner = nullptr;
-  std::shared_ptr<ColorFilter> outer = nullptr;
+  const std::vector<Unichar>& getGlyphToUnicodeMap(const std::shared_ptr<Typeface>& typeface);
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  std::unordered_map<uint32_t, std::vector<Unichar>> fontToGlyphMap;
 };
+
+#endif
 }  // namespace tgfx

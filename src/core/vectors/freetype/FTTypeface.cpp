@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTTypeface.h"
+#include <cstddef>
 #include "FTLibrary.h"
 #include FT_TRUETYPE_TABLES_H
 #include "FTScalerContext.h"
@@ -165,4 +166,22 @@ std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
   }
   return Data::MakeAdopted(tableData, tableLength);
 }
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
+  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
+  std::vector<Unichar> returnMap(numGlyphs, 0);
+
+  FT_UInt glyphIndex = 0;
+  auto charCode = FT_Get_First_Char(face, &glyphIndex);
+  while (glyphIndex) {
+    if (0 == returnMap[glyphIndex]) {
+      returnMap[glyphIndex] = static_cast<Unichar>(charCode);
+    }
+    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
+  }
+  return returnMap;
+}
+#endif
+
 }  // namespace tgfx
