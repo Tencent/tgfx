@@ -65,7 +65,8 @@ class SVGExportFlags {
  * Compose and Runtime are not supported.
  *
  * - Color filters:
- * Blend is partially supported, similar to blend modes.
+ * Compose and AlphaThreshold filters are not supported. The Blend filter is partially supported,
+ * similar to blend modes.
  *
  * - Shaders:
  * ColorFilter, Blend, and Matrix are not supported. Gradient shaders are partially supported.
