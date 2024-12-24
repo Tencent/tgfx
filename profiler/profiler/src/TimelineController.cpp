@@ -45,7 +45,6 @@ void TimelineController::end(double pxns, const QPointF& wpos, bool vcenter, flo
   const auto& viewData = view.getViewData();
   TimelineContext context;
   context.w = view.width() - 1;
-  // TODO Font info
   context.ty = 15;
   context.sty = 10;
   context.scale = 1;

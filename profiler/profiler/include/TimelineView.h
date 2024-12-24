@@ -36,6 +36,11 @@ public:
     bool highlight;
   };
 
+  struct HoverData {
+    bool hover = false;
+    QPointF pos;
+  };
+
   TimelineView(tracy::Worker& worker, ViewData& viewData, bool threadedRendering, QWidget* parent = nullptr);
   ~TimelineView();
 
@@ -47,13 +52,17 @@ public:
     int offset, uint64_t tid, QPainter* painter);
   void drawMouseLine(QPainter* painter);
   void drawTimeline(QPainter* painter);
-  void drawTimelineFrames(QPainter* painter);
+  void drawTimelineFrames(QPainter* painter, tracy::FrameData& fd, int& yMin);
 
 
   void paintEvent(QPaintEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
 
+  const char* getFrameText(const tracy::FrameData& fd, int i, uint64_t ftime) const;
+  const char* getFrameSetName(const tracy::FrameData& fd) const;
+  const char* getFrameSetName(const tracy::FrameData& fd, const tracy::Worker& worker) const;
+  uint64_t getFrameNumber(const tracy::FrameData& fd, int i) const;
   uint32_t getZoneColor(const tracy::ZoneEvent& ev, uint64_t thread, int depth);
   uint32_t getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth);
   ZoneColorData getZoneColorData(const tracy::ZoneEvent& ev, uint64_t thread, int depth, uint32_t inheritedColor);
@@ -73,4 +82,7 @@ private:
   tracy::Worker& worker;
   ViewData& viewData;
   TimelineController timelineController;
+
+  HoverData hoverData;
+  const tracy::FrameData* frameData;
 };

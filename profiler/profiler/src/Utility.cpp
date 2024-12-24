@@ -47,20 +47,31 @@ QRect getFontSize(const char* text, size_t textSize) {
 }
 
 QColor getColor(uint32_t color) {
-  return QColor(color);
+  // trans tracy color to qt color
+  auto r = (color      ) & 0xFF;
+  auto g = (color >>  8) & 0xFF;
+  auto b = (color >> 16) & 0xFF;
+  auto a = (color >> 24) & 0xFF;
+  return QColor(r, g, b, a);
 }
 
-void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, QColor color, float thickness) {
+void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, uint32_t color, float thickness) {
   QPointF points[3] = {p1, p2, p3};
-  painter->setPen(QPen(color, thickness));
+  painter->setPen(QPen(getColor(color), thickness));
   painter->drawPolyline(points, 3);
 }
 
-void drawTextContrast(QPainter* painter, QPointF pos, QColor color, const char* text) {
-  painter->setPen(QColor(0xAA000000));
+void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, uint32_t color, float thickness) {
+  QPointF points[2] = {p1, p2};
+  painter->setPen(QPen(getColor(color), thickness));
+  painter->drawPolyline(points, 2);
+}
+
+void drawTextContrast(QPainter* painter, QPointF pos, uint32_t color, const char* text) {
+  painter->setPen(getColor(0xAA000000));
   auto height = getFontSize(text).height();
   painter->drawText(pos + QPointF(0.5f, 0.5f + height), text);
-  painter->setPen(QColor(color));
+  painter->setPen(getColor(color));
   painter->drawText(pos + QPointF(0, height), text);
 }
 

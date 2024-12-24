@@ -38,8 +38,10 @@ QFont& getFont();
 QRect getFontSize(const char* text, size_t textSize = 0);
 QColor getColor(uint32_t color);
 
-void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, QColor color, float thickness = 1.f);
-void drawTextContrast(QPainter* painter, QPointF pos, QColor color, const char* test);
+void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, uint32_t color, float thickness = 1.f);
+void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, uint32_t color, float thickness = 1.f);
+void drawTextContrast(QPainter* painter, QPointF pos, uint32_t color, const char* test);
+void drawImage(QPainter* painter);
 
 uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic );
 uint32_t getPlotColor( const tracy::PlotData& plot, const Worker& worker );

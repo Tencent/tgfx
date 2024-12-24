@@ -102,20 +102,20 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     const auto color = headerColor();
     const auto colorInactive = headerColorInactive();
     if (showFull) {
-      painter->setPen(color);
+      painter->setPen(getColor(color));
       painter->drawText(wpos + QPointF(0, hdrOffset + ty), ICON_FA_CARET_DOWN);
     }
     else {
-      painter->setPen(colorInactive);
+      painter->setPen(getColor(colorInactive));
       painter->drawText(wpos + QPointF(0, hdrOffset + ty), ICON_FA_CARET_RIGHT);
     }
 
     const auto lable = headerLable();
     lableWidth = getFontSize(lable).width();
-    painter->setPen(showFull ? color : colorInactive);
+    painter->setPen(getColor(showFull ? color : colorInactive));
     painter->drawText(wpos + QPointF(ty, hdrOffset + ty), lable);
     if (showFull) {
-      painter->setPen(headlineColor());
+      painter->setPen(getColor(headlineColor()));
       painter->drawLine(dpos + QPointF(0, hdrOffset + ty + 1), dpos + QPointF(w, hdrOffset + ty + 1));
     }
   }
