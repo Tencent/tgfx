@@ -28,11 +28,42 @@ namespace tgfx {
  * are not thread-safe and should only be accessed from a single thread.
  */
 class ShapeStyle : public LayerProperty {
+ public:
+  /**
+   * Returns the alpha transparency value of the shape style. Valid values are 0 (fully transparent)
+   * to 1 (fully opaque). The default value is 1.
+   */
+  float alpha() const {
+    return _alpha;
+  }
+
+  /**
+   * Sets the alpha transparency of the shape style.
+   */
+  void setAlpha(float value);
+
+  /**
+   * Returns the blend mode used to composite the shape style with the content below it. The default
+   * value is BlendMode::SrcOver.
+   */
+  BlendMode blendMode() const {
+    return _blendMode;
+  }
+
+  /**
+   * Sets the blend mode of the shape style.
+   */
+  void setBlendMode(BlendMode value);
+
  protected:
   /**
    * Returns the current shader that will be used to draw the shape.
    */
   virtual std::shared_ptr<Shader> getShader() const = 0;
+
+ private:
+  float _alpha = 1.0f;
+  BlendMode _blendMode = BlendMode::SrcOver;
 
   friend class ShapeLayer;
 };

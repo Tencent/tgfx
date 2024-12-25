@@ -58,23 +58,73 @@ void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> style) {
-  if (_fillStyle == style) {
+void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
+  if (_fillStyles.size() == fills.size() &&
+      std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
     return;
   }
-  detachProperty(_fillStyle.get());
-  _fillStyle = std::move(style);
-  attachProperty(_fillStyle.get());
+  for (const auto& style : _fillStyles) {
+    detachProperty(style.get());
+  }
+  _fillStyles = std::move(fills);
+  for (const auto& style : _fillStyles) {
+    attachProperty(style.get());
+  }
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> style) {
-  if (_strokeStyle == style) {
+void ShapeLayer::removeFillStyles() {
+  if (_fillStyles.empty()) {
     return;
   }
-  detachProperty(_strokeStyle.get());
-  _strokeStyle = std::move(style);
-  attachProperty(_strokeStyle.get());
+  for (const auto& style : _fillStyles) {
+    detachProperty(style.get());
+  }
+  _fillStyles = {};
+  invalidateContent();
+}
+
+void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+  if (fillStyle == nullptr) {
+    return;
+  }
+  attachProperty(fillStyle.get());
+  _fillStyles.push_back(std::move(fillStyle));
+  invalidateContent();
+}
+
+void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes) {
+  if (_strokeStyles.size() == strokes.size() &&
+      std::equal(_strokeStyles.begin(), _strokeStyles.end(), strokes.begin())) {
+    return;
+  }
+  for (const auto& style : _strokeStyles) {
+    detachProperty(style.get());
+  }
+  _strokeStyles = std::move(strokes);
+  for (const auto& style : _strokeStyles) {
+    attachProperty(style.get());
+  }
+  invalidateContent();
+}
+
+void ShapeLayer::removeStrokeStyles() {
+  if (_strokeStyles.empty()) {
+    return;
+  }
+  for (const auto& style : _strokeStyles) {
+    detachProperty(style.get());
+  }
+  _strokeStyles = {};
+  invalidateContent();
+}
+
+void ShapeLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
+  if (strokeStyle == nullptr) {
+    return;
+  }
+  attachProperty(strokeStyle.get());
+  _strokeStyles.push_back(std::move(strokeStyle));
   invalidateContent();
 }
 
@@ -164,20 +214,25 @@ void ShapeLayer::setStrokeAlign(StrokeAlign align) {
 }
 
 ShapeLayer::~ShapeLayer() {
-  detachProperty(_strokeStyle.get());
-  detachProperty(_fillStyle.get());
+  for (auto& style : _fillStyles) {
+    detachProperty(style.get());
+  }
+  for (auto& style : _strokeStyles) {
+    detachProperty(style.get());
+  }
 }
 
 std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
-  std::vector<std::unique_ptr<LayerContent>> contents = {};
   if (_shape == nullptr) {
     return nullptr;
   }
-  if (_fillStyle) {
-    auto content = std::make_unique<ShapeContent>(_shape, _fillStyle->getShader());
-    contents.push_back(std::move(content));
+  std::vector<std::unique_ptr<LayerContent>> contents = {};
+  contents.reserve(_fillStyles.size() + _strokeStyles.size());
+  for (auto& style : _fillStyles) {
+    contents.push_back(std::make_unique<ShapeContent>(_shape, style->getShader(), style->alpha(),
+                                                      style->blendMode()));
   }
-  if (stroke.width > 0 && _strokeStyle) {
+  if (stroke.width > 0 && !_strokeStyles.empty()) {
     auto strokeShape = _shape;
     if ((_strokeStart != 0 || _strokeEnd != 1)) {
       auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
@@ -204,9 +259,11 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
     } else {
       strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
     }
-    auto content =
-        std::make_unique<ShapeContent>(std::move(strokeShape), _strokeStyle->getShader());
-    contents.push_back(std::move(content));
+    for (auto& style : _strokeStyles) {
+      auto content = std::make_unique<ShapeContent>(strokeShape, style->getShader(), style->alpha(),
+                                                    style->blendMode());
+      contents.push_back(std::move(content));
+    }
   }
   return LayerContent::Compose(std::move(contents));
 }

@@ -25,7 +25,6 @@
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
-
 class LinearGradient;
 class RadialGradient;
 class ConicGradient;
@@ -84,7 +83,7 @@ class Gradient : public ShapeStyle {
   void setPositions(std::vector<float> positions);
 
  protected:
-  std::vector<tgfx::Color> _colors;
+  std::vector<Color> _colors;
   std::vector<float> _positions;
 };
 

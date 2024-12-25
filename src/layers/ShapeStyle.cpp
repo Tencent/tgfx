@@ -16,31 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ShapeContent.h"
+#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
-ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader,
-                           float alpha, BlendMode blendMode)
-    : bounds(shape->getBounds()), shape(std::move(shape)), shader(std::move(shader)), alpha(alpha),
-      blendMode(blendMode) {
+void ShapeStyle::setAlpha(float value) {
+  _alpha = value;
+  invalidate();
 }
 
-void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT;
-  auto shapePaint = paint;
-  shapePaint.setAlpha(paint.getAlpha() * alpha);
-  // The blend mode in the paint is always SrcOver, use our own blend mode instead.
-  shapePaint.setBlendMode(blendMode);
-  shapePaint.setShader(shader);
-  canvas->drawShape(shape, shapePaint);
-}
-
-bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TRACE_EVENT;
-  if (pixelHitTest) {
-    auto path = shape->getPath();
-    return path.contains(localX, localY);
-  }
-  return bounds.contains(localX, localY);
+void ShapeStyle::setBlendMode(BlendMode value) {
+  _blendMode = value;
+  invalidate();
 }
 }  // namespace tgfx
