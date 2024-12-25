@@ -21,11 +21,11 @@
 #include <memory>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerContent.h"
 #include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
@@ -270,6 +270,18 @@ class Layer {
   void setScrollRect(const Rect& rect);
 
   /**
+   * Returns the layer styles that defines the appearance of the layer.
+   */
+  const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
+    return _layerStyles;
+  }
+
+  /**
+   * Sets the layer styles that defines the appearance of the layer.
+   */
+  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
+
+  /**
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
    * is not added to a display list, its root property is set to nullptr.
    */
@@ -502,20 +514,25 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
-  std::shared_ptr<Picture> applyFilters(std::shared_ptr<Picture> source, float contentScale);
+  std::shared_ptr<ImageFilter> getCurrentFilter(float contentScale);
+
+  std::shared_ptr<Picture> applyLayerStyles(std::shared_ptr<Picture> source, float contentScale);
 
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale);
+  std::shared_ptr<Picture> getLayerContentsWithStyles(const DrawArgs& args, float contentScale,
+                                                      float alpha);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
+
+  void drawWithLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -547,6 +564,7 @@ class Layer {
   std::unique_ptr<LayerContent> layerContent = nullptr;
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+  std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
 
   friend class DisplayList;
   friend class LayerProperty;

@@ -29,19 +29,34 @@ namespace tgfx {
 class LayerFilter : public LayerProperty {
  public:
   /**
-   * Applies the filter to the scaled Image of the layer content and draws it on the canvas.
-   * @param contentScale The scale factor of the source Image relative to its original size.
-   * Some filters have size-related parameters that must be adjusted with this scale factor.
-   * @return True if the filter was applied and drawn, false otherwise.
+   * Returns the current image filter for the given scale factor. If the filter has not been
+   * created yet, it will be created and cached.
+   * @param scale The scale factor to apply to the filter.
+   * @return The current image filter.
    */
-  virtual bool applyFilter(Canvas* canvas, std::shared_ptr<Image> image, float contentScale) = 0;
+  std::shared_ptr<ImageFilter> getImageFilter(float scale);
+
+ protected:
+  /**
+   * Creates a new image filter for the given scale factor. When it is necessary to recreate the
+   * ImageFilter, the onCreateImageFilter method will be called.
+   * @param scale The scale factor to apply to the filter.
+   * @return A new image filter.
+   */
+  virtual std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) = 0;
 
   /**
-   * Returns the bounds after applying the filter to the scaled layer bounds
-   * @param contentScale The scale factor of the source bounds relative to its original size.
-   * Some filters have size-related parameters that must be adjusted with this scale factor
-   * @return The bounds of the filtered image.
+   * Marks the filter as dirty and invalidates the cached filter.
    */
-  virtual Rect filterBounds(const Rect& srcRect, float contentScale) = 0;
+  void invalidateFilter();
+
+ private:
+  bool dirty = true;
+
+  float lastScale = 1.0f;
+
+  std::unique_ptr<Rect> _clipBounds = nullptr;
+
+  std::shared_ptr<ImageFilter> lastFilter;
 };
 }  // namespace tgfx

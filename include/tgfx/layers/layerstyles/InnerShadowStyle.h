@@ -18,21 +18,21 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
 /**
- * A filter draws an inner shadow over the input content.
+ * InnerShadowStyle adds a shadow that falls inside the contents of the layer
  */
-class InnerShadowFilter : public LayerFilter {
+class InnerShadowStyle : public LayerStyle {
  public:
   /**
-   * Create a filter that draws an inner shadow over the input content.
+   * Create a layerStyle that draws a inner shadow.
    */
-  static std::shared_ptr<InnerShadowFilter> Make(float offsetX, float offsetY, float blurrinessX,
-                                                 float blurrinessY, const Color& color,
-                                                 bool innerShadowOnly = false);
+  static std::shared_ptr<InnerShadowStyle> Make(float offsetX, float offsetY, float blurrinessX,
+                                                float blurrinessY, const Color& color,
+                                                BlendMode blendMode = BlendMode::SrcOver);
 
   /**
    * The x offset of the shadow.
@@ -99,30 +99,29 @@ class InnerShadowFilter : public LayerFilter {
    */
   void setColor(const Color& color);
 
-  /**
-   * Whether the resulting image does not include the input content.
-   */
-  bool innerShadowOnly() const {
-    return _innerShadowOnly;
+  void apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale) override;
+
+  Rect filterBounds(const Rect& srcRect, float contentScale) override;
+
+  LayerStylePosition position() const override {
+    return LayerStylePosition::Above;
   }
 
-  /**
-   * Set whether the resulting image does not include the input content.
-   */
-  void setInnerShadowOnly(bool value);
-
- protected:
-  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
-
  private:
-  InnerShadowFilter(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
-                    const Color& color, bool innerShadowOnly);
+  InnerShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
+                   const Color& color, BlendMode blendMode);
+
+  std::shared_ptr<ImageFilter> getShadowFilter(float scale);
+
+  void invalidateFilter();
+
   float _offsetX = 0.0f;
   float _offsetY = 0.0f;
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
-  bool _innerShadowOnly = false;
-};
 
+  std::shared_ptr<ImageFilter> shadowFilter;
+  float currentScale = 0.0f;
+};
 }  // namespace tgfx

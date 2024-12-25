@@ -18,7 +18,6 @@
 
 #include <math.h>
 #include <vector>
-#include "LayerShadowFilter.h"
 #include "core/filters/BlurImageFilter.h"
 #include "core/utils/Profiling.h"
 #include "tgfx/core/PathEffect.h"
@@ -34,6 +33,8 @@
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -1743,7 +1744,43 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   EXPECT_TRUE(root->bitFields.childrenDirty && !root->bitFields.contentDirty);
 }
 
-TGFX_TEST(LayerTest, LayerShadowFilter) {
+TGFX_TEST(LayerTest, DropShadowStyle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(150);
+  back->setHeight(150);
+  auto layer = ShapeLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(30, 30));
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  layer->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  layer->setFillStyle(fillStyle);
+  layer->setBlendMode(BlendMode::Lighten);
+
+  auto shadowLayer = Layer::Make();
+  auto style = DropShadowStyle::Make(10, 10, 0, 0, Color::Black(), false);
+  shadowLayer->setLayerStyles({style});
+  shadowLayer->addChild(layer);
+  back->addChild(shadowLayer);
+  displayList->root()->addChild(back);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle"));
+
+  style->setBlendMode(BlendMode::Luminosity);
+  style->setOffsetX(0);
+  style->setOffsetY(-20);
+  style->setShowBehindTransparent(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle2"));
+}
+
+TGFX_TEST(LayerTest, InnerShadowStyle) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1753,29 +1790,18 @@ TGFX_TEST(LayerTest, LayerShadowFilter) {
   layer->setMatrix(Matrix::MakeTrans(30, 30));
   Path path;
   path.addRect(Rect::MakeWH(100, 100));
+  Path path2;
+  path2.addRect(Rect::MakeWH(50, 50));
+  path2.transform(Matrix::MakeTrans(20, 20));
+  path.addPath(path2, PathOp::Difference);
   layer->setPath(path);
   auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
-  auto filter = LayerShadowFilter::Make({});
-  layer->setFilters({filter});
-  LayerShadowParam param0 = {};
-  param0.offsetX = 10;
-  param0.offsetY = 10;
-  LayerShadowParam param1 = {};
-  param1.offsetX = -10;
-  param1.offsetY = -10;
-  param1.color = Color::White();
-  filter->setShadowParams({param0, param1});
+  auto style = InnerShadowStyle::Make(10, 10, 0, 0, Color::Black());
+  layer->setLayerStyles({style});
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/layerShadowFilter"));
-
-  param1.offsetX = 0;
-  param1.offsetY = -20;
-  filter->setShadowParams({param0, param1});
-  filter->setShowBehindTransparent(true);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/layerShadowFilter1"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/InnerShadowStyle"));
 }
 
 TGFX_TEST(LayerTest, Filters) {
@@ -1798,5 +1824,39 @@ TGFX_TEST(LayerTest, Filters) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filters"));
+}
+
+TGFX_TEST(LayerTest, BlurTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  auto root = Layer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  layer->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  layer->setFillStyle(fillStyle);
+  root->addChild(layer);
+  displayList->root()->addChild(root);
+
+  layer->setShouldRasterize(true);
+  layer->setRasterizationScale(30);
+  for (int i = 1; i < 500; i++) {
+
+    auto matrix = Matrix::MakeTrans(50, 50);
+    matrix.preScale(i * 1.f, i * 1.f);
+    root->setMatrix(matrix);
+
+    //
+    auto filter = BlurFilter::Make(1.f, 1.f);
+    layer->setFilters({filter});
+
+    displayList->render(surface.get());
+    std::string name = "LayerTest/blurtest" + std::to_string(i);
+    EXPECT_TRUE(Baseline::Compare(surface, name));
+  }
 }
 }  // namespace tgfx
