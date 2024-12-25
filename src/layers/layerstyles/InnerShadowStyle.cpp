@@ -74,7 +74,8 @@ InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrines
       _blurrinessY(blurrinessY), _color(color) {
 }
 
-void InnerShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale) {
+void InnerShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                             float alpha) {
   // create opaque image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
@@ -86,6 +87,7 @@ void InnerShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, flo
   Paint paint = {};
   paint.setImageFilter(filter);
   paint.setBlendMode(_blendMode);
+  paint.setAlpha(alpha);
   canvas->drawImage(opaqueImage, &paint);
 }
 

@@ -84,7 +84,8 @@ DropShadowStyle::DropShadowStyle(float offsetX, float offsetY, float blurrinessX
       _blurrinessY(blurrinessY), _color(color), _showBehindTransparent(showBehindTransparent) {
 }
 
-void DropShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale) {
+void DropShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                            float alpha) {
   // create opaque image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
@@ -103,6 +104,7 @@ void DropShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, floa
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(_blendMode);
+  paint.setAlpha(alpha);
   canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
 }
 

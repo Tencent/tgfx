@@ -41,8 +41,10 @@ class LayerStyle : public LayerProperty {
    * Apply the layerStyle to the canvas.
    * @param contentScale The scale factor of the source Image relative to its original size.
    * Some layerStyles have size-related parameters that must be adjusted with this scale factor.
+   * @param alpha
    */
-  virtual void apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale) = 0;
+  virtual void apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                     float alpha) = 0;
 
   /**
    * Returns the bounds of the layerStyle.

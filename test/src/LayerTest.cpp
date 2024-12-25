@@ -1776,6 +1776,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   style->setOffsetX(0);
   style->setOffsetY(-20);
   style->setShowBehindTransparent(true);
+  shadowLayer->setAlpha(0.5);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle2"));
 }

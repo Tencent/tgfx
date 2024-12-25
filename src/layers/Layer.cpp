@@ -572,7 +572,7 @@ Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
 }
 
 std::shared_ptr<Picture> Layer::applyLayerStyles(std::shared_ptr<Picture> source,
-                                                 float contentScale) {
+                                                 float contentScale, float alpha) {
   if (source == nullptr) {
     return nullptr;
   }
@@ -589,7 +589,7 @@ std::shared_ptr<Picture> Layer::applyLayerStyles(std::shared_ptr<Picture> source
     if (layerStyle->position() != LayerStylePosition::Blow) {
       continue;
     }
-    layerStyle->apply(canvas, image, contentScale);
+    layerStyle->apply(canvas, image, contentScale, alpha);
   }
   canvas->restore();
   canvas->drawPicture(source);
@@ -598,7 +598,7 @@ std::shared_ptr<Picture> Layer::applyLayerStyles(std::shared_ptr<Picture> source
     if (layerStyle->position() != LayerStylePosition::Above) {
       continue;
     }
-    layerStyle->apply(canvas, image, contentScale);
+    layerStyle->apply(canvas, image, contentScale, alpha);
   }
   canvas->restore();
   return recorder.finishRecordingAsPicture();
@@ -674,7 +674,7 @@ std::shared_ptr<Picture> Layer::getLayerContentsWithStyles(const DrawArgs& args,
   contentCanvas->scale(contentScale, contentScale);
   drawContents(args, contentCanvas, alpha);
   auto picture = recorder.finishRecordingAsPicture();
-  return applyLayerStyles(picture, contentScale);
+  return applyLayerStyles(picture, contentScale, alpha);
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {

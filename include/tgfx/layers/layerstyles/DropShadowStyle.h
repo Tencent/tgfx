@@ -112,7 +112,8 @@ class DropShadowStyle : public LayerStyle {
    */
   void setShowBehindTransparent(bool showBehindTransparent);
 
-  void apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale) override;
+  void apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+             float alpha) override;
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
