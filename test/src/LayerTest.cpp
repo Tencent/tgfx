@@ -1826,37 +1826,4 @@ TGFX_TEST(LayerTest, Filters) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filters"));
 }
 
-TGFX_TEST(LayerTest, BlurTest) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 150, 150);
-  auto displayList = std::make_unique<DisplayList>();
-  auto layer = ShapeLayer::Make();
-  auto root = Layer::Make();
-  Path path;
-  path.addRect(Rect::MakeWH(50, 50));
-  layer->setPath(path);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
-  layer->setFillStyle(fillStyle);
-  root->addChild(layer);
-  displayList->root()->addChild(root);
-
-  layer->setShouldRasterize(true);
-  layer->setRasterizationScale(30);
-  for (int i = 1; i < 500; i++) {
-
-    auto matrix = Matrix::MakeTrans(50, 50);
-    matrix.preScale(i * 1.f, i * 1.f);
-    root->setMatrix(matrix);
-
-    //
-    auto filter = BlurFilter::Make(1.f, 1.f);
-    layer->setFilters({filter});
-
-    displayList->render(surface.get());
-    std::string name = "LayerTest/blurtest" + std::to_string(i);
-    EXPECT_TRUE(Baseline::Compare(surface, name));
-  }
-}
 }  // namespace tgfx
