@@ -21,6 +21,7 @@
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
 class UniqueKey;
@@ -44,6 +45,12 @@ class Shape {
    * contains a typeface that can't generate a path, such as bitmap typefaces.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
+
+  /**
+   * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr or
+   * if PathProvider::getPath() returns an empty path.
+   */
+  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<PathProvider> pathProvider);
 
   /**
    * Merges two Shapes into a new Shape using the specified path operation. If either Shape is
@@ -152,7 +159,7 @@ class Shape {
   virtual Path getPath(float resolutionScale = 1.0f) const;
 
  protected:
-  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke };
+  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke, External };
 
   /**
    * Returns the type of the Shape.
