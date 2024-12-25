@@ -31,6 +31,10 @@ class RGBAAAImage : public SubsetImage {
   }
 
  protected:
+  Type type() const override {
+    return Type::RGBAAA;
+  }
+
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="300">
+	<mask id="mask_0" style="mask-type:alpha" maskUnits="userSpaceOnUse" width="100%" height="100%">
+		<linearGradient id="gradient_0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="300" y2="300">
+			<stop offset="0" stop-color="#FFF"/>
+			<stop offset="1" stop-color="#000" stop-opacity="0"/>
+		</linearGradient>
+		<rect fill="url(#gradient_0)" width="100%" height="100%"/>
+	</mask>
+	<rect fill="#F00" fill-opacity="1" mask="url(#mask_0)" width="300" height="300"/>
+</svg>

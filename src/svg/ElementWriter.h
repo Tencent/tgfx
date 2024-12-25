@@ -28,11 +28,16 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
+#include "core/filters/ShaderMaskFilter.h"
+#include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/MaskFilter.h"
+#include "tgfx/core/Picture.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
 #include "xml/XMLWriter.h"
@@ -45,8 +50,8 @@ class ElementWriter {
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket);
-  ElementWriter(const std::string& name, Context* context, const std::unique_ptr<XMLWriter>& writer,
-                ResourceStore* bucket, bool disableWarning, const MCState& state,
+  ElementWriter(const std::string& name, Context* context, SVGExportingContext* svgContext,
+                XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
                 const FillStyle& fill, const Stroke* stroke = nullptr);
   ~ElementWriter();
 
@@ -65,7 +70,7 @@ class ElementWriter {
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
 
  private:
-  Resources addResources(const FillStyle& fill, Context* context);
+  Resources addResources(const FillStyle& fill, Context* context, SVGExportingContext* svgContext);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
@@ -80,6 +85,22 @@ class ElementWriter {
 
   void addMatrixColorFilterResources(const MatrixColorFilter& matrixColorFilter,
                                      Resources* resources);
+
+  void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
+                        Context* context, SVGExportingContext* svgContext);
+
+  void addImageMaskResources(const std::shared_ptr<const ImageShader>& imageShader,
+                             const std::string& filterID, Context* context,
+                             SVGExportingContext* svgContext);
+
+  void addPictureImageMaskResources(const std::shared_ptr<const PictureImage>& pictureImage,
+                                    const std::string& filterID, SVGExportingContext* svgContext);
+
+  void addRenderImageMaskResources(const std::shared_ptr<const ImageShader>& imageShaders,
+                                   const std::string& filterID, Context* context);
+
+  void addShaderMaskResources(const std::shared_ptr<Shader>& shader, const std::string& filterID,
+                              Context* context);
 
   void addFillAndStroke(const FillStyle& fill, const Stroke* stroke, const Resources& resources);
 

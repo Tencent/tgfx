@@ -81,4 +81,13 @@ std::shared_ptr<const MatrixColorFilter> ColorFilterCaster::AsMatrixColorFilter(
   }
   return nullptr;
 }
+
+std::shared_ptr<const PictureImage> ImageCaster::AsPictureImage(
+    const std::shared_ptr<Image>& image) {
+  if (image->type() == Image::Type::Picture) {
+    return std::static_pointer_cast<const PictureImage>(image);
+  }
+  return nullptr;
+}
+
 }  // namespace tgfx

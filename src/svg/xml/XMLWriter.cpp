@@ -215,6 +215,7 @@ void XMLStreamWriter::onAddText(const std::string& text) {
 
 void XMLStreamWriter::onEndElement() {
   auto element = getEnd();
+  doEnd();
   if (element.hasChildren || element.hasText) {
     this->tab(static_cast<int>(_elementsStack.size()));
     stream->writeText("</" + element.name + ">");
@@ -222,7 +223,6 @@ void XMLStreamWriter::onEndElement() {
     stream->writeText("/>");
   }
   this->newline();
-  doEnd();
 }
 
 void XMLStreamWriter::onStartElement(const std::string& element) {

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
 
@@ -26,6 +27,14 @@ class ShaderMaskFilter : public MaskFilter {
  public:
   ShaderMaskFilter(std::shared_ptr<Shader> shader, bool inverted)
       : shader(std::move(shader)), inverted(inverted) {
+  }
+
+  std::shared_ptr<Shader> getShader() const {
+    return shader;
+  }
+
+  bool isInverted() const {
+    return inverted;
   }
 
  protected:

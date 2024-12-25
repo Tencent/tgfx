@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <_types/_uint32_t.h>
 #include "core/FillStyle.h"
 
 namespace tgfx {
@@ -27,6 +28,7 @@ struct Resources {
   explicit Resources(const FillStyle& fill);
   std::string paintColor;
   std::string filter;
+  std::string mask;
 };
 
 // TODO(YGAurora) implements the feature to reuse resources
@@ -58,6 +60,10 @@ class ResourceStore {
     return "clip_" + std::to_string(clipCount++);
   }
 
+  std::string addMask() {
+    return "mask_" + std::to_string(maskCount++);
+  }
+
  private:
   uint32_t gradientCount = 0;
   uint32_t pathCount = 0;
@@ -65,6 +71,7 @@ class ResourceStore {
   uint32_t patternCount = 0;
   uint32_t filterCount = 0;
   uint32_t clipCount = 0;
+  uint32_t maskCount = 0;
 };
 
 }  // namespace tgfx

@@ -33,6 +33,10 @@ class OrientImage : public TransformImage {
   int height() const override;
 
  protected:
+  Type type() const override {
+    return Type::Orient;
+  }
+
   Orientation orientation = Orientation::TopLeft;
 
   OrientImage(std::shared_ptr<Image> source, Orientation orientation);

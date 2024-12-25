@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGUtils.h"
+#include <malloc/_malloc.h>
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
@@ -265,8 +266,9 @@ std::shared_ptr<Data> AsDataUri(const Pixmap& pixmap) {
   auto bufferSize = prefixLength + base64Size;
   auto* dest = static_cast<char*>(malloc(bufferSize));
   memcpy(dest, pngPrefix, prefixLength);
-  Base64Encode(imageData->bytes(), base64Size, dest + prefixLength);
-  dest[bufferSize - 1] = 0;
+  Base64Encode(imageData->bytes(), imageData->size(), dest + prefixLength);
+  dest[bufferSize - 1] = '\0';
+
   auto dataUri = Data::MakeAdopted(dest, bufferSize, Data::FreeProc);
   return dataUri;
 }

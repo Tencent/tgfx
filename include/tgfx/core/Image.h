@@ -289,6 +289,22 @@ class Image {
                                     int alphaStartY) const;
 
  protected:
+  enum class Type {
+    Buffer,
+    Decoder,
+    Filter,
+    Generator,
+    Mipmap,
+    Orient,
+    Picture,
+    Rasterized,
+    RGBAAA,
+    Texture,
+    Subset
+  };
+
+  virtual Type type() const = 0;
+
   std::weak_ptr<Image> weakThis;
 
   virtual std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware = true) const;
@@ -328,5 +344,6 @@ class Image {
   friend class RGBAAAImage;
   friend class RasterizedImage;
   friend class ImageShader;
+  friend class ImageCaster;
 };
 }  // namespace tgfx

@@ -75,14 +75,14 @@ void SVGExportingContext::drawRect(const Rect& rect, const MCState& state, const
 
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(fill)) {
-    svg = std::make_unique<ElementWriter>("svg", context, writer, resourceBucket.get(),
+    svg = std::make_unique<ElementWriter>("svg", context, this, writer.get(), resourceBucket.get(),
                                           exportFlags & SVGExportFlags::ConvertTextToPaths, state,
                                           fill);
     svg->addRectAttributes(rect);
   }
 
   applyClipPath(state.clip);
-  ElementWriter rectElement("rect", context, writer, resourceBucket.get(),
+  ElementWriter rectElement("rect", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
 
   if (svg) {
@@ -100,17 +100,17 @@ void SVGExportingContext::drawRRect(const RRect& roundRect, const MCState& state
   applyClipPath(state.clip);
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
-      ElementWriter circleElement("circle", context, writer, resourceBucket.get(),
+      ElementWriter circleElement("circle", context, this, writer.get(), resourceBucket.get(),
                                   exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
       circleElement.addCircleAttributes(roundRect.rect);
       return;
     } else {
-      ElementWriter ovalElement("ellipse", context, writer, resourceBucket.get(),
+      ElementWriter ovalElement("ellipse", context, this, writer.get(), resourceBucket.get(),
                                 exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
       ovalElement.addEllipseAttributes(roundRect.rect);
     }
   } else {
-    ElementWriter rrectElement("rect", context, writer, resourceBucket.get(),
+    ElementWriter rrectElement("rect", context, this, writer.get(), resourceBucket.get(),
                                exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
     rrectElement.addRoundRectAttributes(roundRect);
   }
@@ -120,7 +120,7 @@ void SVGExportingContext::drawShape(std::shared_ptr<Shape> shape, const MCState&
                                     const FillStyle& style) {
   applyClipPath(state.clip);
   auto path = shape->getPath();
-  ElementWriter pathElement("path", context, writer, resourceBucket.get(),
+  ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::ConvertTextToPaths, state, style);
   pathElement.addPathAttributes(path, tgfx::SVGExportingContext::PathEncoding());
   if (path.getFillType() == PathFillType::EvenOdd) {
@@ -181,7 +181,7 @@ void SVGExportingContext::exportPixmap(const Pixmap& pixmap, const MCState& stat
   }
   {
     applyClipPath(state.clip);
-    ElementWriter imageUse("use", context, writer, resourceBucket.get(),
+    ElementWriter imageUse("use", context, this, writer.get(), resourceBucket.get(),
                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, style);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
@@ -220,7 +220,7 @@ void SVGExportingContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>
                                              const Stroke* stroke) {
   Path path;
   if (glyphRunList->getPath(&path)) {
-    ElementWriter pathElement("path", context, writer, resourceBucket.get(),
+    ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                               exportFlags & SVGExportFlags::ConvertTextToPaths, state, style,
                               stroke);
     pathElement.addPathAttributes(path, tgfx::SVGExportingContext::PathEncoding());
@@ -234,7 +234,7 @@ void SVGExportingContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>
                                              const MCState& state, const FillStyle& style,
                                              const Stroke* stroke) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    ElementWriter textElement("text", context, writer, resourceBucket.get(),
+    ElementWriter textElement("text", context, this, writer.get(), resourceBucket.get(),
                               exportFlags & SVGExportFlags::ConvertTextToPaths, state, style,
                               stroke);
 
@@ -384,6 +384,7 @@ Bitmap SVGExportingContext::ImageExportToBitmap(Context* context,
   Bitmap bitmap(image->width(), image->height(), false, false);
   auto* pixels = bitmap.lockPixels();
   if (surface->readPixels(bitmap.info(), pixels)) {
+    bitmap.unlockPixels();
     return bitmap;
   }
   return Bitmap();
