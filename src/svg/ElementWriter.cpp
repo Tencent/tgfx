@@ -18,16 +18,12 @@
 
 #include "ElementWriter.h"
 #include <_types/_uint32_t.h>
-#include <cstring>
-#include <memory>
 #include <string>
 #include <unordered_set>
 #include "SVGExportingContext.h"
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
-#include "core/FillStyle.h"
 #include "core/filters/ShaderMaskFilter.h"
-#include "core/shaders/ImageShader.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -35,7 +31,6 @@
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
@@ -507,8 +502,7 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageSha
   if (bitmap.isEmpty()) {
     return;
   }
-  Pixmap pixmap(bitmap);
-  auto dataUri = AsDataUri(pixmap);
+  auto dataUri = AsDataUri(Pixmap(bitmap));
   if (!dataUri) {
     return;
   }
@@ -544,7 +538,7 @@ void ElementWriter::addImageShaderResources(const std::shared_ptr<const ImageSha
       imageTag.addAttribute("y", 0);
       imageTag.addAttribute("width", image->width());
       imageTag.addAttribute("height", image->height());
-      imageTag.addAttribute("xlink:href", std::string(static_cast<const char*>(dataUri->data())));
+      imageTag.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
     }
   }
   resources->paintColor = "url(#" + patternID + ")";

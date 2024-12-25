@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <_types/_uint32_t.h>
 #include "core/FillStyle.h"
 
 namespace tgfx {
