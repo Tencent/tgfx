@@ -61,34 +61,6 @@ void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
                                                              bounds(), renderFlags);
 }
 
-static std::shared_ptr<Data> MakeVertexData(const Rect& rect, AAType aaType) {
-  TRACE_EVENT;
-  if (aaType != AAType::Coverage) {
-    auto quad = Quad::MakeFrom(rect);
-    return quad.toTriangleStrips();
-  }
-  Buffer buffer(24 * sizeof(float));
-  auto vertices = static_cast<float*>(buffer.data());
-  // There is no need to scale the padding by the view matrix scale, as the view matrix scale is
-  // already applied to the path.
-  auto padding = 0.5f;
-  auto insetBounds = rect.makeInset(padding, padding);
-  auto insetQuad = Quad::MakeFrom(insetBounds);
-  auto outsetBounds = rect.makeOutset(padding, padding);
-  auto outsetQuad = Quad::MakeFrom(outsetBounds);
-  auto index = 0;
-  for (int j = 0; j < 2; ++j) {
-    const auto& quad = j == 0 ? insetQuad : outsetQuad;
-    auto coverage = j == 0 ? 1.0f : 0.0f;
-    for (size_t k = 0; k < 4; ++k) {
-      vertices[index++] = quad.point(k).x;
-      vertices[index++] = quad.point(k).y;
-      vertices[index++] = coverage;
-    }
-  }
-  return buffer.release();
-}
-
 void ShapeDrawOp::execute(RenderPass* renderPass) {
   TRACE_EVENT;
   if (shapeProxy == nullptr) {
@@ -108,13 +80,22 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     if (!realUVMatrix.invert(&maskMatrix)) {
       return;
     }
-    auto rect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    vertexData = MakeVertexData(rect, aa);
+    auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
     auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &maskMatrix, true);
     if (maskFP == nullptr) {
       return;
     }
     addCoverageFP(std::move(maskFP));
+    Path path = {};
+    path.addRect(maskRect);
+    if (aa == AAType::Coverage) {
+      maskVertices.reserve(90);
+      PathTriangulator::ToAATriangles(path, maskRect, &maskVertices);
+    } else {
+      maskVertices.reserve(12);
+      PathTriangulator::ToTriangles(path, maskRect, &maskVertices);
+    }
+    vertexData = Data::MakeWithoutCopy(maskVertices.data(), maskVertices.size() * sizeof(float));
   }
   auto pipeline = createPipeline(
       renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
@@ -126,10 +107,9 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
                                             : PathTriangulator::GetTriangleCount(vertexDataSize);
   if (vertexBuffer != nullptr) {
     renderPass->bindBuffers(nullptr, vertexBuffer);
-    renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
   } else {
     renderPass->bindBuffers(nullptr, vertexData);
-    renderPass->draw(PrimitiveType::TriangleStrip, 0, vertexCount);
   }
+  renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
 }  // namespace tgfx

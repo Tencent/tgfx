@@ -42,6 +42,7 @@ class ShapeDrawOp : public DrawOp {
   std::shared_ptr<Shape> shape = nullptr;
   Matrix uvMatrix = Matrix::I();
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
+  std::vector<float> maskVertices = {};
 
   ShapeDrawOp(Color color, std::shared_ptr<Shape> shape, const Matrix& uvMatrix,
               const Rect& bounds);
