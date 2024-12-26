@@ -31,8 +31,6 @@ class PathProvider {
 
   /**
    * This method retrieves a Path object from the PathProvider.
-   * Note: This method may be called multiple times. If constructing the Path object is
-   * time-consuming, consider caching the Path object after it is created.
    */
   virtual Path getPath(float resolutionScale = 1.0f) const = 0;
 
