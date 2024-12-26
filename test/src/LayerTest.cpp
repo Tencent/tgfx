@@ -448,15 +448,22 @@ TGFX_TEST(LayerTest, shapeLayer) {
     Path path = {};
     path.addRect(rect);
     shaperLayer->setPath(path);
+    shaperLayer->removeFillStyles();
     auto filleStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.bottom});
     filleStyle->setColors({{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
-    shaperLayer->setFillStyle(filleStyle);
+    filleStyle->setAlpha(0.8f);
+    shaperLayer->addFillStyle(filleStyle);
+
     // stroke style
     shaperLayer->setLineWidth(10.0f);
     shaperLayer->setLineCap(LineCap::Butt);
     shaperLayer->setLineJoin(LineJoin::Miter);
     auto strokeStyle = SolidColor::Make(Color::Red());
     shaperLayer->setStrokeStyle(strokeStyle);
+    strokeStyle = SolidColor::Make(Color::Green());
+    strokeStyle->setAlpha(0.5f);
+    strokeStyle->setBlendMode(BlendMode::Lighten);
+    shaperLayer->addStrokeStyle(strokeStyle);
     std::vector<float> dashPattern = {10.0f, 10.0f};
     shaperLayer->setLineDashPattern(dashPattern);
     shaperLayer->setLineDashPhase(5.0f);

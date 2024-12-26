@@ -1,7 +1,4 @@
 {
-    "Canvas": {
-        "Path_complex": "f37b222"
-    },
     "CanvasTest": {
         "Clip": "d010fb8",
         "NothingToDraw": "d010fb8",
@@ -21,6 +18,7 @@
         "Path_addArc_reversed6": "4802e56",
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
+        "Path_complex": "e031f25",
         "Picture": "b062b9a",
         "PictureImage": "c28a93c",
         "PictureImage_Path": "2212c4e",
@@ -31,7 +29,7 @@
         "altas": "b1cfcd4",
         "blendMode": "b3076a3",
         "drawImage": "8cb853c",
-        "drawShape": "f37b222",
+        "drawShape": "e031f25",
         "filter_mode_linear": "d010fb8",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "d010fb8",
@@ -94,7 +92,7 @@
         "Layer_hitTestPointNested": "b062b9a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "draw_shape": "f37b222",
+        "draw_shape": "e031f25",
         "draw_solid": "b4a1231",
         "draw_text": "b062b9a",
         "dropShadow": "43cd416",
