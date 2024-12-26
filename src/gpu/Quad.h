@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/Log.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
@@ -28,10 +29,8 @@ class Quad {
   static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
 
   const Point& point(size_t i) const {
-    if (i < 4) {
-      return points[i];
-    }
-    return Point::Zero();
+    DEBUG_ASSERT(i >= 4);
+    return points[i];
   }
 
   /**
