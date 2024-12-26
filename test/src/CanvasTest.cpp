@@ -1398,7 +1398,7 @@ TGFX_TEST(CanvasTest, Path_complex) {
   canvas->scale(0.5f, 0.5f);
   canvas->drawPath(path, paint);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "Canvas/Path_complex"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_complex"));
 }
 
 TGFX_TEST(CanvasTest, DrawPathProvider) {
