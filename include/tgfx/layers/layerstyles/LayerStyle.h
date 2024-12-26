@@ -79,7 +79,9 @@ class LayerStyle : public LayerProperty {
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha);
+  void draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha) {
+    onDraw(canvas, std::move(content), contentScale, alpha, _blendMode);
+  }
 
  protected:
   /**

@@ -522,16 +522,15 @@ class Layer {
 
   std::shared_ptr<ImageFilter> getCurrentFilter(float contentScale);
 
-  std::shared_ptr<Picture> applyLayerStyles(std::shared_ptr<Picture> source, float contentScale,
-                                            float alpha);
-
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  std::shared_ptr<Picture> getLayerContentsWithStyles(const DrawArgs& args, float contentScale,
-                                                      float alpha);
+  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
+
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                       float alpha, LayerStylePosition position) const;
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
