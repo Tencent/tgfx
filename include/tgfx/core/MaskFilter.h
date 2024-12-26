@@ -37,10 +37,16 @@ class MaskFilter {
 
   virtual ~MaskFilter() = default;
 
+ protected:
+  enum class Type { Shader, None };
+
+  virtual Type type() const = 0;
+
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const = 0;
 
   friend class RenderContext;
+  friend class MaskFilterCaster;
 };
 }  // namespace tgfx

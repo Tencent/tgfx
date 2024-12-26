@@ -48,6 +48,10 @@ class RasterizedImage : public OffscreenImage {
                                         const SamplingOptions& sampling = {}) const override;
 
  protected:
+  Type type() const override {
+    return Type::Rasterized;
+  }
+
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
   bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;

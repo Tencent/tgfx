@@ -43,13 +43,18 @@ class PictureImage : public OffscreenImage {
     return false;
   }
 
+  std::shared_ptr<Picture> picture = nullptr;
+  Matrix* matrix = nullptr;
+
  protected:
+  Type type() const override {
+    return Type::Picture;
+  }
+
   bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
 
  private:
-  std::shared_ptr<Picture> picture = nullptr;
   int _width = 0;
   int _height = 0;
-  Matrix* matrix = nullptr;
 };
 }  // namespace tgfx

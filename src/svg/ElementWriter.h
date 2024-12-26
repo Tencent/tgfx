@@ -28,6 +28,7 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
+#include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
@@ -45,8 +46,8 @@ class ElementWriter {
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket);
-  ElementWriter(const std::string& name, Context* context, const std::unique_ptr<XMLWriter>& writer,
-                ResourceStore* bucket, bool disableWarning, const MCState& state,
+  ElementWriter(const std::string& name, Context* context, SVGExportingContext* svgContext,
+                XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
                 const FillStyle& fill, const Stroke* stroke = nullptr);
   ~ElementWriter();
 
@@ -65,21 +66,33 @@ class ElementWriter {
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
 
  private:
-  Resources addResources(const FillStyle& fill, Context* context);
+  Resources addResources(const FillStyle& fill, Context* context, SVGExportingContext* svgContext);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
-  void addColorShaderResources(const std::shared_ptr<const ColorShader>& shader,
-                               Resources* resources);
-  void addGradientShaderResources(const std::shared_ptr<const GradientShader>& shader,
-                                  Resources* resources);
-  void addImageShaderResources(const std::shared_ptr<const ImageShader>& shader, Context* context,
-                               Resources* resources);
+  void addColorShaderResources(const ColorShader* shader, Resources* resources);
+  void addGradientShaderResources(const GradientShader* shader, Resources* resources);
+  void addImageShaderResources(const ImageShader* shader, Context* context, Resources* resources);
 
-  void addBlendColorFilterResources(const ModeColorFilter& modeColorFilter, Resources* resources);
+  void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter, Resources* resources);
 
-  void addMatrixColorFilterResources(const MatrixColorFilter& matrixColorFilter,
+  void addMatrixColorFilterResources(const MatrixColorFilter* matrixColorFilter,
                                      Resources* resources);
+
+  void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
+                        Context* context, SVGExportingContext* svgContext);
+
+  void addImageMaskResources(const ImageShader* imageShader, const std::string& filterID,
+                             Context* context, SVGExportingContext* svgContext);
+
+  void addPictureImageMaskResources(const PictureImage* pictureImage, const std::string& filterID,
+                                    SVGExportingContext* svgContext);
+
+  void addRenderImageMaskResources(const ImageShader* imageShaders, const std::string& filterID,
+                                   Context* context);
+
+  void addShaderMaskResources(const std::shared_ptr<Shader>& shader, const std::string& filterID,
+                              Context* context);
 
   void addFillAndStroke(const FillStyle& fill, const Stroke* stroke, const Resources& resources);
 
@@ -88,9 +101,9 @@ class ElementWriter {
   std::string addRadialGradientDef(const GradientInfo& info);
   std::string addUnsupportedGradientDef(const GradientInfo& info);
 
-  void addBlurImageFilter(const std::shared_ptr<const BlurImageFilter>& filter);
-  void addDropShadowImageFilter(const std::shared_ptr<const DropShadowImageFilter>& filter);
-  void addInnerShadowImageFilter(const std::shared_ptr<const InnerShadowImageFilter>& filter);
+  void addBlurImageFilter(const BlurImageFilter* filter);
+  void addDropShadowImageFilter(const DropShadowImageFilter* filter);
+  void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
 
   void reportUnsupportedElement(const char* message) const;
 
