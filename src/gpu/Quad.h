@@ -28,7 +28,10 @@ class Quad {
   static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
 
   const Point& point(size_t i) const {
-    return points[i];
+    if (i < 4) {
+      return points[i];
+    }
+    return Point::Zero();
   }
 
   /**
