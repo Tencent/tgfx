@@ -1403,7 +1403,7 @@ TGFX_TEST(CanvasTest, Path_complex) {
 
 TGFX_TEST(CanvasTest, DrawPathProvider) {
   class DrawPathProvider : public PathProvider {
-  public:
+   public:
     explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
     }
 
