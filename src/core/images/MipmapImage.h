@@ -45,6 +45,10 @@ class MipmapImage : public ResourceImage {
                                         const SamplingOptions& sampling = {}) const override;
 
  protected:
+  Type type() const override {
+    return Type::Mipmap;
+  }
+
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;

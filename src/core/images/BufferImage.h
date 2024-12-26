@@ -41,6 +41,10 @@ class BufferImage : public ResourceImage {
   }
 
  protected:
+  Type type() const override {
+    return Type::Buffer;
+  }
+
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const override;
 

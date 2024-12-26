@@ -73,7 +73,12 @@ class SVGExportFlags {
  * 
  * - Gradient shaders:
  * Conic gradients are not supported.
+ *
+ * - Mask filters:
+ * Mask filters are created using shaders. Any unsupported shaders will also result in unsupported
+ * mask filters.
  */
+
 class SVGExporter {
  public:
   /**

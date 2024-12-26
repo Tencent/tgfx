@@ -44,6 +44,10 @@ class FilterImage : public SubsetImage {
   }
 
  protected:
+  Type type() const override {
+    return Type::Filter;
+  }
+
   FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
               std::shared_ptr<ImageFilter> filter);
 
