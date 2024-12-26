@@ -166,13 +166,11 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   static const auto TextureShapeType = UniqueID::Next();
   auto triangleKey = UniqueKey::Append(uniqueKey, &TriangleShapeType, 1);
   auto triangleProxy = findOrWrapGpuBufferProxy(triangleKey);
-  if (triangleProxy != nullptr) {
-    return std::make_shared<GpuShapeProxy>(drawingMatrix, triangleProxy, nullptr);
-  }
   auto textureKey = UniqueKey::Append(uniqueKey, &TextureShapeType, 1);
   auto textureProxy = findOrWrapTextureProxy(textureKey);
-  if (textureProxy != nullptr) {
-    return std::make_shared<GpuShapeProxy>(drawingMatrix, nullptr, textureProxy);
+  if (triangleProxy != nullptr || textureProxy != nullptr) {
+    return std::make_shared<GpuShapeProxy>(drawingMatrix, std::move(triangleProxy),
+                                           std::move(textureProxy));
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));

@@ -626,12 +626,14 @@ TGFX_TEST(CanvasTest, simpleShape) {
   auto point = Point::Make(width / 2, height / 2);
   auto radius = image->width() / 2;
   auto rect = Rect::MakeWH(radius * 2, radius * 2);
-  canvas->drawCircle(point, radius + 30, paint);
-  canvas->setMatrix(Matrix::MakeTrans(point.x - radius, point.y - radius));
+  canvas->drawCircle(point, static_cast<float>(radius) + 30.0f, paint);
+  canvas->setMatrix(Matrix::MakeTrans(point.x - static_cast<float>(radius),
+                                      point.y - static_cast<float>(radius)));
   canvas->drawRoundRect(rect, 10, 10, paint);
 
-  canvas->setMatrix(Matrix::MakeTrans(point.x - radius, point.y - radius));
-  canvas->rotate(45, radius, radius);
+  canvas->setMatrix(Matrix::MakeTrans(point.x - static_cast<float>(radius),
+                                      point.y - static_cast<float>(radius)));
+  canvas->rotate(45.0f, static_cast<float>(radius), static_cast<float>(radius));
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
 }
@@ -1395,6 +1397,6 @@ TGFX_TEST(CanvasTest, Path_complex) {
   canvas->scale(0.5f, 0.5f);
   canvas->drawPath(path, paint);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "Canvas/Path_complex"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_complex"));
 }
 }  // namespace tgfx

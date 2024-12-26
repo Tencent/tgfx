@@ -29,8 +29,14 @@ class MatrixColorFilter : public ColorFilter {
     return alphaIsUnchanged;
   }
 
- private:
   std::array<float, 20> matrix;
+
+ protected:
+  Type type() const override {
+    return Type::Matrix;
+  };
+
+ private:
   bool alphaIsUnchanged;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;

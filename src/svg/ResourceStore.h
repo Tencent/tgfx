@@ -18,29 +18,53 @@
 
 #pragma once
 
-#include "core/utils/Profiling.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/layers/LayerContent.h"
+#include "core/FillStyle.h"
 
 namespace tgfx {
-class ShapeContent : public LayerContent {
- public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader, float alpha,
-               BlendMode blendMode);
 
-  Rect getBounds() const override {
-    return bounds;
+struct Resources {
+  Resources() = default;
+  explicit Resources(const FillStyle& fill);
+  std::string paintColor;
+  std::string filter;
+};
+
+// TODO(YGAurora) implements the feature to reuse resources
+class ResourceStore {
+ public:
+  ResourceStore() = default;
+
+  std::string addGradient() {
+    return "gradient_" + std::to_string(gradientCount++);
   }
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
+  std::string addPath() {
+    return "path_" + std::to_string(pathCount++);
+  }
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  std::string addImage() {
+    return "img_" + std::to_string(imageCount++);
+  }
+
+  std::string addFilter() {
+    return "filter_" + std::to_string(filterCount++);
+  }
+
+  std::string addPattern() {
+    return "pattern_" + std::to_string(patternCount++);
+  }
+
+  std::string addClip() {
+    return "clip_" + std::to_string(clipCount++);
+  }
 
  private:
-  Rect bounds = Rect::MakeEmpty();
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
-  float alpha = 1.0f;
-  BlendMode blendMode = BlendMode::SrcOver;
+  uint32_t gradientCount = 0;
+  uint32_t pathCount = 0;
+  uint32_t imageCount = 0;
+  uint32_t patternCount = 0;
+  uint32_t filterCount = 0;
+  uint32_t clipCount = 0;
 };
+
 }  // namespace tgfx

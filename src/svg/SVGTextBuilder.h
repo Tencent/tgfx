@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,27 @@
 
 #pragma once
 
-#include "tgfx/core/ColorFilter.h"
+#include <MacTypes.h>
+#include <string>
+#include "core/utils/GlyphConverter.h"
+#include "tgfx/core/GlyphRun.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class ComposeColorFilter : public ColorFilter {
+class SVGTextBuilder {
  public:
-  explicit ComposeColorFilter(std::shared_ptr<ColorFilter> inner,
-                              std::shared_ptr<ColorFilter> outer);
-
-  bool isAlphaUnchanged() const override;
-
- protected:
-  Type type() const override {
-    return Type::Compose;
+  struct UnicharsInfo {
+    std::string text;
+    std::string posX;
+    std::string posY;
   };
 
- private:
-  std::shared_ptr<ColorFilter> inner = nullptr;
-  std::shared_ptr<ColorFilter> outer = nullptr;
+  SVGTextBuilder() = default;
+  ~SVGTextBuilder() = default;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  UnicharsInfo glyphToUnicharsInfo(const GlyphRun& glyphRun);
+
+ private:
+  GlyphConverter converter;
 };
 }  // namespace tgfx

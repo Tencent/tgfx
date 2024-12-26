@@ -16,31 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ShapeContent.h"
+#include "GlyphConverter.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader,
-                           float alpha, BlendMode blendMode)
-    : bounds(shape->getBounds()), shape(std::move(shape)), shader(std::move(shader)), alpha(alpha),
-      blendMode(blendMode) {
-}
 
-void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT;
-  auto shapePaint = paint;
-  shapePaint.setAlpha(paint.getAlpha() * alpha);
-  // The blend mode in the paint is always SrcOver, use our own blend mode instead.
-  shapePaint.setBlendMode(blendMode);
-  shapePaint.setShader(shader);
-  canvas->drawShape(shape, shapePaint);
-}
-
-bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TRACE_EVENT;
-  if (pixelHitTest) {
-    auto path = shape->getPath();
-    return path.contains(localX, localY);
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> GlyphConverter::glyphsToUnichars(const Font& font,
+                                                      const std::vector<GlyphID>& glyphs) {
+  auto typeface = font.getTypeface();
+  if (!typeface) {
+    return {};
   }
-  return bounds.contains(localX, localY);
+  std::vector<Unichar> result(glyphs.size(), 0);
+  auto glyphMap = getGlyphToUnicodeMap(typeface);
+  for (size_t i = 0; i < glyphs.size(); i++) {
+    result[i] = glyphMap[glyphs[i]];
+  }
+  return result;
 }
+
+const std::vector<Unichar>& GlyphConverter::getGlyphToUnicodeMap(
+    const std::shared_ptr<Typeface>& typeface) {
+  auto iter = fontToGlyphMap.find(typeface->uniqueID());
+  if (iter != fontToGlyphMap.end()) {
+    return iter->second;
+  }
+  fontToGlyphMap[typeface->uniqueID()] = typeface->getGlyphToUnicodeMap();
+  return fontToGlyphMap[typeface->uniqueID()];
+}
+
+#endif
+
 }  // namespace tgfx

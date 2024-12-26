@@ -20,6 +20,7 @@
 
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
@@ -131,11 +132,19 @@ class Typeface {
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
  protected:
+  /**
+   * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
+   * unicode. The array length is glyphsCount(). 
+   * This method is only implemented when compiling the SVG or PDF export module.
+   */
+  virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
+
   mutable std::mutex locker = {};
 
  private:
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
   friend class ScalerContext;
+  friend class GlyphConverter;
 };
 }  // namespace tgfx

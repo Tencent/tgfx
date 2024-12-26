@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ColorFilter.h"
+#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
-class ComposeColorFilter : public ColorFilter {
- public:
-  explicit ComposeColorFilter(std::shared_ptr<ColorFilter> inner,
-                              std::shared_ptr<ColorFilter> outer);
+void ShapeStyle::setAlpha(float value) {
+  _alpha = value;
+  invalidate();
+}
 
-  bool isAlphaUnchanged() const override;
-
- protected:
-  Type type() const override {
-    return Type::Compose;
-  };
-
- private:
-  std::shared_ptr<ColorFilter> inner = nullptr;
-  std::shared_ptr<ColorFilter> outer = nullptr;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
-};
+void ShapeStyle::setBlendMode(BlendMode value) {
+  _blendMode = value;
+  invalidate();
+}
 }  // namespace tgfx
