@@ -26,8 +26,8 @@ Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
 
 Quad::Quad(const Rect& rect, const Matrix* matrix) {
   points[0] = Point::Make(rect.left, rect.top);
-  points[1] = Point::Make(rect.right, rect.top);
-  points[2] = Point::Make(rect.left, rect.bottom);
+  points[1] = Point::Make(rect.left, rect.bottom);
+  points[2] = Point::Make(rect.right, rect.top);
   points[3] = Point::Make(rect.right, rect.bottom);
   if (matrix) {
     matrix->mapPoints(points, 4);
