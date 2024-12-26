@@ -45,19 +45,8 @@ TimelineView::TimelineView(tracy::Worker& worker, ViewData& viewData, bool threa
   : worker(worker)
   , viewData(viewData)
   , frameData(worker.GetFramesBase())
-  , timelineController(*this, worker, threadedRendering)
-  , redraw(true)
-  , QGraphicsView(parent) {
-
-  // QGraphicsScene *scene = new QGraphicsScene(this);
-  // scene->setItemIndexMethod(QGraphicsScene::NoIndex);
-  // // scene->setSceneRect(0, 0, width, height);
-  // setScene(scene);
-  // setMouseTracking(true);
-  setViewportUpdateMode(BoundingRectViewportUpdate);
-  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  // setStyleSheet("background-color: rgb(255, 0, 0)");
+  , timelineController(*this, worker, threadedRendering) {
+  update();
 }
 
 TimelineView::~TimelineView() {
@@ -124,20 +113,16 @@ TimelineView::ZoneColorData TimelineView::getZoneColorData(const tracy::ZoneEven
 }
 
 uint64_t TimelineView::getFrameNumber(const tracy::FrameData& fd, int i) const {
-  if(fd.name == 0)
-  {
+  if(fd.name == 0) {
     const auto offset = worker.GetFrameOffset();
-    if(offset == 0)
-    {
+    if(offset == 0) {
       return i;
     }
-    else
-    {
+    else {
       return i + offset - 1;
     }
   }
-  else
-  {
+  else {
     return i + 1;
   }
 }
@@ -297,7 +282,8 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tracy::FrameData& fd, i
       }
       if(fend <= viewData.zvEnd)
       {
-        drawPolyLine(painter, dpos + QPointF((fend - viewData.zvStart) * pxns, 0), dpos + QPointF((fend - viewData.zvStart) * pxns, wh), 0x22FFFFFF);
+        painter->setPen(getColor(0x22FFFFFF));
+        painter->drawLine(dpos + QPointF((fend - viewData.zvStart) * pxns, 0), dpos + QPointF((fend - viewData.zvStart) * pxns, wh));
       }
       endPos = fend;
     }
@@ -552,25 +538,59 @@ void TimelineView::drawTimeline(QPainter* painter) {
   timelineController.end(pxns, QPoint(0, yMin), true, yMin, yMax, painter);
 }
 
+void TimelineView::zoomToRange(int64_t start, int64_t end, bool pause) {
+  if( start == end )
+  {
+    end = start + 1;
+  }
+
+  if( pause )
+  {
+    viewMode = ViewMode::Paused;
+  }
+  hightlightZoom.active = false;
+  zoomAnim.active = true;
+  if (viewMode == ViewMode::LastRange) {
+    const auto rangeCurr = viewData.zvEnd - viewData.zvStart;
+    const auto rangeDest = end - start;
+    zoomAnim.start0 = viewData.zvStart;
+    zoomAnim.start1 = viewData.zvStart - ( rangeDest - rangeCurr );
+    zoomAnim.end0 = viewData.zvEnd;
+    zoomAnim.end1 = viewData.zvEnd;
+  }
+  else {
+    zoomAnim.start0 = viewData.zvStart;
+    zoomAnim.start1 = start;
+    zoomAnim.end0 = viewData.zvEnd;
+    zoomAnim.end1 = end;
+  }
+  zoomAnim.progress = 0;
+}
+
+void TimelineView::resizeEvent(QResizeEvent* event){
+  update();
+  QWidget::resizeEvent(event);
+}
+
+
 void TimelineView::paintEvent(QPaintEvent* event) {
-  auto start = std::chrono::high_resolution_clock::now();
-  auto painter = QPainter(this->viewport());
+  TestTime a("paint");
+  auto painter = QPainter(this);
   drawTimeline(&painter);
-  QGraphicsView::paintEvent(event);
-  auto end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = end - start;
-  std::cout << "当前花费时间: " << elapsed.count() << "second" << std::endl;
+  QWidget::paintEvent(event);
 }
 
 void TimelineView::mouseMoveEvent(QMouseEvent* event) {
   if (moveData.isDragging) {
     viewMode = ViewMode::Paused;
     const auto timespan = viewData.zvEnd - viewData.zvStart;
+    zoomAnim.active = false;
     const auto w = width();
     const auto nspx = double(timespan) / w;
-    auto delta = event->globalPos() - moveData.pos;
+    auto delta = event->position().toPoint() - moveData.pos;
+    moveData.pos = event->position().toPoint();
     auto yDelta = delta.y();
-    const auto dpx = int64_t((delta.x() * nspx / 5) + (moveData.hwheelDelta * nspx));
+    const auto dpx = int64_t((delta.x() * nspx) + (moveData.hwheelDelta * nspx));
     if (dpx != 0) {
       viewData.zvStart -= dpx;
       viewData.zvEnd -= dpx;
@@ -589,7 +609,6 @@ void TimelineView::mouseMoveEvent(QMouseEvent* event) {
     }
     event->accept();
     update();
-    redraw = true;
   }
   else {
     QWidget::mouseMoveEvent(event);
@@ -599,7 +618,7 @@ void TimelineView::mouseMoveEvent(QMouseEvent* event) {
 void TimelineView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::RightButton) {
     moveData.isDragging = true;
-    moveData.pos = event->globalPos() - frameGeometry().topLeft();
+    moveData.pos = event->position().toPoint();
     event->accept();
   }
   else {
@@ -618,5 +637,35 @@ void TimelineView::mouseReleaseEvent(QMouseEvent* event)  {
 }
 
 void TimelineView::wheelEvent(QWheelEvent* event) {
+  if (viewMode == ViewMode::LastFrames) viewMode = ViewMode::LastRange;
+  const auto mouse = mapFromGlobal(QCursor().pos()) - frameGeometry().topLeft();
+  const auto p = double(mouse.x()) / width();
+  int64_t t0, t1;
+  if (zoomAnim.active) {
+    t0 = zoomAnim.start1;
+    t1 = zoomAnim.end1;
+  }
+  else {
+    t0 = viewData.zvStart;
+    t1 = viewData.zvEnd;
+  }
+  const auto zoomSpan = t1 - t0;
+  const auto p1 = zoomSpan * p;
+  const auto p2 = zoomSpan - p1;
+
+  double mod = 0.05;
+  auto wheel = event->angleDelta().y();
+  if (wheel > 0) {
+    t0 += int64_t(p1 * mod);
+    t1 -= int64_t(p2 * mod);
+  }
+  else if( wheel < 0 && zoomSpan < 1000ll * 1000 * 1000 * 60 * 60 ) {
+    t0 -= std::max( int64_t( 1 ), int64_t( p1 * mod ) );
+    t1 += std::max( int64_t( 1 ), int64_t( p2 * mod ) );
+  }
+  zoomToRange(t0, t1, !worker.IsConnected() || viewMode == ViewMode::Paused);
+  viewData.zvStart = int64_t( zoomAnim.start0 + zoomAnim.start1 - zoomAnim.start0);
+  viewData.zvEnd = int64_t( zoomAnim.end0 + zoomAnim.end1 - zoomAnim.end0);
+  update();
   event->accept();
 }

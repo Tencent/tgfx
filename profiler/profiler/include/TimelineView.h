@@ -21,15 +21,47 @@
 #include <QGraphicsView>
 #include <QPushButton>
 #include <QWidget>
+#include <QWindow>
 #include "TimelineController.h"
 #include "src/profiler/TracyTimelineDraw.hpp"
 #include "TracyWorker.hpp"
 #include "ViewData.h"
 
-class TimelineView: public QGraphicsView {
+class BatchDraw {
 public:
-  struct ZoneColorData
+  BatchDraw(QPainter* painter = nullptr): painter(painter) {
+    font = QFont("Arial", 12);
+  }
+  void setPainter(QPainter* painter) { this->painter = painter; }
+
+  void addLines(QPointF p1, QPointF p2, uint32_t color);
+  void addRect(QRect rect, uint32_t color);
+  void addText(const char* text, QPointF pos, uint32_t color);
+  void draw();
+private:
+  QFont font;
+  QPainter* painter;
+  std::unordered_map<uint32_t, QVector<QLineF>> lines;
+  std::unordered_map<uint32_t, QPainterPath> paths;
+};
+
+class TimelineView: public QWidget {
+public:
+  struct Region
   {
+    bool active = false;
+    int64_t start;
+    int64_t end;
+  };
+
+  struct Animation {
+    bool active = false;
+    int64_t start0, start1;
+    int64_t end0, end1;
+    double progress;
+  };
+
+  struct ZoneColorData {
     uint32_t color;
     uint32_t accentColor;
     float thickness;
@@ -66,7 +98,9 @@ public:
   void drawTimeline(QPainter* painter);
   void drawTimelineFrames(QPainter* painter, tracy::FrameData& fd, int& yMin);
 
+  void zoomToRange(int64_t start, int64_t end, bool pause);
 
+  void resizeEvent(QResizeEvent* event) override;
   void paintEvent(QPaintEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
@@ -97,9 +131,12 @@ private:
   ViewData& viewData;
   TimelineController timelineController;
 
+  BatchDraw batchDraw;
+  Region hightlight;
+  Region hightlightZoom;
+  Animation zoomAnim;
   ViewMode viewMode;
   HoverData hoverData;
   const tracy::FrameData* frameData;
   MoveData moveData;
-  bool redraw;
 };

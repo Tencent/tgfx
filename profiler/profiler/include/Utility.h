@@ -22,6 +22,7 @@
 #include <QRect>
 #include <QColor>
 #include <QPainter>
+#include <QPainterPath>
 #include "TracyEvent.hpp"
 class Worker;
 
@@ -34,12 +35,29 @@ enum class ShortenName : uint8_t
   NoSpaceAndNormalize,
 };
 
+class TestTime {
+public:
+  TestTime(const char* name) {
+    start = std::chrono::high_resolution_clock::now();
+    this->name = name;
+  }
+  ~TestTime() {
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << name << "当前花费时间: " << elapsed.count() << " second" << std::endl;
+  }
+private:
+  std::chrono::time_point<std::chrono::steady_clock> start;
+  const char* name;
+};
+
 QFont& getFont();
 QRect getFontSize(const char* text, size_t textSize = 0);
 QColor getColor(uint32_t color);
 
 void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, uint32_t color, float thickness = 1.f);
 void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, uint32_t color, float thickness = 1.f);
+void addPolyLine(QPainterPath* path, QPointF p1, QPointF p2, uint32_t color, float thickness = 1.f);
 void drawTextContrast(QPainter* painter, QPointF pos, uint32_t color, const char* test);
 void drawImage(QPainter* painter);
 
