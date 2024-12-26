@@ -28,6 +28,10 @@
 namespace tgfx {
 class ExternalShape : public Shape {
  public:
+  explicit ExternalShape(std::shared_ptr<PathProvider> pathProvider)
+      : provider(std::move(pathProvider)) {
+  }
+
   bool isLine(Point line[2] = nullptr) const override;
 
   bool isRect(Rect* rect = nullptr) const override;
@@ -52,10 +56,9 @@ class ExternalShape : public Shape {
   UniqueKey getUniqueKey() const override;
 
  private:
-  explicit ExternalShape(std::shared_ptr<PathProvider> pathProvider)
-      : provider(std::move(pathProvider)) {
-  }
-
   std::shared_ptr<PathProvider> provider = nullptr;
+  Path path = {};
+
+  Path getPathInternal() const;
 };
 }  // namespace tgfx

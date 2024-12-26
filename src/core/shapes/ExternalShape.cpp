@@ -21,49 +21,61 @@
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<PathProvider> pathProvider) {
-  if (pathProvider != nullptr) {
+  if (pathProvider == nullptr) {
     return nullptr;
   }
 
   return std::make_shared<ExternalShape>(std::move(pathProvider));
 }
 
-bool ExternalShape::isLine(Point line[2]) const override {
-  return provider->getPath().isLine(line);
+bool ExternalShape::isLine(Point line[2]) const {
+  return getPathInternal().isLine(line);
 }
 
-bool ExternalShape::isRect(Rect* rect) const override {
-  return provider->getPath().isRect(rect);
+bool ExternalShape::isRect(Rect* rect) const {
+  return getPathInternal().isRect(rect);
 }
 
-bool ExternalShape::isOval(Rect* bounds) const override {
-  return provider->getPath().isOval(bounds);
+bool ExternalShape::isOval(Rect* bounds) const {
+  return getPathInternal().isOval(bounds);
 }
 
-bool ExternalShape::isRRect(RRect* rRect) const override {
-  return provider->getPath().isRRect(rRect);
+bool ExternalShape::isRRect(RRect* rRect) const {
+  return getPathInternal().isRRect(rRect);
 }
 
-bool ExternalShape::isSimplePath(Path* resultPath) const override {
+bool ExternalShape::isSimplePath(Path* resultPath) const {
   if (resultPath != nullptr) {
-    *resultPath = provider->getPath();
+    *resultPath = getPathInternal();
   }
   return true;
 }
 
-bool ExternalShape::isInverseFillType() const override {
-  return provider->getPath().isInverseFillType();
+bool ExternalShape::isInverseFillType() const {
+  return getPathInternal().isInverseFillType();
 }
 
-Rect ExternalShape::getBounds(float resolutionScale) const override {
-  return provider->getPath(resolutionScale).getBounds();
+Rect ExternalShape::getBounds(float resolutionScale) const {
+  auto finalPath = getPathInternal();
+  finalPath.transform(Matrix::MakeScale(resolutionScale));
+  return finalPath.getBounds();
 }
 
-Path ExternalShape::getPath(float resolutionScale) const override {
-  return provider->getPath(resolutionScale);
+Path ExternalShape::getPath(float resolutionScale) const {
+  auto finalPath = getPathInternal();
+  finalPath.transform(Matrix::MakeScale(resolutionScale));
+  return finalPath;
 }
 
 UniqueKey ExternalShape::getUniqueKey() const {
-  return PathRef::GetUniqueKey(provider->getPath());
+  return PathRef::GetUniqueKey(getPathInternal());
+}
+
+Path ExternalShape::getPathInternal() const {
+  if (path.isEmpty()) {
+    const auto tmpPath = const_cast<Path*>(&path);
+    *tmpPath = provider->getPath();
+  }
+  return path;
 }
 }  // namespace tgfx
