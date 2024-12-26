@@ -29,7 +29,7 @@ class Quad {
   static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
 
   const Point& point(size_t i) const {
-    DEBUG_ASSERT(i >= 4);
+    DEBUG_ASSERT(i < 4);
     return points[i];
   }
 
