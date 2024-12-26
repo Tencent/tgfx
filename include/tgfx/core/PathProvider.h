@@ -32,7 +32,7 @@ class PathProvider {
   /**
    * This method retrieves a Path object from the PathProvider.
    */
-  virtual Path getPath(float resolutionScale = 1.0f) const = 0;
+  virtual Path getPath(float resolutionScale) const = 0;
 
   /**
    * Returns the bounding box of the path. The bounds might be larger than the actual path because
@@ -47,6 +47,6 @@ class PathProvider {
    * will be zoomed down and small errors may be invisible.
    * @return The bounding box of the path.
    */
-  virtual Rect getBounds(float resolutionScale = 1.0f) const = 0;
+  virtual Rect getBounds(float resolutionScale) const = 0;
 };
 }  // namespace tgfx
