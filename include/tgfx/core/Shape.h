@@ -158,7 +158,7 @@ class Shape {
   virtual Path getPath(float resolutionScale = 1.0f) const;
 
  protected:
-  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke, External };
+  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke, Provider };
 
   /**
    * Returns the type of the Shape.

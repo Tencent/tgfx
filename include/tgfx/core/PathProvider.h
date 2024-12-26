@@ -34,6 +34,21 @@ class PathProvider {
    * Note: This method may be called multiple times. If constructing the Path object is
    * time-consuming, consider caching the Path object after it is created.
    */
-  virtual Path getPath() = 0;
+  virtual Path getPath(float resolutionScale = 1.0f) const = 0;
+
+  /**
+   * Returns the bounding box of the path. The bounds might be larger than the actual path because
+   * the exact bounds can't be determined until the path is computed. Note: Since the path may
+   * contain strokes whose outlines can change with different scale factors, it's
+   * best to pass the final drawing scale factor in the resolutionScale for computing the bounds to
+   * ensure accuracy. However, the resolutionScale is not applied to the returned bounds; it just
+   * affects the precision of the bounds.
+   * @param resolutionScale The intended resolution for the path. The default value is 1.0. Higher
+   * values (res > 1) mean the result should be more precise, as it will be zoomed up and small
+   * errors will be magnified. Lower values (0 < res < 1) mean the result can be less precise, as it
+   * will be zoomed down and small errors may be invisible.
+   * @return The bounding box of the path.
+   */
+  virtual Rect getBounds(float resolutionScale = 1.0f) const = 0;
 };
 }  // namespace tgfx

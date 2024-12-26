@@ -18,31 +18,17 @@
 #include "gpu/ResourceKey.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathProvider.h"
-#include "tgfx/core/Point.h"
-#include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shape.h"
 
 #pragma once
 
 namespace tgfx {
-class ExternalShape : public Shape {
+class ProviderShape final : public Shape {
  public:
-  explicit ExternalShape(std::shared_ptr<PathProvider> pathProvider)
+  explicit ProviderShape(std::shared_ptr<PathProvider> pathProvider)
       : provider(std::move(pathProvider)) {
   }
-
-  bool isLine(Point line[2] = nullptr) const override;
-
-  bool isRect(Rect* rect = nullptr) const override;
-
-  bool isOval(Rect* bounds = nullptr) const override;
-
-  bool isRRect(RRect* rRect = nullptr) const override;
-
-  bool isSimplePath(Path* path = nullptr) const override;
-
-  bool isInverseFillType() const override;
 
   Rect getBounds(float resolutionScale = 1.0f) const override;
 
@@ -50,15 +36,15 @@ class ExternalShape : public Shape {
 
  protected:
   Type type() const override {
-    return Type::External;
+    return Type::Provider;
   }
 
-  UniqueKey getUniqueKey() const override;
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
 
  private:
   std::shared_ptr<PathProvider> provider = nullptr;
-  Path path = {};
-
-  Path getPathInternal() const;
+  LazyUniqueKey uniqueKey = {};
 };
 }  // namespace tgfx

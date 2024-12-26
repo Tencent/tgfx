@@ -23,7 +23,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
-#include "core/shapes/ExternalShape.h"
+#include "core/shapes/ProviderShape.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Texture.h"
 #include "gpu/opengl/GLCaps.h"
@@ -1403,33 +1403,44 @@ TGFX_TEST(CanvasTest, Path_complex) {
 
 TGFX_TEST(CanvasTest, DrawPathProvider) {
   class DrawPathProvider : public PathProvider {
-   public:
+  public:
     explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
     }
 
-    Path getPath() override {
-      if (isPathGenerated) {
-        return path;
-      }
-
+    Path getPath(float /*resolutionScale*/) const override {
       if (points.size() < 2) {
         return {};
       }
 
-      path.reset();
+      Path path = {};
       path.moveTo(points[0]);
       for (size_t i = 1; i < points.size(); ++i) {
         path.lineTo(points[i]);
       }
       path.close();
-      isPathGenerated = true;
       return path;
+    }
+
+    Rect getBounds(float /*resolutionScale*/) const override {
+      if (points.size() < 2) {
+        return Rect::MakeEmpty();
+      }
+
+      float minX = points[0].x;
+      float minY = points[0].y;
+      float maxX = points[0].x;
+      float maxY = points[0].y;
+      for (const auto& point : points) {
+        minX = std::min(minX, point.x);
+        minY = std::min(minY, point.y);
+        maxX = std::max(maxX, point.x);
+        maxY = std::max(maxY, point.y);
+      }
+      return Rect::MakeXYWH(minX, minY, maxX - minX, maxX - minX);
     }
 
    private:
     std::vector<Point> points = {};
-    bool isPathGenerated = false;
-    Path path = {};
   };
 
   ContextScope scope;
@@ -1441,11 +1452,6 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
   Paint paint;
   std::vector<Point> pts1 = {{50, 50}, {150, 50}, {150, 150}, {50, 150}};
   auto shape1 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts1));
-  auto drawPathProvider1 = std::make_shared<DrawPathProvider>(pts1);
-  Path srcPath = drawPathProvider1->getPath();
-  auto externShape1 = std::static_pointer_cast<ExternalShape>(shape1);
-  Path dstPath = externShape1->getPathInternal();
-  EXPECT_TRUE(srcPath == dstPath);
   paint.setColor(Color::Red());
   paint.setStyle(PaintStyle::Stroke);
   canvas->drawShape(shape1, paint);
