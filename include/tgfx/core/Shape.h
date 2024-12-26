@@ -47,8 +47,7 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
   /**
-   * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr or
-   * if PathProvider::getPath() returns an empty path.
+   * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<PathProvider> pathProvider);
 
