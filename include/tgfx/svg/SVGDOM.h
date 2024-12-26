@@ -32,10 +32,30 @@ class SVGNode;
 using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
 
 /**
+ * The SVGDOM class represents an SVG Document Object Model (DOM). It provides functionality to 
+ * traverse the SVG DOM tree and render the SVG.
  * 
+ * Usage:
+ * 
+ * 1. Traversing the SVG DOM tree:
+ *    - Use getRoot() to obtain the root node. From the root node, you can access its attributes 
+ *      and child nodes, and then visit the child nodes.
+ *
+ * 2. Rendering the SVG:
+ *    - The simplest way to render is by calling render(canvas,nullptr). If you need to render text
+ *      with specific fonts or set the size of the SVG, you can use the following methods:
+ *    - If text rendering is required, use collectRenderFonts() to gather the necessary typefaces. 
+ *      Traverse the typefaces collected by the fontManager and set the typeface objects.
+ *    - Render the SVG using the render() method. If text rendering is needed, pass in the 
+ *      fontManager object. Otherwise, you can pass in nullptr.
+ *    - To set the size of the SVG, use setContainerSize(). If not set, the size of the root SVG
+ *      node will be used.
  */
 class SVGDOM {
  public:
+  /**
+   * Creates an SVGDOM object from the provided data.
+   */
   static std::shared_ptr<SVGDOM> Make(const std::shared_ptr<Data>&);
 
   /**
@@ -43,13 +63,17 @@ class SVGDOM {
    */
   const std::shared_ptr<SVGSVG>& getRoot() const;
 
+  /**
+   * Collects the font families and styles used for rendering and saves them in the font manager.
+   */
   void collectRenderFonts(const std::shared_ptr<SVGFontManager>&);
 
   /**
    * Renders the SVG to the provided canvas.
    * @param canvas The canvas to render to.
    * @param fontManager The font manager for rendering SVG text. If no text rendering is needed, 
-   * this can be nullptr, and text will not be rendered.
+   * this can be nullptr, and text will not be rendered. If no specific font is set, the default 
+   * font will be used for rendering.
    */
   void render(Canvas* canvas, const std::shared_ptr<SVGFontManager>& fontManager = nullptr);
 
@@ -58,6 +82,9 @@ class SVGDOM {
    */
   void setContainerSize(const Size&);
 
+  /**
+   * Returns the size of the container that the SVG will be rendered into.
+   */
   const Size& getContainerSize() const;
 
  private:

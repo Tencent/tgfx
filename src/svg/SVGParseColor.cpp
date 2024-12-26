@@ -18,7 +18,7 @@
 
 #include <cstdint>
 #include <string>
-#include "svg/SVGParse.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/core/Color.h"
 
 namespace {

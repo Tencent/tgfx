@@ -25,7 +25,7 @@
 #include <utility>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "svg/SVGParse.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
@@ -290,7 +290,7 @@ bool SVGAttributeParser::parseHexColorToken(Color* c) {
       return false;
   }
 
-  *c = SVGParse::Uint32ToColor(v | 0xff000000);
+  *c = Uint32ToColor(v | 0xff000000);
   currentPos = hexEnd;
 
   restoreCurPos.clear();

@@ -25,22 +25,32 @@ SVGFontManager::SVGFontManager(const std::shared_ptr<Typeface>& defaultTypeface)
 }
 
 std::shared_ptr<SVGFontManager> SVGFontManager::Make(const std::shared_ptr<Typeface>& typeface) {
+  if (!typeface) {
+    return nullptr;
+  }
   return std::shared_ptr<SVGFontManager>(new SVGFontManager(typeface));
 }
 
-void SVGFontManager::addFontStyle(const std::string& fontFamily, SVGFontInfo style) {
+void SVGFontManager::addFontStyle(const std::string& fontFamily, SVGFontInfo info) {
   if (typefaceMap.find(fontFamily) != typefaceMap.end()) {
     return;
   }
-  if (typefaceMap[fontFamily].find(style) != typefaceMap[fontFamily].end()) {
+  if (typefaceMap[fontFamily].find(info) != typefaceMap[fontFamily].end()) {
     return;
   }
-  typefaceMap[fontFamily][style] = nullptr;
+  typefaceMap[fontFamily][info] = nullptr;
 }
 
-void SVGFontManager::setTypeface(const std::string& fontFamily, SVGFontInfo style,
+bool SVGFontManager::setTypeface(const std::string& fontFamily, SVGFontInfo info,
                                  const std::shared_ptr<Typeface>& typeface) {
-  typefaceMap[fontFamily][style] = typeface;
+  if (typefaceMap.find(fontFamily) != typefaceMap.end()) {
+    return false;
+  }
+  if (typefaceMap[fontFamily].find(info) != typefaceMap[fontFamily].end()) {
+    return false;
+  }
+  typefaceMap[fontFamily][info] = typeface;
+  return true;
 }
 
 std::vector<std::string> SVGFontManager::getFontFamilies() const {
@@ -66,12 +76,12 @@ std::vector<SVGFontInfo> SVGFontManager::getFontInfos(const std::string& fontFam
 }
 
 std::shared_ptr<Typeface> SVGFontManager::getTypefaceForRendering(const std::string& fontFamily,
-                                                                  SVGFontInfo style) const {
+                                                                  SVGFontInfo info) const {
   auto familyIter = typefaceMap.find(fontFamily);
   if (familyIter == typefaceMap.end()) {
     return defaultTypeface;
   }
-  auto styleIter = familyIter->second.find(style);
+  auto styleIter = familyIter->second.find(info);
   if (styleIter == familyIter->second.end()) {
     return defaultTypeface;
   } else {

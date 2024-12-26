@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
@@ -46,47 +47,6 @@ bool SVGImage::onPrepareToRender(SVGRenderContext* context) const {
          INHERITED::onPrepareToRender(context);
 }
 
-std::vector<unsigned char> base64_decode(const std::string& encoded_string) {
-  static constexpr unsigned char kDecodingTable[] = {
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62,
-      64, 64, 64, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64, 64, 64, 64, 64, 64, 64, 0,
-      1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-      23, 24, 25, 64, 64, 64, 64, 64, 64, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
-      39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 64, 64, 64, 64, 64};
-
-  size_t in_len = encoded_string.size();
-  if (in_len % 4 != 0) throw std::runtime_error("Invalid base64 length");
-
-  size_t out_len = in_len / 4 * 3;
-  if (encoded_string[in_len - 1] == '=') out_len--;
-  if (encoded_string[in_len - 2] == '=') out_len--;
-
-  std::vector<unsigned char> out(out_len);
-  for (size_t i = 0, j = 0; i < in_len;) {
-    uint32_t a = encoded_string[i] == '='
-                     ? 0 & i++
-                     : kDecodingTable[static_cast<unsigned char>(encoded_string[i++])];
-    uint32_t b = encoded_string[i] == '='
-                     ? 0 & i++
-                     : kDecodingTable[static_cast<unsigned char>(encoded_string[i++])];
-    uint32_t c = encoded_string[i] == '='
-                     ? 0 & i++
-                     : kDecodingTable[static_cast<unsigned char>(encoded_string[i++])];
-    uint32_t d = encoded_string[i] == '='
-                     ? 0 & i++
-                     : kDecodingTable[static_cast<unsigned char>(encoded_string[i++])];
-
-    uint32_t triple = (a << 18) + (b << 12) + (c << 6) + d;
-
-    if (j < out_len) out[j++] = (triple >> 16) & 0xFF;
-    if (j < out_len) out[j++] = (triple >> 8) & 0xFF;
-    if (j < out_len) out[j++] = triple & 0xFF;
-  }
-
-  return out;
-}
-
 std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
   const auto& base64URL = href.iri();
   auto pos = base64URL.find("base64,");
@@ -94,10 +54,8 @@ std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
     return nullptr;
   }
   std::string base64Data = base64URL.substr(pos + 7);
-  std::vector<unsigned char> imageData = base64_decode(base64Data);
-  auto data = Data::MakeWithCopy(imageData.data(), imageData.size());
-
-  return Image::MakeFromEncoded(data);
+  auto data = Base64Decode(base64Data);
+  return data ? Image::MakeFromEncoded(data) : nullptr;
 }
 
 SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
