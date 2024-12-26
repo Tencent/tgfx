@@ -19,16 +19,17 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-
-LayerStyle::LayerStyle(BlendMode blendMode) : _blendMode(blendMode) {
-}
-
 void LayerStyle::setBlendMode(BlendMode blendMode) {
   if (_blendMode == blendMode) {
     return;
   }
   _blendMode = blendMode;
   invalidate();
+}
+
+void LayerStyle::draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                      float alpha) {
+  onDraw(canvas, std::move(content), contentScale, alpha, _blendMode);
 }
 
 }  // namespace tgfx

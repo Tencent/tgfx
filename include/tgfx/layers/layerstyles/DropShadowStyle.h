@@ -22,17 +22,16 @@
 
 namespace tgfx {
 /**
- * DropShadowStyle adds a shadow that falls behind the layer.
+ * DropShadowStyle adds a shadow below the layer.
  */
 class DropShadowStyle : public LayerStyle {
  public:
   /**
-   * Create a layerStyle that draws a drop shadow.
+   * Create a layerStyle that adds a shadow below the layer.
    */
   static std::shared_ptr<DropShadowStyle> Make(float offsetX, float offsetY, float blurrinessX,
                                                float blurrinessY, const Color& color,
-                                               bool showBehindTransparent,
-                                               BlendMode blendMode = BlendMode::SrcOver);
+                                               bool showBehindLayer = true);
 
   /**
    * The x offset of the shadow.
@@ -43,7 +42,6 @@ class DropShadowStyle : public LayerStyle {
 
   /**
    * Set x offset of the shadow.
-   * @param offsetX
    */
   void setOffsetX(float offsetX);
 
@@ -56,7 +54,6 @@ class DropShadowStyle : public LayerStyle {
 
   /**
    * Set y offset of the shadow.
-   * @param offsetY
    */
   void setOffsetY(float offsetY);
 
@@ -82,7 +79,6 @@ class DropShadowStyle : public LayerStyle {
 
   /**
    * Set blur radius for the shadow, along the Y axis.
-   * @param blurrinessY
    */
   void setBlurrinessY(float blurrinessY);
 
@@ -95,35 +91,33 @@ class DropShadowStyle : public LayerStyle {
 
   /**
    * Set the color of the shadow.
-   * @param color
    */
   void setColor(const Color& color);
 
   /**
-   * Whether the shadow should be shown behind transparent pixels.
+   * Whether the shadow behind the layer content should be visible. The default value is true.
    */
-  bool showBehindTransparent() const {
-    return _showBehindTransparent;
+  bool showBehindLayer() const {
+    return _showBehindLayer;
   }
 
   /**
-   * Set whether the shadow should be shown behind transparent pixels.
-   * @param showBehindTransparent
+   * Set whether the shadow behind the layer content should be visible.
    */
-  void setShowBehindTransparent(bool showBehindTransparent);
+  void setShowBehindLayer(bool showBehindLayer);
 
-  void apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-             float alpha) override;
+  LayerStylePosition position() const override {
+    return LayerStylePosition::Below;
+  }
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
-  LayerStylePosition position() const override {
-    return LayerStylePosition::Blow;
-  }
-
  private:
   DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
-                  const Color& color, bool showBehindTransparent, BlendMode blendMode);
+                  const Color& color, bool showBehindTransparent);
+
+  void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
+              BlendMode blendMode) override;
 
   void invalidateFilter();
 
@@ -134,7 +128,7 @@ class DropShadowStyle : public LayerStyle {
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
-  bool _showBehindTransparent = false;
+  bool _showBehindLayer = true;
 
   float currentScale = 1.0f;
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;

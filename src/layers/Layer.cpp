@@ -586,10 +586,10 @@ std::shared_ptr<Picture> Layer::applyLayerStyles(std::shared_ptr<Picture> source
   canvas->save();
   canvas->translate(offset.x, offset.y);
   for (const auto& layerStyle : _layerStyles) {
-    if (layerStyle->position() != LayerStylePosition::Blow) {
+    if (layerStyle->position() != LayerStylePosition::Below) {
       continue;
     }
-    layerStyle->apply(canvas, image, contentScale, alpha);
+    layerStyle->draw(canvas, image, contentScale, alpha);
   }
   canvas->restore();
   canvas->drawPicture(source);
@@ -598,7 +598,7 @@ std::shared_ptr<Picture> Layer::applyLayerStyles(std::shared_ptr<Picture> source
     if (layerStyle->position() != LayerStylePosition::Above) {
       continue;
     }
-    layerStyle->apply(canvas, image, contentScale, alpha);
+    layerStyle->draw(canvas, image, contentScale, alpha);
   }
   canvas->restore();
   return recorder.finishRecordingAsPicture();

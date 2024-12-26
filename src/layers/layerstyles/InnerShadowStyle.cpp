@@ -22,10 +22,10 @@ namespace tgfx {
 
 std::shared_ptr<InnerShadowStyle> InnerShadowStyle::Make(float offsetX, float offsetY,
                                                          float blurrinessX, float blurrinessY,
-                                                         const Color& color, BlendMode blendMode) {
+                                                         const Color& color) {
 
   return std::shared_ptr<InnerShadowStyle>(
-      new InnerShadowStyle(offsetX, offsetY, blurrinessX, blurrinessY, color, blendMode));
+      new InnerShadowStyle(offsetX, offsetY, blurrinessX, blurrinessY, color));
 }
 
 void InnerShadowStyle::setOffsetX(float offsetX) {
@@ -69,13 +69,21 @@ void InnerShadowStyle::setColor(const Color& color) {
 }
 
 InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrinessX,
-                                   float blurrinessY, const Color& color, BlendMode blendMode)
-    : LayerStyle(blendMode), _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX),
-      _blurrinessY(blurrinessY), _color(color) {
+                                   float blurrinessY, const Color& color)
+    : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
+      _color(color) {
 }
 
-void InnerShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             float alpha) {
+Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
+  auto filter = getShadowFilter(contentScale);
+  if (!filter) {
+    return srcRect;
+  }
+  return filter->filterBounds(srcRect);
+}
+
+void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                              float alpha, BlendMode blendMode) {
   // create opaque image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
@@ -86,17 +94,9 @@ void InnerShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, flo
   }
   Paint paint = {};
   paint.setImageFilter(filter);
-  paint.setBlendMode(_blendMode);
+  paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
   canvas->drawImage(opaqueImage, &paint);
-}
-
-Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
-  auto filter = getShadowFilter(contentScale);
-  if (!filter) {
-    return srcRect;
-  }
-  return filter->filterBounds(srcRect);
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {

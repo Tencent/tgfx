@@ -219,7 +219,25 @@ class Layer {
   void setAllowsGroupOpacity(bool value);
 
   /**
-   * Returns the list of filters applied to the layer.
+   * Returns the list of layer styles applied to the layer. Unlike layer filters, layer styles do
+   * not create a new offscreen image to replace the original layer content. Instead, they add
+   * visual elements either below or above the layer content, blending directly with the existing
+   * content on the canvas. Each layer style uses the same layer content as input and draws on the
+   * canvas.
+   */
+  const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
+    return _layerStyles;
+  }
+
+  /**
+   * Sets the list of layer styles applied to the layer.
+   */
+  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
+
+  /**
+   * Returns the list of filters applied to the layer. Layer filters create new offscreen images
+   * to replace the original layer content. Each filter takes the output of the previous filter as
+   * input, and the final output is drawn on the canvas.
    */
   const std::vector<std::shared_ptr<LayerFilter>>& filters() const {
     return _filters;
@@ -268,18 +286,6 @@ class Layer {
    * changes to it after calling this function have no effect.
    */
   void setScrollRect(const Rect& rect);
-
-  /**
-   * Returns the layer styles that defines the appearance of the layer.
-   */
-  const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
-    return _layerStyles;
-  }
-
-  /**
-   * Sets the layer styles that defines the appearance of the layer.
-   */
-  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
   /**
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer

@@ -23,10 +23,9 @@ namespace tgfx {
 std::shared_ptr<class DropShadowStyle> DropShadowStyle::Make(float offsetX, float offsetY,
                                                              float blurrinessX, float blurrinessY,
                                                              const Color& color,
-                                                             bool showBehindTransparent,
-                                                             BlendMode blendMode) {
-  return std::shared_ptr<DropShadowStyle>(new DropShadowStyle(
-      offsetX, offsetY, blurrinessX, blurrinessY, color, showBehindTransparent, blendMode));
+                                                             bool showBehindLayer) {
+  return std::shared_ptr<DropShadowStyle>(
+      new DropShadowStyle(offsetX, offsetY, blurrinessX, blurrinessY, color, showBehindLayer));
 }
 
 void DropShadowStyle::setOffsetX(float offsetX) {
@@ -69,23 +68,30 @@ void DropShadowStyle::setColor(const Color& color) {
   invalidateFilter();
 }
 
-void DropShadowStyle::setShowBehindTransparent(bool showBehindTransparent) {
-  if (_showBehindTransparent == showBehindTransparent) {
+void DropShadowStyle::setShowBehindLayer(bool showBehindLayer) {
+  if (_showBehindLayer == showBehindLayer) {
     return;
   }
-  _showBehindTransparent = showBehindTransparent;
+  _showBehindLayer = showBehindLayer;
   invalidate();
 }
 
 DropShadowStyle::DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
-                                 const Color& color, bool showBehindTransparent,
-                                 BlendMode blendMode)
-    : LayerStyle(blendMode), _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX),
-      _blurrinessY(blurrinessY), _color(color), _showBehindTransparent(showBehindTransparent) {
+                                 const Color& color, bool showBehindLayer)
+    : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
+      _color(color), _showBehindLayer(showBehindLayer) {
 }
 
-void DropShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            float alpha) {
+Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
+  auto filter = getShadowFilter(contentScale);
+  if (!filter) {
+    return srcRect;
+  }
+  return filter->filterBounds(srcRect);
+}
+
+void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                             float alpha, BlendMode blendMode) {
   // create opaque image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
@@ -98,22 +104,14 @@ void DropShadowStyle::apply(Canvas* canvas, std::shared_ptr<Image> content, floa
   }
   auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
   Paint paint = {};
-  if (!_showBehindTransparent) {
+  if (!_showBehindLayer) {
     auto shader = Shader::MakeImageShader(opaqueImage, TileMode::Decal, TileMode::Decal);
     auto matrixShader = shader->makeWithMatrix(Matrix::MakeTrans(-offset.x, -offset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
-  paint.setBlendMode(_blendMode);
+  paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
   canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
-}
-
-Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
-  auto filter = getShadowFilter(contentScale);
-  if (!filter) {
-    return srcRect;
-  }
-  return filter->filterBounds(srcRect);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
