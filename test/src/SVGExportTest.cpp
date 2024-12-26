@@ -592,7 +592,7 @@ TGFX_TEST(SVGExportTest, PictureImageMask) {
     }
     auto picture = recorder.finishRecordingAsPicture();
     ASSERT_TRUE(picture != nullptr);
-    auto image = tgfx::Image::MakeFrom(picture, 200, 200);
+    auto image = tgfx::Image::MakeFrom(picture, 125, 125);
     ASSERT_TRUE(image != nullptr);
 
     Paint paint;

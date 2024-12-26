@@ -621,7 +621,11 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
                                      Resources* resources, Context* context,
                                      SVGExportingContext* svgContext) {
 
-  auto maskShaderFilter = std::static_pointer_cast<ShaderMaskFilter>(maskFilter);
+  auto maskShaderFilter = MaskFilterCaster::AsShaderMaskFilter(maskFilter);
+  if (!maskShaderFilter) {
+    return;
+  }
+
   bool inverse = maskShaderFilter->isInverted();
   std::string filterID;
   if (inverse) {
@@ -688,11 +692,30 @@ void ElementWriter::addPictureImageMaskResources(
     const std::shared_ptr<const PictureImage>& pictureImage, const std::string& filterID,
     SVGExportingContext* svgContext) {
   auto picture = pictureImage->picture;
+  auto pictureBound = picture->getBounds(pictureImage->matrix);
+  auto imageBound = Rect::MakeWH(pictureImage->width(), pictureImage->height());
+  std::string clipID;
+  if (!imageBound.contains(pictureBound)) {
+    clipID = resourceStore->addClip();
+    writer->startElement("clipPath");
+    writer->addAttribute("id", clipID);
+    {
+      writer->startElement("rect");
+      addRectAttributes(imageBound);
+      writer->endElement();
+    }
+    writer->endElement();
+  }
+
   MCState state;
   if (pictureImage->matrix) {
     state.matrix = *pictureImage->matrix;
   }
+
   writer->startElement("g");
+  if (!clipID.empty()) {
+    writer->addAttribute("clip-path", "url(#" + clipID + ")");
+  }
   if (!filterID.empty()) {
     writer->addAttribute("filter", filterID);
   }

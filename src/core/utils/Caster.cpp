@@ -90,4 +90,12 @@ std::shared_ptr<const PictureImage> ImageCaster::AsPictureImage(
   return nullptr;
 }
 
+std::shared_ptr<const ShaderMaskFilter> MaskFilterCaster::AsShaderMaskFilter(
+    const std::shared_ptr<MaskFilter>& maskFilter) {
+  if (maskFilter->type() == MaskFilter::Type::Shader) {
+    return std::static_pointer_cast<const ShaderMaskFilter>(maskFilter);
+  }
+  return nullptr;
+}
+
 }  // namespace tgfx

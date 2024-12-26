@@ -382,9 +382,8 @@ Bitmap SVGExportingContext::ImageExportToBitmap(Context* context,
   canvas->drawImage(image);
 
   Bitmap bitmap(image->width(), image->height(), false, false);
-  auto* pixels = bitmap.lockPixels();
-  if (surface->readPixels(bitmap.info(), pixels)) {
-    bitmap.unlockPixels();
+  Pixmap pixmap(bitmap);
+  if (surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
     return bitmap;
   }
   return Bitmap();

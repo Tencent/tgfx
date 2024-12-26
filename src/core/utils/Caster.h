@@ -22,10 +22,12 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
+#include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
+#include "tgfx/core/MaskFilter.h"
 
 #pragma once
 
@@ -65,6 +67,12 @@ class ColorFilterCaster {
 class ImageCaster {
  public:
   static std::shared_ptr<const PictureImage> AsPictureImage(const std::shared_ptr<Image>& image);
+};
+
+class MaskFilterCaster {
+ public:
+  static std::shared_ptr<const ShaderMaskFilter> AsShaderMaskFilter(
+      const std::shared_ptr<MaskFilter>& maskFilter);
 };
 
 }  // namespace tgfx
