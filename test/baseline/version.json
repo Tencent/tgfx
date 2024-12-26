@@ -88,6 +88,9 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
+        "DropShadowStyle": "19dcc4d",
+        "DropShadowStyle2": "19dcc4d",
+        "InnerShadowStyle": "19dcc4d",
         "Layer_hitTestPoint": "50c58e6",
         "Layer_hitTestPointNested": "b062b9a",
         "ModeColorFilter": "43cd416",
@@ -106,8 +109,6 @@
         "imageLayer": "99a5cd9",
         "imageMask": "af2e3ff",
         "innerShadow": "01cce38",
-        "layerShadowFilter": "9000907",
-        "layerShadowFilter1": "9000907",
         "shapeMask": "612c09e",
         "textMask": "9000907"
     },
