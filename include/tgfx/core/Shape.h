@@ -19,9 +19,9 @@
 #pragma once
 
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathProvider.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
 class UniqueKey;
