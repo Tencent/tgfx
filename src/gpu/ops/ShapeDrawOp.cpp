@@ -89,10 +89,8 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     Path path = {};
     path.addRect(maskRect);
     if (aa == AAType::Coverage) {
-      maskVertices.reserve(90);
       PathTriangulator::ToAATriangles(path, maskRect, &maskVertices);
     } else {
-      maskVertices.reserve(12);
       PathTriangulator::ToTriangles(path, maskRect, &maskVertices);
     }
     vertexData = Data::MakeWithoutCopy(maskVertices.data(), maskVertices.size() * sizeof(float));

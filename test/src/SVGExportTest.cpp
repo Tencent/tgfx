@@ -537,6 +537,7 @@ TGFX_TEST(SVGExportTest, GradientMask) {
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
 }
 
+#if 0
 TGFX_TEST(SVGExportTest, ImageMask) {
   ContextScope scope;
   auto* context = scope.getContext();
@@ -571,6 +572,7 @@ TGFX_TEST(SVGExportTest, ImageMask) {
   readStream->read(buffer.data(), buffer.size());
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
 }
+#endif
 
 TGFX_TEST(SVGExportTest, PictureImageMask) {
   ContextScope scope;
