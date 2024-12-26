@@ -35,44 +35,37 @@ namespace tgfx {
 
 class ShaderCaster {
  public:
-  static std::shared_ptr<const ColorShader> AsColorShader(const std::shared_ptr<Shader>& shader);
+  static const ColorShader* AsColorShader(const Shader* shader);
 
-  static std::shared_ptr<const ImageShader> AsImageShader(const std::shared_ptr<Shader>& shader);
+  static const ImageShader* AsImageShader(const Shader* shader);
 
-  static std::shared_ptr<const GradientShader> AsGradientShader(
-      const std::shared_ptr<Shader>& shader);
+  static const GradientShader* AsGradientShader(const Shader* shader);
 };
 
 class ImageFilterCaster {
  public:
-  static std::shared_ptr<const BlurImageFilter> AsBlurImageFilter(
-      const std::shared_ptr<ImageFilter>& imageFilter);
+  static const BlurImageFilter* AsBlurImageFilter(const ImageFilter* imageFilter);
 
-  static std::shared_ptr<const DropShadowImageFilter> AsDropShadowImageFilter(
-      const std::shared_ptr<ImageFilter>& imageFilter);
+  static const DropShadowImageFilter* AsDropShadowImageFilter(const ImageFilter* imageFilter);
 
-  static std::shared_ptr<const InnerShadowImageFilter> AsInnerShadowImageFilter(
-      const std::shared_ptr<ImageFilter>& imageFilter);
+  static const InnerShadowImageFilter* AsInnerShadowImageFilter(const ImageFilter* imageFilter);
 };
 
 class ColorFilterCaster {
  public:
-  static std::shared_ptr<const ModeColorFilter> AsModeColorFilter(
-      const std::shared_ptr<ColorFilter>& colorFilter);
+  static const ModeColorFilter* AsModeColorFilter(const ColorFilter* colorFilter);
 
-  static std::shared_ptr<const MatrixColorFilter> AsMatrixColorFilter(
-      const std::shared_ptr<ColorFilter>& colorFilter);
+  static const MatrixColorFilter* AsMatrixColorFilter(const ColorFilter* colorFilter);
 };
 
 class ImageCaster {
  public:
-  static std::shared_ptr<const PictureImage> AsPictureImage(const std::shared_ptr<Image>& image);
+  static const PictureImage* AsPictureImage(const Image* image);
 };
 
 class MaskFilterCaster {
  public:
-  static std::shared_ptr<const ShaderMaskFilter> AsShaderMaskFilter(
-      const std::shared_ptr<MaskFilter>& maskFilter);
+  static const ShaderMaskFilter* AsShaderMaskFilter(const MaskFilter* maskFilter);
 };
 
 }  // namespace tgfx

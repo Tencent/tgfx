@@ -317,7 +317,7 @@ bool SVGExportingContext::RequiresViewportReset(const FillStyle& fill) {
     return false;
   }
 
-  if (auto imageShader = ShaderCaster::AsImageShader(shader)) {
+  if (const auto* imageShader = ShaderCaster::AsImageShader(shader.get())) {
     return imageShader->tileModeX == TileMode::Repeat || imageShader->tileModeY == TileMode::Repeat;
   }
   return false;

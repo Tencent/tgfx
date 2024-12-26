@@ -17,83 +17,76 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Caster.h"
+#include "core/shaders/ColorShader.h"
 
 namespace tgfx {
-std::shared_ptr<const ColorShader> ShaderCaster::AsColorShader(
-    const std::shared_ptr<Shader>& shader) {
+const ColorShader* ShaderCaster::AsColorShader(const Shader* shader) {
   if (shader->type() == Shader::Type::Color) {
-    return std::static_pointer_cast<const ColorShader>(shader);
+    return static_cast<const ColorShader*>(shader);
   }
   return nullptr;
 }
 
-std::shared_ptr<const ImageShader> ShaderCaster::AsImageShader(
-    const std::shared_ptr<Shader>& shader) {
+const ImageShader* ShaderCaster::AsImageShader(const Shader* shader) {
   if (shader->type() == Shader::Type::Image) {
-    return std::static_pointer_cast<const ImageShader>(shader);
+    return static_cast<const ImageShader*>(shader);
   }
   return nullptr;
 }
 
-std::shared_ptr<const GradientShader> ShaderCaster::AsGradientShader(
-    const std::shared_ptr<Shader>& shader) {
+const GradientShader* ShaderCaster::AsGradientShader(const Shader* shader) {
   if (shader->type() == Shader::Type::Gradient) {
-    return std::static_pointer_cast<const GradientShader>(shader);
+    return static_cast<const GradientShader*>(shader);
   }
   return nullptr;
 }
 
-std::shared_ptr<const BlurImageFilter> ImageFilterCaster::AsBlurImageFilter(
-    const std::shared_ptr<ImageFilter>& imageFilter) {
+const BlurImageFilter* ImageFilterCaster::AsBlurImageFilter(const ImageFilter* imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::Blur) {
-    return std::static_pointer_cast<const BlurImageFilter>(imageFilter);
+    return static_cast<const BlurImageFilter*>(imageFilter);
   }
   return nullptr;
 }
-std::shared_ptr<const DropShadowImageFilter> ImageFilterCaster::AsDropShadowImageFilter(
-    const std::shared_ptr<ImageFilter>& imageFilter) {
+const DropShadowImageFilter* ImageFilterCaster::AsDropShadowImageFilter(
+    const ImageFilter* imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::DropShadow) {
-    return std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
+    return static_cast<const DropShadowImageFilter*>(imageFilter);
   }
   return nullptr;
 }
 
-std::shared_ptr<const InnerShadowImageFilter> ImageFilterCaster::AsInnerShadowImageFilter(
-    const std::shared_ptr<ImageFilter>& imageFilter) {
+const InnerShadowImageFilter* ImageFilterCaster::AsInnerShadowImageFilter(
+    const ImageFilter* imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::InnerShadow) {
-    return std::static_pointer_cast<const InnerShadowImageFilter>(imageFilter);
+    return static_cast<const InnerShadowImageFilter*>(imageFilter);
   }
   return nullptr;
 }
 
-std::shared_ptr<const ModeColorFilter> ColorFilterCaster::AsModeColorFilter(
-    const std::shared_ptr<ColorFilter>& colorFilter) {
+const ModeColorFilter* ColorFilterCaster::AsModeColorFilter(const ColorFilter* colorFilter) {
   if (colorFilter->type() == ColorFilter::Type::Blend) {
-    return std::static_pointer_cast<const ModeColorFilter>(colorFilter);
+    return static_cast<const ModeColorFilter*>(colorFilter);
   }
   return nullptr;
 }
 
-std::shared_ptr<const MatrixColorFilter> ColorFilterCaster::AsMatrixColorFilter(
-    const std::shared_ptr<ColorFilter>& colorFilter) {
+const MatrixColorFilter* ColorFilterCaster::AsMatrixColorFilter(const ColorFilter* colorFilter) {
   if (colorFilter->type() == ColorFilter::Type::Matrix) {
-    return std::static_pointer_cast<const MatrixColorFilter>(colorFilter);
+    return static_cast<const MatrixColorFilter*>(colorFilter);
   }
   return nullptr;
 }
 
-std::shared_ptr<const PictureImage> ImageCaster::AsPictureImage(
-    const std::shared_ptr<Image>& image) {
+const PictureImage* ImageCaster::AsPictureImage(const Image* image) {
   if (image->type() == Image::Type::Picture) {
-    return std::static_pointer_cast<const PictureImage>(image);
+    return static_cast<const PictureImage*>(image);
   }
   return nullptr;
 }
 
-std::shared_ptr<const ShaderMaskFilter> MaskFilterCaster::AsShaderMaskFilter(
-    const std::shared_ptr<MaskFilter>& maskFilter) {
+const ShaderMaskFilter* MaskFilterCaster::AsShaderMaskFilter(const MaskFilter* maskFilter) {
   if (maskFilter->type() == MaskFilter::Type::Shader) {
-    return std::static_pointer_cast<const ShaderMaskFilter>(maskFilter);
+    return static_cast<const ShaderMaskFilter*>(maskFilter);
   }
   return nullptr;
 }
