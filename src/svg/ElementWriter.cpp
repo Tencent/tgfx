@@ -21,7 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_set>
-#include "SVGExportingContext.h"
+#include "SVGExportContext.h"
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
 #include "core/codecs/jpeg/JpegCodec.h"
@@ -60,9 +60,9 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
 }
 
 ElementWriter::ElementWriter(const std::string& name, Context* context,
-                             SVGExportingContext* svgContext, XMLWriter* writer,
-                             ResourceStore* bucket, bool disableWarning, const MCState& state,
-                             const FillStyle& fill, const Stroke* stroke)
+                             SVGExportContext* svgContext, XMLWriter* writer, ResourceStore* bucket,
+                             bool disableWarning, const MCState& state, const FillStyle& fill,
+                             const Stroke* stroke)
     : writer(writer), resourceStore(bucket), disableWarning(disableWarning) {
   Resources resource = addResources(fill, context, svgContext);
 
@@ -360,7 +360,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
 }
 
 Resources ElementWriter::addResources(const FillStyle& fill, Context* context,
-                                      SVGExportingContext* svgContext) {
+                                      SVGExportContext* svgContext) {
   Resources resources(fill);
 
   if (auto shader = fill.shader) {
@@ -629,7 +629,7 @@ void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter* matri
 
 void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter,
                                      Resources* resources, Context* context,
-                                     SVGExportingContext* svgContext) {
+                                     SVGExportContext* svgContext) {
 
   const auto* maskShaderFilter = MaskFilterCaster::AsShaderMaskFilter(maskFilter.get());
   if (!maskShaderFilter) {
@@ -689,7 +689,7 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
 
 void ElementWriter::addImageMaskResources(const ImageShader* imageShader,
                                           const std::string& filterID, Context* context,
-                                          SVGExportingContext* svgContext) {
+                                          SVGExportContext* svgContext) {
   auto image = imageShader->image;
   if (const auto* pictureImage = ImageCaster::AsPictureImage(image.get())) {
     addPictureImageMaskResources(pictureImage, filterID, svgContext);
@@ -700,7 +700,7 @@ void ElementWriter::addImageMaskResources(const ImageShader* imageShader,
 
 void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImage,
                                                  const std::string& filterID,
-                                                 SVGExportingContext* svgContext) {
+                                                 SVGExportContext* svgContext) {
   auto picture = pictureImage->picture;
   auto pictureBound = picture->getBounds(pictureImage->matrix);
   auto imageBound = Rect::MakeWH(pictureImage->width(), pictureImage->height());

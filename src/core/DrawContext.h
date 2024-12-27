@@ -80,8 +80,8 @@ class DrawContext {
   /**
    * Draws a GlyphRunList with the specified MCState, FillStyle, and optional Stroke.
    */
-  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                                const FillStyle& style, const Stroke* stroke) = 0;
+  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
+                                const MCState& state, const FillStyle& style) = 0;
 
   /**
    * Draws a Picture with the specified MCState.
@@ -93,7 +93,7 @@ class DrawContext {
    * filter (if not nullptr), which generates a new image. This new image is finally drawn using the
    * specified FillStyle.
    */
-  virtual void drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
-                         const FillStyle& style, std::shared_ptr<ImageFilter> filter) = 0;
+  virtual void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                         const MCState& state, const FillStyle& style) = 0;
 };
 }  // namespace tgfx

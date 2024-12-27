@@ -50,13 +50,13 @@ class RenderContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state,
                      const FillStyle& style) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const FillStyle& style, const Stroke* stroke) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
+                        const MCState& state, const FillStyle& style) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
-                 std::shared_ptr<ImageFilter> filter) override;
+  void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                 const MCState& state, const FillStyle& style) override;
 
  private:
   OpContext* opContext = nullptr;
@@ -74,7 +74,7 @@ class RenderContext : public DrawContext {
                                                  const Matrix& viewMatrix, AAType aaType,
                                                  Rect* scissorRect);
   Rect getClipBounds(const Path& clip);
-  Rect clipLocalBounds(const Rect& localBounds, const MCState& state, bool inverted = false);
+  Rect clipLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded = false);
   bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
