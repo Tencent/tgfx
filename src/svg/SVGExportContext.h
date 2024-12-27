@@ -43,11 +43,11 @@ namespace tgfx {
 class ResourceStore;
 class ElementWriter;
 
-class SVGExportingContext : public DrawContext {
+class SVGExportContext : public DrawContext {
  public:
-  SVGExportingContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
-                      uint32_t exportFlags);
-  ~SVGExportingContext() override = default;
+  SVGExportContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
+                   uint32_t exportFlags);
+  ~SVGExportContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
     canvas = inputCanvas;
@@ -68,13 +68,13 @@ class SVGExportingContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state,
                      const FillStyle& style) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList>, const MCState&, const FillStyle&,
-                        const Stroke*) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
+                        const MCState& state, const FillStyle& style) override;
 
   void drawPicture(std::shared_ptr<Picture>, const MCState&) override;
 
-  void drawLayer(std::shared_ptr<Picture>, const MCState&, const FillStyle&,
-                 std::shared_ptr<ImageFilter>) override;
+  void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                 const MCState& state, const FillStyle& style) override;
 
   XMLWriter* getWriter() const {
     return writer.get();

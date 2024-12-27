@@ -25,7 +25,8 @@
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
-Picture::Picture(std::vector<Record*> records) : records(std::move(records)) {
+Picture::Picture(std::vector<Record*> records, bool hasUnboundedFill)
+    : records(std::move(records)), _hasUnboundedFill(hasUnboundedFill) {
 }
 
 Picture::~Picture() {
