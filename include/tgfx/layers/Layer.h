@@ -21,11 +21,11 @@
 #include <memory>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerContent.h"
 #include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
@@ -219,7 +219,26 @@ class Layer {
   void setAllowsGroupOpacity(bool value);
 
   /**
-   * Returns the list of filters applied to the layer.
+   * Returns the list of layer styles applied to the layer. Unlike layer filters, layer styles do
+   * not create a new offscreen image to replace the original layer content. Instead, they add
+   * visual elements either below or above the layer content, blending directly with the existing
+   * content on the canvas. Each layer style uses the same layer content as input and draws on the
+   * canvas. Layer styles are applied before filters. The default value is an empty list.
+   */
+  const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
+    return _layerStyles;
+  }
+
+  /**
+   * Sets the list of layer styles applied to the layer.
+   */
+  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
+
+  /**
+   * Returns the list of filters applied to the layer. Layer filters create new offscreen images
+   * to replace the original layer content. Each filter takes the output of the previous filter as
+   * input, and the final output is drawn on the canvas. Layer filters are applied after layer
+   * styles. The default value is an empty list.
    */
   const std::vector<std::shared_ptr<LayerFilter>>& filters() const {
     return _filters;
@@ -502,20 +521,25 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
-  std::shared_ptr<Picture> applyFilters(std::shared_ptr<Picture> source, float contentScale);
+  std::shared_ptr<ImageFilter> getCurrentFilter(float contentScale);
 
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale);
+  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
+
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                       float alpha, LayerStylePosition position) const;
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
+
+  void drawWithLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -547,6 +571,7 @@ class Layer {
   std::unique_ptr<LayerContent> layerContent = nullptr;
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+  std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
 
   friend class DisplayList;
   friend class LayerProperty;

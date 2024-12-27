@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
 
@@ -28,7 +29,19 @@ class ShaderMaskFilter : public MaskFilter {
       : shader(std::move(shader)), inverted(inverted) {
   }
 
+  std::shared_ptr<Shader> getShader() const {
+    return shader;
+  }
+
+  bool isInverted() const {
+    return inverted;
+  }
+
  protected:
+  Type type() const override {
+    return Type::Shader;
+  };
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
 

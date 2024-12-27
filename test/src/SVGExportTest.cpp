@@ -29,6 +29,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
@@ -497,6 +498,172 @@ TGFX_TEST(SVGExportTest, ClipState) {
   exporter->close();
   auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
+}
+
+TGFX_TEST(SVGExportTest, GradientMask) {
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto* canvas = exporter->getCanvas();
+
+  {
+    Paint paint;
+    auto shader = tgfx::Shader::MakeLinearGradient(
+        tgfx::Point{0.f, 0.f}, tgfx::Point{300.f, 300.f},
+        {tgfx::Color{1.f, 1.f, 1.f, 1.f}, tgfx::Color{0.f, 0.f, 0.f, 0.f}}, {});
+    auto maskFilter = tgfx::MaskFilter::MakeShader(shader);
+    paint.setMaskFilter(maskFilter);
+    paint.setColor(Color::Red());
+
+    canvas->drawRect(Rect::MakeWH(300, 300), paint);
+  }
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+
+  auto path = ProjectPath::Absolute("resources/apitest/mask_gradient.svg");
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  auto compareString = std::string(static_cast<char*>(buffer.data()), buffer.size());
+  std::cout << compareString << std::endl;
+  std::cout << SVGString << std::endl;
+
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+}
+
+#if 0
+TGFX_TEST(SVGExportTest, ImageMask) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto* canvas = exporter->getCanvas();
+
+  {
+    Paint paint;
+    auto image = MakeImage("resources/apitest/image_as_mask.png");
+    ASSERT_TRUE(image != nullptr);
+    auto shader = tgfx::Shader::MakeImageShader(image);
+    ASSERT_TRUE(shader != nullptr);
+    auto maskFilter = tgfx::MaskFilter::MakeShader(shader);
+    ASSERT_TRUE(maskFilter != nullptr);
+
+    paint.setMaskFilter(maskFilter);
+    paint.setColor(Color::Red());
+
+    canvas->drawRect(Rect::MakeWH(200, 200), paint);
+  }
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+
+  auto path = ProjectPath::Absolute("resources/apitest/mask_image.svg");
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+}
+#endif
+
+TGFX_TEST(SVGExportTest, PictureImageMask) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto* canvas = exporter->getCanvas();
+
+  {
+    Recorder recorder;
+    auto* pictureCanvas = recorder.beginRecording();
+    {
+      tgfx::Paint paint;
+      pictureCanvas->drawCircle(50, 50, 50, paint);
+      paint.setAlpha(0.5f);
+      pictureCanvas->drawCircle(150, 150, 50, paint);
+    }
+    auto picture = recorder.finishRecordingAsPicture();
+    ASSERT_TRUE(picture != nullptr);
+    auto image = tgfx::Image::MakeFrom(picture, 125, 125);
+    ASSERT_TRUE(image != nullptr);
+
+    Paint paint;
+    auto shader = tgfx::Shader::MakeImageShader(image);
+    ASSERT_TRUE(shader != nullptr);
+    auto maskFilter = tgfx::MaskFilter::MakeShader(shader);
+    ASSERT_TRUE(maskFilter != nullptr);
+
+    paint.setMaskFilter(maskFilter);
+    paint.setColor(Color::Red());
+
+    canvas->drawRect(Rect::MakeXYWH(50.0f, 50.0f, 100.f, 100.f), paint);
+  }
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+
+  auto path = ProjectPath::Absolute("resources/apitest/mask_picture_image.svg");
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+}
+
+TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
+  auto* canvas = exporter->getCanvas();
+
+  {
+    Recorder recorder;
+    auto* pictureCanvas = recorder.beginRecording();
+    {
+      tgfx::Paint paint;
+      pictureCanvas->drawCircle(50, 50, 50, paint);
+      paint.setAlpha(0.5f);
+      pictureCanvas->drawCircle(150, 150, 50, paint);
+    }
+    auto picture = recorder.finishRecordingAsPicture();
+    ASSERT_TRUE(picture != nullptr);
+    auto image = tgfx::Image::MakeFrom(picture, 200, 200);
+    ASSERT_TRUE(image != nullptr);
+
+    Paint paint;
+    auto shader = tgfx::Shader::MakeImageShader(image);
+    ASSERT_TRUE(shader != nullptr);
+    auto maskFilter = tgfx::MaskFilter::MakeShader(shader, true);
+    ASSERT_TRUE(maskFilter != nullptr);
+
+    paint.setMaskFilter(maskFilter);
+    paint.setColor(Color::Red());
+
+    canvas->drawRect(Rect::MakeXYWH(50.0f, 50.0f, 100.f, 100.f), paint);
+  }
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+
+  auto path = ProjectPath::Absolute("resources/apitest/mask_invert_picture_image.svg");
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
 }
 
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "ResourceImage.h"
+#include "ProviderShape.h"
 
 namespace tgfx {
-/**
- * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
- */
-class BufferImage : public ResourceImage {
- public:
-  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
-
-  int width() const override {
-    return imageBuffer->width();
+std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<PathProvider> pathProvider) {
+  if (pathProvider == nullptr) {
+    return nullptr;
   }
 
-  int height() const override {
-    return imageBuffer->height();
-  }
+  return std::make_shared<ProviderShape>(std::move(pathProvider));
+}
 
-  bool isAlphaOnly() const override {
-    return imageBuffer->isAlphaOnly();
-  }
+Rect ProviderShape::getBounds(float resolutionScale) const {
+  return provider->getBounds(resolutionScale);
+}
 
- protected:
-  Type type() const override {
-    return Type::Buffer;
-  }
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
-
- private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-};
+Path ProviderShape::getPath(float resolutionScale) const {
+  return provider->getPath(resolutionScale);
+}
 }  // namespace tgfx

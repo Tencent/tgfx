@@ -23,6 +23,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
+#include "core/shapes/ProviderShape.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Texture.h"
 #include "gpu/opengl/GLCaps.h"
@@ -1398,5 +1399,76 @@ TGFX_TEST(CanvasTest, Path_complex) {
   canvas->drawPath(path, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_complex"));
+}
+
+TGFX_TEST(CanvasTest, DrawPathProvider) {
+  class DrawPathProvider : public PathProvider {
+   public:
+    explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
+    }
+
+    Path getPath(float /*resolutionScale*/) const override {
+      if (points.size() < 2) {
+        return {};
+      }
+
+      Path path = {};
+      path.moveTo(points[0]);
+      for (size_t i = 1; i < points.size(); ++i) {
+        path.lineTo(points[i]);
+      }
+      path.close();
+      return path;
+    }
+
+    Rect getBounds(float /*resolutionScale*/) const override {
+      if (points.size() < 2) {
+        return Rect::MakeEmpty();
+      }
+
+      float minX = points[0].x;
+      float minY = points[0].y;
+      float maxX = points[0].x;
+      float maxY = points[0].y;
+      for (const auto& point : points) {
+        minX = std::min(minX, point.x);
+        minY = std::min(minY, point.y);
+        maxX = std::max(maxX, point.x);
+        maxY = std::max(maxY, point.y);
+      }
+      return Rect::MakeXYWH(minX, minY, maxX - minX, maxX - minX);
+    }
+
+   private:
+    std::vector<Point> points = {};
+  };
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+
+  Paint paint;
+  std::vector<Point> pts1 = {{50, 50}, {150, 50}, {150, 150}, {50, 150}};
+  auto shape1 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts1));
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawShape(shape1, paint);
+
+  std::vector<Point> pts2 = {{300, 0}, {360, 180}, {210, 60}, {390, 60}, {240, 180}};
+  auto shape2 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts2));
+  paint.setColor(Color::Green());
+  paint.setStyle(PaintStyle::Fill);
+  canvas->drawShape(shape2, paint);
+
+  std::vector<Point> pts3 = {{50, 250},  {250, 250}, {250, 240}, {275, 255},
+                             {250, 270}, {250, 260}, {50, 260}};
+  auto shape3 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts3));
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  canvas->drawShape(shape3, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawPathProvider"));
 }
 }  // namespace tgfx

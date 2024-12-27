@@ -18,21 +18,20 @@
 
 #pragma once
 
-#include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-
 /**
- * A filter draws an inner shadow over the input content.
+ * DropShadowStyle adds a shadow below the layer.
  */
-class InnerShadowFilter : public LayerFilter {
+class DropShadowStyle : public LayerStyle {
  public:
   /**
-   * Create a filter that draws an inner shadow over the input content.
+   * Create a layerStyle that adds a shadow below the layer.
    */
-  static std::shared_ptr<InnerShadowFilter> Make(float offsetX, float offsetY, float blurrinessX,
-                                                 float blurrinessY, const Color& color,
-                                                 bool innerShadowOnly = false);
+  static std::shared_ptr<DropShadowStyle> Make(float offsetX, float offsetY, float blurrinessX,
+                                               float blurrinessY, const Color& color,
+                                               bool showBehindLayer = true);
 
   /**
    * The x offset of the shadow.
@@ -43,7 +42,6 @@ class InnerShadowFilter : public LayerFilter {
 
   /**
    * Set x offset of the shadow.
-   * @param offsetX
    */
   void setOffsetX(float offsetX);
 
@@ -56,7 +54,6 @@ class InnerShadowFilter : public LayerFilter {
 
   /**
    * Set y offset of the shadow.
-   * @param offsetY
    */
   void setOffsetY(float offsetY);
 
@@ -82,7 +79,6 @@ class InnerShadowFilter : public LayerFilter {
 
   /**
    * Set blur radius for the shadow, along the Y axis.
-   * @param blurrinessY
    */
   void setBlurrinessY(float blurrinessY);
 
@@ -95,34 +91,46 @@ class InnerShadowFilter : public LayerFilter {
 
   /**
    * Set the color of the shadow.
-   * @param color
    */
   void setColor(const Color& color);
 
   /**
-   * Whether the resulting image does not include the input content.
+   * Whether the shadow behind the layer content should be visible. The default value is true.
    */
-  bool innerShadowOnly() const {
-    return _innerShadowOnly;
+  bool showBehindLayer() const {
+    return _showBehindLayer;
   }
 
   /**
-   * Set whether the resulting image does not include the input content.
+   * Set whether the shadow behind the layer content should be visible.
    */
-  void setInnerShadowOnly(bool value);
+  void setShowBehindLayer(bool showBehindLayer);
 
- protected:
-  std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
+  LayerStylePosition position() const override {
+    return LayerStylePosition::Below;
+  }
+
+  Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
  private:
-  InnerShadowFilter(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
-                    const Color& color, bool innerShadowOnly);
+  DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
+                  const Color& color, bool showBehindTransparent);
+
+  void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
+              BlendMode blendMode) override;
+
+  void invalidateFilter();
+
+  std::shared_ptr<ImageFilter> getShadowFilter(float contentScale);
+
   float _offsetX = 0.0f;
   float _offsetY = 0.0f;
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
-  bool _innerShadowOnly = false;
-};
+  bool _showBehindLayer = true;
 
+  float currentScale = 1.0f;
+  std::shared_ptr<ImageFilter> shadowFilter = nullptr;
+};
 }  // namespace tgfx

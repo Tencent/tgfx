@@ -56,6 +56,10 @@ class TextureImage : public ResourceImage {
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
  protected:
+  Type type() const override {
+    return Type::Texture;
+  }
+
   std::shared_ptr<Image> onMakeMipmapped(bool) const override {
     return nullptr;
   }

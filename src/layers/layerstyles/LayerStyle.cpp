@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,33 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Quad.h"
-#include "tgfx/core/Buffer.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-Quad Quad::MakeFrom(const Rect& rect, const Matrix* matrix) {
-  return Quad(rect, matrix);
-}
-
-Quad::Quad(const Rect& rect, const Matrix* matrix) {
-  points[0] = Point::Make(rect.left, rect.top);
-  points[1] = Point::Make(rect.left, rect.bottom);
-  points[2] = Point::Make(rect.right, rect.top);
-  points[3] = Point::Make(rect.right, rect.bottom);
-  if (matrix) {
-    matrix->mapPoints(points, 4);
+void LayerStyle::setBlendMode(BlendMode blendMode) {
+  if (_blendMode == blendMode) {
+    return;
   }
+  _blendMode = blendMode;
+  invalidate();
 }
-
-std::shared_ptr<Data> Quad::toTriangleStrips() const {
-  Buffer buffer(8 * sizeof(float));
-  auto vertices = static_cast<float*>(buffer.data());
-  int index = 0;
-  for (size_t i = 4; i >= 1; --i) {
-    vertices[index++] = points[i - 1].x;
-    vertices[index++] = points[i - 1].y;
-  }
-  return buffer.release();
-}
-
 }  // namespace tgfx
