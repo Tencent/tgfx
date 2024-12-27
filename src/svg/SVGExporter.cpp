@@ -22,7 +22,7 @@
 #include <utility>
 #include "ElementWriter.h"
 #include "core/utils/Log.h"
-#include "svg/SVGExportingContext.h"
+#include "svg/SVGExportContext.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Size.h"
@@ -42,7 +42,7 @@ SVGExporter::SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context*
                          const Rect& viewBox, uint32_t exportFlags) {
   auto writer =
       std::make_unique<XMLStreamWriter>(svgStream, exportFlags & SVGExportFlags::DisablePrettyXML);
-  drawContext = new SVGExportingContext(context, viewBox, std::move(writer), exportFlags);
+  drawContext = new SVGExportContext(context, viewBox, std::move(writer), exportFlags);
   canvas = new Canvas(drawContext);
   drawContext->setCanvas(canvas);
 };

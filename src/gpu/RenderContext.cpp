@@ -65,22 +65,17 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
 }
 
-Rect RenderContext::clipLocalBounds(const Rect& localBounds, const MCState& state, bool inverted) {
+Rect RenderContext::clipLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {
   Matrix invertMatrix = {};
   if (!state.matrix.invert(&invertMatrix)) {
     return Rect::MakeEmpty();
   }
-  auto& clip = state.clip;
-  auto clipBounds = getClipBounds(clip);
+  auto clipBounds = getClipBounds(state.clip);
   invertMatrix.mapRect(&clipBounds);
-  if (inverted) {
-    return clipBounds;
-  }
-  auto drawRect = localBounds;
-  if (!drawRect.intersect(clipBounds)) {
+  if (!unbounded && !clipBounds.intersect(localBounds)) {
     return Rect::MakeEmpty();
   }
-  return drawRect;
+  return clipBounds;
 }
 
 void RenderContext::clear() {
@@ -93,7 +88,7 @@ void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillS
   if (drawAsClear(rect, state, style)) {
     return;
   }
-  auto localBounds = clipLocalBounds(rect, state);
+  auto localBounds = clipLocalBounds(state, rect);
   if (localBounds.isEmpty()) {
     return;
   }
@@ -130,7 +125,7 @@ bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const Fi
 }
 
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) {
-  auto localBounds = clipLocalBounds(rRect.rect, state);
+  auto localBounds = clipLocalBounds(state, rRect.rect);
   if (localBounds.isEmpty()) {
     return;
   }
@@ -148,7 +143,7 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     return;
   }
   auto localBounds = shape->getBounds(maxScale);
-  localBounds = clipLocalBounds(localBounds, state, shape->isInverseFillType());
+  localBounds = clipLocalBounds(state, localBounds, shape->isInverseFillType());
   if (localBounds.isEmpty()) {
     return;
   }
@@ -172,7 +167,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
   if (image == nullptr) {
     return;
   }
-  auto localBounds = clipLocalBounds(rect, state);
+  auto localBounds = clipLocalBounds(state, rect);
   if (localBounds.isEmpty()) {
     return;
   }
@@ -194,8 +189,8 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const MCState& state, const FillStyle& style,
-                                     const Stroke* stroke) {
+                                     const Stroke* stroke, const MCState& state,
+                                     const FillStyle& style) {
   if (glyphRunList == nullptr) {
     return;
   }
@@ -212,7 +207,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     stroke->applyToBounds(&bounds);
   }
   auto localBounds = bounds;
-  localBounds = clipLocalBounds(localBounds, state);
+  localBounds = clipLocalBounds(state, localBounds);
   if (localBounds.isEmpty()) {
     return;
   }
@@ -241,10 +236,29 @@ void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState&
   }
 }
 
-void RenderContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
-                              const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  auto viewMatrix = filter ? Matrix::I() : state.matrix;
-  auto bounds = picture->getBounds(&viewMatrix);
+void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                              const MCState& state, const FillStyle& style) {
+  Matrix viewMatrix = {};
+  Rect bounds = {};
+  if (filter || style.maskFilter) {
+    if (picture->hasUnboundedFill()) {
+      bounds = clipLocalBounds(state, Rect::MakeEmpty(), true);
+    } else {
+      bounds = picture->getBounds();
+    }
+  } else {
+    bounds = getClipBounds(state.clip);
+    if (!picture->hasUnboundedFill()) {
+      auto deviceBounds = picture->getBounds(&state.matrix);
+      if (!bounds.intersect(deviceBounds)) {
+        return;
+      }
+    }
+    viewMatrix = state.matrix;
+  }
+  if (bounds.isEmpty()) {
+    return;
+  }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());

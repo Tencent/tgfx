@@ -45,13 +45,13 @@ class LayerUnrollContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& mcState,
                      const FillStyle& style) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const FillStyle& style, const Stroke* stroke) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
+                        const MCState& state, const FillStyle& style) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
-                 std::shared_ptr<ImageFilter> filter) override;
+  void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                 const MCState& state, const FillStyle& style) override;
 
  protected:
   FillStyle merge(const FillStyle& style);

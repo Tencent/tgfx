@@ -676,7 +676,10 @@ TGFX_TEST(CanvasTest, inversePath) {
   canvas->clipPath(textPath);
   Path emptyPath = {};
   emptyPath.toggleInverseFillType();
+  auto dropShadowFilter = ImageFilter::DropShadow(2, 2, 2, 2, Color::Black());
+  paint.setImageFilter(dropShadowFilter);
   canvas->drawPath(emptyPath, paint);
+  paint.setImageFilter(nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/inversePath_text"));
 
   surface = Surface::Make(context, 400, 400);
