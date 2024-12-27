@@ -89,9 +89,6 @@ class ElementWriter {
   void addPictureImageMaskResources(const PictureImage* pictureImage, const std::string& filterID,
                                     SVGExportContext* svgContext);
 
-  bool addGeneratorImageMaskResources(const GeneratorImage* generatorImage,
-                                      const std::string& filterID, SVGExportingContext* svgContext);
-
   void addRenderImageMaskResources(const ImageShader* imageShaders, const std::string& filterID,
                                    Context* context);
 

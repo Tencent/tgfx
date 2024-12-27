@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"

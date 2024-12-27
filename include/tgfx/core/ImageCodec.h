@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -112,6 +111,6 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeNativeCodec(std::shared_ptr<Data> imageBytes);
 
   friend class Pixmap;
-  friend class SVGExportingContext;
+  friend class SVGExportContext;
 };
 }  // namespace tgfx

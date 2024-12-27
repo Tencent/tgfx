@@ -502,11 +502,11 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, Context* 
 
   std::shared_ptr<Data> dataUri = nullptr;
 
-  auto data = SVGExportingContext::ImageToEncodedData(image);
+  auto data = SVGExportContext::ImageToEncodedData(image);
   if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
     dataUri = AsDataUri(data);
   } else {
-    Bitmap bitmap = SVGExportingContext::ImageExportToBitmap(context, image);
+    Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, image);
     if (bitmap.isEmpty()) {
       return;
     }
