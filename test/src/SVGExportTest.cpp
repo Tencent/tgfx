@@ -29,7 +29,6 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/Picture.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Color.h"

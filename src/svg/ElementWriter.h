@@ -28,7 +28,6 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
-#include "core/images/GeneratorImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"

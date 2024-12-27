@@ -18,7 +18,6 @@
 
 #include "ElementWriter.h"
 #include <_types/_uint32_t.h>
-#include <memory>
 #include <string>
 #include <unordered_set>
 #include "SVGExportContext.h"
@@ -31,7 +30,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Data.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"

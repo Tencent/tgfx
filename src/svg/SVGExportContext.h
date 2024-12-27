@@ -31,7 +31,6 @@
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Data.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
