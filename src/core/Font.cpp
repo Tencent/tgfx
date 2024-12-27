@@ -33,10 +33,6 @@ class GlyphImageGenerator : public ImageGenerator {
   }
 
  protected:
-  Type type() const override {
-    return Type::GlyphGenerator;
-  }
-
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
     return scalerContext->generateImage(glyphID, tryHardware);
   }

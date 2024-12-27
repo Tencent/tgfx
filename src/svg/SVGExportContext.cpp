@@ -385,16 +385,11 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
-  const auto* generatorImage = ImageCaster::AsGeneratorImage(image.get());
-  if (!generatorImage) {
+  const auto* codecImage = ImageCaster::AsCodecImage(image.get());
+  if (!codecImage) {
     return nullptr;
   }
-
-  auto generator = generatorImage->generator;
-  if (!generator) {
-    return nullptr;
-  }
-  const auto* imageCodec = ImageGeneratorCaster::AsImageCodec(generator.get());
+  auto imageCodec = codecImage->getImageCodec();
   if (!imageCodec) {
     return nullptr;
   }

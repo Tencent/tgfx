@@ -85,10 +85,6 @@ class ImageCodec : public ImageGenerator {
       : ImageGenerator(width, height), _orientation(orientation) {
   }
 
-  Type type() const override {
-    return Type::ImageCodec;
-  }
-
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
   virtual std::shared_ptr<Data> encodedData() const {

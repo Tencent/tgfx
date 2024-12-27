@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Image.h"
 #include "core/images/BufferImage.h"
+#include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
 #include "core/images/RGBAAAImage.h"
@@ -43,10 +44,6 @@ class PixelDataConverter : public ImageGenerator {
   }
 
  protected:
-  Type type() const override {
-    return Type::PixelConverter;
-  }
-
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
     TRACE_EVENT;
     Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);
@@ -68,7 +65,7 @@ class PixelDataConverter : public ImageGenerator {
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   TRACE_EVENT;
   auto codec = ImageCodec::MakeFrom(filePath);
-  auto image = MakeFrom(codec);
+  auto image = CodecImage::MakeFrom(codec);
   if (image == nullptr) {
     return nullptr;
   }
@@ -78,7 +75,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
   TRACE_EVENT;
   auto codec = ImageCodec::MakeFrom(std::move(encodedData));
-  auto image = MakeFrom(codec);
+  auto image = CodecImage::MakeFrom(codec);
   if (image == nullptr) {
     return nullptr;
   }
@@ -88,7 +85,7 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
 std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   TRACE_EVENT;
   auto codec = ImageCodec::MakeFrom(nativeImage);
-  auto image = MakeFrom(codec);
+  auto image = CodecImage::MakeFrom(codec);
   if (image == nullptr) {
     return nullptr;
   }

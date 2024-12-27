@@ -23,6 +23,7 @@
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/images/CodecImage.h"
 #include "core/images/GeneratorImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
@@ -64,17 +65,12 @@ class ImageCaster {
  public:
   static const PictureImage* AsPictureImage(const Image* image);
 
-  static const GeneratorImage* AsGeneratorImage(const Image* image);
+  static const CodecImage* AsCodecImage(const Image* image);
 };
 
 class MaskFilterCaster {
  public:
   static const ShaderMaskFilter* AsShaderMaskFilter(const MaskFilter* maskFilter);
-};
-
-class ImageGeneratorCaster {
- public:
-  static const ImageCodec* AsImageCodec(const ImageGenerator* imageGenerator);
 };
 
 }  // namespace tgfx

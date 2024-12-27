@@ -44,8 +44,6 @@ class GeneratorImage : public ResourceImage {
     return false;
   }
 
-  std::shared_ptr<ImageGenerator> generator = nullptr;
-
  protected:
   Type type() const override {
     return Type::Generator;
@@ -55,5 +53,7 @@ class GeneratorImage : public ResourceImage {
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const override;
+
+  std::shared_ptr<ImageGenerator> generator = nullptr;
 };
 }  // namespace tgfx

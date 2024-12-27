@@ -72,10 +72,6 @@ class ImageGenerator {
   ImageGenerator(int width, int height) : _width(width), _height(height) {
   }
 
-  enum class Type { ImageCodec, GlyphGenerator, Rasterizer, PixelConverter };
-
-  virtual Type type() const = 0;
-
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
 
  private:

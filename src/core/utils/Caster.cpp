@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Caster.h"
+#include "core/images/CodecImage.h"
 #include "core/shaders/ColorShader.h"
 
 namespace tgfx {
@@ -84,9 +85,9 @@ const PictureImage* ImageCaster::AsPictureImage(const Image* image) {
   return nullptr;
 }
 
-const GeneratorImage* ImageCaster::AsGeneratorImage(const Image* image) {
-  if (image->type() == Image::Type::Generator) {
-    return static_cast<const GeneratorImage*>(image);
+const CodecImage* ImageCaster::AsCodecImage(const Image* image) {
+  if (image->type() == Image::Type::Codec) {
+    return static_cast<const CodecImage*>(image);
   }
   return nullptr;
 }
@@ -94,13 +95,6 @@ const GeneratorImage* ImageCaster::AsGeneratorImage(const Image* image) {
 const ShaderMaskFilter* MaskFilterCaster::AsShaderMaskFilter(const MaskFilter* maskFilter) {
   if (maskFilter->type() == MaskFilter::Type::Shader) {
     return static_cast<const ShaderMaskFilter*>(maskFilter);
-  }
-  return nullptr;
-}
-
-const ImageCodec* ImageGeneratorCaster::AsImageCodec(const ImageGenerator* imageGenerator) {
-  if (imageGenerator->type() == ImageGenerator::Type::ImageCodec) {
-    return static_cast<const ImageCodec*>(imageGenerator);
   }
   return nullptr;
 }
