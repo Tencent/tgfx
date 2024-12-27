@@ -207,6 +207,15 @@ bool PngCodec::isAlphaOnly() const {
   return _isAlphaOnly;
 }
 
+std::shared_ptr<Data> PngCodec::encodedData() const {
+  if (fileData) {
+    return fileData;
+  } else if (!filePath.empty()) {
+    return Data::MakeFromFile(filePath);
+  }
+  return nullptr;
+}
+
 #ifdef TGFX_USE_PNG_ENCODE
 struct PngWriter {
   unsigned char* data = nullptr;

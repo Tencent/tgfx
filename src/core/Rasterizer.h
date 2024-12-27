@@ -57,5 +57,9 @@ class Rasterizer : public ImageGenerator {
  protected:
   Rasterizer(int width, int height) : ImageGenerator(width, height) {
   }
+
+  Type type() const override {
+    return Type::Rasterizer;
+  }
 };
 }  // namespace tgfx

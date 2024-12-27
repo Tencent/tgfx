@@ -31,6 +31,7 @@
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
@@ -84,6 +85,11 @@ class SVGExportingContext : public DrawContext {
    * Draws a image onto a surface and reads the pixels from the surface.
    */
   static Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image);
+
+  /**
+   * Returns the encoded pixel data if the image was created from a supported encoded format.
+   */
+  static std::shared_ptr<Data> ImageToEncodedData(const std::shared_ptr<Image>& image);
 
  private:
   /**

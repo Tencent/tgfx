@@ -377,6 +377,7 @@ void SVGExportingContext::applyClipPath(const Path& clipPath) {
 
 Bitmap SVGExportingContext::ImageExportToBitmap(Context* context,
                                                 const std::shared_ptr<Image>& image) {
+  DEBUG_ASSERT(context);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto* canvas = surface->getCanvas();
   canvas->drawImage(image);
@@ -387,6 +388,23 @@ Bitmap SVGExportingContext::ImageExportToBitmap(Context* context,
     return bitmap;
   }
   return Bitmap();
+}
+
+std::shared_ptr<Data> SVGExportingContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
+  const auto* generatorImage = ImageCaster::AsGeneratorImage(image.get());
+  if (!generatorImage) {
+    return nullptr;
+  }
+
+  auto generator = generatorImage->generator;
+  if (!generator) {
+    return nullptr;
+  }
+  const auto* imageCodec = ImageGeneratorCaster::AsImageCodec(generator.get());
+  if (!imageCodec) {
+    return nullptr;
+  }
+  return imageCodec->encodedData();
 }
 
 }  // namespace tgfx

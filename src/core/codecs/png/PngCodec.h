@@ -36,6 +36,8 @@ class PngCodec : public ImageCodec {
  protected:
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
+  std::shared_ptr<Data> encodedData() const override;
+
  private:
   static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
                                                   std::shared_ptr<Data> byteData);

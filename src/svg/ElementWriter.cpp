@@ -18,16 +18,20 @@
 
 #include "ElementWriter.h"
 #include <_types/_uint32_t.h>
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include "SVGExportingContext.h"
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
+#include "core/codecs/jpeg/JpegCodec.h"
+#include "core/codecs/png/PngCodec.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
@@ -496,12 +500,19 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, Context* 
   auto image = shader->image;
   DEBUG_ASSERT(image);
 
-  DEBUG_ASSERT(context);
-  Bitmap bitmap = SVGExportingContext::ImageExportToBitmap(context, image);
-  if (bitmap.isEmpty()) {
-    return;
+  std::shared_ptr<Data> dataUri = nullptr;
+
+  auto data = SVGExportingContext::ImageToEncodedData(image);
+  if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
+    dataUri = AsDataUri(data);
+  } else {
+    Bitmap bitmap = SVGExportingContext::ImageExportToBitmap(context, image);
+    if (bitmap.isEmpty()) {
+      return;
+    }
+    dataUri = AsDataUri(Pixmap(bitmap));
   }
-  auto dataUri = AsDataUri(Pixmap(bitmap));
+
   if (!dataUri) {
     return;
   }

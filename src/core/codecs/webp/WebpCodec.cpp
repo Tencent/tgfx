@@ -112,6 +112,15 @@ bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   return decodeSuccess;
 }
 
+std::shared_ptr<Data> WebpCodec::encodedData() const {
+  if (fileData) {
+    return fileData;
+  } else if (!filePath.empty()) {
+    return Data::MakeFromFile(filePath);
+  }
+  return nullptr;
+}
+
 #ifdef TGFX_USE_WEBP_ENCODE
 struct WebpWriter {
   unsigned char* data = nullptr;

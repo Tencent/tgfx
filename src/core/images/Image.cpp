@@ -43,6 +43,10 @@ class PixelDataConverter : public ImageGenerator {
   }
 
  protected:
+  Type type() const override {
+    return Type::PixelConverter;
+  }
+
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
     TRACE_EVENT;
     Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);

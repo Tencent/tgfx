@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -85,7 +86,15 @@ class ImageCodec : public ImageGenerator {
       : ImageGenerator(width, height), _orientation(orientation) {
   }
 
+  Type type() const override {
+    return Type::ImageCodec;
+  }
+
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+  virtual std::shared_ptr<Data> encodedData() const {
+    return nullptr;
+  };
 
  private:
   Orientation _orientation = Orientation::TopLeft;
@@ -103,5 +112,6 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeNativeCodec(std::shared_ptr<Data> imageBytes);
 
   friend class Pixmap;
+  friend class SVGExportingContext;
 };
 }  // namespace tgfx

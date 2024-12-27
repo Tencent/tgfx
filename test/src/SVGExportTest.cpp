@@ -29,6 +29,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Picture.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
@@ -537,7 +538,6 @@ TGFX_TEST(SVGExportTest, GradientMask) {
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
 }
 
-#if 0
 TGFX_TEST(SVGExportTest, ImageMask) {
   ContextScope scope;
   auto* context = scope.getContext();
@@ -572,7 +572,6 @@ TGFX_TEST(SVGExportTest, ImageMask) {
   readStream->read(buffer.data(), buffer.size());
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
 }
-#endif
 
 TGFX_TEST(SVGExportTest, PictureImageMask) {
   ContextScope scope;

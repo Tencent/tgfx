@@ -28,6 +28,7 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
+#include "core/images/GeneratorImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
@@ -87,6 +88,9 @@ class ElementWriter {
 
   void addPictureImageMaskResources(const PictureImage* pictureImage, const std::string& filterID,
                                     SVGExportingContext* svgContext);
+
+  bool addGeneratorImageMaskResources(const GeneratorImage* generatorImage,
+                                      const std::string& filterID, SVGExportingContext* svgContext);
 
   void addRenderImageMaskResources(const ImageShader* imageShaders, const std::string& filterID,
                                    Context* context);
