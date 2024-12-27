@@ -20,33 +20,42 @@
 
 namespace tgfx {
 /**
- * PathProvider is an external path data provider that can be used to create a Shape object.
- * When constructing a Path externally is time-consuming, PathProvider can be used to delay the
- * creation of the Path. See Shape::MakeFrom(std::shared_ptr<PathProvider> pathProvider) for
- * reference.
+ * PathProvider defines interfaces for creating a Path object lazily, which is useful when the path
+ * is expensive to compute and not needed immediately. It can be used to create a Shape object.
+ * See Shape::MakeFrom(std::shared_ptr<PathProvider> pathProvider) for more details. Note that
+ * PathProvider is thread-safe and immutable once created.
  */
 class PathProvider {
  public:
   virtual ~PathProvider() = default;
 
   /**
-   * This method retrieves a Path object from the PathProvider.
+   * Returns the computed path of the PathProvider. Note: Since the path may contain stroking
+   * operations whose outlines can change with different scale factors, it's best to pass the final
+   * drawing scale factor in the resolutionScale for computing the path to ensure accuracy. However,
+   * the resolutionScale is not applied to the returned path; it just affects the stroking precision
+   * of the path.
+   * @param resolutionScale The intended resolution for the path. The default value is 1.0. Higher
+   * values (res > 1) mean the result should be more precise, as it will be zoomed up and small
+   * errors will be magnified. Lower values (0 < res < 1) mean the result can be less precise, as it
+   * will be zoomed down and small errors may be invisible.
+   * @return The computed path of the PathProvider.
    */
-  virtual Path getPath(float resolutionScale) const = 0;
+  virtual Path getPath(float resolutionScale = 1.0f) const = 0;
 
   /**
    * Returns the bounding box of the path. The bounds might be larger than the actual path because
    * the exact bounds can't be determined until the path is computed. Note: Since the path may
-   * contain strokes whose outlines can change with different scale factors, it's
-   * best to pass the final drawing scale factor in the resolutionScale for computing the bounds to
-   * ensure accuracy. However, the resolutionScale is not applied to the returned bounds; it just
-   * affects the precision of the bounds.
+   * contain stroking operations whose outlines can change with different scale factors, it's best
+   * to pass the final drawing scale factor in the resolutionScale for computing the path to ensure
+   * accuracy. However, the resolutionScale is not applied to the returned path; it just affects the
+   * stroking precision of the path.
    * @param resolutionScale The intended resolution for the path. The default value is 1.0. Higher
    * values (res > 1) mean the result should be more precise, as it will be zoomed up and small
    * errors will be magnified. Lower values (0 < res < 1) mean the result can be less precise, as it
    * will be zoomed down and small errors may be invisible.
    * @return The bounding box of the path.
    */
-  virtual Rect getBounds(float resolutionScale) const = 0;
+  virtual Rect getBounds(float resolutionScale = 1.0f) const = 0;
 };
 }  // namespace tgfx
