@@ -323,6 +323,49 @@ TGFX_TEST(CanvasTest, filterMode) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_linear"));
 }
 
+TGFX_TEST(CanvasTest, drawPaint) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 160, 160);
+  auto canvas = surface->getCanvas();
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 50.f);
+  font.setFauxBold(true);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  auto shape = Shape::MakeFrom(std::move(textBlob));
+  auto path = shape->getPath();
+  path.transform(Matrix::MakeTrans(10, 100));
+  canvas->clear(Color::Red());
+  canvas->save();
+  canvas->clipPath(path);
+  canvas->drawColor(Color::Red(), BlendMode::DstOut);
+  canvas->restore();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawColor"));
+  canvas->clear();
+  Paint paint = {};
+  auto shader = Shader::MakeRadialGradient({100, 100}, 100, {Color::Green(), Color::Blue()}, {});
+  paint.setShader(shader);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto maskShader = Shader::MakeImageShader(std::move(image), TileMode::Decal, TileMode::Decal);
+  auto maskFilter = MaskFilter::MakeShader(std::move(maskShader));
+  maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(45, 45));
+  paint.setMaskFilter(std::move(maskFilter));
+  canvas->translate(-20, -20);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawPaint"));
+  canvas->clear();
+  path.reset();
+  path.toggleInverseFillType();
+  auto imageFilter = ImageFilter::DropShadow(-10, -10, 10, 10, Color::Black());
+  paint.setImageFilter(imageFilter);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawPaint_shadow"));
+}
+
 TGFX_TEST(CanvasTest, rasterizedImage) {
   ContextScope scope;
   auto context = scope.getContext();

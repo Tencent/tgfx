@@ -205,7 +205,7 @@ class Canvas {
    * Fills the current clip with the specified color. The color is blended with the destination
    * pixels using the specified blend mode.
    */
-  void drawColor(const Color& color, BlendMode blendMode);
+  void drawColor(const Color& color, BlendMode blendMode = BlendMode::SrcOver);
 
   /**
    * Fills the current clip with the specified paint. The paint's shader, color, blend mode, color
