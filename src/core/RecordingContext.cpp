@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/RecordingContext.h"
-#include "gpu/Blend.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 /**
@@ -38,6 +38,9 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
       continue;
     }
     switch (record->type()) {
+      case RecordType::DrawStyle:
+        hasUnboundedFill = true;
+        break;
       case RecordType::DrawShape:
         if (static_cast<DrawShape*>(record)->shape->isInverseFillType()) {
           hasUnboundedFill = true;
@@ -66,8 +69,19 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
 void RecordingContext::clear() {
   for (auto& record : records) {
     delete record;
+    records.clear();
   }
-  records.resize(0);
+}
+
+void RecordingContext::drawStyle(const MCState& state, const FillStyle& style) {
+  if (state.clip.isInverseFillType() && state.clip.isEmpty() && style.isOpaque()) {
+    // The clip is wide open, and the style is opaque, so we can discard all previous records as
+    // they are now invisible.
+    clear();
+  }
+  if (style.color.alpha > 0.0f) {
+    records.push_back(new DrawStyle(state, style));
+  }
 }
 
 void RecordingContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -80,26 +94,20 @@ void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const
 
 void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const FillStyle& style) {
-  if (shape == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(shape != nullptr);
   records.push_back(new DrawShape(std::move(shape), state, style));
 }
 
 void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const MCState& state, const FillStyle& style) {
-  if (image == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(image != nullptr);
   records.push_back(new DrawImage(std::move(image), sampling, state, style));
 }
 
 void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions& sampling, const MCState& state,
                                      const FillStyle& style) {
-  if (image == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(image != nullptr);
   records.push_back(new DrawImageRect(std::move(image), rect, sampling, state, style));
 }
 
@@ -116,16 +124,12 @@ void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
 void RecordingContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> filter, const MCState& state,
                                  const FillStyle& style) {
-  if (picture == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(picture != nullptr);
   records.push_back(new DrawLayer(std::move(picture), std::move(filter), state, style));
 }
 
 void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  if (picture == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(picture != nullptr);
   if (picture->records.size() > MaxPictureDrawsToUnrollInsteadOfReference) {
     records.push_back(new DrawPicture(picture, state));
   } else {

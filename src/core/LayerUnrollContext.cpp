@@ -27,7 +27,9 @@ LayerUnrollContext::LayerUnrollContext(DrawContext* drawContext, FillStyle fillS
     : drawContext(drawContext), fillStyle(std::move(fillStyle)) {
 }
 
-void LayerUnrollContext::clear() {
+void LayerUnrollContext::drawStyle(const MCState& state, const FillStyle& style) {
+  drawContext->drawStyle(state, merge(style));
+  unrolled = true;
 }
 
 void LayerUnrollContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {

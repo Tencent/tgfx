@@ -22,6 +22,7 @@
 
 namespace tgfx {
 enum class RecordType {
+  DrawStyle,
   DrawRect,
   DrawRRect,
   DrawShape,
@@ -45,6 +46,22 @@ class Record {
   virtual void playback(DrawContext* context) const = 0;
 
   MCState state;
+};
+
+class DrawStyle : public Record {
+ public:
+  DrawStyle(MCState state, FillStyle style) : Record(std::move(state)), style(std::move(style)) {
+  }
+
+  RecordType type() const override {
+    return RecordType::DrawStyle;
+  }
+
+  void playback(DrawContext* context) const override {
+    context->drawStyle(state, style);
+  }
+
+  FillStyle style;
 };
 
 class DrawRect : public Record {

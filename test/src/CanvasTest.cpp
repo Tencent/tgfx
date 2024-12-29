@@ -116,7 +116,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   int height = 72;
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
-  canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
+  canvas->clear(Color::White());
   Paint paint;
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
   auto lumaColorFilter = ColorFilter::Matrix(lumaColorMatrix);
@@ -152,7 +152,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   int height = 72;
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
-  canvas->clearRect(Rect::MakeWH(width, height), Color::White());
+  canvas->clear(Color::White());
   Paint paint;
   paint.setShader(Shader::MakeLinearGradient(
       Point{0.f, 0.f}, Point{static_cast<float>(width), static_cast<float>(height)},
@@ -191,12 +191,12 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   int height = 72;
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
-  canvas->clearRect(Rect::MakeWH(width, height), Color::White());
+  canvas->clear(Color::White());
   canvas->save();
   Path path;
   path.addRect(Rect::MakeXYWH(0.f, 0.f, 10.f, 10.f));
   canvas->clipPath(path);
-  canvas->clearRect(Rect::MakeWH(width, height), Color::White());
+  canvas->clear(Color::White());
   canvas->restore();
   Paint paint;
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
@@ -287,7 +287,7 @@ TGFX_TEST(CanvasTest, textShape) {
       Surface::Make(context, static_cast<int>(ceil(width)), static_cast<int>(ceil(height)));
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
+  canvas->clear(Color::White());
 
   Paint strokePaint;
   strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
@@ -615,7 +615,7 @@ TGFX_TEST(CanvasTest, simpleShape) {
   auto height = 500;
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
-  canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
+  canvas->clear(Color::White());
   auto image = MakeImage("resources/apitest/imageReplacement_VP8L.webp");
   ASSERT_TRUE(image != nullptr);
   Paint paint;
@@ -767,7 +767,7 @@ TGFX_TEST(CanvasTest, drawShape) {
   auto height = 200;
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
-  canvas->clearRect(Rect::MakeWH(surface->width(), surface->height()), Color::White());
+  canvas->clear(Color::White());
 
   Path path = {};
   auto rect = Rect::MakeWH(50, 50);
