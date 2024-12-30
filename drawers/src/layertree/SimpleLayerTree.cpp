@@ -90,6 +90,7 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   imageLayer->setImage(image);
   auto imageScale = static_cast<float>(std::min(327.0 / image->width(), 344.0 / image->height()));
   auto maskLayer = tgfx::ShapeLayer::Make();
+  maskLayer->setFillStyle(tgfx::SolidColor::Make());
   auto maskPath = tgfx::Path();
   auto radius = 20.f / imageScale;
   maskPath.addRoundRect(tgfx::Rect::MakeWH(image->width(), image->height()), radius, radius);

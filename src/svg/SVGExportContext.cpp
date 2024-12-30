@@ -317,7 +317,7 @@ bool SVGExportContext::RequiresViewportReset(const FillStyle& fill) {
     return false;
   }
 
-  if (const auto* imageShader = ShaderCaster::AsImageShader(shader.get())) {
+  if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
     return imageShader->tileModeX == TileMode::Repeat || imageShader->tileModeY == TileMode::Repeat;
   }
   return false;
@@ -384,7 +384,7 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
-  const auto* codecImage = ImageCaster::AsCodecImage(image.get());
+  const auto* codecImage = Caster::AsCodecImage(image.get());
   if (!codecImage) {
     return nullptr;
   }

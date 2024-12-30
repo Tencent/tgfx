@@ -85,8 +85,7 @@ class ShapeLayer : public Layer {
    * Returns the list of fill styles used to fill the shape's path. Each style can be a solid color,
    * gradient, or image pattern. The fill styles are drawn in the order they are added, followed by
    * the stroke styles on top of the filled shape. If the fill styles list is empty, the shape will
-   * not be filled. By default, the fill styles list contains a SolidColor with an opaque black
-   * color.
+   * not be filled. By default, the fill styles list is empty.
    */
   const std::vector<std::shared_ptr<ShapeStyle>>& fillStyles() const {
     return _fillStyles;
@@ -105,9 +104,7 @@ class ShapeLayer : public Layer {
   /**
    * Replace the current list of fill styles with the given fill style.
    */
-  void setFillStyle(std::shared_ptr<ShapeStyle> fill) {
-    setFillStyles({std::move(fill)});
-  }
+  void setFillStyle(std::shared_ptr<ShapeStyle> fill);
 
   /**
    * Adds a fill style to the end of the existing fill styles.
@@ -137,9 +134,7 @@ class ShapeLayer : public Layer {
   /**
    * Replace the current list of stroke styles with the given stroke style.
    */
-  void setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
-    setStrokeStyles({std::move(stroke)});
-  }
+  void setStrokeStyle(std::shared_ptr<ShapeStyle> stroke);
 
   /**
    * Adds a stroke style to the end of the existing stroke styles.
@@ -280,8 +275,7 @@ class ShapeLayer : public Layer {
   ~ShapeLayer() override;
 
  protected:
-  ShapeLayer() : _fillStyles({SolidColor::Make()}) {
-  }
+  ShapeLayer() = default;
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
