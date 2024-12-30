@@ -207,10 +207,11 @@ bool PngCodec::isAlphaOnly() const {
   return _isAlphaOnly;
 }
 
-std::shared_ptr<Data> PngCodec::encodedData() const {
+std::shared_ptr<Data> PngCodec::getEncodedData() const {
   if (fileData) {
     return fileData;
-  } else if (!filePath.empty()) {
+  }
+  if (!filePath.empty()) {
     return Data::MakeFromFile(filePath);
   }
   return nullptr;

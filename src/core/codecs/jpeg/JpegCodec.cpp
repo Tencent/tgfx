@@ -190,10 +190,11 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   return result;
 }
 
-std::shared_ptr<Data> JpegCodec::encodedData() const {
+std::shared_ptr<Data> JpegCodec::getEncodedData() const {
   if (fileData) {
     return fileData;
-  } else if (!filePath.empty()) {
+  }
+  if (!filePath.empty()) {
     return Data::MakeFromFile(filePath);
   }
   return nullptr;

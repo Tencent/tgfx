@@ -389,11 +389,8 @@ std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr
   if (!codecImage) {
     return nullptr;
   }
-  auto imageCodec = codecImage->getImageCodec();
-  if (!imageCodec) {
-    return nullptr;
-  }
-  return imageCodec->encodedData();
+  auto imageCodec = codecImage->codec();
+  return imageCodec->getEncodedData();
 }
 
 }  // namespace tgfx

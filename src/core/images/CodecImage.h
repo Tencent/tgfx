@@ -31,7 +31,7 @@ class CodecImage : public GeneratorImage {
 
   ~CodecImage() override = default;
 
-  std::shared_ptr<ImageCodec> getImageCodec() const;
+  std::shared_ptr<ImageCodec> codec() const;
 
  protected:
   Type type() const override {

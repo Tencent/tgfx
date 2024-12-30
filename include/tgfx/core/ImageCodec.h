@@ -87,7 +87,7 @@ class ImageCodec : public ImageGenerator {
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
-  virtual std::shared_ptr<Data> encodedData() const {
+  virtual std::shared_ptr<Data> getEncodedData() const {
     return nullptr;
   };
 

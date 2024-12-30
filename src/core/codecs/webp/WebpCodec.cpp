@@ -112,10 +112,11 @@ bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   return decodeSuccess;
 }
 
-std::shared_ptr<Data> WebpCodec::encodedData() const {
+std::shared_ptr<Data> WebpCodec::getEncodedData() const {
   if (fileData) {
     return fileData;
-  } else if (!filePath.empty()) {
+  }
+  if (!filePath.empty()) {
     return Data::MakeFromFile(filePath);
   }
   return nullptr;

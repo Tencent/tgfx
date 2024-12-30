@@ -37,7 +37,7 @@ class WebpCodec : public ImageCodec {
  protected:
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
-  std::shared_ptr<Data> encodedData() const override;
+  std::shared_ptr<Data> getEncodedData() const override;
 
  private:
   std::shared_ptr<Data> fileData;

@@ -34,7 +34,7 @@ CodecImage::CodecImage(const std::shared_ptr<ImageCodec>& codec)
     : GeneratorImage(UniqueKey::Make(), codec) {
 }
 
-std::shared_ptr<ImageCodec> CodecImage::getImageCodec() const {
+std::shared_ptr<ImageCodec> CodecImage::codec() const {
   return std::static_pointer_cast<ImageCodec>(generator);
 }
 
