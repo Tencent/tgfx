@@ -22,7 +22,7 @@ namespace drawers {
 void GridBackground::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   auto width = host->width();
   auto height = host->height();
-  canvas->clearRect(tgfx::Rect::MakeWH(width, height), tgfx::Color::White());
+  canvas->clear(tgfx::Color::White());
   tgfx::Paint paint = {};
   paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   int tileSize = 8 * static_cast<int>(host->density());

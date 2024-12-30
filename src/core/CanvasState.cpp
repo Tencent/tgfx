@@ -24,6 +24,7 @@ CanvasLayer::CanvasLayer(DrawContext* drawContext, const Paint* paint)
     : drawContext(drawContext), layerContext(std::make_unique<RecordingContext>()) {
   if (paint) {
     layerPaint = *paint;
+    layerPaint.setShader(nullptr);
   }
 }
 }  // namespace tgfx

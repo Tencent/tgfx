@@ -29,7 +29,7 @@ class LayerUnrollContext : public DrawContext {
     return unrolled;
   }
 
-  void clear() override;
+  void drawStyle(const MCState& state, const FillStyle& style) override;
 
   void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override;
 

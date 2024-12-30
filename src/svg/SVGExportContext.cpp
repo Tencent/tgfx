@@ -48,7 +48,7 @@ namespace tgfx {
 
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> xmlWriter, uint32_t exportFlags)
-    : exportFlags(exportFlags), context(context), writer(std::move(xmlWriter)),
+    : exportFlags(exportFlags), context(context), viewBox(viewBox), writer(std::move(xmlWriter)),
       resourceBucket(new ResourceStore) {
   if (viewBox.isEmpty()) {
     return;
@@ -69,6 +69,17 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                 FloatToString(viewBox.height());
     rootElement->addAttribute("viewBox", viewBoxString);
   }
+}
+
+void SVGExportContext::drawStyle(const MCState& state, const FillStyle& style) {
+  auto fillStyle = style;
+  if (fillStyle.shader) {
+    fillStyle.shader = fillStyle.shader->makeWithMatrix(state.matrix);
+  }
+  if (fillStyle.maskFilter) {
+    fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(state.matrix);
+  }
+  drawRect(viewBox, MCState{state.clip}, fillStyle);
 }
 
 void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& fill) {
@@ -130,9 +141,7 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const MCState& state, const FillStyle& style) {
-  if (image == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
   return drawImageRect(std::move(image), rect, sampling, state, style);
 }
@@ -140,10 +149,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions&, const MCState& state,
                                      const FillStyle& style) {
-  if (image == nullptr) {
-    return;
-  }
-
+  DEBUG_ASSERT(image != nullptr);
   Bitmap bitmap = ImageExportToBitmap(context, image);
   if (!bitmap.isEmpty()) {
     Rect srcRect = Rect::MakeWH(image->width(), image->height());
@@ -190,10 +196,7 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
 void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                         const Stroke* stroke, const MCState& state,
                                         const FillStyle& style) {
-  if (!glyphRunList) {
-    return;
-  }
-
+  DEBUG_ASSERT(glyphRunList != nullptr);
   bool hasFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
 
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
@@ -284,18 +287,14 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
 }
 
 void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  if (picture != nullptr) {
-    picture->playback(this, state);
-  }
+  DEBUG_ASSERT(picture != nullptr);
+  picture->playback(this, state);
 }
 
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
                                  const FillStyle&) {
-  if (picture == nullptr) {
-    return;
-  }
-
+  DEBUG_ASSERT(picture != nullptr);
   Resources resources;
   if (imageFilter) {
     ElementWriter defs("defs", writer, resourceBucket.get());

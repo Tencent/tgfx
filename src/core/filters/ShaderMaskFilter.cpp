@@ -27,6 +27,11 @@ std::shared_ptr<MaskFilter> MaskFilter::MakeShader(std::shared_ptr<Shader> shade
   return std::make_shared<ShaderMaskFilter>(std::move(shader), inverted);
 }
 
+std::shared_ptr<MaskFilter> ShaderMaskFilter::makeWithMatrix(const Matrix& viewMatrix) const {
+  auto newShader = shader->makeWithMatrix(viewMatrix);
+  return MakeShader(std::move(newShader), inverted);
+}
+
 std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto processor = FragmentProcessor::Make(shader, args, uvMatrix);

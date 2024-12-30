@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-void MeasureContext::clear() {
-  bounds.setEmpty();
+void MeasureContext::drawStyle(const MCState& state, const FillStyle&) {
+  addDeviceBounds(state.clip, Rect::MakeEmpty(), true);
 }
 
 void MeasureContext::drawRect(const Rect& rect, const MCState& state, const FillStyle&) {
@@ -39,9 +40,7 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
                                const MCState& state, const FillStyle&) {
-  if (image == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
   addLocalBounds(state, rect);
 }
@@ -64,20 +63,17 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
 void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
                                const FillStyle&) {
-  if (picture == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(picture != nullptr);
   auto deviceBounds = picture->getBounds(&state.matrix);
   if (imageFilter) {
     deviceBounds = imageFilter->filterBounds(deviceBounds);
   }
-  addDeviceBounds(state.clip, deviceBounds);
+  addDeviceBounds(state.clip, deviceBounds, picture->hasUnboundedFill());
 }
 
 void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  if (picture != nullptr) {
-    picture->playback(this, state);
-  }
+  DEBUG_ASSERT(picture != nullptr);
+  picture->playback(this, state);
 }
 
 void MeasureContext::addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {

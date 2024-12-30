@@ -23,7 +23,6 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
-#include "core/CanvasState.h"
 #include "core/DrawContext.h"
 #include "core/FillStyle.h"
 #include "svg/SVGTextBuilder.h"
@@ -53,13 +52,14 @@ class SVGExportContext : public DrawContext {
     canvas = inputCanvas;
   }
 
-  void clear() override{};
+  void drawStyle(const MCState& state, const FillStyle& style) override;
 
-  void drawRect(const Rect&, const MCState&, const FillStyle&) override;
+  void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override;
 
-  void drawRRect(const RRect&, const MCState&, const FillStyle&) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) override;
 
-  void drawShape(std::shared_ptr<Shape>, const MCState&, const FillStyle&) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                 const FillStyle& style) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const FillStyle& style) override;
@@ -71,7 +71,7 @@ class SVGExportContext : public DrawContext {
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
                         const MCState& state, const FillStyle& style) override;
 
-  void drawPicture(std::shared_ptr<Picture>, const MCState&) override;
+  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
                  const MCState& state, const FillStyle& style) override;
@@ -109,6 +109,7 @@ class SVGExportContext : public DrawContext {
 
   uint32_t exportFlags = {};
   Context* context = nullptr;
+  Rect viewBox = Rect::MakeEmpty();
   Canvas* canvas = nullptr;
   const std::unique_ptr<XMLWriter> writer = nullptr;
   const std::unique_ptr<ResourceStore> resourceBucket = nullptr;
