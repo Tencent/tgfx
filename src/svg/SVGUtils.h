@@ -75,4 +75,6 @@ void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret);
  */
 std::shared_ptr<Data> AsDataUri(const Pixmap& pixmap);
 
+std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData);
+
 }  // namespace tgfx

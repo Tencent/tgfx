@@ -23,6 +23,8 @@
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
+#include "core/codecs/jpeg/JpegCodec.h"
+#include "core/codecs/png/PngCodec.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
@@ -496,12 +498,19 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, Context* 
   auto image = shader->image;
   DEBUG_ASSERT(image);
 
-  DEBUG_ASSERT(context);
-  Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, image);
-  if (bitmap.isEmpty()) {
-    return;
+  std::shared_ptr<Data> dataUri = nullptr;
+
+  auto data = SVGExportContext::ImageToEncodedData(image);
+  if (data && (JpegCodec::IsJpeg(data) || PngCodec::IsPng(data))) {
+    dataUri = AsDataUri(data);
+  } else {
+    Bitmap bitmap = SVGExportContext::ImageExportToBitmap(context, image);
+    if (bitmap.isEmpty()) {
+      return;
+    }
+    dataUri = AsDataUri(Pixmap(bitmap));
   }
-  auto dataUri = AsDataUri(Pixmap(bitmap));
+
   if (!dataUri) {
     return;
   }

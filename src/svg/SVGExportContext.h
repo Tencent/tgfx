@@ -85,6 +85,11 @@ class SVGExportContext : public DrawContext {
    */
   static Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image);
 
+  /**
+   * Returns the encoded pixel data if the image was created from a supported encoded format.
+   */
+  static std::shared_ptr<Data> ImageToEncodedData(const std::shared_ptr<Image>& image);
+
  private:
   /**
    * Determine if the paint requires us to reset the viewport.Currently, we do this whenever the

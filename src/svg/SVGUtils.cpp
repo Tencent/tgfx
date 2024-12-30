@@ -20,6 +20,8 @@
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
+#include "core/codecs/jpeg/JpegCodec.h"
+#include "core/codecs/png/PngCodec.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
@@ -253,19 +255,32 @@ std::shared_ptr<Data> AsDataUri(const Pixmap& pixmap) {
   if (pixmap.isEmpty()) {
     return nullptr;
   }
-  static constexpr auto pngPrefix = "data:image/png;base64,";
-  size_t prefixLength = strlen(pngPrefix);
 
   auto imageData = ImageCodec::Encode(pixmap, EncodedFormat::PNG, 100);
   if (!imageData) {
     return nullptr;
   }
+  return AsDataUri(imageData);
+}
 
-  size_t base64Size = ((imageData->size() + 2) / 3) * 4;
+std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
+  static constexpr auto pngPrefix = "data:image/png;base64,";
+  static constexpr auto jpgPrefix = "data:image/jpeg;base64,";
+
+  const char* prefix = nullptr;
+  if (PngCodec::IsPng(encodedData)) {
+    prefix = pngPrefix;
+  } else if (JpegCodec::IsJpeg(encodedData)) {
+    prefix = jpgPrefix;
+  } else {
+    return nullptr;
+  }
+  size_t prefixLength = strlen(prefix);
+  size_t base64Size = ((encodedData->size() + 2) / 3) * 4;
   auto bufferSize = prefixLength + base64Size;
   auto* dest = static_cast<char*>(malloc(bufferSize));
   memcpy(dest, pngPrefix, prefixLength);
-  Base64Encode(imageData->bytes(), imageData->size(), dest + prefixLength);
+  Base64Encode(encodedData->bytes(), encodedData->size(), dest + prefixLength);
   dest[bufferSize - 1] = '\0';
 
   auto dataUri = Data::MakeAdopted(dest, bufferSize, Data::FreeProc);

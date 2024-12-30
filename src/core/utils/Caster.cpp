@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Caster.h"
+#include "core/images/CodecImage.h"
 #include "core/shaders/ColorShader.h"
 
 namespace tgfx {
@@ -80,6 +81,13 @@ const MatrixColorFilter* ColorFilterCaster::AsMatrixColorFilter(const ColorFilte
 const PictureImage* ImageCaster::AsPictureImage(const Image* image) {
   if (image->type() == Image::Type::Picture) {
     return static_cast<const PictureImage*>(image);
+  }
+  return nullptr;
+}
+
+const CodecImage* ImageCaster::AsCodecImage(const Image* image) {
+  if (image->type() == Image::Type::Codec) {
+    return static_cast<const CodecImage*>(image);
   }
   return nullptr;
 }

@@ -23,10 +23,13 @@
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/images/CodecImage.h"
+#include "core/images/GeneratorImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/MaskFilter.h"
 
 #pragma once
@@ -61,6 +64,8 @@ class ColorFilterCaster {
 class ImageCaster {
  public:
   static const PictureImage* AsPictureImage(const Image* image);
+
+  static const CodecImage* AsCodecImage(const Image* image);
 };
 
 class MaskFilterCaster {

@@ -291,6 +291,7 @@ class Image {
  protected:
   enum class Type {
     Buffer,
+    Codec,
     Decoder,
     Filter,
     Generator,

@@ -380,13 +380,16 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
   auto surface = Surface::Make(context, image->width(), image->height());
   auto* canvas = surface->getCanvas();
   canvas->drawImage(image);
-
-  Bitmap bitmap(image->width(), image->height(), false, false);
-  Pixmap pixmap(bitmap);
-  if (surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
-    return bitmap;
-  }
   return Bitmap();
+}
+
+std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
+  const auto* codecImage = ImageCaster::AsCodecImage(image.get());
+  if (!codecImage) {
+    return nullptr;
+  }
+  auto imageCodec = codecImage->codec();
+  return imageCodec->getEncodedData();
 }
 
 }  // namespace tgfx

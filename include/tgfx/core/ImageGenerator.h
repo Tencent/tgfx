@@ -77,5 +77,7 @@ class ImageGenerator {
  private:
   int _width = 0;
   int _height = 0;
+
+  friend class ImageGeneratorCaster;
 };
 }  // namespace tgfx
