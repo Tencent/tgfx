@@ -225,7 +225,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
-    if (const auto* blurFilter = ImageFilterCaster::AsBlurImageFilter(imageFilter.get())) {
+    if (const auto* blurFilter = Caster::AsBlurImageFilter(imageFilter.get())) {
       bound = blurFilter->filterBounds(bound);
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
@@ -233,8 +233,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
       addBlurImageFilter(blurFilter);
-    } else if (const auto* dropShadowFilter =
-                   ImageFilterCaster::AsDropShadowImageFilter(imageFilter.get())) {
+    } else if (const auto* dropShadowFilter = Caster::AsDropShadowImageFilter(imageFilter.get())) {
       bound = blurFilter->filterBounds(bound);
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
@@ -243,7 +242,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
       addDropShadowImageFilter(dropShadowFilter);
     } else if (const auto* innerShadowFilter =
-                   ImageFilterCaster::AsInnerShadowImageFilter(imageFilter.get())) {
+                   Caster::AsInnerShadowImageFilter(imageFilter.get())) {
       bound = blurFilter->filterBounds(bound);
       filterElement.addAttribute("x", bound.x());
       filterElement.addAttribute("y", bound.y());
@@ -367,10 +366,9 @@ Resources ElementWriter::addResources(const FillStyle& fill, Context* context,
   }
 
   if (auto colorFilter = fill.colorFilter) {
-    if (const auto* blendFilter = ColorFilterCaster::AsModeColorFilter(colorFilter.get())) {
+    if (const auto* blendFilter = Caster::AsModeColorFilter(colorFilter.get())) {
       addBlendColorFilterResources(blendFilter, &resources);
-    } else if (const auto* matrixFilter =
-                   ColorFilterCaster::AsMatrixColorFilter(colorFilter.get())) {
+    } else if (const auto* matrixFilter = Caster::AsMatrixColorFilter(colorFilter.get())) {
       addMatrixColorFilterResources(matrixFilter, &resources);
     } else {
       reportUnsupportedElement("Unsupported color filter");
@@ -386,11 +384,11 @@ Resources ElementWriter::addResources(const FillStyle& fill, Context* context,
 
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                                        Resources* resources) {
-  if (const auto* colorShader = ShaderCaster::AsColorShader(shader.get())) {
+  if (const auto* colorShader = Caster::AsColorShader(shader.get())) {
     addColorShaderResources(colorShader, resources);
-  } else if (const auto* gradientShader = ShaderCaster::AsGradientShader(shader.get())) {
+  } else if (const auto* gradientShader = Caster::AsGradientShader(shader.get())) {
     addGradientShaderResources(gradientShader, resources);
-  } else if (const auto* imageShader = ShaderCaster::AsImageShader(shader.get())) {
+  } else if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
     addImageShaderResources(imageShader, context, resources);
   } else {
     // TODO(YGaurora):
@@ -629,7 +627,7 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
                                      Resources* resources, Context* context,
                                      SVGExportContext* svgContext) {
 
-  const auto* maskShaderFilter = MaskFilterCaster::AsShaderMaskFilter(maskFilter.get());
+  const auto* maskShaderFilter = Caster::AsShaderMaskFilter(maskFilter.get());
   if (!maskShaderFilter) {
     return;
   }
@@ -651,7 +649,7 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
   }
 
   auto maskShader = maskShaderFilter->getShader();
-  if (const auto* imageShader = ShaderCaster::AsImageShader(maskShader.get())) {
+  if (const auto* imageShader = Caster::AsImageShader(maskShader.get())) {
     auto image = imageShader->image;
 
     ElementWriter maskElement("mask", writer);
@@ -665,8 +663,8 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
     addImageMaskResources(imageShader, filterID, context, svgContext);
 
     resources->mask = "url(#" + maskID + ")";
-  } else if (ShaderCaster::AsColorShader(maskShader.get()) ||
-             ShaderCaster::AsGradientShader(maskShader.get())) {
+  } else if (Caster::AsColorShader(maskShader.get()) ||
+             Caster::AsGradientShader(maskShader.get())) {
     ElementWriter maskElement("mask", writer);
     auto maskID = resourceStore->addMask();
     maskElement.addAttribute("id", maskID);
@@ -689,7 +687,7 @@ void ElementWriter::addImageMaskResources(const ImageShader* imageShader,
                                           const std::string& filterID, Context* context,
                                           SVGExportContext* svgContext) {
   auto image = imageShader->image;
-  if (const auto* pictureImage = ImageCaster::AsPictureImage(image.get())) {
+  if (const auto* pictureImage = Caster::AsPictureImage(image.get())) {
     addPictureImageMaskResources(pictureImage, filterID, svgContext);
   } else {
     addRenderImageMaskResources(imageShader, filterID, context);
