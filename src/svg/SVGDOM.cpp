@@ -48,11 +48,14 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(const std::shared_ptr<Data>& data) {
   if (!data) {
     return nullptr;
   }
+  // Parse the data into an XML DOM structure
   auto xmlDom = DOM::MakeFromData(*data);
   if (!xmlDom) {
     return nullptr;
   }
 
+  // Convert the XML structure to an SVG structure, translating XML elements and attributes into
+  // SVG elements and attributes
   SVGIDMapper mapper;
   ConstructionContext constructionContext(&mapper);
   auto root =
@@ -61,6 +64,7 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(const std::shared_ptr<Data>& data) {
     return nullptr;
   }
 
+  // Create SVGDOM with the root node and ID mapper
   return std::shared_ptr<SVGDOM>(
       new SVGDOM(std::static_pointer_cast<SVGSVG>(root), std::move(mapper)));
 }
