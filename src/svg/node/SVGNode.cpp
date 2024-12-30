@@ -150,32 +150,33 @@ Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
     const auto sx = viewPort.width() / viewBox.width();
     const auto sy = viewPort.height() / viewBox.height();
 
-    if (par.align == SVGPreserveAspectRatio::None) {
+    if (par.align == SVGPreserveAspectRatio::Align::None) {
       // none -> anisotropic scaling, regardless of fScale
       return {sx, sy};
     }
 
     // isotropic scaling
-    const auto s = par.scale == SVGPreserveAspectRatio::Meet ? std::min(sx, sy) : std::max(sx, sy);
+    const auto s =
+        par.scale == SVGPreserveAspectRatio::Scale::Meet ? std::min(sx, sy) : std::max(sx, sy);
     return {s, s};
   };
 
   auto compute_trans = [&](const Point& scale) -> Point {
-    static constexpr float gAlignCoeffs[] = {
+    static constexpr float alignCoeffs[] = {
         0.0f,  // Min
         0.5f,  // Mid
         1.0f   // Max
     };
 
-    const size_t x_coeff = par.align >> 0 & 0x03;
-    const size_t y_coeff = par.align >> 2 & 0x03;
+    const size_t x_coeff = static_cast<int>(par.align) >> 0 & 0x03;
+    const size_t y_coeff = static_cast<int>(par.align) >> 2 & 0x03;
 
     const auto tx = -viewBox.x() * scale.x;
     const auto ty = -viewBox.y() * scale.y;
     const auto dx = viewPort.width() - viewBox.width() * scale.x;
     const auto dy = viewPort.height() - viewBox.height() * scale.y;
 
-    return {tx + dx * gAlignCoeffs[x_coeff], ty + dy * gAlignCoeffs[y_coeff]};
+    return {tx + dx * alignCoeffs[x_coeff], ty + dy * alignCoeffs[y_coeff]};
   };
 
   const auto s = compute_scale();

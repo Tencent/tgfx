@@ -46,13 +46,12 @@ enum class SVGPropertyState {
 };
 
 // https://www.w3.org/TR/SVG11/intro.html#TermProperty
-template <typename T, bool kInheritable>
+template <typename T, bool Inheritable>
 class SVGProperty {
  public:
   using ValueT = T;
 
-  SVGProperty() : _state(SVGPropertyState::Unspecified) {
-  }
+  SVGProperty() = default;
 
   explicit SVGProperty(SVGPropertyState state) : _state(state) {
   }
@@ -72,7 +71,7 @@ class SVGProperty {
   }
 
   constexpr bool isInheritable() const {
-    return kInheritable;
+    return Inheritable;
   }
 
   bool isValue() const {
@@ -117,7 +116,7 @@ class SVGProperty {
   }
 
  private:
-  SVGPropertyState _state;
+  SVGPropertyState _state = SVGPropertyState::Unspecified;
   std::optional<T> _value;
 };
 
@@ -137,15 +136,10 @@ class SVGLength {
     PC,
   };
 
-  constexpr SVGLength() : _value(0), _unit(Unit::Unknown) {
+  SVGLength() = default;
+
+  explicit SVGLength(float v, Unit u = Unit::Number) : _value(v), _unit(u) {
   }
-
-  explicit constexpr SVGLength(float v, Unit u = Unit::Number) : _value(v), _unit(u) {
-  }
-
-  SVGLength(const SVGLength&) = default;
-
-  SVGLength& operator=(const SVGLength&) = default;
 
   bool operator==(const SVGLength& other) const {
     return _unit == other._unit && _value == other._value;
@@ -164,8 +158,8 @@ class SVGLength {
   }
 
  private:
-  float _value;
-  Unit _unit;
+  float _value = 0.0f;
+  Unit _unit = Unit::Unknown;
 };
 
 // https://www.w3.org/TR/SVG11/linking.html#IRIReference
@@ -177,8 +171,7 @@ class SVGIRI {
     DataURI,
   };
 
-  SVGIRI() : _type(Type::Local) {
-  }
+  SVGIRI() = default;
 
   SVGIRI(Type t, SVGStringType iri) : _type(t), _iri(std::move(iri)) {
   }
@@ -200,8 +193,8 @@ class SVGIRI {
   }
 
  private:
-  Type _type;
-  SVGStringType _iri;
+  Type _type = Type::Local;
+  SVGStringType _iri = {};
 };
 
 // https://www.w3.org/TR/SVG11/types.html#InterfaceSVGColor
@@ -215,26 +208,18 @@ class SVGColor {
 
   using Vars = std::vector<std::string>;
 
-  SVGColor() : SVGColor(Color::Black()) {
-  }
+  SVGColor() = default;
 
-  explicit SVGColor(const SVGColorType& c) : _type(Type::Color), _color(c), _vars(nullptr) {
+  explicit SVGColor(const SVGColorType& c) : _color(c) {
   }
 
   SVGColor(Type t, Vars&& vars)
-      : _type(t), _color(Color::Black()),
-        _vars(vars.empty() ? nullptr : std::make_shared<Vars>(std::move(vars))) {
+      : _type(t), _vars(vars.empty() ? nullptr : std::make_shared<Vars>(std::move(vars))) {
   }
 
   SVGColor(const SVGColorType& c, Vars&& vars)
-      : _type(Type::Color), _color(c),
-        _vars(vars.empty() ? nullptr : std::make_shared<Vars>(std::move(vars))) {
+      : _color(c), _vars(vars.empty() ? nullptr : std::make_shared<Vars>(std::move(vars))) {
   }
-
-  SVGColor(const SVGColor&) = default;
-  SVGColor& operator=(const SVGColor&) = default;
-  SVGColor(SVGColor&&) = default;
-  SVGColor& operator=(SVGColor&&) = default;
 
   bool operator==(const SVGColor& other) const {
     return _type == other._type && _color == other._color && _vars == other._vars;
@@ -256,14 +241,10 @@ class SVGColor {
     return _vars ? _vars : nullptr;
   }
 
-  std::shared_ptr<Vars> vars() {
-    return _vars ? _vars : nullptr;
-  }
-
  private:
-  Type _type;
-  SVGColorType _color;
-  std::shared_ptr<Vars> _vars;
+  Type _type = Type::Color;
+  SVGColorType _color = Color::Black();
+  std::shared_ptr<Vars> _vars = nullptr;
 };
 
 class SVGPaint {
@@ -274,24 +255,22 @@ class SVGPaint {
     IRI,
   };
 
-  SVGPaint() : _type(Type::None), _color(Color::Black()) {
-  }
+  SVGPaint() = default;
+
   explicit SVGPaint(Type t) : _type(t), _color(Color::Black()) {
   }
-  explicit SVGPaint(SVGColor c) : _type(Type::Color), _color(std::move(c)) {
-  }
-  SVGPaint(SVGIRI iri, SVGColor fallback_color)
-      : _type(Type::IRI), _color(std::move(fallback_color)), _iri(std::move(iri)) {
+
+  explicit SVGPaint(const SVGColor& color) : _type(Type::Color), _color(std::move(color)) {
   }
 
-  SVGPaint(const SVGPaint&) = default;
-  SVGPaint& operator=(const SVGPaint&) = default;
-  SVGPaint(SVGPaint&&) = default;
-  SVGPaint& operator=(SVGPaint&&) = default;
+  SVGPaint(SVGIRI iri, SVGColor color)
+      : _type(Type::IRI), _color(std::move(color)), _iri(std::move(iri)) {
+  }
 
   bool operator==(const SVGPaint& other) const {
     return _type == other._type && _color == other._color && _iri == other._iri;
   }
+
   bool operator!=(const SVGPaint& other) const {
     return !(*this == other);
   }
@@ -299,17 +278,19 @@ class SVGPaint {
   Type type() const {
     return _type;
   }
+
   const SVGColor& color() const {
     return _color;
   }
+
   const SVGIRI& iri() const {
     return _iri;
   }
 
  private:
-  Type _type;
-  SVGColor _color;
-  SVGIRI _iri;
+  Type _type = Type::None;
+  SVGColor _color = SVGColor(Color::Black());
+  SVGIRI _iri = {};
 };
 
 // <funciri> | none (used for clip/mask/filter properties)
@@ -320,8 +301,7 @@ class SVGFuncIRI {
     IRI,
   };
 
-  SVGFuncIRI() : _type(Type::None) {
-  }
+  SVGFuncIRI() = default;
 
   explicit SVGFuncIRI(Type t) : _type(t) {
   }
@@ -346,8 +326,8 @@ class SVGFuncIRI {
   }
 
  private:
-  Type _type;
-  SVGIRI _iri;
+  Type _type = Type::None;
+  SVGIRI _iri = {};
 };
 
 enum class SVGLineCap {
@@ -365,17 +345,15 @@ class SVGLineJoin {
     Inherit,
   };
 
-  constexpr SVGLineJoin() : _type(Type::Inherit) {
-  }
-  constexpr explicit SVGLineJoin(Type t) : _type(t) {
-  }
+  SVGLineJoin() = default;
 
-  SVGLineJoin(const SVGLineJoin&) = default;
-  SVGLineJoin& operator=(const SVGLineJoin&) = default;
+  explicit SVGLineJoin(Type t) : _type(t) {
+  }
 
   bool operator==(const SVGLineJoin& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGLineJoin& other) const {
     return !(*this == other);
   }
@@ -385,7 +363,7 @@ class SVGLineJoin {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Inherit;
 };
 
 class SVGSpreadMethod {
@@ -396,17 +374,15 @@ class SVGSpreadMethod {
     Reflect,
   };
 
-  constexpr SVGSpreadMethod() : _type(Type::Pad) {
-  }
-  constexpr explicit SVGSpreadMethod(Type t) : _type(t) {
-  }
+  SVGSpreadMethod() = default;
 
-  SVGSpreadMethod(const SVGSpreadMethod&) = default;
-  SVGSpreadMethod& operator=(const SVGSpreadMethod&) = default;
+  explicit SVGSpreadMethod(Type t) : _type(t) {
+  }
 
   bool operator==(const SVGSpreadMethod& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGSpreadMethod& other) const {
     return !(*this == other);
   }
@@ -416,7 +392,7 @@ class SVGSpreadMethod {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Pad;
 };
 
 class SVGFillRule {
@@ -427,17 +403,15 @@ class SVGFillRule {
     Inherit,
   };
 
-  constexpr SVGFillRule() : _type(Type::Inherit) {
-  }
-  constexpr explicit SVGFillRule(Type t) : _type(t) {
-  }
+  SVGFillRule() = default;
 
-  SVGFillRule(const SVGFillRule&) = default;
-  SVGFillRule& operator=(const SVGFillRule&) = default;
+  explicit SVGFillRule(Type t) : _type(t) {
+  }
 
   bool operator==(const SVGFillRule& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGFillRule& other) const {
     return !(*this == other);
   }
@@ -451,7 +425,7 @@ class SVGFillRule {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Inherit;
 };
 
 class SVGVisibility {
@@ -463,17 +437,15 @@ class SVGVisibility {
     Inherit,
   };
 
-  constexpr SVGVisibility() : _type(Type::Visible) {
-  }
-  constexpr explicit SVGVisibility(Type t) : _type(t) {
-  }
+  SVGVisibility() = default;
 
-  SVGVisibility(const SVGVisibility&) = default;
-  SVGVisibility& operator=(const SVGVisibility&) = default;
+  explicit SVGVisibility(Type t) : _type(t) {
+  }
 
   bool operator==(const SVGVisibility& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGVisibility& other) const {
     return !(*this == other);
   }
@@ -483,7 +455,7 @@ class SVGVisibility {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Visible;
 };
 
 class SVGDashArray {
@@ -494,20 +466,19 @@ class SVGDashArray {
     Inherit,
   };
 
-  SVGDashArray() : _type(Type::None) {
-  }
+  SVGDashArray() = default;
+
   explicit SVGDashArray(Type t) : _type(t) {
   }
+
   explicit SVGDashArray(std::vector<SVGLength>&& dashArray)
       : _type(Type::DashArray), _dashArray(std::move(dashArray)) {
   }
 
-  SVGDashArray(const SVGDashArray&) = default;
-  SVGDashArray& operator=(const SVGDashArray&) = default;
-
   bool operator==(const SVGDashArray& other) const {
     return _type == other._type && _dashArray == other._dashArray;
   }
+
   bool operator!=(const SVGDashArray& other) const {
     return !(*this == other);
   }
@@ -521,28 +492,26 @@ class SVGDashArray {
   }
 
  private:
-  Type _type;
+  Type _type = Type::None;
   std::vector<SVGLength> _dashArray;
 };
 
 class SVGStopColor {
  public:
   enum class Type {
-    kColor,
-    kCurrentColor,
-    kICCColor,
-    kInherit,
+    Color,
+    CurrentColor,
+    ICCColor,
+    Inherit,
   };
 
-  SVGStopColor() : _type(Type::kColor), _color(Color::Black()) {
-  }
+  SVGStopColor() = default;
+
   explicit SVGStopColor(Type t) : _type(t), _color(Color::Black()) {
   }
-  explicit SVGStopColor(const SVGColorType& c) : _type(Type::kColor), _color(c) {
-  }
 
-  SVGStopColor(const SVGStopColor&) = default;
-  SVGStopColor& operator=(const SVGStopColor&) = default;
+  explicit SVGStopColor(const SVGColorType& c) : _type(Type::Color), _color(c) {
+  }
 
   bool operator==(const SVGStopColor& other) const {
     return _type == other._type && _color == other._color;
@@ -559,8 +528,8 @@ class SVGStopColor {
   }
 
  private:
-  Type _type;
-  SVGColorType _color;
+  Type _type = Type::Color;
+  SVGColorType _color = Color::Black();
 };
 
 class SVGObjectBoundingBoxUnits {
@@ -570,8 +539,8 @@ class SVGObjectBoundingBoxUnits {
     ObjectBoundingBox,
   };
 
-  SVGObjectBoundingBoxUnits() : _type(Type::UserSpaceOnUse) {
-  }
+  SVGObjectBoundingBoxUnits() = default;
+
   explicit SVGObjectBoundingBoxUnits(Type t) : _type(t) {
   }
 
@@ -587,7 +556,7 @@ class SVGObjectBoundingBoxUnits {
   }
 
  private:
-  Type _type;
+  Type _type = Type::UserSpaceOnUse;
 };
 
 class SVGFontFamily {
@@ -597,14 +566,15 @@ class SVGFontFamily {
     Inherit,
   };
 
-  SVGFontFamily() : _type(Type::Inherit) {
-  }
+  SVGFontFamily() = default;
+
   explicit SVGFontFamily(std::string family) : _type(Type::Family), _family(std::move(family)) {
   }
 
   bool operator==(const SVGFontFamily& other) const {
     return _type == other._type && _family == other._family;
   }
+
   bool operator!=(const SVGFontFamily& other) const {
     return !(*this == other);
   }
@@ -618,7 +588,7 @@ class SVGFontFamily {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Inherit;
   std::string _family;
 };
 
@@ -631,14 +601,15 @@ class SVGFontStyle {
     Inherit,
   };
 
-  SVGFontStyle() : _type(Type::Inherit) {
-  }
+  SVGFontStyle() = default;
+
   explicit SVGFontStyle(Type t) : _type(t) {
   }
 
   bool operator==(const SVGFontStyle& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGFontStyle& other) const {
     return !(*this == other);
   }
@@ -648,7 +619,7 @@ class SVGFontStyle {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Inherit;
 };
 
 class SVGFontSize {
@@ -658,14 +629,15 @@ class SVGFontSize {
     Inherit,
   };
 
-  SVGFontSize() : _type(Type::Inherit), _size(0) {
-  }
+  SVGFontSize() = default;
+
   explicit SVGFontSize(const SVGLength& s) : _type(Type::Length), _size(s) {
   }
 
   bool operator==(const SVGFontSize& other) const {
     return _type == other._type && _size == other._size;
   }
+
   bool operator!=(const SVGFontSize& other) const {
     return !(*this == other);
   }
@@ -679,8 +651,8 @@ class SVGFontSize {
   }
 
  private:
-  Type _type;
-  SVGLength _size;
+  Type _type = Type::Inherit;
+  SVGLength _size = SVGLength(0.0f);
 };
 
 class SVGFontWeight {
@@ -702,14 +674,15 @@ class SVGFontWeight {
     Inherit,
   };
 
-  SVGFontWeight() : _type(Type::Inherit) {
-  }
+  SVGFontWeight() = default;
+
   explicit SVGFontWeight(Type t) : _type(t) {
   }
 
   bool operator==(const SVGFontWeight& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGFontWeight& other) const {
     return !(*this == other);
   }
@@ -719,11 +692,11 @@ class SVGFontWeight {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Inherit;
 };
 
 struct SVGPreserveAspectRatio {
-  enum Align : uint8_t {
+  enum class Align {
     // These values are chosen such that bits [0,1] encode X alignment, and
     // bits [2,3] encode Y alignment.
     XMinYMin = 0x00,
@@ -739,13 +712,13 @@ struct SVGPreserveAspectRatio {
     None = 0x10,
   };
 
-  enum Scale {
+  enum class Scale {
     Meet,
     Slice,
   };
 
-  Align align = XMidYMid;
-  Scale scale = Meet;
+  Align align = Align::XMidYMid;
+  Scale scale = Scale::Meet;
 };
 
 class SVGTextAnchor {
@@ -757,14 +730,15 @@ class SVGTextAnchor {
     Inherit,
   };
 
-  SVGTextAnchor() : _type(Type::Inherit) {
-  }
+  SVGTextAnchor() = default;
+
   explicit SVGTextAnchor(Type t) : _type(t) {
   }
 
   bool operator==(const SVGTextAnchor& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGTextAnchor& other) const {
     return !(*this == other);
   }
@@ -774,7 +748,7 @@ class SVGTextAnchor {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Inherit;
 };
 
 // https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveInAttribute
@@ -791,10 +765,11 @@ class SVGFeInputType {
     Unspecified,
   };
 
-  SVGFeInputType() : _type(Type::Unspecified) {
-  }
+  SVGFeInputType() = default;
+
   explicit SVGFeInputType(Type t) : _type(t) {
   }
+
   explicit SVGFeInputType(SVGStringType id)
       : _type(Type::FilterPrimitiveReference), _id(std::move(id)) {
   }
@@ -802,6 +777,7 @@ class SVGFeInputType {
   bool operator==(const SVGFeInputType& other) const {
     return _type == other._type && _id == other._id;
   }
+
   bool operator!=(const SVGFeInputType& other) const {
     return !(*this == other);
   }
@@ -815,7 +791,7 @@ class SVGFeInputType {
   }
 
  private:
-  Type _type;
+  Type _type = Type::Unspecified;
   std::string _id;
 };
 
@@ -839,8 +815,8 @@ enum class SVGFeCompositeOperator {
 
 class SVGFeTurbulenceBaseFrequency {
  public:
-  SVGFeTurbulenceBaseFrequency() : _freqX(0), _freqY(0) {
-  }
+  SVGFeTurbulenceBaseFrequency() = default;
+
   SVGFeTurbulenceBaseFrequency(SVGNumberType freqX, SVGNumberType freqY)
       : _freqX(freqX), _freqY(freqY) {
   }
@@ -848,25 +824,26 @@ class SVGFeTurbulenceBaseFrequency {
   SVGNumberType freqX() const {
     return _freqX;
   }
+
   SVGNumberType freqY() const {
     return _freqY;
   }
 
  private:
-  SVGNumberType _freqX;
-  SVGNumberType _freqY;
+  SVGNumberType _freqX = 0.0;
+  SVGNumberType _freqY = 0.0;
 };
 
 struct SVGFeTurbulenceType {
-  enum Type {
+  enum class Type {
     FractalNoise,
     Turbulence,
   };
 
-  Type type;
+  Type type = Type::Turbulence;
 
-  SVGFeTurbulenceType() : type(Turbulence) {
-  }
+  SVGFeTurbulenceType() = default;
+
   explicit SVGFeTurbulenceType(Type inputType) : type(inputType) {
   }
 };

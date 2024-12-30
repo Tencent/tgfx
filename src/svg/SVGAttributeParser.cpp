@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGUtils.h"
@@ -823,10 +824,11 @@ bool SVGAttributeParser::parse(SVGLineCap* cap) {
 // https://www.w3.org/TR/SVG11/painting.html#StrokeLinejoinProperty
 template <>
 bool SVGAttributeParser::parse(SVGLineJoin* join) {
-  static const struct {
-    SVGLineJoin::Type fType;
-    const char* fName;
-  } gJoinInfo[] = {
+  struct JoinInfo {
+    SVGLineJoin::Type type;
+    const char* name;
+  };
+  static const std::vector<JoinInfo> joinInfoMap = {
       {SVGLineJoin::Type::Miter, "miter"},
       {SVGLineJoin::Type::Round, "round"},
       {SVGLineJoin::Type::Bevel, "bevel"},
@@ -834,9 +836,9 @@ bool SVGAttributeParser::parse(SVGLineJoin* join) {
   };
 
   bool parsedValue = false;
-  for (size_t i = 0; i < std::size(gJoinInfo); ++i) {
-    if (this->parseExpectedStringToken(gJoinInfo[i].fName)) {
-      *join = SVGLineJoin(gJoinInfo[i].fType);
+  for (auto i : joinInfoMap) {
+    if (this->parseExpectedStringToken(i.name)) {
+      *join = SVGLineJoin(i.type);
       parsedValue = true;
       break;
     }
@@ -1099,21 +1101,21 @@ bool SVGAttributeParser::parse(SVGTextAnchor* anchor) {
 // https://www.w3.org/TR/SVG11/coords.html#PreserveAspectRatioAttribute
 bool SVGAttributeParser::parsePreserveAspectRatio(SVGPreserveAspectRatio* par) {
   static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Align> alignMap[] = {
-      {"none", SVGPreserveAspectRatio::None},
-      {"xMinYMin", SVGPreserveAspectRatio::XMinYMin},
-      {"xMidYMin", SVGPreserveAspectRatio::XMidYMin},
-      {"xMaxYMin", SVGPreserveAspectRatio::XMaxYMin},
-      {"xMinYMid", SVGPreserveAspectRatio::XMinYMid},
-      {"xMidYMid", SVGPreserveAspectRatio::XMidYMid},
-      {"xMaxYMid", SVGPreserveAspectRatio::XMaxYMid},
-      {"xMinYMax", SVGPreserveAspectRatio::XMinYMax},
-      {"xMidYMax", SVGPreserveAspectRatio::XMidYMax},
-      {"xMaxYMax", SVGPreserveAspectRatio::XMaxYMax},
+      {"none", SVGPreserveAspectRatio::Align::None},
+      {"xMinYMin", SVGPreserveAspectRatio::Align::XMinYMin},
+      {"xMidYMin", SVGPreserveAspectRatio::Align::XMidYMin},
+      {"xMaxYMin", SVGPreserveAspectRatio::Align::XMaxYMin},
+      {"xMinYMid", SVGPreserveAspectRatio::Align::XMinYMid},
+      {"xMidYMid", SVGPreserveAspectRatio::Align::XMidYMid},
+      {"xMaxYMid", SVGPreserveAspectRatio::Align::XMaxYMid},
+      {"xMinYMax", SVGPreserveAspectRatio::Align::XMinYMax},
+      {"xMidYMax", SVGPreserveAspectRatio::Align::XMidYMax},
+      {"xMaxYMax", SVGPreserveAspectRatio::Align::XMaxYMax},
   };
 
   static constexpr std::tuple<const char*, SVGPreserveAspectRatio::Scale> scaleMap[] = {
-      {"meet", SVGPreserveAspectRatio::Meet},
-      {"slice", SVGPreserveAspectRatio::Slice},
+      {"meet", SVGPreserveAspectRatio::Scale::Meet},
+      {"slice", SVGPreserveAspectRatio::Scale::Slice},
   };
 
   bool parsedValue = false;

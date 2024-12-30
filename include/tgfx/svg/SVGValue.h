@@ -57,8 +57,6 @@ class SVGValue {
 template <typename T, SVGValue::Type ValueType>
 class SVGWrapperValue final : public SVGValue {
  public:
-  static constexpr Type _type = ValueType;
-
   explicit SVGWrapperValue(const T& v) : INHERITED(ValueType), wrappedValue(v) {
   }
 
@@ -83,13 +81,11 @@ class SVGWrapperValue final : public SVGValue {
   using INHERITED = SVGValue;
 };
 
-using SVGColorValue = SVGWrapperValue<SVGColorType, SVGValue::Type::Color>;
 using SVGLengthValue = SVGWrapperValue<SVGLength, SVGValue::Type::Length>;
 using SVGTransformValue = SVGWrapperValue<SVGTransformType, SVGValue::Type::Transform>;
 using SVGViewBoxValue = SVGWrapperValue<SVGViewBoxType, SVGValue::Type::ViewBox>;
 using SVGNumberValue = SVGWrapperValue<SVGNumberType, SVGValue::Type::Number>;
 using SVGStringValue = SVGWrapperValue<SVGStringType, SVGValue::Type::String>;
-using SVGStopColorValue = SVGWrapperValue<SVGStopColor, SVGValue::Type::StopColor>;
 using SVGPreserveAspectRatioValue =
     SVGWrapperValue<SVGPreserveAspectRatio, SVGValue::Type::PreserveAspectRatio>;
 using SVGObjectBoundingBoxUnitsValue =

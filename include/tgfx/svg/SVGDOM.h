@@ -56,7 +56,7 @@ class SVGDOM {
   /**
    * Creates an SVGDOM object from the provided data.
    */
-  static std::shared_ptr<SVGDOM> Make(const std::shared_ptr<Data>&);
+  static std::shared_ptr<SVGDOM> Make(const std::shared_ptr<Data>& data);
 
   /**
    * Returns the root SVG node.
@@ -66,7 +66,7 @@ class SVGDOM {
   /**
    * Collects the font families and styles used for rendering and saves them in the font manager.
    */
-  void collectRenderFonts(const std::shared_ptr<SVGFontManager>&);
+  void collectRenderFonts(const std::shared_ptr<SVGFontManager>& fontManager);
 
   /**
    * Renders the SVG to the provided canvas.
@@ -80,7 +80,7 @@ class SVGDOM {
   /**
    * Sets the size of the container that the SVG will be rendered into.
    */
-  void setContainerSize(const Size&);
+  void setContainerSize(const Size& size);
 
   /**
    * Returns the size of the container that the SVG will be rendered into.
@@ -88,9 +88,13 @@ class SVGDOM {
   const Size& getContainerSize() const;
 
  private:
-  SVGDOM(std::shared_ptr<SVGSVG>, SVGIDMapper&&);
+  /**
+   * Construct a new SVGDOM object
+   */
+  SVGDOM(std::shared_ptr<SVGSVG> root, SVGIDMapper&& mapper);
+
   const std::shared_ptr<SVGSVG> root = nullptr;
   const SVGIDMapper nodeIDMapper = {};
-  Size containerSize = Size::MakeEmpty();
+  Size containerSize = {};
 };
 }  // namespace tgfx
