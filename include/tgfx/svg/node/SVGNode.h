@@ -194,24 +194,19 @@ class SVGNode {
    */
   virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
 
-  /**
-   * Sets the attribute of the SVG node.
-   */
-  void setAttribute(SVGAttribute attribute, const SVGValue& value);
-
-  /**
-   * Sets the attribute of the SVG node.
-   */
-  bool setAttribute(const std::string& attributeName, const std::string& attributeValue);
-
  protected:
   explicit SVGNode(SVGTag tag);
 
+  void setAttribute(SVGAttribute attribute, const SVGValue& value);
+
+  bool setAttribute(const std::string& attributeName, const std::string& attributeValue);
+
   virtual bool parseAndSetAttribute(const std::string& name, const std::string& value);
 
-  static Matrix ComputeViewboxMatrix(const Rect&, const Rect&, SVGPreserveAspectRatio);
+  static Matrix ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
+                                     SVGPreserveAspectRatio PreAspectRatio);
 
-  virtual void onSetAttribute(SVGAttribute, const SVGValue&){};
+  virtual void onSetAttribute(SVGAttribute /*attribute*/, const SVGValue& /*value*/){};
 
   // Called before onRender(), to apply local attributes to the context.  Unlike onRender(),
   // onPrepareToRender() bubbles up the inheritance chain: override should always call
@@ -219,17 +214,17 @@ class SVGNode {
   // (return false).
   // Implementations are expected to return true if rendering is to continue, or false if
   // the node/subtree rendering is disabled.
-  virtual bool onPrepareToRender(SVGRenderContext*) const;
+  virtual bool onPrepareToRender(SVGRenderContext* context) const;
 
-  virtual void onRender(const SVGRenderContext&) const = 0;
+  virtual void onRender(const SVGRenderContext& context) const = 0;
 
-  virtual bool onAsPaint(const SVGRenderContext&, Paint*) const {
+  virtual bool onAsPaint(const SVGRenderContext& /*context*/, Paint* /*paint*/) const {
     return false;
   }
 
-  virtual Path onAsPath(const SVGRenderContext&) const = 0;
+  virtual Path onAsPath(const SVGRenderContext& context) const = 0;
 
-  virtual Rect onObjectBoundingBox(const SVGRenderContext&) const {
+  virtual Rect onObjectBoundingBox(const SVGRenderContext& /*context*/) const {
     return Rect::MakeEmpty();
   }
 

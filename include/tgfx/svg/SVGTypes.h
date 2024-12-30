@@ -507,15 +507,16 @@ class SVGStopColor {
 
   SVGStopColor() = default;
 
-  explicit SVGStopColor(Type t) : _type(t), _color(Color::Black()) {
+  explicit SVGStopColor(Type t) : _type(t) {
   }
 
-  explicit SVGStopColor(const SVGColorType& c) : _type(Type::Color), _color(c) {
+  explicit SVGStopColor(const SVGColorType& c) : _color(c) {
   }
 
   bool operator==(const SVGStopColor& other) const {
     return _type == other._type && _color == other._color;
   }
+
   bool operator!=(const SVGStopColor& other) const {
     return !(*this == other);
   }
@@ -523,6 +524,7 @@ class SVGStopColor {
   Type type() const {
     return _type;
   }
+
   const SVGColorType& color() const {
     return _color;
   }
@@ -547,6 +549,7 @@ class SVGObjectBoundingBoxUnits {
   bool operator==(const SVGObjectBoundingBoxUnits& other) const {
     return _type == other._type;
   }
+
   bool operator!=(const SVGObjectBoundingBoxUnits& other) const {
     return !(*this == other);
   }
@@ -830,8 +833,8 @@ class SVGFeTurbulenceBaseFrequency {
   }
 
  private:
-  SVGNumberType _freqX = 0.0;
-  SVGNumberType _freqY = 0.0;
+  SVGNumberType _freqX = 0.0f;
+  SVGNumberType _freqY = 0.0f;
 };
 
 struct SVGFeTurbulenceType {
