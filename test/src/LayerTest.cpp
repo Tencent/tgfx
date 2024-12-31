@@ -454,7 +454,7 @@ TGFX_TEST(LayerTest, shapeLayer) {
     std::shared_ptr<ShapeStyle> fillStyle = nullptr;
     switch (i) {
       case 0:
-        fillStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.bottom},
+        fillStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.top},
                                          {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
         break;
       case 1:
@@ -464,7 +464,8 @@ TGFX_TEST(LayerTest, shapeLayer) {
       case 2:
         fillStyle = ImagePattern::Make(MakeImage("resources/apitest/imageReplacement.png"),
                                        TileMode::Repeat, TileMode::Mirror);
-        std::static_pointer_cast<ImagePattern>(fillStyle)->setMatrix(Matrix::MakeTrans(10, 10));
+        std::static_pointer_cast<ImagePattern>(fillStyle)->setMatrix(
+            Matrix::MakeTrans(-25, rect.top - 70));
         break;
       default:
         break;
