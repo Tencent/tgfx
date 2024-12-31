@@ -689,7 +689,13 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
   if (!bitFields.excludeChildEffectsInLayerStyle || !ChildrenContainEffect(this)) {
     source = CreatePictureImage(picture, &offset);
   } else {
-    source = getContentsWithoutEffect(args, contentScale, &offset);
+    DrawArgs newArgs = {};
+    newArgs.renderFlags = args.renderFlags | RenderFlags::DisableCache;
+    newArgs.ignoreEffect = true;
+    auto canvas = recorder.beginRecording();
+    canvas->scale(contentScale, contentScale);
+    drawContents(newArgs, canvas, 1.0f);
+    source = CreatePictureImage(recorder.finishRecordingAsPicture(), &offset);
   }
 
   auto canvas = recorder.beginRecording();
@@ -697,19 +703,6 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
   canvas->drawPicture(std::move(picture));
   drawLayerStyles(args, canvas, source, offset, contentScale, alpha, LayerStylePosition::Above);
   return recorder.finishRecordingAsPicture();
-}
-
-std::shared_ptr<Image> Layer::getContentsWithoutEffect(const DrawArgs& args, float contentScale,
-                                                       Point* offset) {
-  DrawArgs newArgs = args;
-  newArgs.renderFlags |= RenderFlags::DisableCache;
-  newArgs.cleanDirtyFlags = false;
-  newArgs.ignoreEffect = true;
-  Recorder recorder = {};
-  auto canvas = recorder.beginRecording();
-  canvas->scale(contentScale, contentScale);
-  drawContents(newArgs, canvas, 1.0f);
-  return CreatePictureImage(recorder.finishRecordingAsPicture(), offset);
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, std::shared_ptr<Image> content,

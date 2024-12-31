@@ -40,10 +40,10 @@ class DrawArgs {
   uint32_t renderFlags = 0;
 
   // Whether to clean the dirty flags of the associated Layer during the drawing process.
-  bool cleanDirtyFlags : 1;
+  bool cleanDirtyFlags = false;
   // Whether to ignore the effect of the associated Layer during the drawing process.
-  bool ignoreEffect : 1;
+  bool ignoreEffect = false;
   // Whether the associated Layer is drawing contour.
-  bool isDrawingContour : 1;
+  bool isDrawingContour = false;
 };
 }  // namespace tgfx

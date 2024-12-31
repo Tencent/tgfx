@@ -544,9 +544,6 @@ class Layer {
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
 
-  std::shared_ptr<Image> getContentsWithoutEffect(const DrawArgs& args, float contentScale,
-                                                  Point* offset);
-
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, std::shared_ptr<Image> content,
                        const Point& contentOffset, float contentScale, float alpha,
                        LayerStylePosition position);
