@@ -20,6 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
+#include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
@@ -167,17 +168,23 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
                                   const SamplingOptions& sampling, const MCState& state,
                                   const FillStyle& style) {
   DEBUG_ASSERT(image != nullptr);
+  DEBUG_ASSERT(image->isAlphaOnly() || style.shader == nullptr);
+  auto uvMatrix = Matrix::I();
+  auto subsetImage = Caster::AsSubsetImage(image.get());
+  if (subsetImage != nullptr) {
+    uvMatrix = Matrix::MakeTrans(subsetImage->bounds.left, subsetImage->bounds.top);
+    image = subsetImage->source;
+  }
   auto localBounds = clipLocalBounds(state, rect);
   if (localBounds.isEmpty()) {
     return;
   }
-  DEBUG_ASSERT(image->isAlphaOnly() || style.shader == nullptr);
   FPArgs args = {getContext(), renderFlags, localBounds, state.matrix};
   auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
   }
-  auto drawOp = RectDrawOp::Make(style.color, localBounds, state.matrix);
+  auto drawOp = RectDrawOp::Make(style.color, localBounds, state.matrix, uvMatrix);
   drawOp->addColorFP(std::move(processor));
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }

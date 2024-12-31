@@ -30,7 +30,7 @@ class RectDrawOp : public DrawOp {
 
   static std::unique_ptr<RectDrawOp> Make(std::optional<Color> color, const Rect& rect,
                                           const Matrix& viewMatrix,
-                                          const Matrix* uvMatrix = nullptr);
+                                          const Matrix& uvMatrix = Matrix::I());
 
   void prepare(Context* context, uint32_t renderFlags) override;
 
@@ -38,7 +38,7 @@ class RectDrawOp : public DrawOp {
 
  private:
   RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-             const Matrix* uvMatrix = nullptr);
+             const Matrix& uvMatrix);
 
   bool onCombineIfPossible(Op* op) override;
 

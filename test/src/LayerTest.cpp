@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <math.h>
+#include <tgfx/layers/ImagePattern.h>
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
 #include "core/utils/Profiling.h"
@@ -450,10 +451,26 @@ TGFX_TEST(LayerTest, shapeLayer) {
     path.addRect(rect);
     shaperLayer->setPath(path);
     shaperLayer->removeFillStyles();
-    auto filleStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.bottom});
-    filleStyle->setColors({{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
-    filleStyle->setAlpha(0.8f);
-    shaperLayer->addFillStyle(filleStyle);
+    std::shared_ptr<ShapeStyle> fillStyle = nullptr;
+    switch (i) {
+      case 0:
+        fillStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.bottom},
+                                         {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+        break;
+      case 1:
+        fillStyle = Gradient::MakeRadial({rect.centerX(), rect.centerY()}, rect.width() / 2.0f,
+                                         {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+        break;
+      case 2:
+        fillStyle = ImagePattern::Make(MakeImage("resources/apitest/imageReplacement.png"),
+                                       TileMode::Repeat, TileMode::Mirror);
+        std::static_pointer_cast<ImagePattern>(fillStyle)->setMatrix(Matrix::MakeTrans(10, 10));
+        break;
+      default:
+        break;
+    }
+    fillStyle->setAlpha(0.8f);
+    shaperLayer->addFillStyle(fillStyle);
 
     // stroke style
     shaperLayer->setLineWidth(10.0f);
@@ -465,9 +482,11 @@ TGFX_TEST(LayerTest, shapeLayer) {
     strokeStyle->setAlpha(0.5f);
     strokeStyle->setBlendMode(BlendMode::Lighten);
     shaperLayer->addStrokeStyle(strokeStyle);
-    std::vector<float> dashPattern = {10.0f, 10.0f};
-    shaperLayer->setLineDashPattern(dashPattern);
-    shaperLayer->setLineDashPhase(5.0f);
+    if (i != 2) {
+      std::vector<float> dashPattern = {10.0f, 10.0f};
+      shaperLayer->setLineDashPattern(dashPattern);
+      shaperLayer->setLineDashPhase(5.0f);
+    }
     shaperLayer->setStrokeAlign(static_cast<StrokeAlign>(i));
     layer->addChild(shaperLayer);
     auto shapeLayerRect = shaperLayer->getBounds();
@@ -871,8 +890,8 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   auto shaperLayer = ShapeLayer::Make();
   shaperLayer->setPath(path);
-  auto radialFilleStyle = Gradient::MakeRadial({500, 500}, 500);
-  radialFilleStyle->setColors({{1.f, 0.f, 0.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+  auto radialFilleStyle =
+      Gradient::MakeRadial({500, 500}, 500, {{1.f, 0.f, 0.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
   shaperLayer->setFillStyle(radialFilleStyle);
   shaperLayer->setAlpha(0.5f);
   layer->addChild(shaperLayer);

@@ -61,6 +61,8 @@ class Caster {
 
   static const CodecImage* AsCodecImage(const Image* image);
 
+  static const SubsetImage* AsSubsetImage(const Image* image);
+
   static const ShaderMaskFilter* AsShaderMaskFilter(const MaskFilter* maskFilter);
 };
 
