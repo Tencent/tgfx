@@ -235,6 +235,19 @@ class Layer {
   void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
   /**
+   * Returns true if the source of layer styles apply filters and layer styles. The default value is
+   * true.
+   */
+  bool layerStyleUseEffect() const {
+    return bitFields.layerStyleUseEffect;
+  }
+
+  /**
+   * Sets whether the source of layer styles apply filters and layer styles.
+   */
+  void setLayerStyleUseEffect(bool value);
+
+  /**
    * Returns the list of filters applied to the layer. Layer filters create new offscreen images
    * to replace the original layer content. Each filter takes the output of the previous filter as
    * input, and the final output is drawn on the canvas. Layer filters are applied after layer
@@ -489,6 +502,8 @@ class Layer {
    */
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
+  virtual LayerContent* getDropShadowMaskContent();
+
   /**
   * Attachs a property to this layer.
   */
@@ -530,8 +545,12 @@ class Layer {
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
 
-  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                       float alpha, LayerStylePosition position) const;
+  std::shared_ptr<Image> getContentsWithoutEffect(const DrawArgs& args, float contentScale,
+                                                  Point* offset);
+
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, std::shared_ptr<Image> content,
+                       const Point& contentOffset, float contentScale, float alpha,
+                       LayerStylePosition position);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
@@ -549,6 +568,9 @@ class Layer {
 
   bool hasValidMask() const;
 
+  std::shared_ptr<Image> getDropShadowStyleMask(const DrawArgs& args, float contentScale,
+                                                Point* offset);
+
   struct {
     bool contentDirty : 1;   // need to update content
     bool childrenDirty : 1;  // need to redraw child layers
@@ -556,6 +578,7 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
+    bool layerStyleUseEffect : 1;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;

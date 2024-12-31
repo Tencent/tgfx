@@ -28,15 +28,26 @@ class DrawArgs {
  public:
   DrawArgs() = default;
 
-  DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false)
-      : context(context), renderFlags(renderFlags), cleanDirtyFlags(cleanDirtyFlags) {
+  DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false,
+           bool ignoreEffect = false, bool isDrawingDropShadowMask = false)
+      : context(context), renderFlags(renderFlags) {
+    bitFields.cleanDirtyFlags = cleanDirtyFlags;
+    bitFields.ignoreEffect = ignoreEffect;
+    bitFields.isDrawingDropShadowMask = isDrawingDropShadowMask;
   }
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
   Context* context = nullptr;
   // Render flags to be used during the drawing process.
   uint32_t renderFlags = 0;
-  // Whether to clean the dirty flags of the associated Layer during the drawing process.
-  bool cleanDirtyFlags = false;
+
+  struct {
+    // Whether to clean the dirty flags of the associated Layer during the drawing process.
+    bool cleanDirtyFlags : 1;
+    // Whether to ignore the effect of the associated Layer during the drawing process.
+    bool ignoreEffect : 1;
+    // Whether the associated Layer is drawing a drop shadow mask.
+    bool isDrawingDropShadowMask : 1;
+  } bitFields = {false, false, false};
 };
 }  // namespace tgfx

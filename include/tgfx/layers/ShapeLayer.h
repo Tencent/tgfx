@@ -279,7 +279,14 @@ class ShapeLayer : public Layer {
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
+  LayerContent* getDropShadowMaskContent() override;
+
  private:
+  std::unique_ptr<LayerContent> createContent(
+      const std::vector<std::shared_ptr<ShapeStyle>>& fillStyles);
+
+  void onContentChange();
+
   std::shared_ptr<Shape> _shape = nullptr;
   std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
   std::vector<std::shared_ptr<ShapeStyle>> _strokeStyles = {};
@@ -289,5 +296,7 @@ class ShapeLayer : public Layer {
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
+
+  std::unique_ptr<LayerContent> dropShadowMaskContent;
 };
 }  // namespace tgfx

@@ -47,7 +47,7 @@ void ShapeLayer::setPath(Path path) {
     return;
   }
   _shape = Shape::MakeFrom(std::move(path));
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
@@ -55,7 +55,7 @@ void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
     return;
   }
   _shape = std::move(value);
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
@@ -70,7 +70,7 @@ void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
   for (const auto& style : _fillStyles) {
     attachProperty(style.get());
   }
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::removeFillStyles() {
@@ -81,7 +81,7 @@ void ShapeLayer::removeFillStyles() {
     detachProperty(style.get());
   }
   _fillStyles = {};
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fill) {
@@ -98,7 +98,7 @@ void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   }
   attachProperty(fillStyle.get());
   _fillStyles.push_back(std::move(fillStyle));
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes) {
@@ -113,7 +113,7 @@ void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> stroke
   for (const auto& style : _strokeStyles) {
     attachProperty(style.get());
   }
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::removeStrokeStyles() {
@@ -124,7 +124,7 @@ void ShapeLayer::removeStrokeStyles() {
     detachProperty(style.get());
   }
   _strokeStyles = {};
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
@@ -141,7 +141,7 @@ void ShapeLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
   }
   attachProperty(strokeStyle.get());
   _strokeStyles.push_back(std::move(strokeStyle));
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setLineCap(LineCap cap) {
@@ -149,7 +149,7 @@ void ShapeLayer::setLineCap(LineCap cap) {
     return;
   }
   stroke.cap = cap;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setLineJoin(LineJoin join) {
@@ -157,7 +157,7 @@ void ShapeLayer::setLineJoin(LineJoin join) {
     return;
   }
   stroke.join = join;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setMiterLimit(float limit) {
@@ -165,7 +165,7 @@ void ShapeLayer::setMiterLimit(float limit) {
     return;
   }
   stroke.miterLimit = limit;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setLineWidth(float width) {
@@ -173,7 +173,7 @@ void ShapeLayer::setLineWidth(float width) {
     return;
   }
   stroke.width = width;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setLineDashPattern(const std::vector<float>& pattern) {
@@ -182,7 +182,7 @@ void ShapeLayer::setLineDashPattern(const std::vector<float>& pattern) {
     return;
   }
   _lineDashPattern = pattern;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setLineDashPhase(float phase) {
@@ -190,7 +190,7 @@ void ShapeLayer::setLineDashPhase(float phase) {
     return;
   }
   _lineDashPhase = phase;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setStrokeStart(float start) {
@@ -204,7 +204,7 @@ void ShapeLayer::setStrokeStart(float start) {
     return;
   }
   _strokeStart = start;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setStrokeEnd(float end) {
@@ -218,7 +218,7 @@ void ShapeLayer::setStrokeEnd(float end) {
     return;
   }
   _strokeEnd = end;
-  invalidateContent();
+  onContentChange();
 }
 
 void ShapeLayer::setStrokeAlign(StrokeAlign align) {
@@ -226,7 +226,7 @@ void ShapeLayer::setStrokeAlign(StrokeAlign align) {
     return;
   }
   _strokeAlign = align;
-  invalidateContent();
+  onContentChange();
 }
 
 ShapeLayer::~ShapeLayer() {
@@ -238,13 +238,14 @@ ShapeLayer::~ShapeLayer() {
   }
 }
 
-std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
+std::unique_ptr<LayerContent> ShapeLayer::createContent(
+    const std::vector<std::shared_ptr<ShapeStyle>>& fillStyles) {
   if (_shape == nullptr) {
     return nullptr;
   }
   std::vector<std::unique_ptr<LayerContent>> contents = {};
-  contents.reserve(_fillStyles.size() + _strokeStyles.size());
-  for (auto& style : _fillStyles) {
+  contents.reserve(fillStyles.size() + _strokeStyles.size());
+  for (auto& style : fillStyles) {
     contents.push_back(std::make_unique<ShapeContent>(_shape, style->getShader(), style->alpha(),
                                                       style->blendMode()));
   }
@@ -282,5 +283,31 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
     }
   }
   return LayerContent::Compose(std::move(contents));
+}
+
+std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
+  if (_shape == nullptr) {
+    return nullptr;
+  }
+  return createContent(_fillStyles);
+}
+
+LayerContent* ShapeLayer::getDropShadowMaskContent() {
+  auto availableStyle = std::find_if(_fillStyles.begin(), _fillStyles.end(),
+                                     [](const auto& style) { return style->alpha() > 0; });
+
+  if (availableStyle != _fillStyles.end()) {
+    return Layer::getDropShadowMaskContent();
+  }
+
+  if (!dropShadowMaskContent) {
+    dropShadowMaskContent = createContent({SolidColor::Make()});
+  }
+  return dropShadowMaskContent.get();
+}
+
+void ShapeLayer::onContentChange() {
+  invalidateContent();
+  dropShadowMaskContent = nullptr;
 }
 }  // namespace tgfx

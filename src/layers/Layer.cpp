@@ -26,10 +26,39 @@
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
 
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
+
+static bool ChildrenContainEffect(const Layer* layer) {
+  for (auto child : layer->children()) {
+    if (!child->layerStyles().empty() || !child->filters().empty()) {
+      return true;
+    }
+    if (ChildrenContainEffect(child.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool HasEmptyFillContents(const Layer* layer) {
+  if (layer->type() == LayerType::Shape) {
+    auto shapeLayer = static_cast<const ShapeLayer*>(layer);
+    if (shapeLayer->fillStyles().empty()) {
+      return true;
+    }
+  }
+  for (auto child : layer->children()) {
+    if (HasEmptyFillContents(child.get())) {
+      return true;
+    }
+  }
+  return false;
+}
 
 static std::shared_ptr<Image> CreatePictureImage(std::shared_ptr<Picture> picture, Point* offset) {
   if (picture == nullptr) {
@@ -218,6 +247,11 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
     layerStyle->attachToLayer(this);
   }
   rasterizedContent = nullptr;
+  invalidate();
+}
+
+void Layer::setLayerStyleUseEffect(bool value) {
+  bitFields.layerStyleUseEffect = value;
   invalidate();
 }
 
@@ -488,6 +522,10 @@ std::unique_ptr<LayerContent> Layer::onUpdateContent() {
   return nullptr;
 }
 
+LayerContent* Layer::getDropShadowMaskContent() {
+  return getContent();
+}
+
 void Layer::attachProperty(LayerProperty* property) const {
   if (property) {
     property->attachToLayer(this);
@@ -643,40 +681,81 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
   contentCanvas->scale(contentScale, contentScale);
   drawContents(args, contentCanvas, alpha);
   auto picture = recorder.finishRecordingAsPicture();
-  if (_layerStyles.empty() || picture == nullptr) {
+  if (_layerStyles.empty() || picture == nullptr || args.bitFields.ignoreEffect) {
     return picture;
   }
+
   Point offset = Point::Zero();
-  auto image = CreatePictureImage(picture, &offset);
+  std::shared_ptr<Image> source = nullptr;
+  if (bitFields.layerStyleUseEffect || !ChildrenContainEffect(this)) {
+    source = CreatePictureImage(picture, &offset);
+  } else {
+    source = getContentsWithoutEffect(args, contentScale, &offset);
+  }
+
   auto canvas = recorder.beginRecording();
-  canvas->translate(offset.x, offset.y);
-  drawLayerStyles(canvas, image, contentScale, alpha, LayerStylePosition::Below);
-  auto matrix = Matrix::MakeTrans(-offset.x, -offset.y);
-  canvas->drawPicture(std::move(picture), &matrix, nullptr);
-  drawLayerStyles(canvas, image, contentScale, alpha, LayerStylePosition::Above);
+  drawLayerStyles(args, canvas, source, offset, contentScale, alpha, LayerStylePosition::Below);
+  canvas->drawPicture(std::move(picture));
+  drawLayerStyles(args, canvas, source, offset, contentScale, alpha, LayerStylePosition::Above);
   return recorder.finishRecordingAsPicture();
 }
 
-void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            float alpha, LayerStylePosition position) const {
+std::shared_ptr<Image> Layer::getContentsWithoutEffect(const DrawArgs& args, float contentScale,
+                                                       Point* offset) {
+  DrawArgs newArgs = args;
+  newArgs.renderFlags |= RenderFlags::DisableCache;
+  newArgs.bitFields.cleanDirtyFlags = false;
+  newArgs.bitFields.ignoreEffect = true;
+  Recorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  canvas->scale(contentScale, contentScale);
+  drawContents(newArgs, canvas, 1.0f);
+  return CreatePictureImage(recorder.finishRecordingAsPicture(), offset);
+}
+
+void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, std::shared_ptr<Image> content,
+                            const Point& contentOffset, float contentScale, float alpha,
+                            LayerStylePosition position) {
+  std::shared_ptr<Image> dropShadowMask = nullptr;
+  Point maskOffset = contentOffset;
+  canvas->save();
+  canvas->translate(contentOffset.x, contentOffset.y);
+
   for (const auto& layerStyle : _layerStyles) {
-    if (layerStyle->position() == position) {
-      canvas->save();
-      layerStyle->draw(canvas, content, contentScale, alpha);
-      canvas->restore();
+    if (layerStyle->position() != position) {
+      continue;
     }
+
+    if (layerStyle->dropShadow()) {
+      auto dropShadowStyle = static_cast<DropShadowStyle*>(layerStyle.get());
+      if (!dropShadowStyle->showBehindLayer()) {
+        if (dropShadowMask == nullptr) {
+          dropShadowMask = !HasEmptyFillContents(this)
+                               ? content
+                               : getDropShadowStyleMask(args, contentScale, &maskOffset);
+          maskOffset -= contentOffset;
+        }
+        dropShadowStyle->setMask(dropShadowMask, maskOffset);
+      }
+    }
+
+    canvas->save();
+    layerStyle->draw(canvas, std::move(content), contentScale, alpha);
+    canvas->restore();
   }
+  canvas->restore();
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   TRACE_EVENT;
   DEBUG_ASSERT(canvas != nullptr);
+  auto ignoreEffect = args.bitFields.ignoreEffect;
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
-             !_filters.empty() || hasValidMask()) {
+             (!_filters.empty() && !ignoreEffect) || hasValidMask()) {
     drawOffscreen(args, canvas, alpha, blendMode);
-  } else if (!_layerStyles.empty()) {
+  } else if (!_layerStyles.empty() && !ignoreEffect) {
     drawWithLayerStyles(args, canvas, alpha);
   } else {
     // draw directly
@@ -739,14 +818,20 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
   paint.setMaskFilter(getMaskFilter(args, contentScale));
-  paint.setImageFilter(getCurrentFilter(contentScale));
+  if (!args.bitFields.ignoreEffect) {
+    paint.setImageFilter(getCurrentFilter(contentScale));
+  }
   auto matrix = Matrix::MakeScale(1.0f / contentScale);
   canvas->drawPicture(std::move(picture), &matrix, &paint);
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   TRACE_EVENT;
-  if (auto content = getContent()) {
+  if (args.bitFields.isDrawingDropShadowMask) {
+    if (auto content = getDropShadowMaskContent()) {
+      content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
+    }
+  } else if (auto content = getContent()) {
     content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
   }
   for (const auto& child : _children) {
@@ -761,7 +846,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
     child->drawLayer(args, canvas, child->_alpha * alpha, child->_blendMode);
     canvas->restore();
   }
-  if (args.cleanDirtyFlags) {
+  if (args.bitFields.cleanDirtyFlags) {
     bitFields.childrenDirty = false;
   }
 }
@@ -822,6 +907,18 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 
 bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root();
+}
+
+std::shared_ptr<Image> Layer::getDropShadowStyleMask(const DrawArgs& args, float contentScale,
+                                                     Point* offset) {
+  Recorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  canvas->scale(contentScale, contentScale);
+  DrawArgs newArgs = DrawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false,
+                              bitFields.layerStyleUseEffect, true);
+  drawContents(newArgs, canvas, 1.0f);
+  auto picture = recorder.finishRecordingAsPicture();
+  return CreatePictureImage(picture, offset);
 }
 
 }  // namespace tgfx

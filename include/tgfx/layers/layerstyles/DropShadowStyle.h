@@ -112,6 +112,11 @@ class DropShadowStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
+ protected:
+  bool dropShadow() const override {
+    return true;
+  }
+
  private:
   DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                   const Color& color, bool showBehindTransparent);
@@ -123,6 +128,8 @@ class DropShadowStyle : public LayerStyle {
 
   std::shared_ptr<ImageFilter> getShadowFilter(float contentScale);
 
+  void setMask(std::weak_ptr<Image> maskImage, const Point& maskOffset);
+
   float _offsetX = 0.0f;
   float _offsetY = 0.0f;
   float _blurrinessX = 0.0f;
@@ -132,5 +139,11 @@ class DropShadowStyle : public LayerStyle {
 
   float currentScale = 1.0f;
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;
+
+  // Mask
+  std::weak_ptr<Image> _maskImage = {};
+  Point _maskOffset = Point::Zero();
+
+  friend class Layer;
 };
 }  // namespace tgfx

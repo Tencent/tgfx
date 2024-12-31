@@ -105,8 +105,14 @@ void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
   Paint paint = {};
   if (!_showBehindLayer) {
-    auto shader = Shader::MakeImageShader(opaqueImage, TileMode::Decal, TileMode::Decal);
-    auto matrixShader = shader->makeWithMatrix(Matrix::MakeTrans(-offset.x, -offset.y));
+    auto maskImage = _maskImage.lock();
+    if (maskImage == nullptr) {
+      return;
+    }
+    maskImage = maskImage->makeWithFilter(opaqueFilter);
+    auto shader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
+    auto matrixShader =
+        shader->makeWithMatrix(Matrix::MakeTrans(-offset.x + _maskOffset.x, -offset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
@@ -129,6 +135,11 @@ std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
 void DropShadowStyle::invalidateFilter() {
   shadowFilter = nullptr;
   invalidate();
+}
+
+void DropShadowStyle::setMask(std::weak_ptr<Image> maskImage, const Point& maskOffset) {
+  _maskImage = std::move(maskImage);
+  _maskOffset = maskOffset;
 }
 
 }  // namespace tgfx

@@ -97,7 +97,13 @@ class LayerStyle : public LayerProperty {
   virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                       float alpha, BlendMode blendMode) = 0;
 
+  virtual bool dropShadow() const {
+    return false;
+  }
+
  private:
   BlendMode _blendMode = BlendMode::SrcOver;
+
+  friend class Layer;
 };
 }  // namespace tgfx
