@@ -35,21 +35,35 @@ std::shared_ptr<ConicGradient> Gradient::MakeConic(const Point& center, float st
 }
 
 void Gradient::setColors(std::vector<Color> colors) {
+  if (_colors.size() == colors.size() &&
+      std::equal(_colors.begin(), _colors.end(), colors.begin())) {
+    return;
+  }
   _colors = std::move(colors);
   invalidate();
 }
 
 void Gradient::setPositions(std::vector<float> positions) {
+  if (_positions.size() == positions.size() &&
+      std::equal(_positions.begin(), _positions.end(), positions.begin())) {
+    return;
+  }
   _positions = std::move(positions);
   invalidate();
 }
 
 void LinearGradient::setEndPoint(const Point& endPoint) {
+  if (_endPoint == endPoint) {
+    return;
+  }
   _endPoint = endPoint;
   invalidate();
 }
 
 void LinearGradient::setStartPoint(const Point& startPoint) {
+  if (_startPoint == startPoint) {
+    return;
+  }
   _startPoint = startPoint;
   invalidate();
 }
@@ -59,11 +73,17 @@ std::shared_ptr<Shader> LinearGradient::getShader() const {
 }
 
 void RadialGradient::setCenter(const Point& center) {
+  if (_center == center) {
+    return;
+  }
   _center = center;
   invalidate();
 }
 
 void RadialGradient::setRadius(float radius) {
+  if (_radius == radius) {
+    return;
+  }
   _radius = radius;
   invalidate();
 }
@@ -73,16 +93,25 @@ std::shared_ptr<Shader> RadialGradient::getShader() const {
 }
 
 void ConicGradient::setStartAngle(float startAngle) {
+  if (_startAngle == startAngle) {
+    return;
+  }
   _startAngle = startAngle;
   invalidate();
 }
 
 void ConicGradient::setCenter(const Point& center) {
+  if (_center == center) {
+    return;
+  }
   _center = center;
   invalidate();
 }
 
 void ConicGradient::setEndAngle(float endAngle) {
+  if (_endAngle == endAngle) {
+    return;
+  }
   _endAngle = endAngle;
   invalidate();
 }
