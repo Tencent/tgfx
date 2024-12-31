@@ -33,7 +33,7 @@ class FillStyle {
   bool antiAlias = true;
 
   /**
-   * The input color, premultiplied, as four floating point values.
+   * The input color, unpremultiplied, as four floating point values.
    */
   Color color = Color::White();
 

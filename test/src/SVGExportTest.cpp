@@ -105,13 +105,13 @@ TGFX_TEST(SVGExportTest, OpacityColor) {
   std::string compareString =
       "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
       "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><circle "
-      "fill=\"#00007F\" fill-opacity=\"0.5\" cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
+      "fill=\"#00F\" fill-opacity=\"0.5\" cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
 
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  tgfx::Paint paint;
+  Paint paint;
   paint.setColor(Color::Blue());
   paint.setAlpha(0.5f);
 
@@ -131,7 +131,7 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
   std::string compareString =
       "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
       "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><circle "
-      "fill=\"#00007F\" fill-opacity=\"0.5\" cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
+      "fill=\"#00F\" fill-opacity=\"0.5\" cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
 
   ContextScope scope;
   auto* context = scope.getContext();
@@ -156,7 +156,7 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
 
   auto readStream = Stream::MakeFromFile(path);
   EXPECT_TRUE(readStream != nullptr);
-  EXPECT_EQ(readStream->size(), 222U);
+  EXPECT_EQ(readStream->size(), 219U);
   Buffer buffer(readStream->size());
   readStream->read(buffer.data(), buffer.size());
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), compareString);
