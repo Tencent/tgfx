@@ -38,12 +38,12 @@ class SubsetImage : public TransformImage {
     return static_cast<int>(bounds.height());
   }
 
+  Rect bounds = Rect::MakeEmpty();
+
  protected:
   Type type() const override {
     return Type::Subset;
   }
-
-  Rect bounds = Rect::MakeEmpty();
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 

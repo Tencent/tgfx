@@ -34,7 +34,7 @@ void OpContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProc
   if (fp == nullptr) {
     return;
   }
-  auto op = RectDrawOp::Make(std::nullopt, dstRect, Matrix::I(), &uvMatrix);
+  auto op = RectDrawOp::Make(std::nullopt, dstRect, Matrix::I(), uvMatrix);
   op->addColorFP(std::move(fp));
   op->setBlendMode(BlendMode::Src);
   addOp(std::move(op));
