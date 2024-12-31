@@ -113,7 +113,7 @@ class DropShadowStyle : public LayerStyle {
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
  protected:
-  bool dropShadow() const override {
+  bool requiresLayerContour() const override {
     return true;
   }
 

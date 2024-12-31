@@ -1774,7 +1774,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   auto style = DropShadowStyle::Make(10, 10, 0, 0, Color::Black(), false);
   shadowLayer->setLayerStyles({style});
   shadowLayer->addChild(layer);
-  shadowLayer->setLayerStyleUseEffect(false);
+  shadowLayer->setExcludeChildEffectsInLayerStyle(true);
   back->addChild(shadowLayer);
   displayList->root()->addChild(back);
   displayList->render(surface.get());

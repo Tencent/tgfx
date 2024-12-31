@@ -17,25 +17,29 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
 #include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-class ComposeContent : public LayerContent {
+
+class ContourContent : public LayerContent {
  public:
-  explicit ComposeContent(std::vector<std::unique_ptr<LayerContent>> contents)
-      : contents(std::move(contents)) {
+  explicit ContourContent(std::shared_ptr<Shape> shape);
+
+  Rect getBounds() const override {
+    return {};
   }
 
-  Rect getBounds() const override;
-
-  void draw(Canvas* canvas, const Paint& paint) const override;
+  void draw(Canvas*, const Paint&) const override {
+  }
 
   void drawContour(Canvas* canvas, const Paint& paint) const override;
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  bool hitTestPoint(float, float, bool) override {
+    return false;
+  }
 
  private:
-  std::vector<std::unique_ptr<LayerContent>> contents = {};
+  std::shared_ptr<Shape> shape = nullptr;
 };
+
 }  // namespace tgfx

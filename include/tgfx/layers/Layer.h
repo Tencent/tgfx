@@ -235,17 +235,18 @@ class Layer {
   void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
   /**
-   * Returns true if the source of layer styles apply filters and layer styles. The default value is
-   * true.
+   * Whether to exclude child effects in the layer style. If true, child layer
+   * styles and filters are not included in the layer content used to generate
+   * the layer style. The default value is false.
    */
-  bool layerStyleUseEffect() const {
-    return bitFields.layerStyleUseEffect;
+  bool excludeChildEffectsInLayerStyle() const {
+    return bitFields.excludeChildEffectsInLayerStyle;
   }
 
   /**
-   * Sets whether the source of layer styles apply filters and layer styles.
+   * Sets whether exclude child effects in the layer style.
    */
-  void setLayerStyleUseEffect(bool value);
+  void setExcludeChildEffectsInLayerStyle(bool value);
 
   /**
    * Returns the list of filters applied to the layer. Layer filters create new offscreen images
@@ -502,8 +503,6 @@ class Layer {
    */
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
-  virtual LayerContent* getDropShadowMaskContent();
-
   /**
   * Attachs a property to this layer.
   */
@@ -568,8 +567,7 @@ class Layer {
 
   bool hasValidMask() const;
 
-  std::shared_ptr<Image> getDropShadowStyleMask(const DrawArgs& args, float contentScale,
-                                                Point* offset);
+  std::shared_ptr<Image> getLayerContour(const DrawArgs& args, float contentScale, Point* offset);
 
   struct {
     bool contentDirty : 1;   // need to update content
@@ -578,7 +576,7 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
-    bool layerStyleUseEffect : 1;
+    bool excludeChildEffectsInLayerStyle : 1;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
