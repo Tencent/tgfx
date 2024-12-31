@@ -20,18 +20,24 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-std::shared_ptr<LinearGradient> Gradient::MakeLinear(const Point& startPoint,
-                                                     const Point& endPoint) {
-  return std::shared_ptr<LinearGradient>(new LinearGradient(startPoint, endPoint));
+std::shared_ptr<LinearGradient> Gradient::MakeLinear(const Point& startPoint, const Point& endPoint,
+                                                     const std::vector<Color>& colors,
+                                                     const std::vector<float>& positions) {
+  return std::shared_ptr<LinearGradient>(
+      new LinearGradient(startPoint, endPoint, colors, positions));
 }
 
-std::shared_ptr<RadialGradient> Gradient::MakeRadial(const Point& center, float radius) {
-  return std::shared_ptr<RadialGradient>(new RadialGradient(center, radius));
+std::shared_ptr<RadialGradient> Gradient::MakeRadial(const Point& center, float radius,
+                                                     const std::vector<Color>& colors,
+                                                     const std::vector<float>& positions) {
+  return std::shared_ptr<RadialGradient>(new RadialGradient(center, radius, colors, positions));
 }
 
 std::shared_ptr<ConicGradient> Gradient::MakeConic(const Point& center, float startAngle,
-                                                   float endAngle) {
-  return std::shared_ptr<ConicGradient>(new ConicGradient(center, startAngle, endAngle));
+                                                   float endAngle, const std::vector<Color>& colors,
+                                                   const std::vector<float>& positions) {
+  return std::shared_ptr<ConicGradient>(
+      new ConicGradient(center, startAngle, endAngle, colors, positions));
 }
 
 void Gradient::setColors(std::vector<Color> colors) {
