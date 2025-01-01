@@ -19,7 +19,7 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm-mt/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
+import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage, addTextElement, ShowFPS, ItemCount, setStartStatus} from "./common";
 
 let shareData: ShareData = new ShareData();
 
@@ -31,6 +31,8 @@ if (typeof window !== 'undefined') {
 
             let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
+            tgfxView.setDrawItemsCount(ItemCount);
+
             var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
             await tgfxView.setImagePath(imagePath);
 
@@ -42,6 +44,8 @@ if (typeof window !== 'undefined') {
             const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
             tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
             updateSize(shareData);
+
+            addTextElement();
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");
@@ -54,6 +58,9 @@ if (typeof window !== 'undefined') {
     };
 
     window.onclick = () => {
-        onclickEvent(shareData);
+        // onclickEvent(shareData);
+        setStartStatus(true);
     };
+
+    window.requestAnimationFrame(() => ShowFPS(shareData));
 }
