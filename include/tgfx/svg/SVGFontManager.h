@@ -66,7 +66,7 @@ class SVGFontInfo {
 class SVGFontManager {
  public:
   /**
-   * Creates an SVGFontManager object with the default typeface.If the default typeface is nullptr,
+   * Creates an SVGFontManager object with the default typeface. If the default typeface is nullptr,
    * retrun nullptr.
    */
   static std::shared_ptr<SVGFontManager> Make(const std::shared_ptr<Typeface>& defaultTypeface);
@@ -77,7 +77,7 @@ class SVGFontManager {
   ~SVGFontManager() = default;
 
   /**
-   * Adds a font style to the font manager.If the font family and style already exist, this method
+   * Adds a font style to the font manager. If the font family and style already exist, this method
    * does nothing and returns false.
    */
   bool setTypeface(const std::string& fontFamily, SVGFontInfo info,
