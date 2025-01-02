@@ -96,11 +96,12 @@ void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
 
+  auto offset = Point::Zero();
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
   }
-  auto shadowImage = opaqueImage->makeWithFilter(filter);
+  auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
   Paint paint = {};
   if (!_showBehindLayer) {
     auto maskImage = _contour.lock();
@@ -109,13 +110,13 @@ void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
     }
     maskImage = maskImage->makeWithFilter(opaqueFilter);
     auto shader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
-    auto matrixShader =
-        shader->makeWithMatrix(Matrix::MakeTrans(_contourOffset.x, _contourOffset.y));
+    auto matrixShader = shader->makeWithMatrix(
+        Matrix::MakeTrans(_contourOffset.x - offset.x, _contourOffset.y - offset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(shadowImage, &paint);
+  canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

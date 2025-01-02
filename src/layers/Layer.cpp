@@ -725,7 +725,8 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
   canvas->save();
   canvas->translate(offset.x, offset.y);
   drawLayerStyles(canvas, source, contentScale, alpha, LayerStylePosition::Below);
-  canvas->drawPicture(std::move(picture));
+  auto matrix = Matrix::MakeTrans(-offset.x, -offset.y);
+  canvas->drawPicture(std::move(picture), &matrix, nullptr);
   drawLayerStyles(canvas, source, contentScale, alpha, LayerStylePosition::Above);
   canvas->restore();
   return recorder.finishRecordingAsPicture();
