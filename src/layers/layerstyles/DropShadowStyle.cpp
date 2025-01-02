@@ -96,28 +96,26 @@ void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
 
-  Point offset = Point::Zero();
-
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
   }
-  auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
+  auto shadowImage = opaqueImage->makeWithFilter(filter);
   Paint paint = {};
   if (!_showBehindLayer) {
-    auto maskImage = _maskImage.lock();
+    auto maskImage = _contour.lock();
     if (maskImage == nullptr) {
       return;
     }
     maskImage = maskImage->makeWithFilter(opaqueFilter);
     auto shader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
     auto matrixShader =
-        shader->makeWithMatrix(Matrix::MakeTrans(-offset.x + _maskOffset.x, -offset.y));
+        shader->makeWithMatrix(Matrix::MakeTrans(_contourOffset.x, _contourOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
+  canvas->drawImage(shadowImage, &paint);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
@@ -137,9 +135,9 @@ void DropShadowStyle::invalidateFilter() {
   invalidate();
 }
 
-void DropShadowStyle::setMask(std::weak_ptr<Image> maskImage, const Point& maskOffset) {
-  _maskImage = std::move(maskImage);
-  _maskOffset = maskOffset;
+void DropShadowStyle::setLayerContour(std::weak_ptr<Image> contour, const Point& offset) {
+  _contour = std::move(contour);
+  _contourOffset = offset;
 }
 
 }  // namespace tgfx

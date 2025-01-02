@@ -26,7 +26,7 @@ class ContourContent : public LayerContent {
   explicit ContourContent(std::shared_ptr<Shape> shape);
 
   Rect getBounds() const override {
-    return {};
+    return Rect::MakeEmpty();
   }
 
   void draw(Canvas*, const Paint&) const override {

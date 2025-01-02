@@ -17,17 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContourContent.h"
-#include <utility>
 
 namespace tgfx {
 ContourContent::ContourContent(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
 }
 
 void ContourContent::drawContour(Canvas* canvas, const Paint& paint) const {
-  auto shapePaint = paint;
-  shapePaint.setBlendMode(BlendMode::SrcOver);
-  shapePaint.setColor(Color::White());
-  canvas->drawShape(shape, shapePaint);
+  canvas->drawShape(shape, paint);
 }
 
 }  // namespace tgfx

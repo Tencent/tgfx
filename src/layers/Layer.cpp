@@ -33,12 +33,12 @@ namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
-static bool ChildrenContainEffect(const Layer* layer) {
+static bool ChildrenContainEffects(const Layer* layer) {
   for (auto child : layer->children()) {
     if (!child->layerStyles().empty() || !child->filters().empty()) {
       return true;
     }
-    if (ChildrenContainEffect(child.get())) {
+    if (ChildrenContainEffects(child.get())) {
       return true;
     }
   }
@@ -254,6 +254,9 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
 }
 
 void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
+  if (value == bitFields.excludeChildEffectsInLayerStyle) {
+    return;
+  }
   bitFields.excludeChildEffectsInLayerStyle = value;
   invalidate();
 }
@@ -680,73 +683,75 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
   contentCanvas->scale(contentScale, contentScale);
   drawContents(args, contentCanvas, alpha);
   auto picture = recorder.finishRecordingAsPicture();
-  if (_layerStyles.empty() || picture == nullptr || args.ignoreEffect) {
+  if (_layerStyles.empty() || picture == nullptr || args.excludeEffects) {
     return picture;
   }
 
   Point offset = Point::Zero();
   std::shared_ptr<Image> source = nullptr;
-  if (!bitFields.excludeChildEffectsInLayerStyle || !ChildrenContainEffect(this)) {
+  if (!bitFields.excludeChildEffectsInLayerStyle || !ChildrenContainEffects(this)) {
     source = CreatePictureImage(picture, &offset);
   } else {
     DrawArgs newArgs = {};
     newArgs.renderFlags = args.renderFlags | RenderFlags::DisableCache;
-    newArgs.ignoreEffect = true;
+    newArgs.excludeEffects = true;
     auto canvas = recorder.beginRecording();
     canvas->scale(contentScale, contentScale);
     drawContents(newArgs, canvas, 1.0f);
     source = CreatePictureImage(recorder.finishRecordingAsPicture(), &offset);
   }
 
+  std::shared_ptr<Image> contourMask = nullptr;
+  Point contourOffset = offset;
+
+  // update drop shadow style's content contour
+  for (const auto& layerStyle : _layerStyles) {
+    if (!layerStyle->isDropShadow()) {
+      continue;
+    }
+    auto dropShadowStyle = static_cast<DropShadowStyle*>(layerStyle.get());
+    if (!dropShadowStyle->showBehindLayer()) {
+      if (contourMask == nullptr) {
+        contourMask = !HasEmptyFillContents(this)
+                          ? source
+                          : getLayerContour(args, contentScale, &contourOffset);
+        contourOffset -= offset;
+      }
+      dropShadowStyle->setLayerContour(contourMask, contourOffset);
+    }
+  }
+
   auto canvas = recorder.beginRecording();
-  drawLayerStyles(args, canvas, source, offset, contentScale, alpha, LayerStylePosition::Below);
+  canvas->save();
+  canvas->translate(offset.x, offset.y);
+  drawLayerStyles(canvas, source, contentScale, alpha, LayerStylePosition::Below);
   canvas->drawPicture(std::move(picture));
-  drawLayerStyles(args, canvas, source, offset, contentScale, alpha, LayerStylePosition::Above);
+  drawLayerStyles(canvas, source, contentScale, alpha, LayerStylePosition::Above);
+  canvas->restore();
   return recorder.finishRecordingAsPicture();
 }
 
-void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, std::shared_ptr<Image> content,
-                            const Point& contentOffset, float contentScale, float alpha,
-                            LayerStylePosition position) {
-  std::shared_ptr<Image> contourMask = nullptr;
-  Point maskOffset = contentOffset;
-  canvas->save();
-  canvas->translate(contentOffset.x, contentOffset.y);
-
+void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                            float alpha, LayerStylePosition position) {
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position) {
       continue;
     }
-    if (layerStyle->requiresLayerContour()) {
-      auto dropShadowStyle = static_cast<DropShadowStyle*>(layerStyle.get());
-      if (!dropShadowStyle->showBehindLayer()) {
-        if (contourMask == nullptr) {
-          contourMask = !HasEmptyFillContents(this)
-                            ? content
-                            : getLayerContour(args, contentScale, &maskOffset);
-          maskOffset -= contentOffset;
-        }
-        dropShadowStyle->setMask(contourMask, maskOffset);
-      }
-    }
-
     canvas->save();
     layerStyle->draw(canvas, std::move(content), contentScale, alpha);
     canvas->restore();
   }
-  canvas->restore();
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   TRACE_EVENT;
   DEBUG_ASSERT(canvas != nullptr);
-  auto ignoreEffect = args.ignoreEffect;
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
-             (!_filters.empty() && !ignoreEffect) || hasValidMask()) {
+             (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
     drawOffscreen(args, canvas, alpha, blendMode);
-  } else if (!_layerStyles.empty() && !ignoreEffect) {
+  } else if (!_layerStyles.empty() && !args.excludeEffects) {
     drawWithLayerStyles(args, canvas, alpha);
   } else {
     // draw directly
@@ -809,7 +814,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
   paint.setMaskFilter(getMaskFilter(args, contentScale));
-  if (!args.ignoreEffect) {
+  if (!args.excludeEffects) {
     paint.setImageFilter(getCurrentFilter(contentScale));
   }
   auto matrix = Matrix::MakeScale(1.0f / contentScale);
@@ -819,7 +824,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   TRACE_EVENT;
   if (auto content = getContent()) {
-    if (args.isDrawingContour) {
+    if (args.drawContour) {
       content->drawContour(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
     } else {
       content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));

@@ -544,9 +544,8 @@ class Layer {
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
 
-  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, std::shared_ptr<Image> content,
-                       const Point& contentOffset, float contentScale, float alpha,
-                       LayerStylePosition position);
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                       float alpha, LayerStylePosition position);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 

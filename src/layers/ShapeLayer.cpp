@@ -21,7 +21,6 @@
 #include "core/utils/Profiling.h"
 #include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -244,10 +243,13 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
     return nullptr;
   }
   std::vector<std::unique_ptr<LayerContent>> contents = {};
-  contents.reserve(_fillStyles.size() + _strokeStyles.size() + 1);
+  contents.reserve(std::max(_fillStyles.size(), 1lu) + _strokeStyles.size());
   for (auto& style : _fillStyles) {
     contents.push_back(std::make_unique<ShapeContent>(_shape, style->getShader(), style->alpha(),
                                                       style->blendMode()));
+  }
+  if (_fillStyles.empty()) {
+    contents.push_back(std::make_unique<ContourContent>(_shape));
   }
   if (stroke.width > 0 && !_strokeStyles.empty()) {
     auto strokeShape = _shape;
@@ -282,7 +284,6 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
       contents.push_back(std::move(content));
     }
   }
-  contents.push_back(std::make_unique<ContourContent>(_shape));
   return LayerContent::Compose(std::move(contents));
 }
 }  // namespace tgfx

@@ -97,7 +97,7 @@ class LayerStyle : public LayerProperty {
   virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                       float alpha, BlendMode blendMode) = 0;
 
-  virtual bool requiresLayerContour() const {
+  virtual bool isDropShadow() const {
     return false;
   }
 

@@ -29,9 +29,9 @@ class DrawArgs {
   DrawArgs() = default;
 
   DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false,
-           bool ignoreEffect = false, bool isDrawingContour = false)
+           bool excludeEffects = false, bool isDrawingContour = false)
       : context(context), renderFlags(renderFlags), cleanDirtyFlags(cleanDirtyFlags),
-        ignoreEffect(ignoreEffect), isDrawingContour(isDrawingContour) {
+        excludeEffects(excludeEffects), drawContour(isDrawingContour) {
   }
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
@@ -41,9 +41,10 @@ class DrawArgs {
 
   // Whether to clean the dirty flags of the associated Layer during the drawing process.
   bool cleanDirtyFlags = false;
-  // Whether to ignore the effect of the associated Layer during the drawing process.
-  bool ignoreEffect = false;
-  // Whether the associated Layer is drawing contour.
-  bool isDrawingContour = false;
+  // Whether to exclude effects during the drawing process.
+  bool excludeEffects = false;
+  // Whether to draw the contour of the associated Layer during the drawing process. If true, the
+  // contour will be drawn instead of the content.
+  bool drawContour = false;
 };
 }  // namespace tgfx
