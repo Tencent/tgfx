@@ -245,12 +245,14 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
   std::vector<std::unique_ptr<LayerContent>> contents = {};
   auto contourSize = _fillStyles.empty() ? 1 : _fillStyles.size();
   contents.reserve(contourSize + _strokeStyles.size());
+  bool needContourContent = true;
   for (auto& style : _fillStyles) {
+    if (style->alpha() <= 0) {
+      continue;
+    }
     contents.push_back(std::make_unique<ShapeContent>(_shape, style->getShader(), style->alpha(),
                                                       style->blendMode()));
-  }
-  if (_fillStyles.empty()) {
-    contents.push_back(std::make_unique<ContourContent>(_shape));
+    needContourContent = false;
   }
   if (stroke.width > 0 && !_strokeStyles.empty()) {
     auto strokeShape = _shape;
@@ -280,10 +282,16 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
       strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
     }
     for (auto& style : _strokeStyles) {
+      if (style->alpha() <= 0) {
+        continue;
+      }
       auto content = std::make_unique<ShapeContent>(strokeShape, style->getShader(), style->alpha(),
                                                     style->blendMode());
       contents.push_back(std::move(content));
     }
+  }
+  if (!contents.empty() && needContourContent) {
+    contents.push_back(std::make_unique<ContourContent>(_shape));
   }
   return LayerContent::Compose(std::move(contents));
 }

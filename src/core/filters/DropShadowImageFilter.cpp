@@ -30,11 +30,17 @@
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color) {
+  if (color.alpha <= 0) {
+    return nullptr;
+  }
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
                                                          float blurrinessY, const Color& color) {
+  if (color.alpha <= 0) {
+    return nullptr;
+  }
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 

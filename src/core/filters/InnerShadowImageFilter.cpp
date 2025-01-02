@@ -25,12 +25,17 @@
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadow(float dx, float dy, float blurrinessX,
                                                       float blurrinessY, const Color& color) {
+  if (color.alpha <= 0) {
+    return nullptr;
+  }
   return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                           float blurrinessY, const Color& color) {
-
+  if (color.alpha <= 0) {
+    return nullptr;
+  }
   return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 
