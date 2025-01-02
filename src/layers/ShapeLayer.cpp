@@ -243,7 +243,8 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
     return nullptr;
   }
   std::vector<std::unique_ptr<LayerContent>> contents = {};
-  contents.reserve(std::max(_fillStyles.size(), 1lu) + _strokeStyles.size());
+  auto contourSize = _fillStyles.empty() ? 1 : _fillStyles.size();
+  contents.reserve(contourSize + _strokeStyles.size());
   for (auto& style : _fillStyles) {
     contents.push_back(std::make_unique<ShapeContent>(_shape, style->getShader(), style->alpha(),
                                                       style->blendMode()));
