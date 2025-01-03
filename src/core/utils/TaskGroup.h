@@ -24,6 +24,7 @@
 #include <thread>
 #include <vector>
 #include "tgfx/core/Task.h"
+#include "LockFreeQueue.h"
 
 namespace tgfx {
 class TaskGroup {
@@ -32,7 +33,9 @@ class TaskGroup {
   std::condition_variable condition = {};
   int activeThreads = 0;
   bool exited = false;
-  std::list<std::shared_ptr<Task>> tasks = {};
+   LockFreeQueue<std::shared_ptr<Task>> tasks = {};
+
+//  std::list<std::shared_ptr<Task>> tasks = {};
   std::vector<std::thread*> threads = {};
   std::vector<std::thread::id> timeoutThreads = {};
 

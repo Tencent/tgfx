@@ -24,6 +24,7 @@
 #include <string>
 #include "core/utils/Log.h"
 #include "core/utils/Profiling.h"
+#include <string>
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -69,7 +70,7 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACE_THREAD_NAME(GetThreadName().c_str());
+//  printf("--------TaskGroup::RunLoop()---\n");
   while (true) {
     auto task = taskGroup->popTask();
     if (!task) {
@@ -124,23 +125,25 @@ bool TaskGroup::checkThreads() {
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
-  std::lock_guard<std::mutex> autoLock(locker);
+//  std::lock_guard<std::mutex> autoLock(locker);
 #if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
   return false;
 #endif
   if (exited || !checkThreads()) {
     return false;
   }
-  tasks.push_back(std::move(task));
+  // printf("--------pushTask---success---\n");
+  tasks.enqueue(std::move(task));
   condition.notify_one();
   return true;
 }
 
 std::shared_ptr<Task> TaskGroup::popTask() {
-  std::unique_lock<std::mutex> autoLock(locker);
+//  std::unique_lock<std::mutex> autoLock(locker);
   activeThreads--;
   while (!exited) {
-    if (tasks.empty()) {
+    if (tasks.isEmpty()) {
+      std::unique_lock<std::mutex> autoLock(locker);
       auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
       if (exited || status == std::cv_status::timeout) {
         auto threadID = std::this_thread::get_id();
@@ -150,34 +153,42 @@ std::shared_ptr<Task> TaskGroup::popTask() {
         return nullptr;
       }
     } else {
-      auto task = tasks.front();
-      tasks.pop_front();
-      activeThreads++;
+//      auto task = tasks.front();
+//      tasks.pop_front();
+       auto task = tasks.peek();
+       tasks.pop();
+       activeThreads++;
       //      LOGI("TaskGroup: A task is running, the current active threads : %lld",
       //      activeThreads);
-      return task;
+      return *task;
     }
   }
   return nullptr;
 }
 
-bool TaskGroup::removeTask(Task* target) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto position = std::find_if(tasks.begin(), tasks.end(),
-                               [=](std::shared_ptr<Task> task) { return task.get() == target; });
-  if (position == tasks.end()) {
-    return false;
-  }
-  tasks.erase(position);
+bool TaskGroup::removeTask(Task*) {
+
+  tasks.dequeue();
+//  std::lock_guard<std::mutex> autoLock(locker);
+//  printf("--------TaskGroup::removeTask()---\n");
   return true;
+//   return tasks.remove(std::shared_ptr<Task>(target));
+//  auto position = std::find_if(tasks.begin(), tasks.end(),
+//                               [=](std::shared_ptr<Task> task) { return task.get() == target; });
+//  if (position == tasks.end()) {
+//    return false;
+//  }
+//  tasks.erase(position);
+//  return true;
 }
 
 void TaskGroup::exit() {
-  locker.lock();
+//  locker.lock();
   exited = true;
-  tasks.clear();
+//  tasks.clear();
+   tasks.empty();
   condition.notify_all();
-  locker.unlock();
+//  locker.unlock();
   for (auto& thread : threads) {
     ReleaseThread(thread);
   }
