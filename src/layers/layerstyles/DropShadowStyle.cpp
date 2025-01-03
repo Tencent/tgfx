@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include <utility>
 
 namespace tgfx {
 
@@ -90,8 +91,13 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             float alpha, BlendMode blendMode) {
+void DropShadowStyle::drawWithContourMask(Canvas* canvas, std::shared_ptr<Image> content,
+                                          std::shared_ptr<Image> contour,
+                                          const Point& contourOffset, float contentScale,
+                                          float alpha) {
+  if (!_showBehindLayer && contour == nullptr) {
+    return;
+  }
   // create opaque image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
@@ -104,19 +110,20 @@ void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, flo
   auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
   Paint paint = {};
   if (!_showBehindLayer) {
-    auto maskImage = _contour.lock();
-    if (maskImage == nullptr) {
-      return;
-    }
-    maskImage = maskImage->makeWithFilter(opaqueFilter);
-    auto shader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal);
+    contour = contour->makeWithFilter(opaqueFilter);
+    auto shader = Shader::MakeImageShader(contour, TileMode::Decal, TileMode::Decal);
     auto matrixShader = shader->makeWithMatrix(
-        Matrix::MakeTrans(_contourOffset.x - offset.x, _contourOffset.y - offset.y));
+        Matrix::MakeTrans(contourOffset.x - offset.x, contourOffset.y - offset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
-  paint.setBlendMode(blendMode);
+  paint.setBlendMode(blendMode());
   paint.setAlpha(alpha);
   canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
+}
+
+void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                             float alpha, BlendMode) {
+  drawWithContourMask(canvas, std::move(content), nullptr, Point::Zero(), contentScale, alpha);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
@@ -134,11 +141,6 @@ std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
 void DropShadowStyle::invalidateFilter() {
   shadowFilter = nullptr;
   invalidate();
-}
-
-void DropShadowStyle::setLayerContour(std::weak_ptr<Image> contour, const Point& offset) {
-  _contour = std::move(contour);
-  _contourOffset = offset;
 }
 
 }  // namespace tgfx

@@ -121,14 +121,16 @@ class DropShadowStyle : public LayerStyle {
   DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                   const Color& color, bool showBehindTransparent);
 
+  void drawWithContourMask(Canvas* canvas, std::shared_ptr<Image> content,
+                           std::shared_ptr<Image> contour, const Point& contourOffset,
+                           float contentScale, float alpha);
+
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
               BlendMode blendMode) override;
 
   void invalidateFilter();
 
   std::shared_ptr<ImageFilter> getShadowFilter(float contentScale);
-
-  void setLayerContour(std::weak_ptr<Image> contour, const Point& offset);
 
   float _offsetX = 0.0f;
   float _offsetY = 0.0f;
@@ -139,10 +141,6 @@ class DropShadowStyle : public LayerStyle {
 
   float currentScale = 1.0f;
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;
-
-  // Mask
-  std::weak_ptr<Image> _contour = {};
-  Point _contourOffset = Point::Zero();
 
   friend class Layer;
 };

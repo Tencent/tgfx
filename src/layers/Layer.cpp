@@ -711,35 +711,42 @@ std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float con
     }
     auto dropShadowStyle = static_cast<DropShadowStyle*>(layerStyle.get());
     if (!dropShadowStyle->showBehindLayer()) {
-      if (contourMask == nullptr) {
-        contourMask = !HasEmptyFillContents(this)
-                          ? source
-                          : getLayerContour(args, contentScale, &contourOffset);
-        contourOffset -= offset;
-      }
-      dropShadowStyle->setLayerContour(contourMask, contourOffset);
+      contourMask = !HasEmptyFillContents(this)
+                        ? source
+                        : getLayerContour(args, contentScale, &contourOffset);
+      contourOffset -= offset;
+      break;
     }
   }
 
   auto canvas = recorder.beginRecording();
   canvas->save();
   canvas->translate(offset.x, offset.y);
-  drawLayerStyles(canvas, source, contentScale, alpha, LayerStylePosition::Below);
+  drawLayerStyles(canvas, source, contourMask, contourOffset, contentScale, alpha,
+                  LayerStylePosition::Below);
   auto matrix = Matrix::MakeTrans(-offset.x, -offset.y);
   canvas->drawPicture(std::move(picture), &matrix, nullptr);
-  drawLayerStyles(canvas, source, contentScale, alpha, LayerStylePosition::Above);
+  drawLayerStyles(canvas, source, contourMask, contourOffset, contentScale, alpha,
+                  LayerStylePosition::Above);
   canvas->restore();
   return recorder.finishRecordingAsPicture();
 }
 
-void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            float alpha, LayerStylePosition position) {
+void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content,
+                            std::shared_ptr<Image> contour, const Point& contourOffset,
+                            float contentScale, float alpha, LayerStylePosition position) {
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position) {
       continue;
     }
     canvas->save();
-    layerStyle->draw(canvas, std::move(content), contentScale, alpha);
+    if (!layerStyle->isDropShadow() || contour == nullptr) {
+      layerStyle->draw(canvas, content, contentScale, alpha);
+    } else {
+      auto dropShadowStyle = static_cast<DropShadowStyle*>(layerStyle.get());
+      dropShadowStyle->drawWithContourMask(canvas, content, contour, contourOffset, contentScale,
+                                           alpha);
+    }
     canvas->restore();
   }
 }

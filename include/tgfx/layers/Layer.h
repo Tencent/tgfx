@@ -237,7 +237,8 @@ class Layer {
   /**
    * Whether to exclude child effects in the layer style. If true, child layer
    * styles and filters are not included in the layer content used to generate
-   * the layer style. The default value is false.
+   * the layer style. This option only affects the appearance of the LayerStyle, not the layer
+   * itself. The default value is false.
    */
   bool excludeChildEffectsInLayerStyle() const {
     return bitFields.excludeChildEffectsInLayerStyle;
@@ -544,8 +545,9 @@ class Layer {
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
 
-  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                       float alpha, LayerStylePosition position);
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content,
+                       std::shared_ptr<Image> contour, const Point& contourOffset,
+                       float contentScale, float alpha, LayerStylePosition position);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
