@@ -148,14 +148,12 @@ uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic ) {
 
 tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize) {
   std::string strText(text);
-  auto layer = tgfx::TextLayer::Make();
   if (textSize) {
     strText = std::string(text, textSize);
   }
-  layer->setText(strText);
   auto typeface = appHost->getTypeface("default");
   tgfx::Font font(typeface, 10 );
-  layer->setFont(font);
+  auto layer = tgfx::TextBlob::MakeFrom(strText, font);
   return layer->getBounds();
 }
 

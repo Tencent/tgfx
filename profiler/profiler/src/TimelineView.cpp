@@ -352,7 +352,7 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, t
       p1 = dpos + tgfx::Point(std::max(-10.0, tpos + tx + 1), ty05);
       p2 = dpos + tgfx::Point(std::min(w + 20.0, f1), ty05);
       drawLine(canvas,p1, p2, color);
-      auto textPos = wpos + tgfx::Point(tpos, getFontSize(buf).height());
+      auto textPos = wpos + tgfx::Point(tpos, getTextSize(appHost.get(), buf).height());
       drawText(canvas, appHost.get(), buf, textPos.x, textPos.y, color);
       // drawPolyLine(painter, dpos + tgfx::Point(std::max(-10.0, f0), ty05), dpos + tgfx::Point(tpos, ty05), color);
       // drawPolyLine(painter, dpos + tgfx::Point(std::max(-10.0, tpos + tx + 1), ty05), dpos + tgfx::Point(std::min(w + 20.0, f1), ty05), color);
@@ -406,7 +406,7 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
 
         }
         const auto tmp = tracy::RealToString(v.num);
-        const auto tsz = getFontSize(tmp);
+        const auto tsz = getTextSize(appHost.get(), tmp);
         if (tsz.width() < px1 - px0) {
           const auto x = px0 + (px1 - px0 - tsz.width()) / 2;
           drawTextContrast(canvas, appHost.get(), wpos.x + x, wpos.y + offset , 0xFF4488DD, tmp);
@@ -421,7 +421,7 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
         const auto zoneColor = getZoneColorData(ev, tid, v.depth, v.inheritedColor);
         const char* zoneName = worker->GetZoneName(ev);
 
-        auto tsz = getFontSize(zoneName);
+        auto tsz = getTextSize(appHost.get(), zoneName);
         if(viewData->shortenName == ShortenName::Always ||
           ((viewData->shortenName == ShortenName::NoSpace || viewData->shortenName == ShortenName::NoSpaceAndNormalize)
             && tsz.width() > zsz))
