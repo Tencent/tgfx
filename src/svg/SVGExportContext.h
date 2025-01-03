@@ -23,7 +23,6 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
-#include "core/CanvasState.h"
 #include "core/DrawContext.h"
 #include "core/FillStyle.h"
 #include "svg/SVGTextBuilder.h"
@@ -43,23 +42,24 @@ namespace tgfx {
 class ResourceStore;
 class ElementWriter;
 
-class SVGExportingContext : public DrawContext {
+class SVGExportContext : public DrawContext {
  public:
-  SVGExportingContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
-                      uint32_t exportFlags);
-  ~SVGExportingContext() override = default;
+  SVGExportContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> writer,
+                   uint32_t exportFlags);
+  ~SVGExportContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
     canvas = inputCanvas;
   }
 
-  void clear() override{};
+  void drawStyle(const MCState& state, const FillStyle& style) override;
 
-  void drawRect(const Rect&, const MCState&, const FillStyle&) override;
+  void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override;
 
-  void drawRRect(const RRect&, const MCState&, const FillStyle&) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) override;
 
-  void drawShape(std::shared_ptr<Shape>, const MCState&, const FillStyle&) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                 const FillStyle& style) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const FillStyle& style) override;
@@ -68,13 +68,13 @@ class SVGExportingContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state,
                      const FillStyle& style) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList>, const MCState&, const FillStyle&,
-                        const Stroke*) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
+                        const MCState& state, const FillStyle& style) override;
 
-  void drawPicture(std::shared_ptr<Picture>, const MCState&) override;
+  void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
-  void drawLayer(std::shared_ptr<Picture>, const MCState&, const FillStyle&,
-                 std::shared_ptr<ImageFilter>) override;
+  void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                 const MCState& state, const FillStyle& style) override;
 
   XMLWriter* getWriter() const {
     return writer.get();
@@ -84,6 +84,11 @@ class SVGExportingContext : public DrawContext {
    * Draws a image onto a surface and reads the pixels from the surface.
    */
   static Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image);
+
+  /**
+   * Returns the encoded pixel data if the image was created from a supported encoded format.
+   */
+  static std::shared_ptr<Data> ImageToEncodedData(const std::shared_ptr<Image>& image);
 
  private:
   /**
@@ -109,6 +114,7 @@ class SVGExportingContext : public DrawContext {
 
   uint32_t exportFlags = {};
   Context* context = nullptr;
+  Rect viewBox = Rect::MakeEmpty();
   Canvas* canvas = nullptr;
   const std::unique_ptr<XMLWriter> writer = nullptr;
   const std::unique_ptr<ResourceStore> resourceBucket = nullptr;

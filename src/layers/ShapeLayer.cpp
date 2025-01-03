@@ -84,6 +84,14 @@ void ShapeLayer::removeFillStyles() {
   invalidateContent();
 }
 
+void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fill) {
+  if (fill == nullptr) {
+    removeFillStyles();
+  } else {
+    setFillStyles({std::move(fill)});
+  }
+}
+
 void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   if (fillStyle == nullptr) {
     return;
@@ -117,6 +125,14 @@ void ShapeLayer::removeStrokeStyles() {
   }
   _strokeStyles = {};
   invalidateContent();
+}
+
+void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
+  if (stroke == nullptr) {
+    removeStrokeStyles();
+  } else {
+    setStrokeStyles({std::move(stroke)});
+  }
 }
 
 void ShapeLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {

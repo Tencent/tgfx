@@ -17,74 +17,80 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Caster.h"
+#include "core/images/CodecImage.h"
 #include "core/shaders/ColorShader.h"
 
 namespace tgfx {
-const ColorShader* ShaderCaster::AsColorShader(const Shader* shader) {
+const ColorShader* Caster::AsColorShader(const Shader* shader) {
   if (shader->type() == Shader::Type::Color) {
     return static_cast<const ColorShader*>(shader);
   }
   return nullptr;
 }
 
-const ImageShader* ShaderCaster::AsImageShader(const Shader* shader) {
+const ImageShader* Caster::AsImageShader(const Shader* shader) {
   if (shader->type() == Shader::Type::Image) {
     return static_cast<const ImageShader*>(shader);
   }
   return nullptr;
 }
 
-const GradientShader* ShaderCaster::AsGradientShader(const Shader* shader) {
+const GradientShader* Caster::AsGradientShader(const Shader* shader) {
   if (shader->type() == Shader::Type::Gradient) {
     return static_cast<const GradientShader*>(shader);
   }
   return nullptr;
 }
 
-const BlurImageFilter* ImageFilterCaster::AsBlurImageFilter(const ImageFilter* imageFilter) {
+const BlurImageFilter* Caster::AsBlurImageFilter(const ImageFilter* imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::Blur) {
     return static_cast<const BlurImageFilter*>(imageFilter);
   }
   return nullptr;
 }
-const DropShadowImageFilter* ImageFilterCaster::AsDropShadowImageFilter(
-    const ImageFilter* imageFilter) {
+const DropShadowImageFilter* Caster::AsDropShadowImageFilter(const ImageFilter* imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::DropShadow) {
     return static_cast<const DropShadowImageFilter*>(imageFilter);
   }
   return nullptr;
 }
 
-const InnerShadowImageFilter* ImageFilterCaster::AsInnerShadowImageFilter(
-    const ImageFilter* imageFilter) {
+const InnerShadowImageFilter* Caster::AsInnerShadowImageFilter(const ImageFilter* imageFilter) {
   if (imageFilter->type() == ImageFilter::Type::InnerShadow) {
     return static_cast<const InnerShadowImageFilter*>(imageFilter);
   }
   return nullptr;
 }
 
-const ModeColorFilter* ColorFilterCaster::AsModeColorFilter(const ColorFilter* colorFilter) {
+const ModeColorFilter* Caster::AsModeColorFilter(const ColorFilter* colorFilter) {
   if (colorFilter->type() == ColorFilter::Type::Blend) {
     return static_cast<const ModeColorFilter*>(colorFilter);
   }
   return nullptr;
 }
 
-const MatrixColorFilter* ColorFilterCaster::AsMatrixColorFilter(const ColorFilter* colorFilter) {
+const MatrixColorFilter* Caster::AsMatrixColorFilter(const ColorFilter* colorFilter) {
   if (colorFilter->type() == ColorFilter::Type::Matrix) {
     return static_cast<const MatrixColorFilter*>(colorFilter);
   }
   return nullptr;
 }
 
-const PictureImage* ImageCaster::AsPictureImage(const Image* image) {
+const PictureImage* Caster::AsPictureImage(const Image* image) {
   if (image->type() == Image::Type::Picture) {
     return static_cast<const PictureImage*>(image);
   }
   return nullptr;
 }
 
-const ShaderMaskFilter* MaskFilterCaster::AsShaderMaskFilter(const MaskFilter* maskFilter) {
+const CodecImage* Caster::AsCodecImage(const Image* image) {
+  if (image->type() == Image::Type::Codec) {
+    return static_cast<const CodecImage*>(image);
+  }
+  return nullptr;
+}
+
+const ShaderMaskFilter* Caster::AsShaderMaskFilter(const MaskFilter* maskFilter) {
   if (maskFilter->type() == MaskFilter::Type::Shader) {
     return static_cast<const ShaderMaskFilter*>(maskFilter);
   }

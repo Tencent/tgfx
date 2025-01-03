@@ -43,8 +43,8 @@ class TransformContext : public DrawContext {
   explicit TransformContext(DrawContext* drawContext) : drawContext(drawContext) {
   }
 
-  void clear() override {
-    drawContext->clear();
+  void drawStyle(const MCState& state, const FillStyle& style) override {
+    drawContext->drawStyle(transform(state), style);
   }
 
   void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override {
@@ -71,18 +71,18 @@ class TransformContext : public DrawContext {
     drawContext->drawImageRect(std::move(image), rect, sampling, transform(state), style);
   }
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const FillStyle& style, const Stroke* stroke) override {
-    drawContext->drawGlyphRunList(std::move(glyphRunList), transform(state), style, stroke);
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
+                        const MCState& state, const FillStyle& style) override {
+    drawContext->drawGlyphRunList(std::move(glyphRunList), stroke, transform(state), style);
   }
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override {
     drawContext->drawPicture(std::move(picture), transform(state));
   }
 
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
-                 std::shared_ptr<ImageFilter> filter) override {
-    drawContext->drawLayer(std::move(picture), transform(state), style, std::move(filter));
+  void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                 const MCState& state, const FillStyle& style) override {
+    drawContext->drawLayer(std::move(picture), std::move(filter), transform(state), style);
   }
 
  protected:

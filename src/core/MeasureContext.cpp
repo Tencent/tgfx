@@ -17,80 +17,80 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-void MeasureContext::clear() {
-  bounds.setEmpty();
+void MeasureContext::drawStyle(const MCState& state, const FillStyle&) {
+  addDeviceBounds(state.clip, Rect::MakeEmpty(), true);
 }
 
 void MeasureContext::drawRect(const Rect& rect, const MCState& state, const FillStyle&) {
-  addLocalBounds(rect, state);
+  addLocalBounds(state, rect);
 }
 
 void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle&) {
-  addLocalBounds(rRect.rect, state);
+  addLocalBounds(state, rRect.rect);
 }
 
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                const FillStyle&) {
   auto localBounds = shape->getBounds(state.matrix.getMaxScale());
-  addLocalBounds(localBounds, state);
+  addLocalBounds(state, localBounds, shape->isInverseFillType());
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
                                const MCState& state, const FillStyle&) {
-  if (image == nullptr) {
-    return;
-  }
+  DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
-  addLocalBounds(rect, state);
+  addLocalBounds(state, rect);
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
                                    const MCState& state, const FillStyle&) {
-  addLocalBounds(rect, state);
+  addLocalBounds(state, rect);
 }
 
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const FillStyle&,
-                                      const Stroke* stroke) {
+                                      const Stroke* stroke, const MCState& state,
+                                      const FillStyle&) {
   auto localBounds = glyphRunList->getBounds(state.matrix.getMaxScale());
   if (stroke) {
     stroke->applyToBounds(&localBounds);
   }
-  addLocalBounds(localBounds, state);
+  addLocalBounds(state, localBounds);
 }
 
-void MeasureContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
-                               const FillStyle&, std::shared_ptr<ImageFilter> imageFilter) {
-  if (picture == nullptr) {
-    return;
-  }
+void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
+                               std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
+                               const FillStyle&) {
+  DEBUG_ASSERT(picture != nullptr);
   auto deviceBounds = picture->getBounds(&state.matrix);
   if (imageFilter) {
     deviceBounds = imageFilter->filterBounds(deviceBounds);
   }
-  addDeviceBounds(deviceBounds, state.clip);
+  addDeviceBounds(state.clip, deviceBounds, picture->hasUnboundedFill());
 }
 
 void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
-  if (picture != nullptr) {
-    picture->playback(this, state);
-  }
+  DEBUG_ASSERT(picture != nullptr);
+  picture->playback(this, state);
 }
 
-void MeasureContext::addLocalBounds(const Rect& localBounds, const MCState& state) {
+void MeasureContext::addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {
   auto deviceBounds = state.matrix.mapRect(localBounds);
-  addDeviceBounds(deviceBounds, state.clip);
+  addDeviceBounds(state.clip, deviceBounds, unbounded);
 }
 
-void MeasureContext::addDeviceBounds(const Rect& deviceBounds, const Path& clip) {
-  if (clip.isEmpty() && clip.isInverseFillType()) {
+void MeasureContext::addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded) {
+  if (clip.isInverseFillType()) {
     bounds.join(deviceBounds);
     return;
   }
+  if (clip.isEmpty()) {
+    return;
+  }
   auto intersectBounds = clip.getBounds();
-  if (!intersectBounds.intersect(deviceBounds)) {
+  if (!unbounded && !intersectBounds.intersect(deviceBounds)) {
     return;
   }
   bounds.join(intersectBounds);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ShaderMaskFilter.h"
-#include "gpu/processors/FragmentProcessor.h"
+#include "CodecImage.h"
+#include <memory>
 
 namespace tgfx {
-std::shared_ptr<MaskFilter> MaskFilter::MakeShader(std::shared_ptr<Shader> shader, bool inverted) {
-  if (shader == nullptr) {
+std::shared_ptr<Image> CodecImage::MakeFrom(const std::shared_ptr<ImageCodec>& codec) {
+  TRACE_EVENT;
+  if (!codec) {
     return nullptr;
   }
-  return std::make_shared<ShaderMaskFilter>(std::move(shader), inverted);
+  auto image = std::shared_ptr<CodecImage>(new CodecImage(codec));
+  image->weakThis = image;
+  return image;
 }
 
-std::shared_ptr<MaskFilter> ShaderMaskFilter::makeWithMatrix(const Matrix& viewMatrix) const {
-  auto newShader = shader->makeWithMatrix(viewMatrix);
-  return MakeShader(std::move(newShader), inverted);
+CodecImage::CodecImage(const std::shared_ptr<ImageCodec>& codec)
+    : GeneratorImage(UniqueKey::Make(), codec) {
 }
 
-std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix) const {
-  auto processor = FragmentProcessor::Make(shader, args, uvMatrix);
-  return FragmentProcessor::MulInputByChildAlpha(std::move(processor), inverted);
+std::shared_ptr<ImageCodec> CodecImage::codec() const {
+  return std::static_pointer_cast<ImageCodec>(generator);
 }
+
 }  // namespace tgfx

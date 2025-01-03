@@ -32,6 +32,9 @@ namespace tgfx {
 class SVGValue;
 class SVGRenderContext;
 
+/**
+ * Enumeration of SVG element tags, where each SVG element corresponds to a specific tag.
+ */
 enum class SVGTag {
   Circle,
   ClipPath,
@@ -112,6 +115,10 @@ enum class SVGTag {
     }                                                                                 \
   }
 
+/**
+ * Abstract base class for SVG nodes, representing an element in SVG with common attributes and
+ * methods.
+ */
 class SVGNode {
  public:
   virtual ~SVGNode();
@@ -120,6 +127,7 @@ class SVGNode {
     return _tag;
   }
 
+  // Inheritable presentation attributes
   SVG_PRES_ATTR(ClipRule, SVGFillRule, true)
   SVG_PRES_ATTR(Color, SVGColorType, true)
   SVG_PRES_ATTR(ColorInterpolation, SVGColorspace, true)
@@ -142,7 +150,7 @@ class SVGNode {
   SVG_PRES_ATTR(TextAnchor, SVGTextAnchor, true)
   SVG_PRES_ATTR(Visibility, SVGVisibility, true)
 
-  // not inherited
+  // Non-inheritable presentation attributes
   SVG_PRES_ATTR(ClipPath, SVGFuncIRI, false)
   SVG_PRES_ATTR(Display, SVGDisplay, false)
   SVG_PRES_ATTR(Mask, SVGFuncIRI, false)
@@ -154,22 +162,40 @@ class SVGNode {
   SVG_PRES_ATTR(FloodOpacity, SVGNumberType, false)
   SVG_PRES_ATTR(LightingColor, SVGColor, false)
 
-  void render(const SVGRenderContext&) const;
+  /**
+   * Renders the SVG node to the provided context.
+   */
+  void render(const SVGRenderContext& context) const;
 
-  bool asPaint(const SVGRenderContext&, Paint*) const;
+  /**
+   * Converts the SVG node to a paint object.
+   */
+  bool asPaint(const SVGRenderContext& context, Paint* paint) const;
 
-  Path asPath(const SVGRenderContext&) const;
+  /**
+   * Converts the SVG node to a path object.
+   */
+  Path asPath(const SVGRenderContext& context) const;
 
-  Rect objectBoundingBox(const SVGRenderContext&) const;
+  /**
+   * Returns the object bounding box of the SVG node.
+   */
+  Rect objectBoundingBox(const SVGRenderContext& context) const;
 
+  /**
+   * Returns the parent node of the SVG node.
+   */
   virtual bool hasChildren() const {
     return false;
   }
 
- protected:
-  explicit SVGNode(SVGTag);
+  /**
+   * Appends a child node to the SVG node.
+   */
+  virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
 
-  virtual void appendChild(std::shared_ptr<SVGNode>) = 0;
+ protected:
+  explicit SVGNode(SVGTag tag);
 
   void setAttribute(SVGAttribute attribute, const SVGValue& value);
 
@@ -177,9 +203,10 @@ class SVGNode {
 
   virtual bool parseAndSetAttribute(const std::string& name, const std::string& value);
 
-  static Matrix ComputeViewboxMatrix(const Rect&, const Rect&, SVGPreserveAspectRatio);
+  static Matrix ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
+                                     SVGPreserveAspectRatio PreAspectRatio);
 
-  virtual void onSetAttribute(SVGAttribute, const SVGValue&){};
+  virtual void onSetAttribute(SVGAttribute /*attribute*/, const SVGValue& /*value*/){};
 
   // Called before onRender(), to apply local attributes to the context.  Unlike onRender(),
   // onPrepareToRender() bubbles up the inheritance chain: override should always call
@@ -187,17 +214,17 @@ class SVGNode {
   // (return false).
   // Implementations are expected to return true if rendering is to continue, or false if
   // the node/subtree rendering is disabled.
-  virtual bool onPrepareToRender(SVGRenderContext*) const;
+  virtual bool onPrepareToRender(SVGRenderContext* context) const;
 
-  virtual void onRender(const SVGRenderContext&) const = 0;
+  virtual void onRender(const SVGRenderContext& context) const = 0;
 
-  virtual bool onAsPaint(const SVGRenderContext&, Paint*) const {
+  virtual bool onAsPaint(const SVGRenderContext& /*context*/, Paint* /*paint*/) const {
     return false;
   }
 
-  virtual Path onAsPath(const SVGRenderContext&) const = 0;
+  virtual Path onAsPath(const SVGRenderContext& context) const = 0;
 
-  virtual Rect onObjectBoundingBox(const SVGRenderContext&) const {
+  virtual Rect onObjectBoundingBox(const SVGRenderContext& /*context*/) const {
     return Rect::MakeEmpty();
   }
 

@@ -20,6 +20,7 @@
 #include <csetjmp>
 #include "core/utils/OrientationHelper.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"
 
 extern "C" {
@@ -187,6 +188,16 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     pixmap.readPixels(dstInfo, dstPixels);
   }
   return result;
+}
+
+std::shared_ptr<Data> JpegCodec::getEncodedData() const {
+  if (fileData) {
+    return fileData;
+  }
+  if (!filePath.empty()) {
+    return Data::MakeFromFile(filePath);
+  }
+  return nullptr;
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE

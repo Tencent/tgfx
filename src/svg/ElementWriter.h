@@ -46,7 +46,7 @@ class ElementWriter {
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket);
-  ElementWriter(const std::string& name, Context* context, SVGExportingContext* svgContext,
+  ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
                 XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
                 const FillStyle& fill, const Stroke* stroke = nullptr);
   ~ElementWriter();
@@ -66,7 +66,7 @@ class ElementWriter {
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
 
  private:
-  Resources addResources(const FillStyle& fill, Context* context, SVGExportingContext* svgContext);
+  Resources addResources(const FillStyle& fill, Context* context, SVGExportContext* svgContext);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
@@ -80,13 +80,13 @@ class ElementWriter {
                                      Resources* resources);
 
   void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
-                        Context* context, SVGExportingContext* svgContext);
+                        Context* context, SVGExportContext* svgContext);
 
   void addImageMaskResources(const ImageShader* imageShader, const std::string& filterID,
-                             Context* context, SVGExportingContext* svgContext);
+                             Context* context, SVGExportContext* svgContext);
 
   void addPictureImageMaskResources(const PictureImage* pictureImage, const std::string& filterID,
-                                    SVGExportingContext* svgContext);
+                                    SVGExportContext* svgContext);
 
   void addRenderImageMaskResources(const ImageShader* imageShaders, const std::string& filterID,
                                    Context* context);

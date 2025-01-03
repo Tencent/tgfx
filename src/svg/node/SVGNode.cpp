@@ -66,7 +66,6 @@ Path SVGNode::asPath(const SVGRenderContext& context) const {
   }
 
   Path path = this->onAsPath(localContext);
-
   if (auto clipPath = localContext.clipPath(); !clipPath.isEmpty()) {
     // There is a clip-path present on the current node.
     path.addPath(clipPath, PathOp::Intersect);
@@ -80,12 +79,14 @@ Rect SVGNode::objectBoundingBox(const SVGRenderContext& context) const {
 }
 
 bool SVGNode::onPrepareToRender(SVGRenderContext* context) const {
+  // Apply the inheritance of presentation attributes
   context->applyPresentationAttributes(presentationAttributes,
                                        this->hasChildren() ? 0 : SVGRenderContext::kLeaf);
 
   // visibility:hidden and display:none disable rendering.
   const auto visibility = context->presentationContext()._inherited.Visibility->type();
-  const auto display = presentationAttributes.Display;  // display is uninherited
+  // display is uninherited
+  const auto display = presentationAttributes.Display;
   return visibility != SVGVisibility::Type::Hidden &&
          (!display.isValue() || *display != SVGDisplay::None);
 }
@@ -109,10 +110,11 @@ void SetInheritedByDefault(std::optional<T>& presentation_attribute, const T& va
   }
 }
 
-bool SVGNode::parseAndSetAttribute(const std::string& n, const std::string& v) {
-#define PARSE_AND_SET(svgName, attrName) \
-  this->set##attrName(                   \
-      SVGAttributeParser::parseProperty<decltype(presentationAttributes.attrName)>(svgName, n, v))
+bool SVGNode::parseAndSetAttribute(const std::string& name, const std::string& value) {
+#define PARSE_AND_SET(svgName, attrName)                                                          \
+  this->set##attrName(                                                                            \
+      SVGAttributeParser::parseProperty<decltype(presentationAttributes.attrName)>(svgName, name, \
+                                                                                   value))
 
   return PARSE_AND_SET("clip-path", ClipPath) || PARSE_AND_SET("clip-rule", ClipRule) ||
          PARSE_AND_SET("color", Color) ||
@@ -141,35 +143,36 @@ bool SVGNode::parseAndSetAttribute(const std::string& n, const std::string& v) {
 
 // https://www.w3.org/TR/SVG11/coords.html#PreserveAspectRatioAttribute
 Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
-                                     SVGPreserveAspectRatio par) {
+                                     SVGPreserveAspectRatio PreAspectRatio) {
   if (viewBox.isEmpty() || viewPort.isEmpty()) {
     return Matrix::MakeScale(0, 0);
   }
 
-  auto compute_scale = [&]() -> Point {
-    const auto sx = viewPort.width() / viewBox.width();
-    const auto sy = viewPort.height() / viewBox.height();
+  auto computeScale = [&]() -> Point {
+    const auto scaleX = viewPort.width() / viewBox.width();
+    const auto scaleY = viewPort.height() / viewBox.height();
 
-    if (par.align == SVGPreserveAspectRatio::Align::None) {
+    if (PreAspectRatio.align == SVGPreserveAspectRatio::Align::None) {
       // none -> anisotropic scaling, regardless of fScale
-      return {sx, sy};
+      return {scaleX, scaleY};
     }
 
     // isotropic scaling
-    const auto s =
-        par.scale == SVGPreserveAspectRatio::Scale::Meet ? std::min(sx, sy) : std::max(sx, sy);
+    const auto s = PreAspectRatio.scale == SVGPreserveAspectRatio::Scale::Meet
+                       ? std::min(scaleX, scaleY)
+                       : std::max(scaleX, scaleY);
     return {s, s};
   };
 
-  auto compute_trans = [&](const Point& scale) -> Point {
+  auto computeTrans = [&](const Point& scale) -> Point {
     static constexpr float alignCoeffs[] = {
         0.0f,  // Min
         0.5f,  // Mid
         1.0f   // Max
     };
 
-    const size_t x_coeff = static_cast<int>(par.align) >> 0 & 0x03;
-    const size_t y_coeff = static_cast<int>(par.align) >> 2 & 0x03;
+    const size_t x_coeff = static_cast<int>(PreAspectRatio.align) >> 0 & 0x03;
+    const size_t y_coeff = static_cast<int>(PreAspectRatio.align) >> 2 & 0x03;
 
     const auto tx = -viewBox.x() * scale.x;
     const auto ty = -viewBox.y() * scale.y;
@@ -179,9 +182,9 @@ Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
     return {tx + dx * alignCoeffs[x_coeff], ty + dy * alignCoeffs[y_coeff]};
   };
 
-  const auto s = compute_scale();
-  const auto t = compute_trans(s);
+  auto scale = computeScale();
+  auto transform = computeTrans(scale);
 
-  return Matrix::MakeTrans(t.x, t.y) * Matrix::MakeScale(s.x, s.y);
+  return Matrix::MakeTrans(transform.x, transform.y) * Matrix::MakeScale(scale.x, scale.y);
 }
 }  // namespace tgfx

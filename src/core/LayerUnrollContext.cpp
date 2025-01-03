@@ -27,7 +27,9 @@ LayerUnrollContext::LayerUnrollContext(DrawContext* drawContext, FillStyle fillS
     : drawContext(drawContext), fillStyle(std::move(fillStyle)) {
 }
 
-void LayerUnrollContext::clear() {
+void LayerUnrollContext::drawStyle(const MCState& state, const FillStyle& style) {
+  drawContext->drawStyle(state, merge(style));
+  unrolled = true;
 }
 
 void LayerUnrollContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -64,16 +66,17 @@ void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect&
 }
 
 void LayerUnrollContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                          const MCState& state, const FillStyle& style,
-                                          const Stroke* stroke) {
+                                          const Stroke* stroke, const MCState& state,
+                                          const FillStyle& style) {
   // We assume that glyphs within a single GlyphRunList usually do not overlap.
-  drawContext->drawGlyphRunList(std::move(glyphRunList), state, merge(style), stroke);
+  drawContext->drawGlyphRunList(std::move(glyphRunList), stroke, state, merge(style));
   unrolled = true;
 }
 
-void LayerUnrollContext::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
-                                   const FillStyle& style, std::shared_ptr<ImageFilter> filter) {
-  drawContext->drawLayer(std::move(picture), state, merge(style), std::move(filter));
+void LayerUnrollContext::drawLayer(std::shared_ptr<Picture> picture,
+                                   std::shared_ptr<ImageFilter> filter, const MCState& state,
+                                   const FillStyle& style) {
+  drawContext->drawLayer(std::move(picture), std::move(filter), state, merge(style));
   unrolled = true;
 }
 

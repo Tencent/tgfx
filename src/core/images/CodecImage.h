@@ -16,15 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CanvasState.h"
-#include "core/RecordingContext.h"
+#pragma once
+
+#include <memory>
+#include "core/images/GeneratorImage.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-CanvasLayer::CanvasLayer(DrawContext* drawContext, const Paint* paint)
-    : drawContext(drawContext), layerContext(std::make_unique<RecordingContext>()) {
-  if (paint) {
-    layerPaint = *paint;
-    layerPaint.setShader(nullptr);
+
+class CodecImage : public GeneratorImage {
+ public:
+  static std::shared_ptr<Image> MakeFrom(const std::shared_ptr<ImageCodec>& codec);
+
+  ~CodecImage() override = default;
+
+  std::shared_ptr<ImageCodec> codec() const;
+
+ protected:
+  Type type() const override {
+    return Type::Codec;
   }
-}
+
+ private:
+  explicit CodecImage(const std::shared_ptr<ImageCodec>& codec);
+};
+
 }  // namespace tgfx

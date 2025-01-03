@@ -36,7 +36,8 @@ class UniqueKey;
 class Shape {
  public:
   /**
-   * Wraps an existing path in a Shape object. Returns nullptr if the path is empty.
+   * Wraps an existing path in a Shape object. Returns nullptr if the path is empty and not an
+   * inverse fill type.
    */
   static std::shared_ptr<Shape> MakeFrom(Path path);
 

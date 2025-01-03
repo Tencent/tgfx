@@ -43,7 +43,7 @@ using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
  *
  * 2. Rendering the SVG:
  *    - The simplest way to render is by calling render(canvas,nullptr). If you need to render text
- *      with specific fonts or set the size of the SVG, you can use the following methods:
+ *      with specific fonts or set the size of the SVG, you can use the following methods.
  *    - If text rendering is required, use collectRenderFonts() to gather the necessary typefaces. 
  *      Traverse the typefaces collected by the fontManager and set the typeface objects.
  *    - Render the SVG using the render() method. If text rendering is needed, pass in the 

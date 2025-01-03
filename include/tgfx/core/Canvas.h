@@ -196,18 +196,24 @@ class Canvas {
   void clipPath(const Path& path);
 
   /**
-   * Clears the entire clip region, making it fully transparent using BlendMode::Src. This
-   * effectively replaces all pixels within the clip region with a transparent color.
+   * Fills the current clip with the specified color, using BlendMode::Src. This replaces all pixels
+   * within the clip with the specified color.
    */
-  void clear();
+  void clear(const Color& color = Color::Transparent());
 
   /**
-   * Fills the specified rectangle with the given color, using the current clip and BlendMode::Src.
-   * This replaces all pixels within the rectangle with the specified color.
-   * @param rect  the rect to fill.
-   * @param color  the color to fill the rect with.
+   * Fills the current clip with the specified color. The color is blended with the destination
+   * pixels using the specified blend mode.
    */
-  void clearRect(const Rect& rect, const Color& color = Color::Transparent());
+  void drawColor(const Color& color, BlendMode blendMode = BlendMode::SrcOver);
+
+  /**
+   * Fills the current clip with the specified paint. The paint's shader, color, blend mode, color
+   * filter, mask filter, and image filter are applied during the fill. Other paint properties are
+   * ignored.
+   * @param paint The paint to use for filling.
+   */
+  void drawPaint(const Paint& paint);
 
   /**
    * Draws a line from (x0, y0) to (x1, y1) using the current clip, matrix, and specified paint.
@@ -422,6 +428,8 @@ class Canvas {
 
   explicit Canvas(DrawContext* drawContext);
   Canvas(DrawContext* drawContext, const Path& initClip);
+  void drawClip(const FillStyle& style);
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,

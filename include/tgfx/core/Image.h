@@ -291,6 +291,7 @@ class Image {
  protected:
   enum class Type {
     Buffer,
+    Codec,
     Decoder,
     Filter,
     Generator,
@@ -344,6 +345,6 @@ class Image {
   friend class RGBAAAImage;
   friend class RasterizedImage;
   friend class ImageShader;
-  friend class ImageCaster;
+  friend class Caster;
 };
 }  // namespace tgfx

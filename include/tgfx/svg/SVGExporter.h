@@ -25,7 +25,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class SVGExportingContext;
+class SVGExportContext;
 
 /**
  * Defines flags for SVG exporting that influence the readability and functionality of the exported
@@ -119,7 +119,7 @@ class SVGExporter {
   SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
               uint32_t exportFlags);
 
-  SVGExportingContext* drawContext = nullptr;
+  SVGExportContext* drawContext = nullptr;
   Canvas* canvas = nullptr;
 };
 

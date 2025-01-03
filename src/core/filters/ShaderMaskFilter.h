@@ -37,6 +37,8 @@ class ShaderMaskFilter : public MaskFilter {
     return inverted;
   }
 
+  std::shared_ptr<MaskFilter> makeWithMatrix(const Matrix& viewMatrix) const override;
+
  protected:
   Type type() const override {
     return Type::Shader;

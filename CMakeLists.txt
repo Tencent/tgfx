@@ -58,6 +58,7 @@ endif ()
 
 if (TGFX_BUILD_SVG)
     set(TGFX_USE_PNG_ENCODE ON)
+    set(TGFX_USE_JPEG_DECODE ON)
 endif ()
 
 if (TGFX_BUILD_TESTS)

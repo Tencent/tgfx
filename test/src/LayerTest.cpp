@@ -681,7 +681,7 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
 
   auto surface = Surface::Make(context, 800, 400);
 
-  surface->getCanvas()->clearRect(Rect::MakeWH(800, 400), Color::FromRGBA(53, 53, 53));
+  surface->getCanvas()->clear(Color::FromRGBA(53, 53, 53));
   DisplayList displayList;
 
   auto root = ShapeLayer::Make();
