@@ -19,6 +19,9 @@
 #include "View.h"
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QQuickWindow>
+#include <QQmlContext>
+#include <QQmlApplicationEngine>
 #include "FramesView.h"
 #include "TimelineView.h"
 #include "TracySysUtil.hpp"
@@ -60,8 +63,15 @@ void View::ViewImpl() {
 
   framesView = new FramesView(worker, viewData, width, frames, this);
   framesView->setFixedHeight(50);
-  timelineView = new TimelineView(worker, viewData, config.threadedRendering, this);
   layout->addWidget(framesView);
-  layout->addWidget(timelineView);
-  this->setLayout(layout);
+
+  qmlRegisterType<tracy::Worker>("tracy", 1, 0, "TracyWorker");
+  qmlRegisterType<TimelineView>("Timeline", 1, 0, "TimelineView");
+  engine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Timeline.qml")));
+  engine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
+  engine->rootContext()->setContextProperty("_viewData", (unsigned long long)&viewData);
+  auto quickWindow = static_cast<QQuickWindow*>(engine->rootObjects().value(0));
+  auto timelineWidget = createWindowContainer(quickWindow);
+  timelineWidget->resize(1000, 1000);
+  layout->addWidget(timelineWidget);
 }

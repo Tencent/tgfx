@@ -18,10 +18,12 @@
 
 #pragma once
 
+#include "tgfx/core/Canvas.h"
+#include <QPainter>
 #include <TracyTaskDispatch.hpp>
 #include "TimelineContext.h"
-#include <QPainter>
 #include "TracyWorker.hpp"
+#include "Utility.h"
 
 class TimelineView;
 
@@ -30,7 +32,7 @@ public:
   TimelineItem(TimelineView& view, tracy::Worker& worker, const void* key);
   virtual ~TimelineItem() = default;
 
-  void draw(bool firstFrame, const TimelineContext ctx, int yOffset, QPainter* painter);
+  void draw(bool firstFrame, const TimelineContext ctx, int yOffset, tgfx::Canvas* canvas, const AppHost* appHost);
   virtual void preprocess(const TimelineContext& ctx, tracy::TaskDispatch& td, bool visible, int yPos) = 0;
   virtual uint32_t headerColor() const = 0;
   virtual uint32_t headerColorInactive() const = 0;
@@ -40,14 +42,14 @@ public:
   virtual void setVisible(bool v) { visible = v; }
   virtual bool isVisible() { return visible; }
   virtual bool isEmpty() { return false; }
-  virtual void drawOverlay(const QPointF& ul, const QPointF& dr) {}
+  virtual void drawOverlay(const tgfx::Point& ul, const tgfx::Point& dr) {}
 
   int getHeight() const {return height;}
 protected:
   virtual void headerToolTip(const char* lable) const {}
   virtual void headerExtraContents( const TimelineContext& ctx, int offset, float labelWidth ) {};
 
-  virtual bool drawContent(const TimelineContext& ctx, int& offset, QPainter* painter) = 0;
+  virtual bool drawContent(const TimelineContext& ctx, int& offset, tgfx::Canvas* painter) = 0;
   virtual void drawFinished() {}
   void adjustThreadHeight(bool firstFrame, int yBegin, int yEnd);
 private:

@@ -59,7 +59,7 @@ void TimelineItem::adjustThreadHeight(bool firstFrame, int yBegin, int yEnd) {
   }
 }
 
-void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset, QPainter* painter) {
+void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset, tgfx::Canvas* canvas, const AppHost* appHost) {
   const auto yBegin = yOffset;
   auto yEnd = yOffset;
 
@@ -80,12 +80,12 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
   const auto ty = ctx.ty;
   const auto ostep = ty + 1;
   const auto& wpos = ctx.wpos;
-  const auto yPos = wpos.y() + yBegin;
-  const auto dpos = wpos + QPointF( 0.5f, 0.5f );
+  const auto yPos = wpos.y + yBegin;
+  const auto dpos = wpos + tgfx::Point( 0.5f, 0.5f );
 
   yEnd += ostep;
   if (showFull) {
-    if (!drawContent(ctx, yEnd, painter) && !timelineView.getViewData().drawEmptyLabels) {
+    if (!drawContent(ctx, yEnd, canvas) && !timelineView.getViewData()->drawEmptyLabels) {
       drawFinished();
       yEnd = yBegin;
       adjustThreadHeight(firstFrame, yBegin,yEnd);
@@ -93,7 +93,7 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     }
   }
 
-  drawOverlay(wpos + QPointF(0, yBegin), wpos + QPointF(w, yEnd));
+  drawOverlay(wpos + tgfx::Point(0, yBegin), wpos + tgfx::Point(w, yEnd));
 
   float lableWidth;
   const auto hdrOffset = yBegin;
@@ -102,21 +102,28 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     const auto color = headerColor();
     const auto colorInactive = headerColorInactive();
     if (showFull) {
-      painter->setPen(getColor(color));
-      painter->drawText(wpos + QPointF(0, hdrOffset + ty), ICON_FA_CARET_DOWN);
+      tgfx::Point point = wpos + tgfx::Point(0, hdrOffset + ty);
+      drawText(canvas, appHost, ICON_FA_CARET_DOWN, point.x, point.y, color);
     }
     else {
-      painter->setPen(getColor(colorInactive));
-      painter->drawText(wpos + QPointF(0, hdrOffset + ty), ICON_FA_CARET_RIGHT);
+      tgfx::Point point = wpos + tgfx::Point(0, hdrOffset + ty);
+      drawText(canvas, appHost, ICON_FA_CARET_RIGHT, point.x, point.y, color);
+      // painter->setPen(getColor(colorInactive));
+      // painter->drawText(wpos + QPointF(0, hdrOffset + ty), ICON_FA_CARET_RIGHT);
     }
 
     const auto lable = headerLable();
-    lableWidth = getFontSize(lable).width();
-    painter->setPen(getColor(showFull ? color : colorInactive));
-    painter->drawText(wpos + QPointF(ty, hdrOffset + ty), lable);
+    lableWidth = getTextSize(appHost, lable).width();
+    tgfx::Point point = wpos + tgfx::Point(ty, hdrOffset + ty);
+    drawText(canvas, appHost, lable, point.x, point.y, showFull ? color : colorInactive);
+    // painter->setPen(getColor(showFull ? color : colorInactive));
+    // painter->drawText(wpos + QPointF(ty, hdrOffset + ty), lable);
     if (showFull) {
-      painter->setPen(getColor(headlineColor()));
-      painter->drawLine(dpos + QPointF(0, hdrOffset + ty + 1), dpos + QPointF(w, hdrOffset + ty + 1));
+      tgfx::Point p1 = dpos + tgfx::Point(0, hdrOffset + ty + 1);
+      tgfx::Point p2 = dpos + tgfx::Point(w, hdrOffset + ty + 1);
+      drawLine(canvas, p1, p2, headlineColor());
+      // painter->setPen(getColor(headlineColor()));
+      // painter->drawLine(dpos + QPointF(0, hdrOffset + ty + 1), dpos + QPointF(w, hdrOffset + ty + 1));
     }
   }
 

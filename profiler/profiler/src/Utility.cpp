@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Utility.h"
+#include <tgfx/core/Paint.h>
+#include <tgfx/layers/TextLayer.h>
 #include <QFontMetrics>
 #include <QRect>
 #include <QString>
+#include <filesystem>
 #include "src/profiler/TracyColor.hpp"
 
 // Short list based on GetTypes() in TracySourceTokenizer.cpp
@@ -30,11 +33,66 @@ constexpr const char* TypesList[] = {
   "uint32_t ", "uint64_t ", "ptrdiff_t ", nullptr
 };
 
+AppHost::AppHost(int width, int height, float density)
+    : _width(width), _height(height), _density(density) {
+}
+void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface) {
+  if (name.empty()) {
+    return;
+  }
+  if (typeface == nullptr) {
+    return;
+  }
+  if (typefaces.count(name) > 0) {
+    return;
+  }
+  typefaces[name] = std::move(typeface);
+}
+
+std::shared_ptr<tgfx::Typeface> AppHost::getTypeface(const std::string& name) const {
+  auto result = typefaces.find(name);
+  if (result != typefaces.end()) {
+    return result->second;
+  }
+  return nullptr;
+}
+
+bool AppHost::updateScreen(int width, int height, float density) {
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+  if (density < 1.0) {
+    return false;
+  }
+  if (width == _width && height == _height && density == _density) {
+    return false;
+  }
+  _width = width;
+  _height = height;
+  _density = density;
+  return true;
+}
+
+
+static std::string getRootPath() {
+  std::filesystem::path filePath = __FILE__;
+  auto dir = filePath.parent_path().string();
+  return std::filesystem::path(dir + "/../../..").lexically_normal();
+}
+
+std::string absolutePath(const std::string& relativePath) {
+  std::filesystem::path path = relativePath;
+  if (path.is_absolute()) {
+    return path;
+  }
+  static const std::string rootPath = getRootPath() + "/";
+  return std::filesystem::path(rootPath + relativePath).lexically_normal();
+}
+
 QFont& getFont() {
   QFont font("Arial", 12);
   return font;
 }
-
 
 QRect getFontSize(const char* text, size_t textSize) {
   QFont font("Arial", 12);
@@ -53,6 +111,14 @@ QColor getColor(uint32_t color) {
   auto b = (color >> 16) & 0xFF;
   auto a = (color >> 24) & 0xFF;
   return QColor(r, g, b, a);
+}
+
+tgfx::Color getTgfxColor(uint32_t color) {
+  auto r = (color      ) & 0xFF;
+  auto g = (color >>  8) & 0xFF;
+  auto b = (color >> 16) & 0xFF;
+  auto a = (color >> 24) & 0xFF;
+  return tgfx::Color::FromRGBA(r, g, b, a);
 }
 
 void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, uint32_t color, float thickness) {
@@ -80,11 +146,79 @@ uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic ) {
   return tracy::GetHsvColor( thread, depth );
 }
 
-uint32_t getPlotColor( const tracy::PlotData& plot, const Worker& worker ) {
-
+tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize) {
+  std::string strText(text);
+  auto layer = tgfx::TextLayer::Make();
+  if (textSize) {
+    strText = std::string(text, textSize);
+  }
+  layer->setText(strText);
+  auto typeface = appHost->getTypeface("default");
+  tgfx::Font font(typeface, 10 );
+  layer->setFont(font);
+  return layer->getBounds();
 }
 
-const char* shortenZoneName(ShortenName type, const char* name, QRect tsz, float zsz) {
+void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color) {
+  tgfx::Rect rect = tgfx::Rect::MakeXYWH(x0, y0, w, h);
+  drawRect(canvas, rect, color);
+}
+
+void drawRect(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color) {
+  tgfx::Rect rect = tgfx::Rect::MakeXYWH(p1.x, p1.y, p2.x, p2.y);
+  drawRect(canvas, rect, color);
+}
+
+void drawRect(tgfx::Canvas* canvas, tgfx::Rect& rect, uint32_t color) {
+  tgfx::Paint paint;
+  paint.setColor(getTgfxColor(color));
+  paint.setStyle(tgfx::PaintStyle::Fill);
+  canvas->drawRect(rect, paint);
+}
+
+void drawLine(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, tgfx::Point& p3, uint32_t color, float thickness) {
+  tgfx::Paint paint;
+  paint.setStroke(tgfx::Stroke(thickness));
+  paint.setStyle(tgfx::PaintStyle::Stroke);
+  paint.setColor(getTgfxColor(color));
+  tgfx::Path path;
+  path.moveTo(p1);
+  path.lineTo(p2);
+  path.lineTo(p3);
+  canvas->drawPath(path, paint);
+}
+
+void drawLine(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color) {
+  drawLine(canvas, p1.x, p1.y, p2.x, p2.y, color);
+}
+
+void drawLine(tgfx::Canvas* canvas, float x0, float y0, float x1, float y1, uint32_t color) {
+  tgfx::Paint paint;
+  paint.setColor(getTgfxColor(color));
+  canvas->drawLine(x0 , y0 , x1 , y1 , paint);
+}
+
+void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& text, float x, float y, uint32_t color) {
+  tgfx::Paint paint;
+  paint.setColor(getTgfxColor(color));
+  auto typeface = appHost->getTypeface("default");
+  tgfx::Font font(typeface, 10 );
+  canvas->drawSimpleText(text, x , y , font, paint);
+}
+
+void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, float y, uint32_t color, const char* text) {
+  auto height = getTextSize(appHost, text).height();
+  drawText(canvas, appHost, text, x + 0.5f, y + height + 0.5f, color);
+  drawText(canvas, appHost, text, x, y + height, color);
+}
+
+void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text) {
+  auto height = getTextSize(appHost, text).height();
+  drawText(canvas, appHost, text, pos.x + 0.5f, pos.y + height + 0.5f, color);
+  drawText(canvas, appHost, text, pos.x, pos.y + height, color);
+}
+
+const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name, tgfx::Rect tsz, float zsz) {
     assert( type != ShortenName::Never );
     if( name[0] == '<' || name[0] == '[' ) return name;
     if( type == ShortenName::Always ) zsz = 0;
@@ -169,7 +303,7 @@ const char* shortenZoneName(ShortenName type, const char* name, QRect tsz, float
         if( !*match ) break;
     }
 
-    tsz = getFontSize(ptr, ptr - end);
+    tsz = getTextSize(appHost, ptr, ptr - end);
 
     if( type == ShortenName::OnlyNormalize || tsz.width() < zsz ) return ptr;
 
@@ -181,7 +315,7 @@ const char* shortenZoneName(ShortenName type, const char* name, QRect tsz, float
         p++;
         while( p < end && *p == ':' ) p++;
         ptr = p;
-        tsz = getFontSize(ptr, ptr - end);
+        tsz = getTextSize(appHost, ptr, ptr - end);
         if( tsz.width() < zsz ) return ptr;
     }
 }

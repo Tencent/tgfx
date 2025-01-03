@@ -18,6 +18,7 @@
 
 #include "MainView.h"
 #include <qevent.h>
+#include <QQmlContext>
 #include <QVBoxLayout>
 #include "FramesView.h"
 #include "ToolView.h"
@@ -30,12 +31,6 @@ MainView::MainView(QWidget* parent): QWidget(parent) {
 }
 
 MainView::~MainView() {
-  if (layout) {
-    delete layout;
-  }
-  if (toolView) {
-    delete toolView;
-  }
 }
 
 void MainView::initView() {

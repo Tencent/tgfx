@@ -17,12 +17,12 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
 endif ()
 
 set(CMAKE_CXX_STANDARD 20)
-add_definitions(-DQT_NO_KEYWORDS)
+add_definitions(-DQT_NO_KEYWORDS -Wno-shorten-64-to-32)
 include(cmake/tracy.cmake)
 
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
+set(TGFX_USE_QT ON)
 
 # configures the local installation path of the QT library.
 if (NOT CMAKE_PREFIX_PATH)
@@ -32,6 +32,8 @@ if (NOT CMAKE_PREFIX_PATH)
     endif ()
     include("./QTCMAKE.cfg")
 endif ()
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./tgfx)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
 if (${QT_VERSION_MAJOR} LESS 6)
@@ -56,6 +58,8 @@ if (${QT_VERSION} VERSION_LESS "5.15")
         endif ()
     endfunction()
 endif ()
+
+qt_add_resources(QT_RESOURCES res.qrc)
 
 if (APPLE)
     find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
@@ -95,6 +99,7 @@ file(GLOB TGFX_PROFILER_FILES
         profiler/src/ToolView.cpp
         profiler/src/View.cpp
         profiler/src/TimelineView.cpp
+        profiler/include/TimelineView.h
         profiler/src/TimelineItem.cpp
         profiler/src/TimelineItemThread.cpp
         profiler/src/TimelineController.cpp
@@ -103,7 +108,7 @@ file(GLOB TGFX_PROFILER_FILES
         profiler/src/UserData.cpp
         profiler/src/ProfilerWindow.cpp)
 
-add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${SERVER_FILES} ${PROFILER_FILES} ${COMMON_FILES})
+add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${SERVER_FILES} ${PROFILER_FILES} ${COMMON_FILES} ${QT_RESOURCES})
 target_include_directories(Profiler PRIVATE ${TGFX_PROFILER_INCLUDE})
-target_link_libraries(Profiler ${TGFX_PROFILER_LIBS} ${TRACY_LIBS})
+target_link_libraries(Profiler ${TGFX_PROFILER_LIBS} ${TRACY_LIBS} tgfx)
 target_link_options(Profiler PRIVATE ${TRACY_OPTION})

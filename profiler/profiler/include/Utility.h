@@ -18,13 +18,34 @@
 
 #pragma once
 #include <stdint.h>
-#include <QFont>
-#include <QRect>
 #include <QColor>
+#include <QFont>
 #include <QPainter>
 #include <QPainterPath>
+#include <iostream>
+
 #include "TracyEvent.hpp"
-class Worker;
+
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Color.h"
+
+class AppHost {
+public:
+  explicit AppHost(int width = 1280, int height = 720, float density = 1.0f);
+
+  int width() const { return _width; }
+  int height() const { return _height; }
+  float density() const { return _density; }
+
+  void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
+  std::shared_ptr<tgfx::Typeface> getTypeface(const std::string& name) const;
+  bool updateScreen(int width, int height, float density);
+private:
+  int _width = 1280;
+  int _height = 720;
+  float _density = 1.0f;
+  std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
+};
 
 enum class ShortenName : uint8_t
 {
@@ -54,6 +75,7 @@ private:
 QFont& getFont();
 QRect getFontSize(const char* text, size_t textSize = 0);
 QColor getColor(uint32_t color);
+tgfx::Color getTgfxColor(uint32_t color);
 
 void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, uint32_t color, float thickness = 1.f);
 void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, uint32_t color, float thickness = 1.f);
@@ -61,6 +83,18 @@ void addPolyLine(QPainterPath* path, QPointF p1, QPointF p2, uint32_t color, flo
 void drawTextContrast(QPainter* painter, QPointF pos, uint32_t color, const char* test);
 void drawImage(QPainter* painter);
 
+void loadFont(const char* fontPath);
+tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize = 0);
+void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color);
+void drawRect(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color);
+void drawRect(tgfx::Canvas* canvas, tgfx::Rect& rect, uint32_t color);
+void drawLine(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color);
+void drawLine(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, tgfx::Point& p3, uint32_t color, float thickness = 1.f);
+void drawLine(tgfx::Canvas* canvas, float x0, float y0, float x1, float y1, uint32_t color);
+void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& text, float x, float y, uint32_t color);
+void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, float y, uint32_t color, const char* text);
+void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text);
+
+
 uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic );
-uint32_t getPlotColor( const tracy::PlotData& plot, const Worker& worker );
-const char* shortenZoneName(ShortenName type, const char* name, QRect tsz, float zsz);
+const char* shortenZoneName(ShortenName type, const char* name, tgfx::Rect tsz, float zsz);

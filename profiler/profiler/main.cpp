@@ -18,24 +18,31 @@
 
 #include <QFont>
 #include <QQuickWindow>
-
+#include "FramesView.h"
 #include "ProfilerApplication.h"
 #include "ProfilerWindow.h"
+#include "qwidget.h"
 
 int main(int argc, char *argv[])
 {
-  QApplication::setApplicationName("PAGPlayer");
-  QApplication::setOrganizationName("PAGTeam");
+  QApplication::setApplicationName("Profiler");
+  QApplication::setOrganizationName("org.tgfx");
+  QSurfaceFormat defaultFormat = QSurfaceFormat();
+  defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
+  defaultFormat.setVersion(3, 2);
+  defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
+  QSurfaceFormat::setDefaultFormat(defaultFormat);
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+#else
+  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
 
-  QFont defaultFonts("Helvetica Neue,PingFang SC");
-  QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
-  defaultFonts.setStyleHint(QFont::SansSerif);
-  QApplication::setFont(defaultFonts);
+  QApplication app(argc, argv);
 
-  ProfilerApplication app(argc, argv);
-
-  ProfilerWindow window;
-  window.show();
+  ProfilerWindow* window = new ProfilerWindow;
+  window->show();
 
   return app.exec();
 }

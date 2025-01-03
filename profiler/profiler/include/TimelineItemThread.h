@@ -33,7 +33,7 @@ public:
   const char* headerLable() const override;
 protected:
   void drawFinished() override;
-  bool drawContent(const TimelineContext& ctx, int& offset, QPainter* painter) override;
+  bool drawContent(const TimelineContext& ctx, int& offset, tgfx::Canvas* canvas) override;
 
 private:
   int preprocessZoneLevel(const TimelineContext& ctx, const tracy::Vector<tracy::short_ptr<tracy::ZoneEvent>>& vec,

@@ -41,8 +41,8 @@ void TimelineController::begin() {
   items.clear();
 }
 
-void TimelineController::end(double pxns, const QPointF& wpos, bool vcenter, float yMin, float yMax, QPainter* painter) {
-  const auto& viewData = view.getViewData();
+void TimelineController::end(double pxns, const tgfx::Point& wpos, bool vcenter, float yMin, float yMax, tgfx::Canvas* canvas, const AppHost* appHost) {
+  const auto viewData = view.getViewData();
   TimelineContext context;
   context.w = view.width() - 1;
   context.ty = 15;
@@ -52,14 +52,14 @@ void TimelineController::end(double pxns, const QPointF& wpos, bool vcenter, flo
   context.yMax = yMax;
   context.pxns = pxns;
   context.nspx = 1.0 / pxns;
-  context.vStart = viewData.zvStart;
-  context.vEnd = viewData.zvEnd;
+  context.vStart = viewData->zvStart;
+  context.vEnd = viewData->zvEnd;
   context.wpos = wpos;
 
   int yOffset = 0;
   for(auto& item: items) {
     if (item->isVisible()) {
-      const auto yPos = wpos.y() + yOffset;
+      const auto yPos = wpos.y + yOffset;
       const bool visible = firstFrame || (yPos < yMax && yPos + item->getHeight() >= yMin);
       item->preprocess(context, taskDispatch, visible, yPos);
     }
@@ -70,7 +70,7 @@ void TimelineController::end(double pxns, const QPointF& wpos, bool vcenter, flo
   yOffset = 0;
   for(auto& item : items) {
     auto currentFrameItemHeight = item->getHeight();
-    item->draw(firstFrame, context, yOffset, painter);
+    item->draw(firstFrame, context, yOffset, canvas, appHost);
     if (firstFrame) {
       currentFrameItemHeight = item->getHeight();
     }

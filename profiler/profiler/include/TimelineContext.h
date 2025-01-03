@@ -19,7 +19,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <QPoint>
+#include "tgfx/core/Point.h"
 
 struct TimelineContext
 {
@@ -27,6 +27,6 @@ struct TimelineContext
   float yMin, yMax;
   double pxns, nspx;
   int64_t vStart, vEnd;
-  QPointF wpos;
+  tgfx::Point wpos;
   bool hover;
 };

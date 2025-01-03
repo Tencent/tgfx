@@ -18,13 +18,14 @@
 
 #pragma once
 #include <QPushButton>
+#include <QQmlApplicationEngine>
 #include <QWidget>
 #include "FramesView.h"
+#include "TimelineController.h"
 #include "TimelineView.h"
 #include "TracyFileRead.hpp"
 #include "TracyWorker.hpp"
 #include "UserData.h"
-#include "TimelineController.h"
 #include "src/profiler/TracyConfig.hpp"
 #include "src/profiler/TracyUserData.hpp"
 
@@ -45,6 +46,7 @@ private:
   ViewData viewData;
   UserData userData;
   const tracy::FrameData* frames;
+  QQmlApplicationEngine* engine;
 
   const tracy::Config& config;
   FramesView* framesView;

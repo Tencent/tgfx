@@ -93,7 +93,7 @@ int TimelineItemThread::preprocessZoneLevel(const TimelineContext& ctx, const V&
           const auto hasChildren = ev.HasChildren();
           auto currentInherited = inheritedColor;
           auto childrenInherited = inheritedColor;
-          if( timelineView.getViewData().inheritParentColors )
+          if( timelineView.getViewData()->inheritParentColors )
           {
               uint32_t color = 0;
               if( worker.HasZoneExtra( ev ) )
@@ -130,13 +130,13 @@ void TimelineItemThread::preprocess(const TimelineContext& ctx, tracy::TaskDispa
     depth = preprocessZoneLevel(ctx, threadData->timeline, 0, visible, 0);
   });
 
-  const auto& viewData = timelineView.getViewData();
-  if (viewData.drawContextSwitches) {
+  const auto viewData = timelineView.getViewData();
+  if (viewData->drawContextSwitches) {
     // TODO draw context switches
   }
 
   hasSamples = false;
-  if (viewData.drawSamples && !threadData->samples.empty()) {
+  if (viewData->drawSamples && !threadData->samples.empty()) {
     // TODO draw samples
   }
 
@@ -145,7 +145,7 @@ void TimelineItemThread::preprocess(const TimelineContext& ctx, tracy::TaskDispa
     // TODO process message
   });
 
-  if (viewData.drawLocks) {
+  if (viewData->drawLocks) {
     // TODO process locks
   }
 }
@@ -154,8 +154,8 @@ void TimelineItemThread::drawFinished() {
   draws.clear();
 }
 
-bool TimelineItemThread::drawContent(const TimelineContext& ctx, int& offset, QPainter* painter) {
-  timelineView.drawThread(ctx, *threadData, draws, offset, depth, painter);
+bool TimelineItemThread::drawContent(const TimelineContext& ctx, int& offset, tgfx::Canvas* canvas) {
+  timelineView.drawThread(ctx, *threadData, draws, offset, depth, canvas);
   return true;
 }
 

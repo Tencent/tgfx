@@ -49,15 +49,12 @@ void ProfilerWindow::setToolBarEnable() {
 }
 
 void ProfilerWindow::initWindow() {
+  initToolBar();
+  addToolBar(Qt::TopToolBarArea, topBar);
+  mainView = new MainView;
+  setCentralWidget(mainView);
+
   QScreen* screen = QGuiApplication::primaryScreen();
   QRect rect = screen->availableGeometry();
   resize(rect.size().width(), rect.height());
-
-  initToolBar();
-  addToolBar(Qt::TopToolBarArea, topBar);
-
-
-  mainView = new MainView;
-  mainView->setStyleSheet("background-color: black");
-  setCentralWidget(mainView);
 }

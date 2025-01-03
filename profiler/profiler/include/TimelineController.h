@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <tgfx/core/Point.h>
 #include <memory>
 #include <optional>
 #include "TimelineItem.h"
+#include "Utility.h"
 #include "TimelineItemThread.h"
 
 class View;
@@ -31,7 +33,7 @@ public:
 
   void firstFrameExpired();
   void begin();
-  void end(double pxns, const QPointF& wpos, bool vcenter, float yMin, float yMax, QPainter* painter);
+  void end(double pxns, const tgfx::Point& wpos, bool vcenter, float yMin, float yMax, tgfx::Canvas* canvas, const AppHost* appHost);
 
   template<class T, class U>
   void addItem(U* data) {
