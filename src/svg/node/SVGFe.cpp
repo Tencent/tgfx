@@ -98,10 +98,10 @@ Rect SVGFe::resolveFilterSubregion(const SVGRenderContext& context,
 
 SVGColorspace SVGFe::resolveColorspace(const SVGRenderContext& context,
                                        const SVGFilterContext&) const {
-      constexpr SVGColorspace DEFAULT_COLOR_SPACE = SVGColorspace::SRGB;
-      const SVGColorspace colorspace =
-          *context.presentationContext()._inherited.ColorInterpolationFilters;
-      return colorspace == SVGColorspace::Auto ? DEFAULT_COLOR_SPACE : colorspace;
+  constexpr SVGColorspace DEFAULT_COLOR_SPACE = SVGColorspace::SRGB;
+  const SVGColorspace colorspace =
+      *context.presentationContext()._inherited.ColorInterpolationFilters;
+  return colorspace == SVGColorspace::Auto ? DEFAULT_COLOR_SPACE : colorspace;
 }
 
 void SVGFe::applyProperties(SVGRenderContext* context) const {

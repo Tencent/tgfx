@@ -228,7 +228,8 @@ bool SVGAttributeParser::parseIdentToken(std::string* ident) {
 
 bool SVGAttributeParser::parseLengthUnitToken(SVGLength::Unit& unit) {
   struct Unit {
-    Unit(std::string name, SVGLength::Unit u) : unitName(std::move(name)), unit(u) {};
+    Unit(std::string name, SVGLength::Unit u) : unitName(std::move(name)), unit(u) {
+    }
     std::string unitName;
     SVGLength::Unit unit;
   };

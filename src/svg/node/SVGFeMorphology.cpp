@@ -32,7 +32,7 @@ bool SVGFeMorphology::parseAndSetAttribute(const std::string& name, const std::s
 
 std::shared_ptr<ImageFilter> SVGFeMorphology::onMakeImageFilter(const SVGRenderContext&,
                                                                 const SVGFilterContext&) const {
-  //TODO (YGAurora)
+  //TODO (YGAurora) waiting for morphology image filter.
   return nullptr;
 }
 

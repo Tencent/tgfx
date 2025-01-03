@@ -57,7 +57,7 @@ bool SVGAttributeParser::parse<SVGFeTurbulenceType>(SVGFeTurbulenceType* type) {
 
 std::shared_ptr<ImageFilter> SVGFeTurbulence::onMakeImageFilter(const SVGRenderContext&,
                                                                 const SVGFilterContext&) const {
-  //TODO (YGAurora)
+  //TODO (YGAurora) waiting for turbulence image filter.
   return nullptr;
 }
 
