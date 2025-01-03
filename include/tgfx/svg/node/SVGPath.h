@@ -36,13 +36,14 @@ class SVGPath final : public SVGShape {
   SVG_ATTR(ShapePath, Path, Path())
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
+  void onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+              PathFillType fillType) const override;
 
-  Path onAsPath(const SVGRenderContext&) const override;
+  Path onAsPath(const SVGRenderContext& context) const override;
 
-  Rect onObjectBoundingBox(const SVGRenderContext&) const override;
+  Rect onObjectBoundingBox(const SVGRenderContext& context) const override;
 
  private:
   SVGPath();

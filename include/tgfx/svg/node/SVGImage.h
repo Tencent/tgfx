@@ -40,19 +40,19 @@ class SVGImage final : public SVGTransformableNode {
     return std::shared_ptr<SVGImage>(new SVGImage());
   }
 
-  void appendChild(std::shared_ptr<SVGNode>) override {
+  void appendChild(std::shared_ptr<SVGNode> /*node*/) override {
   }
 
   struct ImageInfo {
-    std::shared_ptr<Image> fImage;
-    Rect fDst;
+    std::shared_ptr<Image> image;
+    Rect destinationRect;
   };
 
-  bool onPrepareToRender(SVGRenderContext*) const override;
-  void onRender(const SVGRenderContext&) const override;
-  Path onAsPath(const SVGRenderContext&) const override;
-  Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-  static ImageInfo LoadImage(const SVGIRI&, const Rect&, SVGPreserveAspectRatio);
+  bool onPrepareToRender(SVGRenderContext* conetxt) const override;
+  void onRender(const SVGRenderContext& conetxt) const override;
+  Path onAsPath(const SVGRenderContext& conetxt) const override;
+  Rect onObjectBoundingBox(const SVGRenderContext& conetxt) const override;
+  static ImageInfo LoadImage(const SVGIRI& iri, const Rect& viewPort, SVGPreserveAspectRatio ratio);
 
   SVG_ATTR(X, SVGLength, SVGLength(0))
   SVG_ATTR(Y, SVGLength, SVGLength(0))
@@ -62,7 +62,7 @@ class SVGImage final : public SVGTransformableNode {
   SVG_ATTR(PreserveAspectRatio, SVGPreserveAspectRatio, SVGPreserveAspectRatio())
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGImage() : INHERITED(SVGTag::Image) {

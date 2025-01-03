@@ -34,8 +34,8 @@ bool SVGFeGaussianBlur::parseAndSetAttribute(const std::string& name, const std:
 std::shared_ptr<ImageFilter> SVGFeGaussianBlur::onMakeImageFilter(
     const SVGRenderContext& context, const SVGFilterContext& filterContext) const {
   auto scale = context.transformForCurrentBoundBox(filterContext.primitiveUnits()).scale;
-  const auto sigmaX = stdDeviation.fX * scale.x * 4;
-  const auto sigmaY = stdDeviation.fY * scale.y * 4;
+  const auto sigmaX = stdDeviation.X * scale.x * 4;
+  const auto sigmaY = stdDeviation.Y * scale.y * 4;
   return ImageFilter::Blur(sigmaX, sigmaY);
 }
 
@@ -47,8 +47,8 @@ bool SVGAttributeParser::parse<SVGFeGaussianBlur::StdDeviation>(
     return false;
   }
 
-  stdDeviation->fX = values[0];
-  stdDeviation->fY = values.size() > 1 ? values[1] : values[0];
+  stdDeviation->X = values[0];
+  stdDeviation->Y = values.size() > 1 ? values[1] : values[0];
   return true;
 }
 }  // namespace tgfx

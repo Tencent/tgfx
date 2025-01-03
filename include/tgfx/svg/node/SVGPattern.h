@@ -47,9 +47,9 @@ class SVGPattern final : public SVGHiddenContainer {
  protected:
   SVGPattern();
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  bool onAsPaint(const SVGRenderContext&, Paint*) const override;
+  bool onAsPaint(const SVGRenderContext& context, Paint* paint) const override;
 
  private:
   struct PatternAttributes {
@@ -57,8 +57,10 @@ class SVGPattern final : public SVGHiddenContainer {
     std::optional<SVGTransformType> patternTransform;
   };
 
-  const SVGPattern* resolveHref(const SVGRenderContext&, PatternAttributes*) const;
-  const SVGPattern* hrefTarget(const SVGRenderContext&) const;
+  const SVGPattern* resolveHref(const SVGRenderContext& context,
+                                PatternAttributes* attribute) const;
+
+  const SVGPattern* hrefTarget(const SVGRenderContext& context) const;
 
   using INHERITED = SVGHiddenContainer;
 };

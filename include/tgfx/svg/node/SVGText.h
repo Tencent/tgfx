@@ -37,20 +37,21 @@ using ShapedTextCallback =
 // Base class for text-rendering nodes.
 class SVGTextFragment : public SVGTransformableNode {
  public:
-  void renderText(const SVGRenderContext&, const ShapedTextCallback&) const;
+  void renderText(const SVGRenderContext& context, const ShapedTextCallback& function) const;
 
  protected:
   explicit SVGTextFragment(SVGTag t) : INHERITED(t) {
   }
 
-  virtual void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const = 0;
+  virtual void onShapeText(const SVGRenderContext& context,
+                           const ShapedTextCallback& function) const = 0;
 
   // Text nodes other than the root <text> element are not rendered directly.
-  void onRender(const SVGRenderContext&) const override {
+  void onRender(const SVGRenderContext& /*context*/) const override {
   }
 
  private:
-  Path onAsPath(const SVGRenderContext&) const override;
+  Path onAsPath(const SVGRenderContext& context) const override;
 
   using INHERITED = SVGTransformableNode;
 };
@@ -64,15 +65,16 @@ class SVGTextContainer : public SVGTextFragment {
   SVG_ATTR(Dy, std::vector<SVGLength>, {})
   SVG_ATTR(Rotate, std::vector<SVGNumberType>, {})
 
-  void appendChild(std::shared_ptr<SVGNode>) final;
+  void appendChild(std::shared_ptr<SVGNode> node) final;
 
  protected:
   explicit SVGTextContainer(SVGTag t) : INHERITED(t) {
   }
 
-  void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;
+  void onShapeText(const SVGRenderContext& context,
+                   const ShapedTextCallback& function) const override;
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   std::vector<std::shared_ptr<SVGTextFragment>> children;
@@ -90,9 +92,9 @@ class SVGText final : public SVGTextContainer {
   SVGText() : INHERITED(SVGTag::Text) {
   }
 
-  void onRender(const SVGRenderContext&) const override;
-  Rect onObjectBoundingBox(const SVGRenderContext&) const override;
-  Path onAsPath(const SVGRenderContext&) const override;
+  void onRender(const SVGRenderContext& context) const override;
+  Rect onObjectBoundingBox(const SVGRenderContext& context) const override;
+  Path onAsPath(const SVGRenderContext& context) const override;
 
   using INHERITED = SVGTextContainer;
 };
@@ -122,9 +124,10 @@ class SVGTextLiteral final : public SVGTextFragment {
   SVGTextLiteral() : INHERITED(SVGTag::TextLiteral) {
   }
 
-  void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;
+  void onShapeText(const SVGRenderContext& context,
+                   const ShapedTextCallback& function) const override;
 
-  void appendChild(std::shared_ptr<SVGNode>) override {
+  void appendChild(std::shared_ptr<SVGNode> /*node*/) override {
   }
 
   using INHERITED = SVGTextFragment;
@@ -143,9 +146,10 @@ class SVGTextPath final : public SVGTextContainer {
   SVGTextPath() : INHERITED(SVGTag::TextPath) {
   }
 
-  void onShapeText(const SVGRenderContext&, const ShapedTextCallback&) const override;
+  void onShapeText(const SVGRenderContext& context,
+                   const ShapedTextCallback& function) const override;
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
   using INHERITED = SVGTextContainer;
 };

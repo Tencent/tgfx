@@ -37,8 +37,8 @@ bool SVGAttributeParser::parse<SVGFeLighting::KernelUnitLength>(
     return false;
   }
 
-  kernelUnitLength->fDx = values[0];
-  kernelUnitLength->fDy = values.size() > 1 ? values[1] : values[0];
+  kernelUnitLength->Dx = values[0];
+  kernelUnitLength->Dy = values.size() > 1 ? values[1] : values[0];
   return true;
 }
 

@@ -40,11 +40,12 @@ class SVGRadialGradient final : public SVGGradient {
   SVG_OPTIONAL_ATTR(Fy, SVGLength)
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  std::shared_ptr<Shader> onMakeShader(const SVGRenderContext&, const std::vector<Color>&,
-                                       const std::vector<float>&, TileMode,
-                                       const Matrix&) const override;
+  std::shared_ptr<Shader> onMakeShader(const SVGRenderContext& context,
+                                       const std::vector<Color>& colors,
+                                       const std::vector<float>& positions, TileMode tileMode,
+                                       const Matrix& localMatrix) const override;
 
  private:
   SVGRadialGradient();

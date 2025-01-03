@@ -52,8 +52,8 @@ void SVGContainer::onRender(const SVGRenderContext& context) const {
 Path SVGContainer::onAsPath(const SVGRenderContext& context) const {
   Path path;
 
-  for (const auto& i : children) {
-    const Path childPath = i->asPath(context);
+  for (const auto& child : children) {
+    const Path childPath = child->asPath(context);
     path.addPath(childPath, PathOp::Union);
   }
 
@@ -64,8 +64,8 @@ Path SVGContainer::onAsPath(const SVGRenderContext& context) const {
 Rect SVGContainer::onObjectBoundingBox(const SVGRenderContext& context) const {
   Rect bounds = Rect::MakeEmpty();
 
-  for (const auto& i : children) {
-    const Rect childBounds = i->objectBoundingBox(context);
+  for (const auto& child : children) {
+    const Rect childBounds = child->objectBoundingBox(context);
     bounds.join(childBounds);
   }
 

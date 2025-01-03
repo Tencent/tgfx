@@ -29,11 +29,11 @@ namespace tgfx {
 SVGCircle::SVGCircle() : INHERITED(SVGTag::Circle) {
 }
 
-bool SVGCircle::parseAndSetAttribute(const std::string& n, const std::string& v) {
-  return INHERITED::parseAndSetAttribute(n, v) ||
-         this->setCx(SVGAttributeParser::parse<SVGLength>("cx", n, v)) ||
-         this->setCy(SVGAttributeParser::parse<SVGLength>("cy", n, v)) ||
-         this->setR(SVGAttributeParser::parse<SVGLength>("r", n, v));
+bool SVGCircle::parseAndSetAttribute(const std::string& name, const std::string& value) {
+  return INHERITED::parseAndSetAttribute(name, value) ||
+         this->setCx(SVGAttributeParser::parse<SVGLength>("cx", name, value)) ||
+         this->setCy(SVGAttributeParser::parse<SVGLength>("cy", name, value)) ||
+         this->setR(SVGAttributeParser::parse<SVGLength>("r", name, value));
 }
 
 std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lengthContext) const {
@@ -45,7 +45,7 @@ std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lengthContex
 }
 
 void SVGCircle::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-                       PathFillType) const {
+                       PathFillType /*type*/) const {
   auto [pos, r] = this->resolve(lengthContext);
 
   if (r > 0) {

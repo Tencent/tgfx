@@ -32,14 +32,15 @@ enum class SVGTag;
 
 class SVGShape : public SVGTransformableNode {
  public:
-  void appendChild(std::shared_ptr<SVGNode>) override;
+  void appendChild(std::shared_ptr<SVGNode> node) override;
 
  protected:
-  explicit SVGShape(SVGTag);
+  explicit SVGShape(SVGTag tag);
 
-  void onRender(const SVGRenderContext&) const override;
+  void onRender(const SVGRenderContext& context) const override;
 
-  virtual void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const = 0;
+  virtual void onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+                      PathFillType fillType) const = 0;
 
  private:
   using INHERITED = SVGTransformableNode;

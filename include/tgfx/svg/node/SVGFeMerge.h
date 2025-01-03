@@ -39,7 +39,7 @@ class SVGFeMergeNode : public SVGHiddenContainer {
   SVG_ATTR(In, SVGFeInputType, SVGFeInputType())
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGFeMergeNode() : INHERITED(tag) {
@@ -56,8 +56,8 @@ class SVGFeMerge : public SVGFe {
   }
 
  protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override;
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
   std::vector<SVGFeInputType> getInputs() const override;
 

@@ -27,10 +27,10 @@ namespace tgfx {
 SVGClipPath::SVGClipPath() : INHERITED(SVGTag::ClipPath) {
 }
 
-bool SVGClipPath::parseAndSetAttribute(const std::string& n, const std::string& v) {
-  return INHERITED::parseAndSetAttribute(n, v) ||
+bool SVGClipPath::parseAndSetAttribute(const std::string& name, const std::string& value) {
+  return INHERITED::parseAndSetAttribute(name, value) ||
          this->setClipPathUnits(
-             SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("clipPathUnits", n, v));
+             SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("clipPathUnits", name, value));
 }
 
 Path SVGClipPath::resolveClip(const SVGRenderContext& context) const {

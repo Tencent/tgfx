@@ -42,12 +42,14 @@ class SVGGradient : public SVGHiddenContainer {
   explicit SVGGradient(SVGTag t) : INHERITED(t) {
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  bool onAsPaint(const SVGRenderContext&, Paint*) const final;
+  bool onAsPaint(const SVGRenderContext& context, Paint* paint) const final;
 
-  virtual std::shared_ptr<Shader> onMakeShader(const SVGRenderContext&, const std::vector<Color>&,
-                                               const std::vector<float>&, TileMode,
+  virtual std::shared_ptr<Shader> onMakeShader(const SVGRenderContext& context,
+                                               const std::vector<Color>& colors,
+                                               const std::vector<float>& positions,
+                                               TileMode tileMode,
                                                const Matrix& localMatrix) const = 0;
 
  private:

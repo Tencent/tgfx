@@ -40,14 +40,14 @@ class SVGFeOffset : public SVGFe {
   SVG_ATTR(Dy, SVGNumberType, SVGNumberType(0))
 
  protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override;
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGFeOffset() : INHERITED(SVGTag::FeOffset) {

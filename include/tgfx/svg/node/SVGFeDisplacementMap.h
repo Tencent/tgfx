@@ -31,7 +31,12 @@ class SVGRenderContext;
 
 class SVGFeDisplacementMap : public SVGFe {
  public:
-  using ChannelSelector = ColorChannel;
+  enum class ChannelSelector {
+    R,  // the red channel
+    G,  // the green channel
+    B,  // the blue channel
+    A,  // the alpha channel
+  };
 
   static std::shared_ptr<SVGFeDisplacementMap> Make() {
     return std::shared_ptr<SVGFeDisplacementMap>(new SVGFeDisplacementMap());
@@ -42,17 +47,18 @@ class SVGFeDisplacementMap : public SVGFe {
   SVG_ATTR(YChannelSelector, ChannelSelector, ChannelSelector::A)
   SVG_ATTR(Scale, SVGNumberType, SVGNumberType(0))
 
-  SVGColorspace resolveColorspace(const SVGRenderContext&, const SVGFilterContext&) const final;
+  SVGColorspace resolveColorspace(const SVGRenderContext& context,
+                                  const SVGFilterContext& filterContext) const final;
 
  protected:
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn(), this->getIn2()};
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override;
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
  private:
   SVGFeDisplacementMap() : INHERITED(SVGTag::FeDisplacementMap) {

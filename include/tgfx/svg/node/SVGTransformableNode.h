@@ -36,15 +36,15 @@ class SVGTransformableNode : public SVGNode {
   }
 
  protected:
-  SVGTransformableNode(SVGTag);
+  SVGTransformableNode(SVGTag tag);
 
-  bool onPrepareToRender(SVGRenderContext*) const override;
+  bool onPrepareToRender(SVGRenderContext* context) const override;
 
-  void onSetAttribute(SVGAttribute, const SVGValue&) override;
+  void onSetAttribute(SVGAttribute attribute, const SVGValue& value) override;
 
-  void mapToParent(Path*) const;
+  void mapToParent(Path* path) const;
 
-  void mapToParent(Rect*) const;
+  void mapToParent(Rect* rect) const;
 
  private:
   // FIXME: should be sparse

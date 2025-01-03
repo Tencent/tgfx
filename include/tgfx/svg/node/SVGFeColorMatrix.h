@@ -41,14 +41,14 @@ class SVGFeColorMatrix final : public SVGFe {
   SVG_ATTR(Values, SVGFeColorMatrixValues, SVGFeColorMatrixValues())
 
  protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override;
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGFeColorMatrix() : INHERITED(SVGTag::FeColorMatrix) {
@@ -56,7 +56,7 @@ class SVGFeColorMatrix final : public SVGFe {
 
   ColorMatrix makeMatrixForType() const;
 
-  static ColorMatrix MakeSaturate(SVGNumberType s);
+  static ColorMatrix MakeSaturate(SVGNumberType sat);
 
   static ColorMatrix MakeHueRotate(SVGNumberType degrees);
 

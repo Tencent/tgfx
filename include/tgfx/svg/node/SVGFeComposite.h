@@ -45,16 +45,16 @@ class SVGFeComposite final : public SVGFe {
     return {this->getIn(), this->getIn2()};
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override;
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
  private:
   SVGFeComposite() : INHERITED(SVGTag::FeComposite) {
   }
 
-  static BlendMode BlendModeForOperator(SVGFeCompositeOperator);
+  static BlendMode BlendModeForOperator(SVGFeCompositeOperator op);
 
   using INHERITED = SVGFe;
 };

@@ -53,7 +53,7 @@ class SVGFeDistantLight final : public SkSVGFeLightSource {
   SVGFeDistantLight() : INHERITED(SVGTag::FeDistantLight) {
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
   using INHERITED = SkSVGFeLightSource;
 };
@@ -72,7 +72,7 @@ class SVGFePointLight final : public SkSVGFeLightSource {
   SVGFePointLight() : INHERITED(SVGTag::FePointLight) {
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
   using INHERITED = SkSVGFeLightSource;
 };
@@ -97,7 +97,7 @@ class SVGFeSpotLight final : public SkSVGFeLightSource {
   SVGFeSpotLight() : INHERITED(SVGTag::FeSpotLight) {
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
   using INHERITED = SkSVGFeLightSource;
 };

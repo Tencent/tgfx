@@ -43,16 +43,17 @@ class SVGEllipse final : public SVGShape {
   SVG_OPTIONAL_ATTR(Ry, SVGLength)
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
+  void onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+              PathFillType fillType) const override;
 
-  Path onAsPath(const SVGRenderContext&) const override;
+  Path onAsPath(const SVGRenderContext& context) const override;
 
  private:
   SVGEllipse();
 
-  Rect resolve(const SVGLengthContext&) const;
+  Rect resolve(const SVGLengthContext& context) const;
 
   using INHERITED = SVGShape;
 };

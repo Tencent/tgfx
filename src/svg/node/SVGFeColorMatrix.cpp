@@ -35,14 +35,14 @@ bool SVGFeColorMatrix::parseAndSetAttribute(const std::string& name, const std::
 
 template <>
 bool SVGAttributeParser::parse(SVGFeColorMatrixType* type) {
-  static constexpr std::tuple<const char*, SVGFeColorMatrixType> gTypeMap[] = {
+  static constexpr std::tuple<const char*, SVGFeColorMatrixType> typeMap[] = {
       {"matrix", SVGFeColorMatrixType::Matrix},
       {"saturate", SVGFeColorMatrixType::Saturate},
       {"hueRotate", SVGFeColorMatrixType::HueRotate},
       {"luminanceToAlpha", SVGFeColorMatrixType::LuminanceToAlpha},
   };
 
-  return this->parseEnumMap(gTypeMap, type) && this->parseEOSToken();
+  return this->parseEnumMap(typeMap, type) && this->parseEOSToken();
 }
 
 ColorMatrix SVGFeColorMatrix::makeMatrixForType() const {
@@ -70,20 +70,20 @@ ColorMatrix SVGFeColorMatrix::makeMatrixForType() const {
 
 ColorMatrix SVGFeColorMatrix::MakeSaturate(SVGNumberType sat) {
   enum {
-    kR_Scale = 0,
-    kG_Scale = 6,
-    kB_Scale = 12,
-    kA_Scale = 18,
+    R_Scale = 0,
+    G_Scale = 6,
+    B_Scale = 12,
+    A_Scale = 18,
 
-    kR_Trans = 4,
-    kG_Trans = 9,
-    kB_Trans = 14,
-    kA_Trans = 19,
+    R_Trans = 4,
+    G_Trans = 9,
+    B_Trans = 14,
+    A_Trans = 19,
   };
 
-  static const float kHueR = 0.213f;
-  static const float kHueG = 0.715f;
-  static const float kHueB = 0.072f;
+  constexpr float HueR = 0.213f;
+  constexpr float HueG = 0.715f;
+  constexpr float HueB = 0.072f;
 
   auto setrow = [](float row[], float r, float g, float b) {
     row[0] = r;
@@ -92,23 +92,22 @@ ColorMatrix SVGFeColorMatrix::MakeSaturate(SVGNumberType sat) {
   };
 
   ColorMatrix matrix;
-  // m.setSaturation(s);
 
   matrix.fill(0.0f);
-  const float R = kHueR * (1 - sat);
-  const float G = kHueG * (1 - sat);
-  const float B = kHueB * (1 - sat);
+  float R = HueR * (1 - sat);
+  float G = HueG * (1 - sat);
+  float B = HueB * (1 - sat);
   setrow(matrix.data() + 0, R + sat, G, B);
   setrow(matrix.data() + 5, R, G + sat, B);
   setrow(matrix.data() + 10, R, G, B + sat);
-  matrix[kA_Scale] = 1;
+  matrix[A_Scale] = 1;
   return matrix;
 }
 
 ColorMatrix SVGFeColorMatrix::MakeHueRotate(SVGNumberType degrees) {
-  const float theta = DegreesToRadians(degrees);
-  const SVGNumberType c = std::cos(theta);
-  const SVGNumberType s = std::sin(theta);
+  float theta = DegreesToRadians(degrees);
+  SVGNumberType c = std::cos(theta);
+  SVGNumberType s = std::sin(theta);
   return ColorMatrix{0.213f + c * 0.787f + s * -0.213f,
                      0.715f + c * -0.715f + s * -0.715f,
                      0.072f + c * -0.072f + s * 0.928f,

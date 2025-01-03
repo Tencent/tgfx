@@ -20,6 +20,9 @@
 #include <tuple>
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGFilterContext.h"
+#include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
@@ -55,9 +58,9 @@ BlendMode SVGFeComposite::BlendModeForOperator(SVGFeCompositeOperator op) {
   }
 }
 
-std::shared_ptr<ImageFilter> SVGFeComposite::onMakeImageFilter(const SVGRenderContext&,
-                                                               const SVGFilterContext&) const {
-  //TODO (YGAurora) Implement this by filter blending
+std::shared_ptr<ImageFilter> SVGFeComposite::onMakeImageFilter(
+    const SVGRenderContext& /*context*/, const SVGFilterContext& /*filterContext*/) const {
+  //TODO (YGAurora) waiting for blend and arithmetic image filter implementation
   return nullptr;
 }
 

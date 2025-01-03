@@ -120,7 +120,7 @@ bool SVGFe::parseAndSetAttribute(const std::string& name, const std::string& val
 
 template <>
 bool SVGAttributeParser::parse(SVGFeInputType* type) {
-  static constexpr std::tuple<const char*, SVGFeInputType::Type> gTypeMap[] = {
+  static constexpr std::tuple<const char*, SVGFeInputType::Type> typeMap[] = {
       {"SourceGraphic", SVGFeInputType::Type::SourceGraphic},
       {"SourceAlpha", SVGFeInputType::Type::SourceAlpha},
       {"BackgroundImage", SVGFeInputType::Type::BackgroundImage},
@@ -132,12 +132,12 @@ bool SVGAttributeParser::parse(SVGFeInputType* type) {
   SVGStringType resultId;
   SVGFeInputType::Type tempType;
   bool parsedValue = false;
-  if (this->parseEnumMap(gTypeMap, &tempType)) {
-        *type = SVGFeInputType(tempType);
-        parsedValue = true;
+  if (this->parseEnumMap(typeMap, &tempType)) {
+    *type = SVGFeInputType(tempType);
+    parsedValue = true;
   } else if (parse(&resultId)) {
-        *type = SVGFeInputType(resultId);
-        parsedValue = true;
+    *type = SVGFeInputType(resultId);
+    parsedValue = true;
   }
 
   return parsedValue && this->parseEOSToken();

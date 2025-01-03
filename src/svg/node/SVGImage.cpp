@@ -59,7 +59,7 @@ std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
 }
 
 SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
-                                        SVGPreserveAspectRatio /*par*/) {
+                                        SVGPreserveAspectRatio /*ratio*/) {
   std::shared_ptr<Image> image = ::tgfx::LoadImage(iri);
   if (!image) {
     return {};
@@ -69,8 +69,6 @@ SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
   const Rect viewBox = Rect::MakeWH(image->width(), image->height());
 
   // Map and place at x, y specified by viewport
-  // const Matrix m = ComputeViewboxMatrix(viewBox, viewPort, par);
-  // const Rect dst = m.mapRect(viewBox).makeOffset(viewPort.left, viewPort.top);
   Rect dst = viewBox.makeOffset(viewPort.left, viewPort.top);
 
   return {std::move(image), dst};
@@ -83,16 +81,16 @@ void SVGImage::onRender(const SVGRenderContext& context) const {
 
   ImageInfo image;
   const auto imgInfo = LoadImage(Href, viewPort, PreserveAspectRatio);
-  if (!imgInfo.fImage) {
+  if (!imgInfo.image) {
     LOGE("can't render image: load image failed\n");
     return;
   }
 
-  auto matrix = Matrix::MakeScale(viewPort.width() / imgInfo.fDst.width(),
-                                  viewPort.height() / imgInfo.fDst.height());
-  matrix.preTranslate(imgInfo.fDst.x(), imgInfo.fDst.y());
+  auto matrix = Matrix::MakeScale(viewPort.width() / imgInfo.destinationRect.width(),
+                                  viewPort.height() / imgInfo.destinationRect.height());
+  matrix.preTranslate(imgInfo.destinationRect.x(), imgInfo.destinationRect.y());
 
-  context.canvas()->drawImage(imgInfo.fImage, matrix);
+  context.canvas()->drawImage(imgInfo.image, matrix);
 }
 
 Path SVGImage::onAsPath(const SVGRenderContext&) const {

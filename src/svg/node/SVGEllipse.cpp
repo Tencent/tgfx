@@ -27,12 +27,12 @@ namespace tgfx {
 SVGEllipse::SVGEllipse() : INHERITED(SVGTag::Ellipse) {
 }
 
-bool SVGEllipse::parseAndSetAttribute(const std::string& n, const std::string& v) {
-  return INHERITED::parseAndSetAttribute(n, v) ||
-         this->setCx(SVGAttributeParser::parse<SVGLength>("cx", n, v)) ||
-         this->setCy(SVGAttributeParser::parse<SVGLength>("cy", n, v)) ||
-         this->setRx(SVGAttributeParser::parse<SVGLength>("rx", n, v)) ||
-         this->setRy(SVGAttributeParser::parse<SVGLength>("ry", n, v));
+bool SVGEllipse::parseAndSetAttribute(const std::string& name, const std::string& value) {
+  return INHERITED::parseAndSetAttribute(name, value) ||
+         this->setCx(SVGAttributeParser::parse<SVGLength>("cx", name, value)) ||
+         this->setCy(SVGAttributeParser::parse<SVGLength>("cy", name, value)) ||
+         this->setRx(SVGAttributeParser::parse<SVGLength>("rx", name, value)) ||
+         this->setRy(SVGAttributeParser::parse<SVGLength>("ry", name, value));
 }
 
 Rect SVGEllipse::resolve(const SVGLengthContext& lengthContext) const {
@@ -51,7 +51,7 @@ Rect SVGEllipse::resolve(const SVGLengthContext& lengthContext) const {
 }
 
 void SVGEllipse::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-                        PathFillType) const {
+                        PathFillType /*fillType*/) const {
   canvas->drawOval(this->resolve(lengthContext), paint);
 }
 

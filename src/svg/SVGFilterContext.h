@@ -38,25 +38,29 @@ class SVGFilterContext {
     return _filterEffectsRegion;
   }
 
-  const Rect& filterPrimitiveSubregion(const SVGFeInputType&) const;
+  const Rect& filterPrimitiveSubregion(const SVGFeInputType& input) const;
 
   const SVGObjectBoundingBoxUnits& primitiveUnits() const {
     return _primitiveUnits;
   }
 
-  void registerResult(const SVGStringType&, const std::shared_ptr<ImageFilter>&, const Rect&,
-                      SVGColorspace);
+  void registerResult(const SVGStringType& ID, const std::shared_ptr<ImageFilter>& result,
+                      const Rect& subregion, SVGColorspace resultColorspace);
 
-  void setPreviousResult(const std::shared_ptr<ImageFilter>&, const Rect&, SVGColorspace);
+  void setPreviousResult(const std::shared_ptr<ImageFilter>& result, const Rect& subregion,
+                         SVGColorspace resultColorspace);
 
   bool previousResultIsSourceGraphic() const;
 
-  SVGColorspace resolveInputColorspace(const SVGRenderContext&, const SVGFeInputType&) const;
+  SVGColorspace resolveInputColorspace(const SVGRenderContext& context,
+                                       const SVGFeInputType& inputType) const;
 
-  std::shared_ptr<ImageFilter> resolveInput(const SVGRenderContext&, const SVGFeInputType&) const;
+  std::shared_ptr<ImageFilter> resolveInput(const SVGRenderContext& context,
+                                            const SVGFeInputType& inputType) const;
 
-  std::shared_ptr<ImageFilter> resolveInput(const SVGRenderContext&, const SVGFeInputType&,
-                                            SVGColorspace) const;
+  std::shared_ptr<ImageFilter> resolveInput(const SVGRenderContext& context,
+                                            const SVGFeInputType& inputType,
+                                            SVGColorspace resultColorspace) const;
 
  private:
   struct Result {
@@ -65,10 +69,10 @@ class SVGFilterContext {
     SVGColorspace colorspace;
   };
 
-  const Result* findResultById(const SVGStringType&) const;
+  const Result* findResultById(const SVGStringType& ID) const;
 
-  std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> getInput(const SVGRenderContext&,
-                                                                   const SVGFeInputType&) const;
+  std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> getInput(
+      const SVGRenderContext& context, const SVGFeInputType& inputType) const;
 
   Rect _filterEffectsRegion;
 

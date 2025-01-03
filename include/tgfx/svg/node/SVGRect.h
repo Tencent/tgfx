@@ -45,18 +45,19 @@ class SVGRect final : public SVGShape {
   SVG_OPTIONAL_ATTR(Ry, SVGLength)
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  void onDraw(Canvas*, const SVGLengthContext&, const Paint&, PathFillType) const override;
+  void onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+              PathFillType fillType) const override;
 
-  Path onAsPath(const SVGRenderContext&) const override;
+  Path onAsPath(const SVGRenderContext& context) const override;
 
-  Rect onObjectBoundingBox(const SVGRenderContext&) const override;
+  Rect onObjectBoundingBox(const SVGRenderContext& context) const override;
 
  private:
   SVGRect();
 
-  RRect resolve(const SVGLengthContext&) const;
+  RRect resolve(const SVGLengthContext& lengthContext) const;
 
   using INHERITED = SVGShape;
 };

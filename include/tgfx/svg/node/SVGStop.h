@@ -36,7 +36,7 @@ class SVGStop : public SVGHiddenContainer {
   SVG_ATTR(Offset, SVGLength, SVGLength(0, SVGLength::Unit::Percentage))
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGStop();

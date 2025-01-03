@@ -44,12 +44,12 @@ std::shared_ptr<ImageFilter> SVGFeBlend::onMakeImageFilter(
 
 template <>
 bool SVGAttributeParser::parse<SVGFeBlend::Mode>(SVGFeBlend::Mode* mode) {
-  static constexpr std::tuple<const char*, SVGFeBlend::Mode> gMap[] = {
-      {"normal", SVGFeBlend::Mode::kNormal},   {"multiply", SVGFeBlend::Mode::kMultiply},
-      {"screen", SVGFeBlend::Mode::kScreen},   {"darken", SVGFeBlend::Mode::kDarken},
-      {"lighten", SVGFeBlend::Mode::kLighten},
+  static constexpr std::tuple<const char*, SVGFeBlend::Mode> blendMap[] = {
+      {"normal", SVGFeBlend::Mode::Normal},   {"multiply", SVGFeBlend::Mode::Multiply},
+      {"screen", SVGFeBlend::Mode::Screen},   {"darken", SVGFeBlend::Mode::Darken},
+      {"lighten", SVGFeBlend::Mode::Lighten},
   };
 
-  return this->parseEnumMap(gMap, mode) && this->parseEOSToken();
+  return this->parseEnumMap(blendMap, mode) && this->parseEOSToken();
 }
 }  // namespace tgfx

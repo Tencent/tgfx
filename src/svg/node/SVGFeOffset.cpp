@@ -28,9 +28,9 @@ bool SVGFeOffset::parseAndSetAttribute(const std::string& name, const std::strin
          this->setDy(SVGAttributeParser::parse<SVGNumberType>("dy", name, value));
 }
 
-std::shared_ptr<ImageFilter> SVGFeOffset::onMakeImageFilter(const SVGRenderContext&,
-                                                            const SVGFilterContext&) const {
-  //TODO (YGAurora)
+std::shared_ptr<ImageFilter> SVGFeOffset::onMakeImageFilter(
+    const SVGRenderContext& /*context*/, const SVGFilterContext& /*filterContext*/) const {
+  //TODO (YGaurora) offset filter not implemented
   return nullptr;
 }
 

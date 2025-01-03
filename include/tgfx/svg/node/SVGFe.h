@@ -57,17 +57,19 @@ class SVGFe : public SVGHiddenContainer {
                                                const SVGFilterContext& filterContext) const;
 
   // https://www.w3.org/TR/SVG11/filters.html#FilterPrimitiveSubRegion
-  Rect resolveFilterSubregion(const SVGRenderContext&, const SVGFilterContext&) const;
+  Rect resolveFilterSubregion(const SVGRenderContext& context,
+                              const SVGFilterContext& filterContext) const;
 
   /**
    * Resolves the colorspace within which this filter effect should be applied.
    * Spec: https://www.w3.org/TR/SVG11/painting.html#ColorInterpolationProperties
    * 'color-interpolation-filters' property.
    */
-  virtual SVGColorspace resolveColorspace(const SVGRenderContext&, const SVGFilterContext&) const;
+  virtual SVGColorspace resolveColorspace(const SVGRenderContext& context,
+                                          const SVGFilterContext& filterContext) const;
 
   /** Propagates any inherited presentation attributes in the given context. */
-  void applyProperties(SVGRenderContext*) const;
+  void applyProperties(SVGRenderContext* context) const;
 
   SVG_ATTR(In, SVGFeInputType, SVGFeInputType())
 
@@ -81,12 +83,12 @@ class SVGFe : public SVGHiddenContainer {
   explicit SVGFe(SVGTag t) : INHERITED(t) {
   }
 
-  virtual std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                         const SVGFilterContext&) const = 0;
+  virtual std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const = 0;
 
   virtual std::vector<SVGFeInputType> getInputs() const = 0;
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   /**
@@ -94,7 +96,8 @@ class SVGFe : public SVGHiddenContainer {
      * filter effect. These attributes are resolved according to the given length context and
      * the value of 'primitiveUnits' on the parent <filter> element.
      */
-  Rect resolveBoundaries(const SVGRenderContext&, const SVGFilterContext&) const;
+  Rect resolveBoundaries(const SVGRenderContext& context,
+                         const SVGFilterContext& filterContext) const;
 
   using INHERITED = SVGHiddenContainer;
 };

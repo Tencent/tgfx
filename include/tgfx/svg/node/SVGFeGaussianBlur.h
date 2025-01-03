@@ -32,8 +32,8 @@ class SVGRenderContext;
 class SVGFeGaussianBlur : public SVGFe {
  public:
   struct StdDeviation {
-    SVGNumberType fX;
-    SVGNumberType fY;
+    SVGNumberType X;
+    SVGNumberType Y;
   };
 
   static std::shared_ptr<SVGFeGaussianBlur> Make() {
@@ -43,14 +43,14 @@ class SVGFeGaussianBlur : public SVGFe {
   SVG_ATTR(stdDeviation, StdDeviation, StdDeviation({0, 0}))
 
  protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override;
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGFeGaussianBlur() : INHERITED(SVGTag::FeGaussianBlur) {

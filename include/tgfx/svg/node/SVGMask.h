@@ -47,11 +47,11 @@ class SVGMask final : public SVGHiddenContainer {
   SVGMask() : INHERITED(SVGTag::Mask) {
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  Rect bounds(const SVGRenderContext&) const;
+  Rect bounds(const SVGRenderContext& context) const;
 
-  void renderMask(const SVGRenderContext&) const;
+  void renderMask(const SVGRenderContext& context) const;
 
   using INHERITED = SVGHiddenContainer;
 };

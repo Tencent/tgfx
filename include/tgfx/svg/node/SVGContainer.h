@@ -30,18 +30,18 @@ class SVGRenderContext;
 
 class SVGContainer : public SVGTransformableNode {
  public:
-  void appendChild(std::shared_ptr<SVGNode>) override;
+  void appendChild(std::shared_ptr<SVGNode> node) override;
   const std::vector<std::shared_ptr<SVGNode>>& getChildren() const;
   bool hasChildren() const final;
 
  protected:
   explicit SVGContainer(SVGTag);
 
-  void onRender(const SVGRenderContext&) const override;
+  void onRender(const SVGRenderContext& context) const override;
 
-  Path onAsPath(const SVGRenderContext&) const override;
+  Path onAsPath(const SVGRenderContext& context) const override;
 
-  Rect onObjectBoundingBox(const SVGRenderContext&) const override;
+  Rect onObjectBoundingBox(const SVGRenderContext& context) const override;
 
   template <typename NodeType, typename Func>
   void forEachChild(Func func) const {

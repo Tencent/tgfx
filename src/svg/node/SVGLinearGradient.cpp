@@ -40,7 +40,8 @@ bool SVGLinearGradient::parseAndSetAttribute(const std::string& name, const std:
 std::shared_ptr<Shader> SVGLinearGradient::onMakeShader(const SVGRenderContext& context,
                                                         const std::vector<Color>& colors,
                                                         const std::vector<float>& positions,
-                                                        TileMode, const Matrix&) const {
+                                                        TileMode /*tileMode*/,
+                                                        const Matrix& /*localMatrix*/) const {
   SVGLengthContext lengthContext = context.lengthContext();
   lengthContext.setPatternUnits(getGradientUnits());
 

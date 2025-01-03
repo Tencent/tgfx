@@ -47,14 +47,14 @@ class SVGSVG : public SVGContainer {
 
   SVG_OPTIONAL_ATTR(ViewBox, SVGViewBoxType)
 
-  Size intrinsicSize(const SVGLengthContext&) const;
+  Size intrinsicSize(const SVGLengthContext& lengthContext) const;
 
-  void renderNode(const SVGRenderContext&, const SVGIRI& iri) const;
+  void renderNode(const SVGRenderContext& context, const SVGIRI& iri) const;
 
  protected:
-  bool onPrepareToRender(SVGRenderContext*) const override;
+  bool onPrepareToRender(SVGRenderContext* context) const override;
 
-  void onSetAttribute(SVGAttribute, const SVGValue&) override;
+  void onSetAttribute(SVGAttribute attribute, const SVGValue& value) override;
 
  private:
   explicit SVGSVG(Type t) : INHERITED(SVGTag::Svg), type(t) {

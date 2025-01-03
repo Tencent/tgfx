@@ -31,29 +31,29 @@ namespace tgfx {
 class SVGFeBlend : public SVGFe {
  public:
   enum class Mode {
-    kNormal,
-    kMultiply,
-    kScreen,
-    kDarken,
-    kLighten,
+    Normal,
+    Multiply,
+    Screen,
+    Darken,
+    Lighten,
   };
 
   static std::shared_ptr<SVGFeBlend> Make() {
     return std::shared_ptr<SVGFeBlend>(new SVGFeBlend());
   }
 
-  SVG_ATTR(BlendMode, Mode, Mode::kNormal)
+  SVG_ATTR(BlendMode, Mode, Mode::Normal)
   SVG_ATTR(In2, SVGFeInputType, SVGFeInputType())
 
  protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override;
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {this->getIn(), this->getIn2()};
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGFeBlend() : INHERITED(SVGTag::FeBlend) {

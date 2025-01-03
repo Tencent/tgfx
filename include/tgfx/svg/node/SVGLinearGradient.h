@@ -38,10 +38,11 @@ class SVGLinearGradient final : public SVGGradient {
   SVG_ATTR(Y2, SVGLength, SVGLength(0, SVGLength::Unit::Percentage))
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  std::shared_ptr<Shader> onMakeShader(const SVGRenderContext&, const std::vector<Color>&,
-                                       const std::vector<float>&, TileMode,
+  std::shared_ptr<Shader> onMakeShader(const SVGRenderContext& context,
+                                       const std::vector<Color>& colors,
+                                       const std::vector<float>& positions, TileMode tileMode,
                                        const Matrix& localMatrix) const override;
 
  private:

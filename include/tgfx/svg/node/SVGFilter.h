@@ -33,9 +33,9 @@ class SVGFilter final : public SVGHiddenContainer {
   }
 
   /** Propagates any inherited presentation attributes in the given context. */
-  void applyProperties(SVGRenderContext*) const;
+  void applyProperties(SVGRenderContext* context) const;
 
-  std::shared_ptr<ImageFilter> buildFilterDAG(const SVGRenderContext&) const;
+  std::shared_ptr<ImageFilter> buildFilterDAG(const SVGRenderContext& context) const;
 
   SVG_ATTR(X, SVGLength, SVGLength(-10, SVGLength::Unit::Percentage))
   SVG_ATTR(Y, SVGLength, SVGLength(-10, SVGLength::Unit::Percentage))
@@ -50,7 +50,7 @@ class SVGFilter final : public SVGHiddenContainer {
   SVGFilter() : INHERITED(SVGTag::Filter) {
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
   using INHERITED = SVGHiddenContainer;
 };

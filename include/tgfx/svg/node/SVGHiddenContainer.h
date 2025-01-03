@@ -27,7 +27,7 @@ class SVGHiddenContainer : public SVGContainer {
   explicit SVGHiddenContainer(SVGTag t) : INHERITED(t) {
   }
 
-  void onRender(const SVGRenderContext&) const final {
+  void onRender(const SVGRenderContext& /*context*/) const final {
     //abort rendering children nodes
   }
 

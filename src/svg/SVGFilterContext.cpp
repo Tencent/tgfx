@@ -27,8 +27,8 @@
 
 namespace tgfx {
 
-const SVGFilterContext::Result* SVGFilterContext::findResultById(const SVGStringType& id) const {
-  auto iter = results.find(id);
+const SVGFilterContext::Result* SVGFilterContext::findResultById(const SVGStringType& ID) const {
+  auto iter = results.find(ID);
   return iter != results.end() ? &iter->second : nullptr;
 }
 
@@ -43,11 +43,11 @@ const Rect& SVGFilterContext::filterPrimitiveSubregion(const SVGFeInputType& inp
   return res ? res->filterSubregion : _filterEffectsRegion;
 }
 
-void SVGFilterContext::registerResult(const SVGStringType& id,
+void SVGFilterContext::registerResult(const SVGStringType& ID,
                                       const std::shared_ptr<ImageFilter>& result,
                                       const Rect& subregion, SVGColorspace resultColorspace) {
-  ASSERT(!id.empty());
-  results[id] = {result, subregion, resultColorspace};
+  ASSERT(!ID.empty());
+  results[ID] = {result, subregion, resultColorspace};
 }
 
 void SVGFilterContext::setPreviousResult(const std::shared_ptr<ImageFilter>& result,
@@ -118,9 +118,9 @@ std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(const SVGRenderConte
   return std::get<0>(this->getInput(context, inputType));
 }
 
-std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(const SVGRenderContext&,
-                                                            const SVGFeInputType&,
-                                                            SVGColorspace) const {
+std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(
+    const SVGRenderContext& /*context*/, const SVGFeInputType& /*inputType*/,
+    SVGColorspace /*resultColorspace*/) const {
   //TODO (YGAurora) - ConvertFilterColorspace
   return nullptr;
 }

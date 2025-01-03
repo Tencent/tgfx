@@ -46,15 +46,15 @@ class SVGUse final : public SVGTransformableNode {
   SVG_ATTR(Href, SVGIRI, SVGIRI())
 
  protected:
-  bool onPrepareToRender(SVGRenderContext*) const override;
-  void onRender(const SVGRenderContext&) const override;
-  Path onAsPath(const SVGRenderContext&) const override;
-  Rect onObjectBoundingBox(const SVGRenderContext&) const override;
+  bool onPrepareToRender(SVGRenderContext* context) const override;
+  void onRender(const SVGRenderContext& context) const override;
+  Path onAsPath(const SVGRenderContext& context) const override;
+  Rect onObjectBoundingBox(const SVGRenderContext& context) const override;
 
  private:
   SVGUse();
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
   using INHERITED = SVGTransformableNode;
 };

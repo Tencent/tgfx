@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <__memory/shared_ptr.h>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -77,8 +76,9 @@ class SVGFeComponentTransfer final : public SVGFe {
   }
 
  protected:
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const override {
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& /*context*/,
+      const SVGFilterContext& /*filterContext*/) const override {
     return nullptr;
   };
 

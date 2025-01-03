@@ -34,8 +34,8 @@ class SVGFeSpotLight;
 class SVGFeLighting : public SVGFe {
  public:
   struct KernelUnitLength {
-    SVGNumberType fDx;
-    SVGNumberType fDy;
+    SVGNumberType Dx;
+    SVGNumberType Dy;
   };
 
   SVG_ATTR(SurfaceScale, SVGNumberType, 1)
@@ -49,10 +49,10 @@ class SVGFeLighting : public SVGFe {
     return {this->getIn()};
   }
 
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  std::shared_ptr<ImageFilter> onMakeImageFilter(const SVGRenderContext&,
-                                                 const SVGFilterContext&) const final {
+  std::shared_ptr<ImageFilter> onMakeImageFilter(
+      const SVGRenderContext& /*context*/, const SVGFilterContext& /*filterContext*/) const final {
     return nullptr;
   };
 
@@ -70,7 +70,7 @@ class SVGFeSpecularLighting final : public SVGFeLighting {
   SVG_ATTR(SpecularExponent, SVGNumberType, 1)
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGFeSpecularLighting() : INHERITED(SVGTag::FeSpecularLighting) {
@@ -88,7 +88,7 @@ class SVGFeDiffuseLighting final : public SVGFeLighting {
   SVG_ATTR(DiffuseConstant, SVGNumberType, 1)
 
  protected:
-  bool parseAndSetAttribute(const std::string&, const std::string&) override;
+  bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
   SVGFeDiffuseLighting() : INHERITED(SVGTag::FeDiffuseLighting) {
