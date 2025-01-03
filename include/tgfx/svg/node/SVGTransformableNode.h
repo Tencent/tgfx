@@ -32,7 +32,7 @@ enum class SVGAttribute;
 class SVGTransformableNode : public SVGNode {
  public:
   void setTransform(const SVGTransformType& t) {
-    fTransform = t;
+    transform = t;
   }
 
  protected:
@@ -47,8 +47,7 @@ class SVGTransformableNode : public SVGNode {
   void mapToParent(Rect* rect) const;
 
  private:
-  // FIXME: should be sparse
-  SVGTransformType fTransform;
+  SVGTransformType transform;
 
   using INHERITED = SVGNode;
 };

@@ -27,21 +27,21 @@
 
 namespace tgfx {
 
-SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag), fTransform(Matrix::I()) {
+SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag), transform(Matrix::I()) {
 }
 
 bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
-  if (!fTransform.isIdentity()) {
-    auto transform = fTransform;
+  if (!transform.isIdentity()) {
+    auto tempTransform = transform;
     if (auto unit = context->lengthContext().getPatternUnits();
         unit.has_value() &&
         unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-      transform.postScale(context->lengthContext().viewPort().width,
-                          context->lengthContext().viewPort().height);
+      tempTransform.postScale(context->lengthContext().viewPort().width,
+                              context->lengthContext().viewPort().height);
     }
     context->saveOnce();
-    context->canvas()->concat(transform);
-    context->concat(transform);
+    context->canvas()->concat(tempTransform);
+    context->concat(tempTransform);
   }
 
   return this->INHERITED::onPrepareToRender(context);
@@ -62,11 +62,11 @@ void SVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) 
 
 void SVGTransformableNode::mapToParent(Path* path) const {
   // transforms the path to parent node coordinates.
-  path->transform(fTransform);
+  path->transform(transform);
 }
 
 void SVGTransformableNode::mapToParent(Rect* rect) const {
-  *rect = fTransform.mapRect(*rect);
+  *rect = transform.mapRect(*rect);
 }
 
 }  // namespace tgfx

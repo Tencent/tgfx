@@ -386,7 +386,6 @@ std::optional<Paint> SVGRenderContext::strokePaint() const {
     stroke.miterLimit = *props.StrokeMiterLimit;
     paint->setStroke(stroke);
 
-    //TODO (YGAurora): Implement stroke dash array use PathEffect
     dash_effect(props, *_lengthContext);
   }
 

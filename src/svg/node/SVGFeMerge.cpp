@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGFeMerge.h"
+#include <memory>
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGFilterContext.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
@@ -29,10 +31,14 @@ bool SVGFeMergeNode::parseAndSetAttribute(const std::string& name, const std::st
          this->setIn(SVGAttributeParser::parse<SVGFeInputType>("in", name, value));
 }
 
-std::shared_ptr<ImageFilter> SVGFeMerge::onMakeImageFilter(const SVGRenderContext&,
-                                                           const SVGFilterContext&) const {
-  //TODO (YGAurora): Implement relying on ImageFilters::Merge to implement this
-  return nullptr;
+std::shared_ptr<ImageFilter> SVGFeMerge::onMakeImageFilter(
+    const SVGRenderContext& context, const SVGFilterContext& filterContext) const {
+  std::vector<std::shared_ptr<ImageFilter>> mergeNodeFilters(children.size());
+
+  this->forEachChild<SVGFeMergeNode>([&](const SVGFeMergeNode* child) {
+    mergeNodeFilters.push_back(filterContext.resolveInput(context, child->getIn()));
+  });
+  return ImageFilter::Compose(mergeNodeFilters);
 }
 
 std::vector<SVGFeInputType> SVGFeMerge::getInputs() const {

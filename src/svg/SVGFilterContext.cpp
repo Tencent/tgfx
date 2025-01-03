@@ -119,9 +119,10 @@ std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(const SVGRenderConte
 }
 
 std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(
-    const SVGRenderContext& /*context*/, const SVGFeInputType& /*inputType*/,
+    const SVGRenderContext& context, const SVGFeInputType& inputType,
     SVGColorspace /*resultColorspace*/) const {
-  //TODO (YGAurora) - ConvertFilterColorspace
+  //TODO (YGAurora) - waiting for color space implementation
+  resolveInput(context, inputType);
   return nullptr;
 }
 
