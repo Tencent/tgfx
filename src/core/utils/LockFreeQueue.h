@@ -16,64 +16,64 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 #pragma once
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
 
 namespace tgfx {
-class NonCopyable
-{
-  protected:
-  NonCopyable() {}
-  ~NonCopyable() {}
+class NonCopyable {
+ protected:
+  NonCopyable() {
+  }
+  ~NonCopyable() {
+  }
 
-  private:
+ private:
   NonCopyable(const NonCopyable&);
   const NonCopyable& operator=(const NonCopyable&);
 };
 
-template<typename T>
+template <typename T>
 class LockFreeQueue : NonCopyable {
  public:
   using ElementType = T;
-  LockFreeQueue() : mSize(0), mListSize(0), mUniqDelFlag(0) {
-    mHead = mTail = mDelTail = new TNode;
-    mDelTail->BeDeleted = true;
+  LockFreeQueue() : _size(0), listSize(0), uniqueFlag(0) {
+    header = tail = mDelTail = new TNode;
+    mDelTail->beDeleted = true;
   }
   ~LockFreeQueue() {
     TNode* pTail = mDelTail;
     while (pTail != nullptr) {
       TNode* pNode = pTail;
-      pTail = pNode->NextNode;
+      pTail = pNode->nextNode;
       delete pNode;
     }
   }
-  bool dequeue() {
-    TNode* pTail = mTail;
-    do
-    {
-      if (pTail->NextNode == nullptr) return false;
-    } while (!std::atomic_compare_exchange_weak(&mTail, &pTail, pTail->NextNode));
+  bool dequeue(ElementType& OutItem) {
+    TNode* pTail = tail;
+    do {
+      if (pTail->nextNode == nullptr) return false;
+    } while (!std::atomic_compare_exchange_weak(&tail, &pTail, pTail->nextNode));
 
-    TNode* pPop = pTail->NextNode;
-//    OutItem = std::move(pPop->Item);
-    pPop->BeDeleted = true;
-    pPop->Item = ElementType();
-    uint64_t uCurrSize = --mSize;
-    uint64_t uNeedDelNum = mListSize.load() - uCurrSize;
+    TNode* pPop = pTail->nextNode;
+    OutItem = std::move(pPop->item);
+    pPop->beDeleted = true;
+    pPop->item = ElementType();
+    uint64_t uCurrSize = --_size;
+    uint64_t uNeedDelNum = listSize.load() - uCurrSize;
     if (uNeedDelNum > 256) {
-      if (++mUniqDelFlag == 1) {
-        while (mDelTail->NextNode != nullptr && mDelTail->NextNode->BeDeleted && uNeedDelNum > 256) {
+      if (++uniqueFlag == 1) {
+        while (mDelTail->nextNode != nullptr && mDelTail->nextNode->beDeleted &&
+               uNeedDelNum > 256) {
           TNode* pDel = mDelTail;
-          mDelTail = mDelTail->NextNode;
-          mListSize--;
+          mDelTail = mDelTail->nextNode;
+          listSize--;
           uNeedDelNum--;
           delete pDel;
         }
       }
-      --mUniqDelFlag;
+      --uniqueFlag;
     }
     return true;
   }
@@ -82,73 +82,76 @@ class LockFreeQueue : NonCopyable {
     TNode* pNewNode = new (std::nothrow) TNode(InItem);
     if (pNewNode == nullptr) return false;
 
-    TNode* pCurrHead = mHead;
-    while (!std::atomic_compare_exchange_weak(&mHead, &pCurrHead, pNewNode));
+    TNode* pCurrHead = header;
+    while (!std::atomic_compare_exchange_weak(&header, &pCurrHead, pNewNode))
+      ;
     std::atomic_thread_fence(std::memory_order_seq_cst);
-    pCurrHead->NextNode = pNewNode;
-    mSize++;
-    mListSize++;
+    pCurrHead->nextNode = pNewNode;
+    _size++;
+    listSize++;
     return true;
   }
 
-  bool isEmpty() const { return mSize == 0; }
-
-  // not support multi thread comsumers
-  ElementType* peek() {
-    if (mTail.load()->NextNode == nullptr) return nullptr;
-    return &(mTail.load()->NextNode->Item);
+  bool empty() const {
+    return _size == 0;
   }
 
-  // not support multi thread comsumers
-  const ElementType* peek() const { return const_cast<LockFreeQueue*>(this)->peek(); }
-
   bool pop() {
-    TNode* pTail = mTail;
+    TNode* pTail = tail;
     do {
-      if (pTail->NextNode == nullptr) return false;
-    } while (!std::atomic_compare_exchange_weak(&mTail, &pTail, pTail->NextNode));
-    TNode* pPop = pTail->NextNode;
-    pPop->BeDeleted = true;
-    pPop->Item = ElementType();
-    uint64_t uCurrSize = --mSize;
-    uint64_t uNeedDelNum = mListSize.load() - uCurrSize;
-    if (uNeedDelNum > 10) {
-      if (++mUniqDelFlag == 1) {
-        while (mDelTail->NextNode != nullptr && mDelTail->NextNode->BeDeleted && uNeedDelNum > 10) {
+      if (pTail->nextNode == nullptr) return false;
+    } while (!std::atomic_compare_exchange_weak(&tail, &pTail, pTail->nextNode));
+    TNode* pPop = pTail->nextNode;
+    pPop->beDeleted = true;
+    pPop->item = ElementType();
+    uint64_t uCurrSize = --_size;
+    uint64_t uNeedDelNum = listSize.load() - uCurrSize;
+    if (uNeedDelNum > 256) {
+      if (++uniqueFlag == 1) {
+        while (mDelTail->nextNode != nullptr && mDelTail->nextNode->beDeleted &&
+               uNeedDelNum > 256) {
           TNode* pDel = mDelTail;
-          mDelTail = mDelTail->NextNode;
-          mListSize--;
+          mDelTail = mDelTail->nextNode;
+          listSize--;
           uNeedDelNum--;
           delete pDel;
         }
       }
-      --mUniqDelFlag;
+      --uniqueFlag;
     }
     return true;
   }
 
-  void empty() { while (pop()); }
+  void clear() {
+    while (pop())
+      ;
+  }
 
-  uint64_t getSize() const { return mSize; }
+  uint64_t size() const {
+    return _size;
+  }
 
  private:
   struct TNode {
-    TNode* volatile NextNode;
-    ElementType Item;
-    std::atomic_bool BeDeleted;
-    TNode() : NextNode(nullptr), BeDeleted(false){}
-    explicit TNode(const ElementType& InItem) : NextNode(nullptr), Item(InItem), BeDeleted(false) {}
-    explicit TNode(ElementType& InItem) : NextNode(nullptr), Item(std::move(InItem)), BeDeleted(false) {}
+    TNode* volatile nextNode;
+    ElementType item;
+    std::atomic_bool beDeleted;
+    TNode() : nextNode(nullptr), beDeleted(false) {
+    }
+    explicit TNode(const ElementType& InItem) : nextNode(nullptr), item(InItem), beDeleted(false) {
+    }
+    explicit TNode(ElementType& InItem)
+        : nextNode(nullptr), item(std::move(InItem)), beDeleted(false) {
+    }
   };
 
-  std::atomic<TNode*> mHead;
-  std::atomic<TNode*> mTail;
-  TNode* mDelTail;
+  std::atomic<TNode*> header = nullptr;
+  std::atomic<TNode*> tail = nullptr;
+  TNode* mDelTail = nullptr;
 
-  std::atomic_uint64_t mSize;
-  std::atomic_uint64_t mListSize;
-  std::atomic_int mUniqDelFlag;
+  std::atomic_uint64_t _size;
+  std::atomic_uint64_t listSize;
+  std::atomic_int uniqueFlag;
 };
 
-} // namespace tgfx
-
+}  // namespace tgfx

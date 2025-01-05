@@ -19,5 +19,7 @@
 #import <Cocoa/Cocoa.h>
 
 @interface ViewController : NSViewController
+- (void)redraw;
+- (void)updateTitle;
 
 @end

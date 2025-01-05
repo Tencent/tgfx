@@ -20,7 +20,6 @@
 
 #include <condition_variable>
 #include <functional>
-#include <memory>
 #include <mutex>
 
 namespace tgfx {
@@ -74,7 +73,6 @@ class Task {
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);
-  bool removeTask();
   void execute();
 
   friend class TaskGroup;

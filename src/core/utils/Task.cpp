@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Task.h"
-#include "core/utils/Log.h"
 #include "core/utils/TaskGroup.h"
 
 namespace tgfx {
@@ -36,55 +35,40 @@ Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
 bool Task::executing() {
-//  std::lock_guard<std::mutex> autoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   return _executing;
 }
 
 bool Task::cancelled() {
-//  std::lock_guard<std::mutex> autoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   return _cancelled;
 }
 
 bool Task::finished() {
-//  std::lock_guard<std::mutex> autoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   return !_executing && !_cancelled;
 }
 
 void Task::wait() {
-//  std::unique_lock<std::mutex> autoLock(locker);
+  std::unique_lock<std::mutex> autoLock(locker);
   if (!_executing) {
     return;
   }
-  // Try to remove the task from the queue. Execute it directly on the current thread if the task is
-  // not in the queue. This is to avoid the deadlock situation.
-  if (removeTask()) {
-    block();
-    _executing = false;
-    condition.notify_all();
-    return;
-  }
-  std::unique_lock<std::mutex> autoLock(locker);
   condition.wait(autoLock);
 }
 
 void Task::cancel() {
-//  std::unique_lock<std::mutex> autoLock(locker);
+   std::unique_lock<std::mutex> autoLock(locker);
   if (!_executing) {
     return;
   }
-  if (removeTask()) {
-    _executing = false;
-    _cancelled = true;
-  }
-}
-
-bool Task::removeTask() {
-  return TaskGroup::GetInstance()->removeTask(this);
+  _executing = false;
+  _cancelled = true;
 }
 
 void Task::execute() {
   block();
-//  std::lock_guard<std::mutex> auoLock(locker);
+  std::lock_guard<std::mutex> auoLock(locker);
   _executing = false;
   condition.notify_all();
 }

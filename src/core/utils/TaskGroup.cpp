@@ -18,13 +18,7 @@
 
 #include "TaskGroup.h"
 #include <algorithm>
-#include <atomic>
-#include <cstdio>
 #include <cstdlib>
-#include <string>
-#include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
-#include <string>
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -32,7 +26,6 @@
 
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
-static constexpr uint32_t InvalidThreadNumber = 0;
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -49,28 +42,12 @@ int GetCPUCores() {
   return cpuCores;
 }
 
-uint32_t GetThreadNumber() {
-  static std::atomic<uint32_t> nextID{1};
-  uint32_t number;
-  do {
-    number = nextID.fetch_add(1, std::memory_order_relaxed);
-  } while (number == InvalidThreadNumber);
-  return number;
-}
-
-std::string GetThreadName() {
-  char threadName[10] = {'\0'};
-  snprintf(threadName, 10, "Thread_%d", GetThreadNumber());
-  return threadName;
-}
-
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-//  printf("--------TaskGroup::RunLoop()---\n");
   while (true) {
     auto task = taskGroup->popTask();
     if (!task) {
@@ -125,25 +102,35 @@ bool TaskGroup::checkThreads() {
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
-//  std::lock_guard<std::mutex> autoLock(locker);
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
+#ifdef TGFX_BUILD_FOR_WEB
   return false;
 #endif
   if (exited || !checkThreads()) {
     return false;
   }
-  // printf("--------pushTask---success---\n");
   tasks.enqueue(std::move(task));
+  //  printf("--*************---task size:%llu\n", tasks.size());
   condition.notify_one();
   return true;
 }
 
 std::shared_ptr<Task> TaskGroup::popTask() {
-//  std::unique_lock<std::mutex> autoLock(locker);
+//  activeThreads--;
+//  if (!exited && !tasks.empty()) {
+//    std::shared_ptr<Task> task;
+//    tasks.dequeue(task);
+//    while (task && !task->executing()) {
+//      tasks.dequeue(task);
+//    }
+//    if (task) {
+//      activeThreads++;
+//      return task;
+//    }
+//  }
+  std::unique_lock<std::mutex> autoLock(locker);
   activeThreads--;
   while (!exited) {
-    if (tasks.isEmpty()) {
-      std::unique_lock<std::mutex> autoLock(locker);
+    if (tasks.empty()) {
       auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
       if (exited || status == std::cv_status::timeout) {
         auto threadID = std::this_thread::get_id();
@@ -153,42 +140,26 @@ std::shared_ptr<Task> TaskGroup::popTask() {
         return nullptr;
       }
     } else {
-//      auto task = tasks.front();
-//      tasks.pop_front();
-       auto task = tasks.peek();
-       tasks.pop();
-       activeThreads++;
-      //      LOGI("TaskGroup: A task is running, the current active threads : %lld",
-      //      activeThreads);
-      return *task;
+      std::shared_ptr<Task> task;
+      tasks.dequeue(task);
+      while (task && !task->executing()) {
+        tasks.dequeue(task);
+      }
+      if (task) {
+        activeThreads++;
+      }
+      return task;
     }
   }
   return nullptr;
 }
 
-bool TaskGroup::removeTask(Task*) {
-
-  tasks.dequeue();
-//  std::lock_guard<std::mutex> autoLock(locker);
-//  printf("--------TaskGroup::removeTask()---\n");
-  return true;
-//   return tasks.remove(std::shared_ptr<Task>(target));
-//  auto position = std::find_if(tasks.begin(), tasks.end(),
-//                               [=](std::shared_ptr<Task> task) { return task.get() == target; });
-//  if (position == tasks.end()) {
-//    return false;
-//  }
-//  tasks.erase(position);
-//  return true;
-}
-
 void TaskGroup::exit() {
-//  locker.lock();
+  locker.lock();
   exited = true;
-//  tasks.clear();
-   tasks.empty();
+  tasks.clear();
   condition.notify_all();
-//  locker.unlock();
+  locker.unlock();
   for (auto& thread : threads) {
     ReleaseThread(thread);
   }
