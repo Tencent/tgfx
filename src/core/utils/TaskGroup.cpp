@@ -108,9 +108,12 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   if (exited || !checkThreads()) {
     return false;
   }
+  auto size = tasks.size();
   tasks.enqueue(std::move(task));
   //  printf("--*************---task size:%llu\n", tasks.size());
-  condition.notify_one();
+  if (size == 0) {
+    condition.notify_one();
+  }
   return true;
 }
 
