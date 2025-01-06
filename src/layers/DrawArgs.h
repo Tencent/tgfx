@@ -29,9 +29,9 @@ class DrawArgs {
   DrawArgs() = default;
 
   DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false,
-           bool excludeEffects = false, bool isDrawingContour = false)
+           bool excludeEffects = false, bool drawContour = false)
       : context(context), renderFlags(renderFlags), cleanDirtyFlags(cleanDirtyFlags),
-        excludeEffects(excludeEffects), drawContour(isDrawingContour) {
+        excludeEffects(excludeEffects), drawContour(drawContour) {
   }
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.

@@ -112,21 +112,21 @@ class DropShadowStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
- protected:
-  bool isDropShadow() const override {
-    return true;
+  bool requireLayerContour() const override {
+    return !_showBehindLayer;
   }
+
+ protected:
+  void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
+              BlendMode blendMode) override;
+
+  void onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
+                         std::shared_ptr<Image> contour, const Point& contourOffset,
+                         float contentScale, float alpha, BlendMode blendMode) override;
 
  private:
   DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                   const Color& color, bool showBehindTransparent);
-
-  void drawWithContourMask(Canvas* canvas, std::shared_ptr<Image> content,
-                           std::shared_ptr<Image> contour, const Point& contourOffset,
-                           float contentScale, float alpha);
-
-  void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
-              BlendMode blendMode) override;
 
   void invalidateFilter();
 

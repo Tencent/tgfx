@@ -83,6 +83,34 @@ class LayerStyle : public LayerProperty {
     onDraw(canvas, std::move(content), contentScale, alpha, _blendMode);
   }
 
+  /**
+   *  Returns whether the layer style requires the layer contour to be drawn.
+   */
+  virtual bool requireLayerContour() const {
+    return false;
+  }
+
+  /**
+   * Applies the layer style with the layer contour to the scaled image of the layer content and
+   * draws it on the canvas
+   * @param canvas The canvas to draw the layer style on.
+   * @param content The scaled layer content to apply the layer style to.
+   * @param contour  The scaled layer contour to apply the layer style to.
+   * @param contourOffset The offset of the contour relative to the layer content.
+   * @param contentScale The scale factor of the layer content relative to its original size.
+   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
+   * @param alpha The alpha transparency value used for drawing the layer style.
+   */
+  void drawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
+                       std::shared_ptr<Image> contour, const Point& contourOffset,
+                       float contentScale, float alpha) {
+    if (!requireLayerContour()) {
+      return draw(canvas, std::move(content), contentScale, alpha);
+    }
+    onDrawWithContour(canvas, std::move(content), std::move(contour), contourOffset, contentScale,
+                      alpha, _blendMode);
+  }
+
  protected:
   /**
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
@@ -97,13 +125,22 @@ class LayerStyle : public LayerProperty {
   virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                       float alpha, BlendMode blendMode) = 0;
 
-  virtual bool isDropShadow() const {
-    return false;
-  }
+  /**
+   * Applies the layer style with layer contour to the scaled image of the layer content and draws it on the canvas.
+   * The default implementation calls onDraw with the layer content only.
+   * @param canvas The canvas to draw the layer style on.
+   * @param content The scaled layer content to apply the layer style to.
+   * @param contour  The scaled layer contour to apply the layer style to.
+   * @param contourOffset The offset of the contour relative to the layer content.
+   * @param contentScale The scale factor of the layer content relative to its original size.
+   * Some layer styles have size-related parameters that must be adjusted with this scale factor.
+   * @param alpha The alpha transparency value used for drawing the layer style.
+   */
+  virtual void onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
+                                 std::shared_ptr<Image> contour, const Point& contourOffset,
+                                 float contentScale, float alpha, BlendMode blendMode);
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;
-
-  friend class Layer;
 };
 }  // namespace tgfx

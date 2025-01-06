@@ -45,13 +45,6 @@ class LayerContent {
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
 
   /**
-   * Draws the content's contour to the given canvas with the given paint.
-   */
-  virtual void drawContour(Canvas* canvas, const Paint& paint) const {
-    draw(canvas, paint);
-  }
-
-  /**
     * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
     * The localX and localY coordinates are in the layer's local coordinate space. If the
     * pixelHitTest flag is true, it checks the actual pixels of the layer content; otherwise, it

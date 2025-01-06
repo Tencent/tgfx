@@ -277,9 +277,18 @@ class ShapeLayer : public Layer {
  protected:
   ShapeLayer() = default;
 
+  std::shared_ptr<Shape> createStrokeShape() const;
+
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
+  LayerContent* getContour() override;
+
  private:
+  static std::unique_ptr<LayerContent> CreateContourWithStyles(
+      std::shared_ptr<Shape> shape, const std::vector<std::shared_ptr<ShapeStyle>>& styles);
+
+  void invalidateContentAndContour();
+
   std::shared_ptr<Shape> _shape = nullptr;
   std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
   std::vector<std::shared_ptr<ShapeStyle>> _strokeStyles = {};
@@ -289,5 +298,7 @@ class ShapeLayer : public Layer {
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
+
+  std::unique_ptr<LayerContent> contourContent;
 };
 }  // namespace tgfx

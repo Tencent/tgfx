@@ -47,13 +47,6 @@ void ComposeContent::draw(Canvas* canvas, const Paint& paint) const {
   }
 }
 
-void ComposeContent::drawContour(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT;
-  for (const auto& content : contents) {
-    content->drawContour(canvas, paint);
-  }
-}
-
 bool ComposeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
   TRACE_EVENT;
   for (const auto& content : contents) {

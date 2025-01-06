@@ -505,6 +505,12 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
+   * Returns the layer contour used for layer styles that require it.
+   * The default implementation returns the layer content.
+   */
+  virtual LayerContent* getContour();
+
+  /**
   * Attachs a property to this layer.
   */
   void attachProperty(LayerProperty* property) const;
@@ -545,6 +551,9 @@ class Layer {
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
 
+  std::shared_ptr<Picture> getLayerContentsWithStyles(const DrawArgs& args, float contentScale,
+                                                      float alpha);
+
   void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content,
                        std::shared_ptr<Image> contour, const Point& contourOffset,
                        float contentScale, float alpha, LayerStylePosition position);
@@ -555,7 +564,7 @@ class Layer {
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawWithLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha);
+  void drawContentsWithStyles(const DrawArgs& args, Canvas* canvas, float alpha);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -564,8 +573,6 @@ class Layer {
   Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
-
-  std::shared_ptr<Image> getLayerContour(const DrawArgs& args, float contentScale, Point* offset);
 
   struct {
     bool contentDirty : 1;   // need to update content

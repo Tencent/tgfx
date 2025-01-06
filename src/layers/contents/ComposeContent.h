@@ -31,8 +31,6 @@ class ComposeContent : public LayerContent {
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
-  void drawContour(Canvas* canvas, const Paint& paint) const override;
-
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  private:

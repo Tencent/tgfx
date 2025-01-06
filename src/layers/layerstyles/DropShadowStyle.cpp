@@ -91,13 +91,9 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void DropShadowStyle::drawWithContourMask(Canvas* canvas, std::shared_ptr<Image> content,
-                                          std::shared_ptr<Image> contour,
-                                          const Point& contourOffset, float contentScale,
-                                          float alpha) {
-  if (!_showBehindLayer && contour == nullptr) {
-    return;
-  }
+void DropShadowStyle::onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
+                                        std::shared_ptr<Image> contour, const Point& contourOffset,
+                                        float contentScale, float alpha, BlendMode blendMode) {
   // create opaque image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
@@ -116,14 +112,14 @@ void DropShadowStyle::drawWithContourMask(Canvas* canvas, std::shared_ptr<Image>
         Matrix::MakeTrans(contourOffset.x - offset.x, contourOffset.y - offset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
-  paint.setBlendMode(blendMode());
+  paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
   canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
 }
 
 void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                             float alpha, BlendMode) {
-  drawWithContourMask(canvas, std::move(content), nullptr, Point::Zero(), contentScale, alpha);
+                             float alpha, BlendMode blendMode) {
+  onDrawWithContour(canvas, content, nullptr, Point::Zero(), contentScale, alpha, blendMode);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
