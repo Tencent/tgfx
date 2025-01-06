@@ -95,19 +95,18 @@ class LayerStyle : public LayerProperty {
    * draws it on the canvas
    * @param canvas The canvas to draw the layer style on.
    * @param content The scaled layer content to apply the layer style to.
-   * @param contour  The scaled layer contour to apply the layer style to.
-   * @param contourOffset The offset of the contour relative to the layer content.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
+   * @param contour  The scaled layer contour to apply the layer style to.
+   * @param contourOffset The offset of the contour relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void drawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
-                       std::shared_ptr<Image> contour, const Point& contourOffset,
-                       float contentScale, float alpha) {
+  void drawWithContour(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                       std::shared_ptr<Image> contour, const Point& contourOffset, float alpha) {
     if (!requireLayerContour()) {
       return draw(canvas, std::move(content), contentScale, alpha);
     }
-    onDrawWithContour(canvas, std::move(content), std::move(contour), contourOffset, contentScale,
+    onDrawWithContour(canvas, std::move(content), contentScale, std::move(contour), contourOffset,
                       alpha, _blendMode);
   }
 
@@ -130,15 +129,15 @@ class LayerStyle : public LayerProperty {
    * The default implementation calls onDraw with the layer content only.
    * @param canvas The canvas to draw the layer style on.
    * @param content The scaled layer content to apply the layer style to.
-   * @param contour  The scaled layer contour to apply the layer style to.
-   * @param contourOffset The offset of the contour relative to the layer content.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
+   * @param contour  The scaled layer contour to apply the layer style to.
+   * @param contourOffset The offset of the contour relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  virtual void onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
+  virtual void onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                                  std::shared_ptr<Image> contour, const Point& contourOffset,
-                                 float contentScale, float alpha, BlendMode blendMode);
+                                 float alpha, BlendMode blendMode);
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;

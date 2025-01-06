@@ -92,8 +92,9 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
 }
 
 void DropShadowStyle::onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
-                                        std::shared_ptr<Image> contour, const Point& contourOffset,
-                                        float contentScale, float alpha, BlendMode blendMode) {
+                                        float contentScale, std::shared_ptr<Image> contour,
+                                        const Point& contourOffset, float alpha,
+                                        BlendMode blendMode) {
   // create opaque image
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
@@ -119,7 +120,7 @@ void DropShadowStyle::onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> c
 
 void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              float alpha, BlendMode blendMode) {
-  onDrawWithContour(canvas, content, nullptr, Point::Zero(), contentScale, alpha, blendMode);
+  onDrawWithContour(canvas, content, contentScale, nullptr, Point::Zero(), alpha, blendMode);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

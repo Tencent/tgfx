@@ -283,15 +283,16 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
     contents.push_back(std::make_unique<ShapeContent>(_shape, style->getShader(), style->alpha(),
                                                       style->blendMode()));
   }
-  if (stroke.width > 0 && !_strokeStyles.empty()) {
-    auto strokeShape = createStrokeShape();
-    for (auto& style : _strokeStyles) {
-      if (style->alpha() <= 0) {
-        continue;
+  if (!_strokeStyles.empty()) {
+    if (auto strokeShape = createStrokeShape()) {
+      for (auto& style : _strokeStyles) {
+        if (style->alpha() <= 0) {
+          continue;
+        }
+        auto content = std::make_unique<ShapeContent>(strokeShape, style->getShader(),
+                                                      style->alpha(), style->blendMode());
+        contents.push_back(std::move(content));
       }
-      auto content = std::make_unique<ShapeContent>(strokeShape, style->getShader(), style->alpha(),
-                                                    style->blendMode());
-      contents.push_back(std::move(content));
     }
   }
   return LayerContent::Compose(std::move(contents));
@@ -307,14 +308,13 @@ LayerContent* ShapeLayer::getContour() {
 
   contourContent = CreateContourWithStyles(_shape, _fillStyles);
   if (contourContent == nullptr) {
-    contourContent = std::make_unique<ShapeContent>(_shape, Shader::MakeColorShader(Color::White()),
-                                                    1.0f, BlendMode::SrcOver);
+    contourContent =
+        std::make_unique<ShapeContent>(_shape, Shader::MakeColorShader(Color::White()));
   }
 
-  if (stroke.width > 0 && !_strokeStyles.empty()) {
+  if (!_strokeStyles.empty()) {
     auto strokeShape = createStrokeShape();
-    auto strokeContour = CreateContourWithStyles(strokeShape, _strokeStyles);
-    if (strokeContour) {
+    if (auto strokeContour = CreateContourWithStyles(strokeShape, _strokeStyles)) {
       std::vector<std::unique_ptr<LayerContent>> contours(2);
       contours[0] = std::move(contourContent);
       contours[1] = std::move(strokeContour);
@@ -326,18 +326,20 @@ LayerContent* ShapeLayer::getContour() {
 
 std::unique_ptr<LayerContent> ShapeLayer::CreateContourWithStyles(
     std::shared_ptr<Shape> shape, const std::vector<std::shared_ptr<ShapeStyle>>& styles) {
+  if (shape == nullptr || styles.empty()) {
+    return nullptr;
+  }
   std::vector<std::unique_ptr<LayerContent>> contours = {};
   auto isAllImageStyle = std::none_of(styles.begin(), styles.end(), [](const auto& style) {
     return style->alpha() > 0 && !style->isImage();
   });
   if (!isAllImageStyle) {
-    contours.push_back(std::make_unique<ShapeContent>(
-        shape, Shader::MakeColorShader(Color::White()), 1.0f, BlendMode::SrcOver));
+    contours.push_back(
+        std::make_unique<ShapeContent>(shape, Shader::MakeColorShader(Color::White())));
   } else {
     for (const auto& style : styles) {
       if (style->alpha() > 0) {
-        contours.push_back(
-            std::make_unique<ShapeContent>(shape, style->getShader(), 1.0f, BlendMode::SrcOver));
+        contours.push_back(std::make_unique<ShapeContent>(shape, style->getShader()));
       }
     }
   }

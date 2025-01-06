@@ -33,9 +33,8 @@ std::shared_ptr<ImageFilter> ImageFilter::InnerShadow(float dx, float dy, float 
 
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                           float blurrinessY, const Color& color) {
-  if (color.alpha <= 0) {
-    return nullptr;
-  }
+  // If color is transparent, the image after applying the filter will be transparent.
+  // So we should not return nullptr when color is transparent.
   return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 

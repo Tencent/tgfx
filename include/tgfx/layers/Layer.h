@@ -520,6 +520,18 @@ class Layer {
    */
   void detachProperty(LayerProperty* property) const;
 
+  /**
+   * Draws the layer style onto the given canvas.
+   */
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content,
+                       std::shared_ptr<Image> contour, const Point& contourOffset,
+                       float contentScale, float alpha, LayerStylePosition position);
+
+  /**
+   * Draws the layer children onto the given canvas.
+   */
+  void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
+
  private:
   /**
    * Marks the layer's children as changed and needing to be redrawn.
@@ -551,20 +563,11 @@ class Layer {
 
   std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
 
-  std::shared_ptr<Picture> getLayerContentsWithStyles(const DrawArgs& args, float contentScale,
-                                                      float alpha);
-
-  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content,
-                       std::shared_ptr<Image> contour, const Point& contourOffset,
-                       float contentScale, float alpha, LayerStylePosition position);
-
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
-
-  void drawContentsWithStyles(const DrawArgs& args, Canvas* canvas, float alpha);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
