@@ -18,7 +18,6 @@
 
 #include "ShapeRasterizer.h"
 #include "core/PathTriangulator.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Mask.h"
 #include "utils/Log.h"
 

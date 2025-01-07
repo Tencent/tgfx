@@ -18,7 +18,6 @@
 
 #include "TextContent.h"
 #include "core/GlyphRunList.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor)

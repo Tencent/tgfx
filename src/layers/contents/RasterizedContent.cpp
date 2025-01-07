@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedContent.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 Rect RasterizedContent::getBounds() const {

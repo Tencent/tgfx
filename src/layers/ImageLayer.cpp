@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ImageLayer.h"
-#include "core/utils/Profiling.h"
 #include "layers/contents/ImageContent.h"
 
 namespace tgfx {

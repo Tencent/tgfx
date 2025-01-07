@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/layers/LayerContent.h"
 

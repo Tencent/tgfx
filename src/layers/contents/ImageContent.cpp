@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageContent.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 Rect ImageContent::getBounds() const {

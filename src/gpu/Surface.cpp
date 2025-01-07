@@ -21,7 +21,6 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "core/utils/Profiling.h"
 #include "gpu/RenderContext.h"
 
 namespace tgfx {

@@ -22,7 +22,6 @@
 #include "core/LayerUnrollContext.h"
 #include "core/RecordingContext.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {

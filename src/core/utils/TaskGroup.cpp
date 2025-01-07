@@ -23,7 +23,6 @@
 #include <cstdlib>
 #include <string>
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>

@@ -23,7 +23,6 @@
 #include <iostream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
-#include "core/utils/Profiling.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"

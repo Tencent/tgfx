@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ComposeContent.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 std::unique_ptr<LayerContent> LayerContent::Compose(
