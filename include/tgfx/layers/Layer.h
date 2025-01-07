@@ -523,9 +523,9 @@ class Layer {
   /**
    * Draws the layer style onto the given canvas.
    */
-  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content,
-                       std::shared_ptr<Image> contour, const Point& contourOffset,
-                       float contentScale, float alpha, LayerStylePosition position);
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                       std::shared_ptr<Image> contour, const Point& contourOffset, float alpha,
+                       LayerStylePosition position);
 
   /**
    * Draws the layer children onto the given canvas.
@@ -560,8 +560,6 @@ class Layer {
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
-
-  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 

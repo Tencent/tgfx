@@ -92,7 +92,7 @@ class LayerStyle : public LayerProperty {
 
   /**
    * Applies the layer style with the layer contour to the scaled image of the layer content and
-   * draws it on the canvas
+   * draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
    * @param content The scaled layer content to apply the layer style to.
    * @param contentScale The scale factor of the layer content relative to its original size.
@@ -103,9 +103,6 @@ class LayerStyle : public LayerProperty {
    */
   void drawWithContour(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                        std::shared_ptr<Image> contour, const Point& contourOffset, float alpha) {
-    if (!requireLayerContour()) {
-      return draw(canvas, std::move(content), contentScale, alpha);
-    }
     onDrawWithContour(canvas, std::move(content), contentScale, std::move(contour), contourOffset,
                       alpha, _blendMode);
   }

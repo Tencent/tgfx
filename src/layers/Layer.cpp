@@ -45,16 +45,16 @@ static bool ChildrenContainEffects(const Layer* layer) {
   return false;
 }
 
-static std::shared_ptr<Picture> RecordDrawFunction(
-    const DrawArgs& args, float contentScale, float alpha,
-    const std::function<void(const DrawArgs&, Canvas*, float)>& drawFunction) {
+static std::shared_ptr<Picture> CreatePicture(
+    const DrawArgs& args, float contentScale,
+    const std::function<void(const DrawArgs&, Canvas*)>& drawFunction) {
   if (drawFunction == nullptr) {
     return nullptr;
   }
   Recorder recorder = {};
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
-  drawFunction(args, contentCanvas, alpha);
+  drawFunction(args, contentCanvas);
   return recorder.finishRecordingAsPicture();
 }
 
@@ -658,7 +658,9 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
-  auto picture = getLayerContents(args, contentScale, 1.0f);
+  auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
+    drawContents(args, canvas, 1.0f);
+  });
   if (!picture) {
     return nullptr;
   }
@@ -678,23 +680,19 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   return image;
 }
 
-std::shared_ptr<Picture> Layer::getLayerContents(const DrawArgs& args, float contentScale,
-                                                 float alpha) {
-  return RecordDrawFunction(args, contentScale, alpha,
-                            [this](const DrawArgs& args, Canvas* canvas, float alpha) {
-                              drawContents(args, canvas, alpha);
-                            });
-}
-
-void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content,
-                            std::shared_ptr<Image> contour, const Point& contourOffset,
-                            float contentScale, float alpha, LayerStylePosition position) {
+void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                            std::shared_ptr<Image> contour, const Point& contourOffset, float alpha,
+                            LayerStylePosition position) {
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position) {
       continue;
     }
     canvas->save();
-    layerStyle->drawWithContour(canvas, content, contentScale, contour, contourOffset, alpha);
+    if (layerStyle->requireLayerContour()) {
+      layerStyle->drawWithContour(canvas, content, contentScale, contour, contourOffset, alpha);
+    } else {
+      layerStyle->draw(canvas, content, contentScale, alpha);
+    }
     canvas->restore();
   }
 }
@@ -760,7 +758,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (FloatNearlyZero(contentScale)) {
     return;
   }
-  auto picture = getLayerContents(args, contentScale, 1.0f);
+
+  auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
+    drawContents(args, canvas, 1.0f);
+  });
   if (picture == nullptr) {
     return;
   }
@@ -792,7 +793,7 @@ void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   TRACE_EVENT;
-  auto drawOriginContents = [this](const DrawArgs& args, Canvas* canvas, float alpha) {
+  auto drawLayerContents = [this, alpha](const DrawArgs& args, Canvas* canvas) {
     LayerContent* content = nullptr;
     if (args.drawContour) {
       content = getContour();
@@ -809,7 +810,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   };
 
   if (_layerStyles.empty() || args.excludeEffects) {
-    drawOriginContents(args, canvas, alpha);
+    drawLayerContents(args, canvas);
     return;
   }
 
@@ -822,39 +823,36 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   canvas->scale(1.f / contentScale, 1.f / contentScale);
   Point offset = Point::Zero();
   std::shared_ptr<Image> source = nullptr;
-  auto picture = RecordDrawFunction(args, contentScale, alpha, drawOriginContents);
+  auto picture = CreatePicture(args, contentScale, drawLayerContents);
   if (!bitFields.excludeChildEffectsInLayerStyle || !ChildrenContainEffects(this)) {
     source = CreatePictureImage(picture, &offset);
   } else {
     auto newArgs =
         DrawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false, true);
-    auto contentsWithoutEffects =
-        RecordDrawFunction(newArgs, contentScale, alpha, drawOriginContents);
+    auto contentsWithoutEffects = CreatePicture(newArgs, contentScale, drawLayerContents);
     source = CreatePictureImage(contentsWithoutEffects, &offset);
   }
 
+  // get contour image
   std::shared_ptr<Image> contour = nullptr;
   Point contourOffset = offset;
-
-  // get contour image
-  for (const auto& layerStyle : _layerStyles) {
-    if (!layerStyle->requireLayerContour()) {
-      continue;
-    }
+  auto needContour =
+      std::any_of(_layerStyles.begin(), _layerStyles.end(),
+                  [](const auto& layerStyle) { return layerStyle->requireLayerContour(); });
+  if (needContour) {
     DrawArgs newArgs = DrawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false,
                                 bitFields.excludeChildEffectsInLayerStyle, true);
-    auto contourPicture = RecordDrawFunction(newArgs, contentScale, 1.0f, drawOriginContents);
+    auto contourPicture = CreatePicture(newArgs, contentScale, drawLayerContents);
     contour = CreatePictureImage(contourPicture, &contourOffset);
     contourOffset -= offset;
-    break;
   }
 
   canvas->translate(offset.x, offset.y);
-  drawLayerStyles(canvas, source, contour, contourOffset, contentScale, alpha,
+  drawLayerStyles(canvas, source, contentScale, contour, contourOffset, alpha,
                   LayerStylePosition::Below);
   auto matrix = Matrix::MakeTrans(-offset.x, -offset.y);
   canvas->drawPicture(std::move(picture), &matrix, nullptr);
-  drawLayerStyles(canvas, source, contour, contourOffset, contentScale, alpha,
+  drawLayerStyles(canvas, source, contentScale, contour, contourOffset, alpha,
                   LayerStylePosition::Above);
   canvas->restore();
 }

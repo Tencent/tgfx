@@ -299,6 +299,6 @@ class ShapeLayer : public Layer {
   float _strokeEnd = 1.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
 
-  std::unique_ptr<LayerContent> contourContent;
+  std::unique_ptr<LayerContent> contourContent = nullptr;
 };
 }  // namespace tgfx

@@ -56,7 +56,7 @@ class ImagePattern : public ShapeStyle {
   bool isImage() const override {
     return true;
   }
-  
+
  protected:
   std::shared_ptr<Shader> getShader() const override;
 
