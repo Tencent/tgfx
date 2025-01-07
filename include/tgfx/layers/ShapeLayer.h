@@ -291,7 +291,6 @@ class ShapeLayer : public Layer {
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
-  bool _strokeOverLayerStyles = false;
 
   std::shared_ptr<Shape> createStrokeShape() const;
 };
