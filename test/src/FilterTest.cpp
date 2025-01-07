@@ -616,6 +616,5 @@ TGFX_TEST(FilterTest, InnerShadowBadCase) {
   path.addOval(rect);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/InnerShadowBadCase"));
-
 }
 }  // namespace tgfx
