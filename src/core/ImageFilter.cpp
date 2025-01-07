@@ -22,7 +22,7 @@
 #include "gpu/OpContext.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
@@ -92,6 +92,7 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix, isAlphaOnly);
+  return TiledTextureEffect::Make(std::move(textureProxy), TileMode::Decal, TileMode::Decal,
+                                  sampling, &fpMatrix, isAlphaOnly);
 }
 }  // namespace tgfx
