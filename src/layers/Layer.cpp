@@ -798,15 +798,15 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   if (source == nullptr) {
     return;
   }
-  // get contour image
   std::shared_ptr<Image> contour = nullptr;
   Point contourOffset = offset;
   auto needContour =
       std::any_of(_layerStyles.begin(), _layerStyles.end(),
                   [](const auto& layerStyle) { return layerStyle->requireLayerContour(); });
   if (needContour) {
-    DrawArgs newArgs = DrawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false,
-                                bitFields.excludeChildEffectsInLayerStyle, true);
+    // Child effects are always excluded when drawing the layer contour.
+    DrawArgs newArgs =
+        DrawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false, true, true);
     auto contourPicture = CreatePicture(newArgs, contentScale, drawLayerContents);
     contour = CreatePictureImage(contourPicture, &contourOffset);
     contourOffset -= offset;
