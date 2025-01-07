@@ -29,9 +29,9 @@ namespace tgfx {
 class RectPaint {
  public:
   RectPaint(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-            const Matrix* uvMatrix)
+            const Matrix& uvMatrix)
       : color(color.value_or(Color::White())), rect(rect), viewMatrix(viewMatrix),
-        uvMatrix(uvMatrix ? *uvMatrix : Matrix::I()) {
+        uvMatrix(uvMatrix) {
   }
 
   Color color;
@@ -137,13 +137,13 @@ class RectNonCoverageVerticesProvider : public DataProvider {
 };
 
 std::unique_ptr<RectDrawOp> RectDrawOp::Make(std::optional<Color> color, const Rect& rect,
-                                             const Matrix& viewMatrix, const Matrix* uvMatrix) {
+                                             const Matrix& viewMatrix, const Matrix& uvMatrix) {
   TRACE_EVENT;
   return std::unique_ptr<RectDrawOp>(new RectDrawOp(color, rect, viewMatrix, uvMatrix));
 }
 
 RectDrawOp::RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-                       const Matrix* uvMatrix)
+                       const Matrix& uvMatrix)
     : DrawOp(ClassID()), hasColor(color) {
   auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix, uvMatrix);
   rectPaints.push_back(std::move(rectPaint));
