@@ -25,8 +25,8 @@
 namespace tgfx {
 class ShapeContent : public LayerContent {
  public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader, float alpha,
-               BlendMode blendMode);
+  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader, float alpha = 1.0f,
+               BlendMode blendMode = BlendMode::SrcOver);
 
   Rect getBounds() const override {
     return bounds;

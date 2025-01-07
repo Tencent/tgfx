@@ -235,6 +235,21 @@ class Layer {
   void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
   /**
+   * Whether to exclude child effects in the layer style. If true, child layer
+   * styles and filters are not included in the layer content used to generate
+   * the layer style. This option only affects the appearance of the LayerStyle, not the layer
+   * itself. The default value is false.
+   */
+  bool excludeChildEffectsInLayerStyle() const {
+    return bitFields.excludeChildEffectsInLayerStyle;
+  }
+
+  /**
+   * Sets whether exclude child effects in the layer style.
+   */
+  void setExcludeChildEffectsInLayerStyle(bool value);
+
+  /**
    * Returns the list of filters applied to the layer. Layer filters create new offscreen images
    * to replace the original layer content. Each filter takes the output of the previous filter as
    * input, and the final output is drawn on the canvas. Layer filters are applied after layer
@@ -490,6 +505,12 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
+   * Returns the layer contour used for layer styles that require it.
+   * The default implementation returns the layer content.
+   */
+  virtual LayerContent* getContour();
+
+  /**
   * Attachs a property to this layer.
   */
   void attachProperty(LayerProperty* property) const;
@@ -498,6 +519,18 @@ class Layer {
    * Detaches a property from this layer.
    */
   void detachProperty(LayerProperty* property) const;
+
+  /**
+   * Draws the layer style onto the given canvas.
+   */
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                       std::shared_ptr<Image> contour, const Point& contourOffset, float alpha,
+                       LayerStylePosition position);
+
+  /**
+   * Draws the layer children onto the given canvas.
+   */
+  void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
 
  private:
   /**
@@ -528,18 +561,11 @@ class Layer {
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale, float alpha);
-
-  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                       float alpha, LayerStylePosition position) const;
-
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
-
-  void drawWithLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -556,6 +582,7 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
+    bool excludeChildEffectsInLayerStyle : 1;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;

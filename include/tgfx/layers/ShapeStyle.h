@@ -61,6 +61,13 @@ class ShapeStyle : public LayerProperty {
    */
   virtual std::shared_ptr<Shader> getShader() const = 0;
 
+  /**
+   * Returns whether the shape style is an image pattern.
+   */
+  virtual bool isImage() const {
+    return false;
+  }
+
  private:
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;

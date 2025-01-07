@@ -1794,6 +1794,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   auto style = DropShadowStyle::Make(10, 10, 0, 0, Color::Black(), false);
   shadowLayer->setLayerStyles({style});
   shadowLayer->addChild(layer);
+  shadowLayer->setExcludeChildEffectsInLayerStyle(true);
   back->addChild(shadowLayer);
   displayList->root()->addChild(back);
   displayList->render(surface.get());
@@ -1806,6 +1807,25 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   shadowLayer->setAlpha(0.5);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle2"));
+
+  layer->setBlendMode(BlendMode::Multiply);
+  layer->setFillStyle(nullptr);
+  layer->setStrokeStyle(SolidColor::Make(Color::FromRGBA(100, 0, 0, 128)));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-behindLayer"));
+
+  style->setShowBehindLayer(false);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke"));
+
+  auto blur = BlurFilter::Make(10, 10);
+  layer->setFilters({blur});
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur"));
+
+  style->setShowBehindLayer(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur-behindLayer"));
 }
 
 TGFX_TEST(LayerTest, InnerShadowStyle) {

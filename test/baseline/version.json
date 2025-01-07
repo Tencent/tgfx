@@ -93,6 +93,10 @@
     },
     "LayerTest": {
         "DropShadowStyle": "19dcc4d",
+        "DropShadowStyle-stroke": "002c391",
+        "DropShadowStyle-stroke-behindLayer": "002c391",
+        "DropShadowStyle-stroke-blur": "002c391",
+        "DropShadowStyle-stroke-blur-behindLayer": "002c391",
         "DropShadowStyle2": "19dcc4d",
         "InnerShadowStyle": "19dcc4d",
         "Layer_hitTestPoint": "50c58e6",

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/LayerStyle.h"
+#include <utility>
 
 namespace tgfx {
 void LayerStyle::setBlendMode(BlendMode blendMode) {
@@ -26,4 +27,11 @@ void LayerStyle::setBlendMode(BlendMode blendMode) {
   _blendMode = blendMode;
   invalidate();
 }
+
+void LayerStyle::onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content,
+                                   float contentScale, std::shared_ptr<Image>, const Point&,
+                                   float alpha, BlendMode blendMode) {
+  onDraw(canvas, std::move(content), contentScale, alpha, blendMode);
+}
+
 }  // namespace tgfx

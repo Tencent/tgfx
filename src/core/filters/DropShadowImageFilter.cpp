@@ -30,11 +30,16 @@
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color) {
+  if (color.alpha <= 0) {
+    return nullptr;
+  }
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
                                                          float blurrinessY, const Color& color) {
+  // If color is transparent, the image after applying the filter will be transparent.
+  // So we should not return nullptr when color is transparent.
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 
