@@ -117,7 +117,6 @@ public:
 
 protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
-
   tracy_force_inline bool& vis(const void* ptr) {
     auto it = visMap.find(ptr);
     if(it == visMap.end()) {
@@ -145,4 +144,5 @@ private:
   tgfx::Font font;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
+  bool dirty = false;
 };

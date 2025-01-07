@@ -153,8 +153,8 @@ tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize
   }
   auto typeface = appHost->getTypeface("default");
   tgfx::Font font(typeface, 10 );
-  auto layer = tgfx::TextBlob::MakeFrom(strText, font);
-  return layer->getBounds();
+  auto textBlob = tgfx::TextBlob::MakeFrom(strText, font);
+  return textBlob->getBounds();
 }
 
 void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color) {
@@ -204,16 +204,30 @@ void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& t
   canvas->drawSimpleText(text, x , y , font, paint);
 }
 
+void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text) {
+  drawTextContrast(canvas, appHost, pos.x, pos.y, color, text);
+}
+
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, float y, uint32_t color, const char* text) {
   auto height = getTextSize(appHost, text).height();
-  drawText(canvas, appHost, text, x + 0.5f, y + height + 0.5f, color);
+  drawText(canvas, appHost, text, x + 0.5f, y + height + 0.5f, 0xAA000000);
   drawText(canvas, appHost, text, x, y + height, color);
 }
 
-void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text) {
-  auto height = getTextSize(appHost, text).height();
-  drawText(canvas, appHost, text, pos.x + 0.5f, pos.y + height + 0.5f, color);
-  drawText(canvas, appHost, text, pos.x, pos.y + height, color);
+void drawClipTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text, tgfx::Rect& rect) {
+  tgfx::Path clipPath;
+  clipPath.addRect(rect);
+  auto clipShape = tgfx::Shape::MakeFrom(clipPath);
+
+  tgfx::Paint paint;
+  paint.setColor(getTgfxColor(color));
+  auto typeface = appHost->getTypeface("default");
+  tgfx::Font font(typeface, 10 );
+  auto textBlob = tgfx::TextBlob::MakeFrom(text, font);
+  auto textShape = tgfx::Shape::MakeFrom(textBlob);
+
+  auto shape = tgfx::Shape::Merge(clipShape, textShape, tgfx::PathOp::Intersect);
+  canvas->drawShape(shape, paint);
 }
 
 const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name, tgfx::Rect tsz, float zsz) {
@@ -301,7 +315,7 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
         if( !*match ) break;
     }
 
-    tsz = getTextSize(appHost, ptr, ptr - end);
+    tsz = getTextSize(appHost, ptr, end - ptr);
 
     if( type == ShortenName::OnlyNormalize || tsz.width() < zsz ) return ptr;
 
@@ -313,7 +327,7 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
         p++;
         while( p < end && *p == ':' ) p++;
         ptr = p;
-        tsz = getTextSize(appHost, ptr, ptr - end);
+        tsz = getTextSize(appHost, ptr, end - ptr);
         if( tsz.width() < zsz ) return ptr;
     }
 }

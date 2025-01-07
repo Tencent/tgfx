@@ -400,7 +400,6 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
         const auto px1 = (rend - vStart) * pxns;
         tgfx::Point p1 = wpos + tgfx::Point(std::max(px0, -10.0), offset);
         tgfx::Point p2 = tgfx::Point(std::min(std::max(px1 - px0, double(MinVisSize)), double(w + 10)), ty);
-        // painter->fillRect(p1.x(), p1.y(), p2.x(), p2.y(), getColor(color));
         drawRect(canvas, p1, p2, color);
         if (hover) {
 
@@ -410,7 +409,6 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
         if (tsz.width() < px1 - px0) {
           const auto x = px0 + (px1 - px0 - tsz.width()) / 2;
           drawTextContrast(canvas, appHost.get(), wpos.x + x, wpos.y + offset , 0xFF4488DD, tmp);
-          // drawTextContrast(painter, wpos + QPoint(x, offset), 0xFF4488DD, tmp);
         }
         break;
       }
@@ -426,13 +424,14 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
           ((viewData->shortenName == ShortenName::NoSpace || viewData->shortenName == ShortenName::NoSpaceAndNormalize)
             && tsz.width() > zsz))
         {
-          // zoneName = shortenZoneName(viewData->shortenName, zoneName, tsz, zsz);
+          zoneName = shortenZoneName(appHost.get(), viewData->shortenName, zoneName, tsz, zsz);
         }
 
         const auto pr0 = (ev.Start() - viewData->zvStart) * pxns;
         const auto pr1 = (end - viewData->zvStart) * pxns;
         const auto px0 = std::max(pr0, -10.0);
         const auto px1 = std::max({ std::min(pr1, double(w + 10)), px0 + pxns * 0.5, px0 + MinVisSize });
+        drawRect(canvas, px0 + wpos.x, offset + wpos.y, px1 - px0, tsz.height(), zoneColor.color);
         // painter->fillRect(px0 + wpos.x(), offset + wpos.y(), px1 - px0, tsz.height(), getColor(zoneColor.color));
 
         if (zoneColor.highlight) {
@@ -443,18 +442,11 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
           auto p1 = dpos + tgfx::Point(px0, offset + tsz.height());
           auto p2 = dpos + tgfx::Point(px0, offset);
           auto p3 = dpos + tgfx::Point(px1 - 1, offset);
-          drawLine(canvas, p1, p2, p3, zoneColor.color, zoneColor.thickness);
+          drawLine(canvas, p1, p2, p3, darkColor, zoneColor.thickness);
           p1 = dpos + tgfx::Point(px0, offset + tsz.height());
           p2 = dpos + tgfx::Point(px1 - 1, offset + tsz.height());
           p3 = dpos + tgfx::Point(px1 - 1, offset);
-          drawLine(canvas, p1, p2, p3, zoneColor.color, zoneColor.thickness);
-          // drawPolyLine(painter, dpos + tgfx::Point(px0, offset + tsz.height()),
-          //   dpos + tgfx::Point(px0, offset),
-          //   dpos + tgfx::Point(px1 - 1, offset), zoneColor.accentColor, zoneColor.thickness);
-          // drawPolyLine(painter, dpos + tgfx::Point(px0, offset + tsz.height()),
-          //   dpos + tgfx::Point(px1 - 1, offset + tsz.height()),
-          //   dpos + tgfx::Point(px1 - 1, offset),
-          //   darkColor, zoneColor.thickness);
+          drawLine(canvas, p1, p2, p3, darkColor, zoneColor.thickness);
         }
         auto rect = tgfx::Rect::MakeXYWH(float(px0 + wpos.x), float(offset + wpos.y), float(px1 - px0), float(tsz.height()));
         drawRect(canvas, rect, zoneColor.color);
@@ -473,11 +465,13 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
           }
         }
         else {
-          // tgfx::Point topleft = wpos + tgfx::Point(px0, offset - 1);
-          // tgfx::Point bottomright = wpos + tgfx::Point(px1 - px0, tsz.height() + 1);
-          // painter->setClipRect(topleft.x(), topleft.y(), bottomright.x(), bottomright.y());
-          // drawTextContrast(canvas, appHost.get(), wpos + tgfx::Point(std::max(int64_t(0), ev.Start() - viewData->zvStart) * pxns, offset), 0xFFFFFFFF, zoneName);
-          // painter->setClipRect(0, 0, 0, 0, Qt::NoClip);
+          tgfx::Point topleft = wpos + tgfx::Point(px0, offset - 1);
+          tgfx::Point bottomright = wpos + tgfx::Point(px1 - px0, tsz.height() + 1);
+          auto rect = tgfx::Rect::MakeXYWH(topleft.x, topleft.y, bottomright.x, bottomright.y);
+          canvas->save();
+          canvas->clipRect(rect);
+          drawTextContrast(canvas, appHost.get(), wpos + tgfx::Point(std::max(int64_t(0), ev.Start() - viewData->zvStart) * pxns, offset), 0xFFFFFFFF, zoneName);
+          canvas->restore();
         }
         break;
       }
@@ -654,6 +648,7 @@ void TimelineView::draw() {
 }
 
 QSGNode* TimelineView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
+  auto node = static_cast<QSGImageNode*>(oldNode);
   if(!tgfxWindow) {
     tgfxWindow = tgfx::QGLWindow::MakeFrom(this, true);
   }
@@ -666,7 +661,6 @@ QSGNode* TimelineView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     tgfxWindow->invalidSize();
   }
   draw();
-  auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = tgfxWindow->getQSGTexture();
   if (texture) {
     if (node == nullptr) {
@@ -707,7 +701,6 @@ void TimelineView::mouseMoveEvent(QMouseEvent* event) {
       }
     }
     event->accept();
-    update();
   }
   else {
     QQuickItem::mouseMoveEvent(event);
@@ -765,6 +758,5 @@ void TimelineView::wheelEvent(QWheelEvent* event) {
   zoomToRange(t0, t1, !worker->IsConnected() || viewMode == ViewMode::Paused);
   viewData->zvStart = int64_t( zoomAnim.start0 + zoomAnim.start1 - zoomAnim.start0);
   viewData->zvEnd = int64_t( zoomAnim.end0 + zoomAnim.end1 - zoomAnim.end0);
-  update();
   event->accept();
 }

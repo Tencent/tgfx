@@ -94,7 +94,8 @@ void drawLine(tgfx::Canvas* canvas, float x0, float y0, float x1, float y1, uint
 void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& text, float x, float y, uint32_t color);
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, float y, uint32_t color, const char* text);
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text);
+void drawClipTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text, tgfx::Rect& rect);
 
 
 uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic );
-const char* shortenZoneName(ShortenName type, const char* name, tgfx::Rect tsz, float zsz);
+const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name, tgfx::Rect tsz, float zsz);

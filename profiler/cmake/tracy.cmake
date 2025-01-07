@@ -2,7 +2,7 @@ set(TRACY_PATH ../third_party/tracy)
 
 include(${TRACY_PATH}/cmake/config.cmake)
 include(${TRACY_PATH}/cmake/vendor.cmake)
-include(${TRACY_PATH}/cmake/server.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/server.cmake)
 
 option(NO_FILESELECTOR "Disable the file selector" OFF)
 option(GTK_FILESELECTOR "Use the GTK file selector on Linux instead of the xdg-portal one" OFF)
@@ -18,59 +18,15 @@ if(SELF_PROFILE)
 endif()
 
 set(SERVER_FILES
-#    TracyAchievementData.cpp
-#    TracyAchievements.cpp
-#    TracyBadVersion.cpp
     TracyColor.cpp
     TracyEventDebug.cpp
     TracyFileselector.cpp
-#    TracyFilesystem.cpp
-#    TracyImGui.cpp
     TracyMicroArchitecture.cpp
-#    TracyMouse.cpp
     TracyProtoHistory.cpp
-#    TracySourceContents.cpp
-#    TracySourceTokenizer.cpp
-#    TracySourceView.cpp
     TracyStorage.cpp
     TracyTexture.cpp
-#    TracyTimelineController.cpp
-#    TracyTimelineItem.cpp
-#    TracyTimelineItemCpuData.cpp
-#    TracyTimelineItemGpu.cpp
-#    TracyTimelineItemPlot.cpp
-#    TracyTimelineItemThread.cpp
     TracyUserData.cpp
     TracyUtility.cpp
-#    TracyView.cpp
-#    TracyView_Annotations.cpp
-#    TracyView_Callstack.cpp
-#    TracyView_Compare.cpp
-#    TracyView_ConnectionState.cpp
-#    TracyView_ContextSwitch.cpp
-#    TracyView_CpuData.cpp
-#    TracyView_FindZone.cpp
-#    TracyView_FlameGraph.cpp
-#    TracyView_FrameOverview.cpp
-#    TracyView_FrameTimeline.cpp
-#    TracyView_FrameTree.cpp
-#    TracyView_GpuTimeline.cpp
-#    TracyView_Locks.cpp
-#    TracyView_Memory.cpp
-#    TracyView_Messages.cpp
-#    TracyView_Navigation.cpp
-#    TracyView_NotificationArea.cpp
-#    TracyView_Options.cpp
-#    TracyView_Playback.cpp
-#    TracyView_Plots.cpp
-#    TracyView_Ranges.cpp
-#    TracyView_Samples.cpp
-#    TracyView_Statistics.cpp
-#    TracyView_Timeline.cpp
-#    TracyView_TraceInfo.cpp
-#    TracyView_Utility.cpp
-#    TracyView_ZoneInfo.cpp
-#    TracyView_ZoneTimeline.cpp
     TracyWeb.cpp
 )
 

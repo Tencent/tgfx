@@ -1,0 +1,39 @@
+set(TRACY_PATH ../third_party/tracy)
+set(TRACY_COMMON_DIR ${TRACY_PATH}/public/common)
+
+set(TRACY_COMMON_SOURCES
+        tracy_lz4.cpp
+        tracy_lz4hc.cpp
+        TracySocket.cpp
+        TracyStackFrames.cpp
+        TracySystem.cpp
+)
+
+list(TRANSFORM TRACY_COMMON_SOURCES PREPEND "${TRACY_COMMON_DIR}/")
+
+
+set(TRACY_SERVER_DIR ${TRACY_PATH}/server)
+
+set(TRACY_SERVER_SOURCES
+        TracyMemory.cpp
+        TracyMmap.cpp
+        TracyPrint.cpp
+        TracySysUtil.cpp
+        TracyTaskDispatch.cpp
+        TracyTextureCompression.cpp
+        TracyThreadCompress.cpp
+        TracyWorker.cpp
+)
+
+list(TRANSFORM TRACY_SERVER_SOURCES PREPEND "${TRACY_SERVER_DIR}/")
+
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(TRACY_COMMON_SOURCES)
+endif ()
+
+add_library(TracyServer STATIC EXCLUDE_FROM_ALL ${TRACY_COMMON_SOURCES} ${TRACY_SERVER_SOURCES})
+target_include_directories(TracyServer PUBLIC ${TRACY_COMMON_DIR} ${TRACY_SERVER_DIR})
+target_link_libraries(TracyServer PUBLIC TracyCapstone TracyZstd PPQSort::PPQSort)
+if(NO_STATISTICS)
+    target_compile_definitions(TracyServer PUBLIC TRACY_NO_STATISTICS)
+endif()
