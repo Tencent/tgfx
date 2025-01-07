@@ -1873,4 +1873,14 @@ TGFX_TEST(LayerTest, Filters) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filters"));
 }
 
+TGFX_TEST(LayerTest, MaskOnwer) {
+  auto layer = Layer::Make();
+  auto mask = Layer::Make();
+  layer->setMask(mask);
+  EXPECT_EQ(layer->mask(), mask);
+  EXPECT_EQ(mask->maskOwner, layer.get());
+  layer->setMask(nullptr);
+  EXPECT_EQ(layer->mask(), nullptr);
+  EXPECT_EQ(mask->maskOwner, nullptr);
+}
 }  // namespace tgfx
