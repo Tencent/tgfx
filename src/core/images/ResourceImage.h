@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "core/utils/Profiling.h"
 #include "gpu/Resource.h"
 #include "gpu/TPArgs.h"
 #include "gpu/proxies/TextureProxy.h"

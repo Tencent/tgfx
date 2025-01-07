@@ -18,7 +18,6 @@
 
 #include "TextureFlattenTask.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/Pipeline.h"
 #include "gpu/Quad.h"
@@ -34,7 +33,6 @@ TextureFlattenTask::TextureFlattenTask(UniqueKey uniqueKey,
 }
 
 bool TextureFlattenTask::prepare(Context* context) {
-  TRACE_EVENT;
   auto texture = sourceTextureProxy->getTexture();
   if (texture == nullptr) {
     return false;
@@ -59,7 +57,6 @@ bool TextureFlattenTask::prepare(Context* context) {
 }
 
 bool TextureFlattenTask::execute(Context* context) {
-  TRACE_EVENT;
   if (renderTarget == nullptr) {
     return false;
   }

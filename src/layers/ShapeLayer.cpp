@@ -17,13 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include "core/utils/Profiling.h"
 #include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  TRACE_EVENT;
   auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
   layer->weakThis = layer;
   return layer;

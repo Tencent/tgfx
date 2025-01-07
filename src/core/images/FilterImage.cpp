@@ -27,7 +27,6 @@ namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
                                              std::shared_ptr<ImageFilter> filter, Point* offset,
                                              const Rect* clipRect) {
-  TRACE_EVENT;
   if (source == nullptr) {
     return nullptr;
   }
@@ -70,7 +69,6 @@ std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource
 }
 
 std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
-  TRACE_EVENT;
   auto newBounds = subset;
   newBounds.offset(bounds.x(), bounds.y());
   return FilterImage::Wrap(source, newBounds, filter);
@@ -78,7 +76,6 @@ std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
 
 std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter> imageFilter,
                                                      Point* offset, const Rect* clipRect) const {
-  TRACE_EVENT;
   if (imageFilter == nullptr) {
     return nullptr;
   }
@@ -112,7 +109,6 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {
-  TRACE_EVENT;
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto filterBounds = filter->filterBounds(inputBounds);
   return filter->lockTextureProxy(source, filterBounds, args);
@@ -123,7 +119,6 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  TRACE_EVENT;
   auto fpMatrix = concatUVMatrix(uvMatrix);
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto drawBounds = args.drawRect;

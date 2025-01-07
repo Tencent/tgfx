@@ -23,7 +23,6 @@
 #include <cstdlib>
 #include <string>
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -69,7 +68,6 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACE_THREAD_NAME(GetThreadName().c_str());
   while (true) {
     auto task = taskGroup->popTask();
     if (!task) {

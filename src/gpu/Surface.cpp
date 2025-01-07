@@ -21,13 +21,11 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "core/utils/Profiling.h"
 #include "gpu/RenderContext.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
-  TRACE_EVENT_COLOR(TRACY_COLOR_YELLOW);
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
               sampleCount, mipmapped, renderFlags);
 }
