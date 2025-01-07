@@ -18,28 +18,51 @@
 
 #pragma once
 
-#include "tgfx/core/Path.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
+struct ShapePaint {
+  ShapePaint(std::shared_ptr<Shader> shader, float alpha, BlendMode blendMode)
+      : shader(std::move(shader)), alpha(alpha), blendMode(blendMode) {
+  }
+
+  std::shared_ptr<Shader> shader = nullptr;
+  float alpha = 1.0f;
+  BlendMode blendMode = BlendMode::SrcOver;
+};
+
 class ShapeContent : public LayerContent {
  public:
-  ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader, float alpha = 1.0f,
-               BlendMode blendMode = BlendMode::SrcOver);
+  ShapeContent(std::shared_ptr<Shape> fill, std::shared_ptr<Shape> stroke,
+               std::vector<ShapePaint> paintList, size_t fillPaintCount);
 
   Rect getBounds() const override {
     return bounds;
   }
 
+  bool hasFills() const {
+    return fillPaintCount > 0;
+  }
+
   void draw(Canvas* canvas, const Paint& paint) const override;
+
+  void drawContour(Canvas* canvas, const Paint& paint) const;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  private:
   Rect bounds = Rect::MakeEmpty();
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<Shader> shader = nullptr;
-  float alpha = 1.0f;
-  BlendMode blendMode = BlendMode::SrcOver;
+  std::shared_ptr<Shape> fillShape = nullptr;
+  std::shared_ptr<Shape> strokeShape = nullptr;
+  std::vector<ShapePaint> paintList = {};
+  size_t fillPaintCount = 0;
+
+  void drawShape(Canvas* canvas, const Paint& paint, std::shared_ptr<Shape> shape,
+                 const ShapePaint& shapePaint) const;
+
+  void drawShapeContour(Canvas* canvas, const Paint& paint, std::shared_ptr<Shape> shape,
+                        std::vector<ShapePaint>::const_iterator begin,
+                        std::vector<ShapePaint>::const_iterator end) const;
 };
 }  // namespace tgfx
