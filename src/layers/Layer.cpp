@@ -214,6 +214,9 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
     value->maskOwner->setMask(nullptr);
     value->maskOwner = nullptr;
   }
+  if (_mask) {
+    _mask->maskOwner = nullptr;
+  }
   _mask = std::move(value);
   if (_mask) {
     _mask->maskOwner = this;
