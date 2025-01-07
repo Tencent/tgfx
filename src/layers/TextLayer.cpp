@@ -39,7 +39,6 @@ std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
 }
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
-  TRACE_EVENT;
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
   layer->weakThis = layer;
   return layer;

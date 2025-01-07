@@ -24,7 +24,6 @@ namespace tgfx {
 std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(UniqueKey uniqueKey, int width,
                                                                int height, PixelFormat format,
                                                                bool mipmapped, ImageOrigin origin) {
-  TRACE_EVENT;
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -39,7 +38,6 @@ TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height,
 }
 
 std::shared_ptr<Resource> TextureCreateTask::onMakeResource(Context* context) {
-  TRACE_EVENT;
   auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
   if (texture == nullptr) {
     LOGE("TextureCreateTask::onMakeResource() Failed to create the texture!");

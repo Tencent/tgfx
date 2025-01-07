@@ -25,7 +25,6 @@ namespace tgfx {
 thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;
 
 std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
-  TRACE_EVENT_COLOR(TRACY_COLOR_GREEN);
   auto device = cachedDevice;
   if (device == nullptr) {
     device = tgfx::GLDevice::Make();

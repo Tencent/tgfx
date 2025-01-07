@@ -69,7 +69,6 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACE_THREAD_NAME(GetThreadName().c_str());
   while (true) {
     auto task = taskGroup->popTask();
     if (!task) {

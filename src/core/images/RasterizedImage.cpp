@@ -29,7 +29,6 @@ static int GetSize(int size, float scale) {
 std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
                                                  float rasterizationScale,
                                                  const SamplingOptions& sampling) {
-  TRACE_EVENT;
   if (source == nullptr || rasterizationScale <= 0) {
     return nullptr;
   }

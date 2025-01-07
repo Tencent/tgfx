@@ -36,7 +36,6 @@ TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<ImageD
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
-  TRACE_EVENT;
   if (decoder == nullptr) {
     return nullptr;
   }

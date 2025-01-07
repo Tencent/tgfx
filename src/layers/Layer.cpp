@@ -90,7 +90,6 @@ void Layer::SetDefaultAllowsGroupOpacity(bool value) {
 }
 
 std::shared_ptr<Layer> Layer::Make() {
-  TRACE_EVENT_COLOR(TRACY_COLOR_YELLOW);
   auto layer = std::shared_ptr<Layer>(new Layer());
   layer->weakThis = layer;
   return layer;
@@ -600,7 +599,6 @@ Matrix Layer::getMatrixWithScrollRect() const {
 }
 
 LayerContent* Layer::getContent() {
-  TRACE_EVENT;
   if (bitFields.contentDirty) {
     layerContent = onUpdateContent();
     bitFields.contentDirty = false;
@@ -698,7 +696,6 @@ void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, floa
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
-  TRACE_EVENT;
   DEBUG_ASSERT(canvas != nullptr);
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
@@ -792,7 +789,6 @@ void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
-  TRACE_EVENT;
   auto drawLayerContents = [this, alpha](const DrawArgs& args, Canvas* canvas) {
     LayerContent* content = nullptr;
     if (args.drawContour) {

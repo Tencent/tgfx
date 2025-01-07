@@ -22,7 +22,6 @@
 
 namespace tgfx {
 std::shared_ptr<Image> MipmapImage::MakeFrom(std::shared_ptr<ResourceImage> source) {
-  TRACE_EVENT;
   if (source == nullptr) {
     return nullptr;
   }
@@ -52,7 +51,6 @@ std::shared_ptr<Image> MipmapImage::makeRasterized(float rasterizationScale,
 }
 
 std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const {
-  TRACE_EVENT;
   auto newSource = std::static_pointer_cast<ResourceImage>(source->onMakeDecoded(context, false));
   if (newSource == nullptr) {
     return nullptr;

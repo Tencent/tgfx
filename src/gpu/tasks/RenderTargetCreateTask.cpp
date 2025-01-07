@@ -39,7 +39,6 @@ RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey,
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
-  TRACE_EVENT;
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");

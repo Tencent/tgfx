@@ -41,7 +41,6 @@
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
-  TRACE_EVENT;
   std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream && stream->size() > 14) {
@@ -136,7 +135,6 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
-  TRACE_EVENT;
   auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;

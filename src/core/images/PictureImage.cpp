@@ -26,7 +26,6 @@
 namespace tgfx {
 static bool CheckStyleAndClipForMask(const FillStyle& style, const Path& clip, int width,
                                      int height, const Matrix* matrix) {
-  TRACE_EVENT;
   if (style.colorFilter || style.maskFilter || style.shader || style.color != Color::White()) {
     return false;
   }
@@ -59,7 +58,6 @@ static Matrix GetMaskMatrix(const MCState& state, const Matrix* matrix) {
 
 static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record, int width,
                                                            int height, const Matrix* matrix) {
-  TRACE_EVENT;
   if (record->type() == RecordType::DrawShape) {
     auto shapeRecord = static_cast<const DrawShape*>(record);
     if (!CheckStyleAndClipForMask(shapeRecord->style, shapeRecord->state.clip, width, height,
@@ -94,7 +92,6 @@ static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record,
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
                                        const Matrix* matrix) {
-  TRACE_EVENT;
   if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -134,7 +131,6 @@ PictureImage::~PictureImage() {
 
 bool PictureImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
                           uint32_t renderFlags) const {
-  TRACE_EVENT;
   RenderContext renderContext(renderTarget, renderFlags);
   MCState replayState(matrix ? *matrix : Matrix::I());
   picture->playback(&renderContext, replayState);

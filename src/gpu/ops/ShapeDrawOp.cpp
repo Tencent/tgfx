@@ -30,7 +30,6 @@ namespace tgfx {
 std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shape> shape,
                                                const Matrix& viewMatrix,
                                                const Rect& deviceClipBounds) {
-  TRACE_EVENT;
   if (shape == nullptr) {
     return nullptr;
   }
@@ -46,7 +45,6 @@ std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shap
 ShapeDrawOp::ShapeDrawOp(Color color, std::shared_ptr<Shape> s, const Matrix& uvMatrix,
                          const Rect& bounds)
     : DrawOp(ClassID()), color(color), shape(std::move(s)), uvMatrix(uvMatrix) {
-  TRACE_EVENT;
   setBounds(bounds);
 }
 
@@ -56,13 +54,11 @@ bool ShapeDrawOp::onCombineIfPossible(Op*) {
 }
 
 void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  TRACE_EVENT;
   shapeProxy = context->proxyProvider()->createGpuShapeProxy(shape, aa == AAType::Coverage,
                                                              bounds(), renderFlags);
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
-  TRACE_EVENT;
   if (shapeProxy == nullptr) {
     return;
   }

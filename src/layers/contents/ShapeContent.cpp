@@ -26,7 +26,6 @@ ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader>
 }
 
 void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT;
   auto shapePaint = paint;
   shapePaint.setAlpha(paint.getAlpha() * alpha);
   // The blend mode in the paint is always SrcOver, use our own blend mode instead.
@@ -36,7 +35,6 @@ void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TRACE_EVENT;
   if (pixelHitTest) {
     auto path = shape->getPath();
     return path.contains(localX, localY);
