@@ -273,7 +273,6 @@ class ShapeLayer : public Layer {
    */
   void setStrokeAlign(StrokeAlign align);
 
-
  protected:
   ShapeLayer() = default;
 
