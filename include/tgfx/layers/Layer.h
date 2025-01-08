@@ -505,16 +505,14 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
-   * Draws the layer content onto the given canvas. The layer content is the visual representation
-   * of the layer itself, excluding its children. The default implementation calls the drawContent()
-   * method with the layer content and the given paint object.
-   * @param content The layer content to draw. The content may be nullptr.
-   * @param canvas The canvas to draw the layer content on.
-   * @param paint The paint object used to draw the layer content.
-   * @param forContour Whether to draw the layer content for the contour only.
+   * Draws the layer contour on the given canvas. The layer contour is the outline of the layer
+   * content, used for applying layer styles that need the contour. By default, this calls the
+   * draw() method with the layer content and the given paint object.
+   * @param content The layer content to draw. This can be nullptr.
+   * @param canvas The canvas to draw the layer contour on.
+   * @param paint The paint object used to draw the layer contour.
    */
-  virtual void drawContent(LayerContent* content, Canvas* canvas, const Paint& paint,
-                           bool forContour) const;
+  virtual void drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const;
 
   /**
   * Attachs a property to this layer.

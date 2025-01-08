@@ -278,8 +278,7 @@ class ShapeLayer : public Layer {
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  void drawContent(LayerContent* content, Canvas* canvas, const Paint& paint,
-                   bool forContour) const override;
+  void drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const override;
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;

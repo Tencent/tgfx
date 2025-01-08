@@ -267,23 +267,14 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
                                         fillPaintCount);
 }
 
-void ShapeLayer::drawContent(LayerContent* content, Canvas* canvas, const Paint& paint,
-                             bool forContour) const {
-  if (!forContour) {
-    if (content != nullptr) {
-      content->draw(canvas, paint);
-    }
-    return;
-  }
-  if (content == nullptr) {
-    canvas->drawShape(_shape, paint);
-    return;
-  }
+void ShapeLayer::drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const {
   auto shapeContent = static_cast<ShapeContent*>(content);
-  if (!shapeContent->hasFills()) {
+  if (shapeContent == nullptr || !shapeContent->hasFills()) {
     canvas->drawShape(_shape, paint);
   }
-  shapeContent->drawContour(canvas, paint);
+  if (shapeContent != nullptr) {
+    shapeContent->drawContour(canvas, paint);
+  }
 }
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {

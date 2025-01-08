@@ -760,8 +760,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   auto drawLayerContents = [this, alpha](const DrawArgs& args, Canvas* canvas) {
     auto content = getContent();
-    if (content != nullptr || args.drawContour) {
-      drawContent(content, canvas, getLayerPaint(alpha, BlendMode::SrcOver), args.drawContour);
+    if (args.drawContour) {
+      drawContour(content, canvas, getLayerPaint(alpha, BlendMode::SrcOver));
+    } else if (content != nullptr) {
+      content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
     }
     drawChildren(args, canvas, alpha);
     if (args.cleanDirtyFlags) {
@@ -822,7 +824,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   canvas->restore();
 }
 
-void Layer::drawContent(LayerContent* content, Canvas* canvas, const Paint& paint, bool) const {
+void Layer::drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const {
   if (content != nullptr) {
     content->draw(canvas, paint);
   }
