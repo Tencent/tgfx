@@ -49,6 +49,11 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
+  if (color.alpha <= 0) {
+    // The filer will not be created if filter is not drop shadow only and alpha < 0.So if color is
+    // transparent, the image after applying the filter will be transparent.
+    return nullptr;
+  }
   source = source->makeRasterized();
   // get inverted shadow mask
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
