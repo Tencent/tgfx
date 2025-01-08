@@ -1536,6 +1536,5 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   canvas->translate(150, 0);
   canvas->drawShape(shape, Paint());
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape"));
-
 }
 }  // namespace tgfx
