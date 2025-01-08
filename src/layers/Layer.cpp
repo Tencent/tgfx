@@ -781,7 +781,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
     return;
   }
 
-  canvas->save();
+  AutoCanvasRestore autoRestore(canvas);
   canvas->scale(1.f / contentScale, 1.f / contentScale);
   Point offset = Point::Zero();
   std::shared_ptr<Image> source = nullptr;
@@ -821,7 +821,6 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
   canvas->drawPicture(std::move(picture), &matrix, nullptr);
   drawLayerStyles(canvas, source, contentScale, contour, contourOffset, alpha,
                   LayerStylePosition::Above);
-  canvas->restore();
 }
 
 void Layer::drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const {
@@ -835,13 +834,12 @@ void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
     if (!child->visible() || child->_alpha <= 0 || child->maskOwner) {
       continue;
     }
-    canvas->save();
+    AutoCanvasRestore autoRestore(canvas);
     canvas->concat(child->getMatrixWithScrollRect());
     if (child->_scrollRect) {
       canvas->clipRect(*child->_scrollRect);
     }
     child->drawLayer(args, canvas, child->_alpha * alpha, child->_blendMode);
-    canvas->restore();
   }
 }
 
@@ -852,13 +850,12 @@ void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, floa
     if (layerStyle->position() != position) {
       continue;
     }
-    canvas->save();
+    AutoCanvasRestore autoRestore(canvas);
     if (layerStyle->requireLayerContour() && contour != nullptr) {
       layerStyle->drawWithContour(canvas, content, contentScale, contour, contourOffset, alpha);
     } else {
       layerStyle->draw(canvas, content, contentScale, alpha);
     }
-    canvas->restore();
   }
 }
 

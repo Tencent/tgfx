@@ -81,8 +81,7 @@ void Drawer::draw(tgfx::Canvas* canvas, const AppHost* host) {
     tgfx::PrintError("Drawer::draw() appHost is nullptr!");
     return;
   }
-  canvas->save();
+  tgfx::AutoCanvasRestore autoRestore(canvas);
   onDraw(canvas, host);
-  canvas->restore();
 }
 }  // namespace drawers
