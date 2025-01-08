@@ -18,6 +18,7 @@
 
 #include "StrokeShape.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
@@ -40,7 +41,8 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
   }
   auto scaleStroke = *stroke;
-  scaleStroke.width *= scales.x;
+  DEBUG_ASSERT(scales.x != 0);
+  scaleStroke.width /= scales.x;
   shape = std::make_shared<StrokeShape>(matrixShape->shape, scaleStroke);
   return std::make_shared<MatrixShape>(std::move(shape), matrixShape->matrix);
 }

@@ -1517,4 +1517,25 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawPathProvider"));
 }
+
+TGFX_TEST(CanvasTest, StrokeShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(10, 10, 50, 50));
+  auto shape = Shape::MakeFrom(path);
+  Matrix matrix = Matrix::MakeScale(2.0, 2.0);
+  shape = Shape::ApplyMatrix(shape, matrix);
+  Stroke stroke(10);
+  shape = Shape::ApplyStroke(shape, &stroke);
+  canvas->drawShape(shape, Paint());
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(0.2f, 0.6f));
+  canvas->translate(150, 0);
+  canvas->drawShape(shape, Paint());
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape"));
+
+}
 }  // namespace tgfx
