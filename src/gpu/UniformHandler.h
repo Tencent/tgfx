@@ -53,8 +53,6 @@ class UniformHandler {
   ProgramBuilder* programBuilder;
 
  private:
-  std::unordered_map<const TextureSampler*, SamplerHandle> samplerMap = {};
-
   virtual const ShaderVar& samplerVariable(SamplerHandle samplerHandle) const = 0;
 
   virtual const Swizzle& samplerSwizzle(SamplerHandle samplerHandle) const = 0;

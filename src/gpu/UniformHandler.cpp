@@ -21,12 +21,8 @@
 namespace tgfx {
 SamplerHandle UniformHandler::addSampler(const tgfx::TextureSampler* sampler,
                                          const std::string& name) {
-  auto result = samplerMap.find(sampler);
-  if (result != samplerMap.end()) {
-    return result->second;
-  }
-  auto handle = internalAddSampler(sampler, name);
-  samplerMap[sampler] = handle;
-  return handle;
+  // The same sampler can be added multiple times with different names because the same handler of
+  // the program can be used with different samplers.
+  return internalAddSampler(sampler, name);
 }
 }  // namespace tgfx
