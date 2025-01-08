@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "SolidColor.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeStyle.h"
@@ -54,6 +53,8 @@ class ShapeLayer : public Layer {
    * Creates a new shape layer instance.
    */
   static std::shared_ptr<ShapeLayer> Make();
+
+  ~ShapeLayer() override;
 
   LayerType type() const override {
     return LayerType::Shape;
@@ -261,34 +262,25 @@ class ShapeLayer : public Layer {
   void setStrokeEnd(float end);
 
   /**
- * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
- */
+   * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
+   */
   StrokeAlign strokeAlign() const {
     return _strokeAlign;
   }
 
   /**
- * Sets the stroke alignment applied to the shape’s path when stroked.
- */
+   * Sets the stroke alignment applied to the shape’s path when stroked.
+   */
   void setStrokeAlign(StrokeAlign align);
-
-  ~ShapeLayer() override;
 
  protected:
   ShapeLayer() = default;
 
-  std::shared_ptr<Shape> createStrokeShape() const;
-
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  LayerContent* getContour() override;
+  void drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const override;
 
  private:
-  static std::unique_ptr<LayerContent> CreateContourWithStyles(
-      std::shared_ptr<Shape> shape, const std::vector<std::shared_ptr<ShapeStyle>>& styles);
-
-  void invalidateContentAndContour();
-
   std::shared_ptr<Shape> _shape = nullptr;
   std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
   std::vector<std::shared_ptr<ShapeStyle>> _strokeStyles = {};
@@ -299,6 +291,6 @@ class ShapeLayer : public Layer {
   float _strokeEnd = 1.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
 
-  std::unique_ptr<LayerContent> contourContent = nullptr;
+  std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx

@@ -30,6 +30,10 @@ class ImageShader : public Shader {
   TileMode tileModeY = TileMode::Clamp;
   SamplingOptions sampling = {};
 
+  bool isAImage() const override {
+    return true;
+  }
+
  protected:
   Type type() const override {
     return Type::Image;

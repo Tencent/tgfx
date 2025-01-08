@@ -117,6 +117,13 @@ class Shader {
   }
 
   /**
+   * Returns true if the shader is backed by a single image.
+   */
+  virtual bool isAImage() const {
+    return false;
+  }
+
+  /**
    * If the shader has a constant color, this method returns true and updates the color parameter.
    * Otherwise, it returns false and leaves the color parameter unchanged.
    */

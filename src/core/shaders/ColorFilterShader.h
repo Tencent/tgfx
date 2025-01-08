@@ -27,6 +27,14 @@ class ColorFilterShader : public Shader {
       : shader(std::move(shader)), colorFilter(std::move(colorFilter)) {
   }
 
+  bool isOpaque() const override {
+    return shader->isOpaque() && colorFilter->isAlphaUnchanged();
+  }
+
+  bool isAImage() const override {
+    return shader->isAImage();
+  }
+
  protected:
   Type type() const override {
     return Type::ColorFilter;

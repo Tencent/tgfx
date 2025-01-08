@@ -19,26 +19,78 @@
 #include "ShapeContent.h"
 
 namespace tgfx {
-ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, std::shared_ptr<Shader> shader,
-                           float alpha, BlendMode blendMode)
-    : bounds(shape->getBounds()), shape(std::move(shape)), shader(std::move(shader)), alpha(alpha),
-      blendMode(blendMode) {
+ShapeContent::ShapeContent(std::shared_ptr<Shape> fill, std::shared_ptr<Shape> stroke,
+                           std::vector<ShapePaint> paintList, size_t fillPaintCount)
+    : fillShape(std::move(fill)), strokeShape(std::move(stroke)), paintList(std::move(paintList)),
+      fillPaintCount(fillPaintCount) {
+  if (fillShape) {
+    bounds = fillShape->getBounds();
+  }
+  if (strokeShape) {
+    bounds.join(strokeShape->getBounds());
+  }
+}
+void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
+  size_t index = 0;
+  for (auto& shapePaint : paintList) {
+    auto shape = index++ < fillPaintCount ? fillShape : strokeShape;
+    drawShape(canvas, paint, std::move(shape), shapePaint);
+  }
 }
 
-void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
-  auto shapePaint = paint;
-  shapePaint.setAlpha(paint.getAlpha() * alpha);
+void ShapeContent::drawShape(Canvas* canvas, const Paint& paint, std::shared_ptr<Shape> shape,
+                             const ShapePaint& shapePaint) const {
+  auto drawPaint = paint;
+  drawPaint.setAlpha(paint.getAlpha() * shapePaint.alpha);
   // The blend mode in the paint is always SrcOver, use our own blend mode instead.
-  shapePaint.setBlendMode(blendMode);
-  shapePaint.setShader(shader);
-  canvas->drawShape(shape, shapePaint);
+  drawPaint.setBlendMode(shapePaint.blendMode);
+  drawPaint.setShader(shapePaint.shader);
+  canvas->drawShape(std::move(shape), drawPaint);
+}
+
+void ShapeContent::drawContour(Canvas* canvas, const Paint& paint) const {
+  if (fillShape != nullptr) {
+    drawShapeContour(canvas, paint, fillShape, paintList.begin(),
+                     paintList.begin() + static_cast<std::ptrdiff_t>(fillPaintCount));
+  }
+  if (strokeShape != nullptr) {
+    drawShapeContour(canvas, paint, strokeShape,
+                     paintList.begin() + static_cast<std::ptrdiff_t>(fillPaintCount),
+                     paintList.end());
+  }
+}
+
+void ShapeContent::drawShapeContour(Canvas* canvas, const Paint& paint,
+                                    std::shared_ptr<Shape> shape,
+                                    std::vector<ShapePaint>::const_iterator begin,
+                                    std::vector<ShapePaint>::const_iterator end) const {
+  auto allShadersAreImages = std::none_of(
+      begin, end, [](const auto& shapePaint) { return !shapePaint.shader->isAImage(); });
+  if (allShadersAreImages) {
+    for (auto it = begin; it != end; it++) {
+      drawShape(canvas, paint, shape, *it);
+    }
+  } else {
+    canvas->drawShape(shape, paint);
+  }
 }
 
 bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  if (pixelHitTest) {
-    auto path = shape->getPath();
-    return path.contains(localX, localY);
+  if (!pixelHitTest) {
+    return bounds.contains(localX, localY);
   }
-  return bounds.contains(localX, localY);
+  if (fillShape != nullptr) {
+    auto path = fillShape->getPath();
+    if (path.contains(localX, localY)) {
+      return true;
+    }
+  }
+  if (strokeShape != nullptr) {
+    auto path = strokeShape->getPath();
+    if (path.contains(localX, localY)) {
+      return true;
+    }
+  }
+  return false;
 }
 }  // namespace tgfx

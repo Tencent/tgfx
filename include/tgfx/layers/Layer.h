@@ -505,10 +505,14 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
-   * Returns the layer contour used for layer styles that require it.
-   * The default implementation returns the layer content.
+   * Draws the layer contour on the given canvas. The layer contour is the outline of the layer
+   * content, used for applying layer styles that need the contour. By default, this calls the
+   * draw() method with the layer content and the given paint object.
+   * @param content The layer content to draw. This can be nullptr.
+   * @param canvas The canvas to draw the layer contour on.
+   * @param paint The paint object used to draw the layer contour.
    */
-  virtual LayerContent* getContour();
+  virtual void drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const;
 
   /**
   * Attachs a property to this layer.
@@ -519,18 +523,6 @@ class Layer {
    * Detaches a property from this layer.
    */
   void detachProperty(LayerProperty* property) const;
-
-  /**
-   * Draws the layer style onto the given canvas.
-   */
-  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                       std::shared_ptr<Image> contour, const Point& contourOffset, float alpha,
-                       LayerStylePosition position);
-
-  /**
-   * Draws the layer children onto the given canvas.
-   */
-  void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
 
  private:
   /**
@@ -554,7 +546,7 @@ class Layer {
 
   Paint getLayerPaint(float alpha, BlendMode blendMode);
 
-  std::shared_ptr<ImageFilter> getCurrentFilter(float contentScale);
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
@@ -566,6 +558,12 @@ class Layer {
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
+
+  void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
+
+  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                       std::shared_ptr<Image> contour, const Point& contourOffset, float alpha,
+                       LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 

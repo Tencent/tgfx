@@ -19,8 +19,8 @@
 #include "SimpleLayerTree.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
-#include "tgfx/layers/ImagePattern.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidColor.h"
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 

@@ -30,6 +30,10 @@ class MatrixShader final : public Shader {
     return source->isOpaque();
   }
 
+  bool isAImage() const override {
+    return source->isAImage();
+  }
+
   bool asColor(Color* color) const override {
     return source->asColor(color);
   }
