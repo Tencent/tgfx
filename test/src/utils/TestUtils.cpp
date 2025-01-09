@@ -25,7 +25,11 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-static const std::string OUT_ROOT = ProjectPath::Absolute("test/out");
+#ifdef UPDATE_BASELINE
+static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
+#else
+static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
+#endif
 static const std::string WEBP_FILE_EXT = ".webp";
 
 bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture) {
