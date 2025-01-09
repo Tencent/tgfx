@@ -273,12 +273,24 @@ class ShapeLayer : public Layer {
    */
   void setStrokeAlign(StrokeAlign align);
 
+  /**
+   * Indicates whether strokes are drawn on top of child layers and layer styles. Normally, strokes
+   * are drawn above fills but below child layers. If true, strokes are drawn above all child layers
+   * and layer styles. The default value is false.
+   */
+  bool strokeOnTop() const {
+    return _strokeOnTop;
+  }
+
+  void setStrokeOnTop(bool value);
+
  protected:
   ShapeLayer() = default;
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  void drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const override;
+  void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+                    const std::function<void()>& drawChildren) const override;
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;
@@ -290,7 +302,9 @@ class ShapeLayer : public Layer {
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
+  bool _strokeOnTop = false;
 
+  Paint getPaint(float alpha) const;
   std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx

@@ -32,17 +32,13 @@ namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
-static bool ChildrenContainEffects(const Layer* layer) {
-  for (auto child : layer->children()) {
-    if (!child->layerStyles().empty() || !child->filters().empty()) {
-      return true;
-    }
-    if (ChildrenContainEffects(child.get())) {
-      return true;
-    }
-  }
-  return false;
-}
+struct LayerStyleSource {
+  float contentScale = 1.0f;
+  std::shared_ptr<Image> content = nullptr;
+  Point contentOffset = Point::Zero();
+  std::shared_ptr<Image> contour = nullptr;
+  Point contourOffset = Point::Zero();
+};
 
 static std::shared_ptr<Picture> CreatePicture(
     const DrawArgs& args, float contentScale,
@@ -604,8 +600,8 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) {
-  Paint paint;
+Paint Layer::getLayerPaint(float alpha, BlendMode blendMode) const {
+  Paint paint = {};
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
@@ -658,7 +654,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
     return nullptr;
   }
   auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
-    drawContents(args, canvas, 1.0f);
+    drawDirectly(args, canvas, 1.0f);
   });
   if (!picture) {
     return nullptr;
@@ -688,7 +684,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
     // draw directly
-    drawContents(args, canvas, alpha);
+    drawDirectly(args, canvas, alpha);
   }
 }
 
@@ -740,15 +736,12 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
-    drawContents(args, canvas, 1.0f);
+    drawDirectly(args, canvas, 1.0f);
   });
   if (picture == nullptr) {
     return;
   }
-  Paint paint = {};
-  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
-  paint.setAlpha(alpha);
-  paint.setBlendMode(blendMode);
+  auto paint = getLayerPaint(alpha, blendMode);
   paint.setMaskFilter(getMaskFilter(args, contentScale));
   if (!args.excludeEffects) {
     paint.setImageFilter(getImageFilter(contentScale));
@@ -757,76 +750,25 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   canvas->drawPicture(std::move(picture), &matrix, &paint);
 }
 
-void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha) {
-  auto drawLayerContents = [this, alpha](const DrawArgs& args, Canvas* canvas) {
-    auto content = getContent();
-    if (args.drawContour) {
-      drawContour(content, canvas, getLayerPaint(alpha, BlendMode::SrcOver));
-    } else if (content != nullptr) {
-      content->draw(canvas, getLayerPaint(alpha, BlendMode::SrcOver));
-    }
+void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
+  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
+  if (layerStyleSource) {
+    drawLayerStyles(canvas, alpha, layerStyleSource.get(), LayerStylePosition::Below);
+  }
+  drawContents(getContent(), canvas, alpha, args.forContour, [&]() {
     drawChildren(args, canvas, alpha);
-    if (args.cleanDirtyFlags) {
-      bitFields.childrenDirty = false;
+    if (layerStyleSource) {
+      drawLayerStyles(canvas, alpha, layerStyleSource.get(), LayerStylePosition::Above);
     }
-  };
-
-  if (_layerStyles.empty() || args.excludeEffects) {
-    drawLayerContents(args, canvas);
-    return;
-  }
-
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  if (FloatNearlyZero(contentScale)) {
-    return;
-  }
-
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->scale(1.f / contentScale, 1.f / contentScale);
-  Point offset = Point::Zero();
-  std::shared_ptr<Image> source = nullptr;
-  auto picture = CreatePicture(args, contentScale, drawLayerContents);
-  if (picture == nullptr) {
-    return;
-  }
-  if (!bitFields.excludeChildEffectsInLayerStyle || !ChildrenContainEffects(this)) {
-    source = CreatePictureImage(picture, &offset);
-  } else {
-    auto newArgs =
-        DrawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false, true);
-    auto contentsWithoutEffects = CreatePicture(newArgs, contentScale, drawLayerContents);
-    source = CreatePictureImage(contentsWithoutEffects, &offset);
-  }
-  if (source == nullptr) {
-    return;
-  }
-  std::shared_ptr<Image> contour = nullptr;
-  Point contourOffset = offset;
-  auto needContour =
-      std::any_of(_layerStyles.begin(), _layerStyles.end(),
-                  [](const auto& layerStyle) { return layerStyle->requireLayerContour(); });
-  if (needContour) {
-    // Child effects are always excluded when drawing the layer contour.
-    DrawArgs newArgs =
-        DrawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false, true, true);
-    auto contourPicture = CreatePicture(newArgs, contentScale, drawLayerContents);
-    contour = CreatePictureImage(contourPicture, &contourOffset);
-    contourOffset -= offset;
-  }
-
-  canvas->translate(offset.x, offset.y);
-  drawLayerStyles(canvas, source, contentScale, contour, contourOffset, alpha,
-                  LayerStylePosition::Below);
-  auto matrix = Matrix::MakeTrans(-offset.x, -offset.y);
-  canvas->drawPicture(std::move(picture), &matrix, nullptr);
-  drawLayerStyles(canvas, source, contentScale, contour, contourOffset, alpha,
-                  LayerStylePosition::Above);
+  });
 }
 
-void Layer::drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const {
+void Layer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool,
+                         const std::function<void()>& drawChildren) const {
   if (content != nullptr) {
-    content->draw(canvas, paint);
+    content->draw(canvas, getLayerPaint(alpha));
   }
+  drawChildren();
 }
 
 void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
@@ -841,20 +783,69 @@ void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
     }
     child->drawLayer(args, canvas, child->_alpha * alpha, child->_blendMode);
   }
+  if (args.cleanDirtyFlags) {
+    bitFields.childrenDirty = false;
+  }
 }
 
-void Layer::drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            std::shared_ptr<Image> contour, const Point& contourOffset, float alpha,
+std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
+                                                             const Matrix& matrix) {
+  if (_layerStyles.empty() || args.excludeEffects) {
+    return nullptr;
+  }
+  auto contentScale = matrix.getMaxScale();
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+
+  auto drawLayerContents = [this](const DrawArgs& drawArgs, Canvas* canvas) {
+    drawContents(getContent(), canvas, 1.0f, drawArgs.forContour,
+                 [&]() { drawChildren(drawArgs, canvas, 1.0f); });
+  };
+
+  DrawArgs drawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false,
+                    bitFields.excludeChildEffectsInLayerStyle);
+  auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
+  auto contentOffset = Point::Zero();
+  auto content = CreatePictureImage(contentPicture, &contentOffset);
+  if (content == nullptr) {
+    return nullptr;
+  }
+  auto source = std::make_unique<LayerStyleSource>();
+  source->contentScale = contentScale;
+  source->content = std::move(content);
+  source->contentOffset = contentOffset;
+  auto needContour =
+      std::any_of(_layerStyles.begin(), _layerStyles.end(),
+                  [](const auto& layerStyle) { return layerStyle->requireLayerContour(); });
+  if (needContour) {
+    // Child effects are always excluded when drawing the layer contour.
+    drawArgs.excludeEffects = true;
+    drawArgs.forContour = true;
+    auto contourPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
+    source->contour = CreatePictureImage(contourPicture, &source->contourOffset);
+  }
+  return source;
+}
+
+void Layer::drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
                             LayerStylePosition position) {
+  DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
+  auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
+  matrix.preTranslate(source->contentOffset.x, source->contentOffset.y);
+  auto& contour = source->contour;
+  auto contourOffset = source->contourOffset - source->contentOffset;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position) {
       continue;
     }
     AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(matrix);
     if (layerStyle->requireLayerContour() && contour != nullptr) {
-      layerStyle->drawWithContour(canvas, content, contentScale, contour, contourOffset, alpha);
+      layerStyle->drawWithContour(canvas, source->content, source->contentScale, contour,
+                                  contourOffset, alpha);
     } else {
-      layerStyle->draw(canvas, content, contentScale, alpha);
+      layerStyle->draw(canvas, source->content, source->contentScale, alpha);
     }
   }
 }

@@ -31,48 +31,47 @@ ShapeContent::ShapeContent(std::shared_ptr<Shape> fill, std::shared_ptr<Shape> s
   }
 }
 void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
-  size_t index = 0;
-  for (auto& shapePaint : paintList) {
-    auto shape = index++ < fillPaintCount ? fillShape : strokeShape;
-    drawShape(canvas, paint, std::move(shape), shapePaint);
-  }
+  drawFills(canvas, paint, false);
+  drawStrokes(canvas, paint, false);
 }
 
-void ShapeContent::drawShape(Canvas* canvas, const Paint& paint, std::shared_ptr<Shape> shape,
-                             const ShapePaint& shapePaint) const {
-  auto drawPaint = paint;
-  drawPaint.setAlpha(paint.getAlpha() * shapePaint.alpha);
-  // The blend mode in the paint is always SrcOver, use our own blend mode instead.
-  drawPaint.setBlendMode(shapePaint.blendMode);
-  drawPaint.setShader(shapePaint.shader);
-  canvas->drawShape(std::move(shape), drawPaint);
-}
-
-void ShapeContent::drawContour(Canvas* canvas, const Paint& paint) const {
-  if (fillShape != nullptr) {
-    drawShapeContour(canvas, paint, fillShape, paintList.begin(),
-                     paintList.begin() + static_cast<std::ptrdiff_t>(fillPaintCount));
-  }
-  if (strokeShape != nullptr) {
-    drawShapeContour(canvas, paint, strokeShape,
-                     paintList.begin() + static_cast<std::ptrdiff_t>(fillPaintCount),
-                     paintList.end());
-  }
-}
-
-void ShapeContent::drawShapeContour(Canvas* canvas, const Paint& paint,
-                                    std::shared_ptr<Shape> shape,
-                                    std::vector<ShapePaint>::const_iterator begin,
-                                    std::vector<ShapePaint>::const_iterator end) const {
-  auto allShadersAreImages = std::none_of(
-      begin, end, [](const auto& shapePaint) { return !shapePaint.shader->isAImage(); });
-  if (allShadersAreImages) {
-    for (auto it = begin; it != end; it++) {
-      drawShape(canvas, paint, shape, *it);
+static void DrawShape(Canvas* canvas, const Paint& paint, std::shared_ptr<Shape> shape,
+                      bool forContour, const std::vector<ShapePaint>::const_iterator& begin,
+                      const std::vector<ShapePaint>::const_iterator& end) {
+  if (forContour) {
+    auto hasNonImageShader = std::any_of(
+        begin, end, [](const auto& shapePaint) { return !shapePaint.shader->isAImage(); });
+    if (hasNonImageShader) {
+      canvas->drawShape(std::move(shape), paint);
+      return;
     }
-  } else {
-    canvas->drawShape(shape, paint);
   }
+  for (auto iter = begin; iter != end; iter++) {
+    auto drawPaint = paint;
+    drawPaint.setAlpha(paint.getAlpha() * iter->alpha);
+    // The blend mode in the paint is always SrcOver, use our own blend mode instead.
+    drawPaint.setBlendMode(iter->blendMode);
+    drawPaint.setShader(iter->shader);
+    canvas->drawShape(shape, drawPaint);
+  }
+}
+
+bool ShapeContent::drawFills(Canvas* canvas, const Paint& paint, bool forContour) const {
+  if (!fillShape) {
+    return false;
+  }
+  DrawShape(canvas, paint, fillShape, forContour, paintList.begin(),
+            paintList.begin() + static_cast<std::ptrdiff_t>(fillPaintCount));
+  return true;
+}
+
+bool ShapeContent::drawStrokes(Canvas* canvas, const Paint& paint, bool forContour) const {
+  if (!strokeShape) {
+    return false;
+  }
+  DrawShape(canvas, paint, strokeShape, forContour,
+            paintList.begin() + static_cast<std::ptrdiff_t>(fillPaintCount), paintList.end());
+  return true;
 }
 
 bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {

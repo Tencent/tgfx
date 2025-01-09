@@ -444,12 +444,12 @@ TGFX_TEST(LayerTest, shapeLayer) {
   auto layer = Layer::Make();
   displayList->root()->addChild(layer);
   for (int i = 0; i < 3; i++) {
-    auto shaperLayer = ShapeLayer::Make();
+    auto shapeLayer = ShapeLayer::Make();
     auto rect = Rect::MakeXYWH(10, 10 + 100 * i, 140, 80);
     Path path = {};
     path.addRect(rect);
-    shaperLayer->setPath(path);
-    shaperLayer->removeFillStyles();
+    shapeLayer->setPath(path);
+    shapeLayer->removeFillStyles();
     std::shared_ptr<ShapeStyle> fillStyle = nullptr;
     switch (i) {
       case 0:
@@ -470,26 +470,26 @@ TGFX_TEST(LayerTest, shapeLayer) {
         break;
     }
     fillStyle->setAlpha(0.8f);
-    shaperLayer->addFillStyle(fillStyle);
+    shapeLayer->addFillStyle(fillStyle);
 
     // stroke style
-    shaperLayer->setLineWidth(10.0f);
-    shaperLayer->setLineCap(LineCap::Butt);
-    shaperLayer->setLineJoin(LineJoin::Miter);
+    shapeLayer->setLineWidth(10.0f);
+    shapeLayer->setLineCap(LineCap::Butt);
+    shapeLayer->setLineJoin(LineJoin::Miter);
     auto strokeStyle = SolidColor::Make(Color::Red());
-    shaperLayer->setStrokeStyle(strokeStyle);
+    shapeLayer->setStrokeStyle(strokeStyle);
     strokeStyle = SolidColor::Make(Color::Green());
     strokeStyle->setAlpha(0.5f);
     strokeStyle->setBlendMode(BlendMode::Lighten);
-    shaperLayer->addStrokeStyle(strokeStyle);
+    shapeLayer->addStrokeStyle(strokeStyle);
     if (i != 2) {
       std::vector<float> dashPattern = {10.0f, 10.0f};
-      shaperLayer->setLineDashPattern(dashPattern);
-      shaperLayer->setLineDashPhase(5.0f);
+      shapeLayer->setLineDashPattern(dashPattern);
+      shapeLayer->setLineDashPhase(5.0f);
     }
-    shaperLayer->setStrokeAlign(static_cast<StrokeAlign>(i));
-    layer->addChild(shaperLayer);
-    auto shapeLayerRect = shaperLayer->getBounds();
+    shapeLayer->setStrokeAlign(static_cast<StrokeAlign>(i));
+    layer->addChild(shapeLayer);
+    auto shapeLayerRect = shapeLayer->getBounds();
     switch (i) {
       case 0:
         EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(5, 5, 155, 95));
@@ -529,6 +529,44 @@ TGFX_TEST(LayerTest, solidLayer) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_solid"));
+}
+
+TGFX_TEST(LayerTest, StrokeOnTop) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = Layer::Make();
+  displayList->root()->addChild(layer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(20, 20, 150, 150));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  auto strokeColor = SolidColor::Make(Color::Green());
+  strokeColor->setAlpha(0.5f);
+  shapeLayer->setStrokeStyle(strokeColor);
+  shapeLayer->setLineWidth(16);
+  auto innerShadow = InnerShadowStyle::Make(30, 30, 0, 0, Color::FromRGBA(100, 0, 0, 128));
+  auto dropShadow = DropShadowStyle::Make(-20, -20, 0, 0, Color::Black());
+  dropShadow->setShowBehindLayer(false);
+  shapeLayer->setLayerStyles({dropShadow, innerShadow});
+  shapeLayer->setExcludeChildEffectsInLayerStyle(true);
+  layer->addChild(shapeLayer);
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setWidth(100);
+  solidLayer->setHeight(100);
+  solidLayer->setRadiusX(25);
+  solidLayer->setRadiusY(25);
+  solidLayer->setMatrix(Matrix::MakeTrans(75, 75));
+  solidLayer->setColor(Color::Blue());
+  shapeLayer->addChild(solidLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/StrokeOnTop_Off"));
+  shapeLayer->setStrokeOnTop(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/StrokeOnTop_On"));
 }
 
 TGFX_TEST(LayerTest, FilterTest) {
