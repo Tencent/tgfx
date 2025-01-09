@@ -38,7 +38,7 @@ static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json"
 static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache/md5.json";
 static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache/version.json";
 static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache/HEAD";
-#ifdef UPDATE_BASELINE
+#ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
 #else
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
@@ -141,9 +141,6 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
                                  const std::function<void(bool)>& callback) {
 #ifdef UPDATE_BASELINE
   SetJSONValue(OutputMD5, key, md5);
-  if (callback) {
-    callback(true);
-  }
   return true;
 #endif
   auto baselineVersion = GetJSONValue(BaselineVersion, key);
@@ -180,15 +177,15 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
     }
     md5 = DumpMD5(newPixmap.pixels(), newPixmap.byteSize());
   }
+#ifdef GENERATE_BASELINE_IMAGES
+  SaveImage(pixmap, key + "_base");
+#endif
   return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
     if (result) {
       RemoveImage(key);
     } else {
       SaveImage(pixmap, key);
     }
-#ifdef GENERATE_BASELINE_IMAGES
-    SaveImage(pixmap, key + "_base");
-#endif
   });
 }
 
@@ -246,11 +243,13 @@ static void CreateFolder(const std::string& path) {
 void Baseline::TearDown() {
 #ifdef UPDATE_BASELINE
   if (!TGFXTest::HasFailure()) {
+#ifdef GENERATE_BASELINE_IMAGES
     auto outPath = ProjectPath::Absolute("test/out/");
     std::filesystem::remove_all(outPath);
     if (std::filesystem::exists(OUT_ROOT)) {
       std::filesystem::rename(OUT_ROOT, outPath);
     }
+#endif
     CreateFolder(CACHE_MD5_PATH);
     std::ofstream outMD5File(CACHE_MD5_PATH);
     outMD5File << std::setw(4) << OutputMD5 << std::endl;

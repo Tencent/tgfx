@@ -25,7 +25,7 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-#ifdef UPDATE_BASELINE
+#ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
 #else
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
