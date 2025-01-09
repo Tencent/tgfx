@@ -31,6 +31,7 @@ namespace tgfx {
 
 class DisplayList;
 class DrawArgs;
+struct LayerStyleSource;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -505,14 +506,17 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
-   * Draws the layer contour on the given canvas. The layer contour is the outline of the layer
-   * content, used for applying layer styles that need the contour. By default, this calls the
-   * draw() method with the layer content and the given paint object.
+   * Draws the layer content and its children on the given canvas. By default, this method draws the
+   * layer content first, followed by the children. Subclasses can override this method to change
+   * the drawing order or the way the layer content is drawn.
    * @param content The layer content to draw. This can be nullptr.
-   * @param canvas The canvas to draw the layer contour on.
-   * @param paint The paint object used to draw the layer contour.
+   * @param canvas The canvas to draw the layer content on.
+   * @param alpha The alpha transparency value used for drawing the layer content.
+   * @param forContour Whether to draw the layer content for the contour.
+   * @param drawChildren A callback function that draws the children of the layer.
    */
-  virtual void drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const;
+  virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+                            const std::function<void()>& drawChildren) const;
 
   /**
   * Attachs a property to this layer.
@@ -544,7 +548,7 @@ class Layer {
 
   LayerContent* getContent();
 
-  Paint getLayerPaint(float alpha, BlendMode blendMode);
+  Paint getLayerPaint(float alpha, BlendMode blendMode = BlendMode::SrcOver) const;
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
@@ -557,12 +561,13 @@ class Layer {
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
-  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
   void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawLayerStyles(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                       std::shared_ptr<Image> contour, const Point& contourOffset, float alpha,
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
+
+  void drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
                        LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);

@@ -41,13 +41,11 @@ class ShapeContent : public LayerContent {
     return bounds;
   }
 
-  bool hasFills() const {
-    return fillPaintCount > 0;
-  }
-
   void draw(Canvas* canvas, const Paint& paint) const override;
 
-  void drawContour(Canvas* canvas, const Paint& paint) const;
+  bool drawFills(Canvas* canvas, const Paint& paint, bool forContour) const;
+
+  bool drawStrokes(Canvas* canvas, const Paint& paint, bool forContour) const;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
@@ -57,12 +55,5 @@ class ShapeContent : public LayerContent {
   std::shared_ptr<Shape> strokeShape = nullptr;
   std::vector<ShapePaint> paintList = {};
   size_t fillPaintCount = 0;
-
-  void drawShape(Canvas* canvas, const Paint& paint, std::shared_ptr<Shape> shape,
-                 const ShapePaint& shapePaint) const;
-
-  void drawShapeContour(Canvas* canvas, const Paint& paint, std::shared_ptr<Shape> shape,
-                        std::vector<ShapePaint>::const_iterator begin,
-                        std::vector<ShapePaint>::const_iterator end) const;
 };
 }  // namespace tgfx

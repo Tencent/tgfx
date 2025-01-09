@@ -106,6 +106,8 @@
         "Layer_hitTestPointNested": "b062b9a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
+        "StrokeOnTop_Off": "02cad7c",
+        "StrokeOnTop_On": "02cad7c",
         "draw_shape": "67dfa72",
         "draw_solid": "b4a1231",
         "draw_text": "b062b9a",
