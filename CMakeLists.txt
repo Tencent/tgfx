@@ -524,25 +524,20 @@ if (TGFX_BUILD_TESTS)
         list(REMOVE_ITEM TGFX_TEST_FILES ${TGFX_TEST_EXCLUDE_FILES})
     endif ()
 
-    # used to update the local md5 data for baseline testing.
+    list(APPEND TGFX_BASELINE_DEFINES ${TGFX_TEST_DEFINES} UPDATE_BASELINE)
+    if (NOT TGFX_SKIP_GENERATE_BASELINE_IMAGES)
+        list(APPEND TGFX_BASELINE_DEFINES GENERATE_BASELINE_IMAGES)
+    endif ()
+    # used to update the local md5 data for baseline testing and generate baseline images to the
+    # out/ directory. each image has a "_base" suffix.
     add_executable(UpdateBaseline ${TGFX_TEST_FILES})
     add_dependencies(UpdateBaseline test-vendor)
     target_include_directories(UpdateBaseline PUBLIC ${TGFX_TEST_INCLUDES})
     target_include_directories(UpdateBaseline SYSTEM PRIVATE ${TGFX_INCLUDES})
-    target_compile_definitions(UpdateBaseline PUBLIC ${TGFX_TEST_DEFINES} UPDATE_BASELINE)
+    target_compile_definitions(UpdateBaseline PUBLIC ${TGFX_BASELINE_DEFINES})
     target_compile_options(UpdateBaseline PUBLIC ${TGFX_TEST_COMPILE_OPTIONS})
     target_link_options(UpdateBaseline PUBLIC ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(UpdateBaseline ${TGFX_TEST_LIBS})
-
-    # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
-    add_executable(GenerateImages ${TGFX_TEST_FILES})
-    add_dependencies(GenerateImages test-vendor)
-    target_include_directories(GenerateImages PUBLIC ${TGFX_TEST_INCLUDES})
-    target_include_directories(GenerateImages SYSTEM PRIVATE ${TGFX_INCLUDES})
-    target_compile_definitions(GenerateImages PUBLIC ${TGFX_TEST_DEFINES} GENERATOR_BASELINE_IMAGES)
-    target_compile_options(GenerateImages PUBLIC ${TGFX_TEST_COMPILE_OPTIONS})
-    target_link_options(GenerateImages PUBLIC ${TGFX_TEST_LINK_OPTIONS})
-    target_link_libraries(GenerateImages ${TGFX_TEST_LIBS})
 
     add_executable(TGFXUnitTest ${TGFX_TEST_FILES})
     add_dependencies(TGFXUnitTest test-vendor)
