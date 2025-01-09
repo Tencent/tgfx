@@ -34,6 +34,7 @@ MainView::~MainView() {
 }
 
 void MainView::initView() {
+  setStyleSheet("background-color: black;");
   toolView = new ToolView(this);
   layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
@@ -44,11 +45,22 @@ void MainView::openConnectView() {
 
 }
 
-void MainView::openFile() {
+void MainView::connectClient(const char* address, const uint16_t port) {
   toolView->setParent(NULL);
+  // delete toolView;
+
+  tracy::Config config;
+  centorView = new View(address, port, this->width(), config, this);
+  layout->addWidget(centorView);
+}
+
+void MainView::openFile() {
   tracy::Fileselector::OpenFile( "tracy", "Tracy Profiler trace file", [&]( const char* fn ) {
     auto file = std::shared_ptr<tracy::FileRead>(tracy::FileRead::Open(fn));
     if (file) {
+      toolView->setParent(NULL);
+      delete toolView;
+
       tracy::Config config;
       centorView = new View(*file, this->width(), config, this);
       layout->addWidget(centorView);

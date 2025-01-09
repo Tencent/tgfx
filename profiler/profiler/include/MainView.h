@@ -36,6 +36,7 @@ public:
   MainView(QWidget* parent = nullptr);
   ~MainView();
 
+  void connectClient(const char* address, uint16_t port);
   void openConnectView();
   void openFile();
   void openToolView();

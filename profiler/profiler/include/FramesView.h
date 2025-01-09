@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <tgfx/gpu/opengl/qt/QGLWindow.h>
 #include <QGraphicsView>
+#include <QQuickItem>
 #include "TracyWorker.hpp"
 #include "ViewData.h"
 
@@ -25,29 +27,45 @@
 
 constexpr uint64_t MaxFrameTime = 50 * 1000 * 1000;
 
-class FramesView : public QGraphicsView {
+class FramesView : public QQuickItem {
+  Q_OBJECT
+  Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
+  Q_PROPERTY(unsigned long long viewData READ getViewDataPtr WRITE setViewData)
 public:
-  FramesView(tracy::Worker& worker, ViewData& viewData, int width, const tracy::FrameData* frames, QWidget* parent = nullptr);
+  FramesView(QQuickItem* parent = nullptr);
   ~FramesView();
+  void initView();
+  void createAppHost();
 
-  void drawBackground(QPainter* painter, const QRectF& rect) override;
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
 
   uint64_t getFrameNumber(const tracy::FrameData& frameData, int i);
-protected:
-  void paintEvent(QPaintEvent* event) override;
-  void initView();
-  void scaleView(qreal scaleFactor);
 
+  unsigned long long getWorker() const { return (unsigned long long)worker; }
+  void setWorker(unsigned long long _worker) {
+    worker = (tracy::Worker*)(_worker);
+    frames = worker->GetFramesBase();
+  }
+  unsigned long long getViewDataPtr() const { return (unsigned long long)viewData; }
+  void setViewData(unsigned long long _viewData) {
+    viewData = (ViewData*)_viewData;
+    frameTarget = 1000 * 1000 * 1000 / viewData->frameTarget;
+  }
+
+protected:
+  void draw();
+  void drawFrames(tgfx::Canvas* canvas);
+  void drawBackground(tgfx::Canvas* canvs);
+  QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
 
 private:
-  tracy::Worker& worker;
-  ViewData& viewData;
+  tracy::Worker* worker;
+  ViewData* viewData;
   const tracy::FrameData* frames;
-  int height;
-  int width;
   int frameHover = -1;
 
   uint64_t frameTarget;
+  std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
+  std::shared_ptr<AppHost> appHost = nullptr;
 };

@@ -93,19 +93,21 @@ list(APPEND TGFX_PROFILER_INCLUDE
 
 
 file(GLOB TGFX_PROFILER_FILES
+        profiler/include/ToolView.h
+        profiler/include/FramesView.h
+        profiler/include/TimelineView.h
         profiler/main.cpp
         profiler/src/ProfilerApplication.cpp
         profiler/src/MainView.cpp
         profiler/src/ToolView.cpp
-        profiler/src/View.cpp
         profiler/src/TimelineView.cpp
-        profiler/include/TimelineView.h
         profiler/src/TimelineItem.cpp
         profiler/src/TimelineItemThread.cpp
         profiler/src/TimelineController.cpp
         profiler/src/FramesView.cpp
         profiler/src/Utility.cpp
         profiler/src/UserData.cpp
+        profiler/src/View.cpp
         profiler/src/ProfilerWindow.cpp)
 
 add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${SERVER_FILES} ${PROFILER_FILES} ${COMMON_FILES} ${QT_RESOURCES})

@@ -26,11 +26,10 @@
 #include "TimelineView.h"
 #include "TracySysUtil.hpp"
 
-View::View(const char* addr, uint16_t port, const tracy::Config& config, int width, QWidget* parent)
+View::View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent)
   : width(width)
   , worker(addr, port, config.memoryLimit == 0 ? -1 :
     ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ) )
-  , frames(nullptr)
   , config(config)
   , QWidget(parent)
 {
@@ -41,7 +40,6 @@ View::View(tracy::FileRead& file, int width, const tracy::Config& config, QWidge
   : width(width)
   , worker(file)
   , userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime())
-  , frames(worker.GetFramesBase())
   , config(config)
   , QWidget(parent) {
   initView();
@@ -61,17 +59,25 @@ void View::ViewImpl() {
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
-  framesView = new FramesView(worker, viewData, width, frames, this);
-  framesView->setFixedHeight(50);
-  layout->addWidget(framesView);
+  qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
+  framesEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Frames.qml")));
+  framesEngine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
+  framesEngine->rootContext()->setContextProperty("_viewData", (unsigned long long)&viewData);
+  // framesEngine->rootContext()->setContextProperty("_width", width);
+  auto quickWindow = static_cast<QQuickWindow*>(framesEngine->rootObjects().value(0));
+  auto framesWidget = createWindowContainer(quickWindow);
+  framesWidget->setFixedHeight(50);
 
   qmlRegisterType<tracy::Worker>("tracy", 1, 0, "TracyWorker");
   qmlRegisterType<TimelineView>("Timeline", 1, 0, "TimelineView");
-  engine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Timeline.qml")));
-  engine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
-  engine->rootContext()->setContextProperty("_viewData", (unsigned long long)&viewData);
-  auto quickWindow = static_cast<QQuickWindow*>(engine->rootObjects().value(0));
+  timelineEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Timeline.qml")));
+  timelineEngine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
+  timelineEngine->rootContext()->setContextProperty("_viewData", (unsigned long long)&viewData);
+  quickWindow = static_cast<QQuickWindow*>(timelineEngine->rootObjects().value(0));
   auto timelineWidget = createWindowContainer(quickWindow);
   timelineWidget->resize(1000, 1000);
+
+  layout->addWidget(framesWidget);
+
   layout->addWidget(timelineWidget);
 }

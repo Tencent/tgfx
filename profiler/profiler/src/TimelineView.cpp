@@ -637,8 +637,6 @@ void TimelineView::draw() {
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
-  // canvas->save();
-
   drawRect(canvas, 0, 0, 3008 * 2, 1578 * 2, 0xFF000000);
   drawTimeline(nullptr, canvas);
   canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));

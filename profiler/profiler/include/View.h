@@ -31,7 +31,7 @@
 
 class View : public QWidget{
 public:
-  View(const char* addr, uint16_t port, const tracy::Config& config, int width, QWidget* parent = nullptr);
+  View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent = nullptr);
   View(tracy::FileRead& file, int width, const tracy::Config& config, QWidget* parent = nullptr);
 
   ~View();
@@ -45,8 +45,8 @@ private:
 
   ViewData viewData;
   UserData userData;
-  const tracy::FrameData* frames;
-  QQmlApplicationEngine* engine;
+  QQmlApplicationEngine* timelineEngine;
+  QQmlApplicationEngine* framesEngine;
 
   const tracy::Config& config;
   FramesView* framesView;
