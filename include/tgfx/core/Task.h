@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <memory>
 #include <mutex>
 
 namespace tgfx {
@@ -67,10 +67,10 @@ class Task {
   void wait();
 
  private:
-  enum TaskState { Queued = 0, Executing = 1, Finished = 2, Canceled = 3 };
   std::mutex locker = {};
   std::condition_variable condition = {};
-  std::atomic<int> state = TaskState::Queued;
+  bool _executing = true;
+  bool _cancelled = false;
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);

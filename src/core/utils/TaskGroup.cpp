@@ -28,7 +28,6 @@
 
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
-static constexpr int MAX_TASK_COUNT = 100;
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -45,9 +44,6 @@ int GetCPUCores() {
   return cpuCores;
 }
 
-static const int CPUCores = GetCPUCores();
-static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
@@ -59,9 +55,7 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
     if (task == nullptr) {
       continue;
     }
-    if (task->state == Task::TaskState::Queued) {
-      task->execute();
-    }
+    task->execute();
   }
 }
 
@@ -83,6 +77,8 @@ TaskGroup::TaskGroup() {
 }
 
 bool TaskGroup::checkThreads() {
+  static const int CPUCores = GetCPUCores();
+  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   auto totalThreads = static_cast<int>(threads.size());
   if (activeThreads < totalThreads || totalThreads >= MaxThreads) {
     return true;
@@ -104,9 +100,6 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   if (exited || !checkThreads()) {
     return false;
   }
-  if (tasks.size() >= MAX_TASK_COUNT) {
-    return false;
-  }
   tasks.enqueue(std::move(task));
   if (waitDataCount > 0) {
     condition.notify_one();
@@ -125,11 +118,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
         return nullptr;
       }
     } else {
-      std::shared_ptr<Task> task = tasks.dequeue();
-      while (task && task->state != Task::TaskState::Queued) {
-        task = tasks.dequeue();
-      }
-      return task;
+      return tasks.dequeue();
     }
   }
   return nullptr;

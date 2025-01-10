@@ -25,7 +25,6 @@ namespace tgfx {
 template <typename T>
 class LockFreeQueue {
  public:
-  using ElementType = T;
   LockFreeQueue() : _size(0) {
     header = tail = deleteTail = new QueueNode;
   }
@@ -41,15 +40,15 @@ class LockFreeQueue {
     }
   }
 
-  ElementType dequeue() {
+  T dequeue() {
     QueueNode* tailNode = tail;
-    ElementType element = ElementType();
+    T element = T();
     do {
       if (tailNode->nextNode == nullptr) return element;
     } while (!std::atomic_compare_exchange_weak(&tail, &tailNode, tailNode->nextNode));
     QueueNode* popNode = tailNode->nextNode;
     element = std::move(popNode->item);
-    popNode->item = ElementType();
+    popNode->item = T();
     if (deleteTail->nextNode && deleteTail->nextNode->nextNode) {
       QueueNode* deleteNode = deleteTail;
       deleteTail = deleteTail->nextNode;
@@ -62,7 +61,7 @@ class LockFreeQueue {
     return element;
   }
 
-  bool enqueue(const ElementType& element) {
+  bool enqueue(const T& element) {
     QueueNode* newNode = new (std::nothrow) QueueNode(element);
     if (newNode == nullptr) {
       return false;
@@ -93,12 +92,12 @@ class LockFreeQueue {
   struct QueueNode {
     QueueNode() : nextNode(nullptr) {
     }
-    explicit QueueNode(const ElementType& element) : nextNode(nullptr), item(element) {
+    explicit QueueNode(const T& element) : nextNode(nullptr), item(element) {
     }
-    explicit QueueNode(ElementType& element) : nextNode(nullptr), item(std::move(element)) {
+    explicit QueueNode(T& element) : nextNode(nullptr), item(std::move(element)) {
     }
     QueueNode* volatile nextNode;
-    ElementType item;
+    T item;
   };
 
   std::atomic<QueueNode*> header = nullptr;
