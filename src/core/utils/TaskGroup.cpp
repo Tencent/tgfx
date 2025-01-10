@@ -50,7 +50,7 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  while (true) {
+  while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
       continue;
