@@ -20,10 +20,16 @@
 
 #include <condition_variable>
 #include <functional>
-#include <memory>
 #include <mutex>
 
 namespace tgfx {
+enum class TaskState {
+  Queued,
+  Executing,
+  Finished,
+  Canceled,
+};
+
 class TaskGroup;
 
 /**
@@ -69,12 +75,10 @@ class Task {
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
-  bool _executing = true;
-  bool _cancelled = false;
+  std::atomic<TaskState> state = TaskState::Queued;
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);
-  bool removeTask();
   void execute();
 
   friend class TaskGroup;
