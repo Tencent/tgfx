@@ -59,7 +59,7 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
     if (task == nullptr) {
       continue;
     }
-    if (task->state == TaskState::Queued) {
+    if (task->state == Task::TaskState::Queued) {
       task->execute();
     }
   }
@@ -126,7 +126,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
       }
     } else {
       std::shared_ptr<Task> task = tasks.dequeue();
-      while (task && task->state != TaskState::Queued) {
+      while (task && task->state != Task::TaskState::Queued) {
         task = tasks.dequeue();
       }
       return task;

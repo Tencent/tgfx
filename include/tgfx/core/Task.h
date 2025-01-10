@@ -23,13 +23,6 @@
 #include <mutex>
 
 namespace tgfx {
-enum class TaskState {
-  Queued,
-  Executing,
-  Finished,
-  Canceled,
-};
-
 class TaskGroup;
 
 /**
@@ -73,9 +66,10 @@ class Task {
   void wait();
 
  private:
+  enum TaskState { Queued = 0, Executing = 1, Finished = 2, Canceled = 3 };
   std::mutex locker = {};
   std::condition_variable condition = {};
-  std::atomic<TaskState> state = TaskState::Queued;
+  std::atomic<int> state = TaskState::Queued;
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);
