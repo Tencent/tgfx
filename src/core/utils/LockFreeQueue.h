@@ -45,22 +45,21 @@ class QueueNode {
   }
 
   uint64_t getPtrs() {
-    return ptrs.load(std::memory_order_relaxed);
+    return _ptrs.load(std::memory_order_relaxed);
   }
 
   QueueNode* volatile nextNode = nullptr;
   T item = nullptr;
   std::atomic_bool needDelete = false;
-  uint16_t uniqueID = 0;
 
  private:
-  std::atomic_uint64_t ptrs = 0;
+  std::atomic_uint64_t _ptrs = 0;
 
   void init() {
-    uniqueID = GetUniqueID();
+    auto uniqueID = GetUniqueID();
     auto address = reinterpret_cast<uint64_t>(this);
-    ptrs.store((static_cast<uint64_t>(uniqueID) << 48) | (address & 0xFFFFFFFFFFFF),
-               std::memory_order_relaxed);
+    _ptrs.store((static_cast<uint64_t>(uniqueID) << 48) | (address & 0xFFFFFFFFFFFF),
+                std::memory_order_relaxed);
   }
 };
 
