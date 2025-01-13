@@ -27,17 +27,16 @@ static constexpr int kDelayedDeleteCount = 256;
 inline uint16_t GetUniqueID() {
   static std::atomic<uint16_t> nextID{1};
   return nextID.fetch_add(1, std::memory_order_relaxed);
-  ;
 }
 
 template <typename T>
 class QueueNode {
  public:
-  QueueNode() : nextNode(nullptr), needDelete(false) {
+  QueueNode() {
     QueueNode(nullptr);
   }
 
-  explicit QueueNode(const T& element) : nextNode(nullptr), item(element) {
+  explicit QueueNode(const T& element) : nextNode(nullptr), item(element), needDelete(false) {
     init();
   }
 
