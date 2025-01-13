@@ -31,9 +31,9 @@ class TaskGroup {
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
-  std::atomic_int activeThreads = 0;
+  std::atomic_int totalThreads = 0;
   std::atomic_bool exited = false;
-  std::atomic_int waitDataCount = 0;
+  std::atomic_int waitingThreads = 0;
   LockFreeQueue<std::shared_ptr<Task>> tasks = {};
   LockFreeQueue<std::thread*> threads = {};
 

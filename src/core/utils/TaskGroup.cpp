@@ -79,18 +79,18 @@ TaskGroup::TaskGroup() {
 bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-  auto totalThreads = static_cast<int>(threads.size());
-  if (activeThreads < totalThreads || totalThreads >= MaxThreads) {
+  if (totalThreads == 0 || (waitingThreads > 0 && totalThreads < MaxThreads)) {
+    auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
+    if (thread) {
+      totalThreads++;
+      threads.enqueue(thread);
+      //      LOGI("TaskGroup: A task thread is created, the current number of threads : %lld",
+      //           threads.size());
+    }
+  } else {
     return true;
   }
-  auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
-  if (thread) {
-    activeThreads++;
-    threads.enqueue(thread);
-    //    LOGI("TaskGroup: A task thread is created, the current number of threads : %lld",
-    //         threads.size());
-  }
-  return !threads.empty();
+  return totalThreads > 0;
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
@@ -101,7 +101,7 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
     return false;
   }
   tasks.enqueue(std::move(task));
-  if (waitDataCount > 0) {
+  if (waitingThreads > 0) {
     condition.notify_one();
   }
   return true;
@@ -110,15 +110,16 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 std::shared_ptr<Task> TaskGroup::popTask() {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
-    if (tasks.empty()) {
-      waitDataCount++;
+    auto task = tasks.dequeue();
+    if (task) {
+      return task;
+    } else {
+      waitingThreads++;
       auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-      waitDataCount--;
+      waitingThreads--;
       if (exited || status == std::cv_status::timeout) {
         return nullptr;
       }
-    } else {
-      return tasks.dequeue();
     }
   }
   return nullptr;
@@ -133,5 +134,7 @@ void TaskGroup::exit() {
     ReleaseThread(thread);
     thread = threads.dequeue();
   }
+  totalThreads = 0;
+  waitingThreads = 0;
 }
 }  // namespace tgfx

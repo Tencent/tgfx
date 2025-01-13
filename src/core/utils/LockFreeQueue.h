@@ -22,88 +22,130 @@
 #include <cstdint>
 
 namespace tgfx {
+static constexpr int kDelayedDeleteCount = 256;
+
+inline uint16_t GetUniqueID() {
+  static std::atomic<uint16_t> nextID{1};
+  return nextID.fetch_add(1, std::memory_order_relaxed);
+  ;
+}
+
+template <typename T>
+class QueueNode {
+ public:
+  QueueNode() : nextNode(nullptr), needDelete(false) {
+    QueueNode(nullptr);
+  }
+
+  explicit QueueNode(const T& element) : nextNode(nullptr), item(element) {
+    init();
+  }
+
+  explicit QueueNode(T&& element) : nextNode(nullptr), item(element), needDelete(false) {
+    init();
+  }
+
+  uint64_t getPtrs() {
+    return ptrs.load(std::memory_order_relaxed);
+  }
+
+  QueueNode* volatile nextNode = nullptr;
+  T item = nullptr;
+  std::atomic_bool needDelete = false;
+  uint16_t uniqueID = 0;
+
+ private:
+  std::atomic_uint64_t ptrs = 0;
+
+  void init() {
+    uniqueID = GetUniqueID();
+    auto address = reinterpret_cast<uint64_t>(this);
+    ptrs.store((static_cast<uint64_t>(uniqueID) << 48) | (address & 0xFFFFFFFFFFFF),
+               std::memory_order_relaxed);
+  }
+};
+
 template <typename T>
 class LockFreeQueue {
  public:
-  LockFreeQueue() : _size(0) {
-    header = tail = deleteTail = new QueueNode;
+  LockFreeQueue() {
+    header = tail = deleteTail = new QueueNode<T>();
+    deleteTail->needDelete = true;
   }
+
   LockFreeQueue& operator=(const LockFreeQueue& other) = delete;
   LockFreeQueue(const LockFreeQueue& other) = delete;
 
   ~LockFreeQueue() {
-    QueueNode* pTail = deleteTail;
+    QueueNode<T>* pTail = deleteTail;
     while (pTail != nullptr) {
-      QueueNode* pNode = pTail;
+      QueueNode<T>* pNode = pTail;
       pTail = pNode->nextNode;
       delete pNode;
     }
   }
 
   T dequeue() {
-    QueueNode* tailNode = tail;
-    T element = T();
+    QueueNode<T>* tailNode = tail;
     do {
-      if (tailNode->nextNode == nullptr) return element;
-    } while (!std::atomic_compare_exchange_weak(&tail, &tailNode, tailNode->nextNode));
-    QueueNode* popNode = tailNode->nextNode;
-    element = std::move(popNode->item);
-    popNode->item = T();
-    if (deleteTail->nextNode && deleteTail->nextNode->nextNode) {
-      QueueNode* deleteNode = deleteTail;
-      deleteTail = deleteTail->nextNode;
-      delete deleteNode;
-      deleteNode = nullptr;
-    }
-    if (_size > 0) {
-      _size--;
+      if (tailNode->nextNode == nullptr) {
+        return nullptr;
+      }
+    } while (tail.load()->getPtrs() == tailNode->getPtrs() &&
+             !std::atomic_compare_exchange_weak(&tail, &tailNode, tailNode->nextNode));
+    QueueNode<T>* popNode = tailNode->nextNode;
+    T element = std::move(popNode->item);
+    popNode->needDelete = true;
+    popNode->item = nullptr;
+    uint64_t currentSize = --size;
+    uint64_t needDeleteNum = listSize.load() - currentSize;
+    if (needDeleteNum > kDelayedDeleteCount) {
+      if (++uniqueDeleteFlag == 1) {
+        while (deleteTail->nextNode != nullptr && deleteTail->nextNode->needDelete &&
+               needDeleteNum > kDelayedDeleteCount) {
+          QueueNode<T>* deleteNode = deleteTail;
+          deleteTail = deleteTail->nextNode;
+          listSize--;
+          needDeleteNum--;
+          delete deleteNode;
+          deleteNode = nullptr;
+        }
+      }
+      --uniqueDeleteFlag;
     }
     return element;
   }
 
   bool enqueue(const T& element) {
-    QueueNode* newNode = new (std::nothrow) QueueNode(element);
+    QueueNode<T>* newNode = new (std::nothrow) QueueNode<T>(std::move(element));
     if (newNode == nullptr) {
       return false;
     }
-    QueueNode* currentHeader = header;
-    while (!std::atomic_compare_exchange_weak(&header, &currentHeader, newNode))
+    QueueNode<T>* currentHeader = header;
+    while (header.load()->getPtrs() == currentHeader->getPtrs() &&
+           !std::atomic_compare_exchange_weak(&header, &currentHeader, newNode))
       ;
     std::atomic_thread_fence(std::memory_order_seq_cst);
     currentHeader->nextNode = newNode;
-    _size++;
+    size++;
+    listSize++;
     return true;
-  }
-
-  bool empty() const {
-    return _size == 0;
   }
 
   void clear() {
     while (dequeue() != nullptr)
       ;
-  }
-
-  uint64_t size() const {
-    return _size;
+    size = 0;
+    listSize = 0;
   }
 
  private:
-  struct QueueNode {
-    QueueNode() : nextNode(nullptr) {
-    }
-    explicit QueueNode(const T& element) : nextNode(nullptr), item(element) {
-    }
-    explicit QueueNode(T& element) : nextNode(nullptr), item(std::move(element)) {
-    }
-    QueueNode* volatile nextNode;
-    T item;
-  };
-
-  std::atomic<QueueNode*> header = nullptr;
-  std::atomic<QueueNode*> tail = nullptr;
-  QueueNode* deleteTail = nullptr;
-  std::atomic_uint64_t _size = 0;
+  std::atomic<QueueNode<T>*> header = nullptr;
+  std::atomic<QueueNode<T>*> tail = nullptr;
+  QueueNode<T>* deleteTail = nullptr;
+  std::atomic_uint64_t size = 0;
+  std::atomic_uint64_t listSize = 0;
+  std::atomic_int uniqueDeleteFlag = 0;
 };
 
 }  // namespace tgfx
