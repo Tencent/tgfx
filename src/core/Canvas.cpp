@@ -54,10 +54,10 @@ static FillStyle CreateFillStyle(const Paint& paint) {
   Color color = {};
   if (shader && shader->asColor(&color)) {
     color.alpha *= paint.getAlpha();
-    style.color = color.premultiply();
+    style.color = color;
     shader = nullptr;
   } else {
-    style.color = paint.getColor().premultiply();
+    style.color = paint.getColor();
   }
   style.shader = shader;
   style.antiAlias = paint.isAntiAlias();
@@ -504,7 +504,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     state.matrix.preTranslate(-rect.x(), -rect.y());
     auto glyphStyle = style;
     if (colors) {
-      glyphStyle.color = colors[i].premultiply();
+      glyphStyle.color = colors[i];
     }
     if (rect == atlasRect) {
       drawContext->drawImage(atlas, sampling, state, glyphStyle);

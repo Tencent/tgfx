@@ -226,6 +226,14 @@ void ShapeLayer::setStrokeAlign(StrokeAlign align) {
   invalidateContent();
 }
 
+void ShapeLayer::setStrokeOnTop(bool value) {
+  if (_strokeOnTop == value) {
+    return;
+  }
+  _strokeOnTop = value;
+  invalidateContent();
+}
+
 ShapeLayer::~ShapeLayer() {
   for (auto& style : _fillStyles) {
     detachProperty(style.get());
@@ -267,14 +275,30 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
                                         fillPaintCount);
 }
 
-void ShapeLayer::drawContour(LayerContent* content, Canvas* canvas, const Paint& paint) const {
+void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+                              const std::function<void()>& drawChildren) const {
   auto shapeContent = static_cast<ShapeContent*>(content);
-  if (shapeContent == nullptr || !shapeContent->hasFills()) {
-    canvas->drawShape(_shape, paint);
+  if (!shapeContent || !shapeContent->drawFills(canvas, getPaint(alpha), forContour)) {
+    if (forContour) {
+      canvas->drawShape(_shape, getPaint(alpha));
+    }
   }
-  if (shapeContent != nullptr) {
-    shapeContent->drawContour(canvas, paint);
+  if (_strokeOnTop) {
+    drawChildren();
   }
+  if (shapeContent) {
+    shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
+  }
+  if (!_strokeOnTop) {
+    drawChildren();
+  }
+}
+
+Paint ShapeLayer::getPaint(float alpha) const {
+  Paint paint = {};
+  paint.setAntiAlias(allowsEdgeAntialiasing());
+  paint.setAlpha(alpha);
+  return paint;
 }
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
