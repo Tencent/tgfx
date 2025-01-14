@@ -131,8 +131,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
   // intersect the bounds.
   auto boundsWillSample = filterBounds(clipBounds);
   auto filterOriginBounds = filterBounds(Rect::MakeWH(source->width(), source->height()));
-  auto intersectResult = boundsWillSample.intersect(filterOriginBounds);
-  DEBUG_ASSERT(intersectResult);
+  boundsWillSample.intersect(filterOriginBounds);
 
   // sampleOffset means the offset between the source bounds and the sample bounds.
   auto sampleOffset = Point::Make(boundsWillSample.left, boundsWillSample.top);
