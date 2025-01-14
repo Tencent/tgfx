@@ -247,6 +247,29 @@ TGFX_TEST(FilterTest, DropShadow) {
   EXPECT_EQ(bounds, Rect::MakeXYWH(13, 13, 10, 10));
 }
 
+TGFX_TEST(FilterTest, BlurLargePixel) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto imageMatrix = Matrix::I();
+  image = image->makeRasterized(1.f);
+  auto bounds = Rect::MakeWH(image->width(), image->height());
+  imageMatrix.mapRect(&bounds);
+  auto imageWidth = static_cast<float>(bounds.width());
+  auto imageHeight = static_cast<float>(bounds.height());
+  auto surface =
+      Surface::Make(context, static_cast<int>(imageWidth * 2), static_cast<int>(imageHeight * 2));
+  auto canvas = surface->getCanvas();
+  canvas->concat(Matrix::MakeTrans(imageWidth / 2.0f, imageHeight / 2.0f));
+
+  Paint paint;
+  paint.setImageFilter(ImageFilter::Blur(5000, 1500));
+  canvas->drawImage(image, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/blur-large-pixel"));
+}
+
 TGFX_TEST(FilterTest, ImageFilterShader) {
   ContextScope scope;
   auto context = scope.getContext();
