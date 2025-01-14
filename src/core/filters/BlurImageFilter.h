@@ -24,12 +24,14 @@
 namespace tgfx {
 class BlurImageFilter : public ImageFilter {
  public:
-  BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode);
+  BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode,
+                  float scaleFactor);
 
   Point blurOffset;
   float downScaling;
   int iteration;
   TileMode tileMode;
+  float scaleFactor = 1.0f;
 
  protected:
   Type type() const override {
@@ -48,7 +50,7 @@ class BlurImageFilter : public ImageFilter {
                                                          const Matrix* uvMatrix) const override;
 
   void draw(std::shared_ptr<RenderTargetProxy> renderTarget,
-            std::unique_ptr<FragmentProcessor> imageProcessor, const Rect& imageBounds, bool isDown,
-            uint32_t renderFlags) const;
+            std::unique_ptr<FragmentProcessor> imageProcessor, const Size& imageSize,
+            const Matrix& blurUVMatrix, bool isDown, uint32_t renderFlags) const;
 };
 }  // namespace tgfx
