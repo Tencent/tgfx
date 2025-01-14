@@ -223,7 +223,7 @@ TGFX_TEST(LayerTest, imageLayer) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  auto image = MakeImage("resources/apitest/cmyk.jpg");
   auto surface = Surface::Make(context, image->width() * 5, image->height() * 5);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
