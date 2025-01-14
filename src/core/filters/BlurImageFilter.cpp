@@ -153,22 +153,22 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
     }
 
     if (sourceProcessor == nullptr) {
-      sourceUVMatrix =
-          Matrix::MakeScale(textureSize.width / downWidth, textureSize.height / downHeight);
+      sourceUVMatrix = Matrix::MakeScale(textureSize.width / static_cast<float>(downWidth),
+                                         textureSize.height / static_cast<float>(downHeight));
 
       sourceProcessor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), {},
                                             &sourceUVMatrix, isAlphaOnly);
     }
     draw(renderTarget, std::move(sourceProcessor), textureSize, blurUVMatrix, true,
          args.renderFlags);
-    textureSize = Size::Make(downWidth, downHeight);
+    textureSize = Size::Make(static_cast<float>(downWidth), static_cast<float>(downHeight));
     lastRenderTarget = renderTarget;
     blurUVMatrix = Matrix::I();
   }
 
   // upsample
   for (size_t i = renderTargets.size(); i > 0; --i) {
-    auto renderTarget = renderTargets[i - 1];
+    const auto& renderTarget = renderTargets[i - 1];
     if (i == 1) {
       // at the last iteration, we need to calculate the clip bounds of the filter
       blurUVMatrix =
@@ -178,8 +178,9 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
                                          textureSize.height / bounds.height());
     } else {
       // at other iterations, we upscale only
-      sourceUVMatrix = Matrix::MakeScale(textureSize.width / renderTarget->width(),
-                                         textureSize.height / renderTarget->height());
+      sourceUVMatrix =
+          Matrix::MakeScale(textureSize.width / static_cast<float>(renderTarget->width()),
+                            textureSize.height / static_cast<float>(renderTarget->height()));
     }
     sourceProcessor =
         TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, &sourceUVMatrix, isAlphaOnly);
@@ -187,7 +188,8 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
     draw(renderTarget, std::move(sourceProcessor), textureSize, blurUVMatrix, false,
          args.renderFlags);
     lastRenderTarget = renderTarget;
-    textureSize = Size::Make(renderTarget->width(), renderTarget->height());
+    textureSize = Size::Make(static_cast<float>(renderTarget->width()),
+                             static_cast<float>(renderTarget->height()));
   }
   return lastRenderTarget->getTextureProxy();
 }
