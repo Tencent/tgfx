@@ -124,17 +124,25 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
   auto drawRect = Rect::MakeWH(lastRenderTarget->width(), lastRenderTarget->height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
 
-  // calculate the bounds of filter after scaling. Bounds means the max texture size of the filter.
-  auto bounds = filterBounds(Rect::MakeWH(source->width(), source->height()));
-  auto filterOffset = Point::Make(bounds.left, bounds.top);
-  bounds.scale(scaleFactor, scaleFactor);
+  // Calculate the bounds of the filter after scaling.
+  // `boundsWillSample` will determine the size of the texture after the first downsample.
+  // By calculating the clip bound after filter, we can determine the bounds that will affect the
+  // result. However, the bounds may be larger than the origin filter bounds, so we need to
+  // intersect the bounds.
+  auto boundsWillSample = filterBounds(clipBounds);
+  auto filterOriginBounds = filterBounds(Rect::MakeWH(source->width(), source->height()));
+  boundsWillSample.intersect(filterOriginBounds);
+
+  // sampleOffset means the offset between the source bounds and the sample bounds.
+  auto sampleOffset = Point::Make(boundsWillSample.left, boundsWillSample.top);
+  boundsWillSample.scale(scaleFactor, scaleFactor);
 
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   // calculate the size of the source image of the first downsample
-  auto textureSize = Size::Make(bounds.width(), bounds.height());
-  // calculate the uv matrix of the first downsample
-  auto blurUVMatrix = Matrix::MakeTrans(filterOffset.x * scaleFactor * downScaling,
-                                        filterOffset.y * scaleFactor * downScaling);
+  auto textureSize = Size::Make(boundsWillSample.width(), boundsWillSample.height());
+  // calculate the uv matrix of the first downsample. Add sampleOffset to get the sample texture.
+  auto blurUVMatrix = Matrix::MakeTrans(sampleOffset.x * scaleFactor * downScaling,
+                                        sampleOffset.y * scaleFactor * downScaling);
 
   // scale the source image to smaller size
   auto sourceUVMatrix = Matrix::MakeScale(1 / (downScaling * scaleFactor));
@@ -170,12 +178,14 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
   for (size_t i = renderTargets.size(); i > 0; --i) {
     const auto& renderTarget = renderTargets[i - 1];
     if (i == 1) {
-      // at the last iteration, we need to calculate the clip bounds of the filter
+      // At the last iteration, we need to calculate the clip bounds of the filter.
+      // Subtract sampleOffset means to convert sample bounds to origin bounds.
+      // Add offset of clipBounds to apply clipBounds.
       blurUVMatrix =
-          Matrix::MakeTrans(clipBounds.left - filterOffset.x, clipBounds.top - filterOffset.y);
+          Matrix::MakeTrans(clipBounds.left - sampleOffset.x, clipBounds.top - sampleOffset.y);
       blurUVMatrix.postScale(scaleFactor, scaleFactor);
-      sourceUVMatrix = Matrix::MakeScale(textureSize.width / bounds.width(),
-                                         textureSize.height / bounds.height());
+      sourceUVMatrix = Matrix::MakeScale(textureSize.width / boundsWillSample.width(),
+                                         textureSize.height / boundsWillSample.height());
     } else {
       // at other iterations, we upscale only
       sourceUVMatrix =
