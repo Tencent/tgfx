@@ -17,7 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#if __APPLE__
 #include <TargetConditionals.h>
+#if defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < 110000
+#define DISABLE_ALIGNAS 1
+#endif
+#endif
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -105,7 +110,7 @@ class LockFreeQueue {
 
  private:
   T* queuePool = nullptr;
-#if defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < 110000
+#ifdef DISABLE_ALIGNAS
   std::atomic<uint32_t> head = {0};
   // tail indicates the position after requesting space,
   std::atomic<uint32_t> tail = {1};
