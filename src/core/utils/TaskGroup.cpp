@@ -84,8 +84,6 @@ bool TaskGroup::checkThreads() {
     if (thread) {
       totalThreads++;
       threads.enqueue(thread);
-      //      LOGI("TaskGroup: A task thread is created, the current number of threads : %lld",
-      //           threads.size());
     }
   } else {
     return true;
@@ -100,7 +98,9 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   if (exited || !checkThreads()) {
     return false;
   }
-  tasks.enqueue(std::move(task));
+  if (!tasks.enqueue(std::move(task))) {
+    return false;
+  }
   if (waitingThreads > 0) {
     condition.notify_one();
   }
@@ -113,13 +113,12 @@ std::shared_ptr<Task> TaskGroup::popTask() {
     auto task = tasks.dequeue();
     if (task) {
       return task;
-    } else {
-      waitingThreads++;
-      auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-      waitingThreads--;
-      if (exited || status == std::cv_status::timeout) {
-        return nullptr;
-      }
+    }
+    waitingThreads++;
+    auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
+    waitingThreads--;
+    if (exited || status == std::cv_status::timeout) {
+      return nullptr;
     }
   }
   return nullptr;
@@ -127,7 +126,6 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 
 void TaskGroup::exit() {
   exited = true;
-  tasks.clear();
   condition.notify_all();
   auto thread = threads.dequeue();
   while (thread != nullptr) {
