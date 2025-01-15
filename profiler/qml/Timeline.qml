@@ -18,5 +18,12 @@ Window {
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         objectName: "timelineView"
+
+
     }
+
+
+
+
+
 }
