@@ -18,15 +18,14 @@
 
 #pragma once
 
-#include <QGraphicsView>
-#include <QPushButton>
-#include <QWidget>
+
 #include <QGraphicsLineItem>
 #include "TimelineController.h"
 #include "src/profiler/TracyTimelineDraw.hpp"
 #include "TracyWorker.hpp"
 #include "ViewData.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
+#include "FramesView.h"
 
 class TimelineView: public QQuickItem {
   Q_OBJECT
@@ -54,9 +53,21 @@ public:
     bool highlight;
   };
 
+  //hovered struct.
   struct HoverData {
     bool hover = false;
-    QPointF pos;
+    const tracy::ZoneEvent* zoneHover = nullptr;
+    const tracy::ZoneEvent* selectedZone = nullptr;
+    uint32_t color = 0;
+    QPointF pressPos;
+    float thickness = 1.0f;
+    bool isPressed = false;
+  };
+
+  //clicked zone info.
+  struct ZoneInfoWindow {
+    bool active = false;
+    std::unique_ptr<QDialog> window;
   };
 
   struct MoveData {
@@ -71,6 +82,8 @@ public:
     LastFrames,
     LastRange
   };
+
+
   TimelineView(QQuickItem* parent = nullptr);
   ~TimelineView();
 
@@ -92,6 +105,15 @@ public:
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
 
+ //hovered functions.
+  void showZoneInfo(const tracy::ZoneEvent& ev);
+  void showZoneToolTip(const tracy::ZoneEvent& ev);
+  void hoverLeaveEvent(QHoverEvent *event) override;
+
+  //centered functions.
+  void zoomToTimeRange(int64_t start,int64_t end);
+  void centerOnTime(int64_t time);
+
   const char* getFrameText(const tracy::FrameData& fd, int i, uint64_t ftime) const;
   const char* getFrameSetName(const tracy::FrameData& fd) const;
   const char* getFrameSetName(const tracy::FrameData& fd, const tracy::Worker* worker) const;
@@ -110,6 +132,13 @@ public:
     frameData = worker->GetFramesBase();
     timelineController = new TimelineController(*this, *worker, true);
   }
+  void setFramesView(FramesView* framesView) {
+    m_framesView = framesView;
+  }
+
+  //slots
+  Q_SLOT  void onframeSelected(int64_t frameStart,int64_t frameEnd);
+  Q_SLOT  void onframeRangeSelected(int64_t startTime, int64_t endTime,int startFrame,int endFrame);
   ViewData* getViewDataPtr() const { return viewData; }
   void setViewData(ViewData* _viewData) { viewData = _viewData; }
 
@@ -122,10 +151,14 @@ protected:
     }
     return it->second;
   }
+  void onViewChanged() {
+    m_framesView->updateTimeRange(viewData->zvStart,viewData->zvEnd);
+  }
 private:
   tracy::unordered_flat_map<const void*, bool> visMap;
   tracy::Vector<const tracy::ThreadData*> threadOrder;
   tracy::Vector<const tracy::ThreadData*> threadReinsert;
+  FramesView* m_framesView = nullptr;
 
   tracy::Worker* worker;
   ViewData* viewData;
@@ -139,8 +172,23 @@ private:
   const tracy::FrameData* frameData;
   MoveData moveData;
 
+  void updateTimeRange(int64_t start , int64_t end);
+
   tgfx::Font font;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
   bool dirty = false;
+
+  //selected
+  bool hasSeletedFrame = false;
+  int64_t selectedFrameStart = 0;
+  int64_t selectedFrameEnd = 0;
+
+  //hover members
+  ZoneInfoWindow zoneInfo;
+  bool highlightZoom = false;
+
+  //same
+  std::vector<tracy::ZoneEvent*> sameZone;
+
 };

@@ -29,4 +29,5 @@ struct TimelineContext
   int64_t vStart, vEnd;
   tgfx::Point wpos;
   bool hover;
+  QPoint hoverPos;
 };

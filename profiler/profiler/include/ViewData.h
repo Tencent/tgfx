@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <QObject>
+#include <src/profiler/TracyUtility.hpp>
 #include "Utility.h"
-
+#include <QObject>
 
 struct ViewData: QObject {
   int64_t zvStart = 0;
@@ -48,4 +48,5 @@ struct ViewData: QObject {
   uint32_t frameTarget = 60;
 
   uint32_t plotHeight = 100;
+  double pxns = 0.0;
 };

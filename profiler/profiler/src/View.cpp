@@ -21,10 +21,8 @@
 #include <QLabel>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <QQuickWindow>
 #include <QRadioButton>
 #include <QSpinBox>
-#include <QVBoxLayout>
 #include <src/profiler/TracyFileselector.hpp>
 #include "FramesView.h"
 #include "TimelineView.h"
@@ -247,6 +245,9 @@ void View::ViewImpl() {
   qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
   framesEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Frames.qml")));
   framesEngine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
+  framesEngine->rootContext()->setContextProperty("_viewData", (unsigned long long)&viewData);
+  //framesEngine->load(QUrl((QStringLiteral("qrc:/qml/Frames.qml"))));
+  // framesEngine->rootContext()->setContextProperty("_width", width);
   framesEngine->rootContext()->setContextProperty("_viewData", &viewData);
   auto quickWindow = static_cast<QQuickWindow*>(framesEngine->rootObjects().value(0));
   auto framesWidget = createWindowContainer(quickWindow);
@@ -261,8 +262,25 @@ void View::ViewImpl() {
   auto timelineWidget = createWindowContainer(quickWindow);
   timelineWidget->resize(1000, 1000);
 
-  layout->addWidget(framesWidget);
+  //connect
+  auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
+  auto timelineWindow = qobject_cast<QQuickWindow*>(timelineEngine->rootObjects().first());
 
+   framesView = framesWindow->findChild<FramesView*>("framesView");
+   timelineView = timelineWindow->findChild<TimelineView*>("timelineView");
+   timelineView->setFramesView(framesView);
+
+
+  if(framesView && timelineView) {
+    connect(framesView,&FramesView::frameSelected,timelineView,&TimelineView::onframeSelected);
+    connect(framesView,&FramesView::frameSelectedRange,timelineView,&TimelineView::onframeRangeSelected);
+    connect(framesView, &FramesView::frameSelectedRange,
+        [this](int64_t startTime, int64_t endTime, int startFrame, int endFrame) {
+    timelineView->zoomToRange(startTime, endTime,false);
+});
+
+  }
+  layout->addWidget(framesWidget);
   layout->addWidget(timelineWidget);
 }
 

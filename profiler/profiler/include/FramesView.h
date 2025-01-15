@@ -32,13 +32,19 @@ class FramesView : public QQuickItem {
   Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
   Q_PROPERTY(ViewData* viewData READ getViewDataPtr WRITE setViewData)
 public:
+
   FramesView(QQuickItem* parent = nullptr);
   ~FramesView();
   void initView();
   void createAppHost();
 
+
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
+  void mousePressEvent(QMouseEvent *event) override;
+  void mouseReleaseEvent(QMouseEvent *event) override;
+  void hoverMoveEvent(QHoverEvent* event) override;
+
 
   uint64_t getFrameNumber(const tracy::FrameData& frameData, int i);
 
@@ -56,19 +62,56 @@ public:
     }
   }
 
+  //hover information utility.
+  void showFrameTip(const tracy::FrameData* frames);
+
+  //slots utility.
+  int64_t findFramesfromTime(int64_t time);
+
+  //signals
+  Q_SIGNAL void frameSelected(int64_t frameStart,int64_t frameEnd);
+  Q_SIGNAL void frameSelectedRange(int64_t frameStart,int64_t frameEnd,int startFrame,int endFrame);
+
+  //slots
+  Q_SLOT void updateTimeRange(int64_t trStart, int64_t trEnd);
+
+
+
 protected:
   void draw();
   void drawFrames(tgfx::Canvas* canvas);
   void drawBackground(tgfx::Canvas* canvs);
   QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
 
+
 private:
-  tracy::Worker* worker;
+  tracy::Worker* worker = nullptr;
   ViewData* viewData;
-  const tracy::FrameData* frames;
-  int frameHover = -1;
+  const tracy::FrameData* frames = nullptr;
 
   uint64_t frameTarget;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
+
+  //hover tip
+  uint64_t frameHover = 0;
+
+  //Left button pressing
+  float viewOffset = 0.0f;
+  int selectedFrame ;
+
+  //RightButton dragging
+  bool isRightDragging = false;
+  QPoint lastRightDragPos;
+
+  //selecting Range.
+  bool isFrameRangeSelecting = false;
+  int rangeFrameStart = -1;
+  int rangeFrameEnd = -1;
+
+  //timing range
+  int64_t rangeTimestart = -1;
+  int64_t rangeTimeEnd = -1;
+
+
 };
