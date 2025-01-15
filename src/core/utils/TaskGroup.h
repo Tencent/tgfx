@@ -35,8 +35,7 @@ class TaskGroup {
   std::atomic_bool exited = false;
   std::atomic_int waitingThreads = 0;
   LockFreeQueue<std::shared_ptr<Task>> tasks = {};
-  LockFreeQueue<std::thread*> threads = {};
-
+  std::vector<std::thread*> threads = {};
   static TaskGroup* GetInstance();
   static void RunLoop(TaskGroup* taskGroup);
 

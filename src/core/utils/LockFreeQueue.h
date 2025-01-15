@@ -17,18 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#if __APPLE__
-#include <TargetConditionals.h>
-#if defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < 110000
-#define DISABLE_ALIGNAS 1
-#endif
-#endif
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include "Log.h"
+
+#if __APPLE__
+#include <TargetConditionals.h>
+#if defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < 110000
+#define DISABLE_ALIGNAS 1
+#endif
+#endif
 
 namespace tgfx {
 static constexpr size_t CACHELINE_SIZE = 64;
@@ -48,16 +49,10 @@ class LockFreeQueue {
       LOGE("LockFreeQueue init Failed!\n");
       return;
     }
-    for (uint32_t i = 0; i < QUEUE_SIZE; i++) {
-      new (&queuePool[i]) T();
-    }
   }
 
   ~LockFreeQueue() {
     if (queuePool) {
-      for (uint32_t i = 0; i < QUEUE_SIZE; i++) {
-        queuePool[i].~T();
-      }
       std::free(queuePool);
       queuePool = nullptr;
     }
@@ -77,9 +72,9 @@ class LockFreeQueue {
         return nullptr;
       }
       element = queuePool[GetIndex(newHead)];
+      queuePool[GetIndex(newHead)] = nullptr;
     } while (!head.compare_exchange_weak(oldHead, newHead, std::memory_order_acq_rel,
                                          std::memory_order_relaxed));
-
     return element;
   }
 
@@ -112,13 +107,13 @@ class LockFreeQueue {
   T* queuePool = nullptr;
 #ifdef DISABLE_ALIGNAS
   std::atomic<uint32_t> head = {0};
-  // tail indicates the position after requesting space,
+  // tail indicates the position after requesting space.
   std::atomic<uint32_t> tail = {1};
   // tailPosition indicates the position after filling data.
   std::atomic<uint32_t> tailPosition = {1};
 #else
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> head = {0};
-  // tail indicates the position after requesting space,
+  // tail indicates the position after requesting space.
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> tail = {1};
   // tailPosition indicates the position after filling data.
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> tailPosition = {1};

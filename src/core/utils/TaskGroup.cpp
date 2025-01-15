@@ -44,6 +44,9 @@ int GetCPUCores() {
   return cpuCores;
 }
 
+static const int CPUCores = GetCPUCores();
+static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
+
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
@@ -74,19 +77,15 @@ void OnAppExit() {
 
 TaskGroup::TaskGroup() {
   std::atexit(OnAppExit);
+  threads.resize(static_cast<size_t>(MaxThreads), nullptr);
 }
 
 bool TaskGroup::checkThreads() {
-  static const int CPUCores = GetCPUCores();
-  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-  if (totalThreads == 0 || (waitingThreads > 0 && totalThreads < MaxThreads)) {
+  if (waitingThreads == 0 && totalThreads < MaxThreads) {
     auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
     if (thread) {
-      if (threads.enqueue(thread)) {
-        totalThreads++;
-      } else {
-        delete thread;
-      }
+      threads[static_cast<size_t>(totalThreads)] = thread;
+      totalThreads++;
     }
   } else {
     return true;
@@ -130,10 +129,11 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 void TaskGroup::exit() {
   exited = true;
   condition.notify_all();
-  auto thread = threads.dequeue();
-  while (thread != nullptr) {
-    ReleaseThread(thread);
-    thread = threads.dequeue();
+  for (int i = 0; i < totalThreads; i++) {
+    auto thread = threads[static_cast<size_t>(i)];
+    if (thread) {
+      ReleaseThread(thread);
+    }
   }
   totalThreads = 0;
   waitingThreads = 0;
