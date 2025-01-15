@@ -24,6 +24,9 @@ std::shared_ptr<SolidColor> SolidColor::Make(const Color& color) {
 }
 
 void SolidColor::setColor(const Color& color) {
+  if (_color == color) {
+    return;
+  }
   _color = color;
   invalidate();
 }

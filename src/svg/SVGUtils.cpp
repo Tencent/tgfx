@@ -295,7 +295,7 @@ void Base64Encode(unsigned char const* bytesToEncode, size_t length, char* ret) 
     char_array_4[3] = char_array_3[2] & 0x3f;
 
     for (j = 0; (j < i + 1); j++) {
-      ret += base64_chars[char_array_4[j]];
+      *ret++ = base64_chars[char_array_4[j]];
     }
 
     while ((i++ < 3)) {
@@ -335,7 +335,6 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
   size_t base64Size = ((encodedData->size() + 2) / 3) * 4;
   auto bufferSize = prefixLength + base64Size;
   auto* dest = static_cast<char*>(malloc(bufferSize));
-  memset(dest, 0, bufferSize);
   memcpy(dest, pngPrefix, prefixLength);
   Base64Encode(encodedData->bytes(), encodedData->size(), dest + prefixLength);
   dest[bufferSize - 1] = '\0';

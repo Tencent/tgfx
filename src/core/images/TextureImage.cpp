@@ -20,7 +20,6 @@
 
 namespace tgfx {
 std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy) {
-  TRACE_EVENT;
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -37,7 +36,6 @@ TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t 
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
-  TRACE_EVENT;
   if (context == nullptr || context->uniqueID() != contextID) {
     return {};
   }
@@ -53,7 +51,6 @@ BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* or
 }
 
 std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
-  TRACE_EVENT;
   if (context == nullptr || context->uniqueID() != contextID) {
     return nullptr;
   }
@@ -62,7 +59,6 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
 
 std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(const TPArgs& args,
                                                                const UniqueKey&) const {
-  TRACE_EVENT;
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }

@@ -21,7 +21,6 @@
 
 namespace tgfx {
 std::shared_ptr<Image> CodecImage::MakeFrom(const std::shared_ptr<ImageCodec>& codec) {
-  TRACE_EVENT;
   if (!codec) {
     return nullptr;
   }

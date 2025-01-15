@@ -27,7 +27,6 @@ OffscreenImage::OffscreenImage(UniqueKey uniqueKey) : ResourceImage(std::move(un
 
 std::shared_ptr<TextureProxy> OffscreenImage::onLockTextureProxy(const TPArgs& args,
                                                                  const UniqueKey& key) const {
-  TRACE_EVENT;
   auto proxyProvider = args.context->proxyProvider();
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(key);
   if (textureProxy != nullptr) {

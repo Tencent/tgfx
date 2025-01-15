@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "SolidColor.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeStyle.h"
@@ -54,6 +53,8 @@ class ShapeLayer : public Layer {
    * Creates a new shape layer instance.
    */
   static std::shared_ptr<ShapeLayer> Make();
+
+  ~ShapeLayer() override;
 
   LayerType type() const override {
     return LayerType::Shape;
@@ -261,23 +262,35 @@ class ShapeLayer : public Layer {
   void setStrokeEnd(float end);
 
   /**
- * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
- */
+   * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
+   */
   StrokeAlign strokeAlign() const {
     return _strokeAlign;
   }
 
   /**
- * Sets the stroke alignment applied to the shape’s path when stroked.
- */
+   * Sets the stroke alignment applied to the shape’s path when stroked.
+   */
   void setStrokeAlign(StrokeAlign align);
 
-  ~ShapeLayer() override;
+  /**
+   * Indicates whether strokes are drawn on top of child layers and layer styles. Normally, strokes
+   * are drawn above fills but below child layers. If true, strokes are drawn above all child layers
+   * and layer styles. The default value is false.
+   */
+  bool strokeOnTop() const {
+    return _strokeOnTop;
+  }
+
+  void setStrokeOnTop(bool value);
 
  protected:
   ShapeLayer() = default;
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
+
+  void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+                    const std::function<void()>& drawChildren) const override;
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;
@@ -289,5 +302,9 @@ class ShapeLayer : public Layer {
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
+  bool _strokeOnTop = false;
+
+  Paint getPaint(float alpha) const;
+  std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx

@@ -34,7 +34,6 @@ std::shared_ptr<Image> ResourceImage::makeRasterized(float rasterizationScale,
 }
 
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
-  TRACE_EVENT;
   auto newArgs = args;
   // ResourceImage has preset mipmaps.
   newArgs.mipmapped = hasMipmaps();
@@ -42,7 +41,6 @@ std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args
 }
 
 std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
-  TRACE_EVENT;
   auto source = std::static_pointer_cast<ResourceImage>(weakThis.lock());
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
 }
@@ -50,7 +48,6 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
 std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
     const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
-  TRACE_EVENT;
   TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,

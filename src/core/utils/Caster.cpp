@@ -90,6 +90,13 @@ const CodecImage* Caster::AsCodecImage(const Image* image) {
   return nullptr;
 }
 
+const SubsetImage* Caster::AsSubsetImage(const Image* image) {
+  if (image->type() == Image::Type::Subset) {
+    return static_cast<const SubsetImage*>(image);
+  }
+  return nullptr;
+}
+
 const ShaderMaskFilter* Caster::AsShaderMaskFilter(const MaskFilter* maskFilter) {
   if (maskFilter->type() == MaskFilter::Type::Shader) {
     return static_cast<const ShaderMaskFilter*>(maskFilter);

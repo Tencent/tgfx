@@ -441,4 +441,36 @@ class Canvas {
   friend class Recorder;
   friend class SVGExporter;
 };
+
+/**
+ * AutoCanvasRestore is a helper class that automatically saves the current state of a Canvas when
+ * created and restores it when destroyed. This is useful for ensuring that the Canvas state is
+ * restored to its previous state when exiting a scope.
+ */
+class AutoCanvasRestore {
+ public:
+  /**
+   * Creates an AutoSaveRestore object for the specified Canvas. The current state of the Canvas is
+   * saved when created and restored when destroyed.
+   * @param canvas  the Canvas to save and restore.
+   */
+  explicit AutoCanvasRestore(Canvas* canvas) : canvas(canvas) {
+    if (canvas) {
+      saveCount = canvas->save();
+    }
+  }
+
+  /**
+   * Restores the Canvas state to the saved state.
+   */
+  ~AutoCanvasRestore() {
+    if (canvas) {
+      canvas->restoreToCount(saveCount);
+    }
+  }
+
+ private:
+  Canvas* canvas = nullptr;
+  int saveCount = 0;
+};
 }  // namespace tgfx

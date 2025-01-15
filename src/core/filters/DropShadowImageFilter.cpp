@@ -30,11 +30,16 @@
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color) {
+  if (color.alpha <= 0) {
+    return nullptr;
+  }
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
                                                          float blurrinessY, const Color& color) {
+  // If color is transparent, the image after applying the filter will be transparent.
+  // So we should not return nullptr when color is transparent.
   return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 
@@ -59,6 +64,11 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
+  if (color.alpha <= 0) {
+    // The filer will not be created if filter is not drop shadow only and alpha < 0.So if color is
+    // transparent, the image after applying the filter will be transparent.
+    return nullptr;
+  }
   source = source->makeRasterized();
   std::unique_ptr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);

@@ -23,7 +23,6 @@
 namespace tgfx {
 std::shared_ptr<Image> DecoderImage::MakeFrom(UniqueKey uniqueKey,
                                               std::shared_ptr<ImageDecoder> decoder) {
-  TRACE_EVENT;
   if (decoder == nullptr) {
     return nullptr;
   }
@@ -39,7 +38,6 @@ DecoderImage::DecoderImage(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> de
 
 std::shared_ptr<TextureProxy> DecoderImage::onLockTextureProxy(const TPArgs& args,
                                                                const UniqueKey& key) const {
-  TRACE_EVENT;
   return args.context->proxyProvider()->createTextureProxy(key, decoder, args.mipmapped,
                                                            args.renderFlags);
 }

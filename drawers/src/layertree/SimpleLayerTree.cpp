@@ -19,8 +19,8 @@
 #include "SimpleLayerTree.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
-#include "tgfx/layers/ImagePattern.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidColor.h"
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 
@@ -67,8 +67,9 @@ static std::shared_ptr<tgfx::Layer> CreateBackground() {
   background->setPath(backPath);
 
   auto backgroundGradient = tgfx::ShapeLayer::Make();
-  auto gradient = tgfx::Gradient::MakeLinear({0, 0}, {0, 430});
-  gradient->setColors({tgfx::Color::FromRGBA(233, 0, 100), tgfx::Color::FromRGBA(134, 93, 255, 0)});
+  auto gradient = tgfx::Gradient::MakeLinear(
+      {0, 0}, {0, 430},
+      {tgfx::Color::FromRGBA(233, 0, 100), tgfx::Color::FromRGBA(134, 93, 255, 0)});
   auto gradientPath = tgfx::Path();
   gradientPath.addRect(tgfx::Rect::MakeXYWH(0, 0, 375, 430));
   gradientPath.addPath(backPath, tgfx::PathOp::Intersect);

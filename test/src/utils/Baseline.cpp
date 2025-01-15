@@ -23,7 +23,7 @@
 #include <iostream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
-#include "core/utils/Profiling.h"
+#include "core/utils/USE.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
@@ -37,10 +37,14 @@ static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/")
 static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json";
 static const std::string CACHE_MD5_PATH = BASELINE_ROOT + "/.cache/md5.json";
 static const std::string CACHE_VERSION_PATH = BASELINE_ROOT + "/.cache/version.json";
+static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache/HEAD";
+#ifdef GENERATE_BASELINE_IMAGES
+static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
+#else
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
+#endif
 static const std::string OUT_MD5_PATH = OUT_ROOT + "/md5.json";
 static const std::string OUT_VERSION_PATH = OUT_ROOT + "/version.json";
-static const std::string GIT_HEAD_PATH = BASELINE_ROOT + "/.cache/HEAD";
 
 static nlohmann::json BaselineVersion = {};
 static nlohmann::json CacheVersion = {};
@@ -113,7 +117,6 @@ bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::stri
 }
 
 bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string& key) {
-  TRACE_EVENT;
   if (surface == nullptr) {
     return false;
   }
@@ -174,15 +177,15 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
     }
     md5 = DumpMD5(newPixmap.pixels(), newPixmap.byteSize());
   }
+#ifdef GENERATE_BASELINE_IMAGES
+  SaveImage(pixmap, key + "_base");
+#endif
   return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
     if (result) {
       RemoveImage(key);
     } else {
       SaveImage(pixmap, key);
     }
-#ifdef GENERATOR_BASELINE_IMAGES
-    SaveImage(pixmap, key + "_base");
-#endif
   });
 }
 
@@ -240,6 +243,13 @@ static void CreateFolder(const std::string& path) {
 void Baseline::TearDown() {
 #ifdef UPDATE_BASELINE
   if (!TGFXTest::HasFailure()) {
+#ifdef GENERATE_BASELINE_IMAGES
+    auto outPath = ProjectPath::Absolute("test/out/");
+    std::filesystem::remove_all(outPath);
+    if (std::filesystem::exists(OUT_ROOT)) {
+      std::filesystem::rename(OUT_ROOT, outPath);
+    }
+#endif
     CreateFolder(CACHE_MD5_PATH);
     std::ofstream outMD5File(CACHE_MD5_PATH);
     outMD5File << std::setw(4) << OutputMD5 << std::endl;
@@ -247,7 +257,10 @@ void Baseline::TearDown() {
     CreateFolder(CACHE_VERSION_PATH);
     std::filesystem::copy(BASELINE_VERSION_PATH, CACHE_VERSION_PATH,
                           std::filesystem::copy_options::overwrite_existing);
+  } else {
+    std::filesystem::remove_all(OUT_ROOT);
   }
+  USE(RemoveEmptyFolder);
 #else
   std::filesystem::remove(OUT_MD5_PATH);
   if (!OutputMD5.empty()) {
@@ -260,7 +273,7 @@ void Baseline::TearDown() {
   std::ofstream versionFile(OUT_VERSION_PATH);
   versionFile << std::setw(4) << OutputVersion << std::endl;
   versionFile.close();
-#endif
   RemoveEmptyFolder(OUT_ROOT);
+#endif
 }
 }  // namespace tgfx

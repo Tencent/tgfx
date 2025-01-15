@@ -18,7 +18,6 @@
 
 #include "ImageDecoder.h"
 #include "core/utils/DataTask.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 

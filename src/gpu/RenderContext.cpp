@@ -20,6 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
+#include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
 #include "gpu/ProxyProvider.h"
@@ -98,7 +99,7 @@ void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillS
   if (localBounds.isEmpty()) {
     return;
   }
-  auto drawOp = RectDrawOp::Make(style.color, localBounds, state.matrix);
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), localBounds, state.matrix);
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
@@ -110,7 +111,7 @@ bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const Fi
   if (!HasColorOnly(style) || !style.isOpaque() || !state.matrix.rectStaysRect()) {
     return false;
   }
-  auto color = style.color;
+  auto color = style.color.premultiply();
   auto bounds = rect;
   state.matrix.mapRect(&bounds);
   auto [clipRect, useScissor] = getClipRect(state.clip, &bounds);
@@ -135,7 +136,7 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
   if (localBounds.isEmpty()) {
     return;
   }
-  auto drawOp = RRectDrawOp::Make(style.color, rRect, state.matrix);
+  auto drawOp = RRectDrawOp::Make(style.color.premultiply(), rRect, state.matrix);
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
@@ -152,7 +153,8 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     return;
   }
   auto clipBounds = getClipBounds(state.clip);
-  auto drawOp = ShapeDrawOp::Make(style.color, std::move(shape), state.matrix, clipBounds);
+  auto drawOp =
+      ShapeDrawOp::Make(style.color.premultiply(), std::move(shape), state.matrix, clipBounds);
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
 
@@ -167,17 +169,23 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
                                   const SamplingOptions& sampling, const MCState& state,
                                   const FillStyle& style) {
   DEBUG_ASSERT(image != nullptr);
+  DEBUG_ASSERT(image->isAlphaOnly() || style.shader == nullptr);
+  auto uvMatrix = Matrix::I();
+  auto subsetImage = Caster::AsSubsetImage(image.get());
+  if (subsetImage != nullptr) {
+    uvMatrix = Matrix::MakeTrans(subsetImage->bounds.left, subsetImage->bounds.top);
+    image = subsetImage->source;
+  }
   auto localBounds = clipLocalBounds(state, rect);
   if (localBounds.isEmpty()) {
     return;
   }
-  DEBUG_ASSERT(image->isAlphaOnly() || style.shader == nullptr);
   FPArgs args = {getContext(), renderFlags, localBounds, state.matrix};
   auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
   }
-  auto drawOp = RectDrawOp::Make(style.color, localBounds, state.matrix);
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), localBounds, state.matrix, uvMatrix);
   drawOp->addColorFP(std::move(processor));
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
@@ -217,7 +225,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (processor == nullptr) {
     return;
   }
-  auto drawOp = RectDrawOp::Make(style.color, localBounds, state.matrix);
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), localBounds, state.matrix);
   drawOp->addCoverageFP(std::move(processor));
   addDrawOp(std::move(drawOp), localBounds, state, style);
 }
