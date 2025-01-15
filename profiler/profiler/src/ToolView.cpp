@@ -16,15 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ToolView.h"
-#include <MainView.h>
 #include <QComboBox>
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <TracyFileRead.hpp>
-#include <cinttypes>
+#include "MainView.h"
+#include "TracyFileRead.hpp"
+#include "ToolView.h"
 
 ClientItem::ClientItem(ClientData& data, QWidget* parent):
   data(data), QWidget(parent){
@@ -60,8 +59,31 @@ ToolView::ToolView(QWidget* parent) :
   initConnect();
 }
 
-ToolView::~ToolView() {
 
+void ToolView::reset() {
+  clientWidget->clear();
+  clients.clear();
+  clientItems.clear();
+  itemToClients.clear();
+}
+
+ToolView::~ToolView() {
+  disconnect(clientWidget, &QListWidget::itemDoubleClicked, this, &ToolView::connectClient);
+  clients.clear();
+  for (auto iter: clientItems) {
+    if (iter.second) {
+      clientWidget->removeItemWidget(iter.second);
+      delete iter.second;
+    }
+  }
+  clientItems.clear();
+  itemToClients.clear();
+  resolvMap.clear();
+
+  delete clientWidget;
+  delete textCombobox;
+  delete connectButton;
+  delete openFileButton;
 }
 
 void ToolView::paintEvent(QPaintEvent* event) {
@@ -77,7 +99,6 @@ void ToolView::timerEvent(QTimerEvent* event) {
 
 void ToolView::initView() {
   auto layout = new QVBoxLayout(this);
-  // layout->setContentsMargins(0, 0, 0, 0);
   auto lable = new QLabel("TGFX Profiler v1.0.0", this);
   QFont font;
   font.setFamily("Arial");
@@ -88,6 +109,7 @@ void ToolView::initView() {
   lable->setAlignment(Qt::AlignCenter);
 
   textCombobox = new QComboBox;
+  textCombobox->addItem("127.0.0.1");
   textCombobox->setEditable(true);
 
   auto buttonLayout = new QHBoxLayout;
@@ -104,10 +126,9 @@ void ToolView::initView() {
   layout->addWidget(textCombobox);
   layout->addLayout(buttonLayout);
   layout->addWidget(clientWidget);
-  // layout->addWidget(itemWidget);
 }
 
-void ToolView::connectClient(QListWidgetItem* currenItem, QListWidgetItem*) {
+void ToolView::connectClient(QListWidgetItem* currenItem) {
   auto clientIdIter = itemToClients.find(currenItem);
   if (clientIdIter == itemToClients.end()) {
     return;
@@ -119,11 +140,34 @@ void ToolView::connectClient(QListWidgetItem* currenItem, QListWidgetItem*) {
   auto data = clientDataIter->second;
   auto mainView = static_cast<MainView*>(this->parent());
   mainView->connectClient(data.address.c_str(), data.port);
+  reset();
 }
 
-void ToolView::connect() {
-  auto mainView = static_cast<MainView*>(this->parent());
-  mainView->openConnectView();
+void ToolView::connectAddress() {
+  auto addr = textCombobox->currentText();
+  auto byteArray = addr.toLatin1();
+  auto aptr = byteArray.data();
+  while( *aptr == ' ' || *aptr == '\t' ) aptr++;
+  auto aend = aptr;
+  while( *aend && *aend != ' ' && *aend != '\t' ) aend++;
+
+  if( aptr != aend ) {
+
+    auto mainView = static_cast<MainView*>(this->parent());
+    std::string address( aptr, aend );
+
+    auto adata = address.data();
+    auto ptr = adata + address.size() - 1;
+    while( ptr > adata && *ptr != ':' ) ptr--;
+    if (*ptr == ':') {
+      std::string addrPart = std::string( adata, ptr );
+      uint16_t portPart = (uint16_t)atoi( ptr+1 );
+      mainView->connectClient(addrPart.c_str(), portPart);
+    }
+    else {
+      mainView->connectClient(address.c_str(), 8086);
+    }
+  }
 }
 
 void ToolView::openFile() {
@@ -149,10 +193,10 @@ void ToolView::handleClient(uint64_t clientId) {
 }
 
 void ToolView::initConnect() {
-  QObject::connect(connectButton, &QPushButton::clicked, this, &ToolView::connect);
-  QObject::connect(openFileButton, &QPushButton::clicked, this, &ToolView::openFile);
-  QObject::connect(this, &ToolView::addClient, this, &ToolView::handleClient);
-  QObject::connect(clientWidget, &QListWidget::currentItemChanged, this, &ToolView::connectClient);
+  connect(connectButton, &QPushButton::clicked, this, &ToolView::connectAddress);
+  connect(openFileButton, &QPushButton::clicked, this, &ToolView::openFile);
+  connect(this, &ToolView::addClient, this, &ToolView::handleClient);
+  connect(clientWidget, &QListWidget::itemClicked, this, &ToolView::connectClient);
 }
 
 void ToolView::updateBroadcastClients()

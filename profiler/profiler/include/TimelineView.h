@@ -31,7 +31,7 @@
 class TimelineView: public QQuickItem {
   Q_OBJECT
   Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
-  Q_PROPERTY(unsigned long long viewData READ getViewDataPtr WRITE setViewData)
+  Q_PROPERTY(ViewData* viewData READ getViewDataPtr WRITE setViewData)
 public:
   struct Region
   {
@@ -110,10 +110,8 @@ public:
     frameData = worker->GetFramesBase();
     timelineController = new TimelineController(*this, *worker, true);
   }
-  unsigned long long getViewDataPtr() const { return (unsigned long long)viewData; }
-  void setViewData(unsigned long long _viewData) {
-    viewData = (ViewData*)_viewData;
-  }
+  ViewData* getViewDataPtr() const { return viewData; }
+  void setViewData(ViewData* _viewData) { viewData = _viewData; }
 
 protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;

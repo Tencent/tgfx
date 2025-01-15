@@ -33,6 +33,7 @@ if (NOT CMAKE_PREFIX_PATH)
     include("./QTCMAKE.cfg")
 endif ()
 
+option(TGFX_ENABLE_PROFILING "Enable Profiling" OFF)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./tgfx)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
@@ -93,11 +94,13 @@ list(APPEND TGFX_PROFILER_INCLUDE
 
 
 file(GLOB TGFX_PROFILER_FILES
+        profiler/include/View.h
+        profiler/include/MainView.h
         profiler/include/ToolView.h
         profiler/include/FramesView.h
         profiler/include/TimelineView.h
+        profiler/include/ProfilerWindow.h
         profiler/main.cpp
-        profiler/src/ProfilerApplication.cpp
         profiler/src/MainView.cpp
         profiler/src/ToolView.cpp
         profiler/src/TimelineView.cpp
@@ -108,7 +111,8 @@ file(GLOB TGFX_PROFILER_FILES
         profiler/src/Utility.cpp
         profiler/src/UserData.cpp
         profiler/src/View.cpp
-        profiler/src/ProfilerWindow.cpp)
+        profiler/src/ProfilerWindow.cpp
+        profiler/src/ProfilerApplication.cpp)
 
 add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${SERVER_FILES} ${PROFILER_FILES} ${COMMON_FILES} ${QT_RESOURCES})
 target_include_directories(Profiler PRIVATE ${TGFX_PROFILER_INCLUDE})

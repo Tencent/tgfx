@@ -20,32 +20,38 @@
 #include <qguiapplication.h>
 #include <qscreen.h>
 #include <QToolBar>
-#include <QPainter>
-#include <QVBoxLayout>
 #include "MainView.h"
 
 ProfilerWindow::ProfilerWindow(QMainWindow* parent): QMainWindow(parent) {
   initWindow();
+  initConnect();
+  updateToolBar(ProfilerStatus::None);
 }
 
 void ProfilerWindow::initToolBar() {
-  quitAction = new QAction(QIcon(":/icons/exit.png"), tr("&quit"), this);
-  saveFileAction = new QAction(tr("&save"), this);
-  stopAction = new QAction(QIcon(":/icons/player_stop.png"),tr("&stop"), this);
-  discardAction = new QAction(QIcon(":/icons/exit.png"),tr("&dicard"), this);
 
-  topBar = new QToolBar(tr("Tools"));
+  topBar = new QToolBar(tr("Tools"), this);
   topBar->setMovable(false);
-  topBar->setStyleSheet("background-color: blue");
+  // topBar->setStyleSheet("background-color: blue");
+  quitAction = new QAction(QIcon(":/icons/power.png"), tr("&quit"), this);
   topBar->addAction(quitAction);
+
+  saveFileAction = new QAction(QIcon(":/icons/save.png"),tr("&save"), this);
   topBar->addAction(saveFileAction);
-  topBar->addAction(stopAction);
+
+  palyeAction = new QAction(QIcon(":/icons/pause.png"),tr("&pause"), this);
+  topBar->addAction(palyeAction);
+
+  discardAction = new QAction(QIcon(":/icons/discard.png"),tr("&dicard"), this);
   topBar->addAction(discardAction);
 }
 
 
-void ProfilerWindow::setToolBarEnable() {
-
+void ProfilerWindow::updateToolBar(ProfilerStatus status) {
+  quitAction->setEnabled(status == ProfilerStatus::ReadFile);
+  saveFileAction->setEnabled(status == ProfilerStatus::Connect);
+  palyeAction->setEnabled(status == ProfilerStatus::Connect);
+  discardAction->setEnabled(status == ProfilerStatus::Connect);
 }
 
 void ProfilerWindow::initWindow() {
@@ -57,4 +63,11 @@ void ProfilerWindow::initWindow() {
   QScreen* screen = QGuiApplication::primaryScreen();
   QRect rect = screen->availableGeometry();
   resize(rect.size().width(), rect.height());
+}
+
+void ProfilerWindow::initConnect() {
+  connect(mainView, &MainView::statusChange, this, &ProfilerWindow::updateToolBar);
+  connect(saveFileAction, &QAction::triggered, mainView, &MainView::saveFile);
+  connect(quitAction, &QAction::triggered, mainView, &MainView::quitReadFile);
+  connect(discardAction, &QAction::triggered, mainView, &MainView::discardConnect);
 }

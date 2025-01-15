@@ -19,17 +19,18 @@
 #pragma once
 
 #include <ToolView.h>
+#include <QGraphicsView>
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <thread>
-#include <QGraphicsView>
-
-#include "src/profiler/TracyConfig.hpp"
-#include "TracySysUtil.hpp"
 #include "TracyWorker.hpp"
+#include "Utility.h"
+#include "View.h"
+#include "src/profiler/TracyConfig.hpp"
 
 class MainView: public QWidget {
+  Q_OBJECT
 public:
   static std::thread loadThread;
 
@@ -37,14 +38,19 @@ public:
   ~MainView();
 
   void connectClient(const char* address, uint16_t port);
-  void openConnectView();
   void openFile();
   void openToolView();
+
+  Q_SLOT void quitReadFile();
+  Q_SLOT void saveFile();
+  Q_SLOT void discardConnect();
+  Q_SIGNAL void statusChange(ProfilerStatus status);
 protected:
-  void initView();
+  void initToolView();
+  void reopenToolView();
 private:
   QWidget* toolView;
   QWidget* connectView;
-  QWidget* centorView;
+  View* centorView;
   QVBoxLayout* layout;
 };

@@ -2,5 +2,11 @@
     <qresource prefix="/">
         <file>qml/Timeline.qml</file>
         <file>qml/Frames.qml</file>
+        <file>icons/power.png</file>
+        <file>icons/save.png</file>
+        <file>icons/pause.png</file>
+        <file>icons/next.png</file>
+        <file>icons/stop.png</file>
+        <file>icons/discard.png</file>
     </qresource>
 </RCC>

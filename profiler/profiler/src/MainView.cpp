@@ -27,46 +27,76 @@
 #include "src/profiler/TracyFileselector.hpp"
 
 MainView::MainView(QWidget* parent): QWidget(parent) {
-  initView();
+  setAttribute(Qt::WA_StyledBackground);
+  setStyleSheet("background-color: black;");
+  initToolView();
 }
 
 MainView::~MainView() {
 }
 
-void MainView::initView() {
-  setStyleSheet("background-color: black;");
+void MainView::initToolView() {
   toolView = new ToolView(this);
   layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->addWidget(toolView);
 }
 
-void MainView::openConnectView() {
+void MainView::reopenToolView() {
+  Q_EMIT statusChange(ProfilerStatus::None);
+  if (!toolView) {
+    toolView = new ToolView(this);
+  }
+  layout->addWidget(toolView);
+}
 
+void MainView::saveFile(){
+  centorView->saveFile();
+}
+
+void MainView::quitReadFile(){
+  if (centorView) {
+    delete centorView;
+    centorView = nullptr;
+  }
+
+  reopenToolView();
+}
+
+void MainView::discardConnect() {
+  if (centorView) {
+    delete centorView;
+    centorView = nullptr;
+  }
+
+  reopenToolView();
 }
 
 void MainView::connectClient(const char* address, const uint16_t port) {
-  toolView->setParent(NULL);
-  // delete toolView;
-
+  toolView->setParent(nullptr);
   tracy::Config config;
   centorView = new View(address, port, this->width(), config, this);
+  if (!centorView->isConnected()) {
+    delete centorView;
+    centorView = nullptr;
+    return;
+  }
   layout->addWidget(centorView);
+  Q_EMIT statusChange(ProfilerStatus::Connect);
 }
 
 void MainView::openFile() {
   tracy::Fileselector::OpenFile( "tracy", "Tracy Profiler trace file", [&]( const char* fn ) {
     auto file = std::shared_ptr<tracy::FileRead>(tracy::FileRead::Open(fn));
     if (file) {
-      toolView->setParent(NULL);
-      delete toolView;
+      toolView->setParent(nullptr);
 
       tracy::Config config;
       centorView = new View(*file, this->width(), config, this);
       layout->addWidget(centorView);
-      // loadThread = std::thread([file] {
-      //
-      // });
+      Q_EMIT statusChange(ProfilerStatus::ReadFile);
+      delete toolView;
+      toolView = nullptr;
     }
   });
 }

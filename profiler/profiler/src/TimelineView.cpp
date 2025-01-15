@@ -244,7 +244,6 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, t
       const auto end = fd.frames.begin() + zrange.second;
       auto it = std::lower_bound(begin, end, int64_t(fbegin + MinVisSize * nspx),
         [this, &fd] (const auto& l, const auto& r) {
-          // return worker->GetFrameEnd(fd, std::distance(fd.frames.begin(), &l)) < r;
           return worker->GetFrameEnd(fd, fd.frames.begin() - &l) < r;
         });
       if(it == begin) ++it;
@@ -269,24 +268,18 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, t
     {
       if(fend - fbegin > frameTarget)
       {
-        // tgfx::Point p1 = wpos + tgfx::Point((fbegin + frameTarget - viewData->zvStart) * pxns, 0);
-        // tgfx::Point p2 =wpos + tgfx::Point((fend - viewData->zvStart) * pxns, wh);
-        // painter->fillRect(QRectF(p1, p2) , getColor(0x224444FF));
         tgfx::Point p1 = wpos + tgfx::Point((fbegin + frameTarget - viewData->zvStart) * pxns, 0);
         tgfx::Point p2 = wpos + tgfx::Point((fend - viewData->zvStart) * pxns, wh);
         drawRect(canvas, p1, p2, 0x224444FF);
       }
       if(fbegin >= viewData->zvStart && endPos != fbegin)
       {
-        // drawPolyLine(painter, dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns, 0), dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns, wh), 0x22FFFFFF);
         tgfx::Point p1 = dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns, 0);
         tgfx::Point p2 = dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns, wh);
         drawLine(canvas,p1, p2, 0x22FFFFFF);
       }
       if(fend <= viewData->zvEnd)
       {
-        // painter->setPen(getColor(0x22FFFFFF));
-        // painter->drawLine(dpos + tgfx::Point((fend - viewData->zvStart) * pxns, 0), dpos + tgfx::Point((fend - viewData->zvStart) * pxns, wh));
         tgfx::Point p1 = dpos + tgfx::Point((fend - viewData->zvStart) * pxns, 0);
         tgfx::Point p2 = dpos + tgfx::Point((fend - viewData->zvStart) * pxns, wh);
         drawLine(canvas,p1, p2, 0x22FFFFFF);
@@ -314,14 +307,12 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, t
 
     if(fbegin >= viewData->zvStart)
     {
-      // drawPolyLine(painter, dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns + 2, 1), dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns + 2, ty - 1), color);
       tgfx::Point p1 = dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns + 2, 1);
       tgfx::Point p2 = dpos + tgfx::Point((fbegin - viewData->zvStart) * pxns + 2, ty - 1);
       drawLine(canvas,p1, p2, color);
     }
     if(fend <= viewData->zvEnd)
     {
-      // drawPolyLine(painter, dpos + tgfx::Point((fend - viewData->zvStart) * pxns - 2, 1), dpos + tgfx::Point((fend - viewData->zvStart) * pxns - 2, ty - 1), color);
       auto p1 = dpos + tgfx::Point((fend - viewData->zvStart) * pxns - 2, 1);
       auto p2 = dpos + tgfx::Point((fend - viewData->zvStart) * pxns - 2, ty - 1);
       drawLine(canvas,p1, p2, color);
@@ -354,17 +345,12 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, t
       drawLine(canvas,p1, p2, color);
       auto textPos = wpos + tgfx::Point(tpos, getTextSize(appHost.get(), buf).height());
       drawText(canvas, appHost.get(), buf, textPos.x, textPos.y, color);
-      // drawPolyLine(painter, dpos + tgfx::Point(std::max(-10.0, f0), ty05), dpos + tgfx::Point(tpos, ty05), color);
-      // drawPolyLine(painter, dpos + tgfx::Point(std::max(-10.0, tpos + tx + 1), ty05), dpos + tgfx::Point(std::min(w + 20.0, f1), ty05), color);
-      // painter->setPen(getColor(color));
-      // painter->drawText(wpos + tgfx::Point(tpos, getFontSize(buf).height()), buf);
     }
     else
     {
       auto p1 = dpos + tgfx::Point(std::max(-10.0, (fbegin - viewData->zvStart) * pxns + 2), ty05);
       auto p2 = dpos + tgfx::Point(std::min(w + 20.0, (fend - viewData->zvStart) * pxns - 2), ty05);
       drawLine(canvas,p1, p2, color);
-      // drawPolyLine(painter, dpos + tgfx::Point(std::max(-10.0, (fbegin - viewData->zvStart) * pxns + 2), ty05), dpos + tgfx::Point(std::min(w + 20.0, (fend - viewData->zvStart) * pxns - 2), ty05), color);
     }
     i++;
   }
@@ -432,7 +418,6 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
         const auto px0 = std::max(pr0, -10.0);
         const auto px1 = std::max({ std::min(pr1, double(w + 10)), px0 + pxns * 0.5, px0 + MinVisSize });
         drawRect(canvas, px0 + wpos.x, offset + wpos.y, px1 - px0, tsz.height(), zoneColor.color);
-        // painter->fillRect(px0 + wpos.x(), offset + wpos.y(), px1 - px0, tsz.height(), getColor(zoneColor.color));
 
         if (zoneColor.highlight) {
           // TODO hight light
@@ -518,7 +503,6 @@ void TimelineView::drawTimeline(QPainter* painter, tgfx::Canvas* canvas) {
   if (timeEnd < viewData->zvEnd) {
     topLeft.x = (timeEnd - viewData->zvStart) * pxns;
   }
-  // painter->fillRect(QRectF(topLeft, bottomRight), getColor(0x44000000));
   drawRect(canvas, topLeft.x, topLeft.y, bottomRight.x, bottomRight.y, 0x44000000);
 
   timelineController->begin();

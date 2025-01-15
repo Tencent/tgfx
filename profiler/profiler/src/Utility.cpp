@@ -23,6 +23,8 @@
 #include <QRect>
 #include <QString>
 #include <filesystem>
+#include <src/profiler/TracyColor.hpp>
+#include "../../../src/core/utils/Profiling.h"
 #include "src/profiler/TracyColor.hpp"
 
 // Short list based on GetTypes() in TracySourceTokenizer.cpp
@@ -73,72 +75,12 @@ bool AppHost::updateScreen(int width, int height, float density) {
   return true;
 }
 
-
-static std::string getRootPath() {
-  std::filesystem::path filePath = __FILE__;
-  auto dir = filePath.parent_path().string();
-  return std::filesystem::path(dir + "/../../..").lexically_normal();
-}
-
-std::string absolutePath(const std::string& relativePath) {
-  std::filesystem::path path = relativePath;
-  if (path.is_absolute()) {
-    return path;
-  }
-  static const std::string rootPath = getRootPath() + "/";
-  return std::filesystem::path(rootPath + relativePath).lexically_normal();
-}
-
-QFont& getFont() {
-  QFont font("Arial", 12);
-  return font;
-}
-
-QRect getFontSize(const char* text, size_t textSize) {
-  QFont font("Arial", 12);
-  QFontMetrics fm(font);
-  QString str = QString(text);
-  if (textSize) {
-    str = QString(str.data(), textSize);
-  }
-  return fm.boundingRect(str);
-}
-
-QColor getColor(uint32_t color) {
-  // trans tracy color to qt color
-  auto r = (color      ) & 0xFF;
-  auto g = (color >>  8) & 0xFF;
-  auto b = (color >> 16) & 0xFF;
-  auto a = (color >> 24) & 0xFF;
-  return QColor(r, g, b, a);
-}
-
 tgfx::Color getTgfxColor(uint32_t color) {
   auto r = (color      ) & 0xFF;
   auto g = (color >>  8) & 0xFF;
   auto b = (color >> 16) & 0xFF;
   auto a = (color >> 24) & 0xFF;
   return tgfx::Color::FromRGBA(r, g, b, a);
-}
-
-void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, QPointF p3, uint32_t color, float thickness) {
-  QPointF points[3] = {p1, p2, p3};
-  painter->setPen(QPen(getColor(color), thickness));
-  painter->drawPolyline(points, 3);
-}
-
-void drawPolyLine(QPainter* painter, QPointF p1, QPointF p2, uint32_t color, float thickness) {
-  QPointF points[2] = {p1, p2};
-  painter->setPen(QPen(getColor(color), thickness));
-  painter->drawPolyline(points, 2);
-}
-
-void drawTextContrast(QPainter* painter, QPointF pos, uint32_t color, const char* text) {
-  painter->setPen(getColor(0xAA000000));
-  auto height = getFontSize(text).height();
-  painter->drawText(pos + QPointF(0.5f, 0.5f + height), text);
-  painter->setPen(getColor(color));
-  painter->drawText(pos + QPointF(0, height), text);
 }
 
 uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic ) {
@@ -148,13 +90,19 @@ uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic ) {
 
 tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize) {
   std::string strText(text);
+  auto iter = TextSizeMap.find(strText);
+  if (iter != TextSizeMap.end()) {
+    return iter->second;
+  }
   if (textSize) {
     strText = std::string(text, textSize);
   }
   auto typeface = appHost->getTypeface("default");
   tgfx::Font font(typeface, 10 );
   auto textBlob = tgfx::TextBlob::MakeFrom(strText, font);
-  return textBlob->getBounds();
+  auto rect = textBlob->getBounds();
+  TextSizeMap.emplace(strText, rect);
+  return rect;
 }
 
 void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color) {
@@ -212,22 +160,6 @@ void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, flo
   auto height = getTextSize(appHost, text).height();
   drawText(canvas, appHost, text, x + 0.5f, y + height + 0.5f, 0xAA000000);
   drawText(canvas, appHost, text, x, y + height, color);
-}
-
-void drawClipTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text, tgfx::Rect& rect) {
-  tgfx::Path clipPath;
-  clipPath.addRect(rect);
-  auto clipShape = tgfx::Shape::MakeFrom(clipPath);
-
-  tgfx::Paint paint;
-  paint.setColor(getTgfxColor(color));
-  auto typeface = appHost->getTypeface("default");
-  tgfx::Font font(typeface, 10 );
-  auto textBlob = tgfx::TextBlob::MakeFrom(text, font);
-  auto textShape = tgfx::Shape::MakeFrom(textBlob);
-
-  auto shape = tgfx::Shape::Merge(clipShape, textShape, tgfx::PathOp::Intersect);
-  canvas->drawShape(shape, paint);
 }
 
 const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name, tgfx::Rect tsz, float zsz) {

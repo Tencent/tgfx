@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tracy_robin_hood.h>
 #include <QComboBox>
 #include <QPushButton>
 #include <QListWidgetItem>
 #include <QWidget>
-#include <TracySocket.hpp>
+#include "TracySocket.hpp"
+#include "tracy_robin_hood.h"
 #include "profiler/src/ResolvService.hpp"
 
 struct ClientData
@@ -56,8 +56,9 @@ public:
   void initView();
   void initConnect();
   void openFile();
-  void connect();
-  Q_SLOT void connectClient(QListWidgetItem* currenItem, QListWidgetItem*);
+  void reset();
+  Q_SLOT void connectAddress();
+  Q_SLOT void connectClient(QListWidgetItem* currenItem);
   Q_SLOT void handleClient(uint64_t clinetId);
   Q_SIGNAL void addClient(uint64_t clinetId);
 private:

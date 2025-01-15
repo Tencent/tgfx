@@ -95,7 +95,6 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
 
   drawOverlay(wpos + tgfx::Point(0, yBegin), wpos + tgfx::Point(w, yEnd));
 
-  float lableWidth;
   const auto hdrOffset = yBegin;
   const bool drawHeader = yPos + ty >= ctx.yMin && yPos <= ctx.yMax;
   if (drawHeader) {
@@ -108,22 +107,15 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     else {
       tgfx::Point point = wpos + tgfx::Point(0, hdrOffset + ty);
       drawText(canvas, appHost, ICON_FA_CARET_RIGHT, point.x, point.y, color);
-      // painter->setPen(getColor(colorInactive));
-      // painter->drawText(wpos + QPointF(0, hdrOffset + ty), ICON_FA_CARET_RIGHT);
     }
 
     const auto lable = headerLable();
-    lableWidth = getTextSize(appHost, lable).width();
     tgfx::Point point = wpos + tgfx::Point(ty, hdrOffset + ty);
     drawText(canvas, appHost, lable, point.x, point.y, showFull ? color : colorInactive);
-    // painter->setPen(getColor(showFull ? color : colorInactive));
-    // painter->drawText(wpos + QPointF(ty, hdrOffset + ty), lable);
     if (showFull) {
       tgfx::Point p1 = dpos + tgfx::Point(0, hdrOffset + ty + 1);
       tgfx::Point p2 = dpos + tgfx::Point(w, hdrOffset + ty + 1);
       drawLine(canvas, p1, p2, headlineColor());
-      // painter->setPen(getColor(headlineColor()));
-      // painter->drawLine(dpos + QPointF(0, hdrOffset + ty + 1), dpos + QPointF(w, hdrOffset + ty + 1));
     }
   }
 

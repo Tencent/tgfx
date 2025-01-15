@@ -23,18 +23,20 @@
 #include "MainView.h"
 
 class ProfilerWindow: public QMainWindow {
+  Q_OBJECT
 public:
   ProfilerWindow(QMainWindow* parent = nullptr);
   void initWindow();
+  void initConnect();
+  Q_SLOT void updateToolBar(ProfilerStatus status);
 protected:
   void initToolBar();
-  void setToolBarEnable();
 private:
   MainView* mainView;
 
   QToolBar* topBar;
   QAction* quitAction;
   QAction* saveFileAction;
-  QAction* stopAction;
+  QAction* palyeAction;
   QAction* discardAction;
 };
