@@ -64,6 +64,7 @@ class LockFreeQueue {
     }
     uint32_t newHead = 0;
     uint32_t oldHead = head.load(std::memory_order_relaxed);
+    uint32_t oldHeadPosition = headPosition.load(std::memory_order_relaxed);
     T element = nullptr;
 
     do {
@@ -72,9 +73,14 @@ class LockFreeQueue {
         return nullptr;
       }
       element = queuePool[GetIndex(newHead)];
-      queuePool[GetIndex(newHead)] = nullptr;
     } while (!head.compare_exchange_weak(oldHead, newHead, std::memory_order_acq_rel,
                                          std::memory_order_relaxed));
+
+    queuePool[GetIndex(newHead)] = nullptr;
+
+    while (!headPosition.compare_exchange_weak(oldHeadPosition, newHead, std::memory_order_acq_rel,
+                                               std::memory_order_relaxed))
+      ;
     return element;
   }
 
@@ -88,7 +94,7 @@ class LockFreeQueue {
 
     do {
       newTail = oldTail + 1;
-      if (GetIndex(newTail) == GetIndex(head.load(std::memory_order_acquire))) {
+      if (GetIndex(newTail) == GetIndex(headPosition.load(std::memory_order_acquire))) {
         LOGI("The queue has reached its maximum capacity, capacity: %u!\n", QUEUE_SIZE);
         return false;
       }
@@ -106,13 +112,19 @@ class LockFreeQueue {
  private:
   T* queuePool = nullptr;
 #ifdef DISABLE_ALIGNAS
+  // head indicates the position after requesting space.
   std::atomic<uint32_t> head = {0};
+  // headPosition indicates the position after release data.
+  std::atomic<uint32_t> headPosition = {0};
   // tail indicates the position after requesting space.
   std::atomic<uint32_t> tail = {1};
   // tailPosition indicates the position after filling data.
   std::atomic<uint32_t> tailPosition = {1};
 #else
+  // head indicates the position after requesting space.
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> head = {0};
+  // headPosition indicates the position after release data.
+  alignas(CACHELINE_SIZE) std::atomic<uint32_t> headPosition = {0};
   // tail indicates the position after requesting space.
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> tail = {1};
   // tailPosition indicates the position after filling data.
