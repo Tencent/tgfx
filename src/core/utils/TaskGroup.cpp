@@ -82,8 +82,11 @@ bool TaskGroup::checkThreads() {
   if (totalThreads == 0 || (waitingThreads > 0 && totalThreads < MaxThreads)) {
     auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
     if (thread) {
-      totalThreads++;
-      threads.enqueue(thread);
+      if (threads.enqueue(thread)) {
+        totalThreads++;
+      } else {
+        delete thread;
+      }
     }
   } else {
     return true;

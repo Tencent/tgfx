@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <TargetConditionals.h>
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -104,11 +105,19 @@ class LockFreeQueue {
 
  private:
   T* queuePool = nullptr;
+#if defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED < 110000
+  std::atomic<uint32_t> head = {0};
+  // tail indicates the position after requesting space,
+  std::atomic<uint32_t> tail = {1};
+  // tailPosition indicates the position after filling data.
+  std::atomic<uint32_t> tailPosition = {1};
+#else
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> head = {0};
   // tail indicates the position after requesting space,
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> tail = {1};
   // tailPosition indicates the position after filling data.
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> tailPosition = {1};
+#endif
 };
 
 }  // namespace tgfx
