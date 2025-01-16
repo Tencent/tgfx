@@ -74,7 +74,6 @@ class Task {
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);
-  bool removeTask();
   void execute();
 
   friend class TaskGroup;

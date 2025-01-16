@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Task.h"
-#include "core/utils/Log.h"
 #include "core/utils/TaskGroup.h"
 
 namespace tgfx {
@@ -55,14 +54,6 @@ void Task::wait() {
   if (!_executing) {
     return;
   }
-  // Try to remove the task from the queue. Execute it directly on the current thread if the task is
-  // not in the queue. This is to avoid the deadlock situation.
-  if (removeTask()) {
-    block();
-    _executing = false;
-    condition.notify_all();
-    return;
-  }
   condition.wait(autoLock);
 }
 
@@ -71,14 +62,8 @@ void Task::cancel() {
   if (!_executing) {
     return;
   }
-  if (removeTask()) {
-    _executing = false;
-    _cancelled = true;
-  }
-}
-
-bool Task::removeTask() {
-  return TaskGroup::GetInstance()->removeTask(this);
+  _executing = false;
+  _cancelled = true;
 }
 
 void Task::execute() {
