@@ -64,7 +64,6 @@ class LockFreeQueue {
     }
     uint32_t newHead = 0;
     uint32_t oldHead = head.load(std::memory_order_relaxed);
-    uint32_t oldHeadPosition = headPosition.load(std::memory_order_relaxed);
     T element = nullptr;
 
     do {
@@ -78,9 +77,12 @@ class LockFreeQueue {
 
     queuePool[GetIndex(newHead)] = nullptr;
 
-    while (!headPosition.compare_exchange_weak(oldHeadPosition, newHead, std::memory_order_acq_rel,
-                                               std::memory_order_relaxed))
-      ;
+    uint32_t newHeadPosition = 0;
+    uint32_t oldHeadPosition = headPosition.load(std::memory_order_relaxed);
+    do {
+      newHeadPosition = oldHeadPosition + 1;
+    } while (!headPosition.compare_exchange_weak(
+        oldHeadPosition, newHeadPosition, std::memory_order_acq_rel, std::memory_order_relaxed));
     return element;
   }
 
@@ -90,7 +92,6 @@ class LockFreeQueue {
     }
     uint32_t newTail = 0;
     uint32_t oldTail = tail.load(std::memory_order_relaxed);
-    uint32_t oldTailPosition = tailPosition.load(std::memory_order_relaxed);
 
     do {
       newTail = oldTail + 1;
@@ -103,9 +104,12 @@ class LockFreeQueue {
 
     queuePool[GetIndex(oldTail)] = std::move(element);
 
-    while (!tailPosition.compare_exchange_weak(oldTailPosition, newTail, std::memory_order_acq_rel,
-                                               std::memory_order_relaxed))
-      ;
+    uint32_t newTailPosition = 0;
+    uint32_t oldTailPosition = tailPosition.load(std::memory_order_relaxed);
+    do {
+      newTailPosition = oldTailPosition + 1;
+    } while (!tailPosition.compare_exchange_weak(
+        oldTailPosition, newTailPosition, std::memory_order_acq_rel, std::memory_order_relaxed));
     return true;
   }
 
