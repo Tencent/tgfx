@@ -531,8 +531,6 @@ TGFX_TEST(SVGExportTest, GradientMask) {
   Buffer buffer(readStream->size());
   readStream->read(buffer.data(), buffer.size());
   auto compareString = std::string(static_cast<char*>(buffer.data()), buffer.size());
-  std::cout << compareString << std::endl;
-  std::cout << SVGString << std::endl;
 
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
 }
