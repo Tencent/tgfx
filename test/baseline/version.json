@@ -65,7 +65,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
         "ImageWithShadow": "270695a",
-        "SimpleLayerTreeDrawer": "4513df8",
+        "SimpleLayerTreeDrawer": "2c7cacd",
         "SimpleText": "b062b9a"
     },
     "FilterTest": {
@@ -78,6 +78,7 @@
         "ImageFilterShader": "2028a1b",
         "InnerShadowBadCase": "4d5c3b0",
         "ModeColorFilter": "c2b0b18",
+        "OpacityShadowTest": "836aed9",
         "RuntimeEffect": "d93c573",
         "blur": "4d5c3b0",
         "blur-large-pixel": "270695a",
@@ -107,8 +108,8 @@
         "Layer_hitTestPointNested": "b062b9a",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
-        "StrokeOnTop_Off": "02cad7c",
-        "StrokeOnTop_On": "02cad7c",
+        "StrokeOnTop_Off": "2c7cacd",
+        "StrokeOnTop_On": "2c7cacd",
         "draw_shape": "67dfa72",
         "draw_solid": "b4a1231",
         "draw_text": "b062b9a",
