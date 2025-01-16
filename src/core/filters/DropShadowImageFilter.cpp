@@ -84,7 +84,7 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
-  auto colorProcessor = ConstColorProcessor::Make(color, InputMode::Ignore);
+  auto colorProcessor = ConstColorProcessor::Make(color.premultiply(), InputMode::Ignore);
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
       std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
   if (shadowOnly) {

@@ -624,6 +624,32 @@ TGFX_TEST(FilterTest, EmptyShadowTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/EmptyShadowTest"));
 }
 
+TGFX_TEST(FilterTest, OpacityShadowTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawColor(Color::Black());
+
+  auto paint = Paint();
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+
+  Color shadowColor{1.0, 1.0, 1.0, 0.5};
+  paint.setImageFilter(ImageFilter::DropShadow(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(10, 10, 50, 50), paint);
+
+  paint.setImageFilter(ImageFilter::DropShadowOnly(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(110, 10, 50, 50), paint);
+
+  paint.setImageFilter(ImageFilter::InnerShadow(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(10, 110, 50, 50), paint);
+
+  paint.setImageFilter(ImageFilter::InnerShadowOnly(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(110, 110, 50, 50), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/OpacityShadowTest"));
+}
+
 TGFX_TEST(FilterTest, InnerShadowBadCase) {
   ContextScope scope;
   auto context = scope.getContext();

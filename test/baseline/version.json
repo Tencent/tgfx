@@ -78,6 +78,7 @@
         "ImageFilterShader": "2028a1b",
         "InnerShadowBadCase": "4d5c3b0",
         "ModeColorFilter": "c2b0b18",
+        "OpacityShadowTest": "836aed9",
         "RuntimeEffect": "d93c573",
         "blur": "4d5c3b0",
         "blur-large-pixel": "270695a",

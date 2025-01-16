@@ -68,7 +68,7 @@ std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
                                                sampling, &shadowMatrix);
   }
 
-  auto colorProcessor = ConstColorProcessor::Make(color, InputMode::Ignore);
+  auto colorProcessor = ConstColorProcessor::Make(color.premultiply(), InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
