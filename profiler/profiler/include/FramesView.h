@@ -31,12 +31,14 @@ class FramesView : public QQuickItem {
   Q_OBJECT
   Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
   Q_PROPERTY(ViewData* viewData READ getViewDataPtr WRITE setViewData)
+  Q_PROPERTY(unsigned long long viewMode READ getViewMode WRITE setViewMode)
 public:
 
   FramesView(QQuickItem* parent = nullptr);
   ~FramesView();
   void initView();
   void createAppHost();
+  void setViewToLastFrames();
 
 
   void wheelEvent(QWheelEvent* event) override;
@@ -62,6 +64,9 @@ public:
     }
   }
 
+  unsigned long long getViewMode() const {return (unsigned long long)viewMode;}
+  void setViewMode(unsigned long long _viewMode) { viewMode = (ViewMode*)_viewMode; }
+
   //hover information utility.
   void showFrameTip(const tracy::FrameData* frames);
 
@@ -69,13 +74,12 @@ public:
   int64_t findFramesfromTime(int64_t time);
 
   //signals
+  Q_SIGNAL void changeViewMode(ViewMode mode);
   Q_SIGNAL void frameSelected(int64_t frameStart,int64_t frameEnd);
   Q_SIGNAL void frameSelectedRange(int64_t frameStart,int64_t frameEnd,int startFrame,int endFrame);
 
   //slots
   Q_SLOT void updateTimeRange(int64_t trStart, int64_t trEnd);
-
-
 
 protected:
   void draw();
@@ -87,6 +91,7 @@ protected:
 private:
   tracy::Worker* worker = nullptr;
   ViewData* viewData;
+  ViewMode* viewMode;
   const tracy::FrameData* frames = nullptr;
 
   uint64_t frameTarget;

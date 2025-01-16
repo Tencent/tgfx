@@ -31,6 +31,7 @@ class TimelineView: public QQuickItem {
   Q_OBJECT
   Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
   Q_PROPERTY(ViewData* viewData READ getViewDataPtr WRITE setViewData)
+  Q_PROPERTY(unsigned long long viewMode READ getViewMode WRITE setViewMode)
 public:
   struct Region
   {
@@ -75,14 +76,6 @@ public:
     QPointF pos;
     double hwheelDelta = 0;
   };
-
-  enum class ViewMode
-  {
-    Paused,
-    LastFrames,
-    LastRange
-  };
-
 
   TimelineView(QQuickItem* parent = nullptr);
   ~TimelineView();
@@ -137,10 +130,14 @@ public:
   }
 
   //slots
-  Q_SLOT  void onframeSelected(int64_t frameStart,int64_t frameEnd);
-  Q_SLOT  void onframeRangeSelected(int64_t startTime, int64_t endTime,int startFrame,int endFrame);
+  Q_SLOT void onframeSelected(int64_t frameStart,int64_t frameEnd);
+  Q_SLOT void onframeRangeSelected(int64_t startTime, int64_t endTime,int startFrame,int endFrame);
+  Q_SIGNAL void changeViewMode(ViewMode mode);
   ViewData* getViewDataPtr() const { return viewData; }
   void setViewData(ViewData* _viewData) { viewData = _viewData; }
+
+  unsigned long long getViewMode() const {return (unsigned long long)viewMode;}
+  void setViewMode(unsigned long long _viewMode) { viewMode = (ViewMode*)_viewMode; }
 
 protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
@@ -162,12 +159,12 @@ private:
 
   tracy::Worker* worker;
   ViewData* viewData;
+  ViewMode* viewMode;
   TimelineController* timelineController;
 
   Region hightlight;
   Region hightlightZoom;
   Animation zoomAnim;
-  ViewMode viewMode;
   HoverData hoverData;
   const tracy::FrameData* frameData;
   MoveData moveData;
@@ -190,5 +187,4 @@ private:
 
   //same
   std::vector<tracy::ZoneEvent*> sameZone;
-
 };

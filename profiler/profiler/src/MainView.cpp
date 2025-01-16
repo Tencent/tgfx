@@ -21,6 +21,7 @@
 #include <QQmlContext>
 #include <QVBoxLayout>
 #include "FramesView.h"
+#include "ProfilerWindow.h"
 #include "ToolView.h"
 #include "TracyFileRead.hpp"
 #include "View.h"
@@ -51,7 +52,20 @@ void MainView::reopenToolView() {
 }
 
 void MainView::saveFile(){
-  centorView->saveFile();
+  if (centorView) {
+    centorView->saveFile();
+  }
+}
+
+void MainView::changeViewModeButton(bool pause) {
+  auto profilerWindow = (ProfilerWindow*)parentWidget();
+  profilerWindow->changePlayAction(pause);
+}
+
+void MainView::changeViewMode(bool pause) {
+  if (centorView) {
+    centorView->changeViewMode(pause);
+  }
 }
 
 void MainView::quitReadFile(){
@@ -59,7 +73,6 @@ void MainView::quitReadFile(){
     delete centorView;
     centorView = nullptr;
   }
-
   reopenToolView();
 }
 
@@ -68,7 +81,6 @@ void MainView::discardConnect() {
     delete centorView;
     centorView = nullptr;
   }
-
   reopenToolView();
 }
 
@@ -77,8 +89,7 @@ void MainView::connectClient(const char* address, const uint16_t port) {
   tracy::Config config;
   centorView = new View(address, port, this->width(), config, this);
   if (!centorView->isConnected()) {
-    delete centorView;
-    centorView = nullptr;
+    discardConnect();
     return;
   }
   layout->addWidget(centorView);

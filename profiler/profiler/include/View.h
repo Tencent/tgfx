@@ -49,7 +49,7 @@ private:
   QPushButton* cancelButton;
 };
 
-class View : public QWidget{
+class View : public QWidget {
   Q_OBJECT
 public:
   View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent = nullptr);
@@ -61,11 +61,11 @@ public:
   bool save();
   bool isConnected() const { return connected; }
 
+  void changeViewMode(bool pause);
   void saveFile();
   void initView();
-  void initConnect();
   void ViewImpl();
-  Q_SIGNAL void closeView();
+  Q_SLOT void changeViewModeButton(ViewMode mode);
 
   void timerEvent(QTimerEvent* event) override;
 private:
@@ -73,6 +73,7 @@ private:
   int width;
   tracy::Worker worker;
 
+  ViewMode viewMode;
   ViewData viewData;
   UserData userData;
   QQmlApplicationEngine* timelineEngine;

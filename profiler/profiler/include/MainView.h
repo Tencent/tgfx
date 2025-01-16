@@ -41,6 +41,8 @@ public:
   void openFile();
   void openToolView();
 
+  void changeViewModeButton(bool pause);
+  Q_SLOT void changeViewMode(bool pause);
   Q_SLOT void quitReadFile();
   Q_SLOT void saveFile();
   Q_SLOT void discardConnect();

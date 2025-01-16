@@ -142,22 +142,22 @@ void SaveFileDialog::zstdLevelChanged(){
 
 View::View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent)
   : width(width)
+  , viewMode(ViewMode::LastFrames)
   , worker(addr, port, config.memoryLimit == 0 ? -1 :
     ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ) )
   , config(config)
   , QWidget(parent)
 {
-  initConnect();
   initView();
 }
 
 View::View(tracy::FileRead& file, int width, const tracy::Config& config, QWidget* parent)
   : width(width)
+  , viewMode(ViewMode::Paused)
   , worker(file)
   , userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime())
   , config(config)
   , QWidget(parent) {
-  initConnect();
   initView();
   userData.StateShouldBePreserved();
   userData.LoadState(viewData);
@@ -167,8 +167,9 @@ View::~View() {
   userData.SaveState(viewData);
 }
 
-void View::initConnect() {
-  connect(this, &View::closeView, (MainView*)parentWidget(), &MainView::discardConnect);
+void View::changeViewModeButton(ViewMode mode) {
+  auto mainView = (MainView*)parentWidget();
+  mainView->changeViewModeButton(mode == ViewMode::Paused);
 }
 
 void View::initView() {
@@ -183,11 +184,18 @@ void View::initView() {
     connectDialog->exec();
   }
   if (!worker.HasData()) {
-    Q_EMIT closeView();
     return;
   }
   connected = true;
   ViewImpl();
+}
+
+void View::changeViewMode(bool pause) {
+  if (pause) {
+    viewMode = ViewMode::Paused;
+  } else {
+    viewMode = ViewMode::LastFrames;
+  }
 }
 
 void View::saveFile() {
@@ -242,14 +250,13 @@ void View::ViewImpl() {
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
+  qmlRegisterType<ViewMode>("com.example", 1, 0, "ViewMode");
   qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
   framesEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Frames.qml")));
   framesEngine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
-  framesEngine->rootContext()->setContextProperty("_viewData", (unsigned long long)&viewData);
-  //framesEngine->load(QUrl((QStringLiteral("qrc:/qml/Frames.qml"))));
-  // framesEngine->rootContext()->setContextProperty("_width", width);
   framesEngine->rootContext()->setContextProperty("_viewData", &viewData);
-  auto quickWindow = static_cast<QQuickWindow*>(framesEngine->rootObjects().value(0));
+  framesEngine->rootContext()->setContextProperty("_viewMode", (unsigned long long)&viewMode);
+  auto quickWindow = static_cast<QQuickWindow*>(framesEngine->rootObjects().first());
   auto framesWidget = createWindowContainer(quickWindow);
   framesWidget->setFixedHeight(50);
 
@@ -258,9 +265,9 @@ void View::ViewImpl() {
   timelineEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Timeline.qml")));
   timelineEngine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
   timelineEngine->rootContext()->setContextProperty("_viewData", &viewData);
-  quickWindow = static_cast<QQuickWindow*>(timelineEngine->rootObjects().value(0));
+  timelineEngine->rootContext()->setContextProperty("_viewMode", (unsigned long long)&viewMode);
+  quickWindow = static_cast<QQuickWindow*>(timelineEngine->rootObjects().first());
   auto timelineWidget = createWindowContainer(quickWindow);
-  timelineWidget->resize(1000, 1000);
 
   //connect
   auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
@@ -277,8 +284,10 @@ void View::ViewImpl() {
     connect(framesView, &FramesView::frameSelectedRange,
         [this](int64_t startTime, int64_t endTime, int startFrame, int endFrame) {
     timelineView->zoomToRange(startTime, endTime,false);
-});
+    });
 
+    connect(timelineView, &TimelineView::changeViewMode, this, &View::changeViewModeButton);
+    connect(framesView, &FramesView::changeViewMode, this, &View::changeViewModeButton);
   }
   layout->addWidget(framesWidget);
   layout->addWidget(timelineWidget);

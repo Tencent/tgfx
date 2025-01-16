@@ -13,6 +13,7 @@ Window {
         id: timelineView
         worker: _worker
         viewData: _viewData
+        viewMode: _viewMode
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom

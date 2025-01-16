@@ -39,8 +39,8 @@ void ProfilerWindow::initToolBar() {
   saveFileAction = new QAction(QIcon(":/icons/save.png"),tr("&save"), this);
   topBar->addAction(saveFileAction);
 
-  palyeAction = new QAction(QIcon(":/icons/pause.png"),tr("&pause"), this);
-  topBar->addAction(palyeAction);
+  playAction = new QAction(QIcon(":/icons/pause.png"),tr("&pause"), this);
+  topBar->addAction(playAction);
 
   discardAction = new QAction(QIcon(":/icons/discard.png"),tr("&dicard"), this);
   topBar->addAction(discardAction);
@@ -48,10 +48,42 @@ void ProfilerWindow::initToolBar() {
 
 
 void ProfilerWindow::updateToolBar(ProfilerStatus status) {
+  if (status != ProfilerStatus::Connect) {
+    changePlayAction(false);
+  }
+
   quitAction->setEnabled(status == ProfilerStatus::ReadFile);
   saveFileAction->setEnabled(status == ProfilerStatus::Connect);
-  palyeAction->setEnabled(status == ProfilerStatus::Connect);
+  playAction->setEnabled(status == ProfilerStatus::Connect);
   discardAction->setEnabled(status == ProfilerStatus::Connect);
+}
+
+void ProfilerWindow::changeViewMode() {
+  mainView->changeViewMode(pause);
+}
+
+void ProfilerWindow::reversalPlayAction() {
+  changePlayAction(!pause);
+}
+
+void ProfilerWindow::changePlayAction(bool pause) {
+  if (!playAction->isEnabled()) {
+    return;
+  }
+  if (pause) {
+    playAction->setIcon(QIcon(":/icons/next.png"));
+    playAction->setToolTip(tr("&start"));
+  }
+  else {
+    playAction->setIcon(QIcon(":/icons/pause.png"));
+    playAction->setToolTip(tr("&pause"));
+  }
+  this->pause = pause;
+}
+
+void ProfilerWindow::pushPlayAction() {
+  reversalPlayAction();
+  changeViewMode();
 }
 
 void ProfilerWindow::initWindow() {
@@ -70,4 +102,5 @@ void ProfilerWindow::initConnect() {
   connect(saveFileAction, &QAction::triggered, mainView, &MainView::saveFile);
   connect(quitAction, &QAction::triggered, mainView, &MainView::quitReadFile);
   connect(discardAction, &QAction::triggered, mainView, &MainView::discardConnect);
+  connect(playAction, &QAction::triggered, this, &ProfilerWindow::pushPlayAction);
 }

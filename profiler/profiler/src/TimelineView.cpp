@@ -653,11 +653,11 @@ void TimelineView::zoomToRange(int64_t start, int64_t end, bool pause) {
 
   if( pause )
   {
-    viewMode = ViewMode::Paused;
+    *viewMode = ViewMode::Paused;
   }
   hightlightZoom.active = false;
   zoomAnim.active = true;
-  if (viewMode == ViewMode::LastRange) {
+  if (*viewMode == ViewMode::LastRange) {
     const auto rangeCurr = viewData->zvEnd - viewData->zvStart;
     const auto rangeDest = end - start;
     zoomAnim.start0 = viewData->zvStart;
@@ -763,7 +763,8 @@ void TimelineView::updateTimeRange(int64_t start, int64_t end) {
 
 void TimelineView::mouseMoveEvent(QMouseEvent* event) {
   if (moveData.isDragging) {
-    viewMode = ViewMode::Paused;
+    *viewMode = ViewMode::Paused;
+    Q_EMIT changeViewMode(*viewMode);
     const auto timespan = viewData->zvEnd - viewData->zvStart;
     zoomAnim.active = false;
     const auto w = width();
@@ -930,7 +931,9 @@ void TimelineView::centerOnTime(int64_t time) {
 }
 
 void TimelineView::wheelEvent(QWheelEvent* event) {
-  if (viewMode == ViewMode::LastFrames) viewMode = ViewMode::LastRange;
+  if (*viewMode == ViewMode::LastFrames) {
+    *viewMode = ViewMode::LastRange;
+  }
   const auto mouse = mapFromGlobal(QCursor().pos());
   const auto p = double(mouse.x()) / width();
   int64_t t0, t1;
@@ -956,7 +959,7 @@ void TimelineView::wheelEvent(QWheelEvent* event) {
     t0 -= std::max( int64_t( 1 ), int64_t( p1 * mod ) );
     t1 += std::max( int64_t( 1 ), int64_t( p2 * mod ) );
   }
-  zoomToRange(t0, t1, !worker->IsConnected() || viewMode == ViewMode::Paused);
+  zoomToRange(t0, t1, !worker->IsConnected() || *viewMode == ViewMode::Paused);
   viewData->zvStart = int64_t( zoomAnim.start0 + zoomAnim.start1 - zoomAnim.start0);
   viewData->zvEnd = int64_t( zoomAnim.end0 + zoomAnim.end1 - zoomAnim.end0);
   event->accept();

@@ -37,6 +37,12 @@ enum class ProfilerStatus {
   None
 };
 
+enum ViewMode {
+  Paused,
+  LastFrames,
+  LastRange
+};
+
 class AppHost {
 public:
   explicit AppHost(int width = 1280, int height = 720, float density = 1.0f);

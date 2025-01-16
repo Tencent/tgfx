@@ -155,7 +155,21 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
   const int group = GetFrameGroup(viewData->frameScale);
   const int total = worker->GetFrameCount(*frames);
   const int onScreen = (width() - 2) / frameWidth;
-
+  if (*viewMode != ViewMode::Paused) {
+    viewData->frameStart = (total < onScreen * group) ? 0 : total - onScreen * group;
+    if (*viewMode == ViewMode::LastFrames) {
+      setViewToLastFrames();
+    }
+    else {
+      assert( *viewMode == ViewMode::LastRange );
+      const auto delta = worker->GetLastTime() - viewData->zvEnd;
+      if( delta != 0 )
+      {
+        viewData->zvStart += delta;
+        viewData->zvEnd += delta;
+      }
+    }
+  }
   int i = 0, idx = 0;
   while (i < onScreen && viewData->frameStart + idx < total) {
     auto frameTime = worker->GetFrameTime(*frames, viewData->frameStart + idx);
@@ -216,6 +230,21 @@ void FramesView::createAppHost() {
 #endif
   appHost->addTypeface("default", defaultTypeface);
   appHost->addTypeface("emoji", emojiTypeface);
+}
+
+void FramesView::setViewToLastFrames() {
+  const int total = worker->GetFrameCount( *frames );
+
+  viewData->zvStart = worker->GetFrameBegin( *frames, std::max( 0, total - 4 ) );
+  if( total == 1 ) {
+    viewData->zvEnd = worker->GetLastTime();
+  }
+  else {
+    viewData->zvEnd = worker->GetFrameBegin( *frames, total - 1 );
+  }
+  if( viewData->zvEnd == viewData->zvStart ) {
+    viewData->zvEnd = worker->GetLastTime();
+  }
 }
 
 QSGNode* FramesView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {

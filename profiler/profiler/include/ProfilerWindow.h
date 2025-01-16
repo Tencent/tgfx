@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <QMainWindow>
-#include <QWindow>
 #include "MainView.h"
 
 class ProfilerWindow: public QMainWindow {
@@ -28,15 +26,20 @@ public:
   ProfilerWindow(QMainWindow* parent = nullptr);
   void initWindow();
   void initConnect();
+  void changeViewMode();
+  void reversalPlayAction();
+  void changePlayAction(bool pause);
+  Q_SLOT void pushPlayAction();
   Q_SLOT void updateToolBar(ProfilerStatus status);
 protected:
   void initToolBar();
 private:
-  MainView* mainView;
+  bool pause = false;
 
+  MainView* mainView;
   QToolBar* topBar;
   QAction* quitAction;
   QAction* saveFileAction;
-  QAction* palyeAction;
+  QAction* playAction;
   QAction* discardAction;
 };
