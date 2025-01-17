@@ -433,6 +433,9 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
+  if (picture == nullptr) {
+    return;
+  }
   drawContext->drawPicture(std::move(picture), *mcState);
 }
 
