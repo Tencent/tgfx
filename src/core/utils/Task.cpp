@@ -34,42 +34,57 @@ std::shared_ptr<Task> Task::Run(std::function<void()> block) {
 Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
+bool Task::waiting() {
+  return status.load(std::memory_order_relaxed) == TaskStatus::waiting;
+}
+
 bool Task::executing() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return _executing;
+  return status.load(std::memory_order_relaxed) == TaskStatus::executing;
 }
 
 bool Task::cancelled() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return _cancelled;
+  return status.load(std::memory_order_relaxed) == TaskStatus::cancelled;
 }
 
 bool Task::finished() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return !_executing && !_cancelled;
+  return status.load(std::memory_order_relaxed) == TaskStatus::finished;
 }
 
 void Task::wait() {
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (!_executing) {
+  auto oldStatus = status.load(std::memory_order_relaxed);
+  if (oldStatus == TaskStatus::cancelled || oldStatus == TaskStatus::finished) {
     return;
   }
-  condition.wait(autoLock);
+  if (oldStatus == TaskStatus::waiting) {
+    if (status.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
+                                     std::memory_order_relaxed)) {
+      block();
+      status.store(TaskStatus::finished, std::memory_order_relaxed);
+      return;
+    }
+  }
+  std::unique_lock<std::mutex> autoLock(locker);
+  if (status.load(std::memory_order_acquire) == TaskStatus::executing) {
+    condition.wait(autoLock);
+  }
 }
 
 void Task::cancel() {
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (!_executing) {
-    return;
+  auto currentStatus = status.load(std::memory_order_relaxed);
+  if (currentStatus == TaskStatus::waiting) {
+    status.store(TaskStatus::cancelled, std::memory_order_relaxed);
   }
-  _executing = false;
-  _cancelled = true;
 }
 
 void Task::execute() {
-  block();
-  std::lock_guard<std::mutex> auoLock(locker);
-  _executing = false;
-  condition.notify_all();
+  auto oldStatus = status.load(std::memory_order_relaxed);
+  if (oldStatus == TaskStatus::waiting &&
+      status.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
+                                   std::memory_order_relaxed)) {
+    block();
+    status.store(TaskStatus::finished, std::memory_order_relaxed);
+    std::unique_lock<std::mutex> autoLock(locker);
+    condition.notify_all();
+  }
 }
 }  // namespace tgfx

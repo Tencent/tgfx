@@ -39,6 +39,11 @@ class Task {
   static std::shared_ptr<Task> Run(std::function<void()> block);
 
   /**
+   * Returns true if the Task is currently waiting to execute its code block.
+   */
+  bool waiting();
+
+  /**
    * Returns true if the Task is currently executing its code block.
    */
   bool executing();
@@ -67,10 +72,10 @@ class Task {
   void wait();
 
  private:
+  enum class TaskStatus { waiting, executing, finished, cancelled };
   std::mutex locker = {};
   std::condition_variable condition = {};
-  bool _executing = true;
-  bool _cancelled = false;
+  std::atomic<TaskStatus> status = TaskStatus::waiting;
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);

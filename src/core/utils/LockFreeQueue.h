@@ -33,21 +33,18 @@
 
 namespace tgfx {
 static constexpr size_t CACHELINE_SIZE = 64;
-// QUEUE_SIZE needs to be a power of 2, otherwise the implementation of GetIndex needs to be changed.
-static constexpr uint32_t QUEUE_SIZE = 1024;
-
-inline uint32_t GetIndex(uint32_t position) {
-  return position & (QUEUE_SIZE - 1);
-}
 
 template <typename T>
 class LockFreeQueue {
  public:
-  LockFreeQueue() {
-    queuePool = reinterpret_cast<T*>(std::calloc(QUEUE_SIZE, sizeof(T)));
+  /**
+   * capacity needs to be a power of 2, otherwise the implementation of getIndex needs to be changed.
+   * @param capacity
+   */
+  explicit LockFreeQueue(uint32_t capacity) : _capacity(capacity) {
+    queuePool = reinterpret_cast<T*>(std::calloc(capacity, sizeof(T)));
     if (queuePool == nullptr) {
-      LOGE("LockFreeQueue init Failed!\n");
-      return;
+      ABORT("LockFreeQueue init Failed!\n");
     }
   }
 
@@ -59,9 +56,6 @@ class LockFreeQueue {
   }
 
   T dequeue() {
-    if (queuePool == nullptr) {
-      return nullptr;
-    }
     uint32_t newHead = 0;
     uint32_t oldHead = head.load(std::memory_order_relaxed);
     T element = nullptr;
@@ -71,11 +65,11 @@ class LockFreeQueue {
       if (newHead == tailPosition.load(std::memory_order_acquire)) {
         return nullptr;
       }
-      element = queuePool[GetIndex(newHead)];
+      element = queuePool[getIndex(newHead)];
     } while (!head.compare_exchange_weak(oldHead, newHead, std::memory_order_acq_rel,
                                          std::memory_order_relaxed));
 
-    queuePool[GetIndex(newHead)] = nullptr;
+    queuePool[getIndex(newHead)] = nullptr;
 
     uint32_t newHeadPosition = 0;
     uint32_t oldHeadPosition = headPosition.load(std::memory_order_relaxed);
@@ -87,22 +81,19 @@ class LockFreeQueue {
   }
 
   bool enqueue(const T& element) {
-    if (queuePool == nullptr) {
-      return false;
-    }
     uint32_t newTail = 0;
     uint32_t oldTail = tail.load(std::memory_order_relaxed);
 
     do {
-      newTail = oldTail + 1;
-      if (GetIndex(newTail) == GetIndex(headPosition.load(std::memory_order_acquire))) {
-        LOGI("The queue has reached its maximum capacity, capacity: %u!\n", QUEUE_SIZE);
+      if (getIndex(oldTail) == getIndex(headPosition.load(std::memory_order_acquire))) {
+        LOGI("The queue has reached its maximum capacity, capacity: %u!\n", _capacity);
         return false;
       }
+      newTail = oldTail + 1;
     } while (!tail.compare_exchange_weak(oldTail, newTail, std::memory_order_acq_rel,
                                          std::memory_order_relaxed));
 
-    queuePool[GetIndex(oldTail)] = std::move(element);
+    queuePool[getIndex(oldTail)] = std::move(element);
 
     uint32_t newTailPosition = 0;
     uint32_t oldTailPosition = tailPosition.load(std::memory_order_relaxed);
@@ -115,6 +106,7 @@ class LockFreeQueue {
 
  private:
   T* queuePool = nullptr;
+  uint32_t _capacity = 0;
 #ifdef DISABLE_ALIGNAS
   // head indicates the position after requesting space.
   std::atomic<uint32_t> head = {0};
@@ -134,6 +126,10 @@ class LockFreeQueue {
   // tailPosition indicates the position after filling data.
   alignas(CACHELINE_SIZE) std::atomic<uint32_t> tailPosition = {1};
 #endif
+
+  uint32_t getIndex(uint32_t position) {
+    return position & (_capacity - 1);
+  }
 };
 
 }  // namespace tgfx
