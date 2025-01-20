@@ -820,12 +820,12 @@ TGFX_TEST(CanvasTest, drawShape) {
   path.addOval(Rect::MakeWH(100, 100));
   auto shape2 = Shape::MakeFrom(path);
   auto mergedShape = Shape::Merge(shape, shape2, PathOp::Append);
-  EXPECT_TRUE(mergedShape->isSimplePath());
+  EXPECT_FALSE(mergedShape->isSimplePath());
   auto transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
   mergedShape = Shape::Merge({transShape, shape, shape2});
   EXPECT_EQ(mergedShape->type(), Shape::Type::Append);
   auto appendShape = std::static_pointer_cast<AppendShape>(mergedShape);
-  EXPECT_EQ(appendShape->shapes.size(), 2u);
+  EXPECT_EQ(appendShape->shapes.size(), 3u);
 
   Paint paint;
   paint.setStyle(PaintStyle::Stroke);

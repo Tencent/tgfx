@@ -28,15 +28,6 @@ void AppendShape::Append(std::vector<std::shared_ptr<Shape>>* shapes,
     shapes->insert(shapes->end(), appendShape->shapes.begin(), appendShape->shapes.end());
     return;
   }
-  if (shape->type() == Type::Path && !shapes->empty()) {
-    auto lastShape = shapes->back();
-    if (lastShape->type() == Type::Path) {
-      auto path = std::static_pointer_cast<PathShape>(lastShape)->path;
-      path.addPath(std::static_pointer_cast<PathShape>(shape)->path);
-      shapes->back() = std::make_shared<PathShape>(std::move(path));
-      return;
-    }
-  }
   shapes->push_back(std::move(shape));
 }
 
