@@ -27,6 +27,7 @@
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include "FramesView.h"
 
+
 class TimelineView: public QQuickItem {
   Q_OBJECT
   Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
@@ -125,19 +126,21 @@ public:
     frameData = worker->GetFramesBase();
     timelineController = new TimelineController(*this, *worker, true);
   }
-  void setFramesView(FramesView* framesView) {
-    m_framesView = framesView;
+
+  void setTimeSelection(int64_t startTime,int64_t endTime);
+  const std::pair<int64_t,int64_t>getTimeSelection() {
+    return{selectedStartFrame,selectedEndFrame};
   }
 
-  //slots
-  Q_SLOT void onframeSelected(int64_t frameStart,int64_t frameEnd);
-  Q_SLOT void onframeRangeSelected(int64_t startTime, int64_t endTime,int startFrame,int endFrame);
   Q_SIGNAL void changeViewMode(ViewMode mode);
   ViewData* getViewDataPtr() const { return viewData; }
   void setViewData(ViewData* _viewData) { viewData = _viewData; }
 
   unsigned long long getViewMode() const {return (unsigned long long)viewMode;}
   void setViewMode(unsigned long long _viewMode) { viewMode = (ViewMode*)_viewMode; }
+  void setFramesView(FramesView* framesView) {
+    m_framesView = framesView;
+  }
 
 protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
@@ -148,13 +151,17 @@ protected:
     }
     return it->second;
   }
+
   void onViewChanged() {
-    m_framesView->updateTimeRange(viewData->zvStart,viewData->zvEnd);
+    m_framesView -> updateTimeRange(viewData->zvStart,viewData->zvEnd);
   }
+
 private:
+  void updateFrameRange(int64_t start , int64_t end);
   tracy::unordered_flat_map<const void*, bool> visMap;
   tracy::Vector<const tracy::ThreadData*> threadOrder;
   tracy::Vector<const tracy::ThreadData*> threadReinsert;
+//frameview ptr
   FramesView* m_framesView = nullptr;
 
   tracy::Worker* worker;
@@ -169,8 +176,6 @@ private:
   const tracy::FrameData* frameData;
   MoveData moveData;
 
-  void updateTimeRange(int64_t start , int64_t end);
-
   tgfx::Font font;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
@@ -178,13 +183,14 @@ private:
 
   //selected
   bool hasSeletedFrame = false;
-  int64_t selectedFrameStart = 0;
-  int64_t selectedFrameEnd = 0;
+  int64_t selectedStartFrame = 0;
+  int64_t selectedEndFrame = 0;
 
   //hover members
   ZoneInfoWindow zoneInfo;
   bool highlightZoom = false;
 
-  //same
-  std::vector<tracy::ZoneEvent*> sameZone;
+  int64_t rangeStart = 0;
+  int64_t rangeEnd = 0;
+
 };
