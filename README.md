@@ -326,6 +326,29 @@ QT path to your local QT installation path. Next, in the configuration panel of 
 in CLion, set the local QT DLL library path in the `Environment Variables` field, 
 e.g., `PATH=C:\Qt\6.6.1\msvc2019_64\bin`. Finally, you can build and run the `Hello2D` target.
 
+
+### OpenHarmony
+
+The OpenHarmony demo project requires the **[DevEco](https://developer.huawei.com/consumer/cn/deveco-studio/)**
+IDE, which comes with the OpenHarmony SDK pre-installed. To get started, open the `ohos/` directory
+in DevEco. Then, go to `Preferences` > `Build, Execution, Deployment` > `Build Tools` > `Hvigor` and
+uncheck the `Execute tasks in parallel mode (may require larger heap size)` option to avoid issues
+with building third-party libraries.
+
+Alternatively, you can manually build the third-party libraries by running the following command in
+the root directory:
+
+```
+node build_vendor -p ohos
+```
+
+This command will build the third-party libraries for the OpenHarmony platform and cache them in
+the `third_party/out/` directory.
+
+Finally, connect your OpenHarmony device or start the simulator, then build and run the `hello2d`
+target in DevEco. You're all set!
+
+
 ## Build Library
 
 Aside from directly integrating the source code of tgfx into your project, you also have the option
