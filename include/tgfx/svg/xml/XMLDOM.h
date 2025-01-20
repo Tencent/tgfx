@@ -33,7 +33,10 @@ struct DOMAttribute {
   std::string value;
 };
 
-enum class DOMNodeType { Element, Text };
+enum class DOMNodeType {
+  Element,
+  Text,
+};
 
 struct DOMNode {
   std::string name;

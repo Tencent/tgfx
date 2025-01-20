@@ -18,6 +18,8 @@
 
 #include "gtest/gtest.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/svg/SVGDOM.h"
+#include "tgfx/svg/SVGFontManager.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "utils/TestUtils.h"
 
@@ -75,6 +77,174 @@ TGFX_TEST(SVGRenderTest, XMLParse) {
   EXPECT_TRUE(copyDOM != nullptr);
   EXPECT_TRUE(copyDOM.get() != xmlDOM.get());
   EXPECT_EQ(copyDOM->getRootNode()->name, xmlDOM->getRootNode()->name);
+}
+
+TGFX_TEST(SVGRenderTest, PathSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/path.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/path"));
+}
+
+TGFX_TEST(SVGRenderTest, PNGImageSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/png.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/png_image"));
+}
+
+TGFX_TEST(SVGRenderTest, JPGImageSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/jpg.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/jpg_image"));
+}
+
+TGFX_TEST(SVGRenderTest, MaskSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/mask.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/mask"));
+}
+
+TGFX_TEST(SVGRenderTest, GradientSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/radialGradient.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/radialGradient"));
+}
+
+TGFX_TEST(SVGRenderTest, BlurSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/blur.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/blur"));
+}
+
+TGFX_TEST(SVGRenderTest, TextSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/text.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  auto fontManager = SVGFontManager::Make(typeface);
+  ASSERT_TRUE(fontManager != nullptr);
+
+  SVGDom->render(canvas, fontManager);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/text"));
+}
+
+TGFX_TEST(SVGRenderTest, TextFontSVG) {
+  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/textFont.svg"));
+  ASSERT_TRUE(data != nullptr);
+  auto SVGDom = SVGDOM::Make(data);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  auto defaultTypeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(defaultTypeface != nullptr);
+  auto fontManager = SVGFontManager::Make(defaultTypeface);
+  ASSERT_TRUE(fontManager != nullptr);
+
+  SVGDom->collectRenderFonts(fontManager);
+  auto families = fontManager->getFontFamilies();
+  ASSERT_TRUE(families.size() == 1);
+  auto family = fontManager->getFontFamilies()[0];
+  ASSERT_TRUE(family == "Noto Serif SC");
+  auto infos = fontManager->getFontInfos(family);
+  ASSERT_TRUE(infos.size() == 1);
+  auto info = infos[0];
+  ASSERT_TRUE(info.weight() == SVGFontWeight::Type::Normal);
+  ASSERT_TRUE(info.style() == SVGFontStyle::Type::Normal);
+
+  auto typeface = MakeTypeface("resources/font/NotoSerifSC-Regular.otf");
+  fontManager->setTypeface(family, info, typeface);
+
+  SVGDom->render(canvas, fontManager);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/textFont"));
 }
 
 }  // namespace tgfx
