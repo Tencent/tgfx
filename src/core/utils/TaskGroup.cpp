@@ -131,8 +131,8 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 void TaskGroup::exit() {
   exited = true;
   condition.notify_all();
-  auto thread = threads->dequeue();
-  while (thread) {
+  std::thread* thread = nullptr;
+  while ((thread = threads->dequeue()) != nullptr) {
     ReleaseThread(thread);
   }
   delete threads;
