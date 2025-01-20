@@ -273,22 +273,11 @@ void View::ViewImpl() {
   auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
   auto timelineWindow = qobject_cast<QQuickWindow*>(timelineEngine->rootObjects().first());
 
-   framesView = framesWindow->findChild<FramesView*>("framesView");
-   timelineView = timelineWindow->findChild<TimelineView*>("timelineView");
-   timelineView->setFramesView(framesView);
+  framesView = framesWindow->findChild<FramesView*>("framesView");
+  timelineView = timelineWindow->findChild<TimelineView*>("timelineView");
+  timelineView->setFramesView(framesView);
+  framesView->setTimelineView(timelineView);
 
-
-  if(framesView && timelineView) {
-    connect(framesView,&FramesView::frameSelected,timelineView,&TimelineView::onframeSelected);
-    connect(framesView,&FramesView::frameSelectedRange,timelineView,&TimelineView::onframeRangeSelected);
-    connect(framesView, &FramesView::frameSelectedRange,
-        [this](int64_t startTime, int64_t endTime, int startFrame, int endFrame) {
-    timelineView->zoomToRange(startTime, endTime,false);
-    });
-
-    connect(timelineView, &TimelineView::changeViewMode, this, &View::changeViewModeButton);
-    connect(framesView, &FramesView::changeViewMode, this, &View::changeViewModeButton);
-  }
   layout->addWidget(framesWidget);
   layout->addWidget(timelineWidget);
 }
