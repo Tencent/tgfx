@@ -315,12 +315,10 @@ std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip
       rect.round();
       if (rect != Rect::MakeWH(renderTarget->width(), renderTarget->height())) {
         return {rect, true};
-      } else {
-        return {Rect::MakeEmpty(), false};
       }
-    } else {
-      return {rect, false};
+      return {Rect::MakeEmpty(), false};
     }
+    return {rect, false};
   }
   return {{}, false};
 }
