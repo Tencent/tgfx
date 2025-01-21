@@ -38,11 +38,20 @@ template <typename T>
 class LockFreeQueue {
  public:
   /**
-   * capacity needs to be a power of 2, otherwise the implementation of getIndex needs to be changed.
+   * The capacity needs to be a power of 2, otherwise, it will be automatically set to the nearest
+   * power of 2 larger than the capacity.
    * @param capacity
    */
-  explicit LockFreeQueue(uint32_t capacity) : _capacity(capacity) {
-    queuePool = reinterpret_cast<T*>(std::calloc(capacity, sizeof(T)));
+  explicit LockFreeQueue(uint32_t capacity) {
+    if ((capacity & (capacity - 1)) != 0) {
+      _capacity = 1;
+      while (_capacity < capacity) {
+        _capacity <<= 1;
+      }
+    } else {
+      _capacity = capacity;
+    }
+    queuePool = reinterpret_cast<T*>(std::calloc(_capacity, sizeof(T)));
     if (queuePool == nullptr) {
       ABORT("LockFreeQueue init Failed!\n");
     }

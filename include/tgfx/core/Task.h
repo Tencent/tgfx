@@ -27,6 +27,8 @@
 namespace tgfx {
 class TaskGroup;
 
+enum class TaskStatus { queuing, executing, finished, cancelled };
+
 /**
  * The Task class manages the concurrent execution of one or more code blocks.
  */
@@ -38,26 +40,6 @@ class Task {
    * execution. Returns nullptr if the block is nullptr.
    */
   static std::shared_ptr<Task> Run(std::function<void()> block);
-
-  /**
-   * Returns true if the Task is currently waiting to execute its code block.
-   */
-  bool waiting();
-
-  /**
-   * Returns true if the Task is currently executing its code block.
-   */
-  bool executing();
-
-  /**
-   * Returns true if the Task has been cancelled
-   */
-  bool cancelled();
-
-  /**
-   * Returns true if the Task has finished executing its code block.
-   */
-  bool finished();
 
   /**
    * Advises the Task that it should stop executing its code block. Cancellation does not affect the
@@ -72,11 +54,15 @@ class Task {
    */
   void wait();
 
+  /**
+   * Indicates the current status of the Task. To ensure thread safety, read the data using the
+   * following method: taskStatus.load(std::memory_order_relaxed).
+   */
+  std::atomic<TaskStatus> taskStatus = TaskStatus::queuing;
+
  private:
-  enum class TaskStatus { waiting, executing, finished, cancelled };
   std::mutex locker = {};
   std::condition_variable condition = {};
-  std::atomic<TaskStatus> status = TaskStatus::waiting;
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);

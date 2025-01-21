@@ -34,55 +34,47 @@ std::shared_ptr<Task> Task::Run(std::function<void()> block) {
 Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
-bool Task::waiting() {
-  return status.load(std::memory_order_relaxed) == TaskStatus::waiting;
-}
-
-bool Task::executing() {
-  return status.load(std::memory_order_relaxed) == TaskStatus::executing;
-}
-
-bool Task::cancelled() {
-  return status.load(std::memory_order_relaxed) == TaskStatus::cancelled;
-}
-
-bool Task::finished() {
-  return status.load(std::memory_order_relaxed) == TaskStatus::finished;
-}
-
 void Task::wait() {
-  auto oldStatus = status.load(std::memory_order_relaxed);
+  auto oldStatus = taskStatus.load(std::memory_order_relaxed);
   if (oldStatus == TaskStatus::cancelled || oldStatus == TaskStatus::finished) {
     return;
   }
-  if (oldStatus == TaskStatus::waiting) {
-    if (status.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
-                                     std::memory_order_relaxed)) {
+  // If wait() is called from the thread pool, all threads might block, leaving no thread to execute
+  // this task. To avoid deadlock, execute the task directly on the current thread if it's queued.
+  if (oldStatus == TaskStatus::queuing) {
+    if (taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing,
+                                         std::memory_order_acq_rel, std::memory_order_relaxed)) {
       block();
-      status.store(TaskStatus::finished, std::memory_order_relaxed);
+      while (!taskStatus.compare_exchange_weak(
+          oldStatus, TaskStatus::finished, std::memory_order_acq_rel, std::memory_order_relaxed))
+        ;
       return;
     }
   }
   std::unique_lock<std::mutex> autoLock(locker);
-  if (status.load(std::memory_order_acquire) == TaskStatus::executing) {
+  if (taskStatus.load(std::memory_order_acquire) == TaskStatus::executing) {
     condition.wait(autoLock);
   }
 }
 
 void Task::cancel() {
-  auto currentStatus = status.load(std::memory_order_relaxed);
-  if (currentStatus == TaskStatus::waiting) {
-    status.store(TaskStatus::cancelled, std::memory_order_relaxed);
+  auto currentStatus = taskStatus.load(std::memory_order_relaxed);
+  if (currentStatus == TaskStatus::queuing) {
+    while (!taskStatus.compare_exchange_weak(currentStatus, TaskStatus::cancelled,
+                                             std::memory_order_acq_rel, std::memory_order_relaxed))
+      ;
   }
 }
 
 void Task::execute() {
-  auto oldStatus = status.load(std::memory_order_relaxed);
-  if (oldStatus == TaskStatus::waiting &&
-      status.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
-                                   std::memory_order_relaxed)) {
+  auto oldStatus = taskStatus.load(std::memory_order_relaxed);
+  if (oldStatus == TaskStatus::queuing &&
+      taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
+                                       std::memory_order_relaxed)) {
     block();
-    status.store(TaskStatus::finished, std::memory_order_relaxed);
+    while (!taskStatus.compare_exchange_weak(oldStatus, TaskStatus::finished,
+                                             std::memory_order_acq_rel, std::memory_order_relaxed))
+      ;
     std::unique_lock<std::mutex> autoLock(locker);
     condition.notify_all();
   }
