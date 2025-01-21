@@ -27,7 +27,27 @@
 namespace tgfx {
 class TaskGroup;
 
-enum class TaskStatus { queuing, executing, finished, cancelled };
+/**
+ * Defines the possible states of a Task.
+ */
+enum class TaskStatus {
+  /**
+   * The Task is waiting to be executed
+   */
+  Queueing,
+  /**
+   * The Task is currently executing
+   */
+  Executing,
+  /**
+   * The Task has finished executing
+   */
+  Finished,
+  /**
+   * The Task has been canceled
+   */
+  Canceled
+};
 
 /**
  * The Task class manages the concurrent execution of one or more code blocks.
@@ -50,20 +70,20 @@ class Task {
   /**
    * Blocks the current thread until the Task finishes its execution. Returns immediately if the
    * Task is finished or canceled. The task may be executed on the calling thread if it is not
-   * cancelled and still in the queue.
+   * canceled and still in the queue.
    */
   void wait();
 
   /**
    * Return the current status of the Task.
    */
-  TaskStatus taskStatus() const;
+  TaskStatus status() const;
 
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
   std::function<void()> block = nullptr;
-  std::atomic<TaskStatus> _taskStatus = TaskStatus::queuing;
+  std::atomic<TaskStatus> _status = TaskStatus::Queueing;
 
   explicit Task(std::function<void()> block);
   void execute();
