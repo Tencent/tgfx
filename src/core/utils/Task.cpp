@@ -35,50 +35,53 @@ Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
 void Task::wait() {
-  auto oldStatus = taskStatus.load(std::memory_order_relaxed);
+  auto oldStatus = _taskStatus.load(std::memory_order_relaxed);
   if (oldStatus == TaskStatus::cancelled || oldStatus == TaskStatus::finished) {
     return;
   }
   // If wait() is called from the thread pool, all threads might block, leaving no thread to execute
   // this task. To avoid deadlock, execute the task directly on the current thread if it's queued.
   if (oldStatus == TaskStatus::queuing) {
-    if (taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing,
-                                         std::memory_order_acq_rel, std::memory_order_relaxed)) {
+    if (_taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing,
+                                          std::memory_order_acq_rel, std::memory_order_relaxed)) {
       block();
       oldStatus = TaskStatus::executing;
-      while (!taskStatus.compare_exchange_weak(
+      while (!_taskStatus.compare_exchange_weak(
           oldStatus, TaskStatus::finished, std::memory_order_acq_rel, std::memory_order_relaxed))
         ;
       return;
     }
   }
   std::unique_lock<std::mutex> autoLock(locker);
-  if (taskStatus.load(std::memory_order_acquire) == TaskStatus::executing) {
+  if (_taskStatus.load(std::memory_order_acquire) == TaskStatus::executing) {
     condition.wait(autoLock);
   }
 }
 
 void Task::cancel() {
-  auto currentStatus = taskStatus.load(std::memory_order_relaxed);
+  auto currentStatus = _taskStatus.load(std::memory_order_relaxed);
   if (currentStatus == TaskStatus::queuing) {
-    while (!taskStatus.compare_exchange_weak(currentStatus, TaskStatus::cancelled,
-                                             std::memory_order_acq_rel, std::memory_order_relaxed))
-      ;
+    _taskStatus.compare_exchange_weak(currentStatus, TaskStatus::cancelled,
+                                      std::memory_order_acq_rel, std::memory_order_relaxed);
   }
 }
 
 void Task::execute() {
-  auto oldStatus = taskStatus.load(std::memory_order_relaxed);
+  auto oldStatus = _taskStatus.load(std::memory_order_relaxed);
   if (oldStatus == TaskStatus::queuing &&
-      taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
-                                       std::memory_order_relaxed)) {
+      _taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
+                                        std::memory_order_relaxed)) {
     block();
     oldStatus = TaskStatus::executing;
-    while (!taskStatus.compare_exchange_weak(oldStatus, TaskStatus::finished,
-                                             std::memory_order_acq_rel, std::memory_order_relaxed))
+    while (!_taskStatus.compare_exchange_weak(oldStatus, TaskStatus::finished,
+                                              std::memory_order_acq_rel, std::memory_order_relaxed))
       ;
     std::unique_lock<std::mutex> autoLock(locker);
     condition.notify_all();
   }
+}
+
+TaskStatus Task::taskStatus() const {
+  return _taskStatus.load(std::memory_order_relaxed);
 }
 }  // namespace tgfx

@@ -55,15 +55,15 @@ class Task {
   void wait();
 
   /**
-   * Indicates the current status of the Task. To ensure thread safety, read the data using the
-   * following method: taskStatus.load(std::memory_order_relaxed).
+   * Return the current status of the Task.
    */
-  std::atomic<TaskStatus> taskStatus = TaskStatus::queuing;
+  TaskStatus taskStatus() const;
 
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
   std::function<void()> block = nullptr;
+  std::atomic<TaskStatus> _taskStatus = TaskStatus::queuing;
 
   explicit Task(std::function<void()> block);
   void execute();
