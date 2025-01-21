@@ -32,19 +32,19 @@ class TaskGroup;
  */
 enum class TaskStatus {
   /**
-   * The Task is waiting to be executed
+   * The Task is waiting to be executed.
    */
   Queueing,
   /**
-   * The Task is currently executing
+   * The Task is currently executing.
    */
   Executing,
   /**
-   * The Task has finished executing
+   * The Task has finished executing.
    */
   Finished,
   /**
-   * The Task has been canceled
+   * The Task has been canceled.
    */
   Canceled
 };
