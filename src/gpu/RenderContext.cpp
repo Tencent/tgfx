@@ -66,19 +66,6 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
 }
 
-Rect RenderContext::clipLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {
-  Matrix invertMatrix = {};
-  if (!state.matrix.invert(&invertMatrix)) {
-    return Rect::MakeEmpty();
-  }
-  auto clipBounds = getClipBounds(state.clip);
-  invertMatrix.mapRect(&clipBounds);
-  if (!unbounded && !clipBounds.intersect(localBounds)) {
-    return Rect::MakeEmpty();
-  }
-  return clipBounds;
-}
-
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   auto fillStyle = style;
   if (fillStyle.shader) {
@@ -92,15 +79,12 @@ void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
+  DEBUG_ASSERT(!rect.isEmpty());
   if (drawAsClear(rect, state, style)) {
     return;
   }
-  auto localBounds = clipLocalBounds(state, rect);
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  auto drawOp = RectDrawOp::Make(style.color.premultiply(), localBounds, state.matrix);
-  addDrawOp(std::move(drawOp), localBounds, state, style);
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), rect, state.matrix);
+  addDrawOp(std::move(drawOp), rect, state, style);
 }
 
 static bool HasColorOnly(const FillStyle& style) {
@@ -132,12 +116,9 @@ bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const Fi
 }
 
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) {
-  auto localBounds = clipLocalBounds(state, rRect.rect);
-  if (localBounds.isEmpty()) {
-    return;
-  }
+  DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto drawOp = RRectDrawOp::Make(style.color.premultiply(), rRect, state.matrix);
-  addDrawOp(std::move(drawOp), localBounds, state, style);
+  addDrawOp(std::move(drawOp), rRect.rect, state, style);
 }
 
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
@@ -147,15 +128,11 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   if (maxScale <= 0.0f) {
     return;
   }
-  auto localBounds = shape->getBounds(maxScale);
-  localBounds = clipLocalBounds(state, localBounds, shape->isInverseFillType());
-  if (localBounds.isEmpty()) {
-    return;
-  }
+  auto bounds = shape->getBounds(maxScale);
   auto clipBounds = getClipBounds(state.clip);
   auto drawOp =
       ShapeDrawOp::Make(style.color.premultiply(), std::move(shape), state.matrix, clipBounds);
-  addDrawOp(std::move(drawOp), localBounds, state, style);
+  addDrawOp(std::move(drawOp), bounds, state, style);
 }
 
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -176,18 +153,14 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     uvMatrix = Matrix::MakeTrans(subsetImage->bounds.left, subsetImage->bounds.top);
     image = subsetImage->source;
   }
-  auto localBounds = clipLocalBounds(state, rect);
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  FPArgs args = {getContext(), renderFlags, localBounds, state.matrix};
+  FPArgs args = {getContext(), renderFlags, rect, state.matrix};
   auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
   }
-  auto drawOp = RectDrawOp::Make(style.color.premultiply(), localBounds, state.matrix, uvMatrix);
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), rect, state.matrix, uvMatrix);
   drawOp->addColorFP(std::move(processor));
-  addDrawOp(std::move(drawOp), localBounds, state, style);
+  addDrawOp(std::move(drawOp), rect, state, style);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -207,10 +180,6 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     stroke->applyToBounds(&bounds);
   }
   auto localBounds = bounds;
-  localBounds = clipLocalBounds(state, localBounds);
-  if (localBounds.isEmpty()) {
-    return;
-  }
   bounds.scale(maxScale, maxScale);
   auto rasterizeMatrix = Matrix::MakeScale(maxScale);
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
@@ -239,10 +208,14 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
                               const MCState& state, const FillStyle& style) {
   DEBUG_ASSERT(style.shader == nullptr);
   Matrix viewMatrix = {};
-  Rect bounds = {};
+  auto bounds = Rect::MakeEmpty();
   if (filter || style.maskFilter) {
     if (picture->hasUnboundedFill()) {
-      bounds = clipLocalBounds(state, Rect::MakeEmpty(), true);
+      Matrix invertMatrix = {};
+      if (state.matrix.invert(&invertMatrix)) {
+        bounds = getClipBounds(state.clip);
+        invertMatrix.mapRect(&bounds);
+      }
     } else {
       bounds = picture->getBounds();
     }
