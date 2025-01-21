@@ -108,6 +108,28 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
                                                    orientation, filePath, std::move(byteData)));
 }
 
+bool CMYKToColorType(uint32_t* dst, const uint32_t* src, int count, ColorType type) {
+  if (type != ColorType::BGRA_8888 && type != ColorType::RGBA_8888) {
+    return false;
+  }
+  for (int i = 0; i < count; i++) {
+    uint8_t k = (src[i] >> 24) & 0xFF;
+    uint8_t y = (src[i] >> 16) & 0xFF;
+    uint8_t m = (src[i] >> 8) & 0xFF;
+    uint8_t c = (src[i] >> 0) & 0xFF;
+    uint8_t r = (c * k + 127) / 255;
+    uint8_t g = (m * k + 127) / 255;
+    uint8_t b = (y * k + 127) / 255;
+
+    if (type == ColorType::BGRA_8888) {
+      dst[i] = (uint32_t)0xFF << 24 | (uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b << 0;
+    } else {
+      dst[i] = (uint32_t)0xFF << 24 | (uint32_t)b << 16 | (uint32_t)g << 8 | (uint32_t)r << 0;
+    }
+  }
+  return true;
+}
+
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
@@ -166,6 +188,9 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       break;
     }
     cinfo.out_color_space = out_color_space;
+    if (cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK) {
+      cinfo.out_color_space = JCS_CMYK;
+    }
     if (!jpeg_start_decompress(&cinfo)) {
       break;
     }
@@ -180,6 +205,13 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     }
     result = jpeg_finish_decompress(&cinfo);
   } while (false);
+  if (cinfo.out_color_space == JCS_CMYK) {
+    int count = dstInfo.width() * dstInfo.height();
+    if (!CMYKToColorType(static_cast<uint32_t*>(dstPixels), static_cast<uint32_t*>(outPixels),
+                         count, dstInfo.colorType())) {
+      result = false;
+    }
+  }
   jpeg_destroy_decompress(&cinfo);
   if (infile) {
     fclose(infile);
