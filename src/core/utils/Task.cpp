@@ -45,6 +45,7 @@ void Task::wait() {
     if (taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing,
                                          std::memory_order_acq_rel, std::memory_order_relaxed)) {
       block();
+      oldStatus = TaskStatus::executing;
       while (!taskStatus.compare_exchange_weak(
           oldStatus, TaskStatus::finished, std::memory_order_acq_rel, std::memory_order_relaxed))
         ;
@@ -72,6 +73,7 @@ void Task::execute() {
       taskStatus.compare_exchange_weak(oldStatus, TaskStatus::executing, std::memory_order_acq_rel,
                                        std::memory_order_relaxed)) {
     block();
+    oldStatus = TaskStatus::executing;
     while (!taskStatus.compare_exchange_weak(oldStatus, TaskStatus::finished,
                                              std::memory_order_acq_rel, std::memory_order_relaxed))
       ;
