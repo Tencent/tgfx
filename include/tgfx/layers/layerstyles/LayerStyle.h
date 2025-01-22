@@ -37,6 +37,21 @@ enum class LayerStylePosition {
   Below
 };
 
+enum class LayerStyleExtraImageType {
+  /**
+   * The layerStyle requires no extra image.
+   */
+  None,
+  /**
+   * The layerStyle requires the layer contour to be drawn.
+   */
+  Contour,
+  /**
+   * The layerStyle requires the background content.
+   */
+  Background
+};
+
 /**
  * LayerStyle is used to change the appearance of a layer. Unlike LayerFilter, it does not create a
  * new offscreen image to replace the original layer content. Instead, it adds visual elements
@@ -84,10 +99,11 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
-   *  Returns whether the layer style requires the layer contour to be drawn.
+   * Returns the type of the extra image required by the layer style.
+   * Default is LayerStyleExtraImageType::None.
    */
-  virtual bool requireLayerContour() const {
-    return false;
+  virtual LayerStyleExtraImageType extraImageType() const {
+    return LayerStyleExtraImageType::None;
   }
 
   /**
@@ -97,14 +113,16 @@ class LayerStyle : public LayerProperty {
    * @param content The scaled layer content to apply the layer style to.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param contour  The scaled layer contour to apply the layer style to.
-   * @param contourOffset The offset of the contour relative to the layer content.
+   * @param extraImage  The scaled extra image to apply the layer style to. The image may be
+   * layer's contour or background content.
+   * @param imageOffset The offset of the extra image relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void drawWithContour(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                       std::shared_ptr<Image> contour, const Point& contourOffset, float alpha) {
-    onDrawWithContour(canvas, std::move(content), contentScale, std::move(contour), contourOffset,
-                      alpha, _blendMode);
+  void drawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                          std::shared_ptr<Image> extraImage, const Point& imageOffset,
+                          float alpha) {
+    onDrawWithExtraImage(canvas, std::move(content), contentScale, std::move(extraImage),
+                         imageOffset, alpha, _blendMode);
   }
 
  protected:
@@ -122,19 +140,21 @@ class LayerStyle : public LayerProperty {
                       float alpha, BlendMode blendMode) = 0;
 
   /**
-   * Applies the layer style with layer contour to the scaled image of the layer content and draws it on the canvas.
+   * Applies the layer style with layer contour to the scaled image of the layer content and draws
+   * it on the canvas.
    * The default implementation calls onDraw with the layer content only.
    * @param canvas The canvas to draw the layer style on.
    * @param content The scaled layer content to apply the layer style to.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param contour  The scaled layer contour to apply the layer style to.
-   * @param contourOffset The offset of the contour relative to the layer content.
+   * @param extraImage  The scaled layer extra image to apply the layer style to.The image may be
+   * layer's contour or background content.
+   * @param imageOffset The offset of the extra image relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  virtual void onDrawWithContour(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                                 std::shared_ptr<Image> contour, const Point& contourOffset,
-                                 float alpha, BlendMode blendMode);
+  virtual void onDrawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content,
+                                    float contentScale, std::shared_ptr<Image> extraImage,
+                                    const Point& imageOffset, float alpha, BlendMode blendMode);
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;
