@@ -66,7 +66,21 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
 }
 
+static bool HasColorOnly(const FillStyle& style) {
+  return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
+}
+
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
+  auto rect = Rect::MakeWH(opContext->renderTarget()->width(), opContext->renderTarget()->height());
+  if (HasColorOnly(style) && style.isOpaque() && state.clip.isEmpty() &&
+      state.clip.isInverseFillType()) {
+    auto color = style.color.premultiply();
+    auto format = opContext->renderTarget()->format();
+    const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
+    color = writeSwizzle.applyTo(color);
+    addOp(ClearOp::Make(color, rect), [] { return true; });
+    return;
+  }
   auto fillStyle = style;
   if (fillStyle.shader) {
     fillStyle.shader = fillStyle.shader->makeWithMatrix(state.matrix);
@@ -74,45 +88,13 @@ void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   if (fillStyle.maskFilter) {
     fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(state.matrix);
   }
-  drawRect(Rect::MakeWH(opContext->renderTarget()->width(), opContext->renderTarget()->height()),
-           MCState{state.clip}, fillStyle);
+  drawRect(rect, MCState{state.clip}, fillStyle);
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
   DEBUG_ASSERT(!rect.isEmpty());
-  if (drawAsClear(rect, state, style)) {
-    return;
-  }
   auto drawOp = RectDrawOp::Make(style.color.premultiply(), rect, state.matrix);
   addDrawOp(std::move(drawOp), rect, state, style);
-}
-
-static bool HasColorOnly(const FillStyle& style) {
-  return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
-}
-
-bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (!HasColorOnly(style) || !style.isOpaque() || !state.matrix.rectStaysRect()) {
-    return false;
-  }
-  auto color = style.color.premultiply();
-  auto bounds = rect;
-  state.matrix.mapRect(&bounds);
-  auto [clipRect, useScissor] = getClipRect(state.clip, &bounds);
-  if (clipRect.has_value()) {
-    auto format = opContext->renderTarget()->format();
-    const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
-    color = writeSwizzle.applyTo(color);
-    if (useScissor) {
-      addOp(ClearOp::Make(color, *clipRect), [] { return false; });
-      return true;
-    }
-    if (clipRect->isEmpty()) {
-      addOp(ClearOp::Make(color, bounds), [] { return true; });
-      return true;
-    }
-  }
-  return false;
 }
 
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) {
@@ -309,13 +291,9 @@ static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
   }
 }
 
-std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip,
-                                                                const Rect* deviceBounds) {
+std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip) {
   auto rect = Rect::MakeEmpty();
   if (clip.isInverseFillType() || !clip.isRect(&rect)) {
-    return {{}, false};
-  }
-  if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
     return {{}, false};
   }
   auto renderTarget = opContext->renderTarget();

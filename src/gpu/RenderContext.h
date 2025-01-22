@@ -68,13 +68,11 @@ class RenderContext : public DrawContext {
   explicit RenderContext(Surface* surface);
   Context* getContext() const;
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
-  std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip,
-                                                   const Rect* drawBounds = nullptr);
+  std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
   std::unique_ptr<FragmentProcessor> getClipMask(const Path& clip, const Rect& deviceBounds,
                                                  const Matrix& viewMatrix, AAType aaType,
                                                  Rect* scissorRect);
   Rect getClipBounds(const Path& clip);
-  bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
   void addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds, const MCState& state,
