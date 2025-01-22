@@ -58,9 +58,6 @@ class FontStyleSet {
    * Create an empty font style set
    */
   static std::shared_ptr<FontStyleSet> CreateEmpty();
-
- protected:
-  std::shared_ptr<Typeface> matchStyleCSS3(const FontStyle& pattern);
 };
 
 /**

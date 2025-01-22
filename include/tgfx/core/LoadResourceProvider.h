@@ -37,21 +37,21 @@ class LoadResourceProvider {
   virtual ~LoadResourceProvider() = default;
 
   /**
- * Creates an empty resource provider.
- */
+   * Creates an empty resource provider.
+   */
   static std::shared_ptr<LoadResourceProvider> MakeEmpty();
 
   /**
- * Creates a file resource provider with the given base path.
- */
-static std::shared_ptr<LoadResourceProvider> MakeFileProvider(const std::string& basePath);
+   * Creates a file resource provider with the given base path.
+   */
+  static std::shared_ptr<LoadResourceProvider> MakeFileProvider(const std::string& basePath);
 
-/**
+  /**
    * Load a generic resource specified by |path| + |name|, and return as an Data object.
    */
-virtual std::shared_ptr<Data> load(const std::string& /*resourcePath*/,
-                                   const std::string& /*resourceName*/) const {
-  return nullptr;
+  virtual std::shared_ptr<Data> load(const std::string& /*resourcePath*/,
+                                     const std::string& /*resourceName*/) const {
+    return nullptr;
   }
 
   /**

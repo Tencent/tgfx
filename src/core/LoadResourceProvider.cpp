@@ -48,10 +48,7 @@ std::shared_ptr<LoadResourceProvider> LoadResourceProvider::MakeEmpty() {
 
 std::shared_ptr<LoadResourceProvider> LoadResourceProvider::MakeFileProvider(
     const std::string& basePath) {
-  if (std::filesystem::exists(basePath)) {
-    return std::make_shared<FileResourceProvider>(basePath);
-  }
-  return nullptr;
+  return std::make_shared<FileResourceProvider>(basePath);
 }
 
 }  // namespace tgfx

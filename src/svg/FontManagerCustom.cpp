@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/FontManagerCustom.h"
+#include "tgfx/svg/FontManagerCustom.h"
 #include <array>
 #include <cstddef>
 #include <memory>
@@ -55,10 +55,9 @@ std::shared_ptr<Typeface> FontStyleSetCustom::createTypeface(size_t index) {
 
 std::shared_ptr<Typeface> FontStyleSetCustom::matchStyle(const FontStyle& style) {
   std::shared_ptr<Typeface> typeface = nullptr;
-  if (!styles.empty()) {
-    typeface = this->matchStyleCSS3(style);
-    if (!typeface) {
-      typeface = styles[0];
+  for (const auto& item : styles) {
+    if (item->getFontStyle() == style) {
+      return typeface = item;
     }
   }
   return typeface;

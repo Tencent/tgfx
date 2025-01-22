@@ -19,9 +19,9 @@
 #include <iostream>
 #include "gtest/gtest.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/FontManagerCustom.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/svg/FontManagerCustom.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "utils/TestUtils.h"
@@ -198,13 +198,13 @@ class FontLoaderTest : public FontManagerCustom::FontLoader {
   void loadFonts(std::vector<std::shared_ptr<FontStyleSetCustom>>& families) const override {
     auto family = std::make_shared<FontStyleSetCustom>("Noto Sans SC");
     auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-    typeface->setStyle(FontStyle::Normal());
+    typeface->setFontStyle(FontStyle::Normal());
     family->appendTypeface(typeface);
     families.push_back(family);
 
     family = std::make_shared<FontStyleSetCustom>("Noto Serif SC");
     typeface = MakeTypeface("resources/font/NotoSerifSC-Regular.otf");
-    typeface->setStyle(FontStyle::Normal());
+    typeface->setFontStyle(FontStyle::Normal());
     family->appendTypeface(typeface);
     families.push_back(family);
   }

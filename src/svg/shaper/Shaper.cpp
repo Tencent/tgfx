@@ -119,7 +119,8 @@ class FontManagerRunIterator final : public FontRunIterator {
 std::unique_ptr<FontRunIterator> Shaper::MakeFontMgrRunIterator(
     const char* utf8, size_t utf8Bytes, const Font& font, std::shared_ptr<FontManager> fallback) {
   return std::make_unique<FontManagerRunIterator>(utf8, utf8Bytes, font, std::move(fallback),
-                                                  nullptr, font.getTypeface()->getStyle(), nullptr);
+                                                  nullptr, font.getTypeface()->getFontStyle(),
+                                                  nullptr);
 }
 
 std::unique_ptr<LanguageRunIterator> Shaper::MakeStdLanguageRunIterator(const char* /*utf8*/,

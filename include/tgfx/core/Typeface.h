@@ -132,6 +132,24 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
+  /**
+   * Returns the font style object of this typeface.
+   * Note: This value is set by the user and is not read from the font file. This method is used for
+   * font matching and text layout in SVG rendering.
+   */
+  FontStyle getFontStyle() const {
+    return style;
+  }
+
+  /**
+   * Sets the font style for this typeface.
+   * Note: This value is set by the user and is not read from the font file. This method is used for
+   * font matching and text layout in SVG rendering.
+   */
+  void setFontStyle(const FontStyle& value) {
+    style = value;
+  }
+
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -139,22 +157,6 @@ class Typeface {
    * This method is only implemented when compiling the SVG or PDF export module.
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
-
-  /**
-   * Returns the font style object of this typeface.
-   * This method is used for font matching and text layout in SVG rendering.
-   */
-  FontStyle getStyle() const {
-    return style;
-  }
-
-  /**
-   * Sets the font style for this typeface.
-   * This method is used for font matching and text layout in SVG rendering.
-   */
-  void setStyle(const FontStyle& value) {
-    style = value;
-  }
 
   mutable std::mutex locker = {};
 
@@ -164,7 +166,5 @@ class Typeface {
 
   friend class ScalerContext;
   friend class GlyphConverter;
-  friend class FontManager;
-  friend class Shaper;
 };
 }  // namespace tgfx

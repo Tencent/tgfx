@@ -19,7 +19,6 @@
 #pragma once
 
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Typeface.h"
