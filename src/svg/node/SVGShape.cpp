@@ -31,19 +31,25 @@ void SVGShape::onRender(const SVGRenderContext& context) const {
   const auto fillType = context.presentationContext()._inherited.FillRule->asFillType();
 
   auto selfRect = onObjectBoundingBox(context);
-  auto lengthCtx = context.lengthContext();
-  lengthCtx.setViewPort(Size::Make(selfRect.width(), selfRect.height()));
-  auto paintCtx = SVGRenderContext::CopyForPaint(context, context.canvas(), lengthCtx);
+  auto lengthContext = context.lengthContext();
+  lengthContext.setViewPort(Size::Make(selfRect.width(), selfRect.height()));
+  auto paintContext = SVGRenderContext::CopyForPaint(context, context.canvas(), lengthContext);
 
-  const auto fillPaint = paintCtx.fillPaint();
-  const auto strokePaint = paintCtx.strokePaint();
+  auto fillPaint = paintContext.fillPaint();
+  auto strokePaint = paintContext.strokePaint();
 
   if (fillPaint.has_value()) {
-    this->onDraw(context.canvas(), context.lengthContext(), fillPaint.value(), fillType);
+    onDrawFill(context.canvas(), context.lengthContext(), fillPaint.value(), fillType);
   }
 
   if (strokePaint.has_value()) {
-    this->onDraw(context.canvas(), context.lengthContext(), strokePaint.value(), fillType);
+    auto strokePathEffect = context.strokePathEffect();
+    if (strokePathEffect) {
+      onDrawStroke(context.canvas(), context.lengthContext(), strokePaint.value(), fillType,
+                   strokePathEffect);
+    } else {
+      onDrawFill(context.canvas(), context.lengthContext(), strokePaint.value(), fillType);
+    }
   }
 }
 

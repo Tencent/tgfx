@@ -20,8 +20,10 @@
 #include <memory>
 #include "core/utils/Log.h"
 #include "svg/SVGRenderContext.h"
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
 
@@ -77,14 +79,16 @@ std::tuple<std::shared_ptr<ImageFilter>, SVGColorspace> SVGFilterContext::getInp
     case SVGFeInputType::Type::FillPaint: {
       const auto& fillPaint = context.fillPaint();
       if (fillPaint.has_value()) {
-        //TODO (YGAurora) - Implement shader image filter by paint
+        auto colorFilter = ColorFilter::Blend(fillPaint->getColor(), BlendMode::DstIn);
+        result = ImageFilter::ColorFilter(colorFilter);
       }
       break;
     }
     case SVGFeInputType::Type::StrokePaint: {
       const auto& strokePaint = context.strokePaint();
       if (strokePaint.has_value()) {
-        //TODO (YGAurora) - Implement shader image filter by paint
+        auto colorFilter = ColorFilter::Blend(strokePaint->getColor(), BlendMode::DstIn);
+        result = ImageFilter::ColorFilter(colorFilter);
       }
       break;
     }
@@ -122,8 +126,7 @@ std::shared_ptr<ImageFilter> SVGFilterContext::resolveInput(
     const SVGRenderContext& context, const SVGFeInputType& inputType,
     SVGColorspace /*resultColorspace*/) const {
   //TODO (YGAurora) - waiting for color space implementation
-  resolveInput(context, inputType);
-  return nullptr;
+  return resolveInput(context, inputType);
 }
 
 }  // namespace tgfx

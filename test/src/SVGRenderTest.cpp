@@ -16,10 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <iostream>
 #include "gtest/gtest.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/FontManagerCustom.h"
+#include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/svg/SVGDOM.h"
-#include "tgfx/svg/SVGFontManager.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "utils/TestUtils.h"
 
@@ -36,7 +39,9 @@ TGFX_TEST(SVGRenderTest, XMLParse) {
 
   auto data = Data::MakeWithCopy(xml.data(), xml.size());
   EXPECT_TRUE(data != nullptr);
-  auto xmlDOM = DOM::MakeFromData(*data);
+  auto stream = Stream::MakeFromData(data);
+  EXPECT_TRUE(stream != nullptr);
+  auto xmlDOM = DOM::Make(*stream);
   EXPECT_TRUE(xmlDOM != nullptr);
 
   auto rootNode = xmlDOM->getRootNode();
@@ -80,9 +85,9 @@ TGFX_TEST(SVGRenderTest, XMLParse) {
 }
 
 TGFX_TEST(SVGRenderTest, PathSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/path.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/path.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -98,9 +103,9 @@ TGFX_TEST(SVGRenderTest, PathSVG) {
 }
 
 TGFX_TEST(SVGRenderTest, PNGImageSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/png.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/png.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -116,9 +121,9 @@ TGFX_TEST(SVGRenderTest, PNGImageSVG) {
 }
 
 TGFX_TEST(SVGRenderTest, JPGImageSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/jpg.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/jpg.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -134,9 +139,9 @@ TGFX_TEST(SVGRenderTest, JPGImageSVG) {
 }
 
 TGFX_TEST(SVGRenderTest, MaskSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/mask.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/mask.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -152,9 +157,10 @@ TGFX_TEST(SVGRenderTest, MaskSVG) {
 }
 
 TGFX_TEST(SVGRenderTest, GradientSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/radialGradient.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream =
+      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/radialGradient.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -170,9 +176,9 @@ TGFX_TEST(SVGRenderTest, GradientSVG) {
 }
 
 TGFX_TEST(SVGRenderTest, BlurSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/blur.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/blur.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -187,10 +193,34 @@ TGFX_TEST(SVGRenderTest, BlurSVG) {
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/blur"));
 }
 
+class FontLoaderTest : public FontManagerCustom::FontLoader {
+ public:
+  void loadFonts(std::vector<std::shared_ptr<FontStyleSetCustom>>& families) const override {
+    auto family = std::make_shared<FontStyleSetCustom>("Noto Sans SC");
+    auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+    typeface->setStyle(FontStyle::Normal());
+    family->appendTypeface(typeface);
+    families.push_back(family);
+
+    family = std::make_shared<FontStyleSetCustom>("Noto Serif SC");
+    typeface = MakeTypeface("resources/font/NotoSerifSC-Regular.otf");
+    typeface->setStyle(FontStyle::Normal());
+    family->appendTypeface(typeface);
+    families.push_back(family);
+  }
+};
+
 TGFX_TEST(SVGRenderTest, TextSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/text.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/text.svg"));
+  ASSERT_TRUE(stream != nullptr);
+
+  FontLoaderTest loader;
+  std::shared_ptr<FontManagerCustom> fontManager = std::make_shared<FontManagerCustom>(loader);
+
+  SVGDOMOptions options;
+  options.fontManager = fontManager;
+
+  auto SVGDom = SVGDOM::Make(*stream, options);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -201,19 +231,21 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
-  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-  ASSERT_TRUE(typeface != nullptr);
-  auto fontManager = SVGFontManager::Make(typeface);
-  ASSERT_TRUE(fontManager != nullptr);
-
-  SVGDom->render(canvas, fontManager);
+  SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/text"));
 }
 
 TGFX_TEST(SVGRenderTest, TextFontSVG) {
-  auto data = Data::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/textFont.svg"));
-  ASSERT_TRUE(data != nullptr);
-  auto SVGDom = SVGDOM::Make(data);
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/textFont.svg"));
+  ASSERT_TRUE(stream != nullptr);
+
+  FontLoaderTest loader;
+  std::shared_ptr<FontManagerCustom> fontManager = std::make_shared<FontManagerCustom>(loader);
+
+  SVGDOMOptions options;
+  options.fontManager = fontManager;
+
+  auto SVGDom = SVGDOM::Make(*stream, options);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -224,27 +256,127 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
-  auto defaultTypeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-  ASSERT_TRUE(defaultTypeface != nullptr);
-  auto fontManager = SVGFontManager::Make(defaultTypeface);
-  ASSERT_TRUE(fontManager != nullptr);
-
-  SVGDom->collectRenderFonts(fontManager);
-  auto families = fontManager->getFontFamilies();
-  ASSERT_TRUE(families.size() == 1);
-  auto family = fontManager->getFontFamilies()[0];
-  ASSERT_TRUE(family == "Noto Serif SC");
-  auto infos = fontManager->getFontInfos(family);
-  ASSERT_TRUE(infos.size() == 1);
-  auto info = infos[0];
-  ASSERT_TRUE(info.weight() == SVGFontWeight::Type::Normal);
-  ASSERT_TRUE(info.style() == SVGFontStyle::Type::Normal);
-
-  auto typeface = MakeTypeface("resources/font/NotoSerifSC-Regular.otf");
-  fontManager->setTypeface(family, info, typeface);
-
-  SVGDom->render(canvas, fontManager);
+  SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/textFont"));
+}
+
+TGFX_TEST(SVGRenderTest, ComplexSVG) {
+  FontLoaderTest loader;
+  std::shared_ptr<FontManagerCustom> fontManager = std::make_shared<FontManagerCustom>(loader);
+
+  SVGDOMOptions options;
+  options.fontManager = fontManager;
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  {
+    auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex1.svg"));
+    ASSERT_TRUE(stream != nullptr);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto rootNode = SVGDom->getRoot();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto surface = Surface::Make(context, 100, 100);
+    auto* canvas = surface->getCanvas();
+
+    SVGDom->render(canvas);
+    EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex1"));
+  }
+
+  {
+    auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex2.svg"));
+    ASSERT_TRUE(stream != nullptr);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto rootNode = SVGDom->getRoot();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto surface = Surface::Make(context, 160, 160);
+    auto* canvas = surface->getCanvas();
+
+    canvas->scale(10, 10);
+    SVGDom->render(canvas);
+    EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex2"));
+  }
+
+  {
+    auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex3.svg"));
+    ASSERT_TRUE(stream != nullptr);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto rootNode = SVGDom->getRoot();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto surface = Surface::Make(context, 300, 300);
+    auto* canvas = surface->getCanvas();
+
+    canvas->scale(2, 2);
+    SVGDom->render(canvas);
+    EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex3"));
+  }
+
+  {
+    auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex4.svg"));
+    ASSERT_TRUE(stream != nullptr);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto rootNode = SVGDom->getRoot();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto surface = Surface::Make(context, 500, 400);
+    auto* canvas = surface->getCanvas();
+
+    SVGDom->render(canvas);
+    EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex4"));
+  }
+
+  {
+    auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex5.svg"));
+    ASSERT_TRUE(stream != nullptr);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto rootNode = SVGDom->getRoot();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto surface = Surface::Make(context, 1300, 1300);
+    auto* canvas = surface->getCanvas();
+
+    SVGDom->render(canvas);
+    EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex5"));
+  }
+
+  {
+    auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex6.svg"));
+    ASSERT_TRUE(stream != nullptr);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto rootNode = SVGDom->getRoot();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto surface = Surface::Make(context, 375, 812);
+    auto* canvas = surface->getCanvas();
+
+    SVGDom->render(canvas);
+    EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex6"));
+  }
+
+  {
+    auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex7.svg"));
+    ASSERT_TRUE(stream != nullptr);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto rootNode = SVGDom->getRoot();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto surface = Surface::Make(context, 1090, 2026);
+    auto* canvas = surface->getCanvas();
+
+    SVGDom->render(canvas);
+    EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex7"));
+  }
 }
 
 }  // namespace tgfx

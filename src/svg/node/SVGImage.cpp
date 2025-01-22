@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGImage.h"
+#include <filesystem>
 #include <memory>
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
@@ -26,6 +27,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 
@@ -47,20 +49,35 @@ bool SVGImage::onPrepareToRender(SVGRenderContext* context) const {
          INHERITED::onPrepareToRender(context);
 }
 
-std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
-  const auto& base64URL = href.iri();
-  auto pos = base64URL.find("base64,");
-  if (pos == std::string::npos) {
-    return nullptr;
+std::shared_ptr<Image> LoadImage(const std::shared_ptr<LoadResourceProvider>& resourceProvider,
+                                 const SVGIRI& href) {
+
+  switch (href.type()) {
+    case SVGIRI::Type::DataURI: {
+      const auto& base64URL = href.iri();
+      auto pos = base64URL.find("base64,");
+      if (pos == std::string::npos) {
+        return nullptr;
+      }
+      std::string base64Data = base64URL.substr(pos + 7);
+      auto data = Base64Decode(base64Data);
+      return data ? Image::MakeFromEncoded(data) : nullptr;
+    }
+    case SVGIRI::Type::Nonlocal: {
+      std::filesystem::path path(href.iri());
+      auto directory = path.parent_path().string();
+      auto filename = path.filename().string();
+      return resourceProvider->loadImage(directory, filename);
+    }
+    default:
+      return nullptr;
   }
-  std::string base64Data = base64URL.substr(pos + 7);
-  auto data = Base64Decode(base64Data);
-  return data ? Image::MakeFromEncoded(data) : nullptr;
 }
 
-SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
-                                        SVGPreserveAspectRatio /*ratio*/) {
-  std::shared_ptr<Image> image = ::tgfx::LoadImage(iri);
+SVGImage::ImageInfo SVGImage::LoadImage(
+    const std::shared_ptr<LoadResourceProvider>& resourceProvider, const SVGIRI& iri,
+    const Rect& viewPort, SVGPreserveAspectRatio /*ratio*/) {
+  std::shared_ptr<Image> image = ::tgfx::LoadImage(resourceProvider, iri);
   if (!image) {
     return {};
   }
@@ -80,7 +97,7 @@ void SVGImage::onRender(const SVGRenderContext& context) const {
   const Rect viewPort = lengthContext.resolveRect(X, Y, Width, Height);
 
   ImageInfo image;
-  const auto imgInfo = LoadImage(Href, viewPort, PreserveAspectRatio);
+  const auto imgInfo = LoadImage(context.resourceProvider(), Href, viewPort, PreserveAspectRatio);
   if (!imgInfo.image) {
     LOGE("can't render image: load image failed\n");
     return;

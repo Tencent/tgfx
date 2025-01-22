@@ -27,6 +27,7 @@
 #include <utility>
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGLengthContext.h"
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
@@ -35,7 +36,6 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGAttribute.h"
-#include "tgfx/svg/SVGFontManager.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
 #include "tgfx/svg/node/SVGContainer.h"
@@ -44,12 +44,9 @@
 
 namespace tgfx {
 
-std::shared_ptr<SVGDOM> SVGDOM::Make(const std::shared_ptr<Data>& data) {
-  if (!data) {
-    return nullptr;
-  }
+std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, SVGDOMOptions options) {
   // Parse the data into an XML DOM structure
-  auto xmlDom = DOM::MakeFromData(*data);
+  auto xmlDom = DOM::Make(stream);
   if (!xmlDom) {
     return nullptr;
   }
@@ -66,66 +63,46 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(const std::shared_ptr<Data>& data) {
 
   // Create SVGDOM with the root node and ID mapper
   return std::shared_ptr<SVGDOM>(
-      new SVGDOM(std::static_pointer_cast<SVGSVG>(root), std::move(mapper)));
+      new SVGDOM(std::static_pointer_cast<SVGSVG>(root), std::move(options), std::move(mapper)));
 }
 
-SVGDOM::SVGDOM(std::shared_ptr<SVGSVG> root, SVGIDMapper&& mapper)
-    : root(std::move(root)), nodeIDMapper(std::move(mapper)) {
+SVGDOM::SVGDOM(std::shared_ptr<SVGSVG> root, SVGDOMOptions options, SVGIDMapper&& mapper)
+    : root(std::move(root)), nodeIDMapper(std::move(mapper)), options(std::move(options)) {
 }
 
 const std::shared_ptr<SVGSVG>& SVGDOM::getRoot() const {
   return root;
 }
 
-void SVGDOM::collectRenderFonts(const std::shared_ptr<SVGFontManager>& fontManager) {
-  if (!root || !fontManager) {
-    return;
-  }
-
-  auto fontCollector = [](auto collector, const std::shared_ptr<SVGNode>& node,
-                          const std::shared_ptr<SVGFontManager>& fontManager) -> void {
-    if (!node) {
-      return;
-    }
-    if (node->tag() >= SVGTag::Text && node->tag() <= SVGTag::TSpan) {
-      if (node->getFontFamily().isValue()) {
-        auto family = node->getFontFamily()->family();
-        SVGFontWeight::Type weight = node->getFontWeight().isValue() ? node->getFontWeight()->type()
-                                                                     : SVGFontWeight::Type::Normal;
-        SVGFontStyle::Type style = node->getFontStyle().isValue() ? node->getFontStyle()->type()
-                                                                  : SVGFontStyle::Type::Normal;
-        SVGFontInfo fontStyle(weight, style);
-        fontManager->addFontStyle(family, fontStyle);
-      }
-    } else if (node->hasChildren()) {
-      if (auto container = std::static_pointer_cast<SVGContainer>(node)) {
-        for (const auto& child : container->getChildren()) {
-          collector(collector, child, fontManager);
-        }
-      }
-    }
-  };
-  fontCollector(fontCollector, std::static_pointer_cast<SVGContainer>(root), fontManager);
-}
-
-void SVGDOM::render(Canvas* canvas, const std::shared_ptr<SVGFontManager>& fontManager) {
+void SVGDOM::render(Canvas* canvas) {
   // If the container size is not set, use the size of the root SVG element.
   auto drawSize = containerSize;
   if (drawSize.isEmpty()) {
+    auto rootWidth = root->getWidth();
+    auto rootHeight = root->getHeight();
     if (root->getViewBox().has_value()) {
-      drawSize = root->getViewBox()->size();
+      SVGLengthContext viewportLengthContext(root->getViewBox()->size());
+      drawSize = Size::Make(
+          viewportLengthContext.resolve(rootWidth, SVGLengthContext::LengthType::Horizontal),
+          viewportLengthContext.resolve(rootHeight, SVGLengthContext::LengthType::Vertical));
     } else {
-      drawSize = Size::Make(root->getWidth().value(), root->getHeight().value());
+      drawSize = Size::Make(rootWidth.value(), rootHeight.value());
     }
   }
   if (!canvas || !root || drawSize.isEmpty()) {
     return;
   }
 
-  SVGLengthContext lengthContext(containerSize);
+  SVGLengthContext lengthContext(drawSize);
   SVGPresentationContext presentationContext;
-  SVGRenderContext renderContext(canvas, fontManager, nodeIDMapper, lengthContext,
-                                 presentationContext, {nullptr, nullptr}, canvas->getMatrix());
+
+  auto resourceProvider =
+      options.resourceProvider ? options.resourceProvider : LoadResourceProvider::MakeEmpty();
+  auto shaperFactory = options.shaperFactory ? options.shaperFactory : shapers::PrimitiveFactory();
+
+  SVGRenderContext renderContext(canvas, options.fontManager, resourceProvider, shaperFactory,
+                                 nodeIDMapper, lengthContext, presentationContext,
+                                 {nullptr, nullptr}, canvas->getMatrix());
 
   root->render(renderContext);
 }

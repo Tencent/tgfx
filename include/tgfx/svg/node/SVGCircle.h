@@ -43,8 +43,11 @@ class SVGCircle final : public SVGShape {
  protected:
   bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  void onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-              PathFillType type) const override;
+  void onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+                  PathFillType type) const override;
+
+  void onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+                    PathFillType fillType, std::shared_ptr<PathEffect> pathEffect) const override;
 
   Path onAsPath(const SVGRenderContext& context) const override;
 

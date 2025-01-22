@@ -102,61 +102,56 @@ SVGPresentationContext::SVGPresentationContext()
     : _inherited(SVGPresentationAttributes::MakeInitial()) {
 }
 
-SVGRenderContext::SVGRenderContext(Canvas* canvas,
-                                   const std::shared_ptr<SVGFontManager>& fontManager,
+SVGRenderContext::SVGRenderContext(Canvas* canvas, const std::shared_ptr<FontManager>& fontManager,
+                                   const std::shared_ptr<LoadResourceProvider>& resourceProvider,
+                                   const std::shared_ptr<shapers::Factory>& shaperFactory,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                                    const SVGPresentationContext& presentContext,
-                                   const OBBScope& obbs, const Matrix& matrix)
-    : fontManager(fontManager), nodeIDMapper(mapper), _lengthContext(lengthContext),
-      _presentationContext(presentContext), renderCanvas(canvas), recorder(),
-      _canvas(recorder.beginRecording()), scope(obbs), matrix(matrix) {
+                                   const OBBScope& scope, const Matrix& matrix)
+    : _fontManager(fontManager), _resourceProvider(resourceProvider), shaperFactory(shaperFactory),
+      nodeIDMapper(mapper), _lengthContext(lengthContext), _presentationContext(presentContext),
+      _canvas(canvas), canvasSaveCount(canvas->getSaveCount()), scope(scope), _matrix(matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
-    : SVGRenderContext(other._canvas, other.fontManager, other.nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, other.scope, other.matrix) {
+    : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
+                       other.shaperFactory, other.nodeIDMapper, *other._lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
-    : SVGRenderContext(canvas, other.fontManager, other.nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, other.scope, other.matrix) {
+    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.shaperFactory,
+                       other.nodeIDMapper, *other._lengthContext, *other._presentationContext,
+                       other.scope, other._matrix) {
 }
 
-SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGLengthContext& lengthCtx)
-    : SVGRenderContext(other._canvas, other.fontManager, other.nodeIDMapper, lengthCtx,
-                       *other._presentationContext, other.scope, other.matrix) {
+SVGRenderContext::SVGRenderContext(const SVGRenderContext& other,
+                                   const SVGLengthContext& lengthContext)
+    : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
+                       other.shaperFactory, other.nodeIDMapper, lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
-                                   const SVGLengthContext& lengthCtx)
-    : SVGRenderContext(canvas, other.fontManager, other.nodeIDMapper, lengthCtx,
-                       *other._presentationContext, other.scope, other.matrix) {
+                                   const SVGLengthContext& lengthContext)
+    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.shaperFactory,
+                       other.nodeIDMapper, lengthContext, *other._presentationContext, other.scope,
+                       other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
-    : SVGRenderContext(other._canvas, other.fontManager, other.nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, OBBScope{node, this}, other.matrix) {
+    : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
+                       other.shaperFactory, other.nodeIDMapper, *other._lengthContext,
+                       *other._presentationContext, OBBScope{node, this}, other._matrix) {
 }
 
 SVGRenderContext::~SVGRenderContext() {
-  _canvas->restoreToCount(0);
-  auto picture = recorder.finishRecordingAsPicture();
-  if (!picture) {
-    return;
-  }
-
-  renderCanvas->save();
-  if (_clipPath.has_value()) {
-    renderCanvas->clipPath(_clipPath.value());
-  }
-  auto matrix = Matrix::I();
-  renderCanvas->drawPicture(picture, &matrix, &picturePaint);
-  renderCanvas->restore();
+  _canvas->restoreToCount(canvasSaveCount);
 }
 
 SVGRenderContext SVGRenderContext::CopyForPaint(const SVGRenderContext& context, Canvas* canvas,
-                                                const SVGLengthContext& lengthCtx) {
-  SVGRenderContext copyContext(context, canvas, lengthCtx);
+                                                const SVGLengthContext& lengthContext) {
+  SVGRenderContext copyContext(context, canvas, lengthContext);
   copyContext.deferredPaintOpacity = context.deferredPaintOpacity;
   return copyContext;
 }
@@ -165,8 +160,11 @@ std::shared_ptr<SVGNode> SVGRenderContext::findNodeById(const SVGIRI& iri) const
   if (iri.type() != SVGIRI::Type::Local) {
     return nullptr;
   }
-  auto p = nodeIDMapper.find(iri.iri())->second;
-  return p;
+  auto iter = nodeIDMapper.find(iri.iri());
+  if (iter != nodeIDMapper.end()) {
+    return iter->second;
+  }
+  return nullptr;
 }
 
 void SVGRenderContext::applyPresentationAttributes(const SVGPresentationAttributes& attrs,
@@ -207,23 +205,28 @@ void SVGRenderContext::applyPresentationAttributes(const SVGPresentationAttribut
 #undef ApplyLazyInheritedAttribute
 
   if (attrs.ClipPath.isValue()) {
-    _clipPath = this->applyClip(*attrs.ClipPath);
+    saveOnce();
+    _canvas->clipPath(applyClip(*attrs.ClipPath));
   }
 
   const bool hasFilter = attrs.Filter.isValue();
   if (attrs.Opacity.isValue()) {
-    picturePaint.setAlpha(this->applyOpacity(*attrs.Opacity, flags, hasFilter));
+    _canvas->saveLayerAlpha(this->applyOpacity(*attrs.Opacity, flags, hasFilter));
   }
 
   if (attrs.Mask.isValue()) {
     if (auto maskFilter = this->applyMask(*attrs.Mask)) {
-      picturePaint.setMaskFilter(maskFilter);
+      Paint maskPaint;
+      maskPaint.setMaskFilter(maskFilter);
+      _canvas->saveLayer(&maskPaint);
     }
   }
 
   if (hasFilter) {
     if (auto imageFilter = this->applyFilter(*attrs.Filter)) {
-      picturePaint.setImageFilter(imageFilter);
+      Paint filterPaint;
+      filterPaint.setImageFilter(imageFilter);
+      _canvas->saveLayer(&filterPaint);
     }
   }
 }
@@ -240,12 +243,11 @@ float SVGRenderContext::applyOpacity(float opacity, uint32_t flags, bool hasFilt
   //   - it only has a stroke or a fill (but not both);
   //   - it does not have a filter.
   // Going forward, we may needto refine this heuristic (e.g. to accommodate markers).
-  if ((flags & kLeaf) && (hasFill ^ hasStroke) && !hasFilter) {
+  if ((flags & static_cast<uint32_t>(ApplyFlags::Leaf)) && (hasFill ^ hasStroke) && !hasFilter) {
     deferredPaintOpacity *= opacity;
     return 1.0f;
-  } else {
-    return opacity;
   }
+  return opacity;
 }
 
 std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& filter) const {
@@ -263,7 +265,9 @@ std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& fil
 }
 
 void SVGRenderContext::saveOnce() {
-  _canvas->save();
+  if (_canvas->getSaveCount() == canvasSaveCount) {
+    _canvas->save();
+  }
 }
 
 Path SVGRenderContext::applyClip(const SVGFuncIRI& clip) const {
@@ -295,26 +299,22 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   Recorder maskRecorder;
   auto* maskCanvas = maskRecorder.beginRecording();
   {
-    SVGRenderContext maskCtx(*this, maskCanvas);
-    maskNode->renderMask(maskCtx);
+    SVGRenderContext maskContext(*this, maskCanvas);
+    maskNode->renderMask(maskContext);
   }
   auto picture = maskRecorder.finishRecordingAsPicture();
   if (!picture) {
     return nullptr;
   }
 
-  auto bound = picture->getBounds();
-  maskBound.join(bound);
-
-  auto transMatrix = matrix * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
+  auto transMatrix = _matrix * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
   auto shaderImage =
-      Image::MakeFrom(picture, static_cast<int>(bound.width() * matrix.getScaleX()),
-                      static_cast<int>(bound.height() * matrix.getScaleY()), &transMatrix);
+      Image::MakeFrom(picture, static_cast<int>(maskBound.width() * _matrix.getScaleX()),
+                      static_cast<int>(maskBound.height() * _matrix.getScaleY()), &transMatrix);
   auto shader = Shader::MakeImageShader(shaderImage, TileMode::Decal, TileMode::Decal);
   if (!shader) {
     return nullptr;
   }
-  // return nullptr;
   return MaskFilter::MakeShader(shader);
 }
 
@@ -339,8 +339,9 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, flo
       // and node being rendered.
       SVGPresentationContext presentContext;
       presentContext._namedColors = _presentationContext->_namedColors;
-      SVGRenderContext localContext(_canvas, fontManager, nodeIDMapper, *_lengthContext,
-                                    presentContext, scope, Matrix::I());
+      SVGRenderContext localContext(_canvas, _fontManager, _resourceProvider, shaperFactory,
+                                    nodeIDMapper, *_lengthContext, presentContext, scope,
+                                    Matrix::I());
 
       const auto node = this->findNodeById(svgPaint.iri());
       if (!node || !node->asPaint(localContext, &(paint.value()))) {
@@ -378,18 +379,19 @@ std::optional<Paint> SVGRenderContext::strokePaint() const {
 
   if (paint.has_value()) {
     paint->setStyle(PaintStyle::Stroke);
-    paint->setStrokeWidth(
-        _lengthContext->resolve(*props.StrokeWidth, SVGLengthContext::LengthType::Other));
     Stroke stroke;
+    stroke.width = _lengthContext->resolve(*props.StrokeWidth, SVGLengthContext::LengthType::Other);
     stroke.cap = toCap(*props.StrokeLineCap);
     stroke.join = toJoin(*props.StrokeLineJoin);
     stroke.miterLimit = *props.StrokeMiterLimit;
     paint->setStroke(stroke);
-
-    dash_effect(props, *_lengthContext);
   }
-
   return paint;
+}
+
+std::shared_ptr<PathEffect> SVGRenderContext::strokePathEffect() const {
+  const auto& props = _presentationContext->_inherited;
+  return dash_effect(props, *_lengthContext);
 }
 
 SVGColorType SVGRenderContext::resolveSVGColor(const SVGColor& color) const {
@@ -411,25 +413,72 @@ SVGColorType SVGRenderContext::resolveSVGColor(const SVGColor& color) const {
   }
 }
 
-std::tuple<bool, Font> SVGRenderContext::resolveFont() const {
-  // Since there may be SVGs without any text, we accept the absence of a font manager.
-  // However, this will result in the inability to render text.
-  if (!fontManager) {
-    return {false, Font()};
+Font SVGRenderContext::resolveFont() const {
+  if (!_fontManager) {
+    return Font();
   }
-  const auto& family = _presentationContext->_inherited.FontFamily->family();
-  auto fontWeight = _presentationContext->_inherited.FontWeight->type();
-  auto fontStyle = _presentationContext->_inherited.FontStyle->type();
+  auto weight = [](const SVGFontWeight& w) {
+    switch (w.type()) {
+      case SVGFontWeight::Type::W100:
+        return FontStyle::Weight::Thin;
+      case SVGFontWeight::Type::W200:
+        return FontStyle::Weight::ExtraLight;
+      case SVGFontWeight::Type::W300:
+        return FontStyle::Weight::Light;
+      case SVGFontWeight::Type::W400:
+        return FontStyle::Weight::Normal;
+      case SVGFontWeight::Type::W500:
+        return FontStyle::Weight::Medium;
+      case SVGFontWeight::Type::W600:
+        return FontStyle::Weight::SemiBold;
+      case SVGFontWeight::Type::W700:
+        return FontStyle::Weight::Bold;
+      case SVGFontWeight::Type::W800:
+        return FontStyle::Weight::ExtraBold;
+      case SVGFontWeight::Type::W900:
+        return FontStyle::Weight::Black;
+      case SVGFontWeight::Type::Normal:
+        return FontStyle::Weight::Normal;
+      case SVGFontWeight::Type::Bold:
+        return FontStyle::Weight::Bold;
+      case SVGFontWeight::Type::Bolder:
+        return FontStyle::Weight::ExtraBold;
+      case SVGFontWeight::Type::Lighter:
+        return FontStyle::Weight::Light;
+      case SVGFontWeight::Type::Inherit: {
+        return FontStyle::Weight::Normal;
+      }
+    }
+  };
 
-  SVGFontInfo info(fontWeight, fontStyle);
-  auto typeface = fontManager->getTypefaceForRendering(family, info);
+  auto slant = [](const SVGFontStyle& s) {
+    switch (s.type()) {
+      case SVGFontStyle::Type::Normal:
+        return FontStyle::Slant::Upright;
+      case SVGFontStyle::Type::Italic:
+        return FontStyle::Slant::Italic;
+      case SVGFontStyle::Type::Oblique:
+        return FontStyle::Slant::Oblique;
+      case SVGFontStyle::Type::Inherit: {
+        return FontStyle::Slant::Upright;
+      }
+    }
+  };
+
+  const auto& family = presentationContext()._inherited.FontFamily->family();
+  const FontStyle style(weight(*presentationContext()._inherited.FontWeight),
+                        FontStyle::Width::Normal,
+                        slant(*presentationContext()._inherited.FontStyle));
+
+  const auto size = lengthContext().resolve(presentationContext()._inherited.FontSize->size(),
+                                            SVGLengthContext::LengthType::Vertical);
+
+  auto typeface = _fontManager->matchFamilyStyle(family, style);
   if (!typeface) {
-    return {false, Font()};
+    typeface = _fontManager->matchFamilyStyle("", style);
   }
-
-  float size = _lengthContext->resolve(_presentationContext->_inherited.FontSize->size(),
-                                       SVGLengthContext::LengthType::Vertical);
-  return {true, Font(typeface, size)};
+  Font font(std::move(typeface), size);
+  return font;
 }
 
 SVGRenderContext::OBBTransform SVGRenderContext::transformForCurrentBoundBox(
@@ -458,4 +507,23 @@ Rect SVGRenderContext::resolveOBBRect(const SVGLength& x, const SVGLength& y, co
                         transform.scale.y * r.y() + transform.offset.y,
                         transform.scale.x * r.width(), transform.scale.y * r.height());
 }
+std::unique_ptr<Shaper> SVGRenderContext::makeShaper() const {
+  DEBUG_ASSERT(shaperFactory);
+  return shaperFactory->makeShaper();
+}
+
+std::unique_ptr<BiDiRunIterator> SVGRenderContext::makeBidiRunIterator(const char* utf8,
+                                                                       size_t utf8Bytes,
+                                                                       uint8_t bidiLevel) const {
+  DEBUG_ASSERT(shaperFactory);
+  return shaperFactory->makeBidiRunIterator(utf8, utf8Bytes, bidiLevel);
+}
+
+std::unique_ptr<ScriptRunIterator> SVGRenderContext::makeScriptRunIterator(const char* utf8,
+                                                                           size_t utf8Bytes) const {
+  DEBUG_ASSERT(shaperFactory);
+  constexpr FourByteTag unknownScript = SetFourByteTag('Z', 'z', 'z', 'z');
+  return shaperFactory->makeScriptRunIterator(utf8, utf8Bytes, unknownScript);
+}
+
 }  // namespace tgfx

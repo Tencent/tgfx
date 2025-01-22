@@ -50,7 +50,7 @@ enum class PathEncoding {
 
 std::string ToSVGPath(const Path& path, PathEncoding = PathEncoding::Absolute);
 
-std::tuple<bool, std::shared_ptr<Path>> PathMakeFromSVGString(const char data[]);
+std::tuple<bool, std::shared_ptr<Path>> PathMakeFromSVGString(const std::string& pathString);
 
 std::string ToSVGTransform(const Matrix& matrix);
 

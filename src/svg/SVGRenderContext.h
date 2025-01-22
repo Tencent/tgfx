@@ -23,12 +23,16 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include "core/utils/Log.h"
 #include "svg/SVGLengthContext.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/FontManager.h"
+#include "tgfx/core/LoadResourceProvider.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
@@ -36,8 +40,8 @@
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGDOM.h"
-#include "tgfx/svg/SVGFontManager.h"
 #include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/shaper/ShaperFactory.h"
 
 namespace tgfx {
 
@@ -110,8 +114,8 @@ class CopyOnWrite {
 
 struct SVGPresentationContext {
   SVGPresentationContext();
-  SVGPresentationContext(const SVGPresentationContext&) = default;
-  SVGPresentationContext& operator=(const SVGPresentationContext&) = default;
+  SVGPresentationContext(const SVGPresentationContext& other) = default;
+  SVGPresentationContext& operator=(const SVGPresentationContext& other) = default;
 
   const std::unordered_map<std::string, SVGColorType>* _namedColors = nullptr;
   // Inherited presentation attributes, computed for the current node.
@@ -126,18 +130,23 @@ class SVGRenderContext {
     const SVGRenderContext* context;
   };
 
-  SVGRenderContext(Canvas*, const std::shared_ptr<SVGFontManager>&, const SVGIDMapper&,
-                   const SVGLengthContext&, const SVGPresentationContext&, const OBBScope&,
+  SVGRenderContext(Canvas* canvas, const std::shared_ptr<FontManager>& fontManager,
+                   const std::shared_ptr<LoadResourceProvider>& resourceProvider,
+                   const std::shared_ptr<shapers::Factory>& shaperFactory,
+                   const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
+                   const SVGPresentationContext& presentContext, const OBBScope& scope,
                    const Matrix& matrix);
-  SVGRenderContext(const SVGRenderContext&);
-  SVGRenderContext(const SVGRenderContext&, Canvas*);
-  SVGRenderContext(const SVGRenderContext&, const SVGLengthContext&);
-  SVGRenderContext(const SVGRenderContext&, Canvas*, const SVGLengthContext&);
+  SVGRenderContext(const SVGRenderContext& other);
+  SVGRenderContext(const SVGRenderContext& other, Canvas* canvas);
+  SVGRenderContext(const SVGRenderContext& other, const SVGLengthContext& lengthContext);
+  SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
+                   const SVGLengthContext& lengthContext);
   // Establish a new OBB scope.  Normally used when entering a node's render scope.
-  SVGRenderContext(const SVGRenderContext&, const SVGNode*);
+  SVGRenderContext(const SVGRenderContext& other, const SVGNode* node);
   ~SVGRenderContext();
 
-  static SVGRenderContext CopyForPaint(const SVGRenderContext&, Canvas*, const SVGLengthContext&);
+  static SVGRenderContext CopyForPaint(const SVGRenderContext& context, Canvas* canvas,
+                                       const SVGLengthContext& lengthContext);
 
   const SVGLengthContext& lengthContext() const {
     return *_lengthContext;
@@ -158,11 +167,15 @@ class SVGRenderContext {
   void saveOnce();
 
   void concat(const Matrix& inputMatrix) {
-    matrix.preConcat(inputMatrix);
+    _matrix.preConcat(inputMatrix);
   }
 
-  enum ApplyFlags {
-    kLeaf = 1 << 0,  // the target node doesn't have descendants
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
+  enum class ApplyFlags {
+    Leaf = 1 << 0,  // the target node doesn't have descendants
   };
 
   void applyPresentationAttributes(const SVGPresentationAttributes& attrs, uint32_t flags);
@@ -175,19 +188,38 @@ class SVGRenderContext {
 
   std::optional<Paint> strokePaint() const;
 
+  std::shared_ptr<PathEffect> strokePathEffect() const;
+
   SVGColorType resolveSVGColor(const SVGColor&) const;
 
-  std::tuple<bool, Font> resolveFont() const;
+  Font resolveFont() const;
 
   // The local computed clip path (not inherited).
   Path clipPath() const {
     return _clipPath.value_or(Path());
   };
 
+  const std::shared_ptr<LoadResourceProvider>& resourceProvider() const {
+    return _resourceProvider;
+  }
+
+  const std::shared_ptr<FontManager>& fontManager() const {
+    return _fontManager;
+  }
+
+  std::unique_ptr<Shaper> makeShaper() const;
+
+  std::unique_ptr<BiDiRunIterator> makeBidiRunIterator(const char* utf8, size_t utf8Bytes,
+                                                       uint8_t bidiLevel) const;
+
+  std::unique_ptr<ScriptRunIterator> makeScriptRunIterator(const char* utf8,
+                                                           size_t utf8Bytes) const;
+
   // Returns the translate/scale transformation required to map into the current OBB scope,
   // with the specified units.
   struct OBBTransform {
-    Point offset, scale;
+    Point offset;
+    Point scale;
   };
 
   OBBTransform transformForCurrentBoundBox(SVGObjectBoundingBoxUnits) const;
@@ -202,20 +234,21 @@ class SVGRenderContext {
 
  private:
   float applyOpacity(float opacity, uint32_t flags, bool hasFilter);
-  std::shared_ptr<ImageFilter> applyFilter(const SVGFuncIRI&) const;
-  Path applyClip(const SVGFuncIRI&) const;
-  std::shared_ptr<MaskFilter> applyMask(const SVGFuncIRI&);
+  std::shared_ptr<ImageFilter> applyFilter(const SVGFuncIRI& filter) const;
+  Path applyClip(const SVGFuncIRI& clip) const;
+  std::shared_ptr<MaskFilter> applyMask(const SVGFuncIRI& mask);
 
-  std::optional<Paint> commonPaint(const SVGPaint&, float opacity) const;
+  std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
 
-  std::shared_ptr<SVGFontManager> fontManager;
+  std::shared_ptr<FontManager> _fontManager;
+  std::shared_ptr<LoadResourceProvider> _resourceProvider;
+  std::shared_ptr<shapers::Factory> shaperFactory;
+
   const SVGIDMapper& nodeIDMapper;
   CopyOnWrite<SVGLengthContext> _lengthContext;
   CopyOnWrite<SVGPresentationContext> _presentationContext;
-  Canvas* renderCanvas;
-
-  Recorder recorder;
   Canvas* _canvas;
+  int canvasSaveCount = 0;
 
   // clipPath, if present for the current context (not inherited).
   std::optional<Path> _clipPath;
@@ -226,8 +259,6 @@ class SVGRenderContext {
   // Current object bounding box scope.
   const OBBScope scope;
 
-  Paint picturePaint;
-
-  Matrix matrix = Matrix::I();
+  Matrix _matrix = Matrix::I();
 };
 }  // namespace tgfx

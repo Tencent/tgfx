@@ -21,6 +21,7 @@
 #include <memory>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/svg/node/SVGTransformableNode.h"
 
 namespace tgfx {
@@ -39,8 +40,12 @@ class SVGShape : public SVGTransformableNode {
 
   void onRender(const SVGRenderContext& context) const override;
 
-  virtual void onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-                      PathFillType fillType) const = 0;
+  virtual void onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+                          PathFillType fillType) const = 0;
+
+  virtual void onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext,
+                            const Paint& paint, PathFillType fillType,
+                            std::shared_ptr<PathEffect> pathEffect) const = 0;
 
  private:
   using INHERITED = SVGTransformableNode;

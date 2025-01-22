@@ -50,10 +50,24 @@ Rect SVGEllipse::resolve(const SVGLengthContext& lengthContext) const {
   return (rx > 0 && ry > 0) ? Rect::MakeXYWH(cx - rx, cy - ry, rx * 2, ry * 2) : Rect::MakeEmpty();
 }
 
-void SVGEllipse::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-                        PathFillType /*fillType*/) const {
+void SVGEllipse::onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext,
+                            const Paint& paint, PathFillType /*fillType*/) const {
   canvas->drawOval(this->resolve(lengthContext), paint);
 }
+
+void SVGEllipse::onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext,
+                              const Paint& paint, PathFillType /*fillType*/,
+                              std::shared_ptr<PathEffect> pathEffect) const {
+  if (!pathEffect) {
+    return;
+  }
+
+  Path path;
+  path.addOval(resolve(lengthContext));
+  if (pathEffect->filterPath(&path)) {
+    canvas->drawPath(path, paint);
+  }
+};
 
 Path SVGEllipse::onAsPath(const SVGRenderContext& context) const {
   Path path;

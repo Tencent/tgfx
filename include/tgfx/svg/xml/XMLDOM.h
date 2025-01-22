@@ -22,6 +22,7 @@
 #include <tuple>
 #include <vector>
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 
@@ -80,11 +81,11 @@ class DOM {
   ~DOM();
 
   /**
-   * Constructs a DOM tree from XML text data.
-   * @param data XML text data.
+   * Constructs a DOM tree from XML text stream.
+   * @param stream XML text stream.
    * @return The DOM tree. Returns nullptr if construction fails.
    */
-  static std::shared_ptr<DOM> MakeFromData(const Data& data);
+  static std::shared_ptr<DOM> Make(Stream& stream);
 
   /**
    * Creates a deep copy of a DOM tree.

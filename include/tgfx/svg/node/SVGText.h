@@ -65,7 +65,7 @@ class SVGTextContainer : public SVGTextFragment {
   SVG_ATTR(Dy, std::vector<SVGLength>, {})
   SVG_ATTR(Rotate, std::vector<SVGNumberType>, {})
 
-  void appendChild(std::shared_ptr<SVGNode> node) final;
+  void appendChild(std::shared_ptr<SVGNode> child) final;
 
  protected:
   explicit SVGTextContainer(SVGTag t) : INHERITED(t) {

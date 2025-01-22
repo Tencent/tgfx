@@ -31,9 +31,9 @@ SVGCircle::SVGCircle() : INHERITED(SVGTag::Circle) {
 
 bool SVGCircle::parseAndSetAttribute(const std::string& name, const std::string& value) {
   return INHERITED::parseAndSetAttribute(name, value) ||
-         this->setCx(SVGAttributeParser::parse<SVGLength>("cx", name, value)) ||
-         this->setCy(SVGAttributeParser::parse<SVGLength>("cy", name, value)) ||
-         this->setR(SVGAttributeParser::parse<SVGLength>("r", name, value));
+         setCx(SVGAttributeParser::parse<SVGLength>("cx", name, value)) ||
+         setCy(SVGAttributeParser::parse<SVGLength>("cy", name, value)) ||
+         setR(SVGAttributeParser::parse<SVGLength>("r", name, value));
 }
 
 std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lengthContext) const {
@@ -44,14 +44,31 @@ std::tuple<Point, float> SVGCircle::resolve(const SVGLengthContext& lengthContex
   return std::make_tuple(Point::Make(cx, cy), r);
 }
 
-void SVGCircle::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-                       PathFillType /*type*/) const {
-  auto [pos, r] = this->resolve(lengthContext);
+void SVGCircle::onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext,
+                           const Paint& paint, PathFillType /*type*/) const {
+  auto [pos, r] = resolve(lengthContext);
 
   if (r > 0) {
     canvas->drawCircle(pos.x, pos.y, r, paint);
   }
 }
+
+void SVGCircle::onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext,
+                             const Paint& paint, PathFillType /*fillType*/,
+                             std::shared_ptr<PathEffect> pathEffect) const {
+  if (!pathEffect) {
+    return;
+  }
+
+  auto [pos, r] = resolve(lengthContext);
+  if (r > 0) {
+    Path path;
+    path.addOval(Rect::MakeXYWH(pos.x - r, pos.y - r, 2 * r, 2 * r));
+    if (pathEffect->filterPath(&path)) {
+      canvas->drawPath(path, paint);
+    }
+  }
+};
 
 Path SVGCircle::onAsPath(const SVGRenderContext& context) const {
   auto [pos, r] = this->resolve(context.lengthContext());

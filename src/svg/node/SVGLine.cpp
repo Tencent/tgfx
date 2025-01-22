@@ -44,11 +44,28 @@ std::tuple<Point, Point> SVGLine::resolve(const SVGLengthContext& lengthContext)
                   lengthContext.resolve(Y2, SVGLengthContext::LengthType::Vertical)));
 }
 
-void SVGLine::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-                     PathFillType) const {
+void SVGLine::onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+                         PathFillType) const {
   auto [p0, p1] = this->resolve(lengthContext);
   canvas->drawLine(p0, p1, paint);
 }
+
+void SVGLine::onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext,
+                           const Paint& paint, PathFillType /*fillType*/,
+                           std::shared_ptr<PathEffect> pathEffect) const {
+  if (!pathEffect) {
+    return;
+  }
+
+  auto [p0, p1] = this->resolve(lengthContext);
+
+  Path path;
+  path.moveTo(p0);
+  path.lineTo(p1);
+  if (pathEffect->filterPath(&path)) {
+    canvas->drawPath(path, paint);
+  }
+};
 
 Path SVGLine::onAsPath(const SVGRenderContext& context) const {
   auto [p0, p1] = this->resolve(context.lengthContext());

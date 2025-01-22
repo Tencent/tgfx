@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "svg/SVGFilterContext.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/node/SVGHiddenContainer.h"
@@ -51,6 +52,12 @@ class SVGFilter final : public SVGHiddenContainer {
   }
 
   bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
+
+  std::shared_ptr<ImageFilter> buildDropShadowFilter(const SVGRenderContext& context,
+                                                     const SVGFilterContext& filterContext) const;
+
+  std::shared_ptr<ImageFilter> buildInnerShadowFilter(const SVGRenderContext& context,
+                                                      const SVGFilterContext& filterContext) const;
 
   using INHERITED = SVGHiddenContainer;
 };

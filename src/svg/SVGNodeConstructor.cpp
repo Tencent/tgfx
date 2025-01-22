@@ -19,6 +19,7 @@
 #include "SVGNodeConstructor.h"
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/svg/node/SVGCircle.h"
 #include "tgfx/svg/node/SVGClipPath.h"
 #include "tgfx/svg/node/SVGDefs.h"
@@ -159,9 +160,6 @@ class StyleIterator {
 
     if (pos) {
       const char* sep = this->nextSeparator();
-      ASSERT(*sep == ';');
-      ASSERT(*sep == '\0')
-
       const char* valueSep = strchr(pos, ':');
       if (valueSep && valueSep < sep) {
         name = TrimmedString(pos, valueSep - 1);

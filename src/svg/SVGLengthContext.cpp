@@ -50,33 +50,33 @@ constexpr float CMMultiplier = MMMultiplier * 10;
 
 }  // namespace
 
-float SVGLengthContext::resolve(const SVGLength& l, LengthType t) const {
-  switch (l.unit()) {
+float SVGLengthContext::resolve(const SVGLength& length, LengthType type) const {
+  switch (length.unit()) {
     case SVGLength::Unit::Number: {
       if (patternUnit.has_value()) {
         if (patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
-          return l.value() * length_size_for_type(_viewPort, t);
+          return length.value() * length_size_for_type(_viewPort, type);
         } else {
-          return l.value();
+          return length.value();
         }
       } else {
-        return l.value();
+        return length.value();
       }
     }
     case SVGLength::Unit::PX:
-      return l.value();
+      return length.value();
     case SVGLength::Unit::Percentage:
-      return l.value() * length_size_for_type(_viewPort, t) / 100;
+      return length.value() * length_size_for_type(_viewPort, type) / 100;
     case SVGLength::Unit::CM:
-      return l.value() * dpi * CMMultiplier;
+      return length.value() * dpi * CMMultiplier;
     case SVGLength::Unit::MM:
-      return l.value() * dpi * MMMultiplier;
+      return length.value() * dpi * MMMultiplier;
     case SVGLength::Unit::IN:
-      return l.value() * dpi * INMultiplier;
+      return length.value() * dpi * INMultiplier;
     case SVGLength::Unit::PT:
-      return l.value() * dpi * PTMultiplier;
+      return length.value() * dpi * PTMultiplier;
     case SVGLength::Unit::PC:
-      return l.value() * dpi * PCMultiplier;
+      return length.value() * dpi * PCMultiplier;
     default:
       //unsupported unit type
       ASSERT(false);

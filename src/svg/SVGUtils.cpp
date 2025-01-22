@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGUtils.h"
-#include <malloc/_malloc.h>
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
@@ -456,7 +455,8 @@ const char* find_flag(const char str[], bool* value) {
 }
 }  // namespace
 
-std::tuple<bool, std::shared_ptr<Path>> PathMakeFromSVGString(const char data[]) {
+std::tuple<bool, std::shared_ptr<Path>> PathMakeFromSVGString(const std::string& pathString) {
+  const char* data = pathString.c_str();
   // We will write all data to this local path and only write it
   // to result if the whole parsing succeeds.
   auto path = std::make_shared<Path>();

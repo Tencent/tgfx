@@ -36,7 +36,8 @@ bool SVGMask::parseAndSetAttribute(const std::string& n, const std::string& v) {
          this->setMaskUnits(
              SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("maskUnits", n, v)) ||
          this->setMaskContentUnits(
-             SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("maskContentUnits", n, v));
+             SVGAttributeParser::parse<SVGObjectBoundingBoxUnits>("maskContentUnits", n, v)) ||
+         this->setMaskType(SVGAttributeParser::parse<SVGMaskType>("mask-type", n, v));
 }
 
 Rect SVGMask::bounds(const SVGRenderContext& context) const {
@@ -56,7 +57,7 @@ constexpr float LUM_COEFF_R = 0.2126f;
 constexpr float LUM_COEFF_G = 0.7152f;
 constexpr float LUM_COEFF_B = 0.0722f;
 
-std::array<float, 20> MakeLuminanceToAlpha() {
+constexpr std::array<float, 20> MakeLuminanceToAlpha() {
   return std::array<float, 20>{0, 0, 0, 0, 0, 0,           0,           0,           0, 0,
                                0, 0, 0, 0, 0, LUM_COEFF_R, LUM_COEFF_G, LUM_COEFF_B, 0, 0};
 }
@@ -69,24 +70,22 @@ void SVGMask::renderMask(const SVGRenderContext& context) const {
   // propagation currently occurs.
   // The local context also restores the filter layer created below on scope exit.
 
-  Recorder recorder;
-  auto* canvas = recorder.beginRecording();
+  int saveCount = context.canvas()->getSaveCount();
+  if (MaskType.type() != SVGMaskType::Type::Alpha) {
+    auto luminanceFilter = ColorFilter::Matrix(MakeLuminanceToAlpha());
+    Paint luminancePaint;
+    luminancePaint.setColorFilter(luminanceFilter);
+    context.canvas()->saveLayer(&luminancePaint);
+  }
+
   {
-    // Ensure the render context is destructed, drawing to the canvas upon destruction
-    SVGRenderContext localContext(context, canvas);
+    SVGRenderContext localContext(context);
     this->onPrepareToRender(&localContext);
     for (const auto& child : children) {
       child->render(localContext);
     }
   }
-  auto picture = recorder.finishRecordingAsPicture();
-  if (!picture) {
-    return;
-  }
-  auto luminanceFilter = ColorFilter::Matrix(MakeLuminanceToAlpha());
-  Paint luminancePaint;
-  luminancePaint.setColorFilter(luminanceFilter);
-  context.canvas()->drawPicture(picture, nullptr, &luminancePaint);
+  context.canvas()->restoreToCount(saveCount);
 }
 
 }  // namespace tgfx

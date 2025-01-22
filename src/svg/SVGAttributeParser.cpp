@@ -1203,4 +1203,23 @@ bool SVGAttributeParser::parse(SVGDisplay* display) {
 
   return parsedValue && this->parseEOSToken();
 }
+
+template <>
+bool SVGAttributeParser::parse(SVGMaskType* maskType) {
+  static constexpr std::tuple<const char*, SVGMaskType::Type> typeMap[] = {
+      {"luminance", SVGMaskType::Type::Luminance},
+      {"alpha", SVGMaskType::Type::Alpha},
+  };
+
+  bool parsedValue = false;
+  SVGMaskType::Type type;
+
+  if (this->parseEnumMap(typeMap, &type)) {
+    *maskType = SVGMaskType(type);
+    parsedValue = true;
+  }
+
+  return parsedValue && this->parseEOSToken();
+}
+
 }  // namespace tgfx

@@ -44,13 +44,28 @@ bool SVGAttributeParser::parse<Path>(Path* path) {
   return success;
 }
 
-void SVGPath::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
-                     PathFillType fillType) const {
+void SVGPath::onDrawFill(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
+                         PathFillType fillType) const {
   // the passed fillType follows inheritance rules and needs to be applied at draw time.
-  Path path = ShapePath;  // Note: point and verb data are CoW
+  Path path = ShapePath;
   path.setFillType(fillType);
   canvas->drawPath(path, paint);
 }
+
+void SVGPath::onDrawStroke(Canvas* canvas, const SVGLengthContext& /*lengthContext*/,
+                           const Paint& paint, PathFillType fillType,
+                           std::shared_ptr<PathEffect> pathEffect) const {
+  if (!pathEffect) {
+    return;
+  }
+
+  Path path = ShapePath;
+  path.setFillType(fillType);
+  canvas->drawPath(path, paint);
+  if (pathEffect->filterPath(&path)) {
+    canvas->drawPath(path, paint);
+  }
+};
 
 Path SVGPath::onAsPath(const SVGRenderContext& context) const {
   Path path = ShapePath;

@@ -33,17 +33,38 @@ bool SVGPoly::parseAndSetAttribute(const std::string& n, const std::string& v) {
   }
 
   if (this->setPoints(SVGAttributeParser::parse<SVGPointsType>("points", n, v))) {
-    // TODO (YGAurora): construct the polygon path by points.
+    if (!Points.empty()) {
+      path.reset();
+      path.moveTo(Points[0]);
+      for (uint32_t i = 1; i < Points.size(); i++) {
+        path.lineTo(Points[i]);
+      }
+      path.close();
+    }
   }
   return false;
 }
 
-void SVGPoly::onDraw(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
-                     PathFillType fillType) const {
+void SVGPoly::onDrawFill(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
+                         PathFillType fillType) const {
   // the passed fillType follows inheritance rules and needs to be applied at draw time.
   path.setFillType(fillType);
   canvas->drawPath(path, paint);
 }
+
+void SVGPoly::onDrawStroke(Canvas* canvas, const SVGLengthContext& /*lengthContext*/,
+                           const Paint& paint, PathFillType fillType,
+                           std::shared_ptr<PathEffect> pathEffect) const {
+  if (!pathEffect) {
+    return;
+  }
+
+  path.setFillType(fillType);
+  canvas->drawPath(path, paint);
+  if (pathEffect->filterPath(&path)) {
+    canvas->drawPath(path, paint);
+  }
+};
 
 Path SVGPoly::onAsPath(const SVGRenderContext& context) const {
   Path resultPath = path;

@@ -27,37 +27,33 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/svg/SVGFontManager.h"
+#include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
 namespace {
 
-std::vector<float> ResolveLengths(const SVGLengthContext& lengthCtx,
+std::vector<float> ResolveLengths(const SVGRenderContext& context,
                                   const std::vector<SVGLength>& lengths,
                                   SVGLengthContext::LengthType lengthType) {
+  auto lengthContext = context.lengthContext();
   std::vector<float> resolved;
   resolved.reserve(lengths.size());
 
   for (const auto& length : lengths) {
-    resolved.push_back(lengthCtx.resolve(length, lengthType));
+    if (length.unit() == SVGLength::Unit::EMS || length.unit() == SVGLength::Unit::EXS) {
+      auto fontSize = context.presentationContext()._inherited.FontSize->size();
+      auto resolvedLength =
+          lengthContext.resolve(fontSize, SVGLengthContext::LengthType::Horizontal) *
+          length.value();
+      resolved.push_back(resolvedLength);
+    } else {
+      resolved.push_back(lengthContext.resolve(length, lengthType));
+    }
   }
 
   return resolved;
 }
 
-float ComputeAlignmentFactor(const SVGPresentationContext& context) {
-  switch (context._inherited.TextAnchor->type()) {
-    case SVGTextAnchor::Type::Start:
-      return 0.0f;
-    case SVGTextAnchor::Type::Middle:
-      return -0.5f;
-    case SVGTextAnchor::Type::End:
-      return -1.0f;
-    case SVGTextAnchor::Type::Inherit:
-      ASSERT(false);
-      return 0.0f;
-  }
-}
 }  // namespace
 
 void SVGTextContainer::appendChild(std::shared_ptr<SVGNode> child) {
@@ -89,17 +85,17 @@ Path SVGTextFragment::onAsPath(const SVGRenderContext&) const {
 void SVGTextContainer::onShapeText(const SVGRenderContext& context,
                                    const ShapedTextCallback& function) const {
 
-  auto x = ResolveLengths(context.lengthContext(), X, SVGLengthContext::LengthType::Horizontal);
-  auto y = ResolveLengths(context.lengthContext(), Y, SVGLengthContext::LengthType::Vertical);
-  auto dx = ResolveLengths(context.lengthContext(), Dx, SVGLengthContext::LengthType::Horizontal);
-  auto dy = ResolveLengths(context.lengthContext(), Dy, SVGLengthContext::LengthType::Vertical);
+  auto x = ResolveLengths(context, X, SVGLengthContext::LengthType::Horizontal);
+  auto y = ResolveLengths(context, Y, SVGLengthContext::LengthType::Vertical);
+  auto dx = ResolveLengths(context, Dx, SVGLengthContext::LengthType::Horizontal);
+  auto dy = ResolveLengths(context, Dy, SVGLengthContext::LengthType::Vertical);
 
   // TODO (YGAurora) : Handle rotate
   for (uint32_t i = 0; i < children.size(); i++) {
     auto child = children[i];
     context.canvas()->save();
-    float offsetX = x[i] + (i < dx.size() ? dx[i] : 0);
-    float offsetY = y[i] + (i < dy.size() ? dy[i] : 0);
+    float offsetX = (i < x.size() ? x[i] : 0.0f) + (i < dx.size() ? dx[i] : 0.0f);
+    float offsetY = (i < y.size() ? y[i] : 0.0f) + (i < dy.size() ? dy[i] : 0.0f);
     context.canvas()->translate(offsetX, offsetY);
     child->renderText(context, function);
     context.canvas()->restore();
@@ -119,8 +115,8 @@ bool SVGTextContainer::parseAndSetAttribute(const std::string& name, const std::
 void SVGTextLiteral::onShapeText(const SVGRenderContext& context,
                                  const ShapedTextCallback& function) const {
 
-  auto [success, font] = context.resolveFont();
-  if (!success) {
+  auto font = context.resolveFont();
+  if (!font.getTypeface()) {
     return;
   }
   auto textBlob = TextBlob::MakeFrom(Text, font);
@@ -129,27 +125,28 @@ void SVGTextLiteral::onShapeText(const SVGRenderContext& context,
 
 void SVGText::onRender(const SVGRenderContext& context) const {
 
-  auto renderer = [](const SVGRenderContext& renderCtx,
+  auto renderer = [](const SVGRenderContext& context,
                      const std::shared_ptr<TextBlob>& textBlob) -> void {
     if (!textBlob) {
       return;
     }
 
     auto bound = textBlob->getBounds();
-    float x = ComputeAlignmentFactor(renderCtx.presentationContext()) * bound.width();
+    float x =
+        context.presentationContext()._inherited.TextAnchor->getAlignmentFactor() * bound.width();
     float y = 0;
 
-    auto lengthCtx = renderCtx.lengthContext();
-    lengthCtx.setViewPort(Size::Make(bound.width(), bound.height()));
-    SVGRenderContext paintCtx(renderCtx, renderCtx.canvas(), lengthCtx);
-    const auto fillPaint = paintCtx.fillPaint();
-    const auto strokePaint = paintCtx.strokePaint();
+    auto lengthContext = context.lengthContext();
+    lengthContext.setViewPort(Size::Make(bound.width(), bound.height()));
+    SVGRenderContext paintContext(context, context.canvas(), lengthContext);
+    auto fillPaint = paintContext.fillPaint();
+    auto strokePaint = paintContext.strokePaint();
 
     if (fillPaint.has_value()) {
-      renderCtx.canvas()->drawTextBlob(textBlob, x, y, fillPaint.value());
+      context.canvas()->drawTextBlob(textBlob, x, y, fillPaint.value());
     }
     if (strokePaint.has_value()) {
-      renderCtx.canvas()->drawTextBlob(textBlob, x, y, strokePaint.value());
+      context.canvas()->drawTextBlob(textBlob, x, y, strokePaint.value());
     }
   };
 

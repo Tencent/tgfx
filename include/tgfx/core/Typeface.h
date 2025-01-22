@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <vector>
 #include "tgfx/core/Data.h"
+#include "tgfx/core/FontStyle.h"
 
 namespace tgfx {
 /**
@@ -139,12 +140,31 @@ class Typeface {
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
+  /**
+   * Returns the font style object of this typeface.
+   * This method is used for font matching and text layout in SVG rendering.
+   */
+  FontStyle getStyle() const {
+    return style;
+  }
+
+  /**
+   * Sets the font style for this typeface.
+   * This method is used for font matching and text layout in SVG rendering.
+   */
+  void setStyle(const FontStyle& value) {
+    style = value;
+  }
+
   mutable std::mutex locker = {};
 
  private:
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
+  FontStyle style = FontStyle::Normal();
 
   friend class ScalerContext;
   friend class GlyphConverter;
+  friend class FontManager;
+  friend class Shaper;
 };
 }  // namespace tgfx

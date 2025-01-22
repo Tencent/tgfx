@@ -750,6 +750,19 @@ class SVGTextAnchor {
     return _type;
   }
 
+  float getAlignmentFactor() const {
+    switch (_type) {
+      case SVGTextAnchor::Type::Start:
+        return 0.0f;
+      case SVGTextAnchor::Type::Middle:
+        return -0.5f;
+      case SVGTextAnchor::Type::End:
+        return -1.0f;
+      case SVGTextAnchor::Type::Inherit:
+        return 0.0f;
+    }
+  }
+
  private:
   Type _type = Type::Inherit;
 };
@@ -851,6 +864,11 @@ struct SVGFeTurbulenceType {
   }
 };
 
+enum class SVGXmlSpace {
+  Default,
+  Preserve,
+};
+
 enum class SVGColorspace {
   Auto,
   SRGB,
@@ -871,4 +889,33 @@ enum class SVGFeFuncType {
   Linear,
   Gamma,
 };
+
+class SVGMaskType {
+ public:
+  enum class Type {
+    Luminance,
+    Alpha,
+  };
+
+  SVGMaskType() = default;
+
+  explicit SVGMaskType(Type t) : _type(t) {
+  }
+
+  bool operator==(const SVGMaskType& other) const {
+    return _type == other._type;
+  }
+
+  bool operator!=(const SVGMaskType& other) const {
+    return !(*this == other);
+  }
+
+  Type type() const {
+    return _type;
+  }
+
+ private:
+  Type _type = Type::Luminance;
+};
+
 }  // namespace tgfx

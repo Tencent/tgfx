@@ -40,6 +40,7 @@ class SVGMask final : public SVGHiddenContainer {
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox))
   SVG_ATTR(MaskContentUnits, SVGObjectBoundingBoxUnits,
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse))
+  SVG_ATTR(MaskType, SVGMaskType, SVGMaskType(SVGMaskType::Type::Luminance))
 
  private:
   friend class SVGRenderContext;

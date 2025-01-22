@@ -22,6 +22,7 @@
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
@@ -59,16 +60,36 @@ RRect SVGRect::resolve(const SVGLengthContext& lengthContext) const {
   return rrect;
 }
 
-void SVGRect::onDraw(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
-                     PathFillType) const {
-  auto rect = this->resolve(lengthContext);
-  auto offset = Point::Make(rect.rect.left, rect.rect.top);
-  rect.rect = rect.rect.makeOffset(-offset.x, -offset.y);
+void SVGRect::onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
+                         PathFillType) const {
+  auto rrect = this->resolve(lengthContext);
+  auto offset = Point::Make(rrect.rect.left, rrect.rect.top);
+  rrect.rect = rrect.rect.makeOffset(-offset.x, -offset.y);
   canvas->save();
   canvas->translate(offset.x, offset.y);
-  canvas->drawRRect(rect, paint);
+  canvas->drawRRect(rrect, paint);
   canvas->restore();
 }
+
+void SVGRect::onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext,
+                           const Paint& paint, PathFillType /*fillType*/,
+                           std::shared_ptr<PathEffect> pathEffect) const {
+  if (!pathEffect) {
+    return;
+  }
+
+  auto rrect = this->resolve(lengthContext);
+  auto offset = Point::Make(rrect.rect.left, rrect.rect.top);
+  rrect.rect = rrect.rect.makeOffset(-offset.x, -offset.y);
+  Path path;
+  path.addRRect(rrect);
+  if (pathEffect->filterPath(&path)) {
+    canvas->save();
+    canvas->translate(offset.x, offset.y);
+    canvas->drawPath(path, paint);
+    canvas->restore();
+  }
+};
 
 Path SVGRect::onAsPath(const SVGRenderContext& context) const {
   Path path;

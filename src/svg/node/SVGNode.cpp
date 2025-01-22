@@ -80,8 +80,9 @@ Rect SVGNode::objectBoundingBox(const SVGRenderContext& context) const {
 
 bool SVGNode::onPrepareToRender(SVGRenderContext* context) const {
   // Apply the inheritance of presentation attributes
-  context->applyPresentationAttributes(presentationAttributes,
-                                       this->hasChildren() ? 0 : SVGRenderContext::kLeaf);
+  context->applyPresentationAttributes(
+      presentationAttributes,
+      this->hasChildren() ? 0 : static_cast<uint32_t>(SVGRenderContext::ApplyFlags::Leaf));
 
   // visibility:hidden and display:none disable rendering.
   const auto visibility = context->presentationContext()._inherited.Visibility->type();

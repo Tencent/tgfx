@@ -20,6 +20,7 @@
 #include <tuple>
 #include "core/utils/MathExtra.h"
 #include "svg/SVGAttributeParser.h"
+#include "svg/SVGFilterContext.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 
@@ -143,9 +144,15 @@ ColorMatrix SVGFeColorMatrix::MakeLuminanceToAlpha() {
                      0, 0, 0, 0, 0, LUM_COEFF_R, LUM_COEFF_G, LUM_COEFF_B, 0, 0};
 }
 
-std::shared_ptr<ImageFilter> SVGFeColorMatrix::onMakeImageFilter(const SVGRenderContext&,
-                                                                 const SVGFilterContext&) const {
-  return ImageFilter::ColorFilter(ColorFilter::Matrix(makeMatrixForType()));
+std::shared_ptr<ImageFilter> SVGFeColorMatrix::onMakeImageFilter(
+    const SVGRenderContext& context, const SVGFilterContext& filterContext) const {
+  auto colorspace = resolveColorspace(context, filterContext);
+  auto colorFilter = ImageFilter::ColorFilter(ColorFilter::Matrix(makeMatrixForType()));
+
+  if (auto inputFilter = filterContext.resolveInput(context, this->getIn(), colorspace)) {
+    colorFilter = ImageFilter::Compose(colorFilter, inputFilter);
+  }
+  return colorFilter;
 }
 
 }  // namespace tgfx
