@@ -93,7 +93,7 @@
         "GlyphFaceWithStyle": "4032de2"
     },
     "ImageReaderTest": {
-        "update_bitmap": "d010fb8",
+        "update_bitmap": "4b176e4",
         "update_mask": "d010fb8"
     },
     "LayerTest": {
@@ -122,7 +122,7 @@
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "99a5cd9",
-        "imageMask": "af2e3ff",
+        "imageMask": "4b176e4",
         "innerShadow": "270695a",
         "shapeMask": "612c09e",
         "textMask": "9000907"
@@ -204,10 +204,10 @@
     "TextAlignTest": {
         "FontFallbackTest": "b062b9a",
         "SingleLineTextAlign": "b062b9a",
-        "TextAlign": "b062b9a",
+        "TextAlign": "4b176e4",
         "TextAlignBlankLineTest": "b062b9a",
         "TextAlignSimulateVerticalTextLayout": "b062b9a",
-        "TextAlignWidth0Height0": "b062b9a",
+        "TextAlignWidth0Height0": "4b176e4",
         "TextAlignWidth1Height10": "b062b9a",
         "TruncateTextLineTest": "3b0ec3b"
     }
