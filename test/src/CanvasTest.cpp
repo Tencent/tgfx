@@ -192,6 +192,7 @@ TGFX_TEST(CanvasTest, merge_draw_clear_op) {
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
+  canvas->clipRect(Rect::MakeWH(width, height));
   canvas->save();
   Path path;
   path.addRect(Rect::MakeXYWH(0.f, 0.f, 10.f, 10.f));

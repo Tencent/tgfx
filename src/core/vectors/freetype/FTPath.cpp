@@ -111,20 +111,7 @@ bool FTPath::finalizeOutline(FreetypeOutline* outline, size_t startPointIndex) c
   outline->outline.contours = reinterpret_cast<unsigned short*>(outline->contours.data());
   outline->outline.n_points = static_cast<unsigned short>(endPointIndex + 1);
   outline->outline.n_contours = static_cast<unsigned short>(outline->contours.size());
-  switch (getFillType()) {
-    case PathFillType::EvenOdd:
-      outline->outline.flags = FT_OUTLINE_EVEN_ODD_FILL;
-      break;
-    case PathFillType::InverseEvenOdd:
-      outline->outline.flags = FT_OUTLINE_EVEN_ODD_FILL | FT_OUTLINE_REVERSE_FILL;
-      break;
-    case PathFillType::Winding:
-      outline->outline.flags = FT_OUTLINE_NONE;
-      break;
-    case PathFillType::InverseWinding:
-      outline->outline.flags = FT_OUTLINE_REVERSE_FILL;
-      break;
-  }
+  outline->outline.flags = evenOdd ? FT_OUTLINE_EVEN_ODD_FILL : FT_OUTLINE_NONE;
   return true;
 }
 

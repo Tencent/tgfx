@@ -131,16 +131,10 @@ HardwareBufferRef Surface::getHardwareBuffer() {
   return texture->getHardwareBuffer();
 }
 
-static Path GetInitClip(int width, int height) {
-  Path path = {};
-  path.addRect(Rect::MakeWH(width, height));
-  return path;
-}
-
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
     renderContext = new RenderContext(this);
-    canvas = new Canvas(renderContext, GetInitClip(width(), height()));
+    canvas = new Canvas(renderContext);
   }
   return canvas;
 }

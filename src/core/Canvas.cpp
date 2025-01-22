@@ -76,18 +76,12 @@ Canvas::Canvas(DrawContext* drawContext)
   mcState = std::make_unique<MCState>();
 }
 
-Canvas::Canvas(DrawContext* drawContext, const Path& initClip)
-    : surface(drawContext->getSurface()), drawContext(drawContext) {
-  mcState = std::make_unique<MCState>(initClip);
-}
-
 int Canvas::save() {
   stateStack.push(std::make_unique<CanvasState>(*mcState));
   return static_cast<int>(stateStack.size()) - 1;
 }
 
 int Canvas::saveLayer(const Paint* paint) {
-
   auto layer = std::make_unique<CanvasLayer>(drawContext, paint);
   drawContext = layer->layerContext.get();
   stateStack.push(std::make_unique<CanvasState>(*mcState, std::move(layer)));
