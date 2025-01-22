@@ -121,6 +121,16 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
   addDrawOp(std::move(drawOp), rRect.rect, state, style);
 }
 
+static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
+  Matrix invertMatrix = {};
+  if (!viewMatrix.invert(&invertMatrix)) {
+    return Rect::MakeEmpty();
+  }
+  auto localBounds = bounds;
+  invertMatrix.mapRect(&localBounds);
+  return localBounds;
+}
+
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const FillStyle& style) {
   DEBUG_ASSERT(shape != nullptr);
@@ -128,8 +138,9 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   if (maxScale <= 0.0f) {
     return;
   }
-  auto bounds = shape->getBounds(maxScale);
   auto clipBounds = getClipBounds(state.clip);
+  auto bounds = shape->isInverseFillType() ? ToLocalBounds(clipBounds, state.matrix)
+                                           : shape->getBounds(maxScale);
   auto drawOp =
       ShapeDrawOp::Make(style.color.premultiply(), std::move(shape), state.matrix, clipBounds);
   addDrawOp(std::move(drawOp), bounds, state, style);
@@ -208,14 +219,10 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
                               const MCState& state, const FillStyle& style) {
   DEBUG_ASSERT(style.shader == nullptr);
   Matrix viewMatrix = {};
-  auto bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   if (filter || style.maskFilter) {
     if (picture->hasUnboundedFill()) {
-      Matrix invertMatrix = {};
-      if (state.matrix.invert(&invertMatrix)) {
-        bounds = getClipBounds(state.clip);
-        invertMatrix.mapRect(&bounds);
-      }
+      bounds = ToLocalBounds(getClipBounds(state.clip), state.matrix);
     } else {
       bounds = picture->getBounds();
     }
@@ -305,22 +312,22 @@ static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
 std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip,
                                                                 const Rect* deviceBounds) {
   auto rect = Rect::MakeEmpty();
-  if (clip.isRect(&rect)) {
-    if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
-      return {{}, false};
-    }
-    auto renderTarget = opContext->renderTarget();
-    FlipYIfNeeded(&rect, renderTarget);
-    if (IsPixelAligned(rect)) {
-      rect.round();
-      if (rect != Rect::MakeWH(renderTarget->width(), renderTarget->height())) {
-        return {rect, true};
-      }
-      return {Rect::MakeEmpty(), false};
-    }
-    return {rect, false};
+  if (clip.isInverseFillType() || !clip.isRect(&rect)) {
+    return {{}, false};
   }
-  return {{}, false};
+  if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
+    return {{}, false};
+  }
+  auto renderTarget = opContext->renderTarget();
+  FlipYIfNeeded(&rect, renderTarget);
+  if (IsPixelAligned(rect)) {
+    rect.round();
+    if (rect != Rect::MakeWH(renderTarget->width(), renderTarget->height())) {
+      return {rect, true};
+    }
+    return {Rect::MakeEmpty(), false};
+  }
+  return {rect, false};
 }
 
 std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AAType aaType) {

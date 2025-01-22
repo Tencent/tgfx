@@ -106,12 +106,18 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
   totalMatrix.postScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(pixelRef->height()));
   finalPath.transform(totalMatrix);
+  if (finalPath.isInverseFillType()) {
+    Path maskPath = {};
+    maskPath.addRect(Rect::MakeWH(info.width(), info.height()));
+    finalPath.addPath(maskPath, PathOp::Intersect);
+  }
   auto bounds = finalPath.getBounds();
   bounds.roundOut();
   markContentDirty(bounds, true);
   FTPath ftPath = {};
   finalPath.decompose(Iterator, &ftPath);
-  ftPath.setFillType(path.getFillType());
+  auto fillType = finalPath.getFillType();
+  ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
   if (!needsGammaCorrection) {

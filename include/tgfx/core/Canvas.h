@@ -427,7 +427,6 @@ class Canvas {
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
   explicit Canvas(DrawContext* drawContext);
-  Canvas(DrawContext* drawContext, const Path& initClip);
   void drawClip(const FillStyle& style);
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,

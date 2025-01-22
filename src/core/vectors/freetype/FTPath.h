@@ -30,12 +30,12 @@ struct FreetypeOutline {
 
 class FTPath {
  public:
-  PathFillType getFillType() const {
-    return fillType;
+  bool isEvenOdd() const {
+    return evenOdd;
   }
 
-  void setFillType(PathFillType type) {
-    fillType = type;
+  void setEvenOdd(bool value) {
+    evenOdd = value;
   }
 
   bool isEmpty() const;
@@ -53,6 +53,6 @@ class FTPath {
   std::vector<PathVerb> verbs = {};
   std::vector<char> tags = {};
   std::vector<size_t> contours = {};
-  PathFillType fillType = PathFillType::Winding;
+  bool evenOdd = false;
 };
 }  // namespace tgfx
