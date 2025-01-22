@@ -291,13 +291,9 @@ static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
   }
 }
 
-std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip,
-                                                                const Rect* deviceBounds) {
+std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip) {
   auto rect = Rect::MakeEmpty();
   if (clip.isInverseFillType() || !clip.isRect(&rect)) {
-    return {{}, false};
-  }
-  if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
     return {{}, false};
   }
   auto renderTarget = opContext->renderTarget();
