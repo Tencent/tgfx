@@ -183,47 +183,6 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
 }
 
-TGFX_TEST(CanvasTest, merge_draw_clear_op) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  int width = 72;
-  int height = 72;
-  auto surface = Surface::Make(context, width, height);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-  canvas->clipRect(Rect::MakeWH(width, height));
-  canvas->save();
-  Path path;
-  path.addRect(Rect::MakeXYWH(0.f, 0.f, 10.f, 10.f));
-  canvas->clipPath(path);
-  canvas->clear(Color::White());
-  canvas->restore();
-  Paint paint;
-  paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
-  int tileSize = 8;
-  size_t drawCallCount = 0;
-  for (int y = 0; y < height; y += tileSize) {
-    bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < width; x += tileSize) {
-      if (draw) {
-        auto rect = Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
-                                   static_cast<float>(tileSize), static_cast<float>(tileSize));
-        canvas->drawRect(rect, paint);
-        drawCallCount++;
-      }
-      draw = !draw;
-    }
-  }
-
-  auto* drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
-  EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
-  context->flush();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_clear_op"));
-}
-
 TGFX_TEST(CanvasTest, textShape) {
   auto serifTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));

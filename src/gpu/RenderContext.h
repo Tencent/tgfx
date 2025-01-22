@@ -74,7 +74,6 @@ class RenderContext : public DrawContext {
                                                  const Matrix& viewMatrix, AAType aaType,
                                                  Rect* scissorRect);
   Rect getClipBounds(const Path& clip);
-  bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
   void addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds, const MCState& state,
