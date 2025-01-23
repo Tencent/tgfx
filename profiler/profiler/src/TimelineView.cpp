@@ -179,8 +179,18 @@ const char* TimelineView::getFrameText(const tracy::FrameData& fd, int i, uint64
   return buf;
 }
 
-void TimelineView::drawMouseLine(QPainter* painter) {
+void TimelineView::drawMouseLine(tgfx::Canvas* canvas) {
+  if(!mouseLine.isVisible){return;}
 
+  const auto lineColor = 0x33FFFFFF;
+
+  const auto linePos = 0.0f;
+  const auto lineH = height();
+
+  auto p1 = tgfx::Point(mouseLine.xPosition + 0.5f, linePos + 0.5f) ;
+  auto p2 = tgfx::Point(mouseLine.xPosition + 0.5f,linePos + lineH + 0.5f);
+
+  drawLine(canvas, p1, p2, lineColor);
 }
 
 void TimelineView::drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, tracy::FrameData& fd, int& yMin) {
@@ -224,9 +234,7 @@ void TimelineView::drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, t
     const auto fbegin = worker->GetFrameBegin(fd, i);
     const auto fend = worker->GetFrameEnd(fd, i);
     const auto fsz = pxns * ftime;
-    /*if (hoverData.hover) {
 
-    }*/
     if (fsz < MinFrameSize) {
       if (!fd.continuous && prev != -1) {
         if((fbegin - prevEnd) * pxns >= MinFrameSize)
@@ -376,11 +384,13 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
   const auto hover = ctx.hover;
   const auto vStart = ctx.vStart;
 
+  QPointF mousePos = mapFromGlobal(QCursor::pos());
+
   for(auto& v : drawList) {
     const auto offset = _offset + ostep * v.depth;
     const auto yPos = wpos.y + offset;
 
-    if(yPos > yMax || yPos + ostep < yMin) {
+    if(yPos > ctx.yMax || yPos + ostep < ctx.yMin) {
       continue;
     }
 
@@ -398,34 +408,29 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
         const auto tmp = tracy::RealToString(v.num);
         const auto tsz = getTextSize(appHost.get(), tmp);
 
-        //folded
-        auto x = px0 + wpos.x;
-        auto y = offset + wpos.y;
-        auto weight = px1 - px0;
-        auto h =tsz.height();
-        //drawRect(canvas,x,y,w,h,color);
+        drawRect(canvas,wpos.x + px0, offset + wpos.y, px1 - px0 , ty ,color);
 
-        if(hover && !hoverData.hover) {
-          QPointF mousePos = mapFromGlobal(QCursor::pos());
+        //folded zone hover and clicked
+        if(mousePos.x() >= wpos.x + px0 && mousePos.x() <= wpos.x + px1 &&
+          mousePos.y() >= offset + wpos.y && mousePos.y() <= offset + wpos.y + ty) {
 
-          if(mousePos.x() >= x && mousePos.x() <= x + w &&
-            mousePos.y() >= y && mousePos.y() <= y + h) {
+          hoverData.zoneHover = &ev;
 
-            hoverData.hover = true;
-            hoverData.zoneHover = &ev;
-            hoverData.color = color;
-
-            if(v.num > 1) {
-              QString tooltip = QString("Zone too small to display: %1\n")
-              .arg(v.num);
-              tooltip += QString("Excution time: %1")
-              .arg(QString::fromStdString(tracy::TimeToString(rend - ev.Start())));
-              QToolTip::showText(QCursor::pos(),tooltip);
-            }
-            else{
-              showZoneInfo(ev);
-            }
+          if(v.num > 1) {
+            QString tooltip = QString("Zone too small to display: %1\n")
+            .arg(v.num);
+            tooltip += QString("Excution time: %1")
+            .arg(QString::fromStdString(tracy::TimeToString(rend - ev.Start())));
+            QToolTip::showText(QCursor::pos(),tooltip);
           }
+          else{
+            showZoneToolTip(ev);
+          }
+
+          const auto hoverBorderColor = 0xFFFFFFFF;
+          const float borderThickness = 2.0f;
+          drawRect(canvas, wpos.x + px0 - borderThickness, offset + wpos.y - borderThickness,
+            (px1 - px0) + 2 * borderThickness, ty + 2 * borderThickness, hoverBorderColor);
         }
 
         if (tsz.width() < px1 - px0) {
@@ -440,6 +445,27 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
         const auto zsz = std::max((end - ev.Start()) * pxns, pxns * 0.5);
         const auto zoneColor = getZoneColorData(ev, tid, v.depth, v.inheritedColor);
         const char* zoneName = worker->GetZoneName(ev);
+        const auto px0 = (ev.Start() - vStart) * pxns;
+        const auto px1 = (end - vStart) * pxns;
+        drawRect(canvas,wpos.x + px0, offset + wpos.y, px1 - px0, ty, zoneColor.color);
+
+        //zone hover and clicked
+        if(mousePos.x() >= wpos.x + px0 && mousePos.x() <= wpos.x + px1 &&
+          mousePos.y() >= offset + wpos.y && mousePos.y() <= offset + wpos.y + ty) {
+
+          hoverData.zoneHover = &ev;
+          showZoneToolTip(ev);
+
+          const auto hoverBorderColor = 0xFFFFFFFF;
+
+          drawRect(canvas,wpos.x + px0 - 1.0f, offset + wpos.y - 1.0f,
+            (px1 - px0) + 2.0f, ty + 2.0f, hoverBorderColor);
+        }
+
+        if(hoverData.isPressed && hoverData.selectedZone == &ev) {
+          const auto highLightColor = 0xFF00FF00;
+          drawRect(canvas, wpos.x + px0 - 1.0f, offset + wpos.y - 1.0f, (px1 - px0) + 2.0f, ty + 2.0f, highLightColor);
+        }
 
         auto tsz = getTextSize(appHost.get(), zoneName);
         if(viewData->shortenName == ShortenName::Always ||
@@ -449,68 +475,6 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
           zoneName = shortenZoneName(appHost.get(), viewData->shortenName, zoneName, tsz, zsz);
         }
 
-        const auto pr0 = (ev.Start() - viewData->zvStart) * pxns;
-        const auto pr1 = (end - viewData->zvStart) * pxns;
-        const auto px0 = std::max(pr0, -10.0);
-        const auto px1 = std::max({ std::min(pr1, double(w + 10)), px0 + pxns * 0.5, px0 + MinVisSize });
-        //highlight Rect.
-        auto x = px0 + wpos.x;
-        auto y = offset + wpos.y;
-        auto weight = px1 - px0;
-        auto h = tsz.height();
-        drawRect(canvas, px0 + wpos.x, offset + wpos.y, px1 - px0, tsz.height(), zoneColor.color);
-
-        if(hoverData.selectedZone == &ev) {
-          const uint32_t highlightColor = 0xFF00FF7F;
-          const float borderThickness = 2.0f;
-          const float shadowThickness = borderThickness + 1.0f;
-
-          drawRect(canvas, x - 1,y-1,weight+2,borderThickness,highlightColor);
-          drawRect(canvas,x-1,y + h - borderThickness+1,weight+2,shadowThickness,highlightColor);
-          drawRect(canvas,x-1,y-1,borderThickness,h+2,highlightColor);
-          drawRect(canvas,x+weight-shadowThickness+1,y-1,borderThickness,h,highlightColor);
-        }
-
-        if(hoverData.zoneHover == &ev && hoverData.isPressed) {
-          const auto accentColor = tracy::HighlightColor(zoneColor.color);
-          drawRect(canvas,x,y,weight,h,accentColor);
-        }
-        if(hover) {
-          auto rect = tgfx::Rect::MakeXYWH(
-          float(px0+wpos.x),
-          float(offset + wpos.y),
-          float(px1 - px0),
-          float(tsz.height())
-        );
-
-          QPointF mousePos = mapFromGlobal(QCursor::pos());
-          if(rect.contains(mousePos.x(),mousePos.y())) {
-            showZoneToolTip(ev);
-            hoverData.zoneHover = &ev;
-            hoverData.color = zoneColor.color;
-            hoverData.thickness = 5.0f;
-          }
-
-        }
-
-        if (hoverData.zoneHover == &ev && hoverData.isPressed) {
-          const auto accentColor = tracy::HighlightColor(zoneColor.color);
-          auto p1 = wpos + tgfx::Point(px0,offset);
-          auto p2 = tgfx::Point(px1 - px0,tsz.height());
-          drawRect(canvas,p1.x,p1.y,p2.x,p2.y,accentColor);
-          // TODO hight light
-        }
-        else {
-          const auto darkColor = tracy::DarkenColor(zoneColor.color);
-          auto p1 = dpos + tgfx::Point(px0, offset + tsz.height());
-          auto p2 = dpos + tgfx::Point(px0, offset);
-          auto p3 = dpos + tgfx::Point(px1 - 1, offset);
-          drawLine(canvas, p1, p2, p3, darkColor, zoneColor.thickness);
-          p1 = dpos + tgfx::Point(px0, offset + tsz.height());
-          p2 = dpos + tgfx::Point(px1 - 1, offset + tsz.height());
-          p3 = dpos + tgfx::Point(px1 - 1, offset);
-          drawLine(canvas, p1, p2, p3, darkColor, zoneColor.thickness);
-        }
         auto rect = tgfx::Rect::MakeXYWH(float(px0 + wpos.x), float(offset + wpos.y), float(px1 - px0), float(tsz.height()));
         drawRect(canvas, rect, zoneColor.color);
         if (tsz.width() < zsz) {
@@ -629,6 +593,10 @@ void TimelineView::drawTimeline(QPainter* painter, tgfx::Canvas* canvas) {
     }
   }
   timelineController->end(pxns, tgfx::Point(0, yMin), true, yMin, yMax, canvas, appHost.get());
+
+  if(mouseLine.isVisible && hoverData.hover) {
+    drawMouseLine(canvas);
+  }
 }
 
 void TimelineView::zoomToRange(int64_t start, int64_t end, bool pause) {
@@ -733,28 +701,22 @@ QSGNode* TimelineView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   return node;
 }
 
-void TimelineView::updateFrameRange(int64_t start, int64_t end) {
-  if(!viewData) return;
-
-  viewData->zvStart = start;
-  viewData->zvEnd = end;
-
-  double rangeDuration = end - start;
-  double viewWidth = width();
-  viewData->pxns = viewWidth / rangeDuration;
-
-  if(m_framesView) {
-    m_framesView->updateTimeRange(start,end);
-  }
-
-  update();
-}
 
 void TimelineView::mouseMoveEvent(QMouseEvent* event) {
-  if (moveData.isDragging) {
+  mouseLine.isVisible = true;
+  mouseLine.xPosition = event->pos().x();
+
+  const auto timespan = viewData->zvEnd - viewData->zvStart;
+  const auto w = width();
+  const auto nspx = double(timespan) / w;
+
+  if(hightlight.active) {
+    hightlight.end = viewData->zvStart + (event->position().x() * nspx);
+    update();
+  }
+  else if(moveData.isDragging) {
     *viewMode = ViewMode::Paused;
     Q_EMIT changeViewMode(*viewMode);
-    const auto timespan = viewData->zvEnd - viewData->zvStart;
     zoomAnim.active = false;
     const auto w = width();
     const auto nspx = double(timespan) / w;
@@ -778,21 +740,22 @@ void TimelineView::mouseMoveEvent(QMouseEvent* event) {
         viewData->zvStart = viewData->zvEnd - range;
       }
     }
-  }else {
+  }
+  else {
     hoverData.hover = false;
     hoverData.zoneHover = nullptr;
     hoverData.hover = true;
-    update();
   }
-
   update();
-
   event->accept();
-  onViewChanged();
 }
 
 void TimelineView::mousePressEvent(QMouseEvent* event) {
   if(event->button() == Qt::LeftButton) {
+    const auto timespan = viewData->zvEnd - viewData->zvStart;
+    const auto w = width();
+    const auto nspx = double(timespan) / w;
+
     if(hoverData.zoneHover) {
       hoverData.isPressed = true;
       hoverData.pressPos = event->pos();
@@ -803,23 +766,26 @@ void TimelineView::mousePressEvent(QMouseEvent* event) {
         zoneInfo.window.reset();
       }
       showZoneInfo(*hoverData.selectedZone);
-      update();
-
     }else {
-      if(hoverData.selectedZone) {
-        hoverData.selectedZone = nullptr;
-        if(zoneInfo.window) {
-          zoneInfo.window->hide();
-          zoneInfo.window.reset();
-        }
-        update();
+      hightlight.active = true;
+      hightlight.start = hightlight.end = viewData->zvStart + (event->position().x() * nspx);
 
+      hoverData.isPressed = false;
+      hoverData.selectedZone = nullptr;
+
+      if(zoneInfo.window) {
+        zoneInfo.window->hide();
+        zoneInfo.window.reset();
       }
+      zoneInfo.active = false;
     }
+    update();
   }else if(event->button() == Qt::RightButton) {
     moveData.isDragging = true;
     moveData.pos = event->position().toPoint();
-
+    moveData.hwheelDelta = 0;
+    *viewMode = ViewMode::Paused;
+    zoomAnim.active = false;
   }
   event->accept();
 }
@@ -827,13 +793,27 @@ void TimelineView::mousePressEvent(QMouseEvent* event) {
 void TimelineView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::RightButton) {
     moveData.isDragging = false;
-    event->accept();
-  } else {
-    QQuickItem::mouseReleaseEvent(event);
   }
+
+  if (event->button() == Qt::LeftButton) {
+    hightlight.active = false;
+    update();
+  }
+  event->accept();
 }
 
-//pressed utility functions:
+void TimelineView::hoverMoveEvent(QHoverEvent* event) {
+  mouseLine.isVisible = true;
+  mouseLine.xPosition = event->position().x();
+
+  hoverData.hover = true;
+  hoverData.zoneHover = nullptr;
+
+  update();
+  QQuickItem::hoverMoveEvent(event);
+}
+
+//ZoneInfo and ToolTips
 void TimelineView::showZoneInfo(const tracy::ZoneEvent& ev) {
   zoneInfo.window = std::make_unique<QDialog>();
   zoneInfo.window->setWindowTitle("zone information");
@@ -869,13 +849,11 @@ void TimelineView::showZoneInfo(const tracy::ZoneEvent& ev) {
   infoLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   layout->addWidget(infoLabel);
 
-
   zoneInfo.active = true;
   zoneInfo.window->setMinimumWidth(300);
   zoneInfo.window->show();
 }
 
-//hover utility;
 void TimelineView::showZoneToolTip(const tracy::ZoneEvent& ev) {
   //threadid
   const auto end = worker->GetZoneEnd(ev);
@@ -896,39 +874,12 @@ void TimelineView::showZoneToolTip(const tracy::ZoneEvent& ev) {
 
 void TimelineView::hoverLeaveEvent(QHoverEvent *event) {
   QToolTip::hideText();
+  mouseLine.isVisible = false;
+  update();
   QQuickItem::hoverLeaveEvent(event);
 }
 
-void TimelineView::zoomToTimeRange(int64_t start, int64_t end) {
-  if(start >= end) return;
-  rangeStart = start;
-  rangeEnd = end;
-
-  updateFrameRange(rangeStart,rangeEnd);
-  update();
-}
-
-
-void TimelineView::centerOnTime(int64_t time) {
-  if(!viewData) return;
-
-
-  int64_t currentRange = viewData->zvEnd - viewData->zvStart;
-  int64_t halfRange = std::max<int64_t>(1,currentRange / 2);
-  int64_t newStart = time - halfRange ;
-  int64_t newEnd = time + halfRange;
-
-  updateFrameRange(newStart,newEnd);
-}
-
 void TimelineView::wheelEvent(QWheelEvent* event) {
-  if(hasSeletedFrame) {
-    if(selectedEndFrame < viewData->zvStart || selectedStartFrame > viewData->zvEnd) {
-      zoomToTimeRange(selectedStartFrame,selectedEndFrame);
-    }
-  }
-
-
   if (*viewMode == ViewMode::LastFrames) {
     *viewMode = ViewMode::LastRange;
   }
@@ -955,29 +906,11 @@ void TimelineView::wheelEvent(QWheelEvent* event) {
     t0 -= std::max(int64_t(1), int64_t(p1 * mod));
     t1 += std::max(int64_t(1), int64_t(p2 * mod));
   }
-  zoomToRange(t0, t1, !worker->IsConnected() || *viewMode == ViewMode::Paused);
+
   viewData->zvStart = int64_t(zoomAnim.start0 + zoomAnim.start1 - zoomAnim.start0);
   viewData->zvEnd = int64_t(zoomAnim.end0 + zoomAnim.end1 - zoomAnim.end0);
-
+  zoomToRange(t0, t1, !worker->IsConnected() || *viewMode == ViewMode::Paused);
+  update();
   event->accept();
-  onViewChanged();
-  update();
 }
-
-void TimelineView::setTimeSelection(int64_t startTime, int64_t endTime) {
-  if(startTime == selectedStartFrame && endTime == selectedEndFrame) return;
-
-  selectedStartFrame = startTime;
-  selectedEndFrame = endTime;
-  hasSeletedFrame = true;
-
-  if(m_framesView) {
-    int startFrame = m_framesView->findFramesfromTime(startTime);
-    int endFrame = m_framesView->findFramesfromTime(endTime);
-    m_framesView->setSelection(startFrame,endFrame);
-  }
-  update();
-
-}
-
 

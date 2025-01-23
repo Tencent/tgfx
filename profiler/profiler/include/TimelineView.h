@@ -18,15 +18,13 @@
 
 #pragma once
 
-
 #include <QGraphicsLineItem>
 #include "TimelineController.h"
-#include "src/profiler/TracyTimelineDraw.hpp"
 #include "TracyWorker.hpp"
 #include "ViewData.h"
+#include "src/profiler/TracyTimelineDraw.hpp"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include "FramesView.h"
-
 
 class TimelineView: public QQuickItem {
   Q_OBJECT
@@ -78,6 +76,12 @@ public:
     double hwheelDelta = 0;
   };
 
+  // mouseLine
+  struct MouseLine {
+    bool isVisible = false;
+    double xPosition = 0;
+  };
+
   TimelineView(QQuickItem* parent = nullptr);
   ~TimelineView();
 
@@ -88,7 +92,7 @@ public:
       const std::vector<tracy::TimelineDraw>& draw, int& _offset, int depth, tgfx::Canvas* canvas);
   void drawZonelist(const TimelineContext& ctx, const std::vector<tracy::TimelineDraw>& drawList,
     int offset, uint64_t tid, tgfx::Canvas* canvas);
-  void drawMouseLine(QPainter* painter);
+  void drawMouseLine(tgfx::Canvas* canvas);
   void drawTimeline(QPainter* painter, tgfx::Canvas* canvas);
   void drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, tracy::FrameData& fd, int& yMin);
 
@@ -98,15 +102,12 @@ public:
   void mouseMoveEvent(QMouseEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
+  void hoverMoveEvent(QHoverEvent* event) override;
 
  //hovered functions.
   void showZoneInfo(const tracy::ZoneEvent& ev);
   void showZoneToolTip(const tracy::ZoneEvent& ev);
   void hoverLeaveEvent(QHoverEvent *event) override;
-
-  //centered functions.
-  void zoomToTimeRange(int64_t start,int64_t end);
-  void centerOnTime(int64_t time);
 
   const char* getFrameText(const tracy::FrameData& fd, int i, uint64_t ftime) const;
   const char* getFrameSetName(const tracy::FrameData& fd) const;
@@ -127,20 +128,14 @@ public:
     timelineController = new TimelineController(*this, *worker, true);
   }
 
-  void setTimeSelection(int64_t startTime,int64_t endTime);
-  const std::pair<int64_t,int64_t>getTimeSelection() {
-    return{selectedStartFrame,selectedEndFrame};
-  }
-
   Q_SIGNAL void changeViewMode(ViewMode mode);
   ViewData* getViewDataPtr() const { return viewData; }
   void setViewData(ViewData* _viewData) { viewData = _viewData; }
 
   unsigned long long getViewMode() const {return (unsigned long long)viewMode;}
   void setViewMode(unsigned long long _viewMode) { viewMode = (ViewMode*)_viewMode; }
-  void setFramesView(FramesView* framesView) {
-    m_framesView = framesView;
-  }
+
+  void setFramesView(FramesView* framesView) { m_framesView = framesView; }
 
 protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
@@ -152,18 +147,13 @@ protected:
     return it->second;
   }
 
-  void onViewChanged() {
-    m_framesView -> updateTimeRange(viewData->zvStart,viewData->zvEnd);
-  }
-
 private:
-  void updateFrameRange(int64_t start , int64_t end);
   tracy::unordered_flat_map<const void*, bool> visMap;
   tracy::Vector<const tracy::ThreadData*> threadOrder;
   tracy::Vector<const tracy::ThreadData*> threadReinsert;
-//frameview ptr
-  FramesView* m_framesView = nullptr;
 
+  FramesView* m_framesView = nullptr;
+  const tracy::FrameData* frames = nullptr;
   tracy::Worker* worker;
   ViewData* viewData;
   ViewMode* viewMode;
@@ -175,22 +165,14 @@ private:
   HoverData hoverData;
   const tracy::FrameData* frameData;
   MoveData moveData;
+  MouseLine mouseLine;
 
   tgfx::Font font;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
   bool dirty = false;
 
-  //selected
-  bool hasSeletedFrame = false;
-  int64_t selectedStartFrame = 0;
-  int64_t selectedEndFrame = 0;
-
   //hover members
   ZoneInfoWindow zoneInfo;
   bool highlightZoom = false;
-
-  int64_t rangeStart = 0;
-  int64_t rangeEnd = 0;
-
 };
