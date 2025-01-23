@@ -28,9 +28,9 @@ void LayerStyle::setBlendMode(BlendMode blendMode) {
   invalidate();
 }
 
-void LayerStyle::onDrawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content,
-                                      float contentScale, std::shared_ptr<Image>, const Point&,
-                                      float alpha, BlendMode blendMode) {
+void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
+                                       float contentScale, std::shared_ptr<Image>, const Point&,
+                                       float alpha, BlendMode blendMode) {
   onDraw(canvas, std::move(content), contentScale, alpha, blendMode);
 }
 

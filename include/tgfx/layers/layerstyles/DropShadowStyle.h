@@ -112,17 +112,17 @@ class DropShadowStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
-  LayerStyleExtraImageType extraImageType() const override {
-    return !_showBehindLayer ? LayerStyleExtraImageType::Contour : LayerStyleExtraImageType::None;
+  LayerStyleExtraSourceType extraSourceType() const override {
+    return !_showBehindLayer ? LayerStyleExtraSourceType::Contour : LayerStyleExtraSourceType::None;
   }
 
  protected:
   void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha,
               BlendMode blendMode) override;
 
-  void onDrawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            std::shared_ptr<Image> extraImage, const Point& imageOffset,
-                            float alpha, BlendMode blendMode) override;
+  void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                             std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
+                             float alpha, BlendMode blendMode) override;
 
  private:
   DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,

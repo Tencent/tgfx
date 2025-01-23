@@ -563,12 +563,12 @@ class Layer {
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha);
+  void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild = nullptr);
 
   void drawLayersBehindChildLayer(const DrawArgs& args, Canvas* canvas, Layer* childLayer,
                                   float* childLayerAlpha);
 
-  void drawBehindContent(const DrawArgs& args, Canvas* canvas, float* contentAlpha = nullptr);
+  void drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha = nullptr);
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
                                                         bool forBackground);

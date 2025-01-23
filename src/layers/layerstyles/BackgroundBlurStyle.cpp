@@ -48,11 +48,11 @@ void BackgroundBlurStyle::setTileMode(TileMode tileMode) {
   invalidate();
 }
 
-void BackgroundBlurStyle::onDrawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content,
-                                               float contentScale,
-                                               std::shared_ptr<Image> extraImage,
-                                               const Point& imageOffset, float,
-                                               BlendMode blendMode) {
+void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
+                                                float contentScale,
+                                                std::shared_ptr<Image> extraSource,
+                                                const Point& extraSourceOffset, float,
+                                                BlendMode blendMode) {
   if (_blurrinessX <= 0 && _blurrinessY <= 0) {
     return;
   }
@@ -67,8 +67,8 @@ void BackgroundBlurStyle::onDrawWithExtraImage(Canvas* canvas, std::shared_ptr<I
   auto blur =
       ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
   Point backgroundOffset = Point::Zero();
-  auto blurBackground = extraImage->makeWithFilter(blur, &backgroundOffset);
-  backgroundOffset += imageOffset;
+  auto blurBackground = extraSource->makeWithFilter(blur, &backgroundOffset);
+  backgroundOffset += extraSourceOffset;
 
   auto maskShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
   maskShader = maskShader->makeWithColorFilter(ColorFilter::AlphaThreshold(0));

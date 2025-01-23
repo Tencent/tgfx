@@ -37,9 +37,9 @@ enum class LayerStylePosition {
   Below
 };
 
-enum class LayerStyleExtraImageType {
+enum class LayerStyleExtraSourceType {
   /**
-   * The layerStyle requires no extra image.
+   * The layerStyle requires no extra source.
    */
   None,
   /**
@@ -99,11 +99,11 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
-   * Returns the type of the extra image required by the layer style.
-   * Default is LayerStyleExtraImageType::None.
+   * Returns the type of the extra source required by the layer style.
+   * Default is LayerStyleExtraSourceType::None.
    */
-  virtual LayerStyleExtraImageType extraImageType() const {
-    return LayerStyleExtraImageType::None;
+  virtual LayerStyleExtraSourceType extraSourceType() const {
+    return LayerStyleExtraSourceType::None;
   }
 
   /**
@@ -113,16 +113,16 @@ class LayerStyle : public LayerProperty {
    * @param content The scaled layer content to apply the layer style to.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param extraImage  The scaled extra image to apply the layer style to. The image may be
+   * @param extraSource  The scaled extra source to apply the layer style to. The source may be
    * layer's contour or background content.
-   * @param imageOffset The offset of the extra image relative to the layer content.
+   * @param extraSourceOffset The offset of the extra image relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void drawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                          std::shared_ptr<Image> extraImage, const Point& imageOffset,
-                          float alpha) {
-    onDrawWithExtraImage(canvas, std::move(content), contentScale, std::move(extraImage),
-                         imageOffset, alpha, _blendMode);
+  void drawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                           std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
+                           float alpha) {
+    onDrawWithExtraSource(canvas, std::move(content), contentScale, std::move(extraSource),
+                          extraSourceOffset, alpha, _blendMode);
   }
 
  protected:
@@ -147,14 +147,15 @@ class LayerStyle : public LayerProperty {
    * @param content The scaled layer content to apply the layer style to.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
-   * @param extraImage  The scaled layer extra image to apply the layer style to.The image may be
+   * @param extraSource  The scaled layer extra source to apply the layer style to.The source may be
    * layer's contour or background content.
-   * @param imageOffset The offset of the extra image relative to the layer content.
+   * @param extraSourceOffset The offset of the extra source relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  virtual void onDrawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content,
-                                    float contentScale, std::shared_ptr<Image> extraImage,
-                                    const Point& imageOffset, float alpha, BlendMode blendMode);
+  virtual void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
+                                     float contentScale, std::shared_ptr<Image> extraSource,
+                                     const Point& extraSourceOffset, float alpha,
+                                     BlendMode blendMode);
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;

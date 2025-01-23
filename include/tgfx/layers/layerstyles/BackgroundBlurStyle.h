@@ -75,18 +75,18 @@ class BackgroundBlurStyle : public LayerStyle {
     return srcRect;
   }
 
-  LayerStyleExtraImageType extraImageType() const override {
-    return _blurrinessX > 0 && _blurrinessY > 0 ? LayerStyleExtraImageType::Background
-                                                : LayerStyleExtraImageType::None;
+  LayerStyleExtraSourceType extraSourceType() const override {
+    return _blurrinessX > 0 && _blurrinessY > 0 ? LayerStyleExtraSourceType::Background
+                                                : LayerStyleExtraSourceType::None;
   }
 
  protected:
   void onDraw(Canvas*, std::shared_ptr<Image>, float, float, BlendMode) override {
   }
 
-  void onDrawWithExtraImage(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
-                            std::shared_ptr<Image> extraImage, const Point& imageOffset,
-                            float alpha, BlendMode blendMode) override;
+  void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+                             std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
+                             float alpha, BlendMode blendMode) override;
 
  private:
   explicit BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode);
