@@ -61,6 +61,9 @@ class LoadResourceProvider {
                                            const std::string& /*resourceName*/) const {
     return nullptr;
   }
+
+ protected:
+  LoadResourceProvider() = default;
 };
 
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #include "tgfx/core/LoadResourceProvider.h"
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -43,7 +44,7 @@ class FileResourceProvider final : public LoadResourceProvider {
 };
 
 std::shared_ptr<LoadResourceProvider> LoadResourceProvider::MakeEmpty() {
-  return std::make_shared<LoadResourceProvider>();
+  return std::shared_ptr<LoadResourceProvider>(new LoadResourceProvider);
 }
 
 std::shared_ptr<LoadResourceProvider> LoadResourceProvider::MakeFileProvider(
