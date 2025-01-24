@@ -29,14 +29,14 @@ namespace tgfx {
 
 class SVGLengthContext;
 
-class SVGSVG : public SVGContainer {
+class SVGRoot : public SVGContainer {
  public:
   enum class Type {
     kRoot,
     kInner,
   };
-  static std::shared_ptr<SVGSVG> Make(Type t = Type::kInner) {
-    return std::shared_ptr<SVGSVG>(new SVGSVG(t));
+  static std::shared_ptr<SVGRoot> Make(Type t = Type::kInner) {
+    return std::shared_ptr<SVGRoot>(new SVGRoot(t));
   }
 
   SVG_ATTR(X, SVGLength, SVGLength(0))
@@ -57,7 +57,7 @@ class SVGSVG : public SVGContainer {
   void onSetAttribute(SVGAttribute attribute, const SVGValue& value) override;
 
  private:
-  explicit SVGSVG(Type t) : INHERITED(SVGTag::Svg), type(t) {
+  explicit SVGRoot(Type t) : INHERITED(SVGTag::Svg), type(t) {
   }
 
   // Some attributes behave differently for the outermost svg element.

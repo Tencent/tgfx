@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/node/SVGSVG.h"
+#include "tgfx/svg/node/SVGRoot.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/svg/SVGAttribute.h"
@@ -25,7 +25,7 @@
 
 namespace tgfx {
 
-void SVGSVG::renderNode(const SVGRenderContext& context, const SVGIRI& iri) const {
+void SVGRoot::renderNode(const SVGRenderContext& context, const SVGIRI& iri) const {
   SVGRenderContext localContext(context, this);
   auto node = localContext.findNodeById(iri);
   if (!node) {
@@ -41,7 +41,7 @@ void SVGSVG::renderNode(const SVGRenderContext& context, const SVGIRI& iri) cons
   }
 }
 
-bool SVGSVG::onPrepareToRender(SVGRenderContext* context) const {
+bool SVGRoot::onPrepareToRender(SVGRenderContext* context) const {
   // x/y are ignored for outermost svg elements
   const auto x = type == Type::kInner ? X : SVGLength(0);
   const auto y = type == Type::kInner ? Y : SVGLength(0);
@@ -77,7 +77,7 @@ bool SVGSVG::onPrepareToRender(SVGRenderContext* context) const {
 }
 
 // https://www.w3.org/TR/SVG11/coords.html#IntrinsicSizing
-Size SVGSVG::intrinsicSize(const SVGLengthContext& lengthContext) const {
+Size SVGRoot::intrinsicSize(const SVGLengthContext& lengthContext) const {
   // Percentage values do not provide an intrinsic size.
   if (Width.unit() == SVGLength::Unit::Percentage || Height.unit() == SVGLength::Unit::Percentage) {
     return Size::Make(0, 0);
@@ -87,7 +87,7 @@ Size SVGSVG::intrinsicSize(const SVGLengthContext& lengthContext) const {
                     lengthContext.resolve(Height, SVGLengthContext::LengthType::Vertical));
 }
 
-void SVGSVG::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
+void SVGRoot::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   if (type != Type::kInner && type != Type::kRoot) return;
   switch (attr) {
     case SVGAttribute::X:

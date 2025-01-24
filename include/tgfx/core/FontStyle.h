@@ -31,29 +31,29 @@ namespace tgfx {
 class FontStyle {
  public:
   enum class Weight {
-    Invisible = 0,
-    Thin = 100,
-    ExtraLight = 200,
-    Light = 300,
-    Normal = 400,
-    Medium = 500,
-    SemiBold = 600,
-    Bold = 700,
-    ExtraBold = 800,
-    Black = 900,
-    ExtraBlack = 1000,
+    Invisible,
+    Thin,
+    ExtraLight,
+    Light,
+    Normal,
+    Medium,
+    SemiBold,
+    Bold,
+    ExtraBold,
+    Black,
+    ExtraBlack,
   };
 
   enum class Width {
-    UltraCondensed = 1,
-    ExtraCondensed = 2,
-    Condensed = 3,
-    SemiCondensed = 4,
-    Normal = 5,
-    SemiExpanded = 6,
-    Expanded = 7,
-    ExtraExpanded = 8,
-    UltraExpanded = 9,
+    UltraCondensed,
+    ExtraCondensed,
+    Condensed,
+    SemiCondensed,
+    Normal,
+    SemiExpanded,
+    Expanded,
+    ExtraExpanded,
+    UltraExpanded,
   };
 
   enum class Slant {

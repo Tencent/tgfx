@@ -57,6 +57,9 @@ class Typeface {
   static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
                                                 const std::string& fontStyle);
 
+  static std::shared_ptr<Typeface> MakeFromStyle(const std::string& fontFamily,
+                                                 FontStyle fontStyle);
+
   /**
    * Creates a new typeface for the given file path and ttc index. Returns nullptr if the typeface
    * can't be created.
@@ -132,24 +135,6 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
-  /**
-   * Returns the font style object of this typeface.
-   * Note: This value is set by the user and is not read from the font file. This method is used for
-   * font matching and text layout in SVG rendering.
-   */
-  FontStyle getFontStyle() const {
-    return style;
-  }
-
-  /**
-   * Sets the font style for this typeface.
-   * Note: This value is set by the user and is not read from the font file. This method is used for
-   * font matching and text layout in SVG rendering.
-   */
-  void setFontStyle(const FontStyle& value) {
-    style = value;
-  }
-
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -162,7 +147,6 @@ class Typeface {
 
  private:
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
-  FontStyle style = FontStyle::Normal();
 
   friend class ScalerContext;
   friend class GlyphConverter;

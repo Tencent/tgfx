@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,26 +19,19 @@
 #pragma once
 
 #include <memory>
-#include "tgfx/svg/shaper/Shaper.h"
+#include "tgfx/svg/node/SVGContainer.h"
 
 namespace tgfx {
-namespace shapers {
-
-class Factory {
+class SVGGroup : public SVGContainer {
  public:
-  virtual ~Factory() = default;
+  static std::shared_ptr<SVGGroup> Make() {
+    return std::shared_ptr<SVGGroup>(new SVGGroup());
+  }
 
-  virtual std::unique_ptr<Shaper> makeShaper() = 0;
+ private:
+  SVGGroup() : INHERITED(SVGTag::G) {
+  }
 
-  virtual std::unique_ptr<BiDiRunIterator> makeBidiRunIterator(const char* utf8, size_t utf8Bytes,
-                                                               uint8_t bidiLevel) = 0;
-
-  virtual std::unique_ptr<ScriptRunIterator> makeScriptRunIterator(const char* utf8,
-                                                                   size_t utf8Bytes,
-                                                                   FourByteTag script) = 0;
+  using INHERITED = SVGContainer;
 };
-
-std::shared_ptr<Factory> PrimitiveFactory();
-
-}  // namespace shapers
 }  // namespace tgfx

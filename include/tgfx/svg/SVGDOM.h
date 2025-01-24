@@ -21,13 +21,12 @@
 #include <memory>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/FontManager.h"
-#include "tgfx/core/LoadResourceProvider.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/svg/node/SVGSVG.h"
-#include "tgfx/svg/shaper/ShaperFactory.h"
+#include "tgfx/svg/FontManager.h"
+#include "tgfx/svg/ResourceLoader.h"
+#include "tgfx/svg/node/SVGRoot.h"
 
 namespace tgfx {
 
@@ -47,11 +46,7 @@ struct SVGDOMOptions {
    * If resourceProvider is null, base64 image resources will still be parsed, but non-base64 images 
    * will be loaded from absolute paths.
    */
-  std::shared_ptr<LoadResourceProvider> resourceProvider = nullptr;
-  /**
-   * If shaperFactory is null, right-to-left and language-specific text shaping will not be applied.
-   */
-  std::shared_ptr<shapers::Factory> shaperFactory = nullptr;
+  std::shared_ptr<ResourceLoader> resourceProvider = nullptr;
 };
 
 /**
@@ -79,7 +74,7 @@ class SVGDOM {
   /**
    * Returns the root SVG node.
    */
-  const std::shared_ptr<SVGSVG>& getRoot() const;
+  const std::shared_ptr<SVGRoot>& getRoot() const;
 
   /**
    * Renders the SVG to the provided canvas.
@@ -104,9 +99,9 @@ class SVGDOM {
   /**
    * Construct a new SVGDOM object
    */
-  SVGDOM(std::shared_ptr<SVGSVG> root, SVGDOMOptions options, SVGIDMapper&& mapper);
+  SVGDOM(std::shared_ptr<SVGRoot> root, SVGDOMOptions options, SVGIDMapper&& mapper);
 
-  const std::shared_ptr<SVGSVG> root = nullptr;
+  const std::shared_ptr<SVGRoot> root = nullptr;
   const SVGIDMapper nodeIDMapper = {};
   const SVGDOMOptions options = {};
   Size containerSize = {};

@@ -30,6 +30,8 @@
 #include "svg/SVGLengthContext.h"
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
+#include "svg/SystemFontManager.h"
+#include "svg/SystemResourceLoader.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Recorder.h"
@@ -63,14 +65,14 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, SVGDOMOptions options) {
 
   // Create SVGDOM with the root node and ID mapper
   return std::shared_ptr<SVGDOM>(
-      new SVGDOM(std::static_pointer_cast<SVGSVG>(root), std::move(options), std::move(mapper)));
+      new SVGDOM(std::static_pointer_cast<SVGRoot>(root), std::move(options), std::move(mapper)));
 }
 
-SVGDOM::SVGDOM(std::shared_ptr<SVGSVG> root, SVGDOMOptions options, SVGIDMapper&& mapper)
+SVGDOM::SVGDOM(std::shared_ptr<SVGRoot> root, SVGDOMOptions options, SVGIDMapper&& mapper)
     : root(std::move(root)), nodeIDMapper(std::move(mapper)), options(std::move(options)) {
 }
 
-const std::shared_ptr<SVGSVG>& SVGDOM::getRoot() const {
+const std::shared_ptr<SVGRoot>& SVGDOM::getRoot() const {
   return root;
 }
 
@@ -96,13 +98,12 @@ void SVGDOM::render(Canvas* canvas) {
   SVGLengthContext lengthContext(drawSize);
   SVGPresentationContext presentationContext;
 
-  auto resourceProvider =
-      options.resourceProvider ? options.resourceProvider : LoadResourceProvider::MakeEmpty();
-  auto shaperFactory = options.shaperFactory ? options.shaperFactory : shapers::PrimitiveFactory();
+  auto resourceLoader =
+      options.resourceProvider ? options.resourceProvider : SystemResourceLoader::Make();
+  auto fontManager = options.fontManager ? options.fontManager : SystemFontManager::Make();
 
-  SVGRenderContext renderContext(canvas, options.fontManager, resourceProvider, shaperFactory,
-                                 nodeIDMapper, lengthContext, presentationContext,
-                                 {nullptr, nullptr}, canvas->getMatrix());
+  SVGRenderContext renderContext(canvas, fontManager, resourceLoader, nodeIDMapper, lengthContext,
+                                 presentationContext, {nullptr, nullptr}, canvas->getMatrix());
 
   root->render(renderContext);
 }

@@ -16,40 +16,47 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/LoadResourceProvider.h"
-#include <filesystem>
-#include <memory>
-#include <string>
-#include <utility>
+#pragma once
+
+#include "tgfx/svg/ResourceLoader.h"
 
 namespace tgfx {
-
-class FileResourceProvider final : public LoadResourceProvider {
+class SystemResourceLoader final : public ResourceLoader {
  public:
-  explicit FileResourceProvider(std::string basePath) : basePath(std::move(basePath)) {
+  static std::shared_ptr<SystemResourceLoader> Make() {
+    return std::shared_ptr<SystemResourceLoader>(new SystemResourceLoader);
   }
 
   std::shared_ptr<Data> load(const std::string& resourcePath,
                              const std::string& resourceName) const override {
-    return Data::MakeFromFile(basePath + "/" + resourcePath + "/" + resourceName);
+    if (resourceName.empty() && resourcePath.empty()) {
+      return nullptr;
+    }
+    if (resourcePath.empty()) {
+      return Data::MakeFromFile(resourceName);
+    }
+    if (resourceName.empty()) {
+      return Data::MakeFromFile(resourcePath);
+    }
+    return Data::MakeFromFile(resourcePath + "/" + resourceName);
   };
 
   std::shared_ptr<Image> loadImage(const std::string& resourcePath,
                                    const std::string& resourceName) const override {
-    return Image::MakeFromFile(basePath + "/" + resourcePath + "/" + resourceName);
+    if (resourceName.empty() && resourcePath.empty()) {
+      return nullptr;
+    }
+    if (resourcePath.empty()) {
+      return Image::MakeFromFile(resourceName);
+    }
+    if (resourceName.empty()) {
+      return Image::MakeFromFile(resourcePath);
+    }
+    return Image::MakeFromFile(resourcePath + "/" + resourceName);
   }
 
- private:
-  const std::string basePath;
+ protected:
+  SystemResourceLoader() = default;
 };
-
-std::shared_ptr<LoadResourceProvider> LoadResourceProvider::MakeEmpty() {
-  return std::shared_ptr<LoadResourceProvider>(new LoadResourceProvider);
-}
-
-std::shared_ptr<LoadResourceProvider> LoadResourceProvider::MakeFileProvider(
-    const std::string& basePath) {
-  return std::make_shared<FileResourceProvider>(basePath);
-}
 
 }  // namespace tgfx

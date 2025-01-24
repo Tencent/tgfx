@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGTypeface.h"
+#include <CoreFoundation/CoreFoundation.h>
 #include "CGScalerContext.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 
@@ -33,6 +35,7 @@ std::string StringFromCFString(CFStringRef src) {
 
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
+
   CFMutableDictionaryRef cfAttributes = CFDictionaryCreateMutable(
       kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
   if (!fontFamily.empty()) {
@@ -55,6 +58,70 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
   auto cfDesc = CTFontDescriptorCreateWithAttributes(cfAttributes);
   if (cfDesc) {
     auto ctFont = CTFontCreateWithFontDescriptor(cfDesc, 0, nullptr);
+    if (ctFont) {
+      typeface = CGTypeface::Make(ctFont);
+      CFRelease(ctFont);
+    }
+    CFRelease(cfDesc);
+  }
+  CFRelease(cfAttributes);
+  return typeface;
+}
+
+static constexpr std::array<float, 11> FontWeightMap = {-1.0f, -0.6f, -0.5f, -0.4f, 0.0f, 0.23f,
+                                                        0.3f,  0.4f,  0.56f, 0.62f, 0.7f};
+
+static constexpr std::array<float, 9> FontWidthMap = {-0.8f, -0.6f, -0.4f, -0.2f, 0.0f,
+                                                      0.2f,  0.4f,  0.6f,  0.8f};
+
+static constexpr std::array<float, 3> FontSlantMap = {-1.0f, 0.0f, 1.0f};
+
+std::shared_ptr<Typeface> Typeface::MakeFromStyle(const std::string& fontFamily,
+                                                  FontStyle fontStyle) {
+
+  CFMutableDictionaryRef cfAttributes = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+  if (!fontFamily.empty()) {
+    const auto* cfFontName =
+        CFStringCreateWithCString(kCFAllocatorDefault, fontFamily.c_str(), kCFStringEncodingUTF8);
+    if (cfFontName) {
+      CFDictionaryAddValue(cfAttributes, kCTFontFamilyNameAttribute, cfFontName);
+      CFRelease(cfFontName);
+    }
+  }
+
+  CFMutableDictionaryRef cfTraits = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+  if (cfTraits) {
+    float fontWeight = FontWeightMap[static_cast<size_t>(fontStyle.weight())];
+    CFNumberRef cfWeight = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &fontWeight);
+    if (cfWeight) {
+      CFDictionaryAddValue(cfTraits, kCTFontWeightTrait, cfWeight);
+      CFRelease(cfWeight);
+    }
+
+    float fontWidth = FontWidthMap[static_cast<size_t>(fontStyle.width())];
+    CFNumberRef cfWidth = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &fontWidth);
+    if (cfWidth) {
+      CFDictionaryAddValue(cfTraits, kCTFontWidthTrait, cfWidth);
+      CFRelease(cfWidth);
+    }
+
+    float fontSlant = FontSlantMap[static_cast<size_t>(fontStyle.slant())];
+    CFNumberRef cfSlant = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &fontSlant);
+    if (cfSlant) {
+      CFDictionaryAddValue(cfTraits, kCTFontSlantTrait, cfSlant);
+      CFRelease(cfSlant);
+    }
+
+    CFDictionaryAddValue(cfAttributes, kCTFontTraitsAttribute, cfTraits);
+    CFRelease(cfTraits);
+  }
+
+  std::shared_ptr<CGTypeface> typeface;
+  const auto* cfDesc = CTFontDescriptorCreateWithAttributes(cfAttributes);
+  if (cfDesc) {
+    const auto* ctFont = CTFontCreateWithFontDescriptor(cfDesc, 0, nullptr);
     if (ctFont) {
       typeface = CGTypeface::Make(ctFont);
       CFRelease(ctFont);

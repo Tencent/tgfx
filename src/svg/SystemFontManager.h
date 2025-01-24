@@ -16,34 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/shaper/ShaperFactory.h"
+#pragma once
+
+#include <cstddef>
 #include <memory>
-#include "svg/shaper/ShaperPrimitive.h"
-#include "tgfx/svg/shaper/Shaper.h"
+#include <string>
+#include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Typeface.h"
+#include "tgfx/svg/FontManager.h"
 
 namespace tgfx {
 
-namespace {
-class PrimitiveFactoryImpl final : public shapers::Factory {
-  std::unique_ptr<Shaper> makeShaper() override {
-    return std::make_unique<ShaperPrimitive>();
+class SystemFontManager : public FontManager {
+ public:
+  static std::shared_ptr<SystemFontManager> Make() {
+    return std::shared_ptr<SystemFontManager>(new SystemFontManager);
   }
 
-  std::unique_ptr<BiDiRunIterator> makeBidiRunIterator(const char*, size_t, uint8_t) override {
-    return std::make_unique<TrivialBiDiRunIterator>(0, 0);
-  }
+ protected:
+  SystemFontManager() = default;
 
-  std::unique_ptr<ScriptRunIterator> makeScriptRunIterator(const char*, size_t,
-                                                           FourByteTag) override {
-    return std::make_unique<TrivialScriptRunIterator>(0, 0);
-  }
+  std::shared_ptr<Typeface> onMatchTypeface(const std::string& familyName,
+                                            FontStyle style) const override;
+
+  std::shared_ptr<Typeface> onGetFallbackTypeface(const std::string& familyName, FontStyle style,
+                                                  Unichar character) const override;
 };
-}  // namespace
-
-namespace shapers {
-std::shared_ptr<Factory> PrimitiveFactory() {
-  return std::make_shared<PrimitiveFactoryImpl>();
-}
-}  // namespace shapers
 
 }  // namespace tgfx

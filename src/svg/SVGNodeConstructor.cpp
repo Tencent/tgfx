@@ -39,7 +39,7 @@
 #include "tgfx/svg/node/SVGFeOffset.h"
 #include "tgfx/svg/node/SVGFeTurbulence.h"
 #include "tgfx/svg/node/SVGFilter.h"
-#include "tgfx/svg/node/SVGG.h"
+#include "tgfx/svg/node/SVGGroup.h"
 #include "tgfx/svg/node/SVGImage.h"
 #include "tgfx/svg/node/SVGLine.h"
 #include "tgfx/svg/node/SVGLinearGradient.h"
@@ -50,7 +50,7 @@
 #include "tgfx/svg/node/SVGPoly.h"
 #include "tgfx/svg/node/SVGRadialGradient.h"
 #include "tgfx/svg/node/SVGRect.h"
-#include "tgfx/svg/node/SVGSVG.h"
+#include "tgfx/svg/node/SVGRoot.h"
 #include "tgfx/svg/node/SVGStop.h"
 #include "tgfx/svg/node/SVGText.h"
 #include "tgfx/svg/node/SVGUse.h"
@@ -231,7 +231,7 @@ std::unordered_map<std::string, AttrParseInfo> SVGNodeConstructor::attributePars
 
 using ElementFactory = std::function<std::shared_ptr<SVGNode>()>;
 std::unordered_map<std::string, ElementFactory> ElementFactories = {
-    {"a", []() -> std::shared_ptr<SVGNode> { return SVGG::Make(); }},
+    {"a", []() -> std::shared_ptr<SVGNode> { return SVGGroup::Make(); }},
     {"circle", []() -> std::shared_ptr<SVGNode> { return SVGCircle::Make(); }},
     {"clipPath", []() -> std::shared_ptr<SVGNode> { return SVGClipPath::Make(); }},
     {"defs", []() -> std::shared_ptr<SVGNode> { return SVGDefs::Make(); }},
@@ -263,7 +263,7 @@ std::unordered_map<std::string, ElementFactory> ElementFactories = {
     {"feSpotLight", []() -> std::shared_ptr<SVGNode> { return SVGFeSpotLight::Make(); }},
     {"feTurbulence", []() -> std::shared_ptr<SVGNode> { return SVGFeTurbulence::Make(); }},
     {"filter", []() -> std::shared_ptr<SVGNode> { return SVGFilter::Make(); }},
-    {"g", []() -> std::shared_ptr<SVGNode> { return SVGG::Make(); }},
+    {"g", []() -> std::shared_ptr<SVGNode> { return SVGGroup::Make(); }},
     {"image", []() -> std::shared_ptr<SVGNode> { return SVGImage::Make(); }},
     {"line", []() -> std::shared_ptr<SVGNode> { return SVGLine::Make(); }},
     {"linearGradient", []() -> std::shared_ptr<SVGNode> { return SVGLinearGradient::Make(); }},
@@ -331,7 +331,7 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
                      const std::string& elementName) -> std::shared_ptr<SVGNode> {
     if (elementName == "svg") {
       // Outermost SVG element must be tagged as such.
-      return SVGSVG::Make(context.parentNode ? SVGSVG::Type::kInner : SVGSVG::Type::kRoot);
+      return SVGRoot::Make(context.parentNode ? SVGRoot::Type::kInner : SVGRoot::Type::kRoot);
     }
 
     if (auto iter = ElementFactories.find(elementName); iter != ElementFactories.end()) {

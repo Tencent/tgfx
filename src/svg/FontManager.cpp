@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
+#include "tgfx/svg/FontManager.h"
+#include <cstddef>
 #include <memory>
-#include "tgfx/svg/node/SVGContainer.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-class SVGG : public SVGContainer {
- public:
-  static std::shared_ptr<SVGG> Make() {
-    return std::shared_ptr<SVGG>(new SVGG());
-  }
 
- private:
-  SVGG() : INHERITED(SVGTag::G) {
-  }
+std::shared_ptr<Typeface> FontManager::matchTypeface(const std::string& familyName,
+                                                     FontStyle style) const {
+  return onMatchTypeface(familyName, style);
+}
 
-  using INHERITED = SVGContainer;
-};
+std::shared_ptr<Typeface> FontManager::getFallbackTypeface(const std::string& familyName,
+                                                           FontStyle style,
+                                                           Unichar character) const {
+  return onGetFallbackTypeface(familyName, style, character);
+}
+
 }  // namespace tgfx

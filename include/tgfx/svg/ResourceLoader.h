@@ -29,41 +29,24 @@ namespace tgfx {
  * LoadResourceProvider is an interface for loading resources (e.g. images, font) from
  * external sources.
  */
-class LoadResourceProvider {
+class ResourceLoader {
  public:
   /**
    * Data is a wrapper for raw data.
    */
-  virtual ~LoadResourceProvider() = default;
-
-  /**
-   * Creates an empty resource provider.
-   */
-  static std::shared_ptr<LoadResourceProvider> MakeEmpty();
-
-  /**
-   * Creates a file resource provider with the given base path.
-   */
-  static std::shared_ptr<LoadResourceProvider> MakeFileProvider(const std::string& basePath);
+  virtual ~ResourceLoader() = default;
 
   /**
    * Load a generic resource specified by |path| + |name|, and return as an Data object.
    */
-  virtual std::shared_ptr<Data> load(const std::string& /*resourcePath*/,
-                                     const std::string& /*resourceName*/) const {
-    return nullptr;
-  }
+  virtual std::shared_ptr<Data> load(const std::string& resourcePath,
+                                     const std::string& resourceName) const = 0;
 
   /**
    * Load an image asset specified by |path| + |name|, and returns the Image object.
    */
-  virtual std::shared_ptr<Image> loadImage(const std::string& /*resourcePath*/,
-                                           const std::string& /*resourceName*/) const {
-    return nullptr;
-  }
-
- protected:
-  LoadResourceProvider() = default;
+  virtual std::shared_ptr<Image> loadImage(const std::string& resourcePath,
+                                           const std::string& resourceName) const = 0;
 };
 
 }  // namespace tgfx

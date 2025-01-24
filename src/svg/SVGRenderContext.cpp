@@ -103,46 +103,44 @@ SVGPresentationContext::SVGPresentationContext()
 }
 
 SVGRenderContext::SVGRenderContext(Canvas* canvas, const std::shared_ptr<FontManager>& fontManager,
-                                   const std::shared_ptr<LoadResourceProvider>& resourceProvider,
-                                   const std::shared_ptr<shapers::Factory>& shaperFactory,
+                                   const std::shared_ptr<ResourceLoader>& resourceProvider,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                                    const SVGPresentationContext& presentContext,
                                    const OBBScope& scope, const Matrix& matrix)
-    : _fontManager(fontManager), _resourceProvider(resourceProvider), shaperFactory(shaperFactory),
-      nodeIDMapper(mapper), _lengthContext(lengthContext), _presentationContext(presentContext),
-      _canvas(canvas), canvasSaveCount(canvas->getSaveCount()), scope(scope), _matrix(matrix) {
+    : _fontManager(fontManager), _resourceProvider(resourceProvider), nodeIDMapper(mapper),
+      _lengthContext(lengthContext), _presentationContext(presentContext), _canvas(canvas),
+      canvasSaveCount(canvas->getSaveCount()), scope(scope), _matrix(matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
     : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
-                       other.shaperFactory, other.nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, other.scope, other._matrix) {
+                       other.nodeIDMapper, *other._lengthContext, *other._presentationContext,
+                       other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
-    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.shaperFactory,
-                       other.nodeIDMapper, *other._lengthContext, *other._presentationContext,
-                       other.scope, other._matrix) {
+    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.nodeIDMapper,
+                       *other._lengthContext, *other._presentationContext, other.scope,
+                       other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other,
                                    const SVGLengthContext& lengthContext)
     : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
-                       other.shaperFactory, other.nodeIDMapper, lengthContext,
-                       *other._presentationContext, other.scope, other._matrix) {
-}
-
-SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
-                                   const SVGLengthContext& lengthContext)
-    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.shaperFactory,
                        other.nodeIDMapper, lengthContext, *other._presentationContext, other.scope,
                        other._matrix) {
 }
 
+SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
+                                   const SVGLengthContext& lengthContext)
+    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.nodeIDMapper,
+                       lengthContext, *other._presentationContext, other.scope, other._matrix) {
+}
+
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
     : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
-                       other.shaperFactory, other.nodeIDMapper, *other._lengthContext,
-                       *other._presentationContext, OBBScope{node, this}, other._matrix) {
+                       other.nodeIDMapper, *other._lengthContext, *other._presentationContext,
+                       OBBScope{node, this}, other._matrix) {
 }
 
 SVGRenderContext::~SVGRenderContext() {
@@ -339,9 +337,8 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, flo
       // and node being rendered.
       SVGPresentationContext presentContext;
       presentContext._namedColors = _presentationContext->_namedColors;
-      SVGRenderContext localContext(_canvas, _fontManager, _resourceProvider, shaperFactory,
-                                    nodeIDMapper, *_lengthContext, presentContext, scope,
-                                    Matrix::I());
+      SVGRenderContext localContext(_canvas, _fontManager, _resourceProvider, nodeIDMapper,
+                                    *_lengthContext, presentContext, scope, Matrix::I());
 
       const auto node = this->findNodeById(svgPaint.iri());
       if (!node || !node->asPaint(localContext, &(paint.value()))) {
@@ -473,9 +470,9 @@ Font SVGRenderContext::resolveFont() const {
   const auto size = lengthContext().resolve(presentationContext()._inherited.FontSize->size(),
                                             SVGLengthContext::LengthType::Vertical);
 
-  auto typeface = _fontManager->matchFamilyStyle(family, style);
+  auto typeface = _fontManager->matchTypeface(family, style);
   if (!typeface) {
-    typeface = _fontManager->matchFamilyStyle("", style);
+    typeface = _fontManager->matchTypeface("", style);
   }
   Font font(std::move(typeface), size);
   return font;
@@ -506,24 +503,6 @@ Rect SVGRenderContext::resolveOBBRect(const SVGLength& x, const SVGLength& y, co
   return Rect::MakeXYWH(transform.scale.x * r.x() + transform.offset.x,
                         transform.scale.y * r.y() + transform.offset.y,
                         transform.scale.x * r.width(), transform.scale.y * r.height());
-}
-std::unique_ptr<Shaper> SVGRenderContext::makeShaper() const {
-  DEBUG_ASSERT(shaperFactory);
-  return shaperFactory->makeShaper();
-}
-
-std::unique_ptr<BiDiRunIterator> SVGRenderContext::makeBidiRunIterator(const char* utf8,
-                                                                       size_t utf8Bytes,
-                                                                       uint8_t bidiLevel) const {
-  DEBUG_ASSERT(shaperFactory);
-  return shaperFactory->makeBidiRunIterator(utf8, utf8Bytes, bidiLevel);
-}
-
-std::unique_ptr<ScriptRunIterator> SVGRenderContext::makeScriptRunIterator(const char* utf8,
-                                                                           size_t utf8Bytes) const {
-  DEBUG_ASSERT(shaperFactory);
-  constexpr FourByteTag unknownScript = SetFourByteTag('Z', 'z', 'z', 'z');
-  return shaperFactory->makeScriptRunIterator(utf8, utf8Bytes, unknownScript);
 }
 
 }  // namespace tgfx

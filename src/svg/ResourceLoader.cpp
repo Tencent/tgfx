@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Typeface.h"
+#include "tgfx/svg/ResourceLoader.h"
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace tgfx {
-class SystemFont {
- public:
-  static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
-                                                const std::string& fontStyle);
 
-  static std::shared_ptr<Typeface> MakeFromStyle(const std::string& fontFamily,
-                                                 FontStyle fontStyle);
+class SystemResourceLoader final : public ResourceLoader {
+ public:
+  explicit SystemResourceLoader(std::string basePath) : basePath(std::move(basePath)) {
+  }
+
+  std::shared_ptr<Data> load(const std::string& resourcePath,
+                             const std::string& resourceName) const override {
+    return Data::MakeFromFile(basePath + "/" + resourcePath + "/" + resourceName);
+  };
+
+  std::shared_ptr<Image> loadImage(const std::string& resourcePath,
+                                   const std::string& resourceName) const override {
+    return Image::MakeFromFile(basePath + "/" + resourcePath + "/" + resourceName);
+  }
+
+ private:
+  const std::string basePath;
 };
+
 }  // namespace tgfx

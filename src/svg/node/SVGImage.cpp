@@ -49,7 +49,7 @@ bool SVGImage::onPrepareToRender(SVGRenderContext* context) const {
          INHERITED::onPrepareToRender(context);
 }
 
-std::shared_ptr<Image> LoadImage(const std::shared_ptr<LoadResourceProvider>& resourceProvider,
+std::shared_ptr<Image> LoadImage(const std::shared_ptr<ResourceLoader>& resourceProvider,
                                  const SVGIRI& href) {
 
   switch (href.type()) {
@@ -74,9 +74,9 @@ std::shared_ptr<Image> LoadImage(const std::shared_ptr<LoadResourceProvider>& re
   }
 }
 
-SVGImage::ImageInfo SVGImage::LoadImage(
-    const std::shared_ptr<LoadResourceProvider>& resourceProvider, const SVGIRI& iri,
-    const Rect& viewPort, SVGPreserveAspectRatio /*ratio*/) {
+SVGImage::ImageInfo SVGImage::LoadImage(const std::shared_ptr<ResourceLoader>& resourceProvider,
+                                        const SVGIRI& iri, const Rect& viewPort,
+                                        SVGPreserveAspectRatio /*ratio*/) {
   std::shared_ptr<Image> image = ::tgfx::LoadImage(resourceProvider, iri);
   if (!image) {
     return {};

@@ -26,8 +26,6 @@
 #include "core/utils/Log.h"
 #include "svg/SVGLengthContext.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/FontManager.h"
-#include "tgfx/core/LoadResourceProvider.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -38,10 +36,11 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/FontManager.h"
+#include "tgfx/svg/ResourceLoader.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGTypes.h"
-#include "tgfx/svg/shaper/ShaperFactory.h"
 
 namespace tgfx {
 
@@ -131,8 +130,7 @@ class SVGRenderContext {
   };
 
   SVGRenderContext(Canvas* canvas, const std::shared_ptr<FontManager>& fontManager,
-                   const std::shared_ptr<LoadResourceProvider>& resourceProvider,
-                   const std::shared_ptr<shapers::Factory>& shaperFactory,
+                   const std::shared_ptr<ResourceLoader>& resourceProvider,
                    const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                    const SVGPresentationContext& presentContext, const OBBScope& scope,
                    const Matrix& matrix);
@@ -199,21 +197,13 @@ class SVGRenderContext {
     return _clipPath.value_or(Path());
   };
 
-  const std::shared_ptr<LoadResourceProvider>& resourceProvider() const {
+  const std::shared_ptr<ResourceLoader>& resourceProvider() const {
     return _resourceProvider;
   }
 
   const std::shared_ptr<FontManager>& fontManager() const {
     return _fontManager;
   }
-
-  std::unique_ptr<Shaper> makeShaper() const;
-
-  std::unique_ptr<BiDiRunIterator> makeBidiRunIterator(const char* utf8, size_t utf8Bytes,
-                                                       uint8_t bidiLevel) const;
-
-  std::unique_ptr<ScriptRunIterator> makeScriptRunIterator(const char* utf8,
-                                                           size_t utf8Bytes) const;
 
   // Returns the translate/scale transformation required to map into the current OBB scope,
   // with the specified units.
@@ -241,8 +231,7 @@ class SVGRenderContext {
   std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
 
   std::shared_ptr<FontManager> _fontManager;
-  std::shared_ptr<LoadResourceProvider> _resourceProvider;
-  std::shared_ptr<shapers::Factory> shaperFactory;
+  std::shared_ptr<ResourceLoader> _resourceProvider;
 
   const SVGIDMapper& nodeIDMapper;
   CopyOnWrite<SVGLengthContext> _lengthContext;
