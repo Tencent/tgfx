@@ -766,21 +766,22 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
         return layerStyle->position() == LayerStylePosition::Above;
       });
     }
+    return true;
   });
 }
 
 void Layer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool,
-                         const std::function<void()>& drawChildren) const {
+                         const std::function<bool()>& drawChildren) const {
   if (content != nullptr) {
     content->draw(canvas, getLayerPaint(alpha));
   }
   drawChildren();
 }
 
-void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild) {
+bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild) {
   for (const auto& child : _children) {
     if (child.get() == stopChild) {
-      break;
+      return false;
     }
     if (!child->visible() || child->_alpha <= 0 || child->maskOwner) {
       continue;
@@ -795,6 +796,19 @@ void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
   if (args.cleanDirtyFlags) {
     bitFields.childrenDirty = false;
   }
+  return true;
+}
+
+void Layer::collectBackgroundDrawArgs(Canvas* canvas, float* contentAlpha) const {
+  DEBUG_ASSERT(contentAlpha != nullptr);
+  if (_parent) {
+    _parent->collectBackgroundDrawArgs(canvas, contentAlpha);
+  }
+  *contentAlpha = *contentAlpha * _alpha;
+  canvas->concat(getMatrixWithScrollRect());
+  if (_scrollRect) {
+    canvas->clipRect(*_scrollRect);
+  }
 }
 
 void Layer::drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha) {
@@ -802,39 +816,30 @@ void Layer::drawBackground(const DrawArgs& args, Canvas* canvas, float* contentA
   if (contentAlpha == nullptr) {
     contentAlpha = &alpha;
   }
+
+  // parent background -> parent content -> sibling nodes content -> current layer styles (drop shadow)
   if (_parent != nullptr) {
-    _parent->drawLayersBehindChildLayer(args, canvas, this, contentAlpha);
+    _parent->drawBackground(args, canvas, contentAlpha);
+    _parent->drawContents(_parent->getContent(), canvas, *contentAlpha, false, [&]() {
+      return _parent->drawChildren(args, canvas, *contentAlpha, this);
+    });
+    *contentAlpha = *contentAlpha * _alpha;
+    canvas->concat(getMatrixWithScrollRect());
+    if (_scrollRect) {
+      canvas->clipRect(*_scrollRect);
+    }
   }
+
+  // draw layer styles below the layer content
   auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix(), true);
   if (layerStyleSource) {
-    drawLayerStyles(canvas, *contentAlpha, layerStyleSource.get(),
-                    [](const LayerStyle* layerStyle) {
-                      // ignore layer styles which need background content
-                      return layerStyle->position() == LayerStylePosition::Below &&
-                             layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background;
-                    });
+    auto layerStyleSelector = [](const LayerStyle* layerStyle) {
+      // ignore layer styles which need background content
+      return layerStyle->position() == LayerStylePosition::Below &&
+             (layerStyle->extraSourceType() != LayerStyleExtraSourceType::Background);
+    };
+    drawLayerStyles(canvas, *contentAlpha, layerStyleSource.get(), layerStyleSelector);
   }
-}
-
-void Layer::drawLayersBehindChildLayer(const DrawArgs& args, Canvas* canvas, Layer* childLayer,
-                                       float* childLayerAlpha) {
-  DEBUG_ASSERT(childLayer != nullptr && childLayerAlpha != nullptr);
-  if (childLayer->_blendMode != BlendMode::SrcOver) {
-    // When the blendMode is not SrcOver, the background will be affected by the layer content,
-    // causing the BackgroundBlur and the background to influence each other. Therefore, this
-    // logic is skipped.
-    *childLayerAlpha = childLayer->_alpha;
-    canvas->concat(childLayer->getGlobalMatrix());
-    return;
-  }
-
-  auto layerAlpha = 1.0f;
-  drawBackground(args, canvas, &layerAlpha);
-  drawContents(getContent(), canvas, layerAlpha, false,
-               [&]() { drawChildren(args, canvas, layerAlpha, childLayer); });
-
-  canvas->concat(childLayer->_matrix);
-  *childLayerAlpha = childLayer->_alpha * layerAlpha;
 }
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
@@ -850,7 +855,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   auto drawLayerContents = [this](const DrawArgs& drawArgs, Canvas* canvas) {
     drawContents(getContent(), canvas, 1.0f, drawArgs.forContour,
-                 [&]() { drawChildren(drawArgs, canvas, 1.0f); });
+                 [&]() { return drawChildren(drawArgs, canvas, 1.0f); });
   };
 
   DrawArgs drawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false,
@@ -870,10 +875,15 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   bool needBackground = false;
 
   for (const auto& layerStyle : _layerStyles) {
+    if (forBackground && (layerStyle->position() != LayerStylePosition::Below ||
+                          layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background)) {
+      // skip layer styles above the layer content or which need background content when drawing the
+      // background
+      continue;
+    }
     if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
       needContour = true;
-    } else if (!forBackground &&
-               layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background) {
+    } else if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background) {
       needBackground = true;
     }
     if (needContour && (forBackground || needBackground)) {

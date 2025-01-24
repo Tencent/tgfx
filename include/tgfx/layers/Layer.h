@@ -513,10 +513,11 @@ class Layer {
    * @param canvas The canvas to draw the layer content on.
    * @param alpha The alpha transparency value used for drawing the layer content.
    * @param forContour Whether to draw the layer content for the contour.
-   * @param drawChildren A callback function that draws the children of the layer.
+   * @param drawChildren A callback function that draws the children of the layer. if the function
+   * return false, the content above children should not be drawn.
    */
   virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                            const std::function<void()>& drawChildren) const;
+                            const std::function<bool()>& drawChildren) const;
 
   /**
   * Attachs a property to this layer.
@@ -563,10 +564,9 @@ class Layer {
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild = nullptr);
+  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild = nullptr);
 
-  void drawLayersBehindChildLayer(const DrawArgs& args, Canvas* canvas, Layer* childLayer,
-                                  float* childLayerAlpha);
+  void collectBackgroundDrawArgs(Canvas* canvas, float* contentAlpha = nullptr) const;
 
   void drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha = nullptr);
 
