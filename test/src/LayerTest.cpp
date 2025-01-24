@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <math.h>
-#include <tgfx/layers/ImagePattern.h>
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
+#include "tgfx/layers/ImagePattern.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
@@ -33,6 +33,7 @@
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "utils/TestUtils.h"
@@ -1920,5 +1921,71 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   layer->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwner, nullptr);
+}
+
+TGFX_TEST(LayerTest, BackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::Blue());
+  solidLayer->setWidth(150);
+  solidLayer->setHeight(150);
+  displayList->root()->addChild(solidLayer);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  displayList->root()->addChild(background);
+
+  auto layer = ShapeLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(30, 30));
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  layer->setPath(path);
+  auto strokeStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 100));
+  layer->setStrokeStyle(strokeStyle);
+  layer->setLineWidth(10);
+  layer->setStrokeOnTop(true);
+  layer->setExcludeChildEffectsInLayerStyle(true);
+  auto filter = BackgroundBlurStyle::Make(10, 10);
+  auto dropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
+  dropShadow->setShowBehindLayer(true);
+  layer->setExcludeChildEffectsInLayerStyle(true);
+  layer->setLayerStyles({dropShadow, filter});
+
+  auto blurFilter = BlurFilter::Make(1, 20);
+  layer->setFilters({blurFilter});
+
+  auto silbing = ShapeLayer::Make();
+  Path rect;
+  rect.addRect(Rect::MakeWH(50, 50));
+  silbing->setPath(rect);
+  silbing->setMatrix(Matrix::MakeTrans(-10, 0));
+  auto newBackgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  silbing->setLayerStyles({dropShadow, newBackgroundBlur});
+  silbing->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 100)));
+  layer->addChild(silbing);
+
+  auto clipLayer = Layer::Make();
+  clipLayer->setMatrix(Matrix::MakeTrans(2, 40));
+  clipLayer->setScrollRect(Rect::MakeXYWH(10, 10, 20, 20));
+  layer->addChild(clipLayer);
+
+  auto child = ShapeLayer::Make();
+
+  child->setPath(rect);
+  child->setMatrix(Matrix::MakeScale(0.5, 0.5));
+  auto fillStyle2 = SolidColor::Make(Color::FromRGBA(0, 100, 0, 100));
+  child->setFillStyle(fillStyle2);
+  auto backgroundBlur = BackgroundBlurStyle::Make(20, 20);
+  child->setLayerStyles({backgroundBlur});
+  child->setBlendMode(BlendMode::Multiply);
+  clipLayer->addChild(child);
+
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/backgroundLayerBlur"));
 }
 }  // namespace tgfx
