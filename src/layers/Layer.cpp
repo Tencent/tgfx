@@ -850,23 +850,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   source->content = std::move(content);
   source->contentOffset = contentOffset;
 
-  bool needContour = false;
-  bool needBackground = false;
-
-  auto forBackground = args.drawMode == DrawMode::Background;
-  for (const auto& layerStyle : _layerStyles) {
-    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour) {
-      needContour = true;
-    } else if (!forBackground &&
-               layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background) {
-      // in background mode, we should not collect background image.
-      needBackground = true;
-    }
-    if (needContour && (forBackground || needBackground)) {
-      break;
-    }
-  }
-
+  auto needContour =
+      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
+        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
+      });
   if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
@@ -875,6 +862,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     source->contour = CreatePictureImage(contourPicture, &source->contourOffset);
   }
 
+  auto needBackground =
+      args.drawMode != DrawMode::Background &&
+      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
+        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background;
+      });
   if (needBackground) {
     //effects are always included when drawing the background.
     drawArgs.excludeEffects = false;
@@ -911,15 +903,22 @@ void Layer::drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource*
     }
     AutoCanvasRestore autoRestore(canvas);
     canvas->concat(matrix);
-    if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour && contour != nullptr) {
-      layerStyle->drawWithExtraSource(canvas, source->content, source->contentScale, contour,
-                                      contourOffset, alpha);
-    } else if (layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background &&
-               background != nullptr) {
-      layerStyle->drawWithExtraSource(canvas, source->content, source->contentScale, background,
-                                      backgroundOffset, alpha);
-    } else {
-      layerStyle->draw(canvas, source->content, source->contentScale, alpha);
+    switch (layerStyle->extraSourceType()) {
+      case LayerStyleExtraSourceType::None:
+        layerStyle->draw(canvas, source->content, source->contentScale, alpha);
+        break;
+      case LayerStyleExtraSourceType::Background:
+        if (background != nullptr) {
+          layerStyle->drawWithExtraSource(canvas, source->content, source->contentScale, background,
+                                          backgroundOffset, alpha);
+        }
+        break;
+      case LayerStyleExtraSourceType::Contour:
+        if (contour != nullptr) {
+          layerStyle->drawWithExtraSource(canvas, source->content, source->contentScale, contour,
+                                          contourOffset, alpha);
+        }
+        break;
     }
   }
 }
