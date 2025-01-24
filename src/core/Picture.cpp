@@ -51,15 +51,7 @@ void Picture::playback(Canvas* canvas) const {
 
 void Picture::playback(DrawContext* drawContext, const MCState& state) const {
   DEBUG_ASSERT(drawContext != nullptr);
-  std::unique_ptr<TransformContext> transformContext;
-  auto surface = drawContext->getSurface();
-  Rect rect = {};
-  if (surface && state.clip.isRect(&rect) &&
-      rect == Rect::MakeWH(surface->width(), surface->height())) {
-    transformContext = TransformContext::Make(drawContext, state.matrix);
-  } else {
-    transformContext = TransformContext::Make(drawContext, state.matrix, state.clip);
-  }
+  auto transformContext = TransformContext::Make(drawContext, state.matrix, state.clip);
   if (transformContext) {
     drawContext = transformContext.get();
   } else if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {

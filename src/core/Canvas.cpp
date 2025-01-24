@@ -71,8 +71,8 @@ static FillStyle CreateFillStyle(const Paint* paint) {
   return paint ? CreateFillStyle(*paint) : FillStyle();
 }
 
-Canvas::Canvas(DrawContext* drawContext)
-    : surface(drawContext->getSurface()), drawContext(drawContext) {
+Canvas::Canvas(DrawContext* drawContext, Surface* surface)
+    : drawContext(drawContext), surface(surface) {
   mcState = std::make_unique<MCState>();
 }
 

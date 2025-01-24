@@ -26,12 +26,22 @@
 namespace tgfx {
 class RenderContext : public DrawContext {
  public:
-  RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags);
+  RenderContext(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags);
 
-  ~RenderContext() override;
+  Context* getContext() const {
+    return opContext.renderTarget->getContext();
+  }
 
-  Surface* getSurface() const override {
-    return surface;
+  std::shared_ptr<RenderTargetProxy> renderTarget() const {
+    return opContext.renderTarget;
+  }
+
+  uint32_t renderFlags() const {
+    return opContext.renderFlags;
+  }
+
+  uint32_t contentVersion() const {
+    return _contentVersion;
   }
 
   void drawStyle(const MCState& state, const FillStyle& style) override;
@@ -58,15 +68,15 @@ class RenderContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
                  const MCState& state, const FillStyle& style) override;
 
- private:
-  OpContext* opContext = nullptr;
-  uint32_t renderFlags = 0;
-  Surface* surface = nullptr;
-  std::shared_ptr<TextureProxy> clipTexture = nullptr;
-  UniqueKey clipKey = {};
+  std::shared_ptr<Image> makeImageSnapshot();
 
-  explicit RenderContext(Surface* surface);
-  Context* getContext() const;
+ private:
+  OpContext opContext;
+  uint32_t _contentVersion = 1u;
+  UniqueKey clipKey = {};
+  std::shared_ptr<TextureProxy> clipTexture = nullptr;
+  std::shared_ptr<Image> cachedImage = nullptr;
+
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
   std::unique_ptr<FragmentProcessor> getClipMask(const Path& clip, const Rect& deviceBounds,
@@ -79,7 +89,7 @@ class RenderContext : public DrawContext {
                  const FillStyle& style);
   void addOp(std::unique_ptr<Op> op, const std::function<bool()>& willDiscardContent);
   AAType getAAType(const FillStyle& style) const;
-  void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);
+  bool aboutToDraw(const std::function<bool()>& willDiscardContent);
   bool wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state, const FillStyle& style,
                               bool isRectOp) const;
 

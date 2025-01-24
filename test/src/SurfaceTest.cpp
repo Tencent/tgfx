@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/RenderContext.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
@@ -55,11 +56,11 @@ TGFX_TEST(SurfaceTest, ImageSnapshot) {
   surface = Surface::Make(context, width, height);
   canvas = surface->getCanvas();
   snapshotImage = surface->makeImageSnapshot();
-  auto renderTargetProxy = surface->renderTargetProxy;
+  auto renderTargetProxy = surface->renderContext->renderTarget();
   snapshotImage = nullptr;
   canvas->drawImage(image);
   context->flush();
-  EXPECT_TRUE(renderTargetProxy == surface->renderTargetProxy);
+  EXPECT_TRUE(renderTargetProxy == surface->renderContext->renderTarget());
   snapshotImage = surface->makeImageSnapshot();
   snapshotImage2 = surface->makeImageSnapshot();
   EXPECT_TRUE(snapshotImage == snapshotImage2);
