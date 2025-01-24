@@ -421,12 +421,12 @@ class Canvas {
                  const Paint* paint = nullptr);
 
  private:
-  Surface* surface = nullptr;
   DrawContext* drawContext = nullptr;
+  Surface* surface = nullptr;
   std::unique_ptr<MCState> mcState;
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
-  explicit Canvas(DrawContext* drawContext);
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
   void drawClip(const FillStyle& style);
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,

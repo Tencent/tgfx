@@ -36,13 +36,6 @@ class DrawContext {
   virtual ~DrawContext() = default;
 
   /**
-   * Returns the associated Surface if the DrawContext is backed by one, otherwise returns nullptr.
-   */
-  virtual Surface* getSurface() const {
-    return nullptr;
-  }
-
-  /**
    * Fills the entire clip area with the specified FillStyle.
    */
   virtual void drawStyle(const MCState& state, const FillStyle& style) = 0;

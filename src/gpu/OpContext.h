@@ -28,12 +28,12 @@ namespace tgfx {
  */
 class OpContext {
  public:
-  explicit OpContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags)
-      : renderTargetProxy(std::move(renderTargetProxy)), renderFlags(renderFlags) {
+  explicit OpContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
+      : renderTarget(std::move(proxy)), renderFlags(renderFlags) {
   }
 
-  RenderTargetProxy* renderTarget() const {
-    return renderTargetProxy.get();
+  Rect bounds() const {
+    return Rect::MakeWH(renderTarget->width(), renderTarget->height());
   }
 
   void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix,
@@ -44,14 +44,13 @@ class OpContext {
 
   void addOp(std::unique_ptr<Op> op);
 
-  uint32_t contentVersion() const {
-    return _contentVersion;
-  }
+  void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget);
 
  private:
-  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  std::shared_ptr<OpsRenderTask> opsTask = nullptr;
+  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
-  uint32_t _contentVersion = 1u;
+  std::shared_ptr<OpsRenderTask> opsTask = nullptr;
+
+  friend class RenderContext;
 };
 }  // namespace tgfx
