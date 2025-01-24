@@ -566,15 +566,12 @@ class Layer {
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild = nullptr);
 
-  void collectBackgroundDrawArgs(Canvas* canvas, float* contentAlpha = nullptr) const;
-
   void drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha = nullptr);
 
-  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
-                                                        bool forBackground);
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
   void drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
-                       const std::function<bool(const LayerStyle* layerStyle)>& drawCondition);
+                       LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 

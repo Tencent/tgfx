@@ -1948,6 +1948,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   layer->setStrokeStyle(strokeStyle);
   layer->setLineWidth(10);
   layer->setStrokeOnTop(true);
+  layer->setExcludeChildEffectsInLayerStyle(true);
   auto filter = BackgroundBlurStyle::Make(10, 10);
   auto dropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
   dropShadow->setShowBehindLayer(true);
@@ -1957,14 +1958,23 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   auto blurFilter = BlurFilter::Make(1, 20);
   layer->setFilters({blurFilter});
 
+  auto silbing = ShapeLayer::Make();
+  Path rect;
+  rect.addRect(Rect::MakeWH(50, 50));
+  silbing->setPath(rect);
+  silbing->setMatrix(Matrix::MakeTrans(-10, 0));
+  auto newBackgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  silbing->setLayerStyles({dropShadow, newBackgroundBlur});
+  silbing->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 100)));
+  layer->addChild(silbing);
+
   auto clipLayer = Layer::Make();
   clipLayer->setMatrix(Matrix::MakeTrans(2, 40));
   clipLayer->setScrollRect(Rect::MakeXYWH(10, 10, 20, 20));
   layer->addChild(clipLayer);
 
   auto child = ShapeLayer::Make();
-  Path rect;
-  rect.addRect(Rect::MakeWH(50, 50));
+
   child->setPath(rect);
   child->setMatrix(Matrix::MakeScale(0.5, 0.5));
   auto fillStyle2 = SolidColor::Make(Color::FromRGBA(0, 100, 0, 100));
