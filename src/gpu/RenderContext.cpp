@@ -20,6 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
+#include "core/images/TextureImage.h"
 #include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
@@ -40,46 +41,34 @@ namespace tgfx {
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
-RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                             uint32_t renderFlags)
-    : renderFlags(renderFlags) {
-  opContext = new OpContext(std::move(renderTargetProxy), renderFlags);
-}
+static constexpr uint32_t InvalidContentVersion = 0;
 
-RenderContext::RenderContext(Surface* surface) : surface(surface) {
-  renderFlags = surface->_renderFlags;
-  opContext = new OpContext(surface->renderTargetProxy, renderFlags);
-}
-
-RenderContext::~RenderContext() {
-  delete opContext;
-}
-
-Context* RenderContext::getContext() const {
-  return opContext->renderTarget()->getContext();
+RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags)
+    : opContext(std::move(renderTarget), renderFlags) {
 }
 
 Rect RenderContext::getClipBounds(const Path& clip) {
   if (clip.isInverseFillType()) {
-    return Rect::MakeWH(opContext->renderTarget()->width(), opContext->renderTarget()->height());
+    return opContext.bounds();
   }
   return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
 }
 
-Rect RenderContext::clipLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {
-  Matrix invertMatrix = {};
-  if (!state.matrix.invert(&invertMatrix)) {
-    return Rect::MakeEmpty();
-  }
-  auto clipBounds = getClipBounds(state.clip);
-  invertMatrix.mapRect(&clipBounds);
-  if (!unbounded && !clipBounds.intersect(localBounds)) {
-    return Rect::MakeEmpty();
-  }
-  return clipBounds;
+static bool HasColorOnly(const FillStyle& style) {
+  return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
 }
 
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
+  auto rect = opContext.bounds();
+  if (HasColorOnly(style) && style.isOpaque() && state.clip.isEmpty() &&
+      state.clip.isInverseFillType()) {
+    auto color = style.color.premultiply();
+    auto format = opContext.renderTarget->format();
+    const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
+    color = writeSwizzle.applyTo(color);
+    addOp(ClearOp::Make(color, rect), [] { return true; });
+    return;
+  }
   auto fillStyle = style;
   if (fillStyle.shader) {
     fillStyle.shader = fillStyle.shader->makeWithMatrix(state.matrix);
@@ -87,57 +76,29 @@ void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   if (fillStyle.maskFilter) {
     fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(state.matrix);
   }
-  drawRect(Rect::MakeWH(opContext->renderTarget()->width(), opContext->renderTarget()->height()),
-           MCState{state.clip}, fillStyle);
+  drawRect(rect, MCState{state.clip}, fillStyle);
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (drawAsClear(rect, state, style)) {
-    return;
-  }
-  auto localBounds = clipLocalBounds(state, rect);
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  auto drawOp = RectDrawOp::Make(style.color.premultiply(), localBounds, state.matrix);
-  addDrawOp(std::move(drawOp), localBounds, state, style);
-}
-
-static bool HasColorOnly(const FillStyle& style) {
-  return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
-}
-
-bool RenderContext::drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (!HasColorOnly(style) || !style.isOpaque() || !state.matrix.rectStaysRect()) {
-    return false;
-  }
-  auto color = style.color.premultiply();
-  auto bounds = rect;
-  state.matrix.mapRect(&bounds);
-  auto [clipRect, useScissor] = getClipRect(state.clip, &bounds);
-  if (clipRect.has_value()) {
-    auto format = opContext->renderTarget()->format();
-    const auto& writeSwizzle = getContext()->caps()->getWriteSwizzle(format);
-    color = writeSwizzle.applyTo(color);
-    if (useScissor) {
-      addOp(ClearOp::Make(color, *clipRect), [] { return false; });
-      return true;
-    }
-    if (clipRect->isEmpty()) {
-      addOp(ClearOp::Make(color, bounds), [] { return true; });
-      return true;
-    }
-  }
-  return false;
+  DEBUG_ASSERT(!rect.isEmpty());
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), rect, state.matrix);
+  addDrawOp(std::move(drawOp), rect, state, style);
 }
 
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) {
-  auto localBounds = clipLocalBounds(state, rRect.rect);
-  if (localBounds.isEmpty()) {
-    return;
-  }
+  DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto drawOp = RRectDrawOp::Make(style.color.premultiply(), rRect, state.matrix);
-  addDrawOp(std::move(drawOp), localBounds, state, style);
+  addDrawOp(std::move(drawOp), rRect.rect, state, style);
+}
+
+static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
+  Matrix invertMatrix = {};
+  if (!viewMatrix.invert(&invertMatrix)) {
+    return Rect::MakeEmpty();
+  }
+  auto localBounds = bounds;
+  invertMatrix.mapRect(&localBounds);
+  return localBounds;
 }
 
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
@@ -147,15 +108,12 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   if (maxScale <= 0.0f) {
     return;
   }
-  auto localBounds = shape->getBounds(maxScale);
-  localBounds = clipLocalBounds(state, localBounds, shape->isInverseFillType());
-  if (localBounds.isEmpty()) {
-    return;
-  }
   auto clipBounds = getClipBounds(state.clip);
+  auto bounds = shape->isInverseFillType() ? ToLocalBounds(clipBounds, state.matrix)
+                                           : shape->getBounds(maxScale);
   auto drawOp =
       ShapeDrawOp::Make(style.color.premultiply(), std::move(shape), state.matrix, clipBounds);
-  addDrawOp(std::move(drawOp), localBounds, state, style);
+  addDrawOp(std::move(drawOp), bounds, state, style);
 }
 
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -176,18 +134,14 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     uvMatrix = Matrix::MakeTrans(subsetImage->bounds.left, subsetImage->bounds.top);
     image = subsetImage->source;
   }
-  auto localBounds = clipLocalBounds(state, rect);
-  if (localBounds.isEmpty()) {
-    return;
-  }
-  FPArgs args = {getContext(), renderFlags, localBounds, state.matrix};
+  FPArgs args = {getContext(), opContext.renderFlags, rect, state.matrix};
   auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
   }
-  auto drawOp = RectDrawOp::Make(style.color.premultiply(), localBounds, state.matrix, uvMatrix);
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), rect, state.matrix, uvMatrix);
   drawOp->addColorFP(std::move(processor));
-  addDrawOp(std::move(drawOp), localBounds, state, style);
+  addDrawOp(std::move(drawOp), rect, state, style);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -207,10 +161,6 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     stroke->applyToBounds(&bounds);
   }
   auto localBounds = bounds;
-  localBounds = clipLocalBounds(state, localBounds);
-  if (localBounds.isEmpty()) {
-    return;
-  }
   bounds.scale(maxScale, maxScale);
   auto rasterizeMatrix = Matrix::MakeScale(maxScale);
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
@@ -220,7 +170,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList),
                                          aaType == AAType::Coverage, rasterizeMatrix, stroke);
   auto proxyProvider = getContext()->proxyProvider();
-  auto textureProxy = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
+  auto textureProxy =
+      proxyProvider->createTextureProxy({}, rasterizer, false, opContext.renderFlags);
   auto processor = TextureEffect::Make(std::move(textureProxy), {}, &rasterizeMatrix, true);
   if (processor == nullptr) {
     return;
@@ -242,7 +193,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   Rect bounds = {};
   if (filter || style.maskFilter) {
     if (picture->hasUnboundedFill()) {
-      bounds = clipLocalBounds(state, Rect::MakeEmpty(), true);
+      bounds = ToLocalBounds(getClipBounds(state.clip), state.matrix);
     } else {
       bounds = picture->getBounds();
     }
@@ -321,7 +272,7 @@ static bool IsPixelAligned(const Rect& rect) {
          fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
 }
 
-static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
+static void FlipYIfNeeded(Rect* rect, std::shared_ptr<RenderTargetProxy> renderTarget) {
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     auto height = rect->height();
     rect->top = static_cast<float>(renderTarget->height()) - rect->bottom;
@@ -329,27 +280,20 @@ static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
   }
 }
 
-std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip,
-                                                                const Rect* deviceBounds) {
+std::pair<std::optional<Rect>, bool> RenderContext::getClipRect(const Path& clip) {
   auto rect = Rect::MakeEmpty();
-  if (clip.isRect(&rect)) {
-    if (deviceBounds != nullptr && !rect.intersect(*deviceBounds)) {
-      return {{}, false};
-    }
-    auto renderTarget = opContext->renderTarget();
-    FlipYIfNeeded(&rect, renderTarget);
-    if (IsPixelAligned(rect)) {
-      rect.round();
-      if (rect != Rect::MakeWH(renderTarget->width(), renderTarget->height())) {
-        return {rect, true};
-      } else {
-        return {Rect::MakeEmpty(), false};
-      }
-    } else {
-      return {rect, false};
-    }
+  if (clip.isInverseFillType() || !clip.isRect(&rect)) {
+    return {{}, false};
   }
-  return {{}, false};
+  FlipYIfNeeded(&rect, opContext.renderTarget);
+  if (IsPixelAligned(rect)) {
+    rect.round();
+    if (rect != opContext.bounds()) {
+      return {rect, true};
+    }
+    return {Rect::MakeEmpty(), false};
+  }
+  return {rect, false};
 }
 
 std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AAType aaType) {
@@ -378,14 +322,14 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
     if (renderTarget == nullptr) {
       return nullptr;
     }
-    OpContext context(renderTarget, renderFlags);
+    OpContext context(renderTarget, opContext.renderFlags);
     context.addOp(std::move(drawOp));
     clipTexture = renderTarget->getTextureProxy();
   } else {
     auto rasterizer =
         Rasterizer::MakeFrom(width, height, clip, aaType == AAType::Coverage, rasterizeMatrix);
     auto proxyProvider = getContext()->proxyProvider();
-    clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, renderFlags);
+    clipTexture = proxyProvider->createTextureProxy({}, rasterizer, false, opContext.renderFlags);
   }
   clipKey = uniqueKey;
   return clipTexture;
@@ -412,7 +356,7 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
   }
   auto clipBounds = getClipBounds(clip);
   *scissorRect = clipBounds;
-  FlipYIfNeeded(scissorRect, opContext->renderTarget());
+  FlipYIfNeeded(scissorRect, opContext.renderTarget);
   scissorRect->roundOut();
   auto textureProxy = getClipTexture(clip, aaType);
   if (textureProxy == nullptr) {
@@ -428,7 +372,7 @@ void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBound
   if (op == nullptr) {
     return;
   }
-  FPArgs args = {getContext(), renderFlags, localBounds, state.matrix};
+  FPArgs args = {getContext(), opContext.renderFlags, localBounds, state.matrix};
   auto isRectOp = op->classID() == RectDrawOp::ClassID();
   auto aaType = getAAType(style);
   if (aaType == AAType::Coverage && isRectOp && args.viewMatrix.rectStaysRect() &&
@@ -467,20 +411,71 @@ void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBound
 }
 
 void RenderContext::addOp(std::unique_ptr<Op> op, const std::function<bool()>& willDiscardContent) {
-  if (surface && !surface->aboutToDraw(willDiscardContent)) {
+  if (!aboutToDraw(willDiscardContent)) {
     return;
   }
-  opContext->addOp(std::move(op));
+  opContext.addOp(std::move(op));
+  do {
+    _contentVersion++;
+  } while (InvalidContentVersion == _contentVersion);
 }
 
 AAType RenderContext::getAAType(const FillStyle& style) const {
-  if (opContext->renderTarget()->sampleCount() > 1) {
+  if (opContext.renderTarget->sampleCount() > 1) {
     return AAType::MSAA;
   }
   if (style.antiAlias) {
     return AAType::Coverage;
   }
   return AAType::None;
+}
+
+std::shared_ptr<Image> RenderContext::makeImageSnapshot() {
+  if (cachedImage != nullptr) {
+    return cachedImage;
+  }
+  auto renderTargetProxy = renderTarget();
+  auto drawingManager = getContext()->drawingManager();
+  drawingManager->addTextureResolveTask(renderTargetProxy);
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (textureProxy != nullptr && !textureProxy->externallyOwned()) {
+    cachedImage = TextureImage::Wrap(std::move(textureProxy));
+  } else {
+    auto textureCopy = renderTargetProxy->makeTextureProxy();
+    drawingManager->addRenderTargetCopyTask(renderTargetProxy, textureCopy, opContext.bounds(),
+                                            Point::Zero());
+    cachedImage = TextureImage::Wrap(std::move(textureCopy));
+  }
+  return cachedImage;
+}
+
+bool RenderContext::aboutToDraw(const std::function<bool()>& willDiscardContent) {
+  if (cachedImage == nullptr) {
+    return true;
+  }
+  auto isUnique = cachedImage.use_count() == 1;
+  cachedImage = nullptr;
+  if (isUnique) {
+    return true;
+  }
+  auto renderTargetProxy = opContext.renderTarget;
+  auto textureProxy = renderTargetProxy->getTextureProxy();
+  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
+    return true;
+  }
+  auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy();
+  if (newRenderTargetProxy == nullptr) {
+    LOGE("RenderContext::aboutToDraw(): Failed to make a copy of the renderTarget!");
+    return false;
+  }
+  if (!willDiscardContent()) {
+    auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
+    auto drawingManager = getContext()->drawingManager();
+    drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy, opContext.bounds(),
+                                            Point::Zero());
+  }
+  opContext.replaceRenderTarget(std::move(newRenderTargetProxy));
+  return true;
 }
 
 bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state,
@@ -494,8 +489,7 @@ bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCStat
   if (!clip.isRect(&clipRect) || !viewMatrix.rectStaysRect()) {
     return false;
   }
-  auto renderTarget = opContext->renderTarget();
-  auto rtRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
+  auto rtRect = opContext.bounds();
   if (clipRect != rtRect) {
     return false;
   }
@@ -505,10 +499,4 @@ bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCStat
   }
   return style.isOpaque();
 }
-
-void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy) {
-  delete opContext;
-  opContext = new OpContext(std::move(newRenderTargetProxy), renderFlags);
-}
-
 }  // namespace tgfx

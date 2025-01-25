@@ -67,8 +67,9 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> re
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
-    : _uniqueID(UniqueID::Next()), renderTargetProxy(std::move(proxy)), _renderFlags(renderFlags) {
-  DEBUG_ASSERT(this->renderTargetProxy != nullptr);
+    : _uniqueID(UniqueID::Next()) {
+  DEBUG_ASSERT(proxy != nullptr);
+  renderContext = new RenderContext(std::move(proxy), renderFlags);
 }
 
 Surface::~Surface() {
@@ -77,22 +78,27 @@ Surface::~Surface() {
 }
 
 Context* Surface::getContext() const {
-  return renderTargetProxy->getContext();
+  return renderContext->getContext();
+}
+
+uint32_t Surface::renderFlags() const {
+  return renderContext->renderFlags();
 }
 
 int Surface::width() const {
-  return renderTargetProxy->width();
+  return renderContext->renderTarget()->width();
 }
 
 int Surface::height() const {
-  return renderTargetProxy->height();
+  return renderContext->renderTarget()->height();
 }
 
 ImageOrigin Surface::origin() const {
-  return renderTargetProxy->origin();
+  return renderContext->renderTarget()->origin();
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
+  auto renderTargetProxy = renderContext->renderTarget();
   auto context = getContext();
   context->drawingManager()->addTextureResolveTask(renderTargetProxy);
   context->flush();
@@ -104,6 +110,7 @@ BackendRenderTarget Surface::getBackendRenderTarget() {
 }
 
 BackendTexture Surface::getBackendTexture() {
+  auto renderTargetProxy = renderContext->renderTarget();
   if (!renderTargetProxy->isTextureBacked()) {
     return {};
   }
@@ -118,6 +125,7 @@ BackendTexture Surface::getBackendTexture() {
 }
 
 HardwareBufferRef Surface::getHardwareBuffer() {
+  auto renderTargetProxy = renderContext->renderTarget();
   if (!renderTargetProxy->isTextureBacked()) {
     return nullptr;
   }
@@ -131,36 +139,15 @@ HardwareBufferRef Surface::getHardwareBuffer() {
   return texture->getHardwareBuffer();
 }
 
-static Path GetInitClip(int width, int height) {
-  Path path = {};
-  path.addRect(Rect::MakeWH(width, height));
-  return path;
-}
-
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
-    renderContext = new RenderContext(this);
-    canvas = new Canvas(renderContext, GetInitClip(width(), height()));
+    canvas = new Canvas(renderContext, this);
   }
   return canvas;
 }
 
 std::shared_ptr<Image> Surface::makeImageSnapshot() {
-  if (cachedImage != nullptr) {
-    return cachedImage;
-  }
-  auto drawingManager = getContext()->drawingManager();
-  drawingManager->addTextureResolveTask(renderTargetProxy);
-  auto textureProxy = renderTargetProxy->getTextureProxy();
-  if (textureProxy != nullptr && !textureProxy->externallyOwned()) {
-    cachedImage = TextureImage::Wrap(std::move(textureProxy));
-  } else {
-    auto textureCopy = renderTargetProxy->makeTextureProxy();
-    drawingManager->addRenderTargetCopyTask(renderTargetProxy, textureCopy,
-                                            Rect::MakeWH(width(), height()), Point::Zero());
-    cachedImage = TextureImage::Wrap(std::move(textureCopy));
-  }
-  return cachedImage;
+  return renderContext->makeImageSnapshot();
 }
 
 Color Surface::getColor(int x, int y) {
@@ -176,7 +163,8 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto context = getContext();
+  auto renderTargetProxy = renderContext->renderTarget();
+  auto context = renderTargetProxy->getContext();
   context->drawingManager()->addTextureResolveTask(renderTargetProxy);
   context->flush();
   auto texture = renderTargetProxy->getTexture();
@@ -199,38 +187,6 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
 }
 
 uint32_t Surface::contentVersion() const {
-  if (renderContext == nullptr) {
-    return 1u;
-  }
-  return renderContext->opContext->contentVersion();
-}
-
-bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
-  if (cachedImage == nullptr) {
-    return true;
-  }
-  auto isUnique = cachedImage.use_count() == 1;
-  cachedImage = nullptr;
-  if (isUnique) {
-    return true;
-  }
-  auto textureProxy = renderTargetProxy->getTextureProxy();
-  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
-    return true;
-  }
-  auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy();
-  if (newRenderTargetProxy == nullptr) {
-    LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
-    return false;
-  }
-  if (!willDiscardContent()) {
-    auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
-    auto drawingManager = getContext()->drawingManager();
-    drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy,
-                                            Rect::MakeWH(width(), height()), Point::Zero());
-  }
-  renderTargetProxy = std::move(newRenderTargetProxy);
-  renderContext->replaceRenderTarget(renderTargetProxy);
-  return true;
+  return renderContext->contentVersion();
 }
 }  // namespace tgfx

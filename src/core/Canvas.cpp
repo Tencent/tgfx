@@ -71,14 +71,9 @@ static FillStyle CreateFillStyle(const Paint* paint) {
   return paint ? CreateFillStyle(*paint) : FillStyle();
 }
 
-Canvas::Canvas(DrawContext* drawContext)
-    : surface(drawContext->getSurface()), drawContext(drawContext) {
+Canvas::Canvas(DrawContext* drawContext, Surface* surface)
+    : drawContext(drawContext), surface(surface) {
   mcState = std::make_unique<MCState>();
-}
-
-Canvas::Canvas(DrawContext* drawContext, const Path& initClip)
-    : surface(drawContext->getSurface()), drawContext(drawContext) {
-  mcState = std::make_unique<MCState>(initClip);
 }
 
 int Canvas::save() {
@@ -87,7 +82,6 @@ int Canvas::save() {
 }
 
 int Canvas::saveLayer(const Paint* paint) {
-
   auto layer = std::make_unique<CanvasLayer>(drawContext, paint);
   drawContext = layer->layerContext.get();
   stateStack.push(std::make_unique<CanvasState>(*mcState, std::move(layer)));
@@ -433,6 +427,9 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
+  if (picture == nullptr) {
+    return;
+  }
   drawContext->drawPicture(std::move(picture), *mcState);
 }
 

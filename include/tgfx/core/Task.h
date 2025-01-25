@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <functional>
 #include <memory>
@@ -25,6 +26,28 @@
 
 namespace tgfx {
 class TaskGroup;
+
+/**
+ * Defines the possible states of a Task.
+ */
+enum class TaskStatus {
+  /**
+   * The Task is waiting to be executed.
+   */
+  Queueing,
+  /**
+   * The Task is currently executing.
+   */
+  Executing,
+  /**
+   * The Task has finished executing.
+   */
+  Finished,
+  /**
+   * The Task has been canceled.
+   */
+  Canceled
+};
 
 /**
  * The Task class manages the concurrent execution of one or more code blocks.
@@ -39,21 +62,6 @@ class Task {
   static std::shared_ptr<Task> Run(std::function<void()> block);
 
   /**
-   * Returns true if the Task is currently executing its code block.
-   */
-  bool executing();
-
-  /**
-   * Returns true if the Task has been cancelled
-   */
-  bool cancelled();
-
-  /**
-   * Returns true if the Task has finished executing its code block.
-   */
-  bool finished();
-
-  /**
    * Advises the Task that it should stop executing its code block. Cancellation does not affect the
    * execution of a Task that has already begun.
    */
@@ -62,19 +70,22 @@ class Task {
   /**
    * Blocks the current thread until the Task finishes its execution. Returns immediately if the
    * Task is finished or canceled. The task may be executed on the calling thread if it is not
-   * cancelled and still in the queue.
+   * canceled and still in the queue.
    */
   void wait();
+
+  /**
+   * Return the current status of the Task.
+   */
+  TaskStatus status() const;
 
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
-  bool _executing = true;
-  bool _cancelled = false;
   std::function<void()> block = nullptr;
+  std::atomic<TaskStatus> _status = TaskStatus::Queueing;
 
   explicit Task(std::function<void()> block);
-  bool removeTask();
   void execute();
 
   friend class TaskGroup;

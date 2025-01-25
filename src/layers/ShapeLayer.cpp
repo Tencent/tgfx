@@ -276,7 +276,7 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
 }
 
 void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                              const std::function<void()>& drawChildren) const {
+                              const std::function<bool()>& drawChildren) const {
   auto shapeContent = static_cast<ShapeContent*>(content);
   if (!shapeContent || !shapeContent->drawFills(canvas, getPaint(alpha), forContour)) {
     if (forContour) {
@@ -284,7 +284,9 @@ void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha
     }
   }
   if (_strokeOnTop) {
-    drawChildren();
+    if (!drawChildren()) {
+      return;
+    }
   }
   if (shapeContent) {
     shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);

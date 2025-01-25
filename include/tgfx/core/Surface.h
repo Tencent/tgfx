@@ -29,7 +29,6 @@ class Canvas;
 class Context;
 class RenderContext;
 class RenderTargetProxy;
-class TextureProxy;
 
 /**
  * The Surface class is responsible for managing the pixels that a Canvas draws into. The Surface
@@ -98,9 +97,7 @@ class Surface {
   /**
    * Returns the render flags associated with this Surface.
    */
-  uint32_t renderFlags() const {
-    return _renderFlags;
-  }
+  uint32_t renderFlags() const;
 
   /**
    * Returns the width of this surface.
@@ -183,20 +180,14 @@ class Surface {
   uint32_t contentVersion() const;
 
   uint32_t _uniqueID = 0;
-  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  uint32_t _renderFlags = 0;
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
-  std::shared_ptr<Image> cachedImage = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags = 0);
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0);
 
-  bool aboutToDraw(const std::function<bool()>& willDiscardContent);
-
-  friend class RenderContext;
   friend class PictureImage;
   friend class DisplayList;
 };

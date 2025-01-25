@@ -38,6 +38,8 @@ struct LayerStyleSource {
   Point contentOffset = Point::Zero();
   std::shared_ptr<Image> contour = nullptr;
   Point contourOffset = Point::Zero();
+  std::shared_ptr<Image> background = nullptr;
+  Point backgroundOffset = Point::Zero();
 };
 
 static std::shared_ptr<Picture> CreatePicture(
@@ -755,24 +757,28 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   if (layerStyleSource) {
     drawLayerStyles(canvas, alpha, layerStyleSource.get(), LayerStylePosition::Below);
   }
-  drawContents(getContent(), canvas, alpha, args.forContour, [&]() {
+  drawContents(getContent(), canvas, alpha, args.drawMode == DrawMode::Contour, [&]() {
     drawChildren(args, canvas, alpha);
     if (layerStyleSource) {
       drawLayerStyles(canvas, alpha, layerStyleSource.get(), LayerStylePosition::Above);
     }
+    return true;
   });
 }
 
 void Layer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool,
-                         const std::function<void()>& drawChildren) const {
+                         const std::function<bool()>& drawChildren) const {
   if (content != nullptr) {
     content->draw(canvas, getLayerPaint(alpha));
   }
   drawChildren();
 }
 
-void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
+bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild) {
   for (const auto& child : _children) {
+    if (child.get() == stopChild) {
+      return false;
+    }
     if (!child->visible() || child->_alpha <= 0 || child->maskOwner) {
       continue;
     }
@@ -785,6 +791,34 @@ void Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha) {
   }
   if (args.cleanDirtyFlags) {
     bitFields.childrenDirty = false;
+  }
+  return true;
+}
+
+void Layer::drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha) {
+  float alpha = 1.0f;
+  if (contentAlpha == nullptr) {
+    contentAlpha = &alpha;
+  }
+
+  // parent background -> parent content -> sibling nodes content -> current layer styles (drop shadow)
+  if (_parent != nullptr) {
+    _parent->drawBackground(args, canvas, contentAlpha);
+    _parent->drawContents(_parent->getContent(), canvas, *contentAlpha, false, [&]() {
+      return _parent->drawChildren(args, canvas, *contentAlpha, this);
+    });
+    *contentAlpha = *contentAlpha * _alpha;
+    canvas->concat(getMatrixWithScrollRect());
+    if (_scrollRect) {
+      canvas->clipRect(*_scrollRect);
+    }
+  }
+
+  // draw layer styles below the layer content. While drawing the background, args while be set to
+  // DrawType::Background, and layerStyleSource->background will be nullptr.
+  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
+  if (layerStyleSource) {
+    drawLayerStyles(canvas, *contentAlpha, layerStyleSource.get(), LayerStylePosition::Below);
   }
 }
 
@@ -799,8 +833,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   }
 
   auto drawLayerContents = [this](const DrawArgs& drawArgs, Canvas* canvas) {
-    drawContents(getContent(), canvas, 1.0f, drawArgs.forContour,
-                 [&]() { drawChildren(drawArgs, canvas, 1.0f); });
+    drawContents(getContent(), canvas, 1.0f, drawArgs.drawMode == DrawMode::Contour,
+                 [&]() { return drawChildren(drawArgs, canvas, 1.0f); });
   };
 
   DrawArgs drawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false,
@@ -815,15 +849,41 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   source->contentScale = contentScale;
   source->content = std::move(content);
   source->contentOffset = contentOffset;
+
   auto needContour =
-      std::any_of(_layerStyles.begin(), _layerStyles.end(),
-                  [](const auto& layerStyle) { return layerStyle->requireLayerContour(); });
+      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
+        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
+      });
   if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
-    drawArgs.forContour = true;
+    drawArgs.drawMode = DrawMode::Contour;
     auto contourPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
     source->contour = CreatePictureImage(contourPicture, &source->contourOffset);
+  }
+
+  auto needBackground =
+      args.drawMode != DrawMode::Background &&
+      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
+        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background;
+      });
+  if (needBackground) {
+    //effects are always included when drawing the background.
+    drawArgs.excludeEffects = false;
+    drawArgs.drawMode = DrawMode::Background;
+    auto backgroundDrawer = [this](const DrawArgs& args, Canvas* canvas) {
+      auto bounds = getBounds();
+      canvas->clipRect(bounds);
+      auto globalMatrix = getGlobalMatrix();
+      auto invertMatrix = Matrix::I();
+      if (!globalMatrix.invert(&invertMatrix)) {
+        return;
+      }
+      canvas->concat(invertMatrix);
+      drawBackground(args, canvas);
+    };
+    auto backgroundPicture = CreatePicture(drawArgs, contentScale, backgroundDrawer);
+    source->background = CreatePictureImage(backgroundPicture, &source->backgroundOffset);
   }
   return source;
 }
@@ -835,17 +895,30 @@ void Layer::drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource*
   matrix.preTranslate(source->contentOffset.x, source->contentOffset.y);
   auto& contour = source->contour;
   auto contourOffset = source->contourOffset - source->contentOffset;
+  auto& background = source->background;
+  auto backgroundOffset = source->backgroundOffset - source->contentOffset;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position) {
       continue;
     }
     AutoCanvasRestore autoRestore(canvas);
     canvas->concat(matrix);
-    if (layerStyle->requireLayerContour() && contour != nullptr) {
-      layerStyle->drawWithContour(canvas, source->content, source->contentScale, contour,
-                                  contourOffset, alpha);
-    } else {
-      layerStyle->draw(canvas, source->content, source->contentScale, alpha);
+    switch (layerStyle->extraSourceType()) {
+      case LayerStyleExtraSourceType::None:
+        layerStyle->draw(canvas, source->content, source->contentScale, alpha);
+        break;
+      case LayerStyleExtraSourceType::Background:
+        if (background != nullptr) {
+          layerStyle->drawWithExtraSource(canvas, source->content, source->contentScale, background,
+                                          backgroundOffset, alpha);
+        }
+        break;
+      case LayerStyleExtraSourceType::Contour:
+        if (contour != nullptr) {
+          layerStyle->drawWithExtraSource(canvas, source->content, source->contentScale, contour,
+                                          contourOffset, alpha);
+        }
+        break;
     }
   }
 }
