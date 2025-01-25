@@ -26,7 +26,7 @@
 namespace tgfx {
 
 /**
- * LoadResourceProvider is an interface for loading resources (e.g. images, font) from
+ * ResourceLoader is an interface for loading resources (e.g. images, font) from
  * external sources.
  */
 class ResourceLoader {

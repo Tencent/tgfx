@@ -23,6 +23,7 @@
 #ifdef _WIN32
 #include <dwrite.h>
 #include <dwrite_3.h>
+#include <array>
 #include <locale>
 #endif
 
@@ -154,9 +155,6 @@ static constexpr std::array<DWRITE_FONT_STYLE, 3> FontSlantMap = {
     DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_OBLIQUE};
 
 DWriteFontStyle ToDWriteFontStyle(FontStyle fontStyle) {
-  std::string key;
-  key.resize(fontStyle.length());
-  std::transform(fontStyle.begin(), fontStyle.end(), key.begin(), ::tolower);
   DWriteFontStyle dWriteFontStyle{};
   dWriteFontStyle.weight = FontWeightMap[static_cast<size_t>(fontStyle.weight())];
   dWriteFontStyle.stretch = FontWidthMap[static_cast<size_t>(fontStyle.width())];
