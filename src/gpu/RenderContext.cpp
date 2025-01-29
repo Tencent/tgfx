@@ -58,6 +58,17 @@ static bool HasColorOnly(const FillStyle& style) {
   return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
 }
 
+static FillStyle ApplyMatrix(const FillStyle& style, const Matrix& matrix) {
+  auto fillStyle = style;
+  if (fillStyle.shader) {
+    fillStyle.shader = fillStyle.shader->makeWithMatrix(matrix);
+  }
+  if (fillStyle.maskFilter) {
+    fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(matrix);
+  }
+  return fillStyle;
+}
+
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   auto rect = opContext.bounds();
   if (HasColorOnly(style) && style.isOpaque() && state.clip.isEmpty() &&
@@ -69,14 +80,8 @@ void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
     addOp(ClearOp::Make(color, rect), [] { return true; });
     return;
   }
-  auto fillStyle = style;
-  if (fillStyle.shader) {
-    fillStyle.shader = fillStyle.shader->makeWithMatrix(state.matrix);
-  }
-  if (fillStyle.maskFilter) {
-    fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(state.matrix);
-  }
-  drawRect(rect, MCState{state.clip}, fillStyle);
+
+  drawRect(rect, MCState{state.clip}, ApplyMatrix(style, state.matrix));
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -128,18 +133,25 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
                                   const FillStyle& style) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(image->isAlphaOnly() || style.shader == nullptr);
-  auto uvMatrix = Matrix::I();
   auto subsetImage = Caster::AsSubsetImage(image.get());
   if (subsetImage != nullptr) {
-    uvMatrix = Matrix::MakeTrans(subsetImage->bounds.left, subsetImage->bounds.top);
-    image = subsetImage->source;
+    // Unwrap the subset image to maximize the merging of draw calls.
+    auto& subset = subsetImage->bounds;
+    auto newRect = rect;
+    newRect.offset(subset.left, subset.top);
+    auto newState = state;
+    newState.matrix.preTranslate(-subset.left, -subset.top);
+    auto offsetMatrix = Matrix::MakeTrans(subset.left, subset.top);
+    drawImageRect(subsetImage->source, newRect, sampling, newState,
+                  ApplyMatrix(style, offsetMatrix));
+    return;
   }
   FPArgs args = {getContext(), opContext.renderFlags, rect, state.matrix};
   auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
   }
-  auto drawOp = RectDrawOp::Make(style.color.premultiply(), rect, state.matrix, uvMatrix);
+  auto drawOp = RectDrawOp::Make(style.color.premultiply(), rect, state.matrix);
   drawOp->addColorFP(std::move(processor));
   addDrawOp(std::move(drawOp), rect, state, style);
 }

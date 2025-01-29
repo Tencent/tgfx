@@ -29,16 +29,14 @@ class RectDrawOp : public DrawOp {
   DEFINE_OP_CLASS_ID
 
   static std::unique_ptr<RectDrawOp> Make(std::optional<Color> color, const Rect& rect,
-                                          const Matrix& viewMatrix,
-                                          const Matrix& uvMatrix = Matrix::I());
+                                          const Matrix& viewMatrix);
 
   void prepare(Context* context, uint32_t renderFlags) override;
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-             const Matrix& uvMatrix);
+  RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix);
 
   bool onCombineIfPossible(Op* op) override;
 
