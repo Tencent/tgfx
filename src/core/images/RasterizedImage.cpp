@@ -93,7 +93,7 @@ bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
     return false;
   }
   OpContext opContext(renderTarget, args.renderFlags);
-  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
+  opContext.fillWithFP(std::move(processor), true);
   return true;
 }
 }  // namespace tgfx
