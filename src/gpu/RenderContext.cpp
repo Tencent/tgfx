@@ -30,6 +30,7 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
@@ -349,7 +350,6 @@ std::shared_ptr<TextureProxy> RenderContext::getClipTexture(const Path& clip, AA
 
 std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
                                                               const Rect& deviceBounds,
-                                                              const Matrix& viewMatrix,
                                                               AAType aaType, Rect* scissorRect) {
   if ((!clip.isEmpty() && clip.contains(deviceBounds)) ||
       (clip.isEmpty() && clip.isInverseFillType())) {
@@ -368,15 +368,18 @@ std::unique_ptr<FragmentProcessor> RenderContext::getClipMask(const Path& clip,
   }
   auto clipBounds = getClipBounds(clip);
   *scissorRect = clipBounds;
-  FlipYIfNeeded(scissorRect, opContext.renderTarget);
+  auto renderTarget = opContext.renderTarget;
+  FlipYIfNeeded(scissorRect, renderTarget);
   scissorRect->roundOut();
   auto textureProxy = getClipTexture(clip, aaType);
-  if (textureProxy == nullptr) {
-    return nullptr;
+  auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
+  if (renderTarget->origin() == ImageOrigin::BottomLeft) {
+    auto flipYMatrix = Matrix::MakeScale(1.0f, -1.0f);
+    flipYMatrix.postTranslate(0, -static_cast<float>(renderTarget->height()));
+    uvMatrix.preConcat(flipYMatrix);
   }
-  auto uvMatrix = viewMatrix;
-  uvMatrix.postTranslate(-clipBounds.left, -clipBounds.top);
-  return TextureEffect::Make(std::move(textureProxy), {}, &uvMatrix, true);
+  return FragmentProcessor::MulInputByChildAlpha(
+      DeviceSpaceTextureEffect::Make(std::move(textureProxy), uvMatrix));
 }
 
 void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds,
@@ -414,7 +417,7 @@ void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBound
     }
   }
   Rect scissorRect = Rect::MakeEmpty();
-  auto clipMask = getClipMask(state.clip, op->bounds(), args.viewMatrix, aaType, &scissorRect);
+  auto clipMask = getClipMask(state.clip, op->bounds(), aaType, &scissorRect);
   if (clipMask) {
     op->addCoverageFP(std::move(clipMask));
   }
