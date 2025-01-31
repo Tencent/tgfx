@@ -148,7 +148,12 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     return;
   }
   FPArgs args = {getContext(), opContext.renderFlags, rect};
-  auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
+  auto samplingOptions = sampling;
+  if (samplingOptions.mipmapMode != MipmapMode::None && !state.matrix.hasNonIdentityScale()) {
+    // There is no scaling for the source image, so we can disable mipmaps to save memory.
+    samplingOptions.mipmapMode = MipmapMode::None;
+  }
+  auto processor = FragmentProcessor::Make(std::move(image), args, samplingOptions);
   if (processor == nullptr) {
     return;
   }
