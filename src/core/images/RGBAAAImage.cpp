@@ -19,7 +19,6 @@
 #include "RGBAAAImage.h"
 #include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
-#include "core/utils/NeedMipmaps.h"
 #include "gpu/TPArgs.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
@@ -61,7 +60,7 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
-  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   if (bounds.contains(drawBounds)) {
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
     auto proxy = source->lockTextureProxy(tpArgs);

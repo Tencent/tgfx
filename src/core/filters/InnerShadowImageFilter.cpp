@@ -18,7 +18,6 @@
 
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
-#include "core/utils/NeedMipmaps.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"

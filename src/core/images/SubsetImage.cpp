@@ -18,7 +18,6 @@
 
 #include "SubsetImage.h"
 #include "core/utils/AddressOf.h"
-#include "core/utils/NeedMipmaps.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -58,7 +57,7 @@ std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs
   if (bounds.contains(drawBounds)) {
     return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
   }
-  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {

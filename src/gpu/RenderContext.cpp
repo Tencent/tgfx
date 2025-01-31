@@ -147,7 +147,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
                   ApplyMatrix(style, offsetMatrix));
     return;
   }
-  FPArgs args = {getContext(), opContext.renderFlags, rect, state.matrix};
+  FPArgs args = {getContext(), opContext.renderFlags, rect};
   auto processor = FragmentProcessor::Make(std::move(image), args, sampling);
   if (processor == nullptr) {
     return;
@@ -387,10 +387,10 @@ void RenderContext::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBound
   if (op == nullptr) {
     return;
   }
-  FPArgs args = {getContext(), opContext.renderFlags, localBounds, state.matrix};
+  FPArgs args = {getContext(), opContext.renderFlags, localBounds};
   auto isRectOp = op->classID() == RectDrawOp::ClassID();
   auto aaType = getAAType(style);
-  if (aaType == AAType::Coverage && isRectOp && args.viewMatrix.rectStaysRect() &&
+  if (aaType == AAType::Coverage && isRectOp && state.matrix.rectStaysRect() &&
       IsPixelAligned(op->bounds())) {
     op->setAA(AAType::None);
   } else {

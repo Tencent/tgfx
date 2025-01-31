@@ -122,7 +122,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(lastRenderTarget->width(), lastRenderTarget->height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
 
   // Calculate the bounds of the filter after scaling.
   // `boundsWillSample` will determine the size of the texture after the first downsample.
