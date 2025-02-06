@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageFilter.h"
-#include "core/utils/NeedMipmaps.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpContext.h"
 #include "gpu/TPArgs.h"
@@ -47,7 +46,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect, Matrix::I());
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
   auto offsetMatrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
   // There is no scaling for the source image, so we can use the default sampling options.
   auto processor = asFragmentProcessor(std::move(source), fpArgs, {}, &offsetMatrix);
@@ -55,7 +54,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
     return nullptr;
   }
   OpContext opContext(renderTarget, args.renderFlags);
-  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
+  opContext.fillWithFP(std::move(processor), true);
   return renderTarget->getTextureProxy();
 }
 
@@ -83,7 +82,7 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
     return nullptr;
   }
   auto isAlphaOnly = source->isAlphaOnly();
-  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {

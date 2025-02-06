@@ -87,13 +87,13 @@ bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
   Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs args(renderTarget->getContext(), renderFlags, drawRect, Matrix::I());
+  FPArgs args(renderTarget->getContext(), renderFlags, drawRect);
   auto processor = FragmentProcessor::Make(source, args, sampling, &uvMatrix);
   if (processor == nullptr) {
     return false;
   }
   OpContext opContext(renderTarget, args.renderFlags);
-  opContext.fillWithFP(std::move(processor), Matrix::I(), true);
+  opContext.fillWithFP(std::move(processor), true);
   return true;
 }
 }  // namespace tgfx

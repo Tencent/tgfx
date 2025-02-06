@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,15 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/SamplingOptions.h"
+#include "DeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-/**
-   * Returns true if mipmaps are needed for the specified sampling options, view matrix, and UV
-   * matrix.
-   */
-bool NeedMipmaps(const SamplingOptions& sampling, const Matrix& viewMatrix, const Matrix* uvMatrix);
+DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,
+                                                   const Matrix& uvMatrix)
+    : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)), uvMatrix(uvMatrix) {
+}
+
+const TextureSampler* DeviceSpaceTextureEffect::onTextureSampler(size_t) const {
+  auto texture = textureProxy->getTexture();
+  return texture == nullptr ? nullptr : texture->getSampler();
+}
+
+bool DeviceSpaceTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const DeviceSpaceTextureEffect&>(processor);
+  return textureProxy == that.textureProxy && uvMatrix == that.uvMatrix;
+}
 }  // namespace tgfx

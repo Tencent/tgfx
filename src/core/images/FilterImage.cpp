@@ -19,7 +19,6 @@
 #include "FilterImage.h"
 #include "SubsetImage.h"
 #include "core/utils/AddressOf.h"
-#include "core/utils/NeedMipmaps.h"
 #include "gpu/OpContext.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -136,8 +135,7 @@ std::unique_ptr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs
   if (dstBounds.contains(drawBounds)) {
     return filter->asFragmentProcessor(source, args, sampling, AddressOf(fpMatrix));
   }
-  auto mipmapped =
-      source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, AddressOf(fpMatrix));
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
