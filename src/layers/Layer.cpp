@@ -725,6 +725,10 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   relativeMatrix.postScale(scale, scale);
   relativeMatrix.preConcat(drawingMatrix);
   auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
+  if (shader && _mask->_alpha != 1.0f) {
+    shader = shader->makeWithColorFilter(ColorFilter::Matrix(
+        {1.f, 0, 0, 0, 0, 0, 1.f, 0, 0, 0, 0, 0, 1.f, 0, 0, 0, 0, 0, _mask->_alpha, 0}));
+  }
   if (shader) {
     shader = shader->makeWithMatrix(relativeMatrix);
   }
