@@ -27,14 +27,14 @@
 
 namespace tgfx {
 
-std::shared_ptr<Typeface> SystemFontManager::onMatchTypeface(const std::string& familyName,
-                                                             FontStyle style) const {
-  return Typeface::MakeFromStyle(familyName, style);
+std::shared_ptr<Typeface> SystemFontManager::matchTypeface(const std::string& familyName,
+                                                           FontStyle style) const {
+  return Typeface::MakeFromName(familyName, style);
 }
 
-std::shared_ptr<Typeface> SystemFontManager::onGetFallbackTypeface(const std::string& familyName,
-                                                                   FontStyle style, Unichar) const {
-  return onMatchTypeface(familyName, style);
+std::shared_ptr<Typeface> SystemFontManager::getFallbackTypeface(const std::string& familyName,
+                                                                 FontStyle style, Unichar) const {
+  return matchTypeface(familyName, style);
 }
 
 }  // namespace tgfx

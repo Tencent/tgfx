@@ -38,20 +38,15 @@ class FontManager {
   /**
    * Match a font family name and style, and return the corresponding Typeface
    */
-  std::shared_ptr<Typeface> matchTypeface(const std::string& familyName, FontStyle style) const;
+  virtual std::shared_ptr<Typeface> matchTypeface(const std::string& familyName,
+                                                  FontStyle style) const = 0;
 
   /**
    * Match a font family name, style, character, and language, and return the corresponding Typeface
    */
-  std::shared_ptr<Typeface> getFallbackTypeface(const std::string& familyName, FontStyle style,
-                                                Unichar character) const;
-
- private:
-  virtual std::shared_ptr<Typeface> onMatchTypeface(const std::string& familyName,
-                                                    FontStyle style) const = 0;
-  virtual std::shared_ptr<Typeface> onGetFallbackTypeface(const std::string& familyName,
-                                                          FontStyle style,
-                                                          Unichar character) const = 0;
+  virtual std::shared_ptr<Typeface> getFallbackTypeface(const std::string& familyName,
+                                                        FontStyle style,
+                                                        Unichar character) const = 0;
 };
 
 }  // namespace tgfx

@@ -219,6 +219,19 @@ class FontManagerTest : public FontManager {
     return std::shared_ptr<FontManagerTest>(new FontManagerTest);
   }
 
+  std::shared_ptr<Typeface> matchTypeface(const std::string& familyName, FontStyle) const override {
+    auto iter = typefaces.find(familyName);
+    if (iter != typefaces.end()) {
+      return iter->second;
+    }
+    return defaultTypeface;
+  }
+
+  std::shared_ptr<Typeface> getFallbackTypeface(const std::string& familyName, FontStyle style,
+                                                Unichar) const override {
+    return matchTypeface(familyName, style);
+  }
+
  protected:
   FontManagerTest() {
     auto typeface =
@@ -234,20 +247,6 @@ class FontManagerTest : public FontManager {
       typefaces["Noto Serif SC"] = typeface;
     }
   };
-
-  std::shared_ptr<Typeface> onMatchTypeface(const std::string& familyName,
-                                            FontStyle) const override {
-    auto iter = typefaces.find(familyName);
-    if (iter != typefaces.end()) {
-      return iter->second;
-    }
-    return defaultTypeface;
-  }
-
-  std::shared_ptr<Typeface> onGetFallbackTypeface(const std::string& familyName, FontStyle style,
-                                                  Unichar) const override {
-    return onMatchTypeface(familyName, style);
-  }
 
  private:
   std::unordered_map<std::string, std::shared_ptr<Typeface>> typefaces;

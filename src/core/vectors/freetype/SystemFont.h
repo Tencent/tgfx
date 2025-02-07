@@ -26,7 +26,6 @@ class SystemFont {
   static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
                                                 const std::string& fontStyle);
 
-  static std::shared_ptr<Typeface> MakeFromStyle(const std::string& fontFamily,
-                                                 FontStyle fontStyle);
+  static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily, FontStyle fontStyle);
 };
 }  // namespace tgfx

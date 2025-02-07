@@ -33,14 +33,14 @@ class SystemFontManager : public FontManager {
     return std::shared_ptr<SystemFontManager>(new SystemFontManager);
   }
 
+  std::shared_ptr<Typeface> matchTypeface(const std::string& familyName,
+                                          FontStyle style) const override;
+
+  std::shared_ptr<Typeface> getFallbackTypeface(const std::string& familyName, FontStyle style,
+                                                Unichar character) const override;
+
  protected:
   SystemFontManager() = default;
-
-  std::shared_ptr<Typeface> onMatchTypeface(const std::string& familyName,
-                                            FontStyle style) const override;
-
-  std::shared_ptr<Typeface> onGetFallbackTypeface(const std::string& familyName, FontStyle style,
-                                                  Unichar character) const override;
 };
 
 }  // namespace tgfx

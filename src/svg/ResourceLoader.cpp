@@ -29,8 +29,8 @@ class SystemResourceLoader final : public ResourceLoader {
   explicit SystemResourceLoader(std::string basePath) : basePath(std::move(basePath)) {
   }
 
-  std::shared_ptr<Data> load(const std::string& resourcePath,
-                             const std::string& resourceName) const override {
+  std::shared_ptr<Data> loadData(const std::string& resourcePath,
+                                 const std::string& resourceName) const override {
     return Data::MakeFromFile(basePath + "/" + resourcePath + "/" + resourceName);
   };
 

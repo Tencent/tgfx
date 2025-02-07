@@ -27,8 +27,8 @@ class SystemResourceLoader final : public ResourceLoader {
     return std::shared_ptr<SystemResourceLoader>(new SystemResourceLoader);
   }
 
-  std::shared_ptr<Data> load(const std::string& resourcePath,
-                             const std::string& resourceName) const override {
+  std::shared_ptr<Data> loadData(const std::string& resourcePath,
+                                 const std::string& resourceName) const override {
     if (resourceName.empty() && resourcePath.empty()) {
       return nullptr;
     }

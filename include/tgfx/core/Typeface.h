@@ -57,8 +57,12 @@ class Typeface {
   static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
                                                 const std::string& fontStyle);
 
-  static std::shared_ptr<Typeface> MakeFromStyle(const std::string& fontFamily,
-                                                 FontStyle fontStyle);
+  /**
+   * Returns a typeface reference for the given font family and CSS font style. If the family and
+   * style cannot be matched identically, the best match is found and returned, which is never
+   * nullptr.
+   */
+  static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily, FontStyle fontStyle);
 
   /**
    * Creates a new typeface for the given file path and ttc index. Returns nullptr if the typeface

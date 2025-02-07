@@ -30,36 +30,50 @@ namespace tgfx {
  */
 class FontStyle {
  public:
+  /**
+   * Font weight numeric values ranging from 1 to 1000, corresponding to CSS font-weight values.
+   * Only two keyword values are available: normal = 400 and bold = 700. Other enums use FreeType's
+   * FT_WEIGHT_XXX values.
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight
+   */
   enum class Weight {
-    Invisible,
-    Thin,
-    ExtraLight,
-    Light,
-    Normal,
-    Medium,
-    SemiBold,
-    Bold,
-    ExtraBold,
-    Black,
-    ExtraBlack,
+    Invisible,   //0
+    Thin,        //100
+    ExtraLight,  //200
+    Light,       //300
+    Normal,      //400 normal
+    Medium,      //500
+    SemiBold,    //600
+    Bold,        //700 bold
+    ExtraBold,   //800
+    Black,       //900
+    ExtraBlack,  //1000
   };
 
+  /**
+   * Font width values corresponding to CSS font-stretch keyword property
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-stretch
+   */
   enum class Width {
-    UltraCondensed,
-    ExtraCondensed,
-    Condensed,
-    SemiCondensed,
-    Normal,
-    SemiExpanded,
-    Expanded,
-    ExtraExpanded,
-    UltraExpanded,
+    UltraCondensed,  //ultra-condensed
+    ExtraCondensed,  //extra-condensed
+    Condensed,       //condensed
+    SemiCondensed,   //semi-condensed
+    Normal,          //normal
+    SemiExpanded,    //semi-expanded
+    Expanded,        //expanded
+    ExtraExpanded,   //extra-expanded
+    UltraExpanded,   //ultra-expanded
   };
 
+  /**
+   * Font slant values corresponding to CSS font-style keyword property
+   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-style
+   */
   enum class Slant {
-    Upright,
-    Italic,
-    Oblique,
+    Upright,  //normal
+    Italic,   //italic
+    Oblique,  //oblique
   };
 
   constexpr FontStyle(Weight weight, Width width, Slant slant)

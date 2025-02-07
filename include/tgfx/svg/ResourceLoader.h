@@ -39,8 +39,8 @@ class ResourceLoader {
   /**
    * Load a generic resource specified by |path| + |name|, and return as an Data object.
    */
-  virtual std::shared_ptr<Data> load(const std::string& resourcePath,
-                                     const std::string& resourceName) const = 0;
+  virtual std::shared_ptr<Data> loadData(const std::string& resourcePath,
+                                         const std::string& resourceName) const = 0;
 
   /**
    * Load an image asset specified by |path| + |name|, and returns the Image object.
