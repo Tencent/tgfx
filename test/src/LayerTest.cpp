@@ -1989,6 +1989,50 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/backgroundLayerBlur"));
 }
 
+TGFX_TEST(LayerTest, FilterMaxScaleFactor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  EXPECT_EQ(Layer::DefaultFilterMaxScaleFactor(), 2.0f);
+  Layer::SetDefaultFilterMaxScaleFactor(1.0f);
+  EXPECT_EQ(Layer::DefaultFilterMaxScaleFactor(), 1.0f);
+
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  EXPECT_EQ(layer->filterMaxScaleFactor(), 1.0f);
+  layer->setFilterMaxScaleFactor(2.0f);
+  EXPECT_EQ(layer->filterMaxScaleFactor(), 2.0f);
+
+  layer->setMatrix(Matrix::MakeTrans(30, 30));
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  layer->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  layer->setFillStyle(fillStyle);
+  auto filter = BlurFilter::Make(10, 10);
+  layer->setFilters({filter});
+  layer->setMatrix(Matrix::MakeScale(10000.0f));
+
+  auto maskLayer = ShapeLayer::Make();
+  maskLayer->setPath(path);
+  maskLayer->setMatrix(Matrix::MakeTrans(-50, -50));
+  auto maskStyle = SolidColor::Make(Color::FromRGBA(0, 0, 0, 128));
+  maskLayer->setFillStyle(maskStyle);
+  layer->setMask(maskLayer);
+  layer->addChild(maskLayer);
+
+  auto layerStyle = InnerShadowStyle::Make(1, 0, 0, 0, Color::FromRGBA(0, 0, 0, 128));
+  layer->setLayerStyles({layerStyle});
+
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterMaxScaleFactor"));
+
+  Layer::SetDefaultFilterMaxScaleFactor(1.0f);
+}
+
 TGFX_TEST(LayerTest, MaskAlpha) {
   ContextScope scope;
   auto context = scope.getContext();

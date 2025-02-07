@@ -65,6 +65,17 @@ class Layer {
   static void SetDefaultAllowsGroupOpacity(bool value);
 
   /**
+  * Returns the default value for the filterMaxScaleFactor property for new Layer instances. The
+  * default value is 1.0.
+  */
+  static float DefaultFilterMaxScaleFactor();
+
+  /**
+  * Sets the default value for the filterMaxScaleFactor property for new Layer instances.
+  */
+  static void SetDefaultFilterMaxScaleFactor(float value);
+
+  /**
    * Creates a new Layer instance.
    */
   static std::shared_ptr<Layer> Make();
@@ -303,6 +314,22 @@ class Layer {
    * changes to it after calling this function have no effect.
    */
   void setScrollRect(const Rect& rect);
+
+  /**
+  * Returns the maximum scale factor at which the layer's filters are applied. The default value is
+  * read from the Layer::DefaultFilterMaxScaleFactor() method.
+  * When the layer has a scale factor, the LayerFilter will use the scaled layerContent for
+  * filtering. The filterMaxScaleFactor constrains the maximum scale value of the filter source
+  * to prevent excessive memory usage.
+  */
+  float filterMaxScaleFactor() const {
+    return _filterMaxScaleFactor;
+  }
+
+  /**
+  * Sets the maximum scale factor at which the layer's filters are applied.
+  */
+  void setFilterMaxScaleFactor(float value);
 
   /**
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
@@ -595,6 +622,8 @@ class Layer {
   BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = Matrix::I();
   float _rasterizationScale = 1.0f;
+  float _filterMaxScaleFactor = 2.0f;
+
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;

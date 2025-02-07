@@ -31,6 +31,7 @@
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
+static std::atomic<float> FilterMaxScaleFactor = 2.0f;
 
 struct LayerStyleSource {
   float contentScale = 1.0f;
@@ -86,6 +87,14 @@ void Layer::SetDefaultAllowsGroupOpacity(bool value) {
   AllowsGroupOpacity = value;
 }
 
+float Layer::DefaultFilterMaxScaleFactor() {
+  return FilterMaxScaleFactor;
+}
+
+void Layer::SetDefaultFilterMaxScaleFactor(float value) {
+  FilterMaxScaleFactor = value;
+}
+
 std::shared_ptr<Layer> Layer::Make() {
   auto layer = std::shared_ptr<Layer>(new Layer());
   layer->weakThis = layer;
@@ -107,6 +116,8 @@ Layer::Layer() {
   bitFields.visible = true;
   bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
+
+  _filterMaxScaleFactor = FilterMaxScaleFactor;
 }
 
 void Layer::setAlpha(float value) {
@@ -231,6 +242,14 @@ void Layer::setScrollRect(const Rect& rect) {
   } else {
     _scrollRect = std::make_unique<Rect>(rect);
   }
+  invalidate();
+}
+
+void Layer::setFilterMaxScaleFactor(float value) {
+  if (_filterMaxScaleFactor == value) {
+    return;
+  }
+  _filterMaxScaleFactor = value;
   invalidate();
 }
 
@@ -728,7 +747,7 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
-  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto contentScale = std::min(canvas->getMatrix().getMaxScale(), _filterMaxScaleFactor);
   if (FloatNearlyZero(contentScale)) {
     return;
   }
@@ -831,7 +850,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
-  auto contentScale = matrix.getMaxScale();
+  auto contentScale = std::min(matrix.getMaxScale(), _filterMaxScaleFactor);
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
