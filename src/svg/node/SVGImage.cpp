@@ -49,35 +49,50 @@ bool SVGImage::onPrepareToRender(SVGRenderContext* context) const {
          INHERITED::onPrepareToRender(context);
 }
 
-std::shared_ptr<Image> LoadImage(const std::shared_ptr<ResourceLoader>& resourceProvider,
+std::shared_ptr<Image> LoadImage(const std::shared_ptr<StreamFactory>& streamFactory,
                                  const SVGIRI& href) {
+
+  auto loadFromStreamFactory = [&streamFactory](const std::string& path) -> std::shared_ptr<Image> {
+    if (!streamFactory) {
+      return Image::MakeFromFile(path);
+    }
+
+    auto stream = streamFactory->createStream(path);
+    if (!stream) {
+      return nullptr;
+    }
+    auto* out = static_cast<unsigned char*>(malloc(stream->size()));
+    if (!out) {
+      return nullptr;
+    }
+    stream->read(out, stream->size());
+    auto outData = Data::MakeAdopted(out, stream->size(), Data::FreeProc);
+    return Image::MakeFromEncoded(outData);
+  };
 
   switch (href.type()) {
     case SVGIRI::Type::DataURI: {
       const auto& base64URL = href.iri();
       auto pos = base64URL.find("base64,");
       if (pos == std::string::npos) {
-        return nullptr;
+        return loadFromStreamFactory(base64URL);
       }
       std::string base64Data = base64URL.substr(pos + 7);
       auto data = Base64Decode(base64Data);
       return data ? Image::MakeFromEncoded(data) : nullptr;
     }
     case SVGIRI::Type::Nonlocal: {
-      std::filesystem::path path(href.iri());
-      auto directory = path.parent_path().string();
-      auto filename = path.filename().string();
-      return resourceProvider->loadImage(directory, filename);
+      return loadFromStreamFactory(href.iri());
     }
     default:
       return nullptr;
   }
 }
 
-SVGImage::ImageInfo SVGImage::LoadImage(const std::shared_ptr<ResourceLoader>& resourceProvider,
+SVGImage::ImageInfo SVGImage::LoadImage(const std::shared_ptr<StreamFactory>& streamFactory,
                                         const SVGIRI& iri, const Rect& viewPort,
                                         SVGPreserveAspectRatio /*ratio*/) {
-  std::shared_ptr<Image> image = ::tgfx::LoadImage(resourceProvider, iri);
+  std::shared_ptr<Image> image = ::tgfx::LoadImage(streamFactory, iri);
   if (!image) {
     return {};
   }
@@ -97,7 +112,7 @@ void SVGImage::onRender(const SVGRenderContext& context) const {
   const Rect viewPort = lengthContext.resolveRect(X, Y, Width, Height);
 
   ImageInfo image;
-  const auto imgInfo = LoadImage(context.resourceProvider(), Href, viewPort, PreserveAspectRatio);
+  const auto imgInfo = LoadImage(context.streamFactory(), Href, viewPort, PreserveAspectRatio);
   if (!imgInfo.image) {
     LOGE("can't render image: load image failed\n");
     return;

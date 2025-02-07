@@ -31,7 +31,6 @@
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
 #include "svg/SystemFontManager.h"
-#include "svg/SystemResourceLoader.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Recorder.h"
@@ -98,11 +97,7 @@ void SVGDOM::render(Canvas* canvas) {
   SVGLengthContext lengthContext(drawSize);
   SVGPresentationContext presentationContext;
 
-  auto resourceLoader =
-      options.resourceProvider ? options.resourceProvider : SystemResourceLoader::Make();
-  auto fontManager = options.fontManager ? options.fontManager : SystemFontManager::Make();
-
-  SVGRenderContext renderContext(canvas, fontManager, resourceLoader, nodeIDMapper, lengthContext,
+  SVGRenderContext renderContext(canvas, options.streamFactory, nodeIDMapper, lengthContext,
                                  presentationContext, {nullptr, nullptr}, canvas->getMatrix());
 
   root->render(renderContext);

@@ -22,7 +22,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/svg/ResourceLoader.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/node/SVGTransformableNode.h"
@@ -53,8 +53,8 @@ class SVGImage final : public SVGTransformableNode {
   void onRender(const SVGRenderContext& conetxt) const override;
   Path onAsPath(const SVGRenderContext& conetxt) const override;
   Rect onObjectBoundingBox(const SVGRenderContext& conetxt) const override;
-  static ImageInfo LoadImage(const std::shared_ptr<ResourceLoader>& resourceProvider,
-                             const SVGIRI& iri, const Rect& viewPort, SVGPreserveAspectRatio ratio);
+  static ImageInfo LoadImage(const std::shared_ptr<StreamFactory>& streamFactory, const SVGIRI& iri,
+                             const Rect& viewPort, SVGPreserveAspectRatio ratio);
 
   SVG_ATTR(X, SVGLength, SVGLength(0))
   SVG_ATTR(Y, SVGLength, SVGLength(0))

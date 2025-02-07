@@ -34,6 +34,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/svg/node/SVGClipPath.h"
 #include "tgfx/svg/node/SVGFilter.h"
 #include "tgfx/svg/node/SVGMask.h"
@@ -102,45 +103,43 @@ SVGPresentationContext::SVGPresentationContext()
     : _inherited(SVGPresentationAttributes::MakeInitial()) {
 }
 
-SVGRenderContext::SVGRenderContext(Canvas* canvas, const std::shared_ptr<FontManager>& fontManager,
-                                   const std::shared_ptr<ResourceLoader>& resourceProvider,
+SVGRenderContext::SVGRenderContext(Canvas* canvas,
+                                   const std::shared_ptr<StreamFactory>& streamFactory,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                                    const SVGPresentationContext& presentContext,
                                    const OBBScope& scope, const Matrix& matrix)
-    : _fontManager(fontManager), _resourceProvider(resourceProvider), nodeIDMapper(mapper),
-      _lengthContext(lengthContext), _presentationContext(presentContext), _canvas(canvas),
+    : _streamFactory(streamFactory), nodeIDMapper(mapper), _lengthContext(lengthContext),
+      _presentationContext(presentContext), _canvas(canvas),
       canvasSaveCount(canvas->getSaveCount()), scope(scope), _matrix(matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
-    : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
-                       other.nodeIDMapper, *other._lengthContext, *other._presentationContext,
-                       other.scope, other._matrix) {
-}
-
-SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
-    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.nodeIDMapper,
+    : SVGRenderContext(other._canvas, other._streamFactory, other.nodeIDMapper,
                        *other._lengthContext, *other._presentationContext, other.scope,
                        other._matrix) {
 }
 
+SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
+    : SVGRenderContext(canvas, other._streamFactory, other.nodeIDMapper, *other._lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
+}
+
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other,
                                    const SVGLengthContext& lengthContext)
-    : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
-                       other.nodeIDMapper, lengthContext, *other._presentationContext, other.scope,
-                       other._matrix) {
+    : SVGRenderContext(other._canvas, other._streamFactory, other.nodeIDMapper, lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
                                    const SVGLengthContext& lengthContext)
-    : SVGRenderContext(canvas, other._fontManager, other._resourceProvider, other.nodeIDMapper,
-                       lengthContext, *other._presentationContext, other.scope, other._matrix) {
+    : SVGRenderContext(canvas, other._streamFactory, other.nodeIDMapper, lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
-    : SVGRenderContext(other._canvas, other._fontManager, other._resourceProvider,
-                       other.nodeIDMapper, *other._lengthContext, *other._presentationContext,
-                       OBBScope{node, this}, other._matrix) {
+    : SVGRenderContext(other._canvas, other._streamFactory, other.nodeIDMapper,
+                       *other._lengthContext, *other._presentationContext, OBBScope{node, this},
+                       other._matrix) {
 }
 
 SVGRenderContext::~SVGRenderContext() {
@@ -337,8 +336,8 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, flo
       // and node being rendered.
       SVGPresentationContext presentContext;
       presentContext._namedColors = _presentationContext->_namedColors;
-      SVGRenderContext localContext(_canvas, _fontManager, _resourceProvider, nodeIDMapper,
-                                    *_lengthContext, presentContext, scope, Matrix::I());
+      SVGRenderContext localContext(_canvas, _streamFactory, nodeIDMapper, *_lengthContext,
+                                    presentContext, scope, Matrix::I());
 
       const auto node = this->findNodeById(svgPaint.iri());
       if (!node || !node->asPaint(localContext, &(paint.value()))) {
@@ -411,9 +410,7 @@ SVGColorType SVGRenderContext::resolveSVGColor(const SVGColor& color) const {
 }
 
 Font SVGRenderContext::resolveFont() const {
-  if (!_fontManager) {
-    return Font();
-  }
+
   auto weight = [](const SVGFontWeight& w) {
     switch (w.type()) {
       case SVGFontWeight::Type::W100:
@@ -469,9 +466,9 @@ Font SVGRenderContext::resolveFont() const {
   const auto size = lengthContext().resolve(presentationContext()._inherited.FontSize->size(),
                                             SVGLengthContext::LengthType::Vertical);
 
-  auto typeface = _fontManager->matchTypeface(family, style);
+  auto typeface = Typeface::MakeFromName(family, style);
   if (!typeface) {
-    typeface = _fontManager->matchTypeface("", style);
+    return Font();
   }
   Font font(std::move(typeface), size);
   return font;

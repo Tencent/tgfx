@@ -196,71 +196,11 @@ TGFX_TEST(SVGRenderTest, BlurSVG) {
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/blur"));
 }
 
-// class FontLoaderTest : public FontManagerCustom::FontLoader {
-//  public:
-//   void loadFonts(std::vector<std::shared_ptr<FontStyleSetCustom>>& families) const override {
-//     auto family = std::make_shared<FontStyleSetCustom>("Noto Sans SC");
-//     auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-//     typeface->setFontStyle(FontStyle::Normal());
-//     family->appendTypeface(typeface);
-//     families.push_back(family);
-
-//     family = std::make_shared<FontStyleSetCustom>("Noto Serif SC");
-//     typeface = MakeTypeface("resources/font/NotoSerifSC-Regular.otf");
-//     typeface->setFontStyle(FontStyle::Normal());
-//     family->appendTypeface(typeface);
-//     families.push_back(family);
-//   }
-// };
-
-class FontManagerTest : public FontManager {
- public:
-  static std::shared_ptr<FontManagerTest> Make() {
-    return std::shared_ptr<FontManagerTest>(new FontManagerTest);
-  }
-
-  std::shared_ptr<Typeface> matchTypeface(const std::string& familyName, FontStyle) const override {
-    auto iter = typefaces.find(familyName);
-    if (iter != typefaces.end()) {
-      return iter->second;
-    }
-    return defaultTypeface;
-  }
-
-  std::shared_ptr<Typeface> getFallbackTypeface(const std::string& familyName, FontStyle style,
-                                                Unichar) const override {
-    return matchTypeface(familyName, style);
-  }
-
- protected:
-  FontManagerTest() {
-    auto typeface =
-        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0);
-    if (typeface) {
-      typefaces["Noto Sans SC"] = typeface;
-      defaultTypeface = typeface;
-    }
-
-    typeface =
-        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0);
-    if (typeface) {
-      typefaces["Noto Serif SC"] = typeface;
-    }
-  };
-
- private:
-  std::unordered_map<std::string, std::shared_ptr<Typeface>> typefaces;
-  std::shared_ptr<Typeface> defaultTypeface;
-};
-
 TGFX_TEST(SVGRenderTest, TextSVG) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/text.svg"));
   ASSERT_TRUE(stream != nullptr);
 
-  SVGDOMOptions options;
-  options.fontManager = FontManagerTest::Make();
-
-  auto SVGDom = SVGDOM::Make(*stream, options);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -279,10 +219,7 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/textFont.svg"));
   ASSERT_TRUE(stream != nullptr);
 
-  SVGDOMOptions options;
-  options.fontManager = FontManagerTest::Make();
-
-  auto SVGDom = SVGDOM::Make(*stream, options);
+  auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -303,14 +240,11 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  SVGDOMOptions options;
-  options.fontManager = FontManagerTest::Make();
-
   {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex1.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 
@@ -325,7 +259,7 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex2.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 
@@ -341,7 +275,7 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex3.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 
@@ -357,7 +291,7 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex4.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 
@@ -372,7 +306,7 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex5.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 
@@ -387,7 +321,7 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex6.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 
@@ -402,7 +336,7 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex7.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 

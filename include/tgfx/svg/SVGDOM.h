@@ -25,7 +25,6 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/svg/FontManager.h"
-#include "tgfx/svg/ResourceLoader.h"
 #include "tgfx/svg/node/SVGRoot.h"
 
 namespace tgfx {
@@ -39,14 +38,10 @@ using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
  */
 struct SVGDOMOptions {
   /**
-   * If fontManager is null, text will not be rendered.
-   */
-  std::shared_ptr<FontManager> fontManager = nullptr;
-  /**
-   * If resourceProvider is null, base64 image resources will still be parsed, but non-base64 images 
+   * If streamFactory is null, base64 image resources will still be parsed, but non-base64 images 
    * will be loaded from absolute paths.
    */
-  std::shared_ptr<ResourceLoader> resourceProvider = nullptr;
+  std::shared_ptr<StreamFactory> streamFactory = nullptr;
 };
 
 /**
