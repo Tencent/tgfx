@@ -2069,6 +2069,6 @@ TGFX_TEST(LayerTest, ChildMask) {
   list.root()->addChild(group);
   auto surface = Surface::Make(context, 300, 300);
   list.render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask2"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask"));
 }
 }  // namespace tgfx
