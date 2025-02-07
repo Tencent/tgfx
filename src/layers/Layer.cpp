@@ -734,13 +734,13 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   auto paint = getLayerPaint(alpha, blendMode);
-  std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (hasValidMask()) {
-    maskFilter = getMaskFilter(args, contentScale);
+    auto maskFilter = getMaskFilter(args, contentScale);
     // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {
       return;
     }
+    paint.setMaskFilter(maskFilter);
   }
 
   auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
@@ -748,11 +748,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   });
   if (picture == nullptr) {
     return;
-  }
-  if (maskFilter) {
-    auto bounds = picture->getBounds();
-    maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-    paint.setMaskFilter(maskFilter);
   }
   if (!args.excludeEffects) {
     paint.setImageFilter(getImageFilter(contentScale));

@@ -244,9 +244,10 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
     if (image == nullptr) {
       return;
     }
+    viewMatrix.postTranslate(-offset.x, -offset.y);
     drawState.matrix.preTranslate(offset.x, offset.y);
   }
-  drawImage(std::move(image), {}, drawState, style);
+  drawImage(std::move(image), {}, drawState, ApplyMatrix(style, viewMatrix));
 }
 
 void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
