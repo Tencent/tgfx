@@ -36,11 +36,7 @@ class OpContext {
     return Rect::MakeWH(renderTarget->width(), renderTarget->height());
   }
 
-  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix,
-                  bool autoResolve = false);
-
-  void fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                      const Matrix& uvMatrix, bool autoResolve = false);
+  void fillWithFP(std::unique_ptr<FragmentProcessor> fp, bool autoResolve = false);
 
   void addOp(std::unique_ptr<Op> op);
 

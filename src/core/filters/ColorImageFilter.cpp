@@ -39,6 +39,7 @@ std::unique_ptr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  return ComposeFragmentProcessor::Make(std::move(imageProcessor), filter->asFragmentProcessor());
+  return FragmentProcessor::MulChildByInputAlpha(
+      ComposeFragmentProcessor::Make(std::move(imageProcessor), filter->asFragmentProcessor()));
 }
 }  // namespace tgfx

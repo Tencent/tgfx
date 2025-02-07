@@ -27,16 +27,13 @@
 namespace tgfx {
 class RectPaint {
  public:
-  RectPaint(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-            const Matrix& uvMatrix)
-      : color(color.value_or(Color::White())), rect(rect), viewMatrix(viewMatrix),
-        uvMatrix(uvMatrix) {
+  RectPaint(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix)
+      : color(color.value_or(Color::White())), rect(rect), viewMatrix(viewMatrix) {
   }
 
   Color color;
   Rect rect;
   Matrix viewMatrix;
-  Matrix uvMatrix;
 };
 
 class RectCoverageVerticesProvider : public DataProvider {
@@ -53,7 +50,6 @@ class RectCoverageVerticesProvider : public DataProvider {
     for (auto& rectPaint : rectPaints) {
       auto& viewMatrix = rectPaint->viewMatrix;
       auto& rect = rectPaint->rect;
-      auto& uvMatrix = rectPaint->uvMatrix;
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
       // we want the new edge to be .5px away from the old line.
@@ -63,8 +59,8 @@ class RectCoverageVerticesProvider : public DataProvider {
       auto outsetBounds = rect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
 
-      auto normalInsetQuad = Quad::MakeFrom(insetBounds, &uvMatrix);
-      auto normalOutsetQuad = Quad::MakeFrom(outsetBounds, &uvMatrix);
+      auto normalInsetQuad = Quad::MakeFrom(insetBounds);
+      auto normalOutsetQuad = Quad::MakeFrom(outsetBounds);
 
       for (int j = 0; j < 2; ++j) {
         const auto& quad = j == 0 ? insetQuad : outsetQuad;
@@ -108,9 +104,8 @@ class RectNonCoverageVerticesProvider : public DataProvider {
     for (auto& rectPaint : rectPaints) {
       auto& viewMatrix = rectPaint->viewMatrix;
       auto& rect = rectPaint->rect;
-      auto& uvMatrix = rectPaint->uvMatrix;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
-      auto localQuad = Quad::MakeFrom(rect, &uvMatrix);
+      auto localQuad = Quad::MakeFrom(rect);
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
@@ -134,14 +129,13 @@ class RectNonCoverageVerticesProvider : public DataProvider {
 };
 
 std::unique_ptr<RectDrawOp> RectDrawOp::Make(std::optional<Color> color, const Rect& rect,
-                                             const Matrix& viewMatrix, const Matrix& uvMatrix) {
-  return std::unique_ptr<RectDrawOp>(new RectDrawOp(color, rect, viewMatrix, uvMatrix));
+                                             const Matrix& viewMatrix) {
+  return std::unique_ptr<RectDrawOp>(new RectDrawOp(color, rect, viewMatrix));
 }
 
-RectDrawOp::RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-                       const Matrix& uvMatrix)
+RectDrawOp::RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix)
     : DrawOp(ClassID()), hasColor(color) {
-  auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix, uvMatrix);
+  auto rectPaint = std::make_shared<RectPaint>(color, rect, viewMatrix);
   rectPaints.push_back(std::move(rectPaint));
   auto bounds = viewMatrix.mapRect(rect);
   setBounds(bounds);

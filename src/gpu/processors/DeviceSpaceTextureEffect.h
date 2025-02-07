@@ -18,36 +18,32 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/ops/DrawOp.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-class RectPaint;
-
-class RectDrawOp : public DrawOp {
+class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
-  DEFINE_OP_CLASS_ID
+  static std::unique_ptr<DeviceSpaceTextureEffect> Make(std::shared_ptr<TextureProxy> textureProxy,
+                                                        const Matrix& uvMatrix);
 
-  static std::unique_ptr<RectDrawOp> Make(std::optional<Color> color, const Rect& rect,
-                                          const Matrix& viewMatrix);
+  std::string name() const override {
+    return "DeviceSpaceTextureEffect";
+  }
 
-  void prepare(Context* context, uint32_t renderFlags) override;
+ protected:
+  DEFINE_PROCESSOR_CLASS_ID
 
-  void execute(RenderPass* renderPass) override;
+  DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
- private:
-  RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix);
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
-  bool onCombineIfPossible(Op* op) override;
+  size_t onCountTextureSamplers() const override {
+    return 1;
+  }
 
-  bool canAdd(size_t count) const;
+  const TextureSampler* onTextureSampler(size_t) const override;
 
-  bool needsIndexBuffer() const;
-
-  bool hasColor = true;
-  std::vector<std::shared_ptr<RectPaint>> rectPaints = {};
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  std::shared_ptr<Data> vertexData = nullptr;
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  Matrix uvMatrix = Matrix::I();
 };
 }  // namespace tgfx

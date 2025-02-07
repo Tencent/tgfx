@@ -1988,4 +1988,68 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/backgroundLayerBlur"));
 }
+
+TGFX_TEST(LayerTest, MaskAlpha) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList list;
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+
+  auto layer = ShapeLayer::Make();
+  layer->setPath(path);
+  auto layer_style = tgfx::SolidColor::Make({0.0f, 1.0f, 0.0f, 1.0f});
+  layer->setFillStyle(layer_style);
+
+  auto mask = ShapeLayer::Make();
+  mask->setPath(path);
+  mask->setMatrix(Matrix::MakeTrans(50, 50));
+  auto mask_style = tgfx::SolidColor::Make({1.0f, 0.0f, 0.0f, 1.0f});
+  mask_style->setAlpha(0);
+  mask->setFillStyle(mask_style);
+
+  layer->setMask(mask);
+
+  list.root()->addChild(layer);
+  list.root()->addChild(mask);
+  auto surface = Surface::Make(context, 150, 150);
+  list.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MaskAlpha"));
+}
+
+TGFX_TEST(LayerTest, ChildMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList list;
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  auto group = Layer::Make();
+
+  auto layer = ShapeLayer::Make();
+  layer->setPath(path);
+  auto layer_style = tgfx::SolidColor::Make({0.0f, 1.0f, 0.0f, 1.0f});
+  layer->setFillStyle(layer_style);
+
+  auto layer2 = ShapeLayer::Make();
+  layer2->setPath(path);
+  layer2->setMatrix(Matrix::MakeTrans(100, 50));
+  layer2->setFillStyle(layer_style);
+
+  auto mask = ShapeLayer::Make();
+  mask->setPath(path);
+  mask->setMatrix(Matrix::MakeTrans(50, 50));
+  auto mask_style = tgfx::SolidColor::Make({1.0f, 0.0f, 0.0f, 1.0f});
+  mask->setFillStyle(mask_style);
+
+  group->setMask(mask);
+  group->addChild(layer);
+  group->addChild(layer2);
+  group->addChild(mask);
+  list.root()->addChild(group);
+  auto surface = Surface::Make(context, 150, 150);
+  list.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask"));
+}
 }  // namespace tgfx

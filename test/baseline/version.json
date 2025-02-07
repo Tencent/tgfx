@@ -20,7 +20,7 @@
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
         "Path_complex": "e031f25",
-        "Picture": "59ca683",
+        "Picture": "a861948",
         "PictureImage": "3b0ec3b",
         "PictureImage_Path": "2212c4e",
         "PictureImage_Text": "b062b9a",
@@ -49,8 +49,8 @@
         "mipmap_none": "3b0ec3b",
         "path": "f37b222",
         "rasterized": "5a971dd",
-        "rasterized_mipmap": "5a971dd",
-        "rasterized_scale_up": "5a971dd",
+        "rasterized_mipmap": "a861948",
+        "rasterized_scale_up": "a861948",
         "saveLayer": "b9a42bf",
         "shape": "bc64712",
         "text_shape": "b062b9a",
@@ -63,7 +63,7 @@
         "CustomLayerTreeDrawer": "b062b9a",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "5a1fb11",
-        "ImageWithShadow": "270695a",
+        "ImageWithShadow": "a861948",
         "SimpleLayerTreeDrawer": "2c7cacd",
         "SimpleText": "b062b9a"
     },
@@ -79,13 +79,13 @@
         "ModeColorFilter": "c2b0b18",
         "OpacityShadowTest": "836aed9",
         "RuntimeEffect": "d93c573",
-        "blur": "4d5c3b0",
-        "blur-large-pixel": "3b0ec3b",
+        "blur": "a861948",
+        "blur-large-pixel": "238cdf0",
         "dropShadow": "a30de8b",
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
         "innerShadow": "270695a",
-        "shaderMaskFilter": "d93c573"
+        "shaderMaskFilter": "a861948"
     },
     "GlyphFaceTest": {
         "GlyphFaceSimple": "4032de2",
@@ -96,6 +96,7 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
+        "ChildMask": "3dbeed5",
         "DropShadowStyle": "19dcc4d",
         "DropShadowStyle-stroke": "002c391",
         "DropShadowStyle-stroke-behindLayer": "002c391",
@@ -105,6 +106,7 @@
         "InnerShadowStyle": "19dcc4d",
         "Layer_hitTestPoint": "50c58e6",
         "Layer_hitTestPointNested": "b062b9a",
+        "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
         "StrokeOnTop_Off": "2c7cacd",
@@ -117,15 +119,15 @@
         "filterClip": "43cd416",
         "filterTest": "44166b7",
         "filters": "270695a",
-        "getBounds": "3b0ec3b",
+        "getBounds": "238cdf0",
         "getLayersUnderPoint": "b062b9a",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "e5103ae6",
-        "imageMask": "4b176e4",
+        "imageMask": "3dbeed5",
         "innerShadow": "270695a",
-        "shapeMask": "612c09e",
-        "textMask": "9000907"
+        "shapeMask": "3dbeed5",
+        "textMask": "3dbeed5"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

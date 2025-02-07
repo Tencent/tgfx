@@ -17,21 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpContext.h"
+#include <tgfx/core/Mask.h>
 #include "gpu/DrawingManager.h"
 #include "gpu/ops/RectDrawOp.h"
 
 namespace tgfx {
-void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, const Matrix& uvMatrix,
-                           bool autoResolve) {
-  fillRectWithFP(bounds(), std::move(fp), uvMatrix, autoResolve);
-}
-
-void OpContext::fillRectWithFP(const Rect& dstRect, std::unique_ptr<FragmentProcessor> fp,
-                               const Matrix& uvMatrix, bool autoResolve) {
+void OpContext::fillWithFP(std::unique_ptr<FragmentProcessor> fp, bool autoResolve) {
   if (fp == nullptr) {
     return;
   }
-  auto op = RectDrawOp::Make(std::nullopt, dstRect, Matrix::I(), uvMatrix);
+  auto op = RectDrawOp::Make(std::nullopt, bounds(), Matrix::I());
   op->addColorFP(std::move(fp));
   op->setBlendMode(BlendMode::Src);
   addOp(std::move(op));

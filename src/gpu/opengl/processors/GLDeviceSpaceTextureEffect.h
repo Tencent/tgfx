@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,14 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NeedMipmaps.h"
+#pragma once
+
+#include <optional>
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-bool NeedMipmaps(const SamplingOptions& sampling, const Matrix& viewMatrix,
-                 const Matrix* uvMatrix) {
-  if (sampling.mipmapMode == MipmapMode::None) {
-    return false;
-  }
-  return viewMatrix.hasNonIdentityScale() || (uvMatrix && uvMatrix->hasNonIdentityScale());
-}
+class GLDeviceSpaceTextureEffect : public DeviceSpaceTextureEffect {
+ public:
+  GLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
+
+  void emitCode(EmitArgs& args) const override;
+
+ private:
+  void onSetData(UniformBuffer* uniformBuffer) const override;
+};
 }  // namespace tgfx
