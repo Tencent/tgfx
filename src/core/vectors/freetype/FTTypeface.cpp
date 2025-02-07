@@ -32,7 +32,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
-                                                 FontStyle fontStyle) {
+                                                 const FontStyle& fontStyle) {
   return SystemFont::MakeFromName(fontFamily, fontStyle);
 }
 

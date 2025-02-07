@@ -77,7 +77,7 @@ static constexpr std::array<float, 9> FontWidthMap = {-0.8f, -0.6f, -0.4f, -0.2f
 static constexpr std::array<float, 3> FontSlantMap = {-1.0f, 0.0f, 1.0f};
 
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
-                                                 FontStyle fontStyle) {
+                                                 const FontStyle& fontStyle) {
 
   CFMutableDictionaryRef cfAttributes = CFDictionaryCreateMutable(
       kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);

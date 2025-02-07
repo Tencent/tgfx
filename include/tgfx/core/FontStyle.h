@@ -24,102 +24,102 @@
 #include <string>
 
 namespace tgfx {
+/**
+ * Font weight numeric values ranging from 1 to 1000, corresponding to CSS font-weight values.
+ * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight
+ */
+enum class FontWeight {
+  Invisible,   // 0
+  Thin,        // 100
+  ExtraLight,  // 200
+  Light,       // 300
+  Normal,      // 400
+  Medium,      // 500
+  SemiBold,    // 600
+  Bold,        // 700
+  ExtraBold,   // 800
+  Black,       // 900
+  ExtraBlack,  // 1000
+};
 
 /**
- * Font style object
+ * Font width values corresponding to CSS font-stretch keyword property
+ * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-stretch
+ */
+enum class FontWidth {
+  UltraCondensed,
+  ExtraCondensed,
+  Condensed,
+  SemiCondensed,
+  Normal,
+  SemiExpanded,
+  Expanded,
+  ExtraExpanded,
+  UltraExpanded,
+};
+
+/**
+ * Font slant values corresponding to CSS font-style keyword property
+ * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-style
+ */
+enum class FontSlant {
+  Upright,
+  Italic,
+  Oblique,
+};
+
+/**
+ * Font traits for stylistic information.
  */
 class FontStyle {
  public:
-  /**
-   * Font weight numeric values ranging from 1 to 1000, corresponding to CSS font-weight values.
-   * Only two keyword values are available: normal = 400 and bold = 700. Other enums use FreeType's
-   * FT_WEIGHT_XXX values.
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-weight
-   */
-  enum class Weight {
-    Invisible,   //0
-    Thin,        //100
-    ExtraLight,  //200
-    Light,       //300
-    Normal,      //400 normal
-    Medium,      //500
-    SemiBold,    //600
-    Bold,        //700 bold
-    ExtraBold,   //800
-    Black,       //900
-    ExtraBlack,  //1000
-  };
-
-  /**
-   * Font width values corresponding to CSS font-stretch keyword property
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-stretch
-   */
-  enum class Width {
-    UltraCondensed,  //ultra-condensed
-    ExtraCondensed,  //extra-condensed
-    Condensed,       //condensed
-    SemiCondensed,   //semi-condensed
-    Normal,          //normal
-    SemiExpanded,    //semi-expanded
-    Expanded,        //expanded
-    ExtraExpanded,   //extra-expanded
-    UltraExpanded,   //ultra-expanded
-  };
-
-  /**
-   * Font slant values corresponding to CSS font-style keyword property
-   * @see https://developer.mozilla.org/en-US/docs/Web/CSS/font-style
-   */
-  enum class Slant {
-    Upright,  //normal
-    Italic,   //italic
-    Oblique,  //oblique
-  };
-
-  constexpr FontStyle(Weight weight, Width width, Slant slant)
-      : value(static_cast<uint32_t>(std::clamp(weight, Weight::Invisible, Weight::ExtraBlack)) +
-              (static_cast<uint32_t>(std::clamp(width, Width::UltraCondensed, Width::UltraExpanded))
+  constexpr FontStyle(FontWeight weight, FontWidth width, FontSlant slant)
+      : value(static_cast<uint32_t>(
+                  std::clamp(weight, FontWeight::Invisible, FontWeight::ExtraBlack)) +
+              (static_cast<uint32_t>(
+                   std::clamp(width, FontWidth::UltraCondensed, FontWidth::UltraExpanded))
                << 16) +
-              (static_cast<uint32_t>(std::clamp(slant, Slant::Upright, Slant::Oblique)) << 24)) {
+              (static_cast<uint32_t>(std::clamp(slant, FontSlant::Upright, FontSlant::Oblique))
+               << 24)) {
   }
 
-  constexpr FontStyle() : FontStyle{Weight::Normal, Width::Normal, Slant::Upright} {
+  constexpr FontStyle() : FontStyle(FontWeight::Normal, FontWidth::Normal, FontSlant::Upright) {
   }
 
   bool operator==(const FontStyle& rhs) const {
     return value == rhs.value;
   }
 
-  Weight weight() const {
-    return static_cast<Weight>(value & 0xFFFF);
+  FontWeight weight() const {
+    return static_cast<FontWeight>(value & 0xFFFF);
   }
 
-  Width width() const {
-    return static_cast<Width>((value >> 16) & 0xFF);
+  FontWidth width() const {
+    return static_cast<FontWidth>((value >> 16) & 0xFF);
   }
 
-  Slant slant() const {
-    return static_cast<Slant>((value >> 24) & 0xFF);
+  FontSlant slant() const {
+    return static_cast<FontSlant>((value >> 24) & 0xFF);
   }
 
   static constexpr FontStyle Normal() {
-    return FontStyle(Weight::Normal, Width::Normal, Slant::Upright);
+    return FontStyle(FontWeight::Normal, FontWidth::Normal, FontSlant::Upright);
   }
 
   static constexpr FontStyle Bold() {
-    return FontStyle(Weight::Bold, Width::Normal, Slant::Upright);
+    return FontStyle(FontWeight::Bold, FontWidth::Normal, FontSlant::Upright);
   }
 
   static constexpr FontStyle Italic() {
-    return FontStyle(Weight::Normal, Width::Normal, Slant::Italic);
+    return FontStyle(FontWeight::Normal, FontWidth::Normal, FontSlant::Italic);
   }
 
   static constexpr FontStyle BoldItalic() {
-    return FontStyle(Weight::Bold, Width::Normal, Slant::Italic);
+    return FontStyle(FontWeight::Bold, FontWidth::Normal, FontSlant::Italic);
   }
 
  private:
-  uint32_t value;
+  uint32_t value = 0;
 };
 
 }  // namespace tgfx

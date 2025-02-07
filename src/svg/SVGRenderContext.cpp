@@ -417,33 +417,33 @@ Font SVGRenderContext::resolveFont() const {
   auto weight = [](const SVGFontWeight& w) {
     switch (w.type()) {
       case SVGFontWeight::Type::W100:
-        return FontStyle::Weight::Thin;
+        return FontWeight::Thin;
       case SVGFontWeight::Type::W200:
-        return FontStyle::Weight::ExtraLight;
+        return FontWeight::ExtraLight;
       case SVGFontWeight::Type::W300:
-        return FontStyle::Weight::Light;
+        return FontWeight::Light;
       case SVGFontWeight::Type::W400:
-        return FontStyle::Weight::Normal;
+        return FontWeight::Normal;
       case SVGFontWeight::Type::W500:
-        return FontStyle::Weight::Medium;
+        return FontWeight::Medium;
       case SVGFontWeight::Type::W600:
-        return FontStyle::Weight::SemiBold;
+        return FontWeight::SemiBold;
       case SVGFontWeight::Type::W700:
-        return FontStyle::Weight::Bold;
+        return FontWeight::Bold;
       case SVGFontWeight::Type::W800:
-        return FontStyle::Weight::ExtraBold;
+        return FontWeight::ExtraBold;
       case SVGFontWeight::Type::W900:
-        return FontStyle::Weight::Black;
+        return FontWeight::Black;
       case SVGFontWeight::Type::Normal:
-        return FontStyle::Weight::Normal;
+        return FontWeight::Normal;
       case SVGFontWeight::Type::Bold:
-        return FontStyle::Weight::Bold;
+        return FontWeight::Bold;
       case SVGFontWeight::Type::Bolder:
-        return FontStyle::Weight::ExtraBold;
+        return FontWeight::ExtraBold;
       case SVGFontWeight::Type::Lighter:
-        return FontStyle::Weight::Light;
+        return FontWeight::Light;
       case SVGFontWeight::Type::Inherit: {
-        return FontStyle::Weight::Normal;
+        return FontWeight::Normal;
       }
     }
   };
@@ -451,20 +451,19 @@ Font SVGRenderContext::resolveFont() const {
   auto slant = [](const SVGFontStyle& s) {
     switch (s.type()) {
       case SVGFontStyle::Type::Normal:
-        return FontStyle::Slant::Upright;
+        return FontSlant::Upright;
       case SVGFontStyle::Type::Italic:
-        return FontStyle::Slant::Italic;
+        return FontSlant::Italic;
       case SVGFontStyle::Type::Oblique:
-        return FontStyle::Slant::Oblique;
+        return FontSlant::Oblique;
       case SVGFontStyle::Type::Inherit: {
-        return FontStyle::Slant::Upright;
+        return FontSlant::Upright;
       }
     }
   };
 
   const auto& family = presentationContext()._inherited.FontFamily->family();
-  const FontStyle style(weight(*presentationContext()._inherited.FontWeight),
-                        FontStyle::Width::Normal,
+  const FontStyle style(weight(*presentationContext()._inherited.FontWeight), FontWidth::Normal,
                         slant(*presentationContext()._inherited.FontStyle));
 
   const auto size = lengthContext().resolve(presentationContext()._inherited.FontSize->size(),
