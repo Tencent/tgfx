@@ -705,30 +705,22 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 }
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
-  if (!hasValidMask()) {
+  auto maskPicture = CreatePicture(args, scale, [this](const DrawArgs& args, Canvas* canvas) {
+    _mask->drawLayer(args, canvas, _mask->_alpha, BlendMode::SrcOver);
+  });
+  if (maskPicture == nullptr) {
     return nullptr;
   }
-  auto rasterizedCache = static_cast<RasterizedContent*>(_mask->getRasterizedCache(args));
-  std::shared_ptr<Image> maskContentImage = nullptr;
-  auto drawingMatrix = Matrix::I();
-  auto relativeMatrix = _mask->getRelativeMatrix(this);
-  if (rasterizedCache) {
-    drawingMatrix = rasterizedCache->getMatrix();
-    maskContentImage = rasterizedCache->getImage();
-  } else {
-    auto contentScale = relativeMatrix.getMaxScale() * scale;
-    maskContentImage = _mask->getRasterizedImage(args, contentScale, &drawingMatrix);
-  }
+  auto maskImageOffset = Point::Zero();
+  auto maskContentImage = CreatePictureImage(maskPicture, &maskImageOffset);
   if (maskContentImage == nullptr) {
     return nullptr;
   }
+  auto relativeMatrix = _mask->getRelativeMatrix(this);
+  relativeMatrix.preScale(1.0f / scale, 1.0f / scale);
+  relativeMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
   relativeMatrix.postScale(scale, scale);
-  relativeMatrix.preConcat(drawingMatrix);
   auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
-  if (shader && _mask->_alpha != 1.0f) {
-    shader = shader->makeWithColorFilter(ColorFilter::Matrix(
-        {1.f, 0, 0, 0, 0, 0, 1.f, 0, 0, 0, 0, 0, 1.f, 0, 0, 0, 0, 0, _mask->_alpha, 0}));
-  }
   if (shader) {
     shader = shader->makeWithMatrix(relativeMatrix);
   }
@@ -741,14 +733,22 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return;
   }
 
+  auto paint = getLayerPaint(alpha, blendMode);
+  if (hasValidMask()) {
+    auto maskFilter = getMaskFilter(args, contentScale);
+    // if mask filter is nullptr while mask is valid, that means the layer is not visible.
+    if (!maskFilter) {
+      return;
+    }
+    paint.setMaskFilter(maskFilter);
+  }
+
   auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
     drawDirectly(args, canvas, 1.0f);
   });
   if (picture == nullptr) {
     return;
   }
-  auto paint = getLayerPaint(alpha, blendMode);
-  paint.setMaskFilter(getMaskFilter(args, contentScale));
   if (!args.excludeEffects) {
     paint.setImageFilter(getImageFilter(contentScale));
   }

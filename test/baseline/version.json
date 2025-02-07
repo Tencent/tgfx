@@ -96,6 +96,7 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
+        "ChildMask": "3dbeed5",
         "DropShadowStyle": "19dcc4d",
         "DropShadowStyle-stroke": "002c391",
         "DropShadowStyle-stroke-behindLayer": "002c391",
@@ -105,6 +106,7 @@
         "InnerShadowStyle": "19dcc4d",
         "Layer_hitTestPoint": "50c58e6",
         "Layer_hitTestPointNested": "b062b9a",
+        "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "43cd416",
         "PassThoughAndNormal": "43cd416",
         "StrokeOnTop_Off": "2c7cacd",
@@ -122,10 +124,10 @@
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "e5103ae6",
-        "imageMask": "4b176e4",
+        "imageMask": "3dbeed5",
         "innerShadow": "270695a",
         "shapeMask": "3dbeed5",
-        "textMask": "9000907"
+        "textMask": "3dbeed5"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
