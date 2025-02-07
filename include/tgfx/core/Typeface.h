@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <vector>
 #include "tgfx/core/Data.h"
+#include "tgfx/core/FontStyle.h"
 
 namespace tgfx {
 /**
@@ -49,12 +50,18 @@ class Typeface {
   static std::shared_ptr<Typeface> MakeEmpty();
 
   /**
-   * Returns a typeface reference for the given font family and font style. If the family and
-   * style cannot be matched identically, the best match is found and returned, which is never
-   * nullptr.
+   * Returns a typeface object for the specified font family and style name. If an exact match is not
+   * found, the closest match is returned, or nullptr if no match is found.
    */
   static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
                                                 const std::string& fontStyle);
+
+  /**
+   * Returns a typeface object for the specified font family and FontStyle object. If an exact match
+   * is not found, the closest match is returned, or nullptr if no match is found.
+   */
+  static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
+                                                const FontStyle& fontStyle);
 
   /**
    * Creates a new typeface for the given file path and ttc index. Returns nullptr if the typeface

@@ -31,9 +31,9 @@ DOM::DOM(std::shared_ptr<DOMNode> root) {
 
 DOM::~DOM() = default;
 
-std::shared_ptr<DOM> DOM::MakeFromData(const Data& data) {
+std::shared_ptr<DOM> DOM::Make(Stream& stream) {
   DOMParser parser;
-  if (!parser.parse(data)) {
+  if (!parser.parse(stream)) {
     return nullptr;
   }
   auto root = parser.getRoot();

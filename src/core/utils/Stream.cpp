@@ -17,10 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Stream.h"
+#include <cstring>
+#include <memory>
 #include <mutex>
 #include <regex>
 #include <unordered_map>
+#include <utility>
 #include "core/utils/Log.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 static std::mutex& locker = *new std::mutex;
@@ -61,6 +65,53 @@ class FileStream : public Stream {
   size_t length = 0;
 };
 
+class MemoryStream : public Stream {
+ public:
+  explicit MemoryStream(std::shared_ptr<Data> data) : data(std::move(data)) {
+  }
+
+  ~MemoryStream() override = default;
+
+  size_t size() const override {
+    return data->size();
+  }
+
+  bool seek(size_t position) override {
+    offset = position > data->size() ? data->size() : position;
+    return true;
+  }
+
+  bool move(int moveOffset) override {
+    return this->seek(offset + static_cast<size_t>(moveOffset));
+  }
+
+  size_t read(void* buffer, size_t size) override {
+    size_t dataSize = data->size();
+
+    if (size > dataSize - offset) {
+      size = dataSize - offset;
+    }
+    if (buffer) {
+      memcpy(buffer, data->bytes() + offset, size);
+    }
+    offset += size;
+    return size;
+  }
+
+  bool rewind() override {
+    offset = 0;
+    return true;
+  }
+
+  const void* getMemoryBase() override {
+    return data->data();
+  }
+
+ private:
+  std::shared_ptr<Data> data = nullptr;
+  size_t offset = 0;
+};
+
 std::string GetProtocolFromPath(const std::string& path) {
   size_t pos = path.find("://");
   if (pos != std::string::npos) {
@@ -97,6 +148,13 @@ std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   }
   fseek(file, 0, SEEK_SET);
   return std::make_unique<FileStream>(file, length);
+}
+
+std::unique_ptr<Stream> Stream::MakeFromData(std::shared_ptr<Data> data) {
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<MemoryStream>(data);
 }
 
 void StreamFactory::RegisterCustomProtocol(const std::string& customProtocol,

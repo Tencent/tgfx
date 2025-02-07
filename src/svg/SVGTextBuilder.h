@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <MacTypes.h>
 #include <string>
 #include "core/utils/GlyphConverter.h"
 #include "tgfx/core/GlyphRun.h"

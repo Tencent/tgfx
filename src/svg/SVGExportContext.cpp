@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGExportContext.h"
-#include <_types/_uint32_t.h>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -380,6 +379,14 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
   auto surface = Surface::Make(context, image->width(), image->height());
   auto* canvas = surface->getCanvas();
   canvas->drawImage(image);
+
+  Bitmap bitmap(surface->width(), surface->height());
+  auto* pixels = bitmap.lockPixels();
+  if (surface->readPixels(bitmap.info(), pixels)) {
+    bitmap.unlockPixels();
+    return bitmap;
+  }
+  bitmap.unlockPixels();
   return Bitmap();
 }
 

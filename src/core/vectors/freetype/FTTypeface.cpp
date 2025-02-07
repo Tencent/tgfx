@@ -31,6 +31,11 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
   return SystemFont::MakeFromName(fontFamily, fontStyle);
 }
 
+std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
+                                                 const FontStyle& fontStyle) {
+  return SystemFont::MakeFromName(fontFamily, fontStyle);
+}
+
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
   return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
 }

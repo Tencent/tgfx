@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
-#include <_types/_uint32_t.h>
 #include <string>
 #include <unordered_set>
 #include "SVGExportContext.h"
