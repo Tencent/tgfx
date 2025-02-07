@@ -2030,7 +2030,7 @@ TGFX_TEST(LayerTest, FilterMaxScaleFactor) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterMaxScaleFactor"));
 
-  Layer::SetDefaultEffectMaxScaleFactor(1.0f);
+  Layer::SetDefaultEffectMaxScaleFactor(2.0f);
 }
 
 TGFX_TEST(LayerTest, MaskAlpha) {
