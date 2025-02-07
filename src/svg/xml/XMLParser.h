@@ -21,6 +21,7 @@
 
 #include <string>
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 class XMLParser {
@@ -29,12 +30,12 @@ class XMLParser {
   virtual ~XMLParser();
 
   /**
-   * Parses data in XML format, with the parsing results returned via callback functions.
-   * @param data The data to be parsed.
+   * Parses stream in XML format, with the parsing results returned via callback functions.
+   * @param stream The stream to be parsed.
    * @return true if parsing is successful.
    * @return false if parsing fails.
    */
-  bool parse(const Data& data);
+  bool parse(Stream& stream);
 
  protected:
   /**

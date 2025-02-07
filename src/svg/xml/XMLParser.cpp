@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "XMLParser.h"
+#include <cstddef>
 #include <cstdlib>
 #include <string>
 #include "core/utils/Log.h"
@@ -51,7 +52,7 @@ class AutoTCallVProc : public std::unique_ptr<T, FunctionObject<P>> {
   }
 };
 
-constexpr const void* kHashSeed = &kHashSeed;
+constexpr const void* HASH_SEED = &HASH_SEED;
 
 const XML_Memory_Handling_Suite XML_alloc = {malloc, realloc, free};
 
@@ -120,7 +121,7 @@ void XMLCALL entity_decl_handler(void* data, const XML_Char* entityName,
 XMLParser::XMLParser() = default;
 XMLParser::~XMLParser() = default;
 
-bool XMLParser::parse(const Data& data) {
+bool XMLParser::parse(Stream& stream) {
   ParsingContext parsingContext(this);
   if (!parsingContext._XMLParser) {
     LOGE("could not create XML parser\n");
@@ -130,7 +131,7 @@ bool XMLParser::parse(const Data& data) {
   // Avoid calls to rand_s if this is not set. This seed helps prevent DOS
   // with a known hash sequence so an address is sufficient. The provided
   // seed should not be zero as that results in a call to rand_s.
-  auto seed = static_cast<unsigned long>(reinterpret_cast<size_t>(kHashSeed) & 0xFFFFFFFF);
+  auto seed = static_cast<unsigned long>(reinterpret_cast<size_t>(HASH_SEED) & 0xFFFFFFFF);
   XML_SetHashSalt(parsingContext._XMLParser, seed ? seed : 1);
 
   XML_SetUserData(parsingContext._XMLParser, &parsingContext);
@@ -140,9 +141,30 @@ bool XMLParser::parse(const Data& data) {
   // Disable entity processing, to inhibit internal entity expansion. See expat CVE-2013-0340.
   XML_SetEntityDeclHandler(parsingContext._XMLParser, entity_decl_handler);
 
-  XML_Status status =
-      XML_Parse(parsingContext._XMLParser, reinterpret_cast<const char*>(data.bytes()),
-                static_cast<int>(data.size()), true);
+  XML_Status status = XML_STATUS_OK;
+  if (stream.getMemoryBase() && stream.size() != 0) {
+    const char* base = reinterpret_cast<const char*>(stream.getMemoryBase());
+    status = XML_Parse(parsingContext._XMLParser, base, static_cast<int>(stream.size()), true);
+  } else {
+    static constexpr int BUFFER_SIZE = 4096;
+    bool done = false;
+    size_t length = stream.size();
+    size_t currentPos = 0;
+    do {
+      void* buffer = XML_GetBuffer(parsingContext._XMLParser, BUFFER_SIZE);
+      if (!buffer) {
+        return false;
+      }
+
+      size_t readLength = stream.read(buffer, BUFFER_SIZE);
+      currentPos += readLength;
+      done = currentPos >= length;
+      status = XML_ParseBuffer(parsingContext._XMLParser, static_cast<int>(readLength), done);
+      if (XML_STATUS_ERROR == status) {
+        break;
+      }
+    } while (!done);
+  }
   return XML_STATUS_ERROR != status;
 }
 

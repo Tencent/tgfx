@@ -18,10 +18,12 @@
 
 #include "SystemFont.h"
 #include <algorithm>
+#include "tgfx/core/FontStyle.h"
 
 #ifdef _WIN32
 #include <dwrite.h>
 #include <dwrite_3.h>
+#include <array>
 #include <locale>
 #endif
 
@@ -136,6 +138,30 @@ DWriteFontStyle ToDWriteFontStyle(const std::string& fontStyle) {
   return dWriteFontStyle;
 }
 
+static constexpr std::array<DWRITE_FONT_WEIGHT, 11> FontWeightMap = {
+    DWRITE_FONT_WEIGHT_THIN,      DWRITE_FONT_WEIGHT_THIN,       DWRITE_FONT_WEIGHT_EXTRA_LIGHT,
+    DWRITE_FONT_WEIGHT_LIGHT,     DWRITE_FONT_WEIGHT_REGULAR,    DWRITE_FONT_WEIGHT_MEDIUM,
+    DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_FONT_WEIGHT_BOLD,       DWRITE_FONT_WEIGHT_EXTRA_BOLD,
+    DWRITE_FONT_WEIGHT_BLACK,     DWRITE_FONT_WEIGHT_EXTRA_BLACK};
+
+static constexpr std::array<DWRITE_FONT_STRETCH, 9> FontWidthMap = {
+    DWRITE_FONT_STRETCH_ULTRA_CONDENSED, DWRITE_FONT_STRETCH_EXTRA_CONDENSED,
+    DWRITE_FONT_STRETCH_CONDENSED,       DWRITE_FONT_STRETCH_SEMI_CONDENSED,
+    DWRITE_FONT_STRETCH_NORMAL,          DWRITE_FONT_STRETCH_SEMI_EXPANDED,
+    DWRITE_FONT_STRETCH_EXPANDED,        DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+    DWRITE_FONT_STRETCH_ULTRA_EXPANDED};
+
+static constexpr std::array<DWRITE_FONT_STYLE, 3> FontSlantMap = {
+    DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STYLE_OBLIQUE};
+
+DWriteFontStyle ToDWriteFontStyle(FontStyle fontStyle) {
+  DWriteFontStyle dWriteFontStyle{};
+  dWriteFontStyle.weight = FontWeightMap[static_cast<size_t>(fontStyle.weight())];
+  dWriteFontStyle.stretch = FontWidthMap[static_cast<size_t>(fontStyle.width())];
+  dWriteFontStyle.fontStyle = FontSlantMap[static_cast<size_t>(fontStyle.slant())];
+  return dWriteFontStyle;
+}
+
 std::wstring ToWstring(const std::string& input) {
   std::wstring result;
   int len = MultiByteToWideChar(CP_ACP, 0, input.c_str(), input.size(), nullptr, 0);
@@ -174,7 +200,7 @@ void SafeRelease(T** ppT) {
 }
 
 std::shared_ptr<Typeface> MakeFromFontName(const std::string& fontFamily,
-                                           const std::string& fontStyle) {
+                                           const DWriteFontStyle& fontStyle) {
   if (fontFamily.empty()) {
     return nullptr;
   }
@@ -187,10 +213,8 @@ std::shared_ptr<Typeface> MakeFromFontName(const std::string& fontFamily,
     hResult = writeFactory->GetSystemFontSet(&fontSet);
   }
   if (SUCCEEDED(hResult)) {
-    DWriteFontStyle dWriteFontStyle = ToDWriteFontStyle(fontStyle);
-    hResult =
-        fontSet->GetMatchingFonts(ToWstring(fontFamily).c_str(), dWriteFontStyle.weight,
-                                  dWriteFontStyle.stretch, dWriteFontStyle.fontStyle, &fontSet);
+    hResult = fontSet->GetMatchingFonts(ToWstring(fontFamily).c_str(), fontStyle.weight,
+                                        fontStyle.stretch, fontStyle.fontStyle, &fontSet);
   }
   UINT32 fontCount = 0;
   if (SUCCEEDED(hResult)) {
@@ -237,8 +261,19 @@ std::shared_ptr<Typeface> MakeFromFontName(const std::string& fontFamily,
 std::shared_ptr<Typeface> SystemFont::MakeFromName(const std::string& fontFamily,
                                                    const std::string& fontStyle) {
 #ifdef _WIN32
-  return MakeFromFontName(fontFamily, fontStyle);
+  auto dWriteFontStyle = ToDWriteFontStyle(fontStyle);
+  return MakeFromFontName(fontFamily, dWriteFontStyle);
 #endif
   return nullptr;
 }
+
+std::shared_ptr<Typeface> SystemFont::MakeFromName(const std::string& fontFamily,
+                                                   FontStyle fontStyle) {
+#ifdef _WIN32
+  auto dWriteFontStyle = ToDWriteFontStyle(fontStyle);
+  return MakeFromFontName(fontFamily, dWriteFontStyle);
+#endif
+  return nullptr;
+}
+
 }  // namespace tgfx
