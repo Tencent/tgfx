@@ -30,8 +30,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& name,
   return WebTypeface::Make(name, style);
 }
 
-std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
-                                                 FontStyle fontStyle) {
+std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string&, FontStyle) {
   return nullptr;
 }
 
