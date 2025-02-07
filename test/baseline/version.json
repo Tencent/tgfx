@@ -117,6 +117,7 @@
         "draw_text": "b062b9a",
         "dropShadow": "43cd416",
         "filterClip": "43cd416",
+        "filterMaxScaleFactor": "b77dc65",
         "filterTest": "44166b7",
         "filters": "270695a",
         "getBounds": "238cdf0",
