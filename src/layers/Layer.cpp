@@ -31,7 +31,7 @@
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
-static std::atomic<float> FilterMaxScaleFactor = 2.0f;
+static std::atomic<float> EffectMaxScaleFactor = 2.0f;
 
 struct LayerStyleSource {
   float contentScale = 1.0f;
@@ -87,12 +87,12 @@ void Layer::SetDefaultAllowsGroupOpacity(bool value) {
   AllowsGroupOpacity = value;
 }
 
-float Layer::DefaultFilterMaxScaleFactor() {
-  return FilterMaxScaleFactor;
+float Layer::DefaultEffectMaxScaleFactor() {
+  return EffectMaxScaleFactor;
 }
 
-void Layer::SetDefaultFilterMaxScaleFactor(float value) {
-  FilterMaxScaleFactor = value;
+void Layer::SetDefaultEffectMaxScaleFactor(float value) {
+  EffectMaxScaleFactor = value;
 }
 
 std::shared_ptr<Layer> Layer::Make() {
@@ -117,7 +117,7 @@ Layer::Layer() {
   bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
 
-  _filterMaxScaleFactor = FilterMaxScaleFactor;
+  _effectMaxScaleFactor = EffectMaxScaleFactor;
 }
 
 void Layer::setAlpha(float value) {
@@ -245,11 +245,11 @@ void Layer::setScrollRect(const Rect& rect) {
   invalidate();
 }
 
-void Layer::setFilterMaxScaleFactor(float value) {
-  if (_filterMaxScaleFactor == value) {
+void Layer::setEffectMaxScaleFactor(float value) {
+  if (_effectMaxScaleFactor == value) {
     return;
   }
-  _filterMaxScaleFactor = value;
+  _effectMaxScaleFactor = value;
   invalidate();
 }
 
@@ -747,7 +747,10 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
-  auto contentScale = std::min(canvas->getMatrix().getMaxScale(), _filterMaxScaleFactor);
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  if (_effectMaxScaleFactor > 0) {
+    contentScale = std::min(contentScale, _effectMaxScaleFactor);
+  }
   if (FloatNearlyZero(contentScale)) {
     return;
   }
@@ -850,7 +853,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
-  auto contentScale = std::min(matrix.getMaxScale(), _filterMaxScaleFactor);
+  auto contentScale = matrix.getMaxScale();
+  if (_effectMaxScaleFactor > 0) {
+    contentScale = std::min(contentScale, _effectMaxScaleFactor);
+  }
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }

@@ -65,15 +65,16 @@ class Layer {
   static void SetDefaultAllowsGroupOpacity(bool value);
 
   /**
-  * Returns the default value for the filterMaxScaleFactor property for new Layer instances. The
-  * default value is 1.0.
-  */
-  static float DefaultFilterMaxScaleFactor();
+   * Returns the default value for the effectMaxScaleFactor property for new Layer instances. The
+   * default value is 2.0. If the value is less than or equal to 0, the layerContent will have no
+   * limit on scaling.
+   */
+  static float DefaultEffectMaxScaleFactor();
 
   /**
-  * Sets the default value for the filterMaxScaleFactor property for new Layer instances.
-  */
-  static void SetDefaultFilterMaxScaleFactor(float value);
+   * Sets the default value for the effectMaxScaleFactor property for new Layer instances.
+   */
+  static void SetDefaultEffectMaxScaleFactor(float value);
 
   /**
    * Creates a new Layer instance.
@@ -316,20 +317,22 @@ class Layer {
   void setScrollRect(const Rect& rect);
 
   /**
-  * Returns the maximum scale factor at which the layer's filters are applied. The default value is
-  * read from the Layer::DefaultFilterMaxScaleFactor() method.
-  * When the layer has a scale factor, the LayerFilter will use the scaled layerContent for
-  * filtering. The filterMaxScaleFactor constrains the maximum scale value of the filter source
-  * to prevent excessive memory usage.
-  */
-  float filterMaxScaleFactor() const {
-    return _filterMaxScaleFactor;
+   * Returns the maximum scale factor at which the layer's effects are applied. The default value is
+   * read from the Layer::DefaultFilterMaxScaleFactor() method.
+   * When the layer has a scale factor, effects will use the scaled layerContent as source.
+   * The effectMaxScaleFactor constrains the maximum scale value of the effect source
+   * to prevent excessive memory usage.
+   * If effectMaxScaleFactor is less than or equal to 0, the layerContent will have no limit on
+   * scaling.
+   */
+  float effectMaxScaleFactor() const {
+    return _effectMaxScaleFactor;
   }
 
   /**
-  * Sets the maximum scale factor at which the layer's filters are applied.
-  */
-  void setFilterMaxScaleFactor(float value);
+   * Sets the maximum scale factor at which the layer's effects are applied.
+   */
+  void setEffectMaxScaleFactor(float value);
 
   /**
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
@@ -622,7 +625,7 @@ class Layer {
   BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = Matrix::I();
   float _rasterizationScale = 1.0f;
-  float _filterMaxScaleFactor = 2.0f;
+  float _effectMaxScaleFactor = 2.0f;
 
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;

@@ -1994,16 +1994,16 @@ TGFX_TEST(LayerTest, FilterMaxScaleFactor) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
-  EXPECT_EQ(Layer::DefaultFilterMaxScaleFactor(), 2.0f);
-  Layer::SetDefaultFilterMaxScaleFactor(1.0f);
-  EXPECT_EQ(Layer::DefaultFilterMaxScaleFactor(), 1.0f);
+  EXPECT_EQ(Layer::DefaultEffectMaxScaleFactor(), 2.0f);
+  Layer::SetDefaultEffectMaxScaleFactor(1.0f);
+  EXPECT_EQ(Layer::DefaultEffectMaxScaleFactor(), 1.0f);
 
   auto surface = Surface::Make(context, 150, 150);
   auto displayList = std::make_unique<DisplayList>();
   auto layer = ShapeLayer::Make();
-  EXPECT_EQ(layer->filterMaxScaleFactor(), 1.0f);
-  layer->setFilterMaxScaleFactor(2.0f);
-  EXPECT_EQ(layer->filterMaxScaleFactor(), 2.0f);
+  EXPECT_EQ(layer->effectMaxScaleFactor(), 1.0f);
+  layer->setEffectMaxScaleFactor(2.0f);
+  EXPECT_EQ(layer->effectMaxScaleFactor(), 2.0f);
 
   layer->setMatrix(Matrix::MakeTrans(30, 30));
   Path path;
@@ -2030,7 +2030,7 @@ TGFX_TEST(LayerTest, FilterMaxScaleFactor) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterMaxScaleFactor"));
 
-  Layer::SetDefaultFilterMaxScaleFactor(1.0f);
+  Layer::SetDefaultEffectMaxScaleFactor(1.0f);
 }
 
 TGFX_TEST(LayerTest, MaskAlpha) {
