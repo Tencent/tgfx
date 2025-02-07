@@ -2060,11 +2060,15 @@ TGFX_TEST(LayerTest, ChildMask) {
 
   group->setMask(mask);
 
+  auto groupMatrix = Matrix::MakeScale(0.5f);
+  groupMatrix.postRotate(30);
+  group->setMatrix(groupMatrix);
+
   group->setFilters({BlurFilter::Make(30, 30)});
 
   list.root()->addChild(group);
   auto surface = Surface::Make(context, 300, 300);
   list.render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask2"));
 }
 }  // namespace tgfx
