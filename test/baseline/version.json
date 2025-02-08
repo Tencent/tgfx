@@ -96,7 +96,7 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
-        "ChildMask": "3dbeed5",
+        "ChildMask": "b77dc65",
         "DropShadowStyle": "19dcc4d",
         "DropShadowStyle-stroke": "002c391",
         "DropShadowStyle-stroke-behindLayer": "002c391",
@@ -124,7 +124,7 @@
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "e5103ae6",
-        "imageMask": "3dbeed5",
+        "imageMask": "df76820",
         "innerShadow": "270695a",
         "shapeMask": "3dbeed5",
         "textMask": "3dbeed5"
@@ -199,20 +199,20 @@
     },
     "SVGTest": {
         "blur": "b1db872",
-        "jpg_image": "b1db872",
-        "mask": "b1db872",
-        "path": "b1db872",
-        "png_image": "b1db872",
-        "radialGradient": "b1db872",
-        "text": "b1db872",
-        "textFont": "348f70e",
         "complex1": "ba1c7c2",
         "complex2": "ba1c7c2",
         "complex3": "ba1c7c2",
         "complex4": "ba1c7c2",
         "complex5": "ba1c7c2",
-        "complex6": "ba1c7c2",
-        "complex7": "ba1c7c2"
+        "complex6": "da364e8",
+        "complex7": "da364e8",
+        "jpg_image": "b1db872",
+        "mask": "da364e8",
+        "path": "b1db872",
+        "png_image": "b1db872",
+        "radialGradient": "b1db872",
+        "text": "b1db872",
+        "textFont": "348f70e"
     },
     "SurfaceTest": {
         "ImageSnapshot1": "d010fb8",

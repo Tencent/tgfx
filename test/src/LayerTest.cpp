@@ -2025,30 +2025,49 @@ TGFX_TEST(LayerTest, ChildMask) {
   DisplayList list;
   Path path;
   path.addRect(Rect::MakeWH(100, 100));
-  auto group = Layer::Make();
+
+  const auto init_trans = Matrix::MakeTrans(150, 50);
+
+  auto group = ShapeLayer::Make();
 
   auto layer = ShapeLayer::Make();
   layer->setPath(path);
-  auto layer_style = tgfx::SolidColor::Make({0.0f, 1.0f, 0.0f, 1.0f});
+  auto layer_matrix = Matrix::MakeRotate(45);
+  layer_matrix.postConcat(init_trans);
+  layer->setMatrix(layer_matrix);
+  auto layer_style = SolidColor::Make(Color::Red());
   layer->setFillStyle(layer_style);
 
   auto layer2 = ShapeLayer::Make();
   layer2->setPath(path);
-  layer2->setMatrix(Matrix::MakeTrans(100, 50));
-  layer2->setFillStyle(layer_style);
+  auto layer2_matrix = Matrix::MakeTrans(100, 0);
+  layer2_matrix.postConcat(init_trans);
+  layer2->setMatrix(layer2_matrix);
+  auto layer2_style = SolidColor::Make(Color::Green());
+  layer2->setFillStyle(layer2_style);
 
   auto mask = ShapeLayer::Make();
   mask->setPath(path);
-  mask->setMatrix(Matrix::MakeTrans(50, 50));
-  auto mask_style = tgfx::SolidColor::Make({1.0f, 0.0f, 0.0f, 1.0f});
+  auto mask_matrix = Matrix::MakeTrans(50, 50);
+  mask_matrix.postConcat(init_trans);
+  mask->setMatrix(mask_matrix);
+  auto mask_style = SolidColor::Make(Color::Blue());
   mask->setFillStyle(mask_style);
 
-  group->setMask(mask);
   group->addChild(layer);
   group->addChild(layer2);
   group->addChild(mask);
+
+  group->setMask(mask);
+
+  auto groupMatrix = Matrix::MakeScale(0.5f);
+  groupMatrix.postRotate(30);
+  group->setMatrix(groupMatrix);
+
+  group->setFilters({BlurFilter::Make(30, 30)});
+
   list.root()->addChild(group);
-  auto surface = Surface::Make(context, 150, 150);
+  auto surface = Surface::Make(context, 300, 300);
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask"));
 }

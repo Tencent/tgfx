@@ -209,7 +209,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   DEBUG_ASSERT(style.shader == nullptr);
   Matrix viewMatrix = {};
   Rect bounds = {};
-  if (filter || style.maskFilter) {
+  if (filter) {
     if (picture->hasUnboundedFill()) {
       bounds = ToLocalBounds(getClipBounds(state.clip), state.matrix);
     } else {
@@ -232,21 +232,21 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
-  Matrix invertMatrix = {};
-  if (!viewMatrix.invert(&invertMatrix)) {
-    return;
-  }
   MCState drawState = state;
-  drawState.matrix.preConcat(invertMatrix);
   if (filter) {
     auto offset = Point::Zero();
     image = image->makeWithFilter(std::move(filter), &offset);
     if (image == nullptr) {
       return;
     }
-    drawState.matrix.preTranslate(offset.x, offset.y);
+    viewMatrix.preTranslate(-offset.x, -offset.y);
   }
-  drawImage(std::move(image), {}, drawState, style);
+  Matrix invertMatrix = {};
+  if (!viewMatrix.invert(&invertMatrix)) {
+    return;
+  }
+  drawState.matrix.preConcat(invertMatrix);
+  drawImage(std::move(image), {}, drawState, ApplyMatrix(style, viewMatrix));
 }
 
 void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
