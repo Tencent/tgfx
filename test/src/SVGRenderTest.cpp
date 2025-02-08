@@ -211,7 +211,7 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
-  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")},
+  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")},
                                {0});
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/text"));
@@ -236,6 +236,28 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
                                {0});
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/textFont"));
+}
+
+TGFX_TEST(SVGRenderTest, TextEmojiSVG) {
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/emoji.svg"));
+  ASSERT_TRUE(stream != nullptr);
+
+  auto SVGDom = SVGDOM::Make(*stream);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
+                                ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf")},
+                               {0, 0});
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/textEmoji"));
 }
 
 TGFX_TEST(SVGRenderTest, ComplexSVG) {
@@ -302,6 +324,8 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto surface = Surface::Make(context, 500, 400);
     auto* canvas = surface->getCanvas();
 
+    SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")},
+                                 {0});
     SVGDom->render(canvas);
     EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex4"));
   }
