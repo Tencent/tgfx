@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGDOM.h"
-#include <_types/_uint32_t.h>
 #include <cstddef>
 #include <cstring>
 #include <ctime>
@@ -37,7 +36,6 @@
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/core/Typeface.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"

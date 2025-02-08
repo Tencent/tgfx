@@ -23,7 +23,6 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <vector>
 #include "core/utils/Log.h"
 #include "svg/SVGLengthContext.h"
 #include "tgfx/core/Canvas.h"
@@ -37,7 +36,6 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/core/Typeface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/FontManager.h"
 #include "tgfx/svg/SVGAttribute.h"

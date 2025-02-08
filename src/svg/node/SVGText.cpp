@@ -21,14 +21,12 @@
 #include <cstdint>
 #include <memory>
 #include <tuple>
-#include <vector>
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 #include "tgfx/svg/SVGTypes.h"
 
