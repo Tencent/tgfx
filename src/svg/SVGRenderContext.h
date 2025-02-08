@@ -23,6 +23,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include "core/utils/Log.h"
 #include "svg/SVGLengthContext.h"
 #include "tgfx/core/Canvas.h"
@@ -36,6 +37,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/FontManager.h"
 #include "tgfx/svg/SVGAttribute.h"
@@ -130,6 +132,7 @@ class SVGRenderContext {
   };
 
   SVGRenderContext(Canvas* canvas, const std::shared_ptr<StreamFactory>& streamFactory,
+                   const std::vector<std::shared_ptr<Typeface>>& fontList,
                    const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                    const SVGPresentationContext& presentContext, const OBBScope& scope,
                    const Matrix& matrix);
@@ -189,7 +192,9 @@ class SVGRenderContext {
 
   SVGColorType resolveSVGColor(const SVGColor&) const;
 
-  Font resolveFont() const;
+  float resolveFontSize() const;
+
+  std::shared_ptr<Typeface> resolveTypeface() const;
 
   // The local computed clip path (not inherited).
   Path clipPath() const {
@@ -198,6 +203,10 @@ class SVGRenderContext {
 
   const std::shared_ptr<StreamFactory>& streamFactory() const {
     return _streamFactory;
+  }
+
+  const std::vector<std::shared_ptr<Typeface>>& fallbackTypefaceList() const {
+    return _fallbackFontList;
   }
 
   // Returns the translate/scale transformation required to map into the current OBB scope,
@@ -225,8 +234,8 @@ class SVGRenderContext {
 
   std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
 
-  // std::shared_ptr<FontManager> _fontManager;
   std::shared_ptr<StreamFactory> _streamFactory;
+  const std::vector<std::shared_ptr<Typeface>>& _fallbackFontList;
 
   const SVGIDMapper& nodeIDMapper;
   CopyOnWrite<SVGLengthContext> _lengthContext;

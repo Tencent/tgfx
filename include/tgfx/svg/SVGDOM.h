@@ -90,6 +90,11 @@ class SVGDOM {
    */
   const Size& getContainerSize() const;
 
+  static void SetFallbackFontNames(const std::vector<std::string>& fontNames);
+
+  static void SetFallbackFontPaths(const std::vector<std::string>& fontPaths,
+                                   const std::vector<int>& ttcIndices);
+
  private:
   /**
    * Construct a new SVGDOM object
@@ -100,5 +105,7 @@ class SVGDOM {
   const SVGIDMapper nodeIDMapper = {};
   const SVGDOMOptions options = {};
   Size containerSize = {};
+
+  inline static std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList = {};
 };
 }  // namespace tgfx

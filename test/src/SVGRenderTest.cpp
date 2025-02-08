@@ -211,6 +211,8 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
+  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")},
+                               {0});
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/text"));
 }
@@ -230,6 +232,8 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
+  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")},
+                               {0});
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/textFont"));
 }
