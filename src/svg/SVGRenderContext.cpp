@@ -291,7 +291,7 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   }
 
   auto maskNode = std::static_pointer_cast<SVGMask>(node);
-  auto maskBound = maskNode->bounds(*this);
+  // auto maskBound = maskNode->bounds(*this);
 
   Recorder maskRecorder;
   auto* maskCanvas = maskRecorder.beginRecording();
@@ -304,13 +304,16 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
     return nullptr;
   }
 
-  auto transMatrix = _matrix * Matrix::MakeTrans(-maskBound.left, -maskBound.top);
-  auto shaderImage =
-      Image::MakeFrom(picture, static_cast<int>(maskBound.width() * _matrix.getScaleX()),
-                      static_cast<int>(maskBound.height() * _matrix.getScaleY()), &transMatrix);
+  auto bounds = picture->getBounds();
+  bounds.roundOut();
+  auto transMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  auto shaderImage = Image::MakeFrom(picture, static_cast<int>(bounds.width()),
+                                     static_cast<int>(bounds.height()), &transMatrix);
   auto shader = Shader::MakeImageShader(shaderImage, TileMode::Decal, TileMode::Decal);
-  if (!shader) {
-    return nullptr;
+  if (shader) {
+    Matrix shaderMatrix = _matrix;
+    shaderMatrix.preTranslate(bounds.left, bounds.top);
+    shader = shader->makeWithMatrix(shaderMatrix);
   }
   return MaskFilter::MakeShader(shader);
 }
