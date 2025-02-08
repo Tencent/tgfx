@@ -291,8 +291,6 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
   }
 
   auto maskNode = std::static_pointer_cast<SVGMask>(node);
-  // auto maskBound = maskNode->bounds(*this);
-
   Recorder maskRecorder;
   auto* maskCanvas = maskRecorder.beginRecording();
   {
@@ -306,9 +304,11 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
 
   auto bounds = picture->getBounds();
   bounds.roundOut();
+
   auto transMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   auto shaderImage = Image::MakeFrom(picture, static_cast<int>(bounds.width()),
                                      static_cast<int>(bounds.height()), &transMatrix);
+
   auto shader = Shader::MakeImageShader(shaderImage, TileMode::Decal, TileMode::Decal);
   if (shader) {
     Matrix shaderMatrix = _matrix;
