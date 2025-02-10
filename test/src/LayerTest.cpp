@@ -1913,19 +1913,37 @@ TGFX_TEST(LayerTest, Filters) {
 }
 
 TGFX_TEST(LayerTest, MaskOnwer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1, 1);
+  auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
+  auto layer2 = Layer::Make();
   auto mask = Layer::Make();
+
+  displayList->root()->addChild(layer);
+  displayList->root()->addChild(layer2);
+  displayList->root()->addChild(mask);
+
   layer->setMask(mask);
   EXPECT_EQ(layer->mask(), mask);
   EXPECT_NE(mask->maskOwners.find(layer.get()), mask->maskOwners.end());
 
-  auto layer2 = Layer::Make();
   layer2->setMask(mask);
   EXPECT_EQ(layer2->mask(), mask);
   EXPECT_NE(mask->maskOwners.find(layer2.get()), mask->maskOwners.end());
 
   layer2->setMask(mask);
   EXPECT_EQ(mask->maskOwners.size(), 2lu);
+
+  displayList->render(surface.get());
+  EXPECT_FALSE(layer->bitFields.contentDirty);
+  EXPECT_FALSE(layer2->bitFields.contentDirty);
+  EXPECT_FALSE(mask->bitFields.contentDirty);
+  mask->setAlpha(0.5f);
+  EXPECT_TRUE(layer->bitFields.contentDirty);
+  EXPECT_TRUE(layer2->bitFields.contentDirty);
 
   layer->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
