@@ -97,7 +97,7 @@ Layer::~Layer() {
     filter->detachFromLayer(this);
   }
   if (_mask) {
-    _mask->removeMaskOwner(this);
+    _mask->maskOwners.erase(this);
   }
   removeChildren();
 }
@@ -209,11 +209,11 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
     return;
   }
   if (_mask) {
-    _mask->removeMaskOwner(this);
+    _mask->maskOwners.erase(this);
   }
   _mask = std::move(value);
   if (_mask) {
-    _mask->maskOwners.push_back(this);
+    _mask->maskOwners.insert(this);
   }
   invalidate();
 }
@@ -970,12 +970,4 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root();
 }
-
-void Layer::removeMaskOwner(Layer* layer) {
-  auto layerIt = std::find(maskOwners.begin(), maskOwners.end(), layer);
-  if (layerIt != maskOwners.end()) {
-    maskOwners.erase(layerIt);
-  }
-}
-
 }  // namespace tgfx

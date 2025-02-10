@@ -1917,12 +1917,12 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   auto mask = Layer::Make();
   layer->setMask(mask);
   EXPECT_EQ(layer->mask(), mask);
-  EXPECT_EQ(mask->maskOwners[0], layer.get());
+  EXPECT_NE(mask->maskOwners.find(layer.get()), mask->maskOwners.end());
 
   auto layer2 = Layer::Make();
   layer2->setMask(mask);
   EXPECT_EQ(layer2->mask(), mask);
-  EXPECT_EQ(mask->maskOwners[1], layer2.get());
+  EXPECT_NE(mask->maskOwners.find(layer2.get()), mask->maskOwners.end());
 
   layer2->setMask(mask);
   EXPECT_EQ(mask->maskOwners.size(), 2lu);
@@ -1930,9 +1930,8 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   layer->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwners.size(), 1lu);
-  EXPECT_TRUE(std::find(mask->maskOwners.begin(), mask->maskOwners.end(), layer.get()) ==
-              mask->maskOwners.end());
-  EXPECT_EQ(mask->maskOwners[0], layer2.get());
+  EXPECT_EQ(mask->maskOwners.find(layer.get()), mask->maskOwners.end());
+  EXPECT_NE(mask->maskOwners.find(layer2.get()), mask->maskOwners.end());
 
   layer2->setMask(nullptr);
   EXPECT_EQ(layer2->mask(), nullptr);
