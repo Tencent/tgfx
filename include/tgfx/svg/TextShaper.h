@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
 #include "tgfx/core/Font.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
