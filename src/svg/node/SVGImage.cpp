@@ -60,33 +60,19 @@ std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
   // For base64 protocol:
   //   - base64 data is decoded and loaded using Image::MakeFromEncoded
 
-  auto loadFromStream = [](const std::string& path) -> std::shared_ptr<Image> {
-    auto stream = Stream::MakeFromFile(path);
-    if (!stream) {
-      return nullptr;
-    }
-    auto* out = static_cast<unsigned char*>(malloc(stream->size()));
-    if (!out) {
-      return nullptr;
-    }
-    stream->read(out, stream->size());
-    auto outData = Data::MakeAdopted(out, stream->size(), Data::FreeProc);
-    return Image::MakeFromEncoded(outData);
-  };
-
   switch (href.type()) {
     case SVGIRI::Type::DataURI: {
       const auto& base64URL = href.iri();
       auto pos = base64URL.find("base64,");
       if (pos == std::string::npos) {
-        return loadFromStream(base64URL);
+        return Image::MakeFromFile(base64URL);
       }
       std::string base64Data = base64URL.substr(pos + 7);
       auto data = Base64Decode(base64Data);
       return data ? Image::MakeFromEncoded(data) : nullptr;
     }
     case SVGIRI::Type::Nonlocal: {
-      return loadFromStream(href.iri());
+      return Image::MakeFromFile(href.iri());
     }
     default:
       return nullptr;
