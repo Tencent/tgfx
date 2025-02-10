@@ -16,25 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SystemFontManager.h"
-#include <array>
-#include <cstddef>
+#pragma once
+
 #include <memory>
 #include <string>
-#include "core/utils/Log.h"
-#include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
+/**
+ * An abstract class for text layout and shaping. This class converts text strings into TextBlob
+ * objects. Users can provide their own implementation.
+ */
+class TextShaper {
+ public:
+  /**
+   * Creates a TextShaper object with the specified fallback typeface list.
+   * Provides a basic implementation.
+   */
+  static std::shared_ptr<TextShaper> Make(
+      std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList);
 
-std::shared_ptr<Typeface> SystemFontManager::matchTypeface(const std::string& familyName,
-                                                           FontStyle style) const {
-  return Typeface::MakeFromName(familyName, style);
-}
+  /**
+   * Destroys the TextShaper object.
+   */
+  virtual ~TextShaper() = default;
 
-std::shared_ptr<Typeface> SystemFontManager::getFallbackTypeface(const std::string& familyName,
-                                                                 FontStyle style, Unichar) const {
-  return matchTypeface(familyName, style);
-}
+  /**
+   * Shapes the input text string into a TextBlob object. The typeface parameter is the system font
+   * matched based on text attributes, or nullptr if no match is found. The fontSize parameter
+   * specifies the font size to use.
+   */
+  virtual std::shared_ptr<TextBlob> shape(const std::string& text,
+                                          std::shared_ptr<Typeface> typeface, float fontSize) = 0;
+};
 
 }  // namespace tgfx

@@ -37,10 +37,10 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/FontManager.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/TextShaper.h"
 
 namespace tgfx {
 
@@ -130,8 +130,8 @@ class SVGRenderContext {
   };
 
   SVGRenderContext(Canvas* canvas, const std::shared_ptr<StreamFactory>& streamFactory,
-                   const std::vector<std::shared_ptr<Typeface>>& fontList,
-                   const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
+                   const std::shared_ptr<TextShaper>& textShaper, const SVGIDMapper& mapper,
+                   const SVGLengthContext& lengthContext,
                    const SVGPresentationContext& presentContext, const OBBScope& scope,
                    const Matrix& matrix);
   SVGRenderContext(const SVGRenderContext& other);
@@ -203,8 +203,8 @@ class SVGRenderContext {
     return _streamFactory;
   }
 
-  const std::vector<std::shared_ptr<Typeface>>& fallbackTypefaceList() const {
-    return _fallbackFontList;
+  const std::shared_ptr<TextShaper>& textShaper() const {
+    return _textShaper;
   }
 
   // Returns the translate/scale transformation required to map into the current OBB scope,
@@ -233,7 +233,7 @@ class SVGRenderContext {
   std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
 
   std::shared_ptr<StreamFactory> _streamFactory;
-  const std::vector<std::shared_ptr<Typeface>>& _fallbackFontList;
+  std::shared_ptr<TextShaper> _textShaper;
 
   const SVGIDMapper& nodeIDMapper;
   CopyOnWrite<SVGLengthContext> _lengthContext;

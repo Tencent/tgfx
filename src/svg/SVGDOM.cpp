@@ -30,7 +30,6 @@
 #include "svg/SVGLengthContext.h"
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
-#include "svg/SystemFontManager.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Recorder.h"
@@ -97,7 +96,9 @@ void SVGDOM::render(Canvas* canvas) {
   SVGLengthContext lengthContext(drawSize);
   SVGPresentationContext presentationContext;
 
-  SVGRenderContext renderContext(canvas, options.streamFactory, fallbackTypefaceList, nodeIDMapper,
+  auto textShaper = options.textShaper ? options.textShaper : TextShaper::Make({});
+
+  SVGRenderContext renderContext(canvas, options.streamFactory, textShaper, nodeIDMapper,
                                  lengthContext, presentationContext, {nullptr, nullptr},
                                  canvas->getMatrix());
 
@@ -110,25 +111,6 @@ const Size& SVGDOM::getContainerSize() const {
 
 void SVGDOM::setContainerSize(const Size& size) {
   containerSize = size;
-}
-
-void SVGDOM::SetFallbackFontNames(const std::vector<std::string>& fontNames) {
-  fallbackTypefaceList.clear();
-  for (const auto& fontFamily : fontNames) {
-    auto typeface = Typeface::MakeFromName(fontFamily, "");
-    fallbackTypefaceList.push_back(typeface);
-  }
-}
-
-void SVGDOM::SetFallbackFontPaths(const std::vector<std::string>& fontPaths,
-                                  const std::vector<int>& ttcIndices) {
-  fallbackTypefaceList.clear();
-  uint32_t index = 0;
-  for (const auto& fontPath : fontPaths) {
-    auto typeface = Typeface::MakeFromPath(fontPath, ttcIndices[index]);
-    fallbackTypefaceList.push_back(typeface);
-    index++;
-  }
 }
 
 }  // namespace tgfx

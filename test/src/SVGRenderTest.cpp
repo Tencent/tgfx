@@ -19,12 +19,12 @@
 #include <iostream>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 #include "gtest/gtest.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
-#include "tgfx/svg/FontManager.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "utils/TestUtils.h"
@@ -200,7 +200,13 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/text.svg"));
   ASSERT_TRUE(stream != nullptr);
 
-  auto SVGDom = SVGDOM::Make(*stream);
+  std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
+  fallbackTypefaceList.push_back(
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")));
+  SVGDOMOptions options;
+  options.textShaper = TextShaper::Make(fallbackTypefaceList);
+
+  auto SVGDom = SVGDOM::Make(*stream, options);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -211,8 +217,6 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
-  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")},
-                               {0});
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/text"));
 }
@@ -221,7 +225,13 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/textFont.svg"));
   ASSERT_TRUE(stream != nullptr);
 
-  auto SVGDom = SVGDOM::Make(*stream);
+  std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
+  fallbackTypefaceList.push_back(
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")));
+  SVGDOMOptions options;
+  options.textShaper = TextShaper::Make(fallbackTypefaceList);
+
+  auto SVGDom = SVGDOM::Make(*stream, options);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -232,8 +242,6 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
-  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")},
-                               {0});
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/textFont"));
 }
@@ -242,7 +250,15 @@ TGFX_TEST(SVGRenderTest, TextEmojiSVG) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/emoji.svg"));
   ASSERT_TRUE(stream != nullptr);
 
-  auto SVGDom = SVGDOM::Make(*stream);
+  std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
+  fallbackTypefaceList.push_back(
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")));
+  fallbackTypefaceList.push_back(
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf")));
+  SVGDOMOptions options;
+  options.textShaper = TextShaper::Make(fallbackTypefaceList);
+
+  auto SVGDom = SVGDOM::Make(*stream, options);
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -253,9 +269,6 @@ TGFX_TEST(SVGRenderTest, TextEmojiSVG) {
                                static_cast<int>(rootNode->getHeight().value()));
   auto* canvas = surface->getCanvas();
 
-  SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
-                                ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf")},
-                               {0, 0});
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/textEmoji"));
 }
@@ -317,15 +330,19 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex4.svg"));
     ASSERT_TRUE(stream != nullptr);
 
-    auto SVGDom = SVGDOM::Make(*stream);
+    std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
+    fallbackTypefaceList.push_back(
+        Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")));
+    SVGDOMOptions options;
+    options.textShaper = TextShaper::Make(fallbackTypefaceList);
+
+    auto SVGDom = SVGDOM::Make(*stream, options);
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 
     auto surface = Surface::Make(context, 500, 400);
     auto* canvas = surface->getCanvas();
 
-    SVGDom->SetFallbackFontPaths({ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")},
-                                 {0});
     SVGDom->render(canvas);
     EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/complex4"));
   }
