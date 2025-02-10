@@ -27,6 +27,7 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/core/UTF.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
@@ -114,12 +115,14 @@ bool SVGTextContainer::parseAndSetAttribute(const std::string& name, const std::
 
 void SVGTextLiteral::onShapeText(const SVGRenderContext& context,
                                  const ShapedTextCallback& function) const {
-
-  auto font = context.resolveFont();
-  if (!font.getTypeface()) {
-    return;
+  const auto& shaper = context.textShaper();
+  std::shared_ptr<TextBlob> textBlob = nullptr;
+  if (shaper) {
+    textBlob = shaper->shape(Text, context.resolveTypeface(), context.resolveFontSize());
+  } else {
+    Font font(context.resolveTypeface(), context.resolveFontSize());
+    textBlob = TextBlob::MakeFrom(Text, font);
   }
-  auto textBlob = TextBlob::MakeFrom(Text, font);
   function(context, textBlob);
 }
 

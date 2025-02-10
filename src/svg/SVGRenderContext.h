@@ -37,10 +37,10 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/FontManager.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/TextShaper.h"
 
 namespace tgfx {
 
@@ -129,7 +129,7 @@ class SVGRenderContext {
     const SVGRenderContext* context;
   };
 
-  SVGRenderContext(Canvas* canvas, const std::shared_ptr<StreamFactory>& streamFactory,
+  SVGRenderContext(Canvas* canvas, const std::shared_ptr<TextShaper>& textShaper,
                    const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                    const SVGPresentationContext& presentContext, const OBBScope& scope,
                    const Matrix& matrix);
@@ -189,15 +189,17 @@ class SVGRenderContext {
 
   SVGColorType resolveSVGColor(const SVGColor&) const;
 
-  Font resolveFont() const;
+  float resolveFontSize() const;
+
+  std::shared_ptr<Typeface> resolveTypeface() const;
 
   // The local computed clip path (not inherited).
   Path clipPath() const {
     return _clipPath.value_or(Path());
   };
 
-  const std::shared_ptr<StreamFactory>& streamFactory() const {
-    return _streamFactory;
+  const std::shared_ptr<TextShaper>& textShaper() const {
+    return _textShaper;
   }
 
   // Returns the translate/scale transformation required to map into the current OBB scope,
@@ -225,8 +227,7 @@ class SVGRenderContext {
 
   std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
 
-  // std::shared_ptr<FontManager> _fontManager;
-  std::shared_ptr<StreamFactory> _streamFactory;
+  std::shared_ptr<TextShaper> _textShaper;
 
   const SVGIDMapper& nodeIDMapper;
   CopyOnWrite<SVGLengthContext> _lengthContext;

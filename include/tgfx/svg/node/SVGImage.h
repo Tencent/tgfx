@@ -53,8 +53,7 @@ class SVGImage final : public SVGTransformableNode {
   void onRender(const SVGRenderContext& conetxt) const override;
   Path onAsPath(const SVGRenderContext& conetxt) const override;
   Rect onObjectBoundingBox(const SVGRenderContext& conetxt) const override;
-  static ImageInfo LoadImage(const std::shared_ptr<StreamFactory>& streamFactory, const SVGIRI& iri,
-                             const Rect& viewPort, SVGPreserveAspectRatio ratio);
+  static ImageInfo LoadImage(const SVGIRI& iri, const Rect& viewPort, SVGPreserveAspectRatio ratio);
 
   SVG_ATTR(X, SVGLength, SVGLength(0))
   SVG_ATTR(Y, SVGLength, SVGLength(0))

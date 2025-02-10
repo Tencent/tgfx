@@ -24,25 +24,13 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/svg/FontManager.h"
+#include "tgfx/svg/TextShaper.h"
 #include "tgfx/svg/node/SVGRoot.h"
 
 namespace tgfx {
 
 class SVGNode;
 using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
-
-/**
- * Options for rendering an SVGDOM object. Users can customize fonts, image resources, and shape 
- * text. Implementations should be based on the abstract class interfaces.
- */
-struct SVGDOMOptions {
-  /**
-   * If streamFactory is null, base64 image resources will still be parsed, but non-base64 images 
-   * will be loaded from absolute paths.
-   */
-  std::shared_ptr<StreamFactory> streamFactory = nullptr;
-};
 
 /**
  * The SVGDOM class represents an SVG Document Object Model (DOM). It provides functionality to 
@@ -63,8 +51,11 @@ class SVGDOM {
  public:
   /**
    * Creates an SVGDOM object from the provided stream.
+   * If textShaper is nullptr, only text with specified system fonts will render. Text without a
+   * specified font or requiring fallback fonts will not render.
    */
-  static std::shared_ptr<SVGDOM> Make(Stream& stream, SVGDOMOptions options = {});
+  static std::shared_ptr<SVGDOM> Make(Stream& stream,
+                                      std::shared_ptr<TextShaper> textShaper = nullptr);
 
   /**
    * Returns the root SVG node.
@@ -94,11 +85,12 @@ class SVGDOM {
   /**
    * Construct a new SVGDOM object
    */
-  SVGDOM(std::shared_ptr<SVGRoot> root, SVGDOMOptions options, SVGIDMapper&& mapper);
+  SVGDOM(std::shared_ptr<SVGRoot> root, std::shared_ptr<TextShaper> textShaper,
+         SVGIDMapper&& mapper);
 
   const std::shared_ptr<SVGRoot> root = nullptr;
   const SVGIDMapper nodeIDMapper = {};
-  const SVGDOMOptions options = {};
+  const std::shared_ptr<TextShaper> textShaper = nullptr;
   Size containerSize = {};
 };
 }  // namespace tgfx
