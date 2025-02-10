@@ -206,11 +206,11 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     jpeg_create_decompress(&cinfo);
     if (infile) {
       jpeg_stdio_src(&cinfo, infile);
-      jpeg_save_markers(&cinfo, JPEG_APP0 + 1, 0xFFFF);
-      jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 0xFFFF);
     } else {
       jpeg_mem_src(&cinfo, fileData->bytes(), fileData->size());
     }
+    jpeg_save_markers(&cinfo, JPEG_APP0 + 1, 0xFFFF);
+    jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 0xFFFF);
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
       break;
     }
