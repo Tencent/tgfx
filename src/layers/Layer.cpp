@@ -500,7 +500,7 @@ void Layer::invalidate() {
     }
   } else {
     for (auto maskOwner : maskOwners) {
-      maskOwner->invalidateContent();
+      maskOwner->invalidate();
     }
   }
 }

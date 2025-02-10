@@ -1920,11 +1920,15 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   auto displayList = std::make_unique<DisplayList>();
   auto layer = Layer::Make();
   auto layer2 = Layer::Make();
-  auto mask = Layer::Make();
+  auto mask = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeWH(1, 1));
+  mask->setPath(path);
+  mask->setFillStyle(SolidColor::Make());
 
   displayList->root()->addChild(layer);
-  displayList->root()->addChild(layer2);
-  displayList->root()->addChild(mask);
+  layer->addChild(layer2);
+  layer2->addChild(mask);
 
   layer->setMask(mask);
   EXPECT_EQ(layer->mask(), mask);
@@ -1938,12 +1942,10 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_EQ(mask->maskOwners.size(), 2lu);
 
   displayList->render(surface.get());
-  EXPECT_FALSE(layer->bitFields.contentDirty);
-  EXPECT_FALSE(layer2->bitFields.contentDirty);
-  EXPECT_FALSE(mask->bitFields.contentDirty);
+  EXPECT_FALSE(layer->bitFields.childrenDirty);
   mask->setAlpha(0.5f);
-  EXPECT_TRUE(layer->bitFields.contentDirty);
-  EXPECT_TRUE(layer2->bitFields.contentDirty);
+  EXPECT_TRUE(layer->bitFields.childrenDirty);
+  EXPECT_FALSE(layer->bitFields.contentDirty);
 
   layer->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
