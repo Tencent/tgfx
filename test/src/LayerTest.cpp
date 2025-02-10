@@ -2140,6 +2140,6 @@ TGFX_TEST(LayerTest, MultiMaskOwners) {
   list.root()->addChild(group);
   auto surface = Surface::Make(context, 300, 300);
   list.render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MultiMaskOwners"));
 }
 }  // namespace tgfx
