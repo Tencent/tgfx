@@ -103,45 +103,40 @@ SVGPresentationContext::SVGPresentationContext()
     : _inherited(SVGPresentationAttributes::MakeInitial()) {
 }
 
-SVGRenderContext::SVGRenderContext(Canvas* canvas,
-                                   const std::shared_ptr<StreamFactory>& streamFactory,
-                                   const std::shared_ptr<TextShaper>& textShaper,
+SVGRenderContext::SVGRenderContext(Canvas* canvas, const std::shared_ptr<TextShaper>& textShaper,
                                    const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                                    const SVGPresentationContext& presentContext,
                                    const OBBScope& scope, const Matrix& matrix)
-    : _streamFactory(streamFactory), _textShaper(textShaper), nodeIDMapper(mapper),
-      _lengthContext(lengthContext), _presentationContext(presentContext), _canvas(canvas),
+    : _textShaper(textShaper), nodeIDMapper(mapper), _lengthContext(lengthContext),
+      _presentationContext(presentContext), _canvas(canvas),
       canvasSaveCount(canvas->getSaveCount()), scope(scope), _matrix(matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other)
-    : SVGRenderContext(other._canvas, other._streamFactory, other._textShaper, other.nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, other.scope,
-                       other._matrix) {
+    : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas)
-    : SVGRenderContext(canvas, other._streamFactory, other._textShaper, other.nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, other.scope,
-                       other._matrix) {
+    : SVGRenderContext(canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other,
                                    const SVGLengthContext& lengthContext)
-    : SVGRenderContext(other._canvas, other._streamFactory, other._textShaper, other.nodeIDMapper,
-                       lengthContext, *other._presentationContext, other.scope, other._matrix) {
+    : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, Canvas* canvas,
                                    const SVGLengthContext& lengthContext)
-    : SVGRenderContext(canvas, other._streamFactory, other._textShaper, other.nodeIDMapper,
-                       lengthContext, *other._presentationContext, other.scope, other._matrix) {
+    : SVGRenderContext(canvas, other._textShaper, other.nodeIDMapper, lengthContext,
+                       *other._presentationContext, other.scope, other._matrix) {
 }
 
 SVGRenderContext::SVGRenderContext(const SVGRenderContext& other, const SVGNode* node)
-    : SVGRenderContext(other._canvas, other._streamFactory, other._textShaper, other.nodeIDMapper,
-                       *other._lengthContext, *other._presentationContext, OBBScope{node, this},
-                       other._matrix) {
+    : SVGRenderContext(other._canvas, other._textShaper, other.nodeIDMapper, *other._lengthContext,
+                       *other._presentationContext, OBBScope{node, this}, other._matrix) {
 }
 
 SVGRenderContext::~SVGRenderContext() {
@@ -341,8 +336,8 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, flo
       // and node being rendered.
       SVGPresentationContext presentContext;
       presentContext._namedColors = _presentationContext->_namedColors;
-      SVGRenderContext localContext(_canvas, _streamFactory, _textShaper, nodeIDMapper,
-                                    *_lengthContext, presentContext, scope, Matrix::I());
+      SVGRenderContext localContext(_canvas, _textShaper, nodeIDMapper, *_lengthContext,
+                                    presentContext, scope, Matrix::I());
 
       const auto node = this->findNodeById(svgPaint.iri());
       if (!node || !node->asPaint(localContext, &(paint.value()))) {

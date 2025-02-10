@@ -44,7 +44,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, SVGDOMOptions options) {
+std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper> textShaper) {
   // Parse the data into an XML DOM structure
   auto xmlDom = DOM::Make(stream);
   if (!xmlDom) {
@@ -62,12 +62,13 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, SVGDOMOptions options) {
   }
 
   // Create SVGDOM with the root node and ID mapper
-  return std::shared_ptr<SVGDOM>(
-      new SVGDOM(std::static_pointer_cast<SVGRoot>(root), std::move(options), std::move(mapper)));
+  return std::shared_ptr<SVGDOM>(new SVGDOM(std::static_pointer_cast<SVGRoot>(root),
+                                            std::move(textShaper), std::move(mapper)));
 }
 
-SVGDOM::SVGDOM(std::shared_ptr<SVGRoot> root, SVGDOMOptions options, SVGIDMapper&& mapper)
-    : root(std::move(root)), nodeIDMapper(std::move(mapper)), options(std::move(options)) {
+SVGDOM::SVGDOM(std::shared_ptr<SVGRoot> root, std::shared_ptr<TextShaper> textShaper,
+               SVGIDMapper&& mapper)
+    : root(std::move(root)), nodeIDMapper(std::move(mapper)), textShaper(std::move(textShaper)) {
 }
 
 const std::shared_ptr<SVGRoot>& SVGDOM::getRoot() const {
@@ -96,11 +97,8 @@ void SVGDOM::render(Canvas* canvas) {
   SVGLengthContext lengthContext(drawSize);
   SVGPresentationContext presentationContext;
 
-  auto textShaper = options.textShaper ? options.textShaper : TextShaper::Make({});
-
-  SVGRenderContext renderContext(canvas, options.streamFactory, textShaper, nodeIDMapper,
-                                 lengthContext, presentationContext, {nullptr, nullptr},
-                                 canvas->getMatrix());
+  SVGRenderContext renderContext(canvas, textShaper, nodeIDMapper, lengthContext,
+                                 presentationContext, {nullptr, nullptr}, canvas->getMatrix());
 
   root->render(renderContext);
 }

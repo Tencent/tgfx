@@ -115,8 +115,14 @@ bool SVGTextContainer::parseAndSetAttribute(const std::string& name, const std::
 
 void SVGTextLiteral::onShapeText(const SVGRenderContext& context,
                                  const ShapedTextCallback& function) const {
-  auto textBlob =
-      context.textShaper()->shape(Text, context.resolveTypeface(), context.resolveFontSize());
+  const auto& shaper = context.textShaper();
+  std::shared_ptr<TextBlob> textBlob = nullptr;
+  if (shaper) {
+    textBlob = shaper->shape(Text, context.resolveTypeface(), context.resolveFontSize());
+  } else {
+    Font font(context.resolveTypeface(), context.resolveFontSize());
+    textBlob = TextBlob::MakeFrom(Text, font);
+  }
   function(context, textBlob);
 }
 

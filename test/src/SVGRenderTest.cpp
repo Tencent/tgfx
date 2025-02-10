@@ -203,10 +203,8 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
   std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
   fallbackTypefaceList.push_back(
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")));
-  SVGDOMOptions options;
-  options.textShaper = TextShaper::Make(fallbackTypefaceList);
 
-  auto SVGDom = SVGDOM::Make(*stream, options);
+  auto SVGDom = SVGDOM::Make(*stream, TextShaper::Make(fallbackTypefaceList));
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -228,10 +226,8 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
   std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
   fallbackTypefaceList.push_back(
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")));
-  SVGDOMOptions options;
-  options.textShaper = TextShaper::Make(fallbackTypefaceList);
 
-  auto SVGDom = SVGDOM::Make(*stream, options);
+  auto SVGDom = SVGDOM::Make(*stream, TextShaper::Make(fallbackTypefaceList));
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -255,10 +251,8 @@ TGFX_TEST(SVGRenderTest, TextEmojiSVG) {
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")));
   fallbackTypefaceList.push_back(
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf")));
-  SVGDOMOptions options;
-  options.textShaper = TextShaper::Make(fallbackTypefaceList);
 
-  auto SVGDom = SVGDOM::Make(*stream, options);
+  auto SVGDom = SVGDOM::Make(*stream, TextShaper::Make(fallbackTypefaceList));
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 
@@ -333,10 +327,8 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
     std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
     fallbackTypefaceList.push_back(
         Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf")));
-    SVGDOMOptions options;
-    options.textShaper = TextShaper::Make(fallbackTypefaceList);
 
-    auto SVGDom = SVGDOM::Make(*stream, options);
+    auto SVGDom = SVGDOM::Make(*stream, TextShaper::Make(fallbackTypefaceList));
     auto rootNode = SVGDom->getRoot();
     ASSERT_TRUE(rootNode != nullptr);
 

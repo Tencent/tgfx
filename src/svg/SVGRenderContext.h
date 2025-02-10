@@ -129,9 +129,8 @@ class SVGRenderContext {
     const SVGRenderContext* context;
   };
 
-  SVGRenderContext(Canvas* canvas, const std::shared_ptr<StreamFactory>& streamFactory,
-                   const std::shared_ptr<TextShaper>& textShaper, const SVGIDMapper& mapper,
-                   const SVGLengthContext& lengthContext,
+  SVGRenderContext(Canvas* canvas, const std::shared_ptr<TextShaper>& textShaper,
+                   const SVGIDMapper& mapper, const SVGLengthContext& lengthContext,
                    const SVGPresentationContext& presentContext, const OBBScope& scope,
                    const Matrix& matrix);
   SVGRenderContext(const SVGRenderContext& other);
@@ -199,10 +198,6 @@ class SVGRenderContext {
     return _clipPath.value_or(Path());
   };
 
-  const std::shared_ptr<StreamFactory>& streamFactory() const {
-    return _streamFactory;
-  }
-
   const std::shared_ptr<TextShaper>& textShaper() const {
     return _textShaper;
   }
@@ -232,7 +227,6 @@ class SVGRenderContext {
 
   std::optional<Paint> commonPaint(const SVGPaint& paint, float opacity) const;
 
-  std::shared_ptr<StreamFactory> _streamFactory;
   std::shared_ptr<TextShaper> _textShaper;
 
   const SVGIDMapper& nodeIDMapper;
