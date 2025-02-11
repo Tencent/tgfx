@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -598,7 +597,7 @@ class Layer {
   float _rasterizationScale = 1.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
-  std::unordered_set<Layer*> maskOwners = {};
+  Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
   Layer* _root = nullptr;
   Layer* _parent = nullptr;
