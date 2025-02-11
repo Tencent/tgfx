@@ -97,7 +97,7 @@ Layer::~Layer() {
     filter->detachFromLayer(this);
   }
   if (_mask) {
-    _mask->maskOwners.erase(this);
+    _mask->maskOwner = nullptr;
   }
   removeChildren();
 }
@@ -208,12 +208,16 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   if (_mask == value) {
     return;
   }
+  if (value && value->maskOwner) {
+    value->maskOwner->setMask(nullptr);
+    value->maskOwner = nullptr;
+  }
   if (_mask) {
-    _mask->maskOwners.erase(this);
+    _mask->maskOwner = nullptr;
   }
   _mask = std::move(value);
   if (_mask) {
-    _mask->maskOwners.insert(this);
+    _mask->maskOwner = this;
   }
   invalidate();
 }
@@ -388,7 +392,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
     bounds.join(content->getBounds());
   }
   for (const auto& child : _children) {
-    if (!child->visible() || !child->maskOwners.empty()) {
+    if (!child->visible() || child->maskOwner) {
       continue;
     }
     auto childBounds = child->getBounds();
@@ -455,7 +459,7 @@ bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
   }
 
   for (const auto& childLayer : _children) {
-    if (!childLayer->visible() || childLayer->_alpha <= 0.f || !childLayer->maskOwners.empty()) {
+    if (!childLayer->visible() || childLayer->_alpha <= 0.f || childLayer->maskOwner) {
       continue;
     }
 
@@ -785,7 +789,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
     if (child.get() == stopChild) {
       return false;
     }
-    if (!child->visible() || child->_alpha <= 0 || !child->maskOwners.empty()) {
+    if (!child->visible() || child->_alpha <= 0 || child->maskOwner) {
       continue;
     }
     AutoCanvasRestore autoRestore(canvas);
@@ -976,4 +980,5 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root();
 }
+
 }  // namespace tgfx
