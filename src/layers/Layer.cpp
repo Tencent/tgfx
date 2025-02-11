@@ -498,14 +498,10 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 }
 
 void Layer::invalidate() {
-  if (maskOwners.empty()) {
-    if (_parent) {
-      _parent->invalidateChildren();
-    }
-  } else {
-    for (auto maskOwner : maskOwners) {
-      maskOwner->invalidate();
-    }
+  if (maskOwner) {
+    maskOwner->invalidate();
+  } else if (_parent) {
+    _parent->invalidateChildren();
   }
 }
 
