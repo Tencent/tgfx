@@ -974,7 +974,7 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 }
 
 bool Layer::hasValidMask() const {
-  return _mask && _mask->root() == root();
+  return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
 }  // namespace tgfx
