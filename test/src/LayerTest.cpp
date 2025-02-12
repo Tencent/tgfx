@@ -2097,4 +2097,33 @@ TGFX_TEST(LayerTest, ChildMask) {
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ChildMask"));
 }
+
+TGFX_TEST(LayerTest, InvalidMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList list;
+  Path path;
+  path.addRect(Rect::MakeWH(10, 10));
+  auto shapeLayer = ShapeLayer::Make();
+  shapeLayer->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::Red());
+  shapeLayer->setFillStyle(fillStyle);
+
+  auto maskLayer = ShapeLayer::Make();
+  maskLayer->setPath(path);
+  auto maskFillStyle = SolidColor::Make(Color::FromRGBA(0, 0, 0, 128));
+  maskLayer->setFillStyle(maskFillStyle);
+  maskLayer->setVisible(false);
+
+  shapeLayer->setMask(maskLayer);
+
+  list.root()->addChild(shapeLayer);
+  list.root()->addChild(maskLayer);
+
+  auto surface = Surface::Make(context, 10, 10);
+
+  list.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/InvalidMask"));
+}
 }  // namespace tgfx
