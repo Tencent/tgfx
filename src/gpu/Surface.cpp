@@ -202,7 +202,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
-bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
+bool Surface::aboutToDraw(bool discardContent) {
   do {
     _contentVersion++;
   } while (InvalidContentVersion == _contentVersion);
@@ -225,7 +225,7 @@ bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
     return false;
   }
-  if (willDiscardContent == nullptr || !willDiscardContent()) {
+  if (!discardContent) {
     auto newTextureProxy = newRenderTarget->getTextureProxy();
     auto drawingManager = getContext()->drawingManager();
     drawingManager->addRenderTargetCopyTask(renderTarget, newTextureProxy,

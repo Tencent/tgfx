@@ -73,9 +73,8 @@ class RenderContext : public DrawContext {
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
   AAType getAAType(const FillStyle& style) const;
-  OpsCompositor* getOpsCompositor(const std::function<bool()>& willDiscardContent = nullptr);
-  bool wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state, const FillStyle& style,
-                              bool hasExtraImageFill = false) const;
+  OpsCompositor* getOpsCompositor(bool discardContent = false);
+
   friend class Surface;
 };
 }  // namespace tgfx

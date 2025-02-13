@@ -39,12 +39,19 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 }
 
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
-  drawRect(renderTarget->bounds(), MCState{state.clip}, style.makeWithMatrix(state.matrix));
+  auto rect = renderTarget->bounds();
+  auto& clip = state.clip;
+  if (clip.isInverseFillType() && clip.isEmpty() && style.hasOnlyColor() && style.isOpaque()) {
+    if (auto compositor = getOpsCompositor(true)) {
+      compositor->fillRect(rect, state, style);
+    }
+  } else {
+    drawRect(rect, MCState{clip}, style.makeWithMatrix(state.matrix));
+  }
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (auto compositor =
-          getOpsCompositor([&] { return wouldOverwriteEntireRT(rect, state, style); })) {
+  if (auto compositor = getOpsCompositor()) {
     compositor->fillRect(rect, state, style);
   }
 }
@@ -102,8 +109,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     options.mipmapMode = MipmapMode::None;
   }
-  if (auto compositor =
-          getOpsCompositor([&] { return wouldOverwriteEntireRT(rect, state, style, true); })) {
+  if (auto compositor = getOpsCompositor()) {
     compositor->fillImage(std::move(image), imageRect, options, imageState, imageStyle);
   }
 }
@@ -233,8 +239,8 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
   }
 }
 
-OpsCompositor* RenderContext::getOpsCompositor(const std::function<bool()>& willDiscardContent) {
-  if (surface && !surface->aboutToDraw(willDiscardContent)) {
+OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
+  if (surface && !surface->aboutToDraw(discardContent)) {
     return nullptr;
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
@@ -252,24 +258,5 @@ bool RenderContext::flush() {
     return !closed;
   }
   return false;
-}
-
-bool RenderContext::wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state,
-                                           const FillStyle& style, bool hasExtraImageFill) const {
-  auto& clip = state.clip;
-  auto& viewMatrix = state.matrix;
-  auto clipRect = Rect::MakeEmpty();
-  if (!clip.isRect(&clipRect) || !viewMatrix.rectStaysRect()) {
-    return false;
-  }
-  auto rtRect = renderTarget->bounds();
-  if (clipRect != rtRect) {
-    return false;
-  }
-  auto deviceRect = viewMatrix.mapRect(localBounds);
-  if (!deviceRect.contains(rtRect)) {
-    return false;
-  }
-  return style.isOpaque(hasExtraImageFill);
 }
 }  // namespace tgfx

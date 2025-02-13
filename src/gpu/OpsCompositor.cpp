@@ -176,10 +176,6 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
   addDrawOp(std::move(drawOp), localBounds, clip, style);
 }
 
-static bool HasColorOnly(const FillStyle& style) {
-  return style.colorFilter == nullptr && style.shader == nullptr && style.maskFilter == nullptr;
-}
-
 /**
  * Returns true if the given rect counts as aligned with pixel boundaries.
  */
@@ -199,7 +195,7 @@ static void FlipYIfNeeded(Rect* rect, std::shared_ptr<RenderTargetProxy> renderT
 }
 
 bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style) {
-  if (!HasColorOnly(style) || !style.isOpaque() || !state.matrix.rectStaysRect()) {
+  if (!style.hasOnlyColor() || !style.isOpaque() || !state.matrix.rectStaysRect()) {
     return false;
   }
   auto& clip = state.clip;

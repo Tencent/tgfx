@@ -21,15 +21,13 @@
 #include "gpu/Blend.h"
 
 namespace tgfx {
-static OpacityType GetOpacityType(const Color& color, const Shader* shader,
-                                  bool hasExtraImageFill) {
+static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
   auto alpha = color.alpha;
-  if (alpha == 1.0f && !hasExtraImageFill && (!shader || shader->isOpaque())) {
+  if (alpha == 1.0f && (!shader || shader->isOpaque())) {
     return OpacityType::Opaque;
   }
   if (alpha == 0.0f) {
-    if (hasExtraImageFill || shader || color.red != 0.0f || color.green != 0.0f ||
-        color.blue != 0.0f) {
+    if (shader || color.red != 0.0f || color.green != 0.0f || color.blue != 0.0f) {
       return OpacityType::TransparentAlpha;
     }
     return OpacityType::TransparentBlack;
@@ -37,15 +35,18 @@ static OpacityType GetOpacityType(const Color& color, const Shader* shader,
   return OpacityType::Unknown;
 }
 
-bool FillStyle::isOpaque(bool hasExtraImageFill) const {
+bool FillStyle::hasOnlyColor() const {
+  return !shader && !maskFilter && !colorFilter;
+}
+
+bool FillStyle::isOpaque() const {
   if (maskFilter) {
     return false;
   }
   if (colorFilter && !colorFilter->isAlphaUnchanged()) {
     return false;
   }
-  auto opacityType = GetOpacityType(color, shader.get(), hasExtraImageFill);
-  return BlendModeIsOpaque(blendMode, opacityType);
+  return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
 }
 
 bool FillStyle::isEqual(const FillStyle& style, bool ignoreColor) const {

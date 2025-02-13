@@ -61,9 +61,14 @@ class FillStyle {
   BlendMode blendMode = BlendMode::SrcOver;
 
   /**
+   * Returns true if the FillStyle contains only a color and no shader, mask filter, or color filter.
+   */
+  bool hasOnlyColor() const;
+
+  /**
    * Returns true if the FillStyle is guaranteed to produce only opaque colors.
    */
-  bool isOpaque(bool hasExtraImageFill = false) const;
+  bool isOpaque() const;
 
   /**
    * Returns true if the FillStyle is equal to the given style. If ignoreColor is true, the color

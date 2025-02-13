@@ -192,7 +192,7 @@ class Surface {
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0);
 
-  bool aboutToDraw(const std::function<bool()>& willDiscardContent);
+  bool aboutToDraw(bool discardContent = false);
 
   void forceResolveRenderTarget();
 
