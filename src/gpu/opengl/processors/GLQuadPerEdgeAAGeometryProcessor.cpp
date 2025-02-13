@@ -68,7 +68,7 @@ void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                                FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
   if (uniformColor.has_value()) {
-    uniformBuffer->setData("Color", uniformColor.value());
+    uniformBuffer->setData("Color", *uniformColor);
   }
 }
 }  // namespace tgfx
