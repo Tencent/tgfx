@@ -32,6 +32,7 @@ namespace tgfx {
 class Pipeline;
 class Image;
 class Shader;
+class RenderQueue;
 
 class FPArgs {
  public:
@@ -130,8 +131,6 @@ class FragmentProcessor : public Processor {
   const CoordTransform* coordTransform(size_t index) const {
     return coordTransforms[index];
   }
-
-  bool isEqual(const FragmentProcessor& that) const;
 
   /**
    * Pre-order traversal of a FP hierarchy, or of the forest of FPs in a Pipeline. In the latter
@@ -314,10 +313,6 @@ class FragmentProcessor : public Processor {
 
   virtual SamplerState onSamplerState(size_t) const {
     return {};
-  }
-
-  virtual bool onIsEqual(const FragmentProcessor&) const {
-    return true;
   }
 
   void internalEmitChild(size_t, const std::string&, const std::string&, EmitArgs&,

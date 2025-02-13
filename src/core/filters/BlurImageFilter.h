@@ -36,7 +36,7 @@ class BlurImageFilter : public ImageFilter {
  protected:
   Type type() const override {
     return Type::Blur;
-  };
+  }
 
   Rect onFilterBounds(const Rect& srcRect) const override;
 
@@ -49,8 +49,8 @@ class BlurImageFilter : public ImageFilter {
                                                          const SamplingOptions& sampling,
                                                          const Matrix* uvMatrix) const override;
 
-  void draw(std::shared_ptr<RenderTargetProxy> renderTarget,
-            std::unique_ptr<FragmentProcessor> imageProcessor, const Size& imageSize, bool isDown,
-            uint32_t renderFlags) const;
+  void draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
+            std::unique_ptr<FragmentProcessor> imageProcessor, const Size& imageSize,
+            bool isDown) const;
 };
 }  // namespace tgfx

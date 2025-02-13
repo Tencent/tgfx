@@ -35,7 +35,7 @@ class InnerShadowImageFilter : public ImageFilter {
  protected:
   Type type() const override {
     return Type::InnerShadow;
-  };
+  }
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const FPArgs& args,

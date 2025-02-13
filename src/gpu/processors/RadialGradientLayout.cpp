@@ -23,9 +23,4 @@ RadialGradientLayout::RadialGradientLayout(Matrix matrix)
     : FragmentProcessor(ClassID()), coordTransform(matrix) {
   addCoordTransform(&coordTransform);
 }
-
-bool RadialGradientLayout::onIsEqual(const FragmentProcessor& processor) const {
-  return coordTransform.matrix ==
-         static_cast<const RadialGradientLayout&>(processor).coordTransform.matrix;
-}
 }  // namespace tgfx

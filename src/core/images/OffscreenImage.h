@@ -31,7 +31,7 @@ class OffscreenImage : public ResourceImage {
 
  protected:
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override final;
+                                                   const UniqueKey& key) const final;
 
   virtual bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
                       uint32_t renderFlags) const = 0;

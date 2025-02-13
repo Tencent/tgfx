@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModeColorFilter.h"
+#include "core/utils/Caster.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 
@@ -56,6 +57,11 @@ bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
     *mode = this->mode;
   }
   return true;
+}
+
+bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
+  auto other = Caster::AsModeColorFilter(colorFilter);
+  return other && color == other->color && mode == other->mode;
 }
 
 std::unique_ptr<FragmentProcessor> ModeColorFilter::asFragmentProcessor() const {

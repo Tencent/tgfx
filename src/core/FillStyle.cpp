@@ -17,16 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FillStyle.h"
+#include "core/utils/Caster.h"
 #include "gpu/Blend.h"
 
 namespace tgfx {
-static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
+static OpacityType GetOpacityType(const Color& color, const Shader* shader,
+                                  bool hasExtraImageFill) {
   auto alpha = color.alpha;
-  if (alpha == 1.0f && (!shader || shader->isOpaque())) {
+  if (alpha == 1.0f && !hasExtraImageFill && (!shader || shader->isOpaque())) {
     return OpacityType::Opaque;
   }
   if (alpha == 0.0f) {
-    if (shader || color.red != 0.0f || color.green != 0.0f || color.blue != 0.0f) {
+    if (hasExtraImageFill || shader || color.red != 0.0f || color.green != 0.0f ||
+        color.blue != 0.0f) {
       return OpacityType::TransparentAlpha;
     }
     return OpacityType::TransparentBlack;
@@ -34,14 +37,54 @@ static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
   return OpacityType::Unknown;
 }
 
-bool FillStyle::isOpaque() const {
+bool FillStyle::isOpaque(bool hasExtraImageFill) const {
   if (maskFilter) {
     return false;
   }
   if (colorFilter && !colorFilter->isAlphaUnchanged()) {
     return false;
   }
-  return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
+  auto opacityType = GetOpacityType(color, shader.get(), hasExtraImageFill);
+  return BlendModeIsOpaque(blendMode, opacityType);
 }
 
+bool FillStyle::isEqual(const FillStyle& style, bool ignoreColor) const {
+  if (antiAlias != style.antiAlias || blendMode != style.blendMode ||
+      (!ignoreColor && color != style.color)) {
+    return false;
+  }
+  if (shader) {
+    if (!style.shader || !Caster::Compare(shader.get(), style.shader.get())) {
+      return false;
+    }
+  } else if (style.shader) {
+    return false;
+  }
+  if (maskFilter) {
+    if (!style.maskFilter || !Caster::Compare(maskFilter.get(), style.maskFilter.get())) {
+      return false;
+    }
+  } else if (style.maskFilter) {
+    return false;
+  }
+  if (colorFilter) {
+    if (!style.colorFilter || !Caster::Compare(colorFilter.get(), style.colorFilter.get())) {
+      return false;
+    }
+  } else if (style.colorFilter) {
+    return false;
+  }
+  return true;
+}
+
+FillStyle FillStyle::makeWithMatrix(const Matrix& matrix) const {
+  auto fillStyle = *this;
+  if (fillStyle.shader) {
+    fillStyle.shader = fillStyle.shader->makeWithMatrix(matrix);
+  }
+  if (fillStyle.maskFilter) {
+    fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(matrix);
+  }
+  return fillStyle;
+}
 }  // namespace tgfx

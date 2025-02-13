@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
-#include "core/images/BufferImage.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
@@ -25,8 +24,9 @@
 #include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
-#include "gpu/OpContext.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -137,8 +137,15 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
+  if (context == nullptr) {
+    return nullptr;
+  }
   TPArgs args(context, 0, hasMipmaps());
-  return TextureImage::Wrap(lockTextureProxy(args));
+  auto textureProxy = lockTextureProxy(args);
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  return TextureImage::Wrap(std::move(textureProxy));
 }
 
 BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
@@ -233,11 +240,10 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const 
   FPArgs fpArgs(args.context, args.renderFlags, drawRect);
   // There is no scaling for the image, so we can use the default sampling options.
   auto processor = asFragmentProcessor(fpArgs, TileMode::Clamp, TileMode::Clamp, {}, nullptr);
-  if (processor == nullptr) {
+  auto drawingManager = args.context->drawingManager();
+  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
   }
-  OpContext opContext(renderTarget, args.renderFlags);
-  opContext.fillWithFP(std::move(processor), true);
   return renderTarget->getTextureProxy();
 }
 }  // namespace tgfx

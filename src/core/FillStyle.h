@@ -24,6 +24,9 @@
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
+/**
+ * FillStyle specifies how the geometry of a drawing operation is filled.
+ */
 class FillStyle {
  public:
   /**
@@ -60,6 +63,17 @@ class FillStyle {
   /**
    * Returns true if the FillStyle is guaranteed to produce only opaque colors.
    */
-  bool isOpaque() const;
+  bool isOpaque(bool hasExtraImageFill = false) const;
+
+  /**
+   * Returns true if the FillStyle is equal to the given style. If ignoreColor is true, the color
+   * is not compared.
+   */
+  bool isEqual(const FillStyle& style, bool ignoreColor = false) const;
+
+  /**
+   * Returns a new FillStyle applying the given matrix to the shader and mask filter.
+   */
+  FillStyle makeWithMatrix(const Matrix& matrix) const;
 };
 }  // namespace tgfx

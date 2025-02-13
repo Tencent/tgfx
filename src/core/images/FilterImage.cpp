@@ -19,7 +19,6 @@
 #include "FilterImage.h"
 #include "SubsetImage.h"
 #include "core/utils/AddressOf.h"
-#include "gpu/OpContext.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {

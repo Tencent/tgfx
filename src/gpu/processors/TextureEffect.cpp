@@ -42,12 +42,6 @@ TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const Sampling
   addCoordTransform(&coordTransform);
 }
 
-bool TextureEffect::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const TextureEffect&>(processor);
-  return textureProxy == that.textureProxy && alphaStart == that.alphaStart &&
-         coordTransform.matrix == that.coordTransform.matrix && samplerState == that.samplerState;
-}
-
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   auto texture = getTexture();
   if (texture == nullptr) {

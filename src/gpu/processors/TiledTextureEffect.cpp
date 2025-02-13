@@ -140,12 +140,6 @@ void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(flags);
 }
 
-bool TiledTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const TiledTextureEffect&>(processor);
-  return textureProxy == that.textureProxy && samplerState == that.samplerState &&
-         coordTransform.matrix == that.coordTransform.matrix;
-}
-
 size_t TiledTextureEffect::onCountTextureSamplers() const {
   auto texture = getTexture();
   return texture ? 1 : 0;

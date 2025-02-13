@@ -47,8 +47,6 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
         thresholds1_7(thresholds1_7), thresholds9_13(thresholds9_13) {
   }
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   int intervalCount;
   Color scale0_1;
   Color scale2_3;

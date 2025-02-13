@@ -45,6 +45,8 @@ class MatrixShader final : public Shader {
     return Type::Matrix;
   }
 
+  bool isEqual(const Shader* shader) const override;
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;
 

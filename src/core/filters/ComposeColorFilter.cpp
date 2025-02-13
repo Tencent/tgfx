@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ComposeColorFilter.h"
+#include "core/utils/Caster.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -41,6 +42,11 @@ ComposeColorFilter::ComposeColorFilter(std::shared_ptr<ColorFilter> inner,
 
 bool ComposeColorFilter::isAlphaUnchanged() const {
   return outer->isAlphaUnchanged() && inner->isAlphaUnchanged();
+}
+
+bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
+  auto other = Caster::AsComposeColorFilter(colorFilter);
+  return other && inner->isEqual(other->inner.get()) && outer->isEqual(other->outer.get());
 }
 
 std::unique_ptr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor() const {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,12 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DualIntervalGradientColorizer.h"
+#pragma once
+
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-bool DualIntervalGradientColorizer::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const DualIntervalGradientColorizer&>(processor);
-  return scale01 == that.scale01 && bias01 == that.bias01 && scale23 == that.scale23 &&
-         bias23 == that.bias23 && threshold == that.threshold;
-}
+class MCState {
+ public:
+  explicit MCState(const Matrix& matrix) : matrix(matrix) {
+    clip.toggleInverseFillType();
+  }
+
+  explicit MCState(Path initClip) : clip(std::move(initClip)) {
+  }
+
+  MCState(const Matrix& matrix, Path clip) : matrix(matrix), clip(std::move(clip)) {
+  }
+
+  MCState() {
+    clip.toggleInverseFillType();
+  }
+
+  Matrix matrix = Matrix::I();
+  Path clip = {};
+};
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderMaskFilter.h"
+#include "core/utils/Caster.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -30,6 +31,11 @@ std::shared_ptr<MaskFilter> MaskFilter::MakeShader(std::shared_ptr<Shader> shade
 std::shared_ptr<MaskFilter> ShaderMaskFilter::makeWithMatrix(const Matrix& viewMatrix) const {
   auto newShader = shader->makeWithMatrix(viewMatrix);
   return MakeShader(std::move(newShader), inverted);
+}
+
+bool ShaderMaskFilter::isEqual(const MaskFilter* maskFilter) const {
+  auto other = Caster::AsShaderMaskFilter(maskFilter);
+  return other && inverted == other->inverted && Caster::Compare(shader.get(), other->shader.get());
 }
 
 std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(

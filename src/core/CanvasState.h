@@ -18,33 +18,10 @@
 
 #pragma once
 
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Paint.h"
-#include "tgfx/core/Path.h"
+#include "core/MCState.h"
 
 namespace tgfx {
 class DrawContext;
-class RecordingContext;
-
-class MCState {
- public:
-  explicit MCState(const Matrix& matrix) : matrix(matrix) {
-    clip.toggleInverseFillType();
-  }
-
-  explicit MCState(Path initClip) : clip(std::move(initClip)) {
-  }
-
-  MCState(const Matrix& matrix, Path clip) : matrix(matrix), clip(std::move(clip)) {
-  }
-
-  MCState() {
-    clip.toggleInverseFillType();
-  }
-
-  Matrix matrix = Matrix::I();
-  Path clip = {};
-};
 
 class CanvasLayer {
  public:

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AlphaThresholdColorFilter.h"
+#include "core/utils/Caster.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 
 namespace tgfx {
@@ -24,6 +25,11 @@ namespace tgfx {
 std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
   threshold = std::max(threshold, 0.0f);
   return std::make_shared<AlphaThresholdColorFilter>(threshold);
+}
+
+bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
+  auto other = Caster::AsAlphaThresholdColorFilter(colorFilter);
+  return other && threshold == other->threshold;
 }
 
 std::unique_ptr<FragmentProcessor> AlphaThresholdColorFilter::asFragmentProcessor() const {

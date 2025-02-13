@@ -49,8 +49,8 @@ class Path {
   friend bool operator!=(const Path& a, const Path& b);
 
   /**
-   * Returns PathFillType, the rule used to fill Path. PathFillType of a new Path is Path
-   * FillType::Winding.
+   * Returns PathFillType, the rule used to fill Path. PathFillType of a new Path is
+   * PathFillType::Winding.
    */
   PathFillType getFillType() const;
 

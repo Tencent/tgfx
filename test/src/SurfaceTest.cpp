@@ -56,11 +56,11 @@ TGFX_TEST(SurfaceTest, ImageSnapshot) {
   surface = Surface::Make(context, width, height);
   canvas = surface->getCanvas();
   snapshotImage = surface->makeImageSnapshot();
-  auto renderTargetProxy = surface->renderContext->renderTarget();
+  auto renderTargetProxy = surface->renderContext->renderTarget;
   snapshotImage = nullptr;
   canvas->drawImage(image);
   context->flush();
-  EXPECT_TRUE(renderTargetProxy == surface->renderContext->renderTarget());
+  EXPECT_TRUE(renderTargetProxy == surface->renderContext->renderTarget);
   snapshotImage = surface->makeImageSnapshot();
   snapshotImage2 = surface->makeImageSnapshot();
   EXPECT_TRUE(snapshotImage == snapshotImage2);

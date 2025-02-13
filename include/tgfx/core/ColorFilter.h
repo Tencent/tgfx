@@ -99,10 +99,15 @@ class ColorFilter {
    */
   virtual Type type() const = 0;
 
+  /**
+   * Returns true if the specified color filter is equivalent to this ColorFilter.
+   */
+  virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
+
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
 
-  friend class RenderContext;
+  friend class OpsCompositor;
   friend class ColorFilterShader;
   friend class ComposeColorFilter;
   friend class ColorImageFilter;
