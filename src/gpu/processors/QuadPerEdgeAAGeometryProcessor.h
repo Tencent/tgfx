@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "GeometryProcessor.h"
 #include "gpu/AAType.h"
 #include "tgfx/core/Paint.h"
