@@ -39,14 +39,11 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 }
 
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
-  auto rect = renderTarget->bounds();
   auto& clip = state.clip;
-  if (clip.isInverseFillType() && clip.isEmpty() && style.hasOnlyColor() && style.isOpaque()) {
-    if (auto compositor = getOpsCompositor(true)) {
-      compositor->fillRect(rect, state, style);
-    }
-  } else {
-    drawRect(rect, MCState{clip}, style.makeWithMatrix(state.matrix));
+  auto discardContent =
+      clip.isInverseFillType() && clip.isEmpty() && style.hasOnlyColor() && style.isOpaque();
+  if (auto compositor = getOpsCompositor(discardContent)) {
+    compositor->fillRect(renderTarget->bounds(), MCState{clip}, style.makeWithMatrix(state.matrix));
   }
 }
 

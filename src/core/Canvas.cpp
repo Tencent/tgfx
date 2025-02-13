@@ -186,14 +186,11 @@ void Canvas::resetStateStack() {
 }
 
 void Canvas::clear(const Color& color) {
-  drawColor(color, BlendMode::Src);
+  drawClip({color, BlendMode::Src});
 }
 
 void Canvas::drawColor(const Color& color, BlendMode blendMode) {
-  FillStyle style = {};
-  style.color = color;
-  style.blendMode = blendMode;
-  drawClip(style);
+  drawClip({color, blendMode});
 }
 
 void Canvas::drawPaint(const Paint& paint) {

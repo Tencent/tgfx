@@ -29,6 +29,11 @@ namespace tgfx {
  */
 class FillStyle {
  public:
+  FillStyle() = default;
+
+  FillStyle(const Color& color, BlendMode blendMode) : color(color), blendMode(blendMode) {
+  }
+
   /**
    * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
    * default value is true.
