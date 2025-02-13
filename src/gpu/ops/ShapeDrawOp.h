@@ -25,26 +25,19 @@
 namespace tgfx {
 class ShapeDrawOp : public DrawOp {
  public:
-  DEFINE_OP_CLASS_ID
-
-  static std::unique_ptr<ShapeDrawOp> Make(Color color, std::shared_ptr<Shape> shape,
-                                           const Matrix& viewMatrix, const Rect& deviceClipBounds);
-
-  void prepare(Context* context, uint32_t renderFlags) override;
+  static std::unique_ptr<ShapeDrawOp> Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
+                                           const Matrix& uvMatrix, const Rect& bounds,
+                                           AAType aaType);
 
   void execute(RenderPass* renderPass) override;
 
- protected:
-  bool onCombineIfPossible(Op* op) override;
-
  private:
-  Color color = Color::Transparent();
-  std::shared_ptr<Shape> shape = nullptr;
-  Matrix uvMatrix = Matrix::I();
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
+  Color color = Color::Transparent();
+  Matrix uvMatrix = Matrix::I();
   std::vector<float> maskVertices = {};
 
-  ShapeDrawOp(Color color, std::shared_ptr<Shape> shape, const Matrix& uvMatrix,
-              const Rect& bounds);
+  ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,
+              const Rect& bounds, AAType aaType);
 };
 }  // namespace tgfx

@@ -18,7 +18,8 @@
 
 #include "BlurImageFilter.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/OpContext.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/DualBlurFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -92,15 +93,15 @@ BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iterat
       scaleFactor(scaleFactor) {
 }
 
-void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
+void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
                            std::unique_ptr<FragmentProcessor> imageProcessor, const Size& imageSize,
-                           bool isDown, uint32_t renderFlags) const {
+                           bool isDown) const {
   auto texelSize = Size::Make(0.5f / imageSize.width, 0.5f / imageSize.height);
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset, texelSize);
-  OpContext opContext(std::move(renderTarget), renderFlags);
-  opContext.fillWithFP(std::move(blurProcessor), true);
+  auto drawingManager = renderTarget->getContext()->drawingManager();
+  drawingManager->fillRTWithFP(std::move(renderTarget), std::move(blurProcessor), renderFlags);
 }
 
 Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -165,7 +166,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
       sourceProcessor =
           TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, &uvMatrix, isAlphaOnly);
     }
-    draw(renderTarget, std::move(sourceProcessor), textureSize, true, args.renderFlags);
+    draw(renderTarget, args.renderFlags, std::move(sourceProcessor), textureSize, true);
     textureSize = Size::Make(static_cast<float>(downWidth), static_cast<float>(downHeight));
     lastRenderTarget = renderTarget;
   }
@@ -189,7 +190,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
     sourceProcessor =
         TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, &uvMatrix, isAlphaOnly);
 
-    draw(renderTarget, std::move(sourceProcessor), textureSize, false, args.renderFlags);
+    draw(renderTarget, args.renderFlags, std::move(sourceProcessor), textureSize, false);
     lastRenderTarget = renderTarget;
     textureSize = Size::Make(static_cast<float>(renderTarget->width()),
                              static_cast<float>(renderTarget->height()));

@@ -27,9 +27,6 @@
 namespace tgfx {
 class DrawOp : public Op {
  public:
-  explicit DrawOp(uint8_t classID) : Op(classID) {
-  }
-
   std::unique_ptr<Pipeline> createPipeline(RenderPass* renderPass,
                                            std::unique_ptr<GeometryProcessor> gp);
 
@@ -45,10 +42,6 @@ class DrawOp : public Op {
     blendMode = mode;
   }
 
-  void setAA(AAType type) {
-    aa = type;
-  }
-
   void addColorFP(std::unique_ptr<FragmentProcessor> colorProcessor) {
     _colors.emplace_back(std::move(colorProcessor));
   }
@@ -58,9 +51,10 @@ class DrawOp : public Op {
   }
 
  protected:
-  AAType aa = AAType::None;
+  AAType aaType = AAType::None;
 
-  bool onCombineIfPossible(Op* op) override;
+  DrawOp(const Rect& bounds, AAType aaType) : Op(bounds), aaType(aaType) {
+  }
 
  private:
   Rect _scissorRect = Rect::MakeEmpty();

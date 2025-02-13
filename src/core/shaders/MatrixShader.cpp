@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MatrixShader.h"
+#include "core/utils/Caster.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -44,6 +45,11 @@ std::shared_ptr<Shader> MatrixShader::makeWithMatrix(const Matrix& viewMatrix) c
   auto totalMatrix = matrix;
   totalMatrix.postConcat(viewMatrix);
   return MatrixShader::MakeFrom(source, totalMatrix);
+}
+
+bool MatrixShader::isEqual(const Shader* shader) const {
+  auto other = Caster::AsMatrixShader(shader);
+  return other && matrix == other->matrix && Caster::Compare(source.get(), other->source.get());
 }
 
 std::unique_ptr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args,

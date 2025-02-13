@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <memory>
+#include "core/filters/AlphaThresholdColorFilter.h"
 #include "core/filters/BlurImageFilter.h"
+#include "core/filters/ComposeColorFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
@@ -27,9 +29,12 @@
 #include "core/images/GeneratorImage.h"
 #include "core/images/PictureImage.h"
 #include "core/images/SubsetImage.h"
+#include "core/shaders/BlendShader.h"
+#include "core/shaders/ColorFilterShader.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
+#include "core/shaders/MatrixShader.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/MaskFilter.h"
 
@@ -41,11 +46,19 @@ namespace tgfx {
  */
 class Caster {
  public:
+  static bool Compare(const Shader* shader, const Shader* other);
+
   static const ColorShader* AsColorShader(const Shader* shader);
 
   static const ImageShader* AsImageShader(const Shader* shader);
 
   static const GradientShader* AsGradientShader(const Shader* shader);
+
+  static const ColorFilterShader* AsColorFilterShader(const Shader* shader);
+
+  static const BlendShader* AsBlendShader(const Shader* shader);
+
+  static const MatrixShader* AsMatrixShader(const Shader* shader);
 
   static const BlurImageFilter* AsBlurImageFilter(const ImageFilter* imageFilter);
 
@@ -53,15 +66,24 @@ class Caster {
 
   static const InnerShadowImageFilter* AsInnerShadowImageFilter(const ImageFilter* imageFilter);
 
+  static bool Compare(const ColorFilter* colorFilter, const ColorFilter* other);
+
   static const ModeColorFilter* AsModeColorFilter(const ColorFilter* colorFilter);
 
   static const MatrixColorFilter* AsMatrixColorFilter(const ColorFilter* colorFilter);
+
+  static const AlphaThresholdColorFilter* AsAlphaThresholdColorFilter(
+      const ColorFilter* colorFilter);
+
+  static const ComposeColorFilter* AsComposeColorFilter(const ColorFilter* colorFilter);
 
   static const PictureImage* AsPictureImage(const Image* image);
 
   static const CodecImage* AsCodecImage(const Image* image);
 
   static const SubsetImage* AsSubsetImage(const Image* image);
+
+  static bool Compare(const MaskFilter* maskFilter, const MaskFilter* other);
 
   static const ShaderMaskFilter* AsShaderMaskFilter(const MaskFilter* maskFilter);
 };

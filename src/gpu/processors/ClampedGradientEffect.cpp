@@ -19,11 +19,6 @@
 #include "ClampedGradientEffect.h"
 
 namespace tgfx {
-bool ClampedGradientEffect::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const ClampedGradientEffect&>(processor);
-  return leftBorderColor == that.leftBorderColor && rightBorderColor == that.rightBorderColor;
-}
-
 ClampedGradientEffect::ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                                              std::unique_ptr<FragmentProcessor> gradLayout,
                                              Color leftBorderColor, Color rightBorderColor)

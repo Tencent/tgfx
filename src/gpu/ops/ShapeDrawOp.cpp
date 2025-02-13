@@ -26,35 +26,19 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shape> shape,
-                                               const Matrix& viewMatrix,
-                                               const Rect& deviceClipBounds) {
-  if (shape == nullptr) {
+std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GpuShapeProxy> shapeProxy,
+                                               Color color, const Matrix& uvMatrix,
+                                               const Rect& bounds, AAType aaType) {
+  if (shapeProxy == nullptr) {
     return nullptr;
   }
-  auto uvMatrix = Matrix::I();
-  if (!viewMatrix.invert(&uvMatrix)) {
-    return nullptr;
-  }
-  shape = Shape::ApplyMatrix(std::move(shape), viewMatrix);
-  auto bounds = shape->isInverseFillType() ? deviceClipBounds : shape->getBounds();
-  return std::unique_ptr<ShapeDrawOp>(new ShapeDrawOp(color, std::move(shape), uvMatrix, bounds));
+  return std::unique_ptr<ShapeDrawOp>(
+      new ShapeDrawOp(std::move(shapeProxy), color, uvMatrix, bounds, aaType));
 }
 
-ShapeDrawOp::ShapeDrawOp(Color color, std::shared_ptr<Shape> s, const Matrix& uvMatrix,
-                         const Rect& bounds)
-    : DrawOp(ClassID()), color(color), shape(std::move(s)), uvMatrix(uvMatrix) {
-  setBounds(bounds);
-}
-
-bool ShapeDrawOp::onCombineIfPossible(Op*) {
-  // Shapes are rasterized in parallel, so we don't combine them.
-  return false;
-}
-
-void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  shapeProxy = context->proxyProvider()->createGpuShapeProxy(shape, aa == AAType::Coverage,
-                                                             bounds(), renderFlags);
+ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
+                         const Matrix& uvMatrix, const Rect& bounds, AAType aaType)
+    : DrawOp(bounds, aaType), shapeProxy(std::move(shapeProxy)), color(color), uvMatrix(uvMatrix) {
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
@@ -83,7 +67,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     addCoverageFP(std::move(maskFP));
     Path path = {};
     path.addRect(maskRect);
-    if (aa == AAType::Coverage) {
+    if (aaType == AAType::Coverage) {
       PathTriangulator::ToAATriangles(path, maskRect, &maskVertices);
     } else {
       PathTriangulator::ToTriangles(path, maskRect, &maskVertices);
@@ -92,12 +76,13 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
   }
   auto pipeline = createPipeline(
       renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
-                                                 renderPass->renderTarget()->height(), aa,
+                                                 renderPass->renderTarget()->height(), aaType,
                                                  viewMatrix, realUVMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   auto vertexDataSize = vertexBuffer ? vertexBuffer->size() : vertexData->size();
-  auto vertexCount = aa == AAType::Coverage ? PathTriangulator::GetAATriangleCount(vertexDataSize)
-                                            : PathTriangulator::GetTriangleCount(vertexDataSize);
+  auto vertexCount = aaType == AAType::Coverage
+                         ? PathTriangulator::GetAATriangleCount(vertexDataSize)
+                         : PathTriangulator::GetTriangleCount(vertexDataSize);
   if (vertexBuffer != nullptr) {
     renderPass->bindBuffers(nullptr, vertexBuffer);
   } else {

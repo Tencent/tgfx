@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FillStyle.h"
+#include "core/utils/Caster.h"
 #include "gpu/Blend.h"
 
 namespace tgfx {
@@ -34,6 +35,10 @@ static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
   return OpacityType::Unknown;
 }
 
+bool FillStyle::hasOnlyColor() const {
+  return !shader && !maskFilter && !colorFilter;
+}
+
 bool FillStyle::isOpaque() const {
   if (maskFilter) {
     return false;
@@ -44,4 +49,43 @@ bool FillStyle::isOpaque() const {
   return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
 }
 
+bool FillStyle::isEqual(const FillStyle& style, bool ignoreColor) const {
+  if (antiAlias != style.antiAlias || blendMode != style.blendMode ||
+      (!ignoreColor && color != style.color)) {
+    return false;
+  }
+  if (shader) {
+    if (!style.shader || !Caster::Compare(shader.get(), style.shader.get())) {
+      return false;
+    }
+  } else if (style.shader) {
+    return false;
+  }
+  if (maskFilter) {
+    if (!style.maskFilter || !Caster::Compare(maskFilter.get(), style.maskFilter.get())) {
+      return false;
+    }
+  } else if (style.maskFilter) {
+    return false;
+  }
+  if (colorFilter) {
+    if (!style.colorFilter || !Caster::Compare(colorFilter.get(), style.colorFilter.get())) {
+      return false;
+    }
+  } else if (style.colorFilter) {
+    return false;
+  }
+  return true;
+}
+
+FillStyle FillStyle::makeWithMatrix(const Matrix& matrix) const {
+  auto fillStyle = *this;
+  if (fillStyle.shader) {
+    fillStyle.shader = fillStyle.shader->makeWithMatrix(matrix);
+  }
+  if (fillStyle.maskFilter) {
+    fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(matrix);
+  }
+  return fillStyle;
+}
 }  // namespace tgfx

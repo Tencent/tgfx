@@ -31,7 +31,7 @@ Layer* DisplayList::root() const {
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
   if (!surface ||
-      (replaceAll && surface->_uniqueID == surfaceID &&
+      (replaceAll && surface->uniqueID() == surfaceID &&
        surface->contentVersion() == surfaceContentVersion && !_root->bitFields.childrenDirty)) {
     return false;
   }
@@ -42,7 +42,7 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   DrawArgs args(surface->getContext(), surface->renderFlags(), true);
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   surfaceContentVersion = surface->contentVersion();
-  surfaceID = surface->_uniqueID;
+  surfaceID = surface->uniqueID();
   return true;
 }
 

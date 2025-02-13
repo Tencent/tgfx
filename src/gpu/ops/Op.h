@@ -20,53 +20,27 @@
 
 #include <functional>
 #include "gpu/RenderTarget.h"
-#include "gpu/proxies/ResourceProxy.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class RenderPass;
 
-#define DEFINE_OP_CLASS_ID                   \
-  static uint8_t ClassID() {                 \
-    static uint8_t ClassID = GenOpClassID(); \
-    return ClassID;                          \
-  }
-
 class Op {
  public:
-  explicit Op(uint8_t classID) : _classID(classID) {
-  }
-
   virtual ~Op() = default;
 
-  virtual void prepare(Context* context, uint32_t renderFlags) = 0;
-
   virtual void execute(RenderPass* renderPass) = 0;
-
-  bool combineIfPossible(Op* op);
 
   const Rect& bounds() const {
     return _bounds;
   }
 
-  uint8_t classID() const {
-    return _classID;
-  }
-
  protected:
-  static uint8_t GenOpClassID();
-
-  void setBounds(Rect bounds) {
-    _bounds = bounds;
-  }
-
-  virtual bool onCombineIfPossible(Op*) {
-    return false;
+  explicit Op(const Rect& bounds) : _bounds(bounds) {
   }
 
  private:
-  uint8_t _classID = 0;
   Rect _bounds = Rect::MakeEmpty();
 };
 }  // namespace tgfx

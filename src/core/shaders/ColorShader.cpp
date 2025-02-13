@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorShader.h"
+#include "core/utils/Caster.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
@@ -33,6 +34,11 @@ bool ColorShader::isOpaque() const {
 bool ColorShader::asColor(Color* output) const {
   *output = color;
   return true;
+}
+
+bool ColorShader::isEqual(const Shader* shader) const {
+  auto other = Caster::AsColorShader(shader);
+  return other && color == other->color;
 }
 
 std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&,

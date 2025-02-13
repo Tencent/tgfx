@@ -30,7 +30,7 @@ class ColorImageFilter : public ImageFilter {
  protected:
   Type type() const override {
     return Type::Color;
-  };
+  }
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                          const FPArgs& args,

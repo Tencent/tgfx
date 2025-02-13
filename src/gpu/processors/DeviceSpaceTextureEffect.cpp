@@ -28,9 +28,4 @@ const TextureSampler* DeviceSpaceTextureEffect::onTextureSampler(size_t) const {
   auto texture = textureProxy->getTexture();
   return texture == nullptr ? nullptr : texture->getSampler();
 }
-
-bool DeviceSpaceTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const DeviceSpaceTextureEffect&>(processor);
-  return textureProxy == that.textureProxy && uvMatrix == that.uvMatrix;
-}
 }  // namespace tgfx

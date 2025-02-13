@@ -18,7 +18,7 @@
 
 #include "tgfx/core/ImageFilter.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/OpContext.h"
+#include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -50,11 +50,10 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   auto offsetMatrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
   // There is no scaling for the source image, so we can use the default sampling options.
   auto processor = asFragmentProcessor(std::move(source), fpArgs, {}, &offsetMatrix);
-  if (!processor) {
+  auto drawingManager = args.context->drawingManager();
+  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
   }
-  OpContext opContext(renderTarget, args.renderFlags);
-  opContext.fillWithFP(std::move(processor), true);
   return renderTarget->getTextureProxy();
 }
 
@@ -94,9 +93,8 @@ std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   if (dstBounds.contains(clipBounds)) {
     return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix, isAlphaOnly);
-  } else {
-    return TiledTextureEffect::Make(std::move(textureProxy), TileMode::Decal, TileMode::Decal,
-                                    sampling, &fpMatrix, isAlphaOnly);
   }
+  return TiledTextureEffect::Make(std::move(textureProxy), TileMode::Decal, TileMode::Decal,
+                                  sampling, &fpMatrix, isAlphaOnly);
 }
 }  // namespace tgfx

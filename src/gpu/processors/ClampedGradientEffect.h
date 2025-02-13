@@ -40,8 +40,6 @@ class ClampedGradientEffect : public FragmentProcessor {
                         std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
                         Color rightBorderColor);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   size_t colorizerIndex = ULONG_MAX;
   size_t gradLayoutIndex = ULONG_MAX;
   Color leftBorderColor;

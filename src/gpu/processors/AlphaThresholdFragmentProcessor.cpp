@@ -24,8 +24,4 @@ std::unique_ptr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor
     float threshold) {
   return std::make_unique<GLAlphaThresholdFragmentProcessor>(threshold);
 }
-
-bool AlphaThresholdFragmentProcessor::onIsEqual(const FragmentProcessor& other) const {
-  return threshold == static_cast<const AlphaThresholdFragmentProcessor&>(other).threshold;
-}
 }  // namespace tgfx

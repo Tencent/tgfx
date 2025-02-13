@@ -18,7 +18,6 @@
 
 #include "ComposeImageFilter.h"
 #include "core/images/FilterImage.h"
-#include "gpu/OpContext.h"
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::Compose(std::shared_ptr<ImageFilter> inner,

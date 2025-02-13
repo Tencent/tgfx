@@ -34,8 +34,6 @@ class RadialGradientLayout : public FragmentProcessor {
 
   explicit RadialGradientLayout(Matrix matrix);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

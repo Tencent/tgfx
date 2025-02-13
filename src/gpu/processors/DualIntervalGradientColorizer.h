@@ -40,8 +40,6 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
         bias23(bias23), threshold(threshold) {
   }
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   Color scale01;
   Color bias01;
   Color scale23;

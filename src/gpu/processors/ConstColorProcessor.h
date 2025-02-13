@@ -41,8 +41,6 @@ class ConstColorProcessor : public FragmentProcessor {
       : FragmentProcessor(ClassID()), color(color), inputMode(mode) {
   }
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   Color color;
   InputMode inputMode;
 };

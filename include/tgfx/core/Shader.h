@@ -151,13 +151,17 @@ class Shader {
    */
   virtual Type type() const = 0;
 
+  /**
+   * Returns true if the specified shader is equivalent to this Shader.
+   */
+  virtual bool isEqual(const Shader* shader) const = 0;
+
   std::weak_ptr<Shader> weakThis;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
-  friend class Canvas;
   friend class Caster;
 };
 }  // namespace tgfx

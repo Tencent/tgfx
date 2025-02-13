@@ -20,6 +20,7 @@
 #include "core/Rasterizer.h"
 #include "core/Records.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 
@@ -134,8 +135,7 @@ bool PictureImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
   RenderContext renderContext(renderTarget, renderFlags);
   MCState replayState(matrix ? *matrix : Matrix::I());
   picture->playback(&renderContext, replayState);
-  auto drawingManager = renderTarget->getContext()->drawingManager();
-  drawingManager->addTextureResolveTask(renderTarget);
+  renderContext.flush();
   return true;
 }
 }  // namespace tgfx

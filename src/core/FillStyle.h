@@ -24,8 +24,16 @@
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
+/**
+ * FillStyle specifies how the geometry of a drawing operation is filled.
+ */
 class FillStyle {
  public:
+  FillStyle() = default;
+
+  FillStyle(const Color& color, BlendMode blendMode) : color(color), blendMode(blendMode) {
+  }
+
   /**
    * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
    * default value is true.
@@ -58,8 +66,24 @@ class FillStyle {
   BlendMode blendMode = BlendMode::SrcOver;
 
   /**
+   * Returns true if the FillStyle contains only a color and no shader, mask filter, or color filter.
+   */
+  bool hasOnlyColor() const;
+
+  /**
    * Returns true if the FillStyle is guaranteed to produce only opaque colors.
    */
   bool isOpaque() const;
+
+  /**
+   * Returns true if the FillStyle is equal to the given style. If ignoreColor is true, the color
+   * is not compared.
+   */
+  bool isEqual(const FillStyle& style, bool ignoreColor = false) const;
+
+  /**
+   * Returns a new FillStyle applying the given matrix to the shader and mask filter.
+   */
+  FillStyle makeWithMatrix(const Matrix& matrix) const;
 };
 }  // namespace tgfx

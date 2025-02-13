@@ -65,8 +65,6 @@ class TiledTextureEffect : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   size_t onCountTextureSamplers() const override;
 
   const TextureSampler* onTextureSampler(size_t) const override;

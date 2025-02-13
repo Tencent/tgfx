@@ -35,7 +35,7 @@ class DropShadowImageFilter : public ImageFilter {
  protected:
   Type type() const override {
     return Type::DropShadow;
-  };
+  }
 
   Rect onFilterBounds(const Rect& srcRect) const override;
 

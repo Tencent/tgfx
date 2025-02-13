@@ -28,7 +28,9 @@ class AlphaThresholdColorFilter : public ColorFilter {
  protected:
   Type type() const override {
     return Type::AlphaThreshold;
-  };
+  }
+
+  bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;

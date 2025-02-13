@@ -21,19 +21,6 @@
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
-  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
-    return;
-  }
-  ops.emplace_back(std::move(op));
-}
-
-void OpsRenderTask::prepare(Context* context) {
-  for (auto& op : ops) {
-    op->prepare(context, renderFlags);
-  }
-}
-
 bool OpsRenderTask::execute(Gpu* gpu) {
   if (ops.empty() || renderTargetProxy == nullptr) {
     return false;

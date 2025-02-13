@@ -22,9 +22,4 @@ namespace tgfx {
 void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(inputMode));
 }
-
-bool ConstColorProcessor::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const ConstColorProcessor&>(processor);
-  return inputMode == that.inputMode && color == that.color;
-}
 }  // namespace tgfx

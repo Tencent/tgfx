@@ -34,8 +34,6 @@ class ConicGradientLayout : public FragmentProcessor {
 
   ConicGradientLayout(Matrix matrix, float bias, float scale);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   CoordTransform coordTransform;
   float bias;
   float scale;

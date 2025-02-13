@@ -73,25 +73,4 @@ std::unique_ptr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
                                     numColorProcessors, blendMode, std::move(dstTextureInfo),
                                     &swizzle);
 }
-
-static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor>>& frags1,
-                             const std::vector<std::unique_ptr<FragmentProcessor>>& frags2) {
-  if (frags1.size() != frags2.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < frags1.size(); i++) {
-    if (!frags1[i]->isEqual(*frags2[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool DrawOp::onCombineIfPossible(Op* op) {
-  auto* that = static_cast<DrawOp*>(op);
-  return aa == that->aa && _scissorRect == that->_scissorRect &&
-         CompareFragments(_colors, that->_colors) &&
-         CompareFragments(_coverages, that->_coverages) && blendMode == that->blendMode;
-}
-
 }  // namespace tgfx

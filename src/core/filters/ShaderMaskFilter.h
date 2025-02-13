@@ -42,7 +42,9 @@ class ShaderMaskFilter : public MaskFilter {
  protected:
   Type type() const override {
     return Type::Shader;
-  };
+  }
+
+  bool isEqual(const MaskFilter* maskFilter) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;

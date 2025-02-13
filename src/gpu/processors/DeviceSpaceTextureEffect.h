@@ -35,8 +35,6 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
 
   DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   size_t onCountTextureSamplers() const override {
     return 1;
   }

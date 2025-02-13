@@ -18,7 +18,7 @@
 
 #include "RasterizedImage.h"
 #include "core/images/SubsetImage.h"
-#include "gpu/OpContext.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
@@ -89,11 +89,7 @@ bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs args(renderTarget->getContext(), renderFlags, drawRect);
   auto processor = FragmentProcessor::Make(source, args, sampling, &uvMatrix);
-  if (processor == nullptr) {
-    return false;
-  }
-  OpContext opContext(renderTarget, args.renderFlags);
-  opContext.fillWithFP(std::move(processor), true);
-  return true;
+  auto drawingManager = renderTarget->getContext()->drawingManager();
+  return drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 }  // namespace tgfx

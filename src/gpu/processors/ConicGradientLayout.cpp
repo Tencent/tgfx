@@ -23,10 +23,4 @@ ConicGradientLayout::ConicGradientLayout(Matrix matrix, float bias, float scale)
     : FragmentProcessor(ClassID()), coordTransform(matrix), bias(bias), scale(scale) {
   addCoordTransform(&coordTransform);
 }
-
-bool ConicGradientLayout::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const ConicGradientLayout&>(processor);
-  return coordTransform.matrix == that.coordTransform.matrix && bias == that.bias &&
-         scale == that.scale;
-}
 }  // namespace tgfx

@@ -20,14 +20,14 @@
 
 namespace tgfx {
 std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
-    int width, int height, AAType aa, bool hasColor) {
+    int width, int height, AAType aa, std::optional<Color> uniformColor) {
   return std::unique_ptr<QuadPerEdgeAAGeometryProcessor>(
-      new GLQuadPerEdgeAAGeometryProcessor(width, height, aa, hasColor));
+      new GLQuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor));
 }
 
-GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                                                   bool hasColor)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, hasColor) {
+GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(
+    int width, int height, AAType aa, std::optional<Color> uniformColor)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor) {
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -50,12 +50,14 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
-  if (color.isInitialized()) {
+  if (uniformColor.has_value()) {
+    auto colorName =
+        args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
@@ -65,5 +67,8 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
 void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                                FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
+  if (uniformColor.has_value()) {
+    uniformBuffer->setData("Color", *uniformColor);
+  }
 }
 }  // namespace tgfx

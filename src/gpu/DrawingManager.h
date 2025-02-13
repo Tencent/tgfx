@@ -19,13 +19,12 @@
 #pragma once
 
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
+#include "gpu/OpsCompositor.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
 #include "gpu/tasks/TextureFlattenTask.h"
-#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 class DrawingManager {
@@ -33,16 +32,26 @@ class DrawingManager {
   explicit DrawingManager(Context* context) : context(context) {
   }
 
-  std::shared_ptr<OpsRenderTask> addOpsTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                            uint32_t renderFlags);
+  /**
+   * Fills the render target using the provided fragment processor, and automatically resolves the
+   * render target. Returns false if the render target or fragment processor is nullptr.
+   */
+  bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
+                    std::unique_ptr<FragmentProcessor> processor, uint32_t renderFlags);
 
-  void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
+  std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                                  uint32_t renderFlags);
+
+  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
+                        std::vector<std::unique_ptr<Op>> ops);
+
+  void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
-  void addTextureFlattenTask(std::shared_ptr<TextureFlattenTask> flattenTask);
+  void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
 
-  void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  void addTextureFlattenTask(std::shared_ptr<TextureFlattenTask> flattenTask);
 
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest, Rect srcRect, Point dstPoint);
@@ -56,16 +65,12 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
-  std::unordered_set<std::shared_ptr<RenderTargetProxy>> needResolveTargets = {};
   std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::shared_ptr<TextureFlattenTask>> flattenTasks = {};
   std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
-  std::shared_ptr<OpsRenderTask> activeOpsTask = nullptr;
-#ifdef DEBUG
-  ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
-#endif
+  std::vector<std::shared_ptr<OpsCompositor>> compositors = {};
+  ResourceKeyMap<size_t> resourceTaskMap = {};
 
-  void addRenderTask(std::shared_ptr<RenderTask> renderTask);
-  void checkIfResolveNeeded(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+  friend class RenderQueue;
 };
 }  // namespace tgfx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
-#include "core/CanvasState.h"
 #include "core/DrawContext.h"
 #include "core/LayerUnrollContext.h"
 #include "core/RecordingContext.h"
@@ -187,14 +186,11 @@ void Canvas::resetStateStack() {
 }
 
 void Canvas::clear(const Color& color) {
-  drawColor(color, BlendMode::Src);
+  drawClip({color, BlendMode::Src});
 }
 
 void Canvas::drawColor(const Color& color, BlendMode blendMode) {
-  FillStyle style = {};
-  style.color = color;
-  style.blendMode = blendMode;
-  drawClip(style);
+  drawClip({color, blendMode});
 }
 
 void Canvas::drawPaint(const Paint& paint) {
@@ -269,7 +265,8 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
 }
 
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
-  if (rRect.radii.isZero()) {
+  auto& radii = rRect.radii;
+  if (radii.x < 0.5f && radii.y < 0.5f) {
     drawRect(rRect.rect, paint);
     return;
   }

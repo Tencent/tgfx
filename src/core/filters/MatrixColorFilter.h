@@ -34,7 +34,9 @@ class MatrixColorFilter : public ColorFilter {
  protected:
   Type type() const override {
     return Type::Matrix;
-  };
+  }
+
+  bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
   bool alphaIsUnchanged;

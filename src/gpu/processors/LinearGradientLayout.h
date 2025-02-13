@@ -34,8 +34,6 @@ class LinearGradientLayout : public FragmentProcessor {
 
   explicit LinearGradientLayout(Matrix matrix);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

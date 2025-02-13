@@ -37,7 +37,9 @@ class ModeColorFilter : public ColorFilter {
  protected:
   Type type() const override {
     return Type::Blend;
-  };
+  }
+
+  bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;

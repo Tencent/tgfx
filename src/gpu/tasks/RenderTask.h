@@ -27,9 +27,6 @@ class RenderTask {
  public:
   virtual ~RenderTask() = default;
 
-  virtual void prepare(Context*) {
-  }
-
   virtual bool execute(Gpu* gpu) = 0;
 
  protected:
@@ -38,5 +35,7 @@ class RenderTask {
   }
 
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
+
+  friend class RenderQueue;
 };
 }  // namespace tgfx

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {

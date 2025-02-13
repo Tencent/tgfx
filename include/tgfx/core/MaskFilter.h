@@ -47,13 +47,21 @@ class MaskFilter {
  protected:
   enum class Type { Shader, None };
 
+  /**
+   * Returns the type of this mask filter.
+   */
   virtual Type type() const = 0;
+
+  /**
+   * Returns true if this mask filter is equivalent to the specified mask filter.
+   */
+  virtual bool isEqual(const MaskFilter* maskFilter) const = 0;
 
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const = 0;
 
-  friend class RenderContext;
+  friend class OpsCompositor;
   friend class Caster;
 };
 }  // namespace tgfx

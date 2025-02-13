@@ -45,8 +45,6 @@ class TextureGradientColorizer : public FragmentProcessor {
     return gradient->getSampler();
   }
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   std::shared_ptr<Texture> gradient;
 };
 }  // namespace tgfx

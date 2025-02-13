@@ -31,7 +31,7 @@ class RuntimeImageFilter : public ImageFilter {
  protected:
   Type type() const override {
     return Type::Runtime;
-  };
+  }
 
   Rect onFilterBounds(const Rect& srcRect) const override;
 
