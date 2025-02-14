@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,18 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ClearOp.h"
+#include "CopyOp.h"
+#include "core/utils/Log.h"
+#include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-std::unique_ptr<ClearOp> ClearOp::Make(Color color, const Rect& scissor) {
-  if (scissor.isEmpty()) {
+std::unique_ptr<CopyOp> CopyOp::Make(std::shared_ptr<TextureProxy> textureProxy,
+                                     const Rect& srcRect, const Point& dstPoint) {
+  if (textureProxy == nullptr || srcRect.isEmpty()) {
     return nullptr;
   }
-  return std::unique_ptr<ClearOp>(new ClearOp(color, scissor));
+  return std::unique_ptr<CopyOp>(new CopyOp(std::move(textureProxy), srcRect, dstPoint));
 }
 
-void ClearOp::execute(RenderPass* renderPass) {
-  renderPass->clear(scissor, color);
+CopyOp::CopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+               const Point& dstPoint)
+    : Op(srcRect), textureProxy(std::move(textureProxy)), srcRect(srcRect), dstPoint(dstPoint) {
 }
+
+void CopyOp::execute(RenderPass* renderPass) {
+  auto texture = textureProxy->getTexture();
+  if (texture == nullptr) {
+    LOGE("CopyOp::execute() Failed to get the dest texture!");
+    return;
+  }
+  renderPass->copyTo(texture.get(), srcRect, dstPoint);
+}
+
 }  // namespace tgfx

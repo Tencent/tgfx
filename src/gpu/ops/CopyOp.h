@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,14 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Gpu.h"
-#include "gpu/Texture.h"
+#pragma once
+
+#include "Op.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-void Gpu::regenerateMipmapLevels(const TextureSampler* sampler) {
-  if (!sampler->hasMipmaps()) {
-    return;
-  }
-  onRegenerateMipmapLevels(sampler);
-}
+class CopyOp : public Op {
+ public:
+  static std::unique_ptr<CopyOp> Make(std::shared_ptr<TextureProxy> textureProxy,
+                                      const Rect& srcRect, const Point& dstPoint);
+
+  void execute(RenderPass* renderPass) override;
+
+ private:
+  CopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect, const Point& dstPoint);
+
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  Rect srcRect = Rect::MakeEmpty();
+  Point dstPoint = Point::Zero();
+};
 }  // namespace tgfx

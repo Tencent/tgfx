@@ -47,7 +47,7 @@ void GLProgram::onReleaseGPU() {
   }
 }
 
-void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
+void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarget,
                                                  const ProgramInfo* programInfo) {
   setRenderTargetState(renderTarget);
   programInfo->getUniforms(uniformBuffer.get());
@@ -73,7 +73,7 @@ static std::array<float, 4> GetRTAdjustArray(int width, int height, bool flipY) 
   return result;
 }
 
-void GLProgram::setRenderTargetState(const GLRenderTarget* renderTarget) {
+void GLProgram::setRenderTargetState(const RenderTarget* renderTarget) {
   int width = renderTarget->width();
   int height = renderTarget->height();
   auto origin = renderTarget->origin();

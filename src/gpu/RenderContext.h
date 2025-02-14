@@ -58,6 +58,12 @@ class RenderContext : public DrawContext {
                  const MCState& state, const FillStyle& style) override;
 
   /**
+   * Copies the contents of the render target to the given texture.
+   */
+  void copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+                     const Point& dstPoint);
+
+  /**
    * Flushes the render context, submitting all pending operations to the drawing manager. Returns
    * true if any operations were submitted.
    */

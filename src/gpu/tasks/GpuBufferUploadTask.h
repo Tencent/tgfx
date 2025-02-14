@@ -28,17 +28,17 @@ class GpuBufferUploadTask : public ResourceTask {
   /**
    * Create a new GpuBufferUploadTask to generate a GpuBuffer with the given data provider.
    */
-  static std::shared_ptr<GpuBufferUploadTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
-                                                       std::shared_ptr<DataProvider> provider);
+  static std::unique_ptr<GpuBufferUploadTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
+                                                       std::unique_ptr<DataProvider> provider);
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
   BufferType bufferType = BufferType::Vertex;
-  std::shared_ptr<DataProvider> provider = nullptr;
+  std::unique_ptr<DataProvider> provider = nullptr;
 
   GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
-                      std::shared_ptr<DataProvider> provider);
+                      std::unique_ptr<DataProvider> provider);
 };
 }  // namespace tgfx

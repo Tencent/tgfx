@@ -120,8 +120,8 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
       }
     }
   }
-  if (sampler->hasMipmaps()) {
-    onRegenerateMipmapLevels(sampler);
+  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
+    gl->generateMipmap(glSampler->target);
   }
 }
 
@@ -203,15 +203,12 @@ void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->getFrameBufferID(false));
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
   gl->bindTexture(glSampler->target, glSampler->id);
-  // format != BGRA && !srcHasMSAARenderBuffer && !dstHasMSAARenderBuffer && dstIsTextureable &&
-  // dstOrigin == srcOrigin && canConfigBeFBOColorAttachment(srcConfig) && (!srcIsTextureable ||
-  // srcIsGLTexture2D)
   gl->copyTexSubImage2D(glSampler->target, 0, static_cast<int>(dstPoint.x),
                         static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
                         static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
                         static_cast<int>(srcRect.height()));
-  if (texture->hasMipmaps()) {
-    onRegenerateMipmapLevels(texture->getSampler());
+  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
+    gl->generateMipmap(glSampler->target);
   }
 }
 
@@ -240,6 +237,16 @@ void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {
     gl->disable(GL_SCISSOR_TEST);
     gl->blitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
   }
+}
+
+void GLGpu::regenerateMipmapLevels(const TextureSampler* sampler) {
+  auto gl = GLFunctions::Get(context);
+  auto glSampler = static_cast<const GLSampler*>(sampler);
+  if (!glSampler->hasMipmaps() || glSampler->target != GL_TEXTURE_2D) {
+    return;
+  }
+  gl->bindTexture(glSampler->target, glSampler->id);
+  gl->generateMipmap(glSampler->target);
 }
 
 bool GLGpu::insertSemaphore(Semaphore* semaphore) {
@@ -276,15 +283,5 @@ bool GLGpu::submitToGpu(bool syncCpu) {
     gl->flush();
   }
   return true;
-}
-
-void GLGpu::onRegenerateMipmapLevels(const TextureSampler* sampler) {
-  auto gl = GLFunctions::Get(context);
-  auto glSampler = static_cast<const GLSampler*>(sampler);
-  if (glSampler->target != GL_TEXTURE_2D) {
-    return;
-  }
-  gl->bindTexture(glSampler->target, glSampler->id);
-  gl->generateMipmap(glSampler->target);
 }
 }  // namespace tgfx

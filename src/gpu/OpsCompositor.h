@@ -67,6 +67,12 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
 
   /**
+   * Copy the contents of the render target to the given texture.
+   */
+  void copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+                     const Point& dstPoint);
+
+  /**
    * Close the compositor and submit the composed render task to the render queue. After closing,
    * the compositor is no longer valid.
    */

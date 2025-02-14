@@ -27,7 +27,7 @@ class TextureCreateTask : public ResourceTask {
   /**
    * Creates a TextureCreateTask to create a texture using the specified size and format.
    */
-  static std::shared_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey, int width, int height,
+  static std::unique_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey, int width, int height,
                                                      PixelFormat format, bool mipmapped = false,
                                                      ImageOrigin origin = ImageOrigin::TopLeft);
 

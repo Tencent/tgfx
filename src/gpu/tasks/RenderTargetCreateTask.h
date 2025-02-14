@@ -27,7 +27,7 @@ class RenderTargetCreateTask : public ResourceTask {
   /**
    * Create a new RenderTargetCreateTask to generate a RenderTarget with the given properties.
    */
-  static std::shared_ptr<RenderTargetCreateTask> MakeFrom(
+  static std::unique_ptr<RenderTargetCreateTask> MakeFrom(
       UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy, PixelFormat pixelFormat,
       int sampleCount = 1, bool clearAll = false);
 

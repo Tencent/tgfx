@@ -32,7 +32,7 @@ class DataWrapper : public DataProvider {
   std::shared_ptr<Data> data = nullptr;
 };
 
-std::shared_ptr<DataProvider> DataProvider::Wrap(std::shared_ptr<Data> data) {
-  return std::make_shared<DataWrapper>(std::move(data));
+std::unique_ptr<DataProvider> DataProvider::Wrap(std::shared_ptr<Data> data) {
+  return std::make_unique<DataWrapper>(std::move(data));
 }
 }  // namespace tgfx

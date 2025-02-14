@@ -20,13 +20,13 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::shared_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(UniqueKey uniqueKey, int width,
+std::unique_ptr<TextureCreateTask> TextureCreateTask::MakeFrom(UniqueKey uniqueKey, int width,
                                                                int height, PixelFormat format,
                                                                bool mipmapped, ImageOrigin origin) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::shared_ptr<TextureCreateTask>(
+  return std::unique_ptr<TextureCreateTask>(
       new TextureCreateTask(std::move(uniqueKey), width, height, format, mipmapped, origin));
 }
 
