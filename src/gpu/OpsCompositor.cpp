@@ -28,6 +28,7 @@
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 /**
@@ -98,20 +99,26 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   if (!state.matrix.invert(&uvMatrix)) {
     return;
   }
+  auto localBounds = Rect::MakeEmpty();
+  auto deviceBounds = Rect::MakeEmpty();
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(style);
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
-  auto localBounds = shape->isInverseFillType() ? ToLocalBounds(clipBounds, state.matrix)
-                                                : shape->getBounds(maxScale);
-
+  if (needLocalBounds) {
+    localBounds = shape->isInverseFillType() ? ToLocalBounds(clipBounds, state.matrix)
+                                             : shape->getBounds(maxScale);
+  }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
-  auto bounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
+  if (needDeviceBounds) {
+    deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
+  }
   auto aaType = getAAType(style);
   auto proxyProvider = renderTarget->getContext()->proxyProvider();
   auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType == AAType::Coverage,
                                                        clipBounds, renderFlags);
   auto drawOp =
-      ShapeDrawOp::Make(std::move(shapeProxy), style.color.premultiply(), uvMatrix, bounds, aaType);
-  addDrawOp(std::move(drawOp), localBounds, clip, style);
+      ShapeDrawOp::Make(std::move(shapeProxy), style.color.premultiply(), uvMatrix, aaType);
+  addDrawOp(std::move(drawOp), clip, style, localBounds, deviceBounds);
 }
 
 void OpsCompositor::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
@@ -147,6 +154,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
   std::swap(pendingStyle, style);
   std::unique_ptr<DrawOp> drawOp = nullptr;
   auto localBounds = Rect::MakeEmpty();
+  auto deviceBounds = Rect::MakeEmpty();
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(style, type == PendingOpType::Image);
   auto context = renderTarget->getContext();
   auto aaType = getAAType(style);
   switch (type) {
@@ -161,14 +170,28 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
     // fallthrough
     case PendingOpType::Image:
       drawOp = RectDrawOp::Make(context, pendingRects, aaType, renderFlags);
-      for (auto& rect : pendingRects) {
-        localBounds.join(rect.rect);
+      if (needLocalBounds) {
+        for (auto& rect : pendingRects) {
+          localBounds.join(rect.rect);
+        }
+      }
+      if (needDeviceBounds) {
+        for (auto& rectPaint : pendingRects) {
+          auto rect = rectPaint.viewMatrix.mapRect(rectPaint.rect);
+          deviceBounds.join(rect);
+        }
       }
       pendingRects.clear();
       break;
     case PendingOpType::RRect:
       drawOp = RRectDrawOp::Make(context, pendingRRects, aaType, renderFlags);
-      localBounds = drawOp->bounds();
+      if (needLocalBounds || needDeviceBounds) {
+        for (auto& rRectPaint : pendingRRects) {
+          auto rect = rRectPaint.viewMatrix.mapRect(rRectPaint.rRect.rect);
+          deviceBounds.join(rect);
+        }
+        localBounds = deviceBounds;
+      }
       pendingRRects.clear();
       break;
     default:
@@ -183,7 +206,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
     }
     drawOp->addColorFP(std::move(processor));
   }
-  addDrawOp(std::move(drawOp), localBounds, clip, style);
+  addDrawOp(std::move(drawOp), clip, style, localBounds, deviceBounds);
 }
 
 /**
@@ -257,6 +280,19 @@ AAType OpsCompositor::getAAType(const FillStyle& style) const {
   return AAType::None;
 }
 
+std::pair<bool, bool> OpsCompositor::needComputeBounds(const FillStyle& style, bool hasImageFill) {
+  bool needLocalBounds = hasImageFill || style.shader != nullptr || style.maskFilter != nullptr;
+  bool needDeviceBounds = false;
+  if (!BlendModeAsCoeff(style.blendMode)) {
+    auto caps = renderTarget->getContext()->caps();
+    if (!caps->frameBufferFetchSupport &&
+        (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr)) {
+      needDeviceBounds = true;
+    }
+  }
+  return {needLocalBounds, needDeviceBounds};
+}
+
 Rect OpsCompositor::getClipBounds(const Path& clip) {
   if (clip.isInverseFillType()) {
     return renderTarget->bounds();
@@ -305,8 +341,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType == AAType::Coverage,
                                                          clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
-    auto drawOp =
-        ShapeDrawOp::Make(std::move(shapeProxy), Color::White(), uvMatrix, clipBounds, aaType);
+    auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), Color::White(), uvMatrix, aaType);
     auto target = RenderTargetProxy::MakeFallback(context, width, height, true, 1, false,
                                                   ImageOrigin::TopLeft, true);
     if (target == nullptr) {
@@ -325,11 +360,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   return clipTexture;
 }
 
-std::unique_ptr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip,
-                                                                const Rect& deviceBounds,
-                                                                AAType aaType, Rect* scissorRect) {
-  if ((!clip.isEmpty() && clip.contains(deviceBounds)) ||
-      (clip.isEmpty() && clip.isInverseFillType())) {
+std::unique_ptr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, AAType aaType,
+                                                                Rect* scissorRect) {
+  if (clip.isEmpty() && clip.isInverseFillType()) {
     return nullptr;
   }
   auto [rect, useScissor] = getClipRect(clip);
@@ -358,13 +391,44 @@ std::unique_ptr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip
       DeviceSpaceTextureEffect::Make(std::move(textureProxy), uvMatrix));
 }
 
-void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds, const Path& clip,
-                              const FillStyle& style) {
+DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds) {
+  auto caps = renderTarget->getContext()->caps();
+  if (caps->frameBufferFetchSupport) {
+    return {};
+  }
+  DstTextureInfo dstTextureInfo = {};
+  auto textureProxy = renderTarget->getTextureProxy();
+  if (caps->textureBarrierSupport && textureProxy != nullptr) {
+    dstTextureInfo.textureProxy = std::move(textureProxy);
+    dstTextureInfo.requiresBarrier = true;
+    return dstTextureInfo;
+  }
+  auto bounds = renderTarget->bounds();
+  if (!bounds.intersect(deviceBounds)) {
+    return {};
+  }
+  FlipYIfNeeded(&bounds, renderTarget);
+  bounds.roundOut();
+  dstTextureInfo.offset = {bounds.x(), bounds.y()};
+  auto context = renderTarget->getContext();
+  textureProxy = context->proxyProvider()->createTextureProxy(
+      {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
+      PixelFormat::RGBA_8888, false, renderTarget->origin());
+  auto op = CopyOp::Make(textureProxy, bounds, Point::Zero());
+  if (op == nullptr) {
+    return {};
+  }
+  ops.push_back(std::move(op));
+  dstTextureInfo.textureProxy = std::move(textureProxy);
+  return dstTextureInfo;
+}
+
+void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, const FillStyle& style,
+                              const Rect& localBounds, const Rect& deviceBounds) {
   if (op == nullptr) {
     return;
   }
   DEBUG_ASSERT(renderTarget != nullptr);
-  op->setBlendMode(style.blendMode);
   FPArgs args = {renderTarget->getContext(), renderFlags, localBounds};
   if (style.shader) {
     if (auto processor = FragmentProcessor::Make(style.shader, args)) {
@@ -387,11 +451,17 @@ void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBound
   }
   Rect scissorRect = Rect::MakeEmpty();
   auto aaType = getAAType(style);
-  auto clipMask = getClipMaskFP(clip, op->bounds(), aaType, &scissorRect);
+  auto clipMask = getClipMaskFP(clip, aaType, &scissorRect);
   if (clipMask) {
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
+  op->setBlendMode(style.blendMode);
+  if (!BlendModeAsCoeff(style.blendMode)) {
+    auto dstTextureInfo = makeDstTextureInfo(deviceBounds);
+    auto xferProcessor = PorterDuffXferProcessor::Make(style.blendMode, std::move(dstTextureInfo));
+    op->setXferProcessor(std::move(xferProcessor));
+  }
   ops.push_back(std::move(op));
 }
 }  // namespace tgfx

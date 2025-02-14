@@ -141,7 +141,7 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                        xferProcessor->name().c_str());
 
   SamplerHandle dstTextureSamplerHandle;
-  if (auto dstTexture = pipeline->dstTexture()) {
+  if (auto dstTexture = xferProcessor->dstTexture()) {
     dstTextureSamplerHandle = emitSampler(dstTexture->getSampler(), "DstTextureSampler");
   }
 

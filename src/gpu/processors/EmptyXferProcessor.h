@@ -29,6 +29,9 @@ class EmptyXferProcessor : public XferProcessor {
     return "EmptyXferProcessor";
   }
 
+  void setData(UniformBuffer*) const override {
+  }
+
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
  protected:

@@ -118,15 +118,10 @@ class RectNonCoverageVerticesProvider : public DataProvider {
 
 std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector<RectPaint>& rects,
                                              AAType aaType, uint32_t renderFlags) {
-  auto bounds = Rect::MakeEmpty();
-  for (auto& rectPaint : rects) {
-    auto rect = rectPaint.viewMatrix.mapRect(rectPaint.rect);
-    bounds.join(rect);
-  }
-  if (bounds.isEmpty()) {
+  if (rects.empty()) {
     return nullptr;
   }
-  auto drawOp = std::unique_ptr<RectDrawOp>(new RectDrawOp(bounds, aaType, rects.size()));
+  auto drawOp = std::unique_ptr<RectDrawOp>(new RectDrawOp(aaType, rects.size()));
   auto& firstColor = rects[0].color;
   std::optional<Color> uniformColor = firstColor;
   for (auto& rectPaint : rects) {
@@ -158,8 +153,7 @@ std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector
   return drawOp;
 }
 
-RectDrawOp::RectDrawOp(const Rect& bounds, AAType aaType, size_t rectCount)
-    : DrawOp(bounds, aaType), rectCount(rectCount) {
+RectDrawOp::RectDrawOp(AAType aaType, size_t rectCount) : DrawOp(aaType), rectCount(rectCount) {
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {

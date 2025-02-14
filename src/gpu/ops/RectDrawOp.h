@@ -44,7 +44,7 @@ class RectDrawOp : public DrawOp {
   void execute(RenderPass* renderPass) override;
 
  private:
-  RectDrawOp(const Rect& bounds, AAType aaType, size_t rectCount);
+  RectDrawOp(AAType aaType, size_t rectCount);
 
   size_t rectCount = 0;
   std::optional<Color> uniformColor = std::nullopt;

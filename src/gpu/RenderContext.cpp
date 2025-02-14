@@ -42,7 +42,7 @@ void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   auto& clip = state.clip;
   auto discardContent =
       clip.isInverseFillType() && clip.isEmpty() && style.hasOnlyColor() && style.isOpaque();
-  if (auto compositor = getOpsCompositor(discardContent)) {
+  if (auto compositor = getOpsCompositor(false, discardContent)) {
     compositor->fillRect(renderTarget->bounds(), MCState{clip}, style.makeWithMatrix(state.matrix));
   }
 }
@@ -238,7 +238,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
 
 void RenderContext::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
                                   const Point& dstPoint) {
-  if (auto compositor = getOpsCompositor()) {
+  if (auto compositor = getOpsCompositor(true)) {
     compositor->copyToTexture(std::move(textureProxy), srcRect, dstPoint);
   }
 }
@@ -253,8 +253,8 @@ bool RenderContext::flush() {
   return false;
 }
 
-OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
-  if (surface && !surface->aboutToDraw(discardContent)) {
+OpsCompositor* RenderContext::getOpsCompositor(bool readOnly, bool discardContent) {
+  if (!readOnly && surface && !surface->aboutToDraw(discardContent)) {
     return nullptr;
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {

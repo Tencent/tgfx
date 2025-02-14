@@ -28,7 +28,7 @@ class ClearOp : public Op {
   void execute(RenderPass* renderPass) override;
 
  private:
-  ClearOp(Color color, const Rect& scissor) : Op(scissor), color(color), scissor(scissor) {
+  ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
   }
 
   Color color = Color::Transparent();

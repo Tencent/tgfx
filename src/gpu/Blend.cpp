@@ -20,30 +20,30 @@
 #include <utility>
 
 namespace tgfx {
-bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo) {
-  // clang-format off
-  static constexpr std::pair<BlendModeCoeff, BlendModeCoeff> Coeffs[] = {
-      // For Porter-Duff blend functions, color = src * src coeff + dst * dst coeff
-      // src coeff               dst coeff                  blend func
-      // -------------------     --------------------       ----------
-      { BlendModeCoeff::Zero,    BlendModeCoeff::Zero }, // clear
-      { BlendModeCoeff::One,     BlendModeCoeff::Zero }, // src
-      { BlendModeCoeff::Zero,    BlendModeCoeff::One  }, // dst
-      { BlendModeCoeff::One,     BlendModeCoeff::ISA  }, // src-over
-      { BlendModeCoeff::IDA,     BlendModeCoeff::One  }, // dst-over
-      { BlendModeCoeff::DA,      BlendModeCoeff::Zero }, // src-in
-      { BlendModeCoeff::Zero,    BlendModeCoeff::SA   }, // dst-in
-      { BlendModeCoeff::IDA,     BlendModeCoeff::Zero }, // src-out
-      { BlendModeCoeff::Zero,    BlendModeCoeff::ISA  }, // dst-out
-      { BlendModeCoeff::DA,      BlendModeCoeff::ISA  }, // src-atop
-      { BlendModeCoeff::IDA,     BlendModeCoeff::SA   }, // dst-atop
-      { BlendModeCoeff::IDA,     BlendModeCoeff::ISA  }, // xor
-      { BlendModeCoeff::One,     BlendModeCoeff::One  }, // plus
-      { BlendModeCoeff::Zero,    BlendModeCoeff::SC   }, // modulate
-      { BlendModeCoeff::One,     BlendModeCoeff::ISC  }, // screen
-  };
-  // clang-format on
+// clang-format off
+static constexpr std::pair<BlendModeCoeff, BlendModeCoeff> Coeffs[] = {
+  // For Porter-Duff blend functions, color = src * src coeff + dst * dst coeff
+  // src coeff               dst coeff                  blend func
+  // -------------------     --------------------       ----------
+  { BlendModeCoeff::Zero,    BlendModeCoeff::Zero }, // clear
+  { BlendModeCoeff::One,     BlendModeCoeff::Zero }, // src
+  { BlendModeCoeff::Zero,    BlendModeCoeff::One  }, // dst
+  { BlendModeCoeff::One,     BlendModeCoeff::ISA  }, // src-over
+  { BlendModeCoeff::IDA,     BlendModeCoeff::One  }, // dst-over
+  { BlendModeCoeff::DA,      BlendModeCoeff::Zero }, // src-in
+  { BlendModeCoeff::Zero,    BlendModeCoeff::SA   }, // dst-in
+  { BlendModeCoeff::IDA,     BlendModeCoeff::Zero }, // src-out
+  { BlendModeCoeff::Zero,    BlendModeCoeff::ISA  }, // dst-out
+  { BlendModeCoeff::DA,      BlendModeCoeff::ISA  }, // src-atop
+  { BlendModeCoeff::IDA,     BlendModeCoeff::SA   }, // dst-atop
+  { BlendModeCoeff::IDA,     BlendModeCoeff::ISA  }, // xor
+  { BlendModeCoeff::One,     BlendModeCoeff::One  }, // plus
+  { BlendModeCoeff::Zero,    BlendModeCoeff::SC   }, // modulate
+  { BlendModeCoeff::One,     BlendModeCoeff::ISC  }, // screen
+};
+// clang-format on
 
+bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo) {
   if (mode > BlendMode::Screen) {
     return false;
   }

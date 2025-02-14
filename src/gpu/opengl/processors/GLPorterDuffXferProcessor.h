@@ -24,11 +24,10 @@
 namespace tgfx {
 class GLPorterDuffXferProcessor : public PorterDuffXferProcessor {
  public:
-  explicit GLPorterDuffXferProcessor(BlendMode blend);
+  GLPorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo);
 
   void emitCode(const EmitArgs& args) const override;
 
-  void setData(UniformBuffer* uniformBuffer, const Texture* dstTexture,
-               const Point& dstTextureOffset) const override;
+  void setData(UniformBuffer* uniformBuffer) const override;
 };
 }  // namespace tgfx

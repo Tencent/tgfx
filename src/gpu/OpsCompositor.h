@@ -105,12 +105,14 @@ class OpsCompositor {
   void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {},
                        FillStyle style = {});
   AAType getAAType(const FillStyle& style) const;
+  std::pair<bool, bool> needComputeBounds(const FillStyle& style, bool hasImageFill = false);
   Rect getClipBounds(const Path& clip);
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
-  std::unique_ptr<FragmentProcessor> getClipMaskFP(const Path& clip, const Rect& deviceBounds,
-                                                   AAType aaType, Rect* scissorRect);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds, const Path& clip,
-                 const FillStyle& style);
+  std::unique_ptr<FragmentProcessor> getClipMaskFP(const Path& clip, AAType aaType,
+                                                   Rect* scissorRect);
+  DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds);
+  void addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, const FillStyle& style,
+                 const Rect& localBounds, const Rect& deviceBounds);
 };
 }  // namespace tgfx

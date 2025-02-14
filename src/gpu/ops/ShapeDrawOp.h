@@ -26,8 +26,7 @@ namespace tgfx {
 class ShapeDrawOp : public DrawOp {
  public:
   static std::unique_ptr<ShapeDrawOp> Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
-                                           const Matrix& uvMatrix, const Rect& bounds,
-                                           AAType aaType);
+                                           const Matrix& uvMatrix, AAType aaType);
 
   void execute(RenderPass* renderPass) override;
 
@@ -38,6 +37,6 @@ class ShapeDrawOp : public DrawOp {
   std::vector<float> maskVertices = {};
 
   ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,
-              const Rect& bounds, AAType aaType);
+              AAType aaType);
 };
 }  // namespace tgfx
