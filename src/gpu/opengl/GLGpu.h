@@ -43,6 +43,8 @@ class GLGpu : public Gpu {
 
   void resolveRenderTarget(RenderTarget* renderTarget) override;
 
+  void regenerateMipmapLevels(const TextureSampler* sampler) override;
+
   bool insertSemaphore(Semaphore* semaphore) override;
 
   bool waitSemaphore(const Semaphore* semaphore) override;
@@ -54,7 +56,5 @@ class GLGpu : public Gpu {
 
   explicit GLGpu(Context* context) : Gpu(context) {
   }
-
-  void onRegenerateMipmapLevels(const TextureSampler* sampler) override;
 };
 }  // namespace tgfx

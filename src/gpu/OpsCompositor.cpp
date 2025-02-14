@@ -24,6 +24,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/ops/ClearOp.h"
+#include "gpu/ops/CopyOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -111,6 +112,15 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), style.color.premultiply(), uvMatrix, bounds, aaType);
   addDrawOp(std::move(drawOp), localBounds, clip, style);
+}
+
+void OpsCompositor::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+                                  const Point& dstPoint) {
+  flushPendingOps();
+  auto op = CopyOp::Make(std::move(textureProxy), srcRect, dstPoint);
+  if (op != nullptr) {
+    ops.push_back(std::move(op));
+  }
 }
 
 bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const FillStyle& style) const {
@@ -221,7 +231,9 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   const auto& writeSwizzle = caps->getWriteSwizzle(format);
   auto color = writeSwizzle.applyTo(style.color.premultiply());
   auto op = ClearOp::Make(color, bounds);
-  ops.push_back(std::move(op));
+  if (op != nullptr) {
+    ops.push_back(std::move(op));
+  }
   return true;
 }
 

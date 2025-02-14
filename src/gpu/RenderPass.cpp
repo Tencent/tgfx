@@ -27,6 +27,7 @@ bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
   _renderTarget = std::move(renderTarget);
   _renderTargetTexture = std::move(renderTexture);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
+  onBindRenderTarget();
   return true;
 }
 
@@ -91,4 +92,10 @@ void RenderPass::clear(const Rect& scissor, Color color) {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   onClear(scissor, color);
 }
+
+void RenderPass::copyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) {
+  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
+  onCopyTo(texture, srcRect, dstPoint);
+}
+
 }  // namespace tgfx

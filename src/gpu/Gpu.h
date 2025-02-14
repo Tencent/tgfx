@@ -53,20 +53,18 @@ class Gpu {
 
   virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
 
+  virtual void regenerateMipmapLevels(const TextureSampler* sampler) = 0;
+
   virtual bool insertSemaphore(Semaphore* semaphore) = 0;
 
   virtual bool waitSemaphore(const Semaphore* semaphore) = 0;
 
   virtual bool submitToGpu(bool syncCpu) = 0;
 
-  void regenerateMipmapLevels(const TextureSampler* sampler);
-
  protected:
   Context* context;
 
   explicit Gpu(Context* context) : context(context) {
   }
-
-  virtual void onRegenerateMipmapLevels(const TextureSampler* sampler) = 0;
 };
 }  // namespace tgfx

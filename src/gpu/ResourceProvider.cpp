@@ -94,7 +94,7 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::createNonAAQuadIndexBuffer() {
     0, 1, 2, 2, 1, 3
   };
   // clang-format on
-  auto provider = std::make_shared<PatternedIndexBufferProvider>(
+  auto provider = std::make_unique<PatternedIndexBufferProvider>(
       kNonAAQuadIndexPattern, kIndicesPerNonAAQuad, kMaxNumNonAAQuads, kVerticesPerNonAAQuad);
   return GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
 }
@@ -121,7 +121,7 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::createAAQuadIndexBuffer() {
     1, 5, 3, 3, 5, 7,
   };
   // clang-format on
-  auto provider = std::make_shared<PatternedIndexBufferProvider>(
+  auto provider = std::make_unique<PatternedIndexBufferProvider>(
       kAAQuadIndexPattern, kIndicesPerAAQuad, kMaxNumAAQuads, kVerticesPerAAQuad);
   return GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
 }

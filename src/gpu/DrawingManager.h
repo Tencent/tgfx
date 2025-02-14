@@ -51,12 +51,9 @@ class DrawingManager {
 
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
 
-  void addTextureFlattenTask(std::shared_ptr<TextureFlattenTask> flattenTask);
+  void addTextureFlattenTask(std::unique_ptr<TextureFlattenTask> flattenTask);
 
-  void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                               std::shared_ptr<TextureProxy> dest, Rect srcRect, Point dstPoint);
-
-  void addResourceTask(std::shared_ptr<ResourceTask> resourceTask);
+  void addResourceTask(std::unique_ptr<ResourceTask> resourceTask);
 
   /**
    * Returns true if any render tasks were executed.
@@ -65,9 +62,9 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
-  std::vector<std::shared_ptr<ResourceTask>> resourceTasks = {};
-  std::vector<std::shared_ptr<TextureFlattenTask>> flattenTasks = {};
-  std::vector<std::shared_ptr<RenderTask>> renderTasks = {};
+  std::vector<std::unique_ptr<ResourceTask>> resourceTasks = {};
+  std::vector<std::unique_ptr<TextureFlattenTask>> flattenTasks = {};
+  std::vector<std::unique_ptr<RenderTask>> renderTasks = {};
   std::vector<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<size_t> resourceTaskMap = {};
 

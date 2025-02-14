@@ -139,7 +139,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   surface->renderContext->flush();
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
+  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RectDrawOp*>(task->ops[1].get())->rectCount, drawCallCount);
   context->flush();
@@ -179,7 +179,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   surface->renderContext->flush();
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = std::static_pointer_cast<OpsRenderTask>(drawingManager->renderTasks[0]);
+  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops[1].get())->rectCount, drawCallCount);
   context->flush();

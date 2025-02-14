@@ -236,15 +236,11 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
   }
 }
 
-OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
-  if (surface && !surface->aboutToDraw(discardContent)) {
-    return nullptr;
+void RenderContext::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+                                  const Point& dstPoint) {
+  if (auto compositor = getOpsCompositor()) {
+    compositor->copyToTexture(std::move(textureProxy), srcRect, dstPoint);
   }
-  if (opsCompositor == nullptr || opsCompositor->isClosed()) {
-    auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-  }
-  return opsCompositor.get();
 }
 
 bool RenderContext::flush() {
@@ -255,5 +251,16 @@ bool RenderContext::flush() {
     return !closed;
   }
   return false;
+}
+
+OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
+  if (surface && !surface->aboutToDraw(discardContent)) {
+    return nullptr;
+  }
+  if (opsCompositor == nullptr || opsCompositor->isClosed()) {
+    auto drawingManager = renderTarget->getContext()->drawingManager();
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+  }
+  return opsCompositor.get();
 }
 }  // namespace tgfx

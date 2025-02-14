@@ -141,12 +141,12 @@ std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector
   } else if (rects.size() > 1) {
     drawOp->indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
   }
-  std::shared_ptr<DataProvider> dataProvider = nullptr;
+  std::unique_ptr<DataProvider> dataProvider = nullptr;
   if (aaType == AAType::Coverage) {
-    dataProvider = std::make_shared<RectCoverageVerticesProvider>(rects, !uniformColor.has_value());
+    dataProvider = std::make_unique<RectCoverageVerticesProvider>(rects, !uniformColor.has_value());
   } else {
     dataProvider =
-        std::make_shared<RectNonCoverageVerticesProvider>(rects, !uniformColor.has_value());
+        std::make_unique<RectNonCoverageVerticesProvider>(rects, !uniformColor.has_value());
   }
   if (rects.size() > 1) {
     drawOp->vertexBufferProxy =

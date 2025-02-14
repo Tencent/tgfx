@@ -268,11 +268,11 @@ std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = std::unique_ptr<RRectDrawOp>(new RRectDrawOp(bounds, aaType, rects.size()));
-  auto indexProvider = std::make_shared<RRectIndicesProvider>(rects.size());
+  auto indexProvider = std::make_unique<RRectIndicesProvider>(rects.size());
   drawOp->indexBufferProxy =
       GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
   auto useScale = UseScale(context);
-  auto vertexProvider = std::make_shared<RRectVerticesProvider>(rects, aaType, useScale);
+  auto vertexProvider = std::make_unique<RRectVerticesProvider>(rects, aaType, useScale);
   if (rects.size() > 1) {
     drawOp->vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexProvider),
                                                          BufferType::Vertex, renderFlags);

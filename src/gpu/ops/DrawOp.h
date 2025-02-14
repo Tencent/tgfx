@@ -58,8 +58,8 @@ class DrawOp : public Op {
 
  private:
   Rect _scissorRect = Rect::MakeEmpty();
-  std::vector<std::unique_ptr<FragmentProcessor>> _colors;
-  std::vector<std::unique_ptr<FragmentProcessor>> _coverages;
+  std::vector<std::unique_ptr<FragmentProcessor>> _colors = {};
+  std::vector<std::unique_ptr<FragmentProcessor>> _coverages = {};
   BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

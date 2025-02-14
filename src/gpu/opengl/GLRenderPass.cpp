@@ -95,6 +95,13 @@ static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
   }
 }
 
+void GLRenderPass::onBindRenderTarget() {
+  auto gl = GLFunctions::Get(context);
+  auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
+  gl->viewport(0, 0, glRT->width(), glRT->height());
+}
+
 bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                                const Rect& scissorRect) {
   _program = static_cast<GLProgram*>(context->programCache()->getProgram(programInfo));
@@ -103,17 +110,14 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   }
   auto gl = GLFunctions::Get(context);
   CheckGLError(context);
-  auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
-  gl->viewport(0, 0, glRT->width(), glRT->height());
   UpdateScissor(context, scissorRect);
   UpdateBlend(context, programInfo->blendInfo());
   if (programInfo->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(glRT, programInfo);
+  program->updateUniformsAndTextureBindings(_renderTarget.get(), programInfo);
   return true;
 }
 
@@ -170,11 +174,25 @@ void GLRenderPass::draw(const std::function<void()>& func) {
 
 void GLRenderPass::onClear(const Rect& scissor, Color color) {
   auto gl = GLFunctions::Get(context);
-  auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
-  gl->viewport(0, 0, glRT->width(), glRT->height());
   UpdateScissor(context, scissor);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
 }
+
+void GLRenderPass::onCopyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) {
+  auto gl = GLFunctions::Get(context);
+  auto glRT = static_cast<const GLRenderTarget*>(_renderTarget.get());
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID(false));
+  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
+  gl->bindTexture(glSampler->target, glSampler->id);
+  gl->copyTexSubImage2D(glSampler->target, 0, static_cast<int>(dstPoint.x),
+                        static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
+                        static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
+                        static_cast<int>(srcRect.height()));
+  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
+    gl->generateMipmap(glSampler->target);
+  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
+}
+
 }  // namespace tgfx

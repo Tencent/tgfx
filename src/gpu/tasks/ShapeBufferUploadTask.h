@@ -31,8 +31,8 @@ class ShapeBufferProvider {
 
 class ShapeBufferUploadTask : public ResourceTask {
  public:
-  static std::shared_ptr<ShapeBufferUploadTask> MakeFrom(
-      UniqueKey trianglesKey, UniqueKey textureKey, std::shared_ptr<ShapeBufferProvider> provider);
+  static std::unique_ptr<ShapeBufferUploadTask> MakeFrom(
+      UniqueKey trianglesKey, UniqueKey textureKey, std::unique_ptr<ShapeBufferProvider> provider);
 
   bool execute(Context* context) override;
 
@@ -44,9 +44,9 @@ class ShapeBufferUploadTask : public ResourceTask {
 
  private:
   UniqueKey textureKey = {};
-  std::shared_ptr<ShapeBufferProvider> provider = nullptr;
+  std::unique_ptr<ShapeBufferProvider> provider = nullptr;
 
   ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
-                        std::shared_ptr<ShapeBufferProvider> provider);
+                        std::unique_ptr<ShapeBufferProvider> provider);
 };
 }  // namespace tgfx
