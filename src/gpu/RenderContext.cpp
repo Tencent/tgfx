@@ -152,6 +152,9 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList),
                                          aaType == AAType::Coverage, rasterizeMatrix, stroke);
   auto image = Image::MakeFrom(std::move(rasterizer));
+  if (image == nullptr) {
+    return;
+  }
   drawImage(std::move(image), {}, newState, style.makeWithMatrix(rasterizeMatrix));
 }
 
@@ -188,6 +191,9 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
+  if (image == nullptr) {
+    return;
+  }
   MCState drawState = state;
   if (filter) {
     auto offset = Point::Zero();
