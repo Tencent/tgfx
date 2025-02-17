@@ -182,7 +182,10 @@ void GLRenderPass::onClear(const Rect& scissor, Color color) {
 void GLRenderPass::onCopyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) {
   auto gl = GLFunctions::Get(context);
   auto glRT = static_cast<const GLRenderTarget*>(_renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID(false));
+  auto hasMSAA = glRT->sampleCount() > 1;
+  if (hasMSAA) {
+    gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID(false));
+  }
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
   gl->bindTexture(glSampler->target, glSampler->id);
   gl->copyTexSubImage2D(glSampler->target, 0, static_cast<int>(dstPoint.x),
@@ -192,7 +195,9 @@ void GLRenderPass::onCopyTo(Texture* texture, const Rect& srcRect, const Point& 
   if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
     gl->generateMipmap(glSampler->target);
   }
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
+  if (hasMSAA) {
+    gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID(true));
+  }
 }
 
 }  // namespace tgfx

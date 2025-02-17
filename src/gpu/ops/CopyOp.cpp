@@ -32,7 +32,7 @@ std::unique_ptr<CopyOp> CopyOp::Make(std::shared_ptr<TextureProxy> textureProxy,
 
 CopyOp::CopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
                const Point& dstPoint)
-    : Op(srcRect), textureProxy(std::move(textureProxy)), srcRect(srcRect), dstPoint(dstPoint) {
+    : textureProxy(std::move(textureProxy)), srcRect(srcRect), dstPoint(dstPoint) {
 }
 
 void CopyOp::execute(RenderPass* renderPass) {

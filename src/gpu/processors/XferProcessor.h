@@ -20,13 +20,18 @@
 
 #include <memory>
 #include "gpu/FragmentShaderBuilder.h"
-#include "gpu/Texture.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
-#include "tgfx/core/BytesKey.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
+struct DstTextureInfo {
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  Point offset = Point::Zero();
+  bool requiresBarrier = false;
+};
+
 class XferProcessor : public Processor {
  public:
   struct EmitArgs {
@@ -45,10 +50,17 @@ class XferProcessor : public Processor {
     const SamplerHandle dstTextureSamplerHandle;
   };
 
+  virtual const Texture* dstTexture() const {
+    return nullptr;
+  }
+
+  virtual bool requiresBarrier() const {
+    return false;
+  }
+
   virtual void emitCode(const EmitArgs& args) const = 0;
 
-  virtual void setData(UniformBuffer*, const Texture*, const Point&) const {
-  }
+  virtual void setData(UniformBuffer* uniformBuffer) const = 0;
 
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {

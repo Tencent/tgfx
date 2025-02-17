@@ -77,9 +77,9 @@ bool TextureFlattenTask::execute(Context* context) {
                                      AAType::None, Matrix::I(), Matrix::I());
   auto format = renderPass->renderTarget()->format();
   const auto& swizzle = context->caps()->getWriteSwizzle(format);
-  auto pipeline = std::unique_ptr<Pipeline>(new Pipeline(std::move(geometryProcessor),
-                                                         std::move(fragmentProcessors), 1,
-                                                         BlendMode::Src, {}, &swizzle));
+  auto pipeline =
+      std::make_unique<Pipeline>(std::move(geometryProcessor), std::move(fragmentProcessors), 1,
+                                 nullptr, BlendMode::Src, &swizzle);
   auto quad = Quad::MakeFrom(Rect::MakeWH(renderTarget->width(), renderTarget->height()));
   auto vertexData = quad.toTriangleStrips();
   renderPass->bindProgramAndScissorClip(pipeline.get(), Rect::MakeEmpty());

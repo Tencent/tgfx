@@ -27,18 +27,17 @@
 
 namespace tgfx {
 std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GpuShapeProxy> shapeProxy,
-                                               Color color, const Matrix& uvMatrix,
-                                               const Rect& bounds, AAType aaType) {
+                                               Color color, const Matrix& uvMatrix, AAType aaType) {
   if (shapeProxy == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<ShapeDrawOp>(
-      new ShapeDrawOp(std::move(shapeProxy), color, uvMatrix, bounds, aaType));
+      new ShapeDrawOp(std::move(shapeProxy), color, uvMatrix, aaType));
 }
 
 ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
-                         const Matrix& uvMatrix, const Rect& bounds, AAType aaType)
-    : DrawOp(bounds, aaType), shapeProxy(std::move(shapeProxy)), color(color), uvMatrix(uvMatrix) {
+                         const Matrix& uvMatrix, AAType aaType)
+    : DrawOp(aaType), shapeProxy(std::move(shapeProxy)), color(color), uvMatrix(uvMatrix) {
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {

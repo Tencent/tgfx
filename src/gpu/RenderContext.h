@@ -79,7 +79,7 @@ class RenderContext : public DrawContext {
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
   AAType getAAType(const FillStyle& style) const;
-  OpsCompositor* getOpsCompositor(bool discardContent = false);
+  OpsCompositor* getOpsCompositor(bool readOnly = false, bool discardContent = false);
 
   friend class Surface;
 };

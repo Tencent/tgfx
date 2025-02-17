@@ -196,22 +196,6 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
                     FilterToGLMagFilter(samplerState.filterMode));
 }
 
-void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
-                                      const Rect& srcRect, const Point& dstPoint) {
-  auto gl = GLFunctions::Get(context);
-  auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->getFrameBufferID(false));
-  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  gl->bindTexture(glSampler->target, glSampler->id);
-  gl->copyTexSubImage2D(glSampler->target, 0, static_cast<int>(dstPoint.x),
-                        static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
-                        static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
-                        static_cast<int>(srcRect.height()));
-  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
-    gl->generateMipmap(glSampler->target);
-  }
-}
-
 void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {
   if (renderTarget->sampleCount() <= 1) {
     return;

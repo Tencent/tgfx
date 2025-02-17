@@ -44,7 +44,7 @@ class RRectDrawOp : public DrawOp {
   void execute(RenderPass* renderPass) override;
 
  private:
-  RRectDrawOp(const Rect& bounds, AAType aaType, size_t rectCount);
+  RRectDrawOp(AAType aaType, size_t rectCount);
 
   size_t rectCount = 0;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;

@@ -259,15 +259,10 @@ static bool UseScale(Context* context) {
 std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Context* context,
                                                const std::vector<RRectPaint>& rects, AAType aaType,
                                                uint32_t renderFlags) {
-  auto bounds = Rect::MakeEmpty();
-  for (auto& rRectPaint : rects) {
-    auto rect = rRectPaint.viewMatrix.mapRect(rRectPaint.rRect.rect);
-    bounds.join(rect);
-  }
-  if (bounds.isEmpty()) {
+  if (rects.empty()) {
     return nullptr;
   }
-  auto drawOp = std::unique_ptr<RRectDrawOp>(new RRectDrawOp(bounds, aaType, rects.size()));
+  auto drawOp = std::unique_ptr<RRectDrawOp>(new RRectDrawOp(aaType, rects.size()));
   auto indexProvider = std::make_unique<RRectIndicesProvider>(rects.size());
   drawOp->indexBufferProxy =
       GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
@@ -283,8 +278,7 @@ std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Context* context,
   return drawOp;
 }
 
-RRectDrawOp::RRectDrawOp(const Rect& bounds, AAType aaType, size_t rectCount)
-    : DrawOp(bounds, aaType), rectCount(rectCount) {
+RRectDrawOp::RRectDrawOp(AAType aaType, size_t rectCount) : DrawOp(aaType), rectCount(rectCount) {
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {

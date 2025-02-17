@@ -31,16 +31,5 @@ class Op {
   virtual ~Op() = default;
 
   virtual void execute(RenderPass* renderPass) = 0;
-
-  const Rect& bounds() const {
-    return _bounds;
-  }
-
- protected:
-  explicit Op(const Rect& bounds) : _bounds(bounds) {
-  }
-
- private:
-  Rect _bounds = Rect::MakeEmpty();
 };
 }  // namespace tgfx

@@ -24,14 +24,12 @@
 namespace tgfx {
 Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
                    std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-                   size_t numColorProcessors, BlendMode blendMode, DstTextureInfo dstTextureInfo,
-                   const Swizzle* outputSwizzle)
+                   size_t numColorProcessors, std::unique_ptr<XferProcessor> xferProcessor,
+                   BlendMode blendMode, const Swizzle* outputSwizzle)
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      dstTextureInfo(std::move(dstTextureInfo)), _outputSwizzle(outputSwizzle) {
-  if (!BlendModeAsCoeff(blendMode, &_blendInfo)) {
-    xferProcessor = PorterDuffXferProcessor::Make(blendMode);
-  }
+      xferProcessor(std::move(xferProcessor)), _outputSwizzle(outputSwizzle) {
+  BlendModeAsCoeff(blendMode, &_blendInfo);
   updateProcessorIndices();
 }
 
@@ -71,8 +69,7 @@ void Pipeline::getUniforms(UniformBuffer* uniformBuffer) const {
   }
   auto processor = getXferProcessor();
   uniformBuffer->nameSuffix = getMangledSuffix(processor);
-  auto texture = dstTextureInfo.texture ? dstTextureInfo.texture.get() : nullptr;
-  processor->setData(uniformBuffer, texture, dstTextureInfo.offset);
+  processor->setData(uniformBuffer);
   uniformBuffer->nameSuffix = "";
 }
 
@@ -87,8 +84,9 @@ std::vector<SamplerInfo> Pipeline::getSamplers() const {
     }
     fp = iter.next();
   }
-  if (dstTextureInfo.texture != nullptr) {
-    SamplerInfo sampler = {dstTextureInfo.texture->getSampler(), {}};
+  auto dstTexture = xferProcessor != nullptr ? xferProcessor->dstTexture() : nullptr;
+  if (dstTexture != nullptr) {
+    SamplerInfo sampler = {dstTexture->getSampler(), {}};
     samplers.push_back(sampler);
   }
   return samplers;
@@ -96,11 +94,12 @@ std::vector<SamplerInfo> Pipeline::getSamplers() const {
 
 void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
   geometryProcessor->computeProcessorKey(context, programKey);
-  if (dstTextureInfo.texture != nullptr) {
-    dstTextureInfo.texture->getSampler()->computeKey(context, programKey);
-  }
   for (const auto& processor : fragmentProcessors) {
     processor->computeProcessorKey(context, programKey);
+  }
+  auto dstTexture = xferProcessor != nullptr ? xferProcessor->dstTexture() : nullptr;
+  if (dstTexture != nullptr) {
+    dstTexture->getSampler()->computeKey(context, programKey);
   }
   getXferProcessor()->computeProcessorKey(context, programKey);
   programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
