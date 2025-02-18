@@ -19,7 +19,6 @@
 #include "ShapeDrawOp.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
@@ -27,70 +26,21 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(Color color, std::shared_ptr<Shape> shape,
-                                               const Matrix& viewMatrix,
-                                               const Rect& deviceClipBounds) {
-  TRACE_EVENT;
-  if (shape == nullptr) {
+std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GpuShapeProxy> shapeProxy,
+                                               Color color, const Matrix& uvMatrix, AAType aaType) {
+  if (shapeProxy == nullptr) {
     return nullptr;
   }
-  auto uvMatrix = Matrix::I();
-  if (!viewMatrix.invert(&uvMatrix)) {
-    return nullptr;
-  }
-  shape = Shape::ApplyMatrix(std::move(shape), viewMatrix);
-  auto bounds = shape->isInverseFillType() ? deviceClipBounds : shape->getBounds();
-  return std::unique_ptr<ShapeDrawOp>(new ShapeDrawOp(color, std::move(shape), uvMatrix, bounds));
+  return std::unique_ptr<ShapeDrawOp>(
+      new ShapeDrawOp(std::move(shapeProxy), color, uvMatrix, aaType));
 }
 
-ShapeDrawOp::ShapeDrawOp(Color color, std::shared_ptr<Shape> s, const Matrix& uvMatrix,
-                         const Rect& bounds)
-    : DrawOp(ClassID()), color(color), shape(std::move(s)), uvMatrix(uvMatrix) {
-  TRACE_EVENT;
-  setBounds(bounds);
-}
-
-bool ShapeDrawOp::onCombineIfPossible(Op*) {
-  // Shapes are rasterized in parallel, so we don't combine them.
-  return false;
-}
-
-void ShapeDrawOp::prepare(Context* context, uint32_t renderFlags) {
-  TRACE_EVENT;
-  shapeProxy = context->proxyProvider()->createGpuShapeProxy(shape, aa == AAType::Coverage,
-                                                             bounds(), renderFlags);
-}
-
-static std::shared_ptr<Data> MakeVertexData(const Rect& rect, AAType aaType) {
-  TRACE_EVENT;
-  if (aaType != AAType::Coverage) {
-    auto quad = Quad::MakeFrom(rect);
-    return quad.toTriangleStrips();
-  }
-  Buffer buffer(24 * sizeof(float));
-  auto vertices = static_cast<float*>(buffer.data());
-  // There is no need to scale the padding by the view matrix scale, as the view matrix scale is
-  // already applied to the path.
-  auto padding = 0.5f;
-  auto insetBounds = rect.makeInset(padding, padding);
-  auto insetQuad = Quad::MakeFrom(insetBounds);
-  auto outsetBounds = rect.makeOutset(padding, padding);
-  auto outsetQuad = Quad::MakeFrom(outsetBounds);
-  auto index = 0;
-  for (int j = 0; j < 2; ++j) {
-    const auto& quad = j == 0 ? insetQuad : outsetQuad;
-    auto coverage = j == 0 ? 1.0f : 0.0f;
-    for (size_t k = 0; k < 4; ++k) {
-      vertices[index++] = quad.point(k).x;
-      vertices[index++] = quad.point(k).y;
-      vertices[index++] = coverage;
-    }
-  }
-  return buffer.release();
+ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
+                         const Matrix& uvMatrix, AAType aaType)
+    : DrawOp(aaType), shapeProxy(std::move(shapeProxy)), color(color), uvMatrix(uvMatrix) {
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
-  TRACE_EVENT;
   if (shapeProxy == nullptr) {
     return;
   }
@@ -108,28 +58,35 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     if (!realUVMatrix.invert(&maskMatrix)) {
       return;
     }
-    auto rect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    vertexData = MakeVertexData(rect, aa);
+    auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
     auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &maskMatrix, true);
     if (maskFP == nullptr) {
       return;
     }
     addCoverageFP(std::move(maskFP));
+    Path path = {};
+    path.addRect(maskRect);
+    if (aaType == AAType::Coverage) {
+      PathTriangulator::ToAATriangles(path, maskRect, &maskVertices);
+    } else {
+      PathTriangulator::ToTriangles(path, maskRect, &maskVertices);
+    }
+    vertexData = Data::MakeWithoutCopy(maskVertices.data(), maskVertices.size() * sizeof(float));
   }
   auto pipeline = createPipeline(
       renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
-                                                 renderPass->renderTarget()->height(), aa,
+                                                 renderPass->renderTarget()->height(), aaType,
                                                  viewMatrix, realUVMatrix));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   auto vertexDataSize = vertexBuffer ? vertexBuffer->size() : vertexData->size();
-  auto vertexCount = aa == AAType::Coverage ? PathTriangulator::GetAATriangleCount(vertexDataSize)
-                                            : PathTriangulator::GetTriangleCount(vertexDataSize);
+  auto vertexCount = aaType == AAType::Coverage
+                         ? PathTriangulator::GetAATriangleCount(vertexDataSize)
+                         : PathTriangulator::GetTriangleCount(vertexDataSize);
   if (vertexBuffer != nullptr) {
     renderPass->bindBuffers(nullptr, vertexBuffer);
-    renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
   } else {
     renderPass->bindBuffers(nullptr, vertexData);
-    renderPass->draw(PrimitiveType::TriangleStrip, 0, vertexCount);
   }
+  renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
 }  // namespace tgfx

@@ -90,6 +90,13 @@ class RenderTargetProxy : public ResourceProxy {
   }
 
   /**
+   * Returns the bounds of the render target.
+   */
+  Rect bounds() const {
+    return Rect::MakeWH(_width, _height);
+  }
+
+  /**
    * Returns the pixel format of the render target.
    */
   PixelFormat format() const {

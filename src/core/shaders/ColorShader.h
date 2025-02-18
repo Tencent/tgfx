@@ -30,10 +30,16 @@ class ColorShader : public Shader {
 
   bool asColor(Color* color) const override;
 
+  std::shared_ptr<Shader> makeWithMatrix(const Matrix&) const override {
+    return weakThis.lock();
+  }
+
  protected:
   Type type() const override {
     return Type::Color;
   }
+
+  bool isEqual(const Shader* shader) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;

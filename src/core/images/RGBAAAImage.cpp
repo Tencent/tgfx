@@ -19,7 +19,6 @@
 #include "RGBAAAImage.h"
 #include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
-#include "core/utils/NeedMipmaps.h"
 #include "gpu/TPArgs.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
@@ -28,7 +27,6 @@
 namespace tgfx {
 std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
                                              int displayHeight, int alphaStartX, int alphaStartY) {
-  TRACE_EVENT;
   if (source == nullptr || source->isAlphaOnly() || alphaStartX + displayWidth > source->width() ||
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
@@ -45,7 +43,6 @@ RGBAAAImage::RGBAAAImage(std::shared_ptr<Image> source, const Rect& bounds, cons
 }
 
 std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  TRACE_EVENT;
   auto image =
       std::shared_ptr<RGBAAAImage>(new RGBAAAImage(std::move(newSource), bounds, alphaStart));
   image->weakThis = image;
@@ -57,14 +54,13 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
                                                                     TileMode tileModeY,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* uvMatrix) const {
-  TRACE_EVENT;
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
-  auto mipmapped = source->hasMipmaps() && NeedMipmaps(sampling, args.viewMatrix, uvMatrix);
+  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   if (bounds.contains(drawBounds)) {
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
     auto proxy = source->lockTextureProxy(tpArgs);
@@ -79,7 +75,6 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs
 }
 
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
-  TRACE_EVENT;
   auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
   auto image = std::shared_ptr<Image>(new RGBAAAImage(source, newBounds, alphaStart));
   image->weakThis = image;

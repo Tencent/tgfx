@@ -21,23 +21,10 @@
 
 namespace tgfx {
 std::unique_ptr<ClearOp> ClearOp::Make(Color color, const Rect& scissor) {
-  return std::unique_ptr<ClearOp>(new ClearOp(color, scissor));
-}
-
-bool ContainsScissor(const Rect& a, const Rect& b) {
-  return a.isEmpty() || (!b.isEmpty() && a.contains(b));
-}
-
-bool ClearOp::onCombineIfPossible(Op* op) {
-  auto that = static_cast<ClearOp*>(op);
-  if (ContainsScissor(that->scissor, scissor)) {
-    scissor = that->scissor;
-    color = that->color;
-    return true;
-  } else if (color == that->color && ContainsScissor(scissor, that->scissor)) {
-    return true;
+  if (scissor.isEmpty()) {
+    return nullptr;
   }
-  return false;
+  return std::unique_ptr<ClearOp>(new ClearOp(color, scissor));
 }
 
 void ClearOp::execute(RenderPass* renderPass) {

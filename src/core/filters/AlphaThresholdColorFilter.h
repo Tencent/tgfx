@@ -25,6 +25,13 @@ class AlphaThresholdColorFilter : public ColorFilter {
  public:
   explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
+ protected:
+  Type type() const override {
+    return Type::AlphaThreshold;
+  }
+
+  bool isEqual(const ColorFilter* colorFilter) const override;
+
  private:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 

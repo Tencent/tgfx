@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MatrixColorFilter.h"
+#include "core/utils/Caster.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 
@@ -33,6 +34,11 @@ static bool IsAlphaUnchanged(const float matrix[20]) {
 
 MatrixColorFilter::MatrixColorFilter(const std::array<float, 20>& matrix)
     : matrix(matrix), alphaIsUnchanged(IsAlphaUnchanged(matrix.data())) {
+}
+
+bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
+  auto other = Caster::AsMatrixColorFilter(colorFilter);
+  return other && matrix == other->matrix;
 }
 
 std::unique_ptr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor() const {

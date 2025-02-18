@@ -20,10 +20,6 @@ else ()
 endif ()
 
 add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES -DWIN32 -D_WINDOWS -D_CRT_SECURE_NO_WARNINGS)
-find_library(Bcrypt_LIB Bcrypt)
-list(APPEND HELLO_2D_LIBS ${Bcrypt_LIB})
-find_library(ws2_32_LIB ws2_32)
-list(APPEND HELLO_2D_LIBS ${ws2_32_LIB})
 if (${CMAKE_SYSTEM_VERSION} VERSION_GREATER_EQUAL 6.3) # Windows 8.1 or later
     add_definitions(-D_WIN32_WINNT=0x0603)
     find_library(SHCORE_LIB SHCore)
@@ -34,10 +30,7 @@ else ()
     list(APPEND HELLO_2D_LIBS ${USER32})
 endif ()
 
-file(GLOB ANGLE_LIBS ../vendor/angle/win/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
-list(APPEND HELLO_2D_LIBS ${ANGLE_LIBS})
 list(APPEND HELLO_2D_INCLUDES ../vendor/angle/include)
-
 file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libEGL.dll)
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/angle/win/${ARCH}/libEGL.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libGLESv2.dll)

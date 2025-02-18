@@ -27,6 +27,7 @@
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/svg/SVGExporter.h"
 
 namespace tgfx {
 class Surface;
@@ -195,18 +196,24 @@ class Canvas {
   void clipPath(const Path& path);
 
   /**
-   * Clears the entire clip region, making it fully transparent using BlendMode::Src. This
-   * effectively replaces all pixels within the clip region with a transparent color.
+   * Fills the current clip with the specified color, using BlendMode::Src. This replaces all pixels
+   * within the clip with the specified color.
    */
-  void clear();
+  void clear(const Color& color = Color::Transparent());
 
   /**
-   * Fills the specified rectangle with the given color, using the current clip and BlendMode::Src.
-   * This replaces all pixels within the rectangle with the specified color.
-   * @param rect  the rect to fill.
-   * @param color  the color to fill the rect with.
+   * Fills the current clip with the specified color. The color is blended with the destination
+   * pixels using the specified blend mode.
    */
-  void clearRect(const Rect& rect, const Color& color = Color::Transparent());
+  void drawColor(const Color& color, BlendMode blendMode = BlendMode::SrcOver);
+
+  /**
+   * Fills the current clip with the specified paint. The paint's shader, color, blend mode, color
+   * filter, mask filter, and image filter are applied during the fill. Other paint properties are
+   * ignored.
+   * @param paint The paint to use for filling.
+   */
+  void drawPaint(const Paint& paint);
 
   /**
    * Draws a line from (x0, y0) to (x1, y1) using the current clip, matrix, and specified paint.
@@ -414,13 +421,14 @@ class Canvas {
                  const Paint* paint = nullptr);
 
  private:
-  Surface* surface = nullptr;
   DrawContext* drawContext = nullptr;
+  Surface* surface = nullptr;
   std::unique_ptr<MCState> mcState;
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
-  explicit Canvas(DrawContext* drawContext);
-  Canvas(DrawContext* drawContext, const Path& initClip);
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  void drawClip(const FillStyle& style);
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
@@ -430,5 +438,38 @@ class Canvas {
   friend class Surface;
   friend class Picture;
   friend class Recorder;
+  friend class SVGExporter;
+};
+
+/**
+ * AutoCanvasRestore is a helper class that automatically saves the current state of a Canvas when
+ * created and restores it when destroyed. This is useful for ensuring that the Canvas state is
+ * restored to its previous state when exiting a scope.
+ */
+class AutoCanvasRestore {
+ public:
+  /**
+   * Creates an AutoSaveRestore object for the specified Canvas. The current state of the Canvas is
+   * saved when created and restored when destroyed.
+   * @param canvas  the Canvas to save and restore.
+   */
+  explicit AutoCanvasRestore(Canvas* canvas) : canvas(canvas) {
+    if (canvas) {
+      saveCount = canvas->save();
+    }
+  }
+
+  /**
+   * Restores the Canvas state to the saved state.
+   */
+  ~AutoCanvasRestore() {
+    if (canvas) {
+      canvas->restoreToCount(saveCount);
+    }
+  }
+
+ private:
+  Canvas* canvas = nullptr;
+  int saveCount = 0;
 };
 }  // namespace tgfx

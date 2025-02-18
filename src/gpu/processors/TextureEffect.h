@@ -46,8 +46,6 @@ class TextureEffect : public FragmentProcessor {
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
                 const Point& alphaStart, const Matrix& uvMatrix);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   size_t onCountTextureSamplers() const override;

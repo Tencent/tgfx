@@ -20,7 +20,6 @@
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/DataTask.h"
-#include "core/utils/Profiling.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
@@ -33,6 +32,7 @@
 #include "gpu/tasks/TextureCreateTask.h"
 #include "gpu/tasks/TextureFlattenTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context) : context(context) {
@@ -65,7 +65,7 @@ class AsyncDataProvider : public DataProvider {
 };
 
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
-    const UniqueKey& uniqueKey, std::shared_ptr<DataProvider> provider, BufferType bufferType,
+    const UniqueKey& uniqueKey, std::unique_ptr<DataProvider> provider, BufferType bufferType,
     uint32_t renderFlags) {
   auto proxy = findOrWrapGpuBufferProxy(uniqueKey);
   if (proxy != nullptr) {
@@ -75,7 +75,7 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
     return nullptr;
   }
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
-    provider = std::make_shared<AsyncDataProvider>(std::move(provider));
+    provider = std::make_unique<AsyncDataProvider>(std::move(provider));
   }
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
   auto task = GpuBufferUploadTask::MakeFrom(proxyKey, bufferType, std::move(provider));
@@ -153,7 +153,10 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
     uniqueKey =
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
   }
-  if (!antiAlias) {
+  if (antiAlias) {
+    // Add a 1-pixel outset to preserve anti-aliasing results.
+    shapeBounds.outset(1.0f, 1.0f);
+  } else {
     static const auto NonAntialiasShapeType = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &NonAntialiasShapeType, 1);
   }
@@ -163,23 +166,21 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   static const auto TextureShapeType = UniqueID::Next();
   auto triangleKey = UniqueKey::Append(uniqueKey, &TriangleShapeType, 1);
   auto triangleProxy = findOrWrapGpuBufferProxy(triangleKey);
-  if (triangleProxy != nullptr) {
-    return std::make_shared<GpuShapeProxy>(drawingMatrix, triangleProxy, nullptr);
-  }
   auto textureKey = UniqueKey::Append(uniqueKey, &TextureShapeType, 1);
   auto textureProxy = findOrWrapTextureProxy(textureKey);
-  if (textureProxy != nullptr) {
-    return std::make_shared<GpuShapeProxy>(drawingMatrix, nullptr, textureProxy);
+  if (triangleProxy != nullptr || textureProxy != nullptr) {
+    return std::make_shared<GpuShapeProxy>(drawingMatrix, std::move(triangleProxy),
+                                           std::move(textureProxy));
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer = std::make_shared<ShapeRasterizer>(width, height, std::move(shape), antiAlias);
-  std::shared_ptr<ShapeBufferProvider> provider = nullptr;
+  std::unique_ptr<ShapeBufferProvider> provider = nullptr;
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
-    provider = std::make_shared<AsyncShapeBufferProvider>(std::move(rasterizer));
+    provider = std::make_unique<AsyncShapeBufferProvider>(std::move(rasterizer));
   } else {
-    provider = std::make_shared<ShapeRasterizerWrapper>(std::move(rasterizer));
+    provider = std::make_unique<ShapeRasterizerWrapper>(std::move(rasterizer));
   }
   auto triangleProxyKey = GetProxyKey(triangleKey, renderFlags);
   auto textureProxyKey = GetProxyKey(textureKey, renderFlags);
@@ -273,7 +274,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::flattenTextureProxy(
     return nullptr;
   }
   auto uniqueKey = UniqueKey::Make();
-  auto task = std::shared_ptr<TextureFlattenTask>(new TextureFlattenTask(uniqueKey, source));
+  auto task = std::unique_ptr<TextureFlattenTask>(new TextureFlattenTask(uniqueKey, source));
   context->drawingManager()->addTextureFlattenTask(std::move(task));
   auto proxy = std::shared_ptr<TextureProxy>(new FlattenTextureProxy(uniqueKey, std::move(source)));
   addResourceProxy(proxy, uniqueKey);

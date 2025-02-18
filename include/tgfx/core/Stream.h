@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 /**
@@ -34,6 +35,11 @@ class Stream {
    * Attempts to open the specified file as a stream, returns nullptr on failure.
    */
   static std::unique_ptr<Stream> MakeFromFile(const std::string& filePath);
+
+  /**
+   * Creates a stream from the specified data. Returns nullptr on failure.
+   */
+  static std::unique_ptr<Stream> MakeFromData(std::shared_ptr<Data> data);
 
   /**
    * Returns the total length of the stream. If this cannot be done, returns 0.
@@ -64,6 +70,13 @@ class Stream {
    * beginning after this call returns.
    */
   virtual bool rewind() = 0;
+
+  /**
+   * Returns the starting address for the data. If this cannot be done, returns nullptr.
+   */
+  virtual const void* getMemoryBase() {
+    return nullptr;
+  }
 };
 
 /**

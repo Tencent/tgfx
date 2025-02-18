@@ -34,7 +34,7 @@ class GpuBufferProxy : public ResourceProxy {
    * Creates a GpuBufferProxy from the given data provider.
    */
   static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context,
-                                                  std::shared_ptr<DataProvider> dataProvider,
+                                                  std::unique_ptr<DataProvider> dataProvider,
                                                   BufferType bufferType, uint32_t renderFlags);
 
   /**

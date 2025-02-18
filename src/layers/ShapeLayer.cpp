@@ -17,14 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include "core/utils/Profiling.h"
 #include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  TRACE_EVENT;
   auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
   layer->weakThis = layer;
   return layer;
@@ -58,23 +55,89 @@ void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> style) {
-  if (_fillStyle == style) {
+void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
+  if (_fillStyles.size() == fills.size() &&
+      std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
     return;
   }
-  detachProperty(_fillStyle.get());
-  _fillStyle = std::move(style);
-  attachProperty(_fillStyle.get());
+  for (const auto& style : _fillStyles) {
+    detachProperty(style.get());
+  }
+  _fillStyles = std::move(fills);
+  for (const auto& style : _fillStyles) {
+    attachProperty(style.get());
+  }
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> style) {
-  if (_strokeStyle == style) {
+void ShapeLayer::removeFillStyles() {
+  if (_fillStyles.empty()) {
     return;
   }
-  detachProperty(_strokeStyle.get());
-  _strokeStyle = std::move(style);
-  attachProperty(_strokeStyle.get());
+  for (const auto& style : _fillStyles) {
+    detachProperty(style.get());
+  }
+  _fillStyles = {};
+  invalidateContent();
+}
+
+void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fill) {
+  if (fill == nullptr) {
+    removeFillStyles();
+  } else {
+    setFillStyles({std::move(fill)});
+  }
+}
+
+void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+  if (fillStyle == nullptr) {
+    return;
+  }
+  attachProperty(fillStyle.get());
+  _fillStyles.push_back(std::move(fillStyle));
+  invalidateContent();
+}
+
+void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes) {
+  if (_strokeStyles.size() == strokes.size() &&
+      std::equal(_strokeStyles.begin(), _strokeStyles.end(), strokes.begin())) {
+    return;
+  }
+  for (const auto& style : _strokeStyles) {
+    detachProperty(style.get());
+  }
+  _strokeStyles = std::move(strokes);
+  for (const auto& style : _strokeStyles) {
+    attachProperty(style.get());
+  }
+  invalidateContent();
+}
+
+void ShapeLayer::removeStrokeStyles() {
+  if (_strokeStyles.empty()) {
+    return;
+  }
+  for (const auto& style : _strokeStyles) {
+    detachProperty(style.get());
+  }
+  _strokeStyles = {};
+  invalidateContent();
+}
+
+void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
+  if (stroke == nullptr) {
+    removeStrokeStyles();
+  } else {
+    setStrokeStyles({std::move(stroke)});
+  }
+}
+
+void ShapeLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
+  if (strokeStyle == nullptr) {
+    return;
+  }
+  attachProperty(strokeStyle.get());
+  _strokeStyles.push_back(std::move(strokeStyle));
   invalidateContent();
 }
 
@@ -163,51 +226,110 @@ void ShapeLayer::setStrokeAlign(StrokeAlign align) {
   invalidateContent();
 }
 
+void ShapeLayer::setStrokeOnTop(bool value) {
+  if (_strokeOnTop == value) {
+    return;
+  }
+  _strokeOnTop = value;
+  invalidateContent();
+}
+
 ShapeLayer::~ShapeLayer() {
-  detachProperty(_strokeStyle.get());
-  detachProperty(_fillStyle.get());
+  for (auto& style : _fillStyles) {
+    detachProperty(style.get());
+  }
+  for (auto& style : _strokeStyles) {
+    detachProperty(style.get());
+  }
+}
+
+static bool NothingToDraw(ShapeStyle* style) {
+  Paint paint = {};
+  paint.setAlpha(style->alpha());
+  paint.setBlendMode(style->blendMode());
+  return paint.nothingToDraw();
 }
 
 std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
-  std::vector<std::unique_ptr<LayerContent>> contents = {};
   if (_shape == nullptr) {
     return nullptr;
   }
-  if (_fillStyle) {
-    auto content = std::make_unique<ShapeContent>(_shape, _fillStyle->getShader());
-    contents.push_back(std::move(content));
+  std::vector<ShapePaint> paintList = {};
+  paintList.reserve(_fillStyles.size() + _strokeStyles.size());
+  for (auto& style : _fillStyles) {
+    if (!NothingToDraw(style.get())) {
+      paintList.emplace_back(style->getShader(), style->alpha(), style->blendMode());
+    }
   }
-  if (stroke.width > 0 && _strokeStyle) {
-    auto strokeShape = _shape;
-    if ((_strokeStart != 0 || _strokeEnd != 1)) {
-      auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
-      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
-    }
-    if (!_lineDashPattern.empty()) {
-      auto dashes = _lineDashPattern;
-      if (_lineDashPattern.size() % 2 != 0) {
-        dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
+  auto fillPaintCount = paintList.size();
+  if (stroke.width > 0) {
+    for (auto& style : _strokeStyles) {
+      if (!NothingToDraw(style.get())) {
+        paintList.emplace_back(style->getShader(), style->alpha(), style->blendMode());
       }
-      auto pathEffect =
-          PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
-      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
     }
-    if (_strokeAlign != StrokeAlign::Center) {
-      auto tempStroke = stroke;
-      tempStroke.width *= 2;
-      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-      if (_strokeAlign == StrokeAlign::Inside) {
-        strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
-      } else {
-        strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
-      }
+  }
+  auto fillShape = fillPaintCount > 0 ? _shape : nullptr;
+  auto strokeShape = fillPaintCount < paintList.size() ? createStrokeShape() : nullptr;
+  return std::make_unique<ShapeContent>(fillShape, strokeShape, std::move(paintList),
+                                        fillPaintCount);
+}
+
+void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+                              const std::function<bool()>& drawChildren) const {
+  auto shapeContent = static_cast<ShapeContent*>(content);
+  if (!shapeContent || !shapeContent->drawFills(canvas, getPaint(alpha), forContour)) {
+    if (forContour) {
+      canvas->drawShape(_shape, getPaint(alpha));
+    }
+  }
+  if (_strokeOnTop) {
+    if (!drawChildren()) {
+      return;
+    }
+  }
+  if (shapeContent) {
+    shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
+  }
+  if (!_strokeOnTop) {
+    drawChildren();
+  }
+}
+
+Paint ShapeLayer::getPaint(float alpha) const {
+  Paint paint = {};
+  paint.setAntiAlias(allowsEdgeAntialiasing());
+  paint.setAlpha(alpha);
+  return paint;
+}
+
+std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
+  auto strokeShape = _shape;
+  if ((_strokeStart != 0 || _strokeEnd != 1)) {
+    auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
+    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
+  }
+  if (!_lineDashPattern.empty()) {
+    auto dashes = _lineDashPattern;
+    if (_lineDashPattern.size() % 2 != 0) {
+      dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
+    }
+    auto pathEffect =
+        PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
+    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
+  }
+  if (_strokeAlign != StrokeAlign::Center) {
+    auto tempStroke = stroke;
+    tempStroke.width *= 2;
+    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
+    if (_strokeAlign == StrokeAlign::Inside) {
+      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
     } else {
-      strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
+      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
     }
-    auto content =
-        std::make_unique<ShapeContent>(std::move(strokeShape), _strokeStyle->getShader());
-    contents.push_back(std::move(content));
+  } else {
+    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
   }
-  return LayerContent::Compose(std::move(contents));
+  return strokeShape;
 }
 }  // namespace tgfx

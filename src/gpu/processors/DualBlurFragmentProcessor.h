@@ -41,8 +41,6 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
   DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor,
                             Point blurOffset, Size texelSize);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   DualBlurPassMode passMode;
   Point blurOffset;
   Size texelSize;

@@ -27,7 +27,7 @@ class TextureUploadTask : public ResourceTask {
   /*
    * Creates a TextureUploadTask to generate a texture using the given image decoder.
    */
-  static std::shared_ptr<TextureUploadTask> MakeFrom(UniqueKey uniqueKey,
+  static std::unique_ptr<TextureUploadTask> MakeFrom(UniqueKey uniqueKey,
                                                      std::shared_ptr<ImageDecoder> imageDecoder,
                                                      bool mipmapped = false);
 

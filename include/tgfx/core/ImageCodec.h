@@ -87,6 +87,10 @@ class ImageCodec : public ImageGenerator {
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
+  virtual std::shared_ptr<Data> getEncodedData() const {
+    return nullptr;
+  };
+
  private:
   Orientation _orientation = Orientation::TopLeft;
 
@@ -103,5 +107,6 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeNativeCodec(std::shared_ptr<Data> imageBytes);
 
   friend class Pixmap;
+  friend class SVGExportContext;
 };
 }  // namespace tgfx

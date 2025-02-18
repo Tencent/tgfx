@@ -22,31 +22,33 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
-class RRectPaint;
+struct RRectPaint {
+  RRectPaint(const RRect& rRect, const Matrix& viewMatrix, Color color = Color::White())
+      : rRect(rRect), viewMatrix(viewMatrix), color(color) {
+  }
+
+  RRect rRect;
+  Matrix viewMatrix;
+  Color color;
+};
 
 class RRectDrawOp : public DrawOp {
  public:
-  DEFINE_OP_CLASS_ID
-
-  static std::unique_ptr<RRectDrawOp> Make(Color color, const RRect& rRect,
-                                           const Matrix& viewMatrix);
-
-  void prepare(Context* context, uint32_t renderFlags) override;
+  /**
+   * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
+   * the device space.
+   */
+  static std::unique_ptr<RRectDrawOp> Make(Context* context, const std::vector<RRectPaint>& rects,
+                                           AAType aaType, uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  RRectDrawOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& uvMatrix);
+  RRectDrawOp(AAType aaType, size_t rectCount);
 
-  bool onCombineIfPossible(Op* op) override;
-
-  std::vector<std::shared_ptr<RRectPaint>> rRectPaints;
-  Matrix uvMatrix = Matrix::I();
+  size_t rectCount = 0;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   std::shared_ptr<Data> vertexData = nullptr;
-
-  //  bool stroked = false;
-  //  Point strokeWidths = Point::Zero();
 };
 }  // namespace tgfx

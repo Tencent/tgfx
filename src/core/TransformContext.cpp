@@ -100,8 +100,7 @@ std::unique_ptr<TransformContext> TransformContext::Make(DrawContext* drawContex
   }
   if (matrix.isIdentity()) {
     return std::make_unique<ClipDrawContext>(drawContext, clip);
-  } else {
-    return std::make_unique<MCStateDrawContext>(drawContext, matrix, clip);
   }
+  return std::make_unique<MCStateDrawContext>(drawContext, matrix, clip);
 }
 }  // namespace tgfx

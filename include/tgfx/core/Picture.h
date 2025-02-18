@@ -25,6 +25,7 @@ namespace tgfx {
 class Record;
 class Canvas;
 class DrawContext;
+class SVGExportContext;
 class MCState;
 class Image;
 
@@ -39,10 +40,21 @@ class Picture {
 
   /**
    * Returns the bounding box of the Picture when drawn with the given Matrix. Since the Picture
-   * may contain shape and text drawing commands whose outlines can change with different scale
+   * may contain shape or glyph drawing commands whose outlines can change with different scale
    * factors, it's best to use the final drawing matrix to calculate the bounds for accuracy.
+   * Note that the bounds only include the combined geometry of each drawing command, but some
+   * commands may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
    */
   Rect getBounds(const Matrix* matrix = nullptr) const;
+
+  /**
+   * Returns true if the Picture contains any drawing commands that fill an unbounded (infinite)
+   * area. For example, drawing a Path with an inverse fill type or drawing a Paint to cover the
+   * entire canvas.
+   */
+  bool hasUnboundedFill() const {
+    return _hasUnboundedFill;
+  }
 
   /**
    * Replays the drawing commands on the specified canvas. In the case that the commands are
@@ -53,8 +65,9 @@ class Picture {
 
  private:
   std::vector<Record*> records = {};
+  bool _hasUnboundedFill = false;
 
-  explicit Picture(std::vector<Record*> records);
+  Picture(std::vector<Record*> records, bool hasUnboundedFill);
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 
@@ -64,6 +77,7 @@ class Picture {
   friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
+  friend class SVGExportContext;
   friend class Image;
   friend class PictureImage;
   friend class Canvas;

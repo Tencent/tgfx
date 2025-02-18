@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "core/utils/Profiling.h"
 #include "gpu/Resource.h"
 #include "gpu/TPArgs.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -31,6 +30,9 @@ namespace tgfx {
 class ResourceImage : public Image {
  public:
   explicit ResourceImage(UniqueKey uniqueKey);
+
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
+                                        const SamplingOptions& sampling = {}) const override;
 
  protected:
   UniqueKey uniqueKey = {};

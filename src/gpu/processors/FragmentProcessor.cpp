@@ -18,6 +18,7 @@
 
 #include "gpu/processors/FragmentProcessor.h"
 #include "ComposeFragmentProcessor.h"
+#include "core/utils/Log.h"
 #include "gpu/Pipeline.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"
@@ -28,9 +29,7 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image
                                                            const FPArgs& args,
                                                            const SamplingOptions& sampling,
                                                            const Matrix* uvMatrix) {
-  if (image == nullptr) {
-    return nullptr;
-  }
+  DEBUG_ASSERT(image != nullptr);
   return image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, uvMatrix);
 }
 
@@ -39,18 +38,14 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image
                                                            TileMode tileModeY,
                                                            const SamplingOptions& sampling,
                                                            const Matrix* uvMatrix) {
-  if (image == nullptr) {
-    return nullptr;
-  }
+  DEBUG_ASSERT(image != nullptr);
   return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
 }
 
 std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
                                                            const FPArgs& args,
                                                            const Matrix* uvMatrix) {
-  if (shader == nullptr) {
-    return nullptr;
-  }
+  DEBUG_ASSERT(shader != nullptr);
   return shader->asFragmentProcessor(args, uvMatrix);
 }
 
@@ -129,40 +124,6 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
     }
   }
   return currFP->coordTransform(currentIndex++);
-}
-
-bool FragmentProcessor::isEqual(const FragmentProcessor& that) const {
-  if (classID() != that.classID()) {
-    return false;
-  }
-  if (this->numTextureSamplers() != that.numTextureSamplers()) {
-    return false;
-  }
-  for (size_t i = 0; i < numTextureSamplers(); ++i) {
-    if (textureSampler(i) != that.textureSampler(i)) {
-      return false;
-    }
-  }
-  if (numCoordTransforms() != that.numCoordTransforms()) {
-    return false;
-  }
-  for (size_t i = 0; i < numCoordTransforms(); ++i) {
-    if (coordTransform(i)->matrix != that.coordTransform(i)->matrix) {
-      return false;
-    }
-  }
-  if (!onIsEqual(that)) {
-    return false;
-  }
-  if (numChildProcessors() != that.numChildProcessors()) {
-    return false;
-  }
-  for (size_t i = 0; i < numChildProcessors(); ++i) {
-    if (!childProcessor(i)->isEqual(*that.childProcessor(i))) {
-      return false;
-    }
-  }
-  return true;
 }
 
 void FragmentProcessor::setData(UniformBuffer* uniformBuffer) const {

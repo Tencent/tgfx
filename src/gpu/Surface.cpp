@@ -21,13 +21,13 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "core/utils/Profiling.h"
 #include "gpu/RenderContext.h"
 
 namespace tgfx {
+static constexpr uint32_t InvalidContentVersion = 0;
+
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
-  TRACE_EVENT_COLOR(TRACY_COLOR_YELLOW);
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
               sampleCount, mipmapped, renderFlags);
 }
@@ -69,8 +69,9 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> re
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
-    : _uniqueID(UniqueID::Next()), renderTargetProxy(std::move(proxy)), _renderFlags(renderFlags) {
-  DEBUG_ASSERT(this->renderTargetProxy != nullptr);
+    : _uniqueID(UniqueID::Next()) {
+  DEBUG_ASSERT(proxy != nullptr);
+  renderContext = new RenderContext(std::move(proxy), renderFlags, this);
 }
 
 Surface::~Surface() {
@@ -79,26 +80,29 @@ Surface::~Surface() {
 }
 
 Context* Surface::getContext() const {
-  return renderTargetProxy->getContext();
+  return renderContext->getContext();
+}
+
+uint32_t Surface::renderFlags() const {
+  return renderContext->renderFlags;
 }
 
 int Surface::width() const {
-  return renderTargetProxy->width();
+  return renderContext->renderTarget->width();
 }
 
 int Surface::height() const {
-  return renderTargetProxy->height();
+  return renderContext->renderTarget->height();
 }
 
 ImageOrigin Surface::origin() const {
-  return renderTargetProxy->origin();
+  return renderContext->renderTarget->origin();
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
-  auto context = getContext();
-  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
-  context->flush();
-  auto renderTarget = renderTargetProxy->getRenderTarget();
+  forceResolveRenderTarget();
+  getContext()->flush();
+  auto renderTarget = renderContext->renderTarget->getRenderTarget();
   if (renderTarget == nullptr) {
     return {};
   }
@@ -106,13 +110,13 @@ BackendRenderTarget Surface::getBackendRenderTarget() {
 }
 
 BackendTexture Surface::getBackendTexture() {
-  if (!renderTargetProxy->isTextureBacked()) {
+  auto renderTarget = renderContext->renderTarget;
+  if (!renderTarget->isTextureBacked()) {
     return {};
   }
-  auto context = getContext();
-  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
-  context->flush();
-  auto texture = renderTargetProxy->getTexture();
+  forceResolveRenderTarget();
+  getContext()->flush();
+  auto texture = renderTarget->getTexture();
   if (texture == nullptr) {
     return {};
   }
@@ -120,29 +124,22 @@ BackendTexture Surface::getBackendTexture() {
 }
 
 HardwareBufferRef Surface::getHardwareBuffer() {
-  if (!renderTargetProxy->isTextureBacked()) {
+  auto renderTarget = renderContext->renderTarget;
+  if (!renderTarget->isTextureBacked()) {
     return nullptr;
   }
-  auto context = getContext();
-  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
-  context->flushAndSubmit(true);
-  auto texture = renderTargetProxy->getTexture();
+  forceResolveRenderTarget();
+  getContext()->flushAndSubmit(true);
+  auto texture = renderTarget->getTexture();
   if (texture == nullptr) {
     return nullptr;
   }
   return texture->getHardwareBuffer();
 }
 
-static Path GetInitClip(int width, int height) {
-  Path path = {};
-  path.addRect(Rect::MakeWH(width, height));
-  return path;
-}
-
 Canvas* Surface::getCanvas() {
   if (canvas == nullptr) {
-    renderContext = new RenderContext(this);
-    canvas = new Canvas(renderContext, GetInitClip(width(), height()));
+    canvas = new Canvas(renderContext, this);
   }
   return canvas;
 }
@@ -151,17 +148,18 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (cachedImage != nullptr) {
     return cachedImage;
   }
+  auto renderTarget = renderContext->renderTarget;
   auto drawingManager = getContext()->drawingManager();
-  drawingManager->addTextureResolveTask(renderTargetProxy);
-  auto textureProxy = renderTargetProxy->getTextureProxy();
-  if (textureProxy != nullptr && !textureProxy->externallyOwned()) {
-    cachedImage = TextureImage::Wrap(std::move(textureProxy));
-  } else {
-    auto textureCopy = renderTargetProxy->makeTextureProxy();
-    drawingManager->addRenderTargetCopyTask(renderTargetProxy, textureCopy,
-                                            Rect::MakeWH(width(), height()), Point::Zero());
-    cachedImage = TextureImage::Wrap(std::move(textureCopy));
+  auto textureProxy = renderTarget->getTextureProxy();
+  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
+    textureProxy = renderTarget->makeTextureProxy();
+    renderContext->copyToTexture(textureProxy, Rect::MakeWH(width(), height()), Point::Zero());
   }
+  if (!renderContext->flush()) {
+    // TODO(domchen): Remove the unnecessary resolve task.
+    drawingManager->addTextureResolveTask(renderContext->renderTarget);
+  }
+  cachedImage = TextureImage::Wrap(std::move(textureProxy));
   return cachedImage;
 }
 
@@ -178,8 +176,9 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto context = getContext();
-  context->drawingManager()->addTextureResolveTask(renderTargetProxy);
+  forceResolveRenderTarget();
+  auto renderTargetProxy = renderContext->renderTarget;
+  auto context = renderTargetProxy->getContext();
   context->flush();
   auto texture = renderTargetProxy->getTexture();
   auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
@@ -200,14 +199,11 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
-uint32_t Surface::contentVersion() const {
-  if (renderContext == nullptr) {
-    return 1u;
-  }
-  return renderContext->opContext->contentVersion();
-}
+bool Surface::aboutToDraw(bool discardContent) {
+  do {
+    _contentVersion++;
+  } while (InvalidContentVersion == _contentVersion);
 
-bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
   if (cachedImage == nullptr) {
     return true;
   }
@@ -216,23 +212,31 @@ bool Surface::aboutToDraw(const std::function<bool()>& willDiscardContent) {
   if (isUnique) {
     return true;
   }
-  auto textureProxy = renderTargetProxy->getTextureProxy();
+  auto renderTarget = renderContext->renderTarget;
+  auto textureProxy = renderTarget->getTextureProxy();
   if (textureProxy == nullptr || textureProxy->externallyOwned()) {
     return true;
   }
-  auto newRenderTargetProxy = renderTargetProxy->makeRenderTargetProxy();
-  if (newRenderTargetProxy == nullptr) {
+  auto newRenderTarget = renderTarget->makeRenderTargetProxy();
+  if (newRenderTarget == nullptr) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
     return false;
   }
-  if (!willDiscardContent()) {
-    auto newTextureProxy = newRenderTargetProxy->getTextureProxy();
-    auto drawingManager = getContext()->drawingManager();
-    drawingManager->addRenderTargetCopyTask(renderTargetProxy, newTextureProxy,
-                                            Rect::MakeWH(width(), height()), Point::Zero());
+  if (!discardContent) {
+    auto newTextureProxy = newRenderTarget->getTextureProxy();
+    renderContext->copyToTexture(std::move(newTextureProxy), Rect::MakeWH(width(), height()),
+                                 Point::Zero());
+    renderContext->flush();
   }
-  renderTargetProxy = std::move(newRenderTargetProxy);
-  renderContext->replaceRenderTarget(renderTargetProxy);
+  renderContext->renderTarget = std::move(newRenderTarget);
   return true;
 }
+
+void Surface::forceResolveRenderTarget() {
+  // TODO(domchen): Remove the unnecessary resolve task.
+  if (!renderContext->flush()) {
+    getContext()->drawingManager()->addTextureResolveTask(renderContext->renderTarget);
+  }
+}
+
 }  // namespace tgfx

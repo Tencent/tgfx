@@ -17,16 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
-#include "core/utils/Profiling.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::shared_ptr<TextureUploadTask> TextureUploadTask::MakeFrom(
+std::unique_ptr<TextureUploadTask> TextureUploadTask::MakeFrom(
     UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped) {
   if (decoder == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<TextureUploadTask>(
+  return std::unique_ptr<TextureUploadTask>(
       new TextureUploadTask(std::move(uniqueKey), std::move(decoder), mipmapped));
 }
 
@@ -36,7 +35,6 @@ TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<ImageD
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
-  TRACE_EVENT;
   if (decoder == nullptr) {
     return nullptr;
   }

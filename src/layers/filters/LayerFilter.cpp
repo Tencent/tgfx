@@ -17,19 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/LayerFilter.h"
-#include "tgfx/layers/Layer.h"
+
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float filterScale) {
-  if (dirty || lastScale != filterScale) {
-    lastFilter = onCreateImageFilter(filterScale);
-    lastScale = filterScale;
+std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float scale) {
+  if (lastScale != scale || dirty) {
+    lastFilter = onCreateImageFilter(scale);
+    lastScale = scale;
     dirty = false;
   }
   return lastFilter;
 }
 
 void LayerFilter::invalidateFilter() {
+  lastFilter = nullptr;
   dirty = true;
   invalidate();
 }

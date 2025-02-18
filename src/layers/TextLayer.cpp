@@ -19,7 +19,6 @@
 #include "tgfx/layers/TextLayer.h"
 #include "core/FontGlyphFace.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
 
@@ -39,7 +38,6 @@ std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
 }
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
-  TRACE_EVENT;
   auto layer = std::shared_ptr<TextLayer>(new TextLayer());
   layer->weakThis = layer;
   return layer;

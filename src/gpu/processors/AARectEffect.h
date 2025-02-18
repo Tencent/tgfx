@@ -35,8 +35,6 @@ class AARectEffect : public FragmentProcessor {
   explicit AARectEffect(const Rect& rect) : FragmentProcessor(ClassID()), rect(rect) {
   }
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   Rect rect = Rect::MakeEmpty();
 };
 }  // namespace tgfx

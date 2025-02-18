@@ -19,7 +19,6 @@
 #include "ResourceProvider.h"
 #include "GradientCache.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
@@ -31,7 +30,6 @@ class PatternedIndexBufferProvider : public DataProvider {
   }
 
   std::shared_ptr<Data> getData() const override {
-    TRACE_EVENT;
     auto size = static_cast<size_t>(reps * patternSize * sizeof(uint16_t));
     Buffer buffer(size);
     if (buffer.isEmpty()) {
@@ -96,7 +94,7 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::createNonAAQuadIndexBuffer() {
     0, 1, 2, 2, 1, 3
   };
   // clang-format on
-  auto provider = std::make_shared<PatternedIndexBufferProvider>(
+  auto provider = std::make_unique<PatternedIndexBufferProvider>(
       kNonAAQuadIndexPattern, kIndicesPerNonAAQuad, kMaxNumNonAAQuads, kVerticesPerNonAAQuad);
   return GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
 }
@@ -123,7 +121,7 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::createAAQuadIndexBuffer() {
     1, 5, 3, 3, 5, 7,
   };
   // clang-format on
-  auto provider = std::make_shared<PatternedIndexBufferProvider>(
+  auto provider = std::make_unique<PatternedIndexBufferProvider>(
       kAAQuadIndexPattern, kIndicesPerAAQuad, kMaxNumAAQuads, kVerticesPerAAQuad);
   return GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
 }

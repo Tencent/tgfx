@@ -61,9 +61,4 @@ XfermodeFragmentProcessor::XfermodeFragmentProcessor(std::unique_ptr<FragmentPro
 void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
 }
-
-bool XfermodeFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const XfermodeFragmentProcessor&>(processor);
-  return mode == that.mode && child == that.child;
-}
 }  // namespace tgfx

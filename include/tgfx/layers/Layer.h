@@ -21,16 +21,17 @@
 #include <memory>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerContent.h"
 #include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
 class DisplayList;
 class DrawArgs;
+struct LayerStyleSource;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -219,7 +220,41 @@ class Layer {
   void setAllowsGroupOpacity(bool value);
 
   /**
-   * Returns the list of filters applied to the layer.
+   * Returns the list of layer styles applied to the layer. Unlike layer filters, layer styles do
+   * not create a new offscreen image to replace the original layer content. Instead, they add
+   * visual elements either below or above the layer content, blending directly with the existing
+   * content on the canvas. Each layer style uses the same layer content as input and draws on the
+   * canvas. Layer styles are applied before filters. The default value is an empty list.
+   */
+  const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
+    return _layerStyles;
+  }
+
+  /**
+   * Sets the list of layer styles applied to the layer.
+   */
+  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
+
+  /**
+   * Whether to exclude child effects in the layer style. If true, child layer
+   * styles and filters are not included in the layer content used to generate
+   * the layer style. This option only affects the appearance of the LayerStyle, not the layer
+   * itself. The default value is false.
+   */
+  bool excludeChildEffectsInLayerStyle() const {
+    return bitFields.excludeChildEffectsInLayerStyle;
+  }
+
+  /**
+   * Sets whether exclude child effects in the layer style.
+   */
+  void setExcludeChildEffectsInLayerStyle(bool value);
+
+  /**
+   * Returns the list of filters applied to the layer. Layer filters create new offscreen images
+   * to replace the original layer content. Each filter takes the output of the previous filter as
+   * input, and the final output is drawn on the canvas. Layer filters are applied after layer
+   * styles. The default value is an empty list.
    */
   const std::vector<std::shared_ptr<LayerFilter>>& filters() const {
     return _filters;
@@ -471,6 +506,20 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
+   * Draws the layer content and its children on the given canvas. By default, this method draws the
+   * layer content first, followed by the children. Subclasses can override this method to change
+   * the drawing order or the way the layer content is drawn.
+   * @param content The layer content to draw. This can be nullptr.
+   * @param canvas The canvas to draw the layer content on.
+   * @param alpha The alpha transparency value used for drawing the layer content.
+   * @param forContour Whether to draw the layer content for the contour.
+   * @param drawChildren A callback function that draws the children of the layer. if the function
+   * return false, the content above children should not be drawn.
+   */
+  virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+                            const std::function<bool()>& drawChildren) const;
+
+  /**
   * Attachs a property to this layer.
   */
   void attachProperty(LayerProperty* property) const;
@@ -500,22 +549,29 @@ class Layer {
 
   LayerContent* getContent();
 
-  Paint getLayerPaint(float alpha, BlendMode blendMode);
+  Paint getLayerPaint(float alpha, BlendMode blendMode = BlendMode::SrcOver) const;
 
-  std::shared_ptr<ImageFilter> getLayerFilter(float contentScale);
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
   LayerContent* getRasterizedCache(const DrawArgs& args);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  std::shared_ptr<Picture> getLayerContents(const DrawArgs& args, float contentScale);
-
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
-  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha);
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
+
+  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild = nullptr);
+
+  void drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha = nullptr);
+
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
+
+  void drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
+                       LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -532,6 +588,7 @@ class Layer {
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
+    bool excludeChildEffectsInLayerStyle : 1;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
@@ -547,6 +604,7 @@ class Layer {
   std::unique_ptr<LayerContent> layerContent = nullptr;
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+  std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
 
   friend class DisplayList;
   friend class LayerProperty;

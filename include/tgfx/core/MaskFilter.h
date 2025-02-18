@@ -37,10 +37,31 @@ class MaskFilter {
 
   virtual ~MaskFilter() = default;
 
+  /**
+   * Returns a mask filter that will apply the specified viewMatrix to this mask filter when
+   * drawing. The specified matrix will be applied after any matrix associated with this mask
+   * filter.
+   */
+  virtual std::shared_ptr<MaskFilter> makeWithMatrix(const Matrix& viewMatrix) const = 0;
+
+ protected:
+  enum class Type { Shader, None };
+
+  /**
+   * Returns the type of this mask filter.
+   */
+  virtual Type type() const = 0;
+
+  /**
+   * Returns true if this mask filter is equivalent to the specified mask filter.
+   */
+  virtual bool isEqual(const MaskFilter* maskFilter) const = 0;
+
  private:
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const = 0;
 
-  friend class RenderContext;
+  friend class OpsCompositor;
+  friend class Caster;
 };
 }  // namespace tgfx

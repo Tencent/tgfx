@@ -68,20 +68,22 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool extern
   if (glDevice) {
     return std::static_pointer_cast<CGLDevice>(glDevice);
   }
-  auto oldCGLContext = CGLGetCurrentContext();
-  if (oldCGLContext != cglContext) {
-    CGLSetCurrentContext(cglContext);
-    if (CGLGetCurrentContext() != cglContext) {
-      return nullptr;
+  @autoreleasepool {
+    auto oldCGLContext = CGLGetCurrentContext();
+    if (oldCGLContext != cglContext) {
+      CGLSetCurrentContext(cglContext);
+      if (CGLGetCurrentContext() != cglContext) {
+        return nullptr;
+      }
     }
+    auto device = std::shared_ptr<CGLDevice>(new CGLDevice(cglContext));
+    device->externallyOwned = externallyOwned;
+    device->weakThis = device;
+    if (oldCGLContext != cglContext) {
+      CGLSetCurrentContext(oldCGLContext);
+    }
+    return device;
   }
-  auto device = std::shared_ptr<CGLDevice>(new CGLDevice(cglContext));
-  device->externallyOwned = externallyOwned;
-  device->weakThis = device;
-  if (oldCGLContext != cglContext) {
-    CGLSetCurrentContext(oldCGLContext);
-  }
-  return device;
 }
 
 CGLDevice::CGLDevice(CGLContextObj cglContext) : GLDevice(cglContext) {
@@ -119,10 +121,12 @@ CVOpenGLTextureCacheRef CGLDevice::getTextureCache() {
 }
 
 bool CGLDevice::onMakeCurrent() {
-  oldContext = CGLGetCurrentContext();
-  CGLRetainContext(oldContext);
-  [glContext makeCurrentContext];
-  return [NSOpenGLContext currentContext] == glContext;
+  @autoreleasepool {
+    oldContext = CGLGetCurrentContext();
+    CGLRetainContext(oldContext);
+    [glContext makeCurrentContext];
+    return [NSOpenGLContext currentContext] == glContext;
+  }
 }
 
 void CGLDevice::onClearCurrent() {

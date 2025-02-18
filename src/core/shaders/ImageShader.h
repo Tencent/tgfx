@@ -30,10 +30,16 @@ class ImageShader : public Shader {
   TileMode tileModeY = TileMode::Clamp;
   SamplingOptions sampling = {};
 
+  bool isAImage() const override {
+    return true;
+  }
+
  protected:
   Type type() const override {
     return Type::Image;
   }
+
+  bool isEqual(const Shader* shader) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;

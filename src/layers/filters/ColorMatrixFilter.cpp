@@ -37,7 +37,7 @@ std::shared_ptr<ImageFilter> ColorMatrixFilter::onCreateImageFilter(float) {
 }
 
 ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix)
-    : LayerFilter(), _matrix(std::move(matrix)) {
+    : _matrix(std::move(matrix)) {
 }
 
 }  // namespace tgfx

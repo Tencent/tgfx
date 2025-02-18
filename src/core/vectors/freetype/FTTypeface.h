@@ -54,6 +54,11 @@ class FTTypeface : public Typeface {
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
+ protected:
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  std::vector<Unichar> getGlyphToUnicodeMap() const override;
+#endif
+
  private:
   uint32_t _uniqueID = 0;
   FTFontData data;

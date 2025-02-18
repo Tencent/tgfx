@@ -42,11 +42,11 @@ class RasterizedContent : public LayerContent {
 
   std::shared_ptr<Image> getImage() const {
     return image;
-  };
+  }
 
   Matrix getMatrix() const {
     return matrix;
-  };
+  }
 
  private:
   uint32_t _contextID = 0;

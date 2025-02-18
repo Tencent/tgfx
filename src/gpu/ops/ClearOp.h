@@ -23,20 +23,13 @@
 namespace tgfx {
 class ClearOp : public Op {
  public:
-  DEFINE_OP_CLASS_ID
-
   static std::unique_ptr<ClearOp> Make(Color color, const Rect& scissor);
-
-  void prepare(Context*, uint32_t) override {
-  }
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  ClearOp(Color color, const Rect& scissor) : Op(ClassID()), color(color), scissor(scissor) {
+  ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
   }
-
-  bool onCombineIfPossible(Op* op) override;
 
   Color color = Color::Transparent();
   Rect scissor = Rect::MakeEmpty();

@@ -20,7 +20,6 @@
 #include <android/bitmap.h>
 #include "NativeImageBuffer.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "platform/android/AHardwareBufferFunctions.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
@@ -322,7 +321,6 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
-  TRACE_EVENT;
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {

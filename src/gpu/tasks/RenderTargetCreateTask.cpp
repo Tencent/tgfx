@@ -18,15 +18,14 @@
 
 #include "RenderTargetCreateTask.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(
+std::unique_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(
     UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy, PixelFormat pixelFormat,
     int sampleCount, bool clearAll) {
-  return std::shared_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
+  return std::unique_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
       std::move(uniqueKey), std::move(textureProxy), pixelFormat, sampleCount, clearAll));
 }
 
@@ -39,7 +38,6 @@ RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey,
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
-  TRACE_EVENT;
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");

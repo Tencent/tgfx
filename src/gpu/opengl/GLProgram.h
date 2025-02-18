@@ -53,7 +53,7 @@ class GLProgram : public Program {
    *
    * It is the caller's responsibility to ensure the program is bound before calling.
    */
-  void updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
+  void updateUniformsAndTextureBindings(const RenderTarget* renderTarget,
                                         const ProgramInfo* programInfo);
 
   int vertexStride() const {
@@ -74,7 +74,7 @@ class GLProgram : public Program {
     std::optional<ImageOrigin> origin;
   };
 
-  void setRenderTargetState(const GLRenderTarget* renderTarget);
+  void setRenderTargetState(const RenderTarget* renderTarget);
 
   RenderTargetState renderTargetState;
   unsigned programId = 0;

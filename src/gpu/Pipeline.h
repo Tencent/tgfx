@@ -27,12 +27,6 @@
 #include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
-struct DstTextureInfo {
-  bool requiresBarrier = false;
-  Point offset = Point::Zero();
-  std::shared_ptr<Texture> texture = nullptr;
-};
-
 /**
  * Pipeline is a ProgramInfo that uses a list of Processors to assemble a shader program and set API
  * state for a draw.
@@ -41,8 +35,8 @@ class Pipeline : public ProgramInfo {
  public:
   Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
            std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-           size_t numColorProcessors, BlendMode blendMode, DstTextureInfo dstTextureInfo,
-           const Swizzle* outputSwizzle);
+           size_t numColorProcessors, std::unique_ptr<XferProcessor> xferProcessor,
+           BlendMode blendMode, const Swizzle* outputSwizzle);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -66,16 +60,8 @@ class Pipeline : public ProgramInfo {
     return _outputSwizzle;
   }
 
-  const Texture* dstTexture() const {
-    return dstTextureInfo.texture.get();
-  }
-
-  const Point& dstTextureOffset() const {
-    return dstTextureInfo.offset;
-  }
-
   bool requiresBarrier() const override {
-    return dstTextureInfo.requiresBarrier;
+    return xferProcessor != nullptr && xferProcessor->requiresBarrier();
   }
 
   const BlendInfo* blendInfo() const override {
@@ -106,7 +92,6 @@ class Pipeline : public ProgramInfo {
   size_t numColorProcessors = 0;
   std::unique_ptr<XferProcessor> xferProcessor = nullptr;
   BlendInfo _blendInfo = {};
-  DstTextureInfo dstTextureInfo = {};
   const Swizzle* _outputSwizzle = nullptr;
 
   void updateProcessorIndices();

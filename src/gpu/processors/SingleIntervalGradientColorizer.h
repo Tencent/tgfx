@@ -37,8 +37,6 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
       : FragmentProcessor(ClassID()), start(start), end(end) {
   }
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   Color start;
   Color end;
 };

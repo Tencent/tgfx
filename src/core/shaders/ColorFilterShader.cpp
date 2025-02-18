@@ -17,9 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorFilterShader.h"
+#include "core/utils/Caster.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
+std::shared_ptr<Shader> ColorFilterShader::makeWithMatrix(const Matrix& viewMatrix) const {
+  auto newShader = shader->makeWithMatrix(viewMatrix);
+  if (newShader == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<ColorFilterShader>(std::move(newShader), colorFilter);
+}
+
+bool ColorFilterShader::isEqual(const Shader* otherShader) const {
+  auto other = Caster::AsColorFilterShader(otherShader);
+  return other && Caster::Compare(colorFilter.get(), other->colorFilter.get()) &&
+         Caster::Compare(shader.get(), other->shader.get());
+}
+
 std::unique_ptr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto fp1 = FragmentProcessor::Make(shader, args, uvMatrix);

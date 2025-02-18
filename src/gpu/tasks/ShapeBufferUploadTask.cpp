@@ -17,28 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
-#include "core/utils/Profiling.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::shared_ptr<ShapeBufferUploadTask> ShapeBufferUploadTask::MakeFrom(
-    UniqueKey trianglesKey, UniqueKey textureKey, std::shared_ptr<ShapeBufferProvider> provider) {
+std::unique_ptr<ShapeBufferUploadTask> ShapeBufferUploadTask::MakeFrom(
+    UniqueKey trianglesKey, UniqueKey textureKey, std::unique_ptr<ShapeBufferProvider> provider) {
   if (provider == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<ShapeBufferUploadTask>(new ShapeBufferUploadTask(
+  return std::unique_ptr<ShapeBufferUploadTask>(new ShapeBufferUploadTask(
       std::move(trianglesKey), std::move(textureKey), std::move(provider)));
 }
 
 ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
-                                             std::shared_ptr<ShapeBufferProvider> provider)
+                                             std::unique_ptr<ShapeBufferProvider> provider)
     : ResourceTask(std::move(trianglesKey)), textureKey(std::move(textureKey)),
       provider(std::move(provider)) {
 }
 
 bool ShapeBufferUploadTask::execute(Context* context) {
-  TRACE_EVENT;
   if (uniqueKey.strongCount() <= 0) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;

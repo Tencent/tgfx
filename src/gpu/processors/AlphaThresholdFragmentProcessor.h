@@ -36,8 +36,6 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
       : FragmentProcessor(ClassID()), threshold(threshold) {
   }
 
-  bool onIsEqual(const FragmentProcessor& other) const override;
-
   float threshold = 0.0f;
 };
 }  // namespace tgfx

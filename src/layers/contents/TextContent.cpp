@@ -18,7 +18,6 @@
 
 #include "TextContent.h"
 #include "core/GlyphRunList.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor)
@@ -26,7 +25,6 @@ TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor)
 }
 
 void TextContent::draw(Canvas* canvas, const Paint& paint) const {
-  TRACE_EVENT;
   auto textPaint = paint;
   auto color = textColor;
   color.alpha *= paint.getAlpha();
@@ -35,7 +33,6 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
 }
 
 bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  TRACE_EVENT;
   if (pixelHitTest) {
     const auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
 

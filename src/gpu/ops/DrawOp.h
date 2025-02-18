@@ -27,9 +27,6 @@
 namespace tgfx {
 class DrawOp : public Op {
  public:
-  explicit DrawOp(uint8_t classID) : Op(classID) {
-  }
-
   std::unique_ptr<Pipeline> createPipeline(RenderPass* renderPass,
                                            std::unique_ptr<GeometryProcessor> gp);
 
@@ -45,27 +42,29 @@ class DrawOp : public Op {
     blendMode = mode;
   }
 
-  void setAA(AAType type) {
-    aa = type;
+  void setXferProcessor(std::unique_ptr<XferProcessor> processor) {
+    xferProcessor = std::move(processor);
   }
 
   void addColorFP(std::unique_ptr<FragmentProcessor> colorProcessor) {
-    _colors.emplace_back(std::move(colorProcessor));
+    colors.emplace_back(std::move(colorProcessor));
   }
 
   void addCoverageFP(std::unique_ptr<FragmentProcessor> coverageProcessor) {
-    _coverages.emplace_back(std::move(coverageProcessor));
+    coverages.emplace_back(std::move(coverageProcessor));
   }
 
  protected:
-  AAType aa = AAType::None;
+  AAType aaType = AAType::None;
 
-  bool onCombineIfPossible(Op* op) override;
+  explicit DrawOp(AAType aaType) : aaType(aaType) {
+  }
 
  private:
   Rect _scissorRect = Rect::MakeEmpty();
-  std::vector<std::unique_ptr<FragmentProcessor>> _colors;
-  std::vector<std::unique_ptr<FragmentProcessor>> _coverages;
+  std::vector<std::unique_ptr<FragmentProcessor>> colors = {};
+  std::vector<std::unique_ptr<FragmentProcessor>> coverages = {};
+  std::unique_ptr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

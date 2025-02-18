@@ -37,8 +37,6 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
       : FragmentProcessor(ClassID()), matrix(matrix) {
   }
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   std::array<float, 20> matrix;
 };
 }  // namespace tgfx

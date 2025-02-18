@@ -17,27 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-void OpsRenderTask::addOp(std::unique_ptr<Op> op) {
-  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
-    return;
-  }
-  ops.emplace_back(std::move(op));
-}
-
-void OpsRenderTask::prepare(Context* context) {
-  TRACE_EVENT_COLOR(TRACY_COLOR_GREEN);
-  for (auto& op : ops) {
-    op->prepare(context, renderFlags);
-  }
-}
-
 bool OpsRenderTask::execute(Gpu* gpu) {
-  TRACE_EVENT;
   if (ops.empty() || renderTargetProxy == nullptr) {
     return false;
   }

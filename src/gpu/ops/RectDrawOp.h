@@ -22,32 +22,32 @@
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-class RectPaint;
+struct RectPaint {
+  RectPaint(const Rect& rect, const Matrix& viewMatrix, const Color& color = Color::White())
+      : rect(rect), viewMatrix(viewMatrix), color(color) {
+  }
+
+  Rect rect;
+  Matrix viewMatrix;
+  Color color;
+};
 
 class RectDrawOp : public DrawOp {
  public:
-  DEFINE_OP_CLASS_ID
-
-  static std::unique_ptr<RectDrawOp> Make(std::optional<Color> color, const Rect& rect,
-                                          const Matrix& viewMatrix,
-                                          const Matrix* uvMatrix = nullptr);
-
-  void prepare(Context* context, uint32_t renderFlags) override;
+  /**
+   * Create a new RectDrawOp for a list of RectPaints. The returned RectDrawOp is in the local space
+   * of each rect.
+   */
+  static std::unique_ptr<RectDrawOp> Make(Context* context, const std::vector<RectPaint>& rects,
+                                          AAType aaType, uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  RectDrawOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-             const Matrix* uvMatrix = nullptr);
+  RectDrawOp(AAType aaType, size_t rectCount);
 
-  bool onCombineIfPossible(Op* op) override;
-
-  bool canAdd(size_t count) const;
-
-  bool needsIndexBuffer() const;
-
-  bool hasColor = true;
-  std::vector<std::shared_ptr<RectPaint>> rectPaints = {};
+  size_t rectCount = 0;
+  std::optional<Color> uniformColor = std::nullopt;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   std::shared_ptr<Data> vertexData = nullptr;

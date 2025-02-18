@@ -70,7 +70,7 @@ class Shader {
    */
   static std::shared_ptr<Shader> MakeLinearGradient(const Point& startPoint, const Point& endPoint,
                                                     const std::vector<Color>& colors,
-                                                    const std::vector<float>& positions);
+                                                    const std::vector<float>& positions = {});
 
   /**
    * Returns a shader that generates a radial gradient given the center and radius. The color
@@ -85,7 +85,7 @@ class Shader {
    */
   static std::shared_ptr<Shader> MakeRadialGradient(const Point& center, float radius,
                                                     const std::vector<Color>& colors,
-                                                    const std::vector<float>& positions);
+                                                    const std::vector<float>& positions = {});
 
   /**
    * Returns a shader that generates a conic gradient given a center point and an angular range.
@@ -103,7 +103,7 @@ class Shader {
    */
   static std::shared_ptr<Shader> MakeConicGradient(const Point& center, float startAngle,
                                                    float endAngle, const std::vector<Color>& colors,
-                                                   const std::vector<float>& positions);
+                                                   const std::vector<float>& positions = {});
 
   virtual ~Shader() = default;
 
@@ -113,6 +113,13 @@ class Shader {
    * optimizations.
    */
   virtual bool isOpaque() const {
+    return false;
+  }
+
+  /**
+   * Returns true if the shader is backed by a single image.
+   */
+  virtual bool isAImage() const {
     return false;
   }
 
@@ -144,12 +151,17 @@ class Shader {
    */
   virtual Type type() const = 0;
 
+  /**
+   * Returns true if the specified shader is equivalent to this Shader.
+   */
+  virtual bool isEqual(const Shader* shader) const = 0;
+
   std::weak_ptr<Shader> weakThis;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
-  friend class Canvas;
+  friend class Caster;
 };
 }  // namespace tgfx

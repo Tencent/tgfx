@@ -21,6 +21,9 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+
+enum class DrawMode { Normal, Contour, Background };
+
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
  */
@@ -28,8 +31,10 @@ class DrawArgs {
  public:
   DrawArgs() = default;
 
-  DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false)
-      : context(context), renderFlags(renderFlags), cleanDirtyFlags(cleanDirtyFlags) {
+  DrawArgs(Context* context, uint32_t renderFlags, bool cleanDirtyFlags = false,
+           bool excludeEffects = false, DrawMode drawMode = DrawMode::Normal)
+      : context(context), renderFlags(renderFlags), cleanDirtyFlags(cleanDirtyFlags),
+        excludeEffects(excludeEffects), drawMode(drawMode) {
   }
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
@@ -38,5 +43,9 @@ class DrawArgs {
   uint32_t renderFlags = 0;
   // Whether to clean the dirty flags of the associated Layer during the drawing process.
   bool cleanDirtyFlags = false;
+  // Whether to exclude effects during the drawing process.
+  bool excludeEffects = false;
+  // Determines the draw mode of the Layer.
+  DrawMode drawMode = DrawMode::Normal;
 };
 }  // namespace tgfx

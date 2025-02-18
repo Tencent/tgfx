@@ -27,10 +27,14 @@ class BlendShader : public Shader {
       : mode(mode), dst(std::move(dst)), src(std::move(src)) {
   }
 
+  std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
+
  protected:
   Type type() const override {
     return Type::Blend;
   }
+
+  bool isEqual(const Shader* shader) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                          const Matrix* uvMatrix) const override;

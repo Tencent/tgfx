@@ -20,21 +20,20 @@
 
 #include <optional>
 #include "core/DrawContext.h"
-#include "gpu/OpContext.h"
+#include "gpu/OpsCompositor.h"
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
 class RenderContext : public DrawContext {
  public:
-  RenderContext(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags);
+  RenderContext(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
+                Surface* surface = nullptr);
 
-  ~RenderContext() override;
-
-  Surface* getSurface() const override {
-    return surface;
+  Context* getContext() const {
+    return renderTarget->getContext();
   }
 
-  void clear() override;
+  void drawStyle(const MCState& state, const FillStyle& style) override;
 
   void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override;
 
@@ -50,41 +49,37 @@ class RenderContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state,
                      const FillStyle& style) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const FillStyle& style, const Stroke* stroke) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
+                        const MCState& state, const FillStyle& style) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const FillStyle& style,
-                 std::shared_ptr<ImageFilter> filter) override;
+  void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                 const MCState& state, const FillStyle& style) override;
+
+  /**
+   * Copies the contents of the render target to the given texture.
+   */
+  void copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+                     const Point& dstPoint);
+
+  /**
+   * Flushes the render context, submitting all pending operations to the drawing manager. Returns
+   * true if any operations were submitted.
+   */
+  bool flush();
 
  private:
-  OpContext* opContext = nullptr;
+  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
   Surface* surface = nullptr;
-  std::shared_ptr<TextureProxy> clipTexture = nullptr;
-  UniqueKey clipKey = {};
+  std::shared_ptr<OpsCompositor> opsCompositor = nullptr;
 
-  explicit RenderContext(Surface* surface);
-  Context* getContext() const;
-  std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
-  std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip,
-                                                   const Rect* drawBounds = nullptr);
-  std::unique_ptr<FragmentProcessor> getClipMask(const Path& clip, const Rect& deviceBounds,
-                                                 const Matrix& viewMatrix, AAType aaType,
-                                                 Rect* scissorRect);
   Rect getClipBounds(const Path& clip);
-  Rect clipLocalBounds(const Rect& localBounds, const MCState& state, bool inverted = false);
-  bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const Rect& localBounds, const MCState& state,
-                 const FillStyle& style);
-  void addOp(std::unique_ptr<Op> op, const std::function<bool()>& willDiscardContent);
   AAType getAAType(const FillStyle& style) const;
-  void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTargetProxy);
-  bool wouldOverwriteEntireRT(const Rect& localBounds, const MCState& state, const FillStyle& style,
-                              bool isRectOp) const;
+  OpsCompositor* getOpsCompositor(bool readOnly = false, bool discardContent = false);
 
   friend class Surface;
 };

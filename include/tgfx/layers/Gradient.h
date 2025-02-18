@@ -25,7 +25,6 @@
 #include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
-
 class LinearGradient;
 class RadialGradient;
 class ConicGradient;
@@ -36,20 +35,52 @@ class ConicGradient;
 class Gradient : public ShapeStyle {
  public:
   /**
-   * Creates a new linear gradient between the specified start and end points.
+   * Creates a shape style that generates a linear gradient between the two specified points. The
+   * color gradient is aligned with the line connecting the two points.
+   * @param startPoint The start point for the gradient.
+   * @param endPoint The end point for the gradient.
+   * @param colors The array of colors, to be distributed between the two points.
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
+   * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
+   * be strictly increasing.
    */
-  static std::shared_ptr<LinearGradient> MakeLinear(const Point& startPoint, const Point& endPoint);
+  static std::shared_ptr<LinearGradient> MakeLinear(const Point& startPoint, const Point& endPoint,
+                                                    const std::vector<Color>& colors,
+                                                    const std::vector<float>& positions = {});
 
   /**
-   * Creates a new radial gradient with the specified center and radius.
+   * Returns a shape style that generates a radial gradient given the center and radius. The color
+   * gradient is drawn from the center point to the edge of the radius.
+   * @param center The center of the circle for this gradient
+   * @param radius Must be positive. The radius of the circle for this gradient.
+   * @param colors The array of colors, to be distributed between the center and edge of the circle.
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
+   * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
+   * be strictly increasing.
    */
-  static std::shared_ptr<RadialGradient> MakeRadial(const Point& center, float radius);
+  static std::shared_ptr<RadialGradient> MakeRadial(const Point& center, float radius,
+                                                    const std::vector<Color>& colors,
+                                                    const std::vector<float>& positions = {});
 
   /**
-   * Creates a new conic gradient with the specified center and angular range.
+   * Returns a shape style that generates a conic gradient given a center point and an angular
+   * range. The color gradient is drawn from the start angle to the end angle, wrapping around the
+   * center point.
+   * @param center The center of the circle for this gradient
+   * @param startAngle Start of the angular range, corresponding to pos == 0.
+   * @param endAngle End of the angular range, corresponding to pos == 1.
+   * @param colors The array of colors, to be distributed around the center, within the gradient
+   * angle range.
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
+   * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
+   * be strictly increasing.
    */
   static std::shared_ptr<ConicGradient> MakeConic(const Point& center, float startAngle,
-                                                  float endAngle);
+                                                  float endAngle, const std::vector<Color>& colors,
+                                                  const std::vector<float>& positions = {});
 
   /**
    * Returns the gradient type. Possible values are GradientType::Linear, GradientType::Radial, and
@@ -84,8 +115,12 @@ class Gradient : public ShapeStyle {
   void setPositions(std::vector<float> positions);
 
  protected:
-  std::vector<tgfx::Color> _colors;
+  std::vector<Color> _colors;
   std::vector<float> _positions;
+
+  Gradient(const std::vector<Color>& colors, const std::vector<float>& positions)
+      : _colors(colors), _positions(positions) {
+  }
 };
 
 /**
@@ -130,8 +165,9 @@ class LinearGradient : public Gradient {
   Point _startPoint = Point::Zero();
   Point _endPoint = Point::Zero();
 
-  LinearGradient(const Point& startPoint, const Point& endPoint)
-      : _startPoint(startPoint), _endPoint(endPoint) {
+  LinearGradient(const Point& startPoint, const Point& endPoint, const std::vector<Color>& colors,
+                 const std::vector<float>& positions)
+      : Gradient(colors, positions), _startPoint(startPoint), _endPoint(endPoint) {
   }
 
   friend class Gradient;
@@ -179,7 +215,9 @@ class RadialGradient : public Gradient {
   Point _center = Point::Zero();
   float _radius = 0;
 
-  RadialGradient(const Point& center, float radius) : _center(center), _radius(radius) {
+  RadialGradient(const Point& center, float radius, const std::vector<Color>& colors,
+                 const std::vector<float>& positions)
+      : Gradient(colors, positions), _center(center), _radius(radius) {
   }
 
   friend class Gradient;
@@ -240,8 +278,9 @@ class ConicGradient : public Gradient {
   float _startAngle = 0;
   float _endAngle = 0;
 
-  ConicGradient(const Point& center, float startAngle, float endAngle)
-      : _center(center), _startAngle(startAngle), _endAngle(endAngle) {
+  ConicGradient(const Point& center, float startAngle, float endAngle,
+                const std::vector<Color>& colors, const std::vector<float>& positions)
+      : Gradient(colors, positions), _center(center), _startAngle(startAngle), _endAngle(endAngle) {
   }
 
   friend class Gradient;

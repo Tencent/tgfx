@@ -17,26 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GpuBufferUploadTask.h"
-#include "core/utils/Profiling.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-std::shared_ptr<GpuBufferUploadTask> GpuBufferUploadTask::MakeFrom(
-    UniqueKey uniqueKey, BufferType bufferType, std::shared_ptr<DataProvider> provider) {
+std::unique_ptr<GpuBufferUploadTask> GpuBufferUploadTask::MakeFrom(
+    UniqueKey uniqueKey, BufferType bufferType, std::unique_ptr<DataProvider> provider) {
   if (provider == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<GpuBufferUploadTask>(
+  return std::unique_ptr<GpuBufferUploadTask>(
       new GpuBufferUploadTask(std::move(uniqueKey), bufferType, std::move(provider)));
 }
 
 GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
-                                         std::shared_ptr<DataProvider> provider)
+                                         std::unique_ptr<DataProvider> provider)
     : ResourceTask(std::move(uniqueKey)), bufferType(bufferType), provider(std::move(provider)) {
 }
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {
-  TRACE_EVENT;
   if (provider == nullptr) {
     return nullptr;
   }

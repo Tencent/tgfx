@@ -22,7 +22,6 @@
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
-  TRACE_EVENT;
   if (generator == nullptr) {
     return nullptr;
   }
@@ -36,7 +35,6 @@ GeneratorImage::GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerat
 }
 
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryHardware) const {
-  TRACE_EVENT;
   if (context != nullptr) {
     auto proxy = context->proxyProvider()->findProxy(uniqueKey);
     if (proxy != nullptr && proxy->getUniqueKey() == uniqueKey) {
@@ -52,7 +50,6 @@ std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryH
 
 std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(const TPArgs& args,
                                                                  const UniqueKey& key) const {
-  TRACE_EVENT;
   return args.context->proxyProvider()->createTextureProxy(key, generator, args.mipmapped,
                                                            args.renderFlags);
 }

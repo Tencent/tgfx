@@ -24,14 +24,17 @@
 namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {
  public:
-  static std::unique_ptr<PorterDuffXferProcessor> Make(BlendMode blend);
-
-  BlendMode getBlend() const {
-    return blend;
-  }
+  static std::unique_ptr<PorterDuffXferProcessor> Make(BlendMode blend,
+                                                       DstTextureInfo dstTextureInfo);
 
   std::string name() const override {
     return "PorterDuffXferProcessor";
+  }
+
+  const Texture* dstTexture() const override;
+
+  virtual bool requiresBarrier() const override {
+    return dstTextureInfo.requiresBarrier;
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
@@ -39,9 +42,11 @@ class PorterDuffXferProcessor : public XferProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit PorterDuffXferProcessor(BlendMode blend) : XferProcessor(ClassID()), blend(blend) {
+  PorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)
+      : XferProcessor(ClassID()), blendMode(blend), dstTextureInfo(std::move(dstTextureInfo)) {
   }
 
-  BlendMode blend;
+  BlendMode blendMode = BlendMode::SrcOver;
+  DstTextureInfo dstTextureInfo = {};
 };
 }  // namespace tgfx

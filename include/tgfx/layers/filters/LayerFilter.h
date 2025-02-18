@@ -24,7 +24,8 @@
 namespace tgfx {
 /**
  * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
- * adjustments. LayerFilters are mutable and can be changed at any time.
+ * adjustments. It creates a new offscreen image that replaces the original layer content.
+ * LayerFilters are mutable and can be changed at any time.
  */
 class LayerFilter : public LayerProperty {
  public:

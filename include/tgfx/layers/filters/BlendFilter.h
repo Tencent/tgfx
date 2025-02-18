@@ -22,10 +22,12 @@
 
 namespace tgfx {
 
+/**
+ * A filter that applies blends between the constant color (src) and input color (dst) based on the
+ * BlendMode.
+ */
 class BlendFilter : public LayerFilter {
  public:
-  virtual ~BlendFilter() = default;
-
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
    * (dst) based on the BlendMode.

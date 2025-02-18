@@ -60,7 +60,7 @@ class ProxyProvider {
    * uploaded to the GPU.
    */
   std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
-                                                       std::shared_ptr<DataProvider> provider,
+                                                       std::unique_ptr<DataProvider> provider,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
 

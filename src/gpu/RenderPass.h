@@ -60,16 +60,19 @@ class RenderPass {
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
   void clear(const Rect& scissor, Color color);
+  void copyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint);
 
  protected:
   explicit RenderPass(Context* context) : context(context) {
   }
 
+  virtual void onBindRenderTarget() = 0;
   virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                            const Rect& drawBounds) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) = 0;
   virtual void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;
+  virtual void onCopyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) = 0;
 
   Context* context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;

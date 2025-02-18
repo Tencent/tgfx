@@ -21,10 +21,12 @@
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
+
+/**
+ * A filter draws an inner shadow over the input content.
+ */
 class InnerShadowFilter : public LayerFilter {
  public:
-  virtual ~InnerShadowFilter() = default;
-
   /**
    * Create a filter that draws an inner shadow over the input content.
    */

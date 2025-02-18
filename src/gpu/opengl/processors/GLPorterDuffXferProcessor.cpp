@@ -20,12 +20,14 @@
 #include "gpu/opengl/GLBlend.h"
 
 namespace tgfx {
-std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlendMode blend) {
-  return std::unique_ptr<PorterDuffXferProcessor>(new GLPorterDuffXferProcessor(blend));
+std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(
+    BlendMode blend, DstTextureInfo dstTextureInfo) {
+  return std::unique_ptr<PorterDuffXferProcessor>(
+      new GLPorterDuffXferProcessor(blend, std::move(dstTextureInfo)));
 }
 
-GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(BlendMode blend)
-    : PorterDuffXferProcessor(blend) {
+GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)
+    : PorterDuffXferProcessor(blend, std::move(dstTextureInfo)) {
 }
 
 void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
@@ -34,14 +36,13 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   const auto& dstColor = fragBuilder->dstColor();
 
   if (args.dstTextureSamplerHandle.isValid()) {
-    // We don't think any shaders actually output negative coverage, but just as a safety
-    // check for floating point precision errors we compare with <= here. We just check the
-    // rgb values of the coverage since the alpha may not have been set when using lcd. If
-    // we are using single channel coverage alpha will equal to rgb anyways.
+    // While shaders typically don't output negative coverage, we use <= as a precaution against
+    // floating point precision errors. We only check the rgb values since the alpha might not be
+    // set when using lcd. If we're using single channel coverage, alpha will match rgb anyway.
     //
-    // The discard here also helps for batching text draws together which need to read from
-    // a dst copy for blends. Though this only helps the case where the outer bounding boxes
-    // of each letter overlap and not two actually parts of the text.
+    // Discarding here also helps batch text draws that need to read from a dst copy for blends.
+    // This is particularly useful when the outer bounding boxes of each letter overlap, though it
+    // doesn't help when actual parts of the text overlap.
     fragBuilder->codeAppendf("if (%s.r <= 0.0 && %s.g <= 0.0 && %s.b <= 0.0) {",
                              args.inputCoverage.c_str(), args.inputCoverage.c_str(),
                              args.inputCoverage.c_str());
@@ -65,28 +66,32 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 
   const char* outColor = "localOutputColor";
   fragBuilder->codeAppendf("vec4 %s;", outColor);
-  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, blend);
+  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, blendMode);
   fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
                            args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
                            dstColor.c_str());
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
-void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer, const Texture* dstTexture,
-                                        const Point& dstTextureOffset) const {
-  if (dstTexture) {
-    uniformBuffer->setData("DstTextureUpperLeft", dstTextureOffset);
-    int width;
-    int height;
-    if (dstTexture->getSampler()->type() == SamplerType::Rectangle) {
-      width = 1;
-      height = 1;
-    } else {
-      width = dstTexture->width();
-      height = dstTexture->height();
-    }
-    float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
-    uniformBuffer->setData("DstTextureCoordScale", scales);
+void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
+  if (dstTextureInfo.textureProxy == nullptr) {
+    return;
   }
+  auto dstTexture = dstTextureInfo.textureProxy->getTexture();
+  if (dstTexture == nullptr) {
+    return;
+  }
+  uniformBuffer->setData("DstTextureUpperLeft", dstTextureInfo.offset);
+  int width;
+  int height;
+  if (dstTexture->getSampler()->type() == SamplerType::Rectangle) {
+    width = 1;
+    height = 1;
+  } else {
+    width = dstTexture->width();
+    height = dstTexture->height();
+  }
+  float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
+  uniformBuffer->setData("DstTextureCoordScale", scales);
 }
 }  // namespace tgfx

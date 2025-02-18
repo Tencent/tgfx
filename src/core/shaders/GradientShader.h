@@ -59,6 +59,12 @@ class GradientShader : public Shader {
     return Type::Gradient;
   }
 
+  bool isEqual(const Shader* shader) const override {
+    // For performance reasons, we don't compare the GradientInfo struct. So multiple
+    // GradientShaders with the same GradientInfo struct will not be considered equal.
+    return shader == this;
+  }
+
   const Matrix pointsToUnit;
   bool colorsAreOpaque = false;
 };

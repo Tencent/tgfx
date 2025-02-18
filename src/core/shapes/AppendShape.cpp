@@ -18,15 +18,42 @@
 
 #include "AppendShape.h"
 #include "MergeShape.h"
+#include "PathShape.h"
 
 namespace tgfx {
-void Shape::Append(std::vector<std::shared_ptr<Shape>>* shapes, std::shared_ptr<Shape> shape) {
+void AppendShape::Append(std::vector<std::shared_ptr<Shape>>* shapes,
+                         std::shared_ptr<Shape> shape) {
   if (shape->type() == Type::Append) {
     auto appendShape = std::static_pointer_cast<AppendShape>(shape);
-    shapes->insert(shapes->end(), appendShape->shapes.end(), appendShape->shapes.begin());
-  } else {
-    shapes->push_back(std::move(shape));
+    shapes->insert(shapes->end(), appendShape->shapes.begin(), appendShape->shapes.end());
+    return;
   }
+  shapes->push_back(std::move(shape));
+}
+
+std::shared_ptr<Shape> Shape::Merge(const std::vector<std::shared_ptr<Shape>>& shapes) {
+  if (shapes.empty()) {
+    return nullptr;
+  }
+  std::vector<std::shared_ptr<Shape>> list = {};
+  for (auto& shape : shapes) {
+    AppendShape::Append(&list, shape);
+  }
+  if (list.size() == 1) {
+    return list.front();
+  }
+  return std::shared_ptr<AppendShape>(new AppendShape(std::move(list)));
+}
+
+std::shared_ptr<Shape> AppendShape::MakeFrom(std::shared_ptr<Shape> first,
+                                             std::shared_ptr<Shape> second) {
+  std::vector<std::shared_ptr<Shape>> shapes = {};
+  Append(&shapes, std::move(first));
+  Append(&shapes, std::move(second));
+  if (shapes.size() == 1) {
+    return shapes.front();
+  }
+  return std::shared_ptr<AppendShape>(new AppendShape(std::move(shapes)));
 }
 
 bool AppendShape::isInverseFillType() const {

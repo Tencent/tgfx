@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathProvider.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -35,7 +36,8 @@ class UniqueKey;
 class Shape {
  public:
   /**
-   * Wraps an existing path in a Shape object. Returns nullptr if the path is empty.
+   * Wraps an existing path in a Shape object. Returns nullptr if the path is empty and not an
+   * inverse fill type.
    */
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
@@ -46,11 +48,22 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
   /**
+   * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr.
+   */
+  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<PathProvider> pathProvider);
+
+  /**
    * Merges two Shapes into a new Shape using the specified path operation. If either Shape is
    * nullptr, the other Shape is returned. Returns nullptr if both Shapes are nullptr.
    */
   static std::shared_ptr<Shape> Merge(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second,
                                       PathOp pathOp = PathOp::Append);
+
+  /**
+   * Merges multiple Shapes into a new Shape using the PathOp::Append operation. Returns nullptr if
+   * the shape vector is empty.
+   */
+  static std::shared_ptr<Shape> Merge(const std::vector<std::shared_ptr<Shape>>& shapes);
 
   /**
    * Applies the specified stroke to the given Shape. If the stroke is nullptr, the original Shape
@@ -146,7 +159,7 @@ class Shape {
   virtual Path getPath(float resolutionScale = 1.0f) const;
 
  protected:
-  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke };
+  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke, Provider };
 
   /**
    * Returns the type of the Shape.
@@ -159,9 +172,7 @@ class Shape {
    */
   virtual UniqueKey getUniqueKey() const = 0;
 
- private:
-  static void Append(std::vector<std::shared_ptr<Shape>>* shapes, std::shared_ptr<Shape> shape);
-
+  friend class AppendShape;
   friend class StrokeShape;
   friend class MatrixShape;
   friend class ShapeDrawOp;

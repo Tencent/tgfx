@@ -20,15 +20,15 @@
 
 namespace tgfx {
 std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(int width, int height,
-                                                                         bool stroke, bool useScale,
-                                                                         const Matrix& uvMatrix) {
+                                                                         bool stroke,
+                                                                         bool useScale) {
   return std::unique_ptr<EllipseGeometryProcessor>(
-      new GLEllipseGeometryProcessor(width, height, stroke, useScale, uvMatrix));
+      new GLEllipseGeometryProcessor(width, height, stroke, useScale));
 }
 
 GLEllipseGeometryProcessor::GLEllipseGeometryProcessor(int width, int height, bool stroke,
-                                                       bool useScale, const Matrix& uvMatrix)
-    : EllipseGeometryProcessor(width, height, stroke, useScale, uvMatrix) {
+                                                       bool useScale)
+    : EllipseGeometryProcessor(width, height, stroke, useScale) {
 }
 
 void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -126,6 +126,6 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 
 void GLEllipseGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(uvMatrix, uniformBuffer, transformIter);
+  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
 }
 }  // namespace tgfx

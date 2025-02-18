@@ -18,34 +18,20 @@
 
 #pragma once
 
-#include "gpu/ops/Op.h"
+#include "gpu/ops/DrawOp.h"
 #include "gpu/tasks/RenderTask.h"
-#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 class OpsRenderTask : public RenderTask {
  public:
-  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags)
-      : RenderTask(std::move(renderTargetProxy)), renderFlags(renderFlags) {
+  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                std::vector<std::unique_ptr<Op>> ops)
+      : RenderTask(std::move(renderTargetProxy)), ops(std::move(ops)) {
   }
-
-  void addOp(std::unique_ptr<Op> op);
-
-  void prepare(Context* context) override;
 
   bool execute(Gpu* gpu) override;
 
-  void makeClosed() {
-    closed = true;
-  }
-
-  bool isClosed() const {
-    return closed;
-  }
-
  private:
-  bool closed = false;
-  uint32_t renderFlags = 0;
   std::vector<std::unique_ptr<Op>> ops = {};
 };
 }  // namespace tgfx

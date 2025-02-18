@@ -59,8 +59,6 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
   XfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
                             std::unique_ptr<FragmentProcessor> dst, BlendMode mode);
 
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
   Child child;
   BlendMode mode;
 };

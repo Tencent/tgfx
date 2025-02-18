@@ -30,6 +30,10 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& name,
   return WebTypeface::Make(name, style);
 }
 
+std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string&, const FontStyle&) {
+  return nullptr;
+}
+
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string&, int) {
   return nullptr;
 }
@@ -101,4 +105,11 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   auto unichar = glyphs.at(glyphID - 1);
   return UTF::ToUTF8(unichar);
 }
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
+  return GlyphsMap()[webFontFamily];
+}
+#endif
+
 }  // namespace tgfx

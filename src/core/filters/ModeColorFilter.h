@@ -31,10 +31,17 @@ class ModeColorFilter : public ColorFilter {
 
   bool asColorMode(Color* color, BlendMode* mode) const override;
 
- private:
   Color color;
   BlendMode mode;
 
+ protected:
+  Type type() const override {
+    return Type::Blend;
+  }
+
+  bool isEqual(const ColorFilter* colorFilter) const override;
+
+ private:
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 };
 }  // namespace tgfx

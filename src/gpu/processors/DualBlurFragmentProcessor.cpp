@@ -30,9 +30,4 @@ DualBlurFragmentProcessor::DualBlurFragmentProcessor(DualBlurPassMode passMode,
 void DualBlurFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(passMode));
 }
-
-bool DualBlurFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const DualBlurFragmentProcessor&>(processor);
-  return passMode == that.passMode && blurOffset == that.blurOffset && texelSize == that.texelSize;
-}
 }  // namespace tgfx

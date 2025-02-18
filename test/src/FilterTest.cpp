@@ -123,7 +123,7 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   image = image->makeOriented(Orientation::LeftBottom);
   image = image->makeMipmapped(true);
-  image = image->makeScaled(0.25f);
+  image = image->makeRasterized(0.25f);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -247,6 +247,29 @@ TGFX_TEST(FilterTest, DropShadow) {
   EXPECT_EQ(bounds, Rect::MakeXYWH(13, 13, 10, 10));
 }
 
+TGFX_TEST(FilterTest, BlurLargePixel) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto imageMatrix = Matrix::I();
+  image = image->makeRasterized(1.f);
+  auto bounds = Rect::MakeWH(image->width(), image->height());
+  imageMatrix.mapRect(&bounds);
+  auto imageWidth = static_cast<float>(bounds.width());
+  auto imageHeight = static_cast<float>(bounds.height());
+  auto surface =
+      Surface::Make(context, static_cast<int>(imageWidth * 2), static_cast<int>(imageHeight * 2));
+  auto canvas = surface->getCanvas();
+  canvas->concat(Matrix::MakeTrans(imageWidth / 2.0f, imageHeight / 2.0f));
+
+  Paint paint;
+  paint.setImageFilter(ImageFilter::Blur(5000, 1500));
+  canvas->drawImage(image, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/blur-large-pixel"));
+}
+
 TGFX_TEST(FilterTest, ImageFilterShader) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -315,8 +338,7 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  image = image->makeScaled(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
-  image = image->makeMipmapped(true);
+  image = image->makeRasterized(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter = ImageFilter::Runtime(std::move(effect));
   image = image->makeWithFilter(std::move(filter));
@@ -379,8 +401,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
     auto blurFilter = std::static_pointer_cast<BlurImageFilter>(imageFilter);
     Size blurSize = blurFilter->filterBounds(Rect::MakeEmpty()).size();
-    EXPECT_EQ(blurSize.width, 18);
-    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(blurSize.width, 18.f);
+    EXPECT_EQ(blurSize.height, 36.f);
   }
 
   {
@@ -388,8 +410,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
     auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
     Size blurSize = dropShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
-    EXPECT_EQ(blurSize.width, 18);
-    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(blurSize.width, 18.f);
+    EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(dropShadowFilter->dx, 15.f);
     EXPECT_EQ(dropShadowFilter->dy, 15.f);
     EXPECT_EQ(dropShadowFilter->color, Color::White());
@@ -401,8 +423,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
     auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
     Size blurSize = dropShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
-    EXPECT_EQ(blurSize.width, 18);
-    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(blurSize.width, 18.f);
+    EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(dropShadowFilter->dx, 15.f);
     EXPECT_EQ(dropShadowFilter->dy, 15.f);
     EXPECT_EQ(dropShadowFilter->color, Color::White());
@@ -414,8 +436,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
     auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
     Size blurSize = innerShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
-    EXPECT_EQ(blurSize.width, 18);
-    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(blurSize.width, 18.f);
+    EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(innerShadowFilter->dx, 15.f);
     EXPECT_EQ(innerShadowFilter->dy, 15.f);
     EXPECT_EQ(innerShadowFilter->color, Color::White());
@@ -427,8 +449,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
     auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
     Size blurSize = innerShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
-    EXPECT_EQ(blurSize.width, 18);
-    EXPECT_EQ(blurSize.height, 36);
+    EXPECT_EQ(blurSize.width, 18.f);
+    EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(innerShadowFilter->dx, 15.f);
     EXPECT_EQ(innerShadowFilter->dy, 15.f);
     EXPECT_EQ(innerShadowFilter->color, Color::White());
@@ -572,5 +594,76 @@ TGFX_TEST(FilterTest, AlphaThreshold) {
   paint.setColorFilter(opacityFilter);
   canvas->drawRect(rect, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/AlphaThreshold"));
+}
+
+TGFX_TEST(FilterTest, EmptyShadowTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  auto canvas = surface->getCanvas();
+  auto paint = Paint();
+  paint.setColor(Color::FromRGBA(100, 0, 0, 255));
+  auto filter = ImageFilter::DropShadow(20, 20, 0, 0, Color::Transparent());
+  EXPECT_EQ(filter, nullptr);
+  filter = ImageFilter::DropShadowOnly(20, 20, 0, 0, Color::Transparent());
+  EXPECT_NE(filter, nullptr);
+  paint.setImageFilter(filter);
+
+  auto rect = Rect::MakeWH(100, 100);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/EmptyShadowTest"));
+
+  filter = ImageFilter::InnerShadow(20, 20, 0, 0, Color::Transparent());
+  EXPECT_EQ(filter, nullptr);
+
+  filter = ImageFilter::InnerShadowOnly(20, 20, 0, 0, Color::Transparent());
+  EXPECT_NE(filter, nullptr);
+  paint.setImageFilter(filter);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/EmptyShadowTest"));
+}
+
+TGFX_TEST(FilterTest, OpacityShadowTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->drawColor(Color::Black());
+
+  auto paint = Paint();
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+
+  Color shadowColor{1.0, 1.0, 1.0, 0.5};
+  paint.setImageFilter(ImageFilter::DropShadow(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(10, 10, 50, 50), paint);
+
+  paint.setImageFilter(ImageFilter::DropShadowOnly(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(110, 10, 50, 50), paint);
+
+  paint.setImageFilter(ImageFilter::InnerShadow(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(10, 110, 50, 50), paint);
+
+  paint.setImageFilter(ImageFilter::InnerShadowOnly(20, 20, 10, 10, shadowColor));
+  canvas->drawRect(Rect::MakeXYWH(110, 110, 50, 50), paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/OpacityShadowTest"));
+}
+
+TGFX_TEST(FilterTest, InnerShadowBadCase) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  auto paint = Paint();
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  auto filter = ImageFilter::InnerShadow(80, 80, 1, 1, Color::Green());
+  paint.setImageFilter(filter);
+  auto rect = Rect::MakeWH(250, 250);
+  Path path;
+  path.addOval(rect);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/InnerShadowBadCase"));
 }
 }  // namespace tgfx

@@ -29,7 +29,6 @@ class Canvas;
 class Context;
 class RenderContext;
 class RenderTargetProxy;
-class TextureProxy;
 
 /**
  * The Surface class is responsible for managing the pixels that a Canvas draws into. The Surface
@@ -91,6 +90,21 @@ class Surface {
   virtual ~Surface();
 
   /**
+   * Returns the unique ID of the Surface. The ID is unique among all Surfaces.
+   */
+  uint32_t uniqueID() const {
+    return _uniqueID;
+  }
+
+  /**
+   * Returns the content version of the Surface, which increments whenever the content changes. The
+   * initial version is 1.
+   */
+  uint32_t contentVersion() const {
+    return _contentVersion;
+  }
+
+  /**
    * Retrieves the context associated with this Surface.
    */
   Context* getContext() const;
@@ -98,9 +112,7 @@ class Surface {
   /**
    * Returns the render flags associated with this Surface.
    */
-  uint32_t renderFlags() const {
-    return _renderFlags;
-  }
+  uint32_t renderFlags() const;
 
   /**
    * Returns the width of this surface.
@@ -168,36 +180,22 @@ class Surface {
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
-  /**
-   * Returns the unique ID of the Surface. The ID is unique among all Surfaces.
-   */
-  uint32_t uniqueID() const {
-    return _uniqueID;
-  }
-
  private:
-  /**
-  * Returns the version of the content. The version is changed when the content is changed.
-  * The initial version is 1;
-  */
-  uint32_t contentVersion() const;
-
   uint32_t _uniqueID = 0;
-  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  uint32_t _renderFlags = 0;
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
+  uint32_t _contentVersion = 1u;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags = 0);
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0);
 
-  bool aboutToDraw(const std::function<bool()>& willDiscardContent);
+  bool aboutToDraw(bool discardContent = false);
+
+  void forceResolveRenderTarget();
 
   friend class RenderContext;
-  friend class PictureImage;
-  friend class DisplayList;
 };
 }  // namespace tgfx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Task.h"
-#include "core/utils/Log.h"
 #include "core/utils/TaskGroup.h"
 
 namespace tgfx {
@@ -35,56 +34,54 @@ std::shared_ptr<Task> Task::Run(std::function<void()> block) {
 Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
-bool Task::executing() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return _executing;
-}
-
-bool Task::cancelled() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return _cancelled;
-}
-
-bool Task::finished() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return !_executing && !_cancelled;
-}
-
 void Task::wait() {
+  auto oldStatus = _status.load(std::memory_order_relaxed);
+  if (oldStatus == TaskStatus::Canceled || oldStatus == TaskStatus::Finished) {
+    return;
+  }
+  // If wait() is called from the thread pool, all threads might block, leaving no thread to execute
+  // this task. To avoid deadlock, execute the task directly on the current thread if it's queued.
+  if (oldStatus == TaskStatus::Queueing) {
+    if (_status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
+                                      std::memory_order_relaxed)) {
+      block();
+      oldStatus = TaskStatus::Executing;
+      while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
+                                            std::memory_order_acq_rel, std::memory_order_relaxed))
+        ;
+      return;
+    }
+  }
   std::unique_lock<std::mutex> autoLock(locker);
-  if (!_executing) {
-    return;
+  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
+    condition.wait(autoLock);
   }
-  // Try to remove the task from the queue. Execute it directly on the current thread if the task is
-  // not in the queue. This is to avoid the deadlock situation.
-  if (removeTask()) {
-    block();
-    _executing = false;
-    condition.notify_all();
-    return;
-  }
-  condition.wait(autoLock);
 }
 
 void Task::cancel() {
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (!_executing) {
-    return;
+  auto currentStatus = _status.load(std::memory_order_relaxed);
+  if (currentStatus == TaskStatus::Queueing) {
+    _status.compare_exchange_weak(currentStatus, TaskStatus::Canceled, std::memory_order_acq_rel,
+                                  std::memory_order_relaxed);
   }
-  if (removeTask()) {
-    _executing = false;
-    _cancelled = true;
-  }
-}
-
-bool Task::removeTask() {
-  return TaskGroup::GetInstance()->removeTask(this);
 }
 
 void Task::execute() {
-  block();
-  std::lock_guard<std::mutex> auoLock(locker);
-  _executing = false;
-  condition.notify_all();
+  auto oldStatus = _status.load(std::memory_order_relaxed);
+  if (oldStatus == TaskStatus::Queueing &&
+      _status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
+                                    std::memory_order_relaxed)) {
+    block();
+    oldStatus = TaskStatus::Executing;
+    while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
+                                          std::memory_order_acq_rel, std::memory_order_relaxed))
+      ;
+    std::unique_lock<std::mutex> autoLock(locker);
+    condition.notify_all();
+  }
+}
+
+TaskStatus Task::status() const {
+  return _status.load(std::memory_order_relaxed);
 }
 }  // namespace tgfx
