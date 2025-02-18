@@ -33,7 +33,7 @@ TGFX_TEST(SurfaceTest, ImageSnapshot) {
   auto height = 200;
   CreateGLTexture(context, width, height, &textureInfo);
   BackendTexture backendTexture = {textureInfo, width, height};
-  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::BottomLeft, 4);
   ASSERT_TRUE(surface != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -53,7 +53,7 @@ TGFX_TEST(SurfaceTest, ImageSnapshot) {
   compareCanvas->drawImage(snapshotImage);
   EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceTest/ImageSnapshot1"));
 
-  surface = Surface::Make(context, width, height);
+  surface = Surface::Make(context, width, height, false, 4);
   canvas = surface->getCanvas();
   snapshotImage = surface->makeImageSnapshot();
   auto renderTargetProxy = surface->renderContext->renderTarget;

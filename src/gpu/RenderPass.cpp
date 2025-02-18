@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderPass.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
@@ -95,7 +96,14 @@ void RenderPass::clear(const Rect& scissor, Color color) {
 
 void RenderPass::copyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  onCopyTo(texture, srcRect, dstPoint);
+  auto gpu = context->gpu();
+  if (_renderTarget->sampleCount() > 1) {
+    gpu->resolveRenderTarget(_renderTarget.get());
+  } else {
+    gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcRect, dstPoint);
+  }
+  // Reset the render target after the copy operation.
+  onBindRenderTarget();
 }
 
 }  // namespace tgfx

@@ -58,12 +58,6 @@ class RenderContext : public DrawContext {
                  const MCState& state, const FillStyle& style) override;
 
   /**
-   * Copies the contents of the render target to the given texture.
-   */
-  void copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                     const Point& dstPoint);
-
-  /**
    * Flushes the render context, submitting all pending operations to the drawing manager. Returns
    * true if any operations were submitted.
    */
@@ -79,7 +73,9 @@ class RenderContext : public DrawContext {
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
   AAType getAAType(const FillStyle& style) const;
-  OpsCompositor* getOpsCompositor(bool readOnly = false, bool discardContent = false);
+  OpsCompositor* getOpsCompositor(bool discardContent = false);
+  void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
+                           std::shared_ptr<Image> oldContent);
 
   friend class Surface;
 };

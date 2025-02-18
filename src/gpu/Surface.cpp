@@ -150,14 +150,14 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   }
   auto renderTarget = renderContext->renderTarget;
   auto drawingManager = getContext()->drawingManager();
-  auto textureProxy = renderTarget->getTextureProxy();
-  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
-    textureProxy = renderTarget->makeTextureProxy();
-    renderContext->copyToTexture(textureProxy, Rect::MakeWH(width(), height()), Point::Zero());
-  }
   if (!renderContext->flush()) {
     // TODO(domchen): Remove the unnecessary resolve task.
     drawingManager->addTextureResolveTask(renderContext->renderTarget);
+  }
+  auto textureProxy = renderTarget->getTextureProxy();
+  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
+    textureProxy = renderTarget->makeTextureProxy();
+    drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
   }
   cachedImage = TextureImage::Wrap(std::move(textureProxy));
   return cachedImage;
@@ -208,6 +208,7 @@ bool Surface::aboutToDraw(bool discardContent) {
     return true;
   }
   auto isUnique = cachedImage.use_count() == 1;
+  auto oldContent = discardContent ? nullptr : cachedImage;
   cachedImage = nullptr;
   if (isUnique) {
     return true;
@@ -222,13 +223,7 @@ bool Surface::aboutToDraw(bool discardContent) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
     return false;
   }
-  if (!discardContent) {
-    auto newTextureProxy = newRenderTarget->getTextureProxy();
-    renderContext->copyToTexture(std::move(newTextureProxy), Rect::MakeWH(width(), height()),
-                                 Point::Zero());
-    renderContext->flush();
-  }
-  renderContext->renderTarget = std::move(newRenderTarget);
+  renderContext->replaceRenderTarget(std::move(newRenderTarget), std::move(oldContent));
   return true;
 }
 

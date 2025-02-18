@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,17 @@
 
 #pragma once
 
-#include "gpu/RenderPass.h"
-#include "gpu/opengl/GLBuffer.h"
-#include "gpu/opengl/GLVertexArray.h"
-#include "gpu/ops/Op.h"
+#include "RenderTask.h"
 
 namespace tgfx {
-
-class GLRenderPass : public RenderPass {
+class RenderTargetCopyTask : public RenderTask {
  public:
-  explicit GLRenderPass(Context* context);
+  RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                       std::shared_ptr<TextureProxy> dest);
 
- protected:
-  void onBindRenderTarget() override;
-  bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                   const Rect& scissorRect) override;
-  void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
-  void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
-  void onClear(const Rect& scissor, Color color) override;
+  bool execute(Gpu* gpu) override;
 
  private:
-  std::shared_ptr<GLVertexArray> vertexArray = nullptr;
-  std::shared_ptr<GLBuffer> sharedVertexBuffer = nullptr;
-
-  void draw(const std::function<void()>& func);
+  std::shared_ptr<TextureProxy> dest = nullptr;
 };
 }  // namespace tgfx

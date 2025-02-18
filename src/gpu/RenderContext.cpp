@@ -42,7 +42,7 @@ void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   auto& clip = state.clip;
   auto discardContent =
       clip.isInverseFillType() && clip.isEmpty() && style.hasOnlyColor() && style.isOpaque();
-  if (auto compositor = getOpsCompositor(false, discardContent)) {
+  if (auto compositor = getOpsCompositor(discardContent)) {
     compositor->fillRect(renderTarget->bounds(), MCState{clip}, style.makeWithMatrix(state.matrix));
   }
 }
@@ -242,13 +242,6 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
   }
 }
 
-void RenderContext::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                                  const Point& dstPoint) {
-  if (auto compositor = getOpsCompositor(true)) {
-    compositor->copyToTexture(std::move(textureProxy), srcRect, dstPoint);
-  }
-}
-
 bool RenderContext::flush() {
   if (opsCompositor != nullptr) {
     auto closed = opsCompositor->isClosed();
@@ -259,8 +252,8 @@ bool RenderContext::flush() {
   return false;
 }
 
-OpsCompositor* RenderContext::getOpsCompositor(bool readOnly, bool discardContent) {
-  if (!readOnly && surface && !surface->aboutToDraw(discardContent)) {
+OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
+  if (surface && !surface->aboutToDraw(discardContent)) {
     return nullptr;
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
@@ -269,4 +262,20 @@ OpsCompositor* RenderContext::getOpsCompositor(bool readOnly, bool discardConten
   }
   return opsCompositor.get();
 }
+
+void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
+                                        std::shared_ptr<Image> oldContent) {
+  renderTarget = std::move(newRenderTarget);
+  if (oldContent != nullptr) {
+    DEBUG_ASSERT(oldContent->width() == renderTarget->width() &&
+                 oldContent->height() == renderTarget->height());
+    auto drawingManager = renderTarget->getContext()->drawingManager();
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    FillStyle fillStyle = {Color::White(), BlendMode::Src};
+    fillStyle.antiAlias = false;
+    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{},
+                             fillStyle);
+  }
+}
+
 }  // namespace tgfx
