@@ -20,12 +20,8 @@
 #include <tgfx/core/Paint.h>
 #include <tgfx/layers/TextLayer.h>
 #include <QFontMetrics>
-#include <QRect>
-#include <QString>
 #include <filesystem>
 #include <src/profiler/TracyColor.hpp>
-#include "../../../src/core/utils/Profiling.h"
-#include "src/profiler/TracyColor.hpp"
 
 // Short list based on GetTypes() in TracySourceTokenizer.cpp
 constexpr const char* TypesList[] = {
