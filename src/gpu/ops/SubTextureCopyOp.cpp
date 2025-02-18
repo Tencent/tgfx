@@ -16,26 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CopyOp.h"
+#include "SubTextureCopyOp.h"
 #include "core/utils/Log.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-std::unique_ptr<CopyOp> CopyOp::Make(std::shared_ptr<TextureProxy> textureProxy,
-                                     const Rect& srcRect, const Point& dstPoint) {
+std::unique_ptr<SubTextureCopyOp> SubTextureCopyOp::Make(std::shared_ptr<TextureProxy> textureProxy,
+                                                         const Rect& srcRect,
+                                                         const Point& dstPoint) {
   if (textureProxy == nullptr || srcRect.isEmpty()) {
     return nullptr;
   }
-  return std::unique_ptr<CopyOp>(new CopyOp(std::move(textureProxy), srcRect, dstPoint));
+  return std::unique_ptr<SubTextureCopyOp>(
+      new SubTextureCopyOp(std::move(textureProxy), srcRect, dstPoint));
 }
 
-CopyOp::CopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-               const Point& dstPoint)
+SubTextureCopyOp::SubTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+                                   const Point& dstPoint)
     : textureProxy(std::move(textureProxy)), srcRect(srcRect), dstPoint(dstPoint) {
 }
 
-void CopyOp::execute(RenderPass* renderPass) {
+void SubTextureCopyOp::execute(RenderPass* renderPass) {
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("CopyOp::execute() Failed to get the dest texture!");

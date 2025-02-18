@@ -22,15 +22,19 @@
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class CopyOp : public Op {
+/**
+ * TextureCopyOp is an operation that copies a portion of a render target to the given texture.
+ */
+class SubTextureCopyOp : public Op {
  public:
-  static std::unique_ptr<CopyOp> Make(std::shared_ptr<TextureProxy> textureProxy,
-                                      const Rect& srcRect, const Point& dstPoint);
+  static std::unique_ptr<SubTextureCopyOp> Make(std::shared_ptr<TextureProxy> textureProxy,
+                                                const Rect& srcRect, const Point& dstPoint);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  CopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect, const Point& dstPoint);
+  SubTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
+                   const Point& dstPoint);
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Rect srcRect = Rect::MakeEmpty();

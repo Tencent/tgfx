@@ -24,8 +24,8 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/ops/ClearOp.h"
-#include "gpu/ops/CopyOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
+#include "gpu/ops/SubTextureCopyOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
@@ -119,15 +119,6 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), style.color.premultiply(), uvMatrix, aaType);
   addDrawOp(std::move(drawOp), clip, style, localBounds, deviceBounds);
-}
-
-void OpsCompositor::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                                  const Point& dstPoint) {
-  flushPendingOps();
-  auto op = CopyOp::Make(std::move(textureProxy), srcRect, dstPoint);
-  if (op != nullptr) {
-    ops.push_back(std::move(op));
-  }
 }
 
 bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const FillStyle& style) const {
@@ -414,11 +405,11 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds) {
   textureProxy = context->proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
       PixelFormat::RGBA_8888, false, renderTarget->origin());
-  auto op = CopyOp::Make(textureProxy, bounds, Point::Zero());
-  if (op == nullptr) {
+  auto textureCopyOp = SubTextureCopyOp::Make(textureProxy, bounds, Point::Zero());
+  if (textureCopyOp == nullptr) {
     return {};
   }
-  ops.push_back(std::move(op));
+  ops.push_back(std::move(textureCopyOp));
   dstTextureInfo.textureProxy = std::move(textureProxy);
   return dstTextureInfo;
 }

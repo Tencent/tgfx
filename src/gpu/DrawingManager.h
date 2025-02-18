@@ -53,6 +53,9 @@ class DrawingManager {
 
   void addTextureFlattenTask(std::unique_ptr<TextureFlattenTask> flattenTask);
 
+  void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                               std::shared_ptr<TextureProxy> dest);
+
   void addResourceTask(std::unique_ptr<ResourceTask> resourceTask);
 
   /**

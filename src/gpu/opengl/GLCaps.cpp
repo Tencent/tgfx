@@ -415,13 +415,15 @@ static MSFBOType GetMSFBOType_GLES(uint32_t version, const GLInfo& glInterface) 
   // ES3 driver bugs on at least one device with a tiled GPU (N10).
   if (glInterface.hasExtension("GL_EXT_multisampled_render_to_texture")) {
     return MSFBOType::ES_EXT_MsToTexture;
-  } else if (glInterface.hasExtension("GL_IMG_multisampled_render_to_texture")) {
+  }
+  if (glInterface.hasExtension("GL_IMG_multisampled_render_to_texture")) {
     return MSFBOType::ES_IMG_MsToTexture;
-  } else if (version >= GL_VER(3, 0) ||
-             glInterface.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
-             glInterface.hasExtension("GL_ANGLE_framebuffer_multisample")) {
+  }
+  if (version >= GL_VER(3, 0) || glInterface.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
+      glInterface.hasExtension("GL_ANGLE_framebuffer_multisample")) {
     return MSFBOType::Standard;
-  } else if (glInterface.hasExtension("GL_APPLE_framebuffer_multisample")) {
+  }
+  if (glInterface.hasExtension("GL_APPLE_framebuffer_multisample")) {
     return MSFBOType::ES_Apple;
   }
   return MSFBOType::None;

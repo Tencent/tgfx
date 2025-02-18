@@ -20,6 +20,7 @@
 #include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
 
@@ -87,6 +88,16 @@ void DrawingManager::addTextureFlattenTask(std::unique_ptr<TextureFlattenTask> f
     return;
   }
   flattenTasks.push_back(std::move(flattenTask));
+}
+
+void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                                             std::shared_ptr<TextureProxy> dest) {
+  if (source == nullptr || dest == nullptr) {
+    return;
+  }
+  DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
+  auto task = std::make_unique<RenderTargetCopyTask>(std::move(source), std::move(dest));
+  renderTasks.push_back(std::move(task));
 }
 
 void DrawingManager::addResourceTask(std::unique_ptr<ResourceTask> resourceTask) {
