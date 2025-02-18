@@ -43,7 +43,7 @@ struct ViewData: QObject {
   uint8_t inheritParentColors = true;
   uint8_t forceColors = false;
   uint8_t ghostZones = true;
-  ShortenName shortenName = ShortenName::NoSpaceAndNormalize;
+  ShortenName shortenName = ShortenName::Always;
 
   uint32_t frameTarget = 60;
 

@@ -140,6 +140,17 @@ void SaveFileDialog::zstdLevelChanged(){
   static_cast<QRadioButton*>(compressionLayout->itemAt(int(3))->widget())->setChecked(true);
 }
 
+View::View(int width, const tracy::Config& config, QWidget* parent)
+  : width(width)
+  , viewMode(ViewMode::LastFrames)
+  , worker(config.memoryLimit == 0 ? -1 :
+  ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ))
+  , config(config)
+  , QWidget(parent)
+{
+  initView();
+}
+
 View::View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent)
   : width(width)
   , viewMode(ViewMode::LastFrames)

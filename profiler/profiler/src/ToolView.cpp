@@ -115,9 +115,12 @@ void ToolView::initView() {
   auto buttonLayout = new QHBoxLayout;
   connectButton = new QPushButton("connect");
   openFileButton = new QPushButton("open file");
+  auto websocketLayout = new QHBoxLayout;
+  openWebsocketButton = new QPushButton("open websocket");
 
   buttonLayout->addWidget(connectButton);
   buttonLayout->addWidget(openFileButton);
+  websocketLayout->addWidget(openWebsocketButton);
 
   clientWidget = new QListWidget;
   clientWidget->setResizeMode(QListView::Adjust);
@@ -125,6 +128,7 @@ void ToolView::initView() {
   layout->addWidget(lable);
   layout->addWidget(textCombobox);
   layout->addLayout(buttonLayout);
+  layout->addLayout(websocketLayout);
   layout->addWidget(clientWidget);
 }
 
@@ -175,6 +179,11 @@ void ToolView::openFile() {
   mainView->openFile();
 }
 
+void ToolView::openWebsocketServer() {
+  auto mainView = static_cast<MainView*>(this->parent());
+  mainView->openWebsocketServer();
+}
+
 void ToolView::handleClient(uint64_t clientId) {
   auto iter = clientItems.find(clientId);
   if (iter != clientItems.end()) {
@@ -195,6 +204,7 @@ void ToolView::handleClient(uint64_t clientId) {
 void ToolView::initConnect() {
   connect(connectButton, &QPushButton::clicked, this, &ToolView::connectAddress);
   connect(openFileButton, &QPushButton::clicked, this, &ToolView::openFile);
+  connect(openWebsocketButton, &QPushButton::clicked, this, &ToolView::openWebsocketServer);
   connect(this, &ToolView::addClient, this, &ToolView::handleClient);
   connect(clientWidget, &QListWidget::itemClicked, this, &ToolView::connectClient);
 }

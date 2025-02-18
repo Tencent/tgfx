@@ -35,6 +35,7 @@ constexpr const char* TypesList[] = {
   "uint32_t ", "uint64_t ", "ptrdiff_t ", nullptr
 };
 
+
 AppHost::AppHost(int width, int height, float density)
     : _width(width), _height(height), _density(density) {
 }
@@ -98,27 +99,33 @@ tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize
     strText = std::string(text, textSize);
   }
   auto typeface = appHost->getTypeface("default");
-  tgfx::Font font(typeface, 10 );
+  tgfx::Font font(typeface, FontSize );
   auto textBlob = tgfx::TextBlob::MakeFrom(strText, font);
   auto rect = textBlob->getBounds();
   TextSizeMap.emplace(strText, rect);
   return rect;
 }
 
-void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color) {
+void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color, float thickness) {
   tgfx::Rect rect = tgfx::Rect::MakeXYWH(x0, y0, w, h);
-  drawRect(canvas, rect, color);
+  drawRect(canvas, rect, color, thickness);
 }
 
-void drawRect(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color) {
+void drawRect(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color, float thickness) {
   tgfx::Rect rect = tgfx::Rect::MakeXYWH(p1.x, p1.y, p2.x, p2.y);
-  drawRect(canvas, rect, color);
+  drawRect(canvas, rect, color, thickness);
 }
 
-void drawRect(tgfx::Canvas* canvas, tgfx::Rect& rect, uint32_t color) {
+void drawRect(tgfx::Canvas* canvas, tgfx::Rect& rect, uint32_t color, float thickness) {
   tgfx::Paint paint;
   paint.setColor(getTgfxColor(color));
-  paint.setStyle(tgfx::PaintStyle::Fill);
+  if (thickness > 0.f) {
+    paint.setStyle(tgfx::PaintStyle::Stroke);
+    paint.setStrokeWidth(thickness);
+  }
+  else {
+    paint.setStyle(tgfx::PaintStyle::Fill);
+  }
   canvas->drawRect(rect, paint);
 }
 
@@ -148,7 +155,7 @@ void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& t
   tgfx::Paint paint;
   paint.setColor(getTgfxColor(color));
   auto typeface = appHost->getTypeface("default");
-  tgfx::Font font(typeface, 10 );
+  tgfx::Font font(typeface, FontSize );
   canvas->drawSimpleText(text, x , y , font, paint);
 }
 
@@ -157,7 +164,7 @@ void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point 
 }
 
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, float y, uint32_t color, const char* text) {
-  auto height = getTextSize(appHost, text).height();
+  auto height = abs(getTextSize(appHost, text).top) + 1;
   drawText(canvas, appHost, text, x + 0.5f, y + height + 0.5f, 0xAA000000);
   drawText(canvas, appHost, text, x, y + height, color);
 }

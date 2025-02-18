@@ -56,6 +56,7 @@ public:
   void initView();
   void initConnect();
   void openFile();
+  void openWebsocketServer();
   void reset();
   Q_SLOT void connectAddress();
   Q_SLOT void connectClient(QListWidgetItem* currenItem);
@@ -65,6 +66,7 @@ private:
   QComboBox* textCombobox;
   QPushButton* connectButton;
   QPushButton* openFileButton;
+  QPushButton* openWebsocketButton;
 
   QListWidget* clientWidget;
 

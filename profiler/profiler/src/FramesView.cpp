@@ -300,9 +300,6 @@ void FramesView::mousePressEvent(QMouseEvent *event) {
               viewData->zvStart = worker->GetFrameBegin(*frames,sel);
               viewData->zvEnd = worker->GetFrameEnd(*frames,sel);
               if(viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
-              const auto t0 = std::min(viewData->zvStart,worker->GetFrameBegin(*frames,sel));
-              const auto t1 = std::max(viewData->zvEnd,worker->GetFrameEnd(*frames,sel));
-              m_timelineView->zoomToRange(t0,t1,false);
             }
           }
           update();
@@ -349,7 +346,7 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
           const auto t1 = worker->GetFrameEnd(*frames,selectedEndFrame);
           viewData->zvStart = t0;
           viewData->zvEnd = t1;
-          update();
+          m_timelineView->zoomToRange(t0, t1, false);
         }
       }
     }

@@ -52,6 +52,7 @@ private:
 class View : public QWidget {
   Q_OBJECT
 public:
+  View(int width, const tracy::Config& config, QWidget* parent = nullptr);
   View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent = nullptr);
   View(tracy::FileRead& file, int width, const tracy::Config& config, QWidget* parent = nullptr);
 

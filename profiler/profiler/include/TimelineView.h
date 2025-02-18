@@ -79,7 +79,6 @@ public:
   // mouseLine
   struct MouseLine {
     bool isVisible = false;
-    double xPosition = 0;
   };
 
   TimelineView(QQuickItem* parent = nullptr);
@@ -93,8 +92,8 @@ public:
   void drawZonelist(const TimelineContext& ctx, const std::vector<tracy::TimelineDraw>& drawList,
     int offset, uint64_t tid, tgfx::Canvas* canvas);
   void drawMouseLine(tgfx::Canvas* canvas);
-  void drawTimeline(QPainter* painter, tgfx::Canvas* canvas);
-  void drawTimelineFrames(QPainter* painter, tgfx::Canvas* canvas, tracy::FrameData& fd, int& yMin);
+  void drawTimeline(tgfx::Canvas* canvas);
+  void drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd, int& yMin);
 
   void zoomToRange(int64_t start, int64_t end, bool pause);
 
@@ -103,11 +102,11 @@ public:
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void hoverMoveEvent(QHoverEvent* event) override;
+  void hoverLeaveEvent(QHoverEvent *event) override;
 
  //hovered functions.
   void showZoneInfo(const tracy::ZoneEvent& ev);
   void showZoneToolTip(const tracy::ZoneEvent& ev);
-  void hoverLeaveEvent(QHoverEvent *event) override;
 
   const char* getFrameText(const tracy::FrameData& fd, int i, uint64_t ftime) const;
   const char* getFrameSetName(const tracy::FrameData& fd) const;
@@ -166,6 +165,7 @@ private:
   const tracy::FrameData* frameData;
   MoveData moveData;
   MouseLine mouseLine;
+  tgfx::Point mouseData;
 
   tgfx::Font font;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;

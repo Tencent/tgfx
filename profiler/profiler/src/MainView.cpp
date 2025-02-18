@@ -112,6 +112,18 @@ void MainView::openFile() {
   });
 }
 
+void MainView::openWebsocketServer() {
+  toolView->setParent(nullptr);
+  tracy::Config config;
+  centorView = new View(this->width(), config, this);
+  if (!centorView->isConnected()) {
+    discardConnect();
+    return;
+  }
+  layout->addWidget(centorView);
+  Q_EMIT statusChange(ProfilerStatus::Connect);
+}
+
 void MainView::openToolView() {
   toolView->setParent(this);
 }

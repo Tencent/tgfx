@@ -19,9 +19,6 @@
 #pragma once
 #include <stdint.h>
 #include <QColor>
-#include <QFont>
-#include <QPainter>
-#include <QPainterPath>
 #include <iostream>
 
 #include "TracyEvent.hpp"
@@ -30,6 +27,9 @@
 #include "tgfx/core/Color.h"
 
 static std::unordered_map<std::string, tgfx::Rect> TextSizeMap;
+const auto FontSize = 15;
+const auto MaxHeight = 28;
+const auto zoneMargin = 1.f;
 
 enum class ProfilerStatus {
   Connect,
@@ -70,28 +70,12 @@ enum class ShortenName : uint8_t
   NoSpaceAndNormalize,
 };
 
-class TestTime {
-public:
-  TestTime(const char* name) {
-    start = std::chrono::high_resolution_clock::now();
-    this->name = name;
-  }
-  ~TestTime() {
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    std::cout << name << "当前花费时间: " << elapsed.count() << " second" << std::endl;
-  }
-private:
-  std::chrono::time_point<std::chrono::steady_clock> start;
-  const char* name;
-};
-
 tgfx::Color getTgfxColor(uint32_t color);
 
 tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize = 0);
-void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color);
-void drawRect(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color);
-void drawRect(tgfx::Canvas* canvas, tgfx::Rect& rect, uint32_t color);
+void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color, float thickness = 0.f);
+void drawRect(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color, float thickness = 0.f);
+void drawRect(tgfx::Canvas* canvas, tgfx::Rect& rect, uint32_t color, float thickness = 0.f);
 void drawLine(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color);
 void drawLine(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, tgfx::Point& p3, uint32_t color, float thickness = 1.f);
 void drawLine(tgfx::Canvas* canvas, float x0, float y0, float x1, float y1, uint32_t color);

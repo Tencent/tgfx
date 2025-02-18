@@ -2,6 +2,8 @@ set(TRACY_PATH ../third_party/tracy)
 set(TRACY_COMMON_DIR ${TRACY_PATH}/public/common)
 
 set(TRACY_COMMON_SOURCES
+        sha1.cpp
+        WSSession.cpp
         tracy_lz4.cpp
         tracy_lz4hc.cpp
         TracySocket.cpp

@@ -40,6 +40,7 @@ public:
   void connectClient(const char* address, uint16_t port);
   void openFile();
   void openToolView();
+  void openWebsocketServer();
 
   void changeViewModeButton(bool pause);
   Q_SLOT void changeViewMode(bool pause);

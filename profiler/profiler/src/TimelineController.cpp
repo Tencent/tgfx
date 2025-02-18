@@ -45,7 +45,7 @@ void TimelineController::end(double pxns, const tgfx::Point& wpos, bool vcenter,
   const auto viewData = view.getViewData();
   TimelineContext context;
   context.w = view.width() - 1;
-  context.ty = 15;
+  context.ty = MaxHeight;
   context.sty = 10;
   context.scale = 1;
   context.yMin = yMin;
