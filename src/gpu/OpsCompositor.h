@@ -105,7 +105,7 @@ class OpsCompositor {
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
   std::unique_ptr<FragmentProcessor> getClipMaskFP(const Path& clip, AAType aaType,
                                                    Rect* scissorRect);
-  DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds);
+  DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, const FillStyle& style,
                  const Rect& localBounds, const Rect& deviceBounds);
 };

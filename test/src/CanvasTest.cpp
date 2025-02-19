@@ -1048,7 +1048,7 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   auto sampler = CreateRectangleTexture(context, 110, 110);
   ASSERT_TRUE(sampler.id > 0);
   auto backendTexture = BackendTexture(sampler, 110, 110);
-  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft);
+  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, 4);
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/apitest/imageReplacement.png");

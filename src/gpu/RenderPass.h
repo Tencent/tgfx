@@ -60,7 +60,8 @@ class RenderPass {
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
   void clear(const Rect& scissor, Color color);
-  void copyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint);
+  void resolve(const Rect& bounds);
+  void copyToTexture(Texture* texture, int srcX, int srcY);
 
  protected:
   explicit RenderPass(Context* context) : context(context) {
