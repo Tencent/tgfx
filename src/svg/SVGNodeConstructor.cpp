@@ -325,45 +325,37 @@ struct CSSRule {
 
 class CSSParser {
  public:
-  explicit CSSParser(std::string cssStr) : css(std::move(cssStr)) {
+  explicit CSSParser(std::string cssString) : css(std::move(cssString)) {
   }
 
-  // Parse the CSS string
   void parse() {
     size_t pos = 0;
-    while (pos < css.length()) {
+    while (pos < css.size()) {
       // Find start of next rule
       size_t ruleStart = css.find_first_not_of(" \t\n\r", pos);
       if (ruleStart == std::string::npos) {
         break;
       }
-
       // Find end of rule
       size_t ruleEnd = css.find('}', ruleStart);
       if (ruleEnd == std::string::npos) {
         break;
       }
-
       // Parse the individual rule
-      std::string ruleStr = css.substr(ruleStart, ruleEnd - ruleStart + 1);
-      CSSRule rule = parseRule(ruleStr);
+      std::string ruleString = css.substr(ruleStart, ruleEnd - ruleStart + 1);
+      CSSRule rule = parseRule(ruleString);
       if (!rule.selector.empty()) {
         rules.push_back(rule);
       }
-
       pos = ruleEnd + 1;
     }
   }
 
-  // Get the parsed rules
   const std::vector<CSSRule>& getRules() const {
     return rules;
   }
 
  private:
-  std::string css;
-  std::vector<CSSRule> rules;
-
   // Remove whitespace from the beginning and end of a string
   std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\n\r");
@@ -374,16 +366,13 @@ class CSSParser {
     return str.substr(first, (last - first + 1));
   }
 
-  // Parse a single CSS rule block
   CSSRule parseRule(const std::string& ruleStr) {
     CSSRule rule;
-
     // Find delimiter between selector and declarations
     size_t openBrace = ruleStr.find('{');
     if (openBrace == std::string::npos) {
       return rule;
     }
-
     // Extract selector
     rule.selector = trim(ruleStr.substr(0, openBrace)).substr(1);
 
@@ -395,6 +384,9 @@ class CSSParser {
     rule.declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
     return rule;
   }
+
+  std::string css;
+  std::vector<CSSRule> rules = {};
 };
 
 void SVGNodeConstructor::ParseCSSStyle(const DOMNode* xmlNode, CSSMapper* mapper) {
@@ -475,8 +467,8 @@ void SVGNodeConstructor::SetClassStyleAttributes(SVGNode& root, const CSSMapper&
       }
     }
     if (node->hasChildren()) {
-      auto* group = static_cast<SVGContainer*>(node);
-      for (const auto& child : group->getChildren()) {
+      auto* container = static_cast<SVGContainer*>(node);
+      for (const auto& child : container->getChildren()) {
         setter(setter, child.get());
       }
     }
