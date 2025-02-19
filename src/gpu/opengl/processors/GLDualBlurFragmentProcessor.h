@@ -25,8 +25,7 @@ namespace tgfx {
 class GLDualBlurFragmentProcessor : public DualBlurFragmentProcessor {
  public:
   GLDualBlurFragmentProcessor(DualBlurPassMode passMode,
-                              std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-                              Size texelSize);
+                              std::unique_ptr<FragmentProcessor> processor, Point blurOffset);
 
   void emitCode(EmitArgs& args) const override;
 
