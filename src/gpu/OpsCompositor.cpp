@@ -391,7 +391,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   auto textureProxy = caps->textureBarrierSupport ? renderTarget->getTextureProxy() : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
     bounds = deviceBounds;
-    if (aaType == AAType::Coverage) {
+    if (aaType != AAType::None) {
       bounds.outset(1.0f, 1.0f);
     }
     bounds.roundOut();

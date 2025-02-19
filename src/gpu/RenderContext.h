@@ -72,7 +72,6 @@ class RenderContext : public DrawContext {
   Rect getClipBounds(const Path& clip);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                        const FillStyle& style);
-  AAType getAAType(const FillStyle& style) const;
   OpsCompositor* getOpsCompositor(bool discardContent = false);
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);

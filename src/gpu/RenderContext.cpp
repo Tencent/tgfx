@@ -111,16 +111,6 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
   }
 }
 
-AAType RenderContext::getAAType(const FillStyle& style) const {
-  if (renderTarget->sampleCount() > 1) {
-    return AAType::MSAA;
-  }
-  if (style.antiAlias) {
-    return AAType::Coverage;
-  }
-  return AAType::None;
-}
-
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const Stroke* stroke, const MCState& state,
                                      const FillStyle& style) {

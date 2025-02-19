@@ -29,7 +29,7 @@
         "YUVImage": "bc64712",
         "YUVImage_RGBAA": "bc64712",
         "altas": "b1cfcd4",
-        "blendMode": "0389826",
+        "blendMode": "69683f78",
         "drawColor": "b7aefeb",
         "drawImage": "1edd823",
         "drawPaint": "b7aefeb",
@@ -59,13 +59,13 @@
         "tile_mode_subset": "1edd823"
     },
     "DrawersTest": {
-        "ConicGradient": "5a1fb11",
-        "CustomLayerTreeDrawer": "79ef3043",
+        "ConicGradient": "69683f78",
+        "CustomLayerTreeDrawer": "69683f78",
         "GridBackground": "2ae64df",
-        "ImageWithMipmap": "1edd823",
-        "ImageWithShadow": "6f3f57e",
-        "SimpleLayerTreeDrawer": "6f3f57e",
-        "SimpleText": "79ef3043"
+        "ImageWithMipmap": "da590da",
+        "ImageWithShadow": "da590da",
+        "SimpleLayerTreeDrawer": "69683f78",
+        "SimpleText": "69683f78"
     },
     "FilterTest": {
         "AlphaThreshold": "5012d73",
