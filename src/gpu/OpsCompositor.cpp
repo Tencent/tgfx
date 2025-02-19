@@ -115,8 +115,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   }
   auto aaType = getAAType(style);
   auto proxyProvider = renderTarget->getContext()->proxyProvider();
-  auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType == AAType::Coverage,
-                                                       clipBounds, renderFlags);
+  auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), style.color.premultiply(), uvMatrix, aaType);
   addDrawOp(std::move(drawOp), clip, style, localBounds, deviceBounds);
@@ -311,7 +310,7 @@ std::pair<std::optional<Rect>, bool> OpsCompositor::getClipRect(const Path& clip
 
 std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AAType aaType) {
   auto uniqueKey = PathRef::GetUniqueKey(clip);
-  if (aaType == AAType::Coverage) {
+  if (aaType != AAType::None) {
     static const auto AntialiasFlag = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &AntialiasFlag, 1);
   }
@@ -331,8 +330,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto shape = Shape::MakeFrom(clip);
     shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
     auto proxyProvider = renderTarget->getContext()->proxyProvider();
-    auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType == AAType::Coverage,
-                                                         clipBounds, renderFlags);
+    auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), Color::White(), uvMatrix, aaType);
     auto target = RenderTargetProxy::MakeFallback(context, width, height, true, 1, false,
@@ -346,7 +344,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     drawingManager->addOpsRenderTask(std::move(target), std::move(ops));
   } else {
     auto rasterizer =
-        Rasterizer::MakeFrom(width, height, clip, aaType == AAType::Coverage, rasterizeMatrix);
+        Rasterizer::MakeFrom(width, height, clip, aaType != AAType::None, rasterizeMatrix);
     clipTexture = context->proxyProvider()->createTextureProxy({}, rasterizer, false, renderFlags);
   }
   clipKey = uniqueKey;

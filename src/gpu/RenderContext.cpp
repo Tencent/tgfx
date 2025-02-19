@@ -148,9 +148,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   newState.matrix.preConcat(invert);
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto aaType = getAAType(style);
-  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList),
-                                         aaType == AAType::Coverage, rasterizeMatrix, stroke);
+  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), style.antiAlias,
+                                         rasterizeMatrix, stroke);
   auto image = Image::MakeFrom(std::move(rasterizer));
   if (image == nullptr) {
     return;
