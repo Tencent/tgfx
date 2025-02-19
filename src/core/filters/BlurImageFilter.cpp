@@ -94,12 +94,11 @@ BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iterat
 }
 
 void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                           std::unique_ptr<FragmentProcessor> imageProcessor, const Size& imageSize,
+                           std::unique_ptr<FragmentProcessor> imageProcessor, float scaleFactor,
                            bool isDown) const {
-  auto texelSize = Size::Make(0.5f / imageSize.width, 0.5f / imageSize.height);
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
-                                      std::move(imageProcessor), blurOffset, texelSize);
+                                      std::move(imageProcessor), blurOffset * scaleFactor);
   auto drawingManager = renderTarget->getContext()->drawingManager();
   drawingManager->fillRTWithFP(std::move(renderTarget), std::move(blurProcessor), renderFlags);
 }
@@ -166,12 +165,13 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
       sourceProcessor =
           TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, &uvMatrix, isAlphaOnly);
     }
-    draw(renderTarget, args.renderFlags, std::move(sourceProcessor), textureSize, true);
+    draw(renderTarget, args.renderFlags, std::move(sourceProcessor), downScaling, true);
     textureSize = Size::Make(static_cast<float>(downWidth), static_cast<float>(downHeight));
     lastRenderTarget = renderTarget;
   }
 
   // upsample
+  auto upSampleScale = 1.0f / downScaling;
   for (size_t i = renderTargets.size(); i > 0; --i) {
     const auto& renderTarget = renderTargets[i - 1];
     if (i == 1) {
@@ -182,6 +182,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
                                    textureSize.height / boundsWillSample.height());
       uvMatrix.preScale(scaleFactor, scaleFactor);
       uvMatrix.preTranslate(clipBounds.left - sampleOffset.x, clipBounds.top - sampleOffset.y);
+      upSampleScale /= scaleFactor;
     } else {
       // at other iterations, we upscale only
       uvMatrix = Matrix::MakeScale(textureSize.width / static_cast<float>(renderTarget->width()),
@@ -189,8 +190,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
     }
     sourceProcessor =
         TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, &uvMatrix, isAlphaOnly);
-
-    draw(renderTarget, args.renderFlags, std::move(sourceProcessor), textureSize, false);
+    draw(renderTarget, args.renderFlags, std::move(sourceProcessor), upSampleScale, false);
     lastRenderTarget = renderTarget;
     textureSize = Size::Make(static_cast<float>(renderTarget->width()),
                              static_cast<float>(renderTarget->height()));

@@ -50,7 +50,7 @@ class BlurImageFilter : public ImageFilter {
                                                          const Matrix* uvMatrix) const override;
 
   void draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-            std::unique_ptr<FragmentProcessor> imageProcessor, const Size& imageSize,
+            std::unique_ptr<FragmentProcessor> imageProcessor, float scaleFactor,
             bool isDown) const;
 };
 }  // namespace tgfx
