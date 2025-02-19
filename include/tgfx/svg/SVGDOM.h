@@ -31,6 +31,7 @@ namespace tgfx {
 
 class SVGNode;
 using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
+using CSSMapper = std::unordered_map<std::string, std::string>;
 
 /**
  * The SVGDOM class represents an SVG Document Object Model (DOM). It provides functionality to 
