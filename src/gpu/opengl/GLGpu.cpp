@@ -159,9 +159,8 @@ static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
   if (target == GL_TEXTURE_RECTANGLE) {
     if (wrapMode == SamplerState::WrapMode::ClampToBorder) {
       return GL_CLAMP_TO_BORDER;
-    } else {
-      return GL_CLAMP_TO_EDGE;
     }
+    return GL_CLAMP_TO_EDGE;
   }
   switch (wrapMode) {
     case SamplerState::WrapMode::Clamp:
@@ -221,26 +220,27 @@ void GLGpu::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) 
   if (!caps->usesMSAARenderBuffers()) {
     return;
   }
-  auto x = static_cast<int>(bounds.x());
-  auto y = static_cast<int>(bounds.y());
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
-  DEBUG_ASSERT(bounds.x() == static_cast<float>(x) && bounds.y() == static_cast<float>(y) &&
-               bounds.width() == static_cast<float>(width) &&
-               bounds.height() == static_cast<float>(height));
+  auto left = static_cast<int>(bounds.left);
+  auto top = static_cast<int>(bounds.top);
+  auto right = static_cast<int>(bounds.right);
+  auto bottom = static_cast<int>(bounds.bottom);
+  DEBUG_ASSERT(bounds.left == static_cast<float>(left) && bounds.top == static_cast<float>(top) &&
+               bounds.right == static_cast<float>(right) &&
+               bounds.bottom == static_cast<float>(bottom));
   auto glRT = static_cast<GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->getFrameBufferID(true));
   gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->getFrameBufferID(false));
   if (caps->msFBOType == MSFBOType::ES_Apple) {
     // Apple's extension uses the scissor as the blit bounds.
     gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(x, y, width, height);
+    gl->scissor(left, top, right - left, bottom - top);
     gl->resolveMultisampleFramebuffer();
     gl->disable(GL_SCISSOR_TEST);
   } else {
     // BlitFrameBuffer respects the scissor, so disable it.
     gl->disable(GL_SCISSOR_TEST);
-    gl->blitFramebuffer(x, y, width, height, x, y, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    gl->blitFramebuffer(left, top, right, bottom, left, top, right, bottom, GL_COLOR_BUFFER_BIT,
+                        GL_NEAREST);
   }
 }
 

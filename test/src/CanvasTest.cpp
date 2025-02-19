@@ -1306,8 +1306,8 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
   auto surfaceHeight = (static_cast<float>(padding + image->height())) * scale *
                        ceil(sizeof(blendModes) / sizeof(BlendMode) / 4.0f) * 2;
 
-  auto surface =
-      Surface::Make(context, static_cast<int>(offset * 4), static_cast<int>(surfaceHeight));
+  auto surface = Surface::Make(context, static_cast<int>(offset * 4),
+                               static_cast<int>(surfaceHeight), false, 4);
   auto canvas = surface->getCanvas();
 
   Paint backPaint;
