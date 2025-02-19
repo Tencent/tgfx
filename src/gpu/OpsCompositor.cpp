@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
-#include <MacTypes.h>
-#include <sys/stat.h>
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
