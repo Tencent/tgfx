@@ -38,10 +38,10 @@ class GLGpu : public Gpu {
 
   void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
 
-  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
-                                 const Rect& srcRect, const Point& dstPoint) override;
+  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
+                                 int srcY) override;
 
-  void resolveRenderTarget(RenderTarget* renderTarget) override;
+  void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) override;
 
   void regenerateMipmapLevels(const TextureSampler* sampler) override;
 

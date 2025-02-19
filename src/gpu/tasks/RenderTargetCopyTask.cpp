@@ -35,8 +35,9 @@ bool RenderTargetCopyTask::execute(Gpu* gpu) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
     return false;
   }
-  auto bounds = renderTargetProxy->bounds();
-  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), bounds, Point::Zero());
+  DEBUG_ASSERT(renderTarget->width() == texture->width() &&
+               renderTarget->height() == texture->height());
+  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
   return true;
 }
 

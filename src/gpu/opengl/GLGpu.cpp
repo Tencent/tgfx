@@ -196,23 +196,23 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
                     FilterToGLMagFilter(samplerState.filterMode));
 }
 
-void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
-                                      const Rect& srcRect, const Point& dstPoint) {
+void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
+                                      int srcY) {
+  DEBUG_ASSERT(srcX >= 0 && srcX + texture->width() <= renderTarget->width());
+  DEBUG_ASSERT(srcY >= 0 && srcY + texture->height() <= renderTarget->height());
   auto gl = GLFunctions::Get(context);
   auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->getFrameBufferID(false));
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
   gl->bindTexture(glSampler->target, glSampler->id);
-  gl->copyTexSubImage2D(glSampler->target, 0, static_cast<int>(dstPoint.x),
-                        static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
-                        static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
-                        static_cast<int>(srcRect.height()));
+  gl->copyTexSubImage2D(glSampler->target, 0, 0, 0, srcX, srcY, texture->width(),
+                        texture->height());
   if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
     gl->generateMipmap(glSampler->target);
   }
 }
 
-void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {
+void GLGpu::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) {
   if (renderTarget->sampleCount() <= 1) {
     return;
   }
@@ -221,21 +221,26 @@ void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {
   if (!caps->usesMSAARenderBuffers()) {
     return;
   }
+  auto x = static_cast<int>(bounds.x());
+  auto y = static_cast<int>(bounds.y());
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  DEBUG_ASSERT(bounds.x() == static_cast<float>(x) && bounds.y() == static_cast<float>(y) &&
+               bounds.width() == static_cast<float>(width) &&
+               bounds.height() == static_cast<float>(height));
   auto glRT = static_cast<GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->getFrameBufferID(true));
   gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->getFrameBufferID(false));
-  auto width = renderTarget->width();
-  auto height = renderTarget->height();
   if (caps->msFBOType == MSFBOType::ES_Apple) {
     // Apple's extension uses the scissor as the blit bounds.
     gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(0, 0, width, height);
+    gl->scissor(x, y, width, height);
     gl->resolveMultisampleFramebuffer();
     gl->disable(GL_SCISSOR_TEST);
   } else {
     // BlitFrameBuffer respects the scissor, so disable it.
     gl->disable(GL_SCISSOR_TEST);
-    gl->blitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    gl->blitFramebuffer(x, y, width, height, x, y, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
   }
 }
 

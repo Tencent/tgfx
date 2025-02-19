@@ -24,8 +24,9 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/ops/ClearOp.h"
+#include "gpu/ops/DstTextureCopyOp.h"
+#include "gpu/ops/ResolveOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
-#include "gpu/ops/SubTextureCopyOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
@@ -277,7 +278,8 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const FillStyle& style, b
   if (!BlendModeAsCoeff(style.blendMode)) {
     auto caps = renderTarget->getContext()->caps();
     if (!caps->frameBufferFetchSupport &&
-        (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr)) {
+        (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr ||
+         renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
   }
@@ -339,7 +341,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
       return nullptr;
     }
     clipTexture = target->getTextureProxy();
-    std::vector<std::unique_ptr<Op>> ops = {};
+    std::vector<std::unique_ptr<Op> > ops = {};
     ops.push_back(std::move(drawOp));
     drawingManager->addOpsRenderTask(std::move(target), std::move(ops));
   } else {
@@ -382,34 +384,47 @@ std::unique_ptr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip
       DeviceSpaceTextureEffect::Make(std::move(textureProxy), uvMatrix));
 }
 
-DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds) {
+DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
   auto caps = renderTarget->getContext()->caps();
   if (caps->frameBufferFetchSupport) {
     return {};
   }
+  auto bounds = Rect::MakeEmpty();
+  auto textureProxy = caps->textureBarrierSupport ? renderTarget->getTextureProxy() : nullptr;
+  if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
+    bounds = deviceBounds;
+    if (aaType == AAType::Coverage) {
+      bounds.outset(1.0f, 1.0f);
+    }
+    bounds.roundOut();
+    if (!bounds.intersect(renderTarget->bounds())) {
+      return {};
+    }
+    FlipYIfNeeded(&bounds, renderTarget);
+  }
   DstTextureInfo dstTextureInfo = {};
-  auto textureProxy = renderTarget->getTextureProxy();
-  if (caps->textureBarrierSupport && textureProxy != nullptr) {
+  if (textureProxy != nullptr) {
+    if (renderTarget->sampleCount() > 1) {
+      auto resolveOp = ResolveOp::Make(bounds);
+      if (resolveOp) {
+        ops.push_back(std::move(resolveOp));
+      }
+    }
     dstTextureInfo.textureProxy = std::move(textureProxy);
     dstTextureInfo.requiresBarrier = true;
     return dstTextureInfo;
   }
-  auto bounds = renderTarget->bounds();
-  if (!bounds.intersect(deviceBounds)) {
-    return {};
-  }
-  FlipYIfNeeded(&bounds, renderTarget);
-  bounds.roundOut();
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
-  auto context = renderTarget->getContext();
-  textureProxy = context->proxyProvider()->createTextureProxy(
+  auto proxyProvider = renderTarget->getContext()->proxyProvider();
+  textureProxy = proxyProvider->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
       PixelFormat::RGBA_8888, false, renderTarget->origin());
-  auto textureCopyOp = SubTextureCopyOp::Make(textureProxy, bounds, Point::Zero());
-  if (textureCopyOp == nullptr) {
+  auto dstTextureCopyOp = DstTextureCopyOp::Make(textureProxy, static_cast<int>(bounds.x()),
+                                                 static_cast<int>(bounds.y()));
+  if (dstTextureCopyOp == nullptr) {
     return {};
   }
-  ops.push_back(std::move(textureCopyOp));
+  ops.push_back(std::move(dstTextureCopyOp));
   dstTextureInfo.textureProxy = std::move(textureProxy);
   return dstTextureInfo;
 }
@@ -449,7 +464,7 @@ void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, cons
   op->setScissorRect(scissorRect);
   op->setBlendMode(style.blendMode);
   if (!BlendModeAsCoeff(style.blendMode)) {
-    auto dstTextureInfo = makeDstTextureInfo(deviceBounds);
+    auto dstTextureInfo = makeDstTextureInfo(deviceBounds, aaType);
     auto xferProcessor = PorterDuffXferProcessor::Make(style.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
