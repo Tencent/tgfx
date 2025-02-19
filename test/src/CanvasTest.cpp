@@ -755,7 +755,9 @@ TGFX_TEST(CanvasTest, saveLayer) {
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   Font font(typeface, 30.f);
   font.setFauxBold(true);
+  paint.setAntiAlias(false);
   canvas->drawSimpleText("Hello TGFX", 50, 400, font, paint);
+  paint.setAntiAlias(true);
   auto atlas = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(atlas != nullptr);
   Matrix matrix[2] = {Matrix::I(), Matrix::MakeTrans(150, 0)};

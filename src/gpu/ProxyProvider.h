@@ -20,6 +20,7 @@
 
 #include "core/DataProvider.h"
 #include "core/ImageDecoder.h"
+#include "gpu/AAType.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -68,7 +69,7 @@ class ProxyProvider {
    * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to
    * the GPU.
    */
-  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, bool antiAlias,
+  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 

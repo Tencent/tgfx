@@ -20,6 +20,7 @@
 
 #include "core/Rasterizer.h"
 #include "core/ShapeBuffer.h"
+#include "gpu/AAType.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Shape.h"
 
@@ -32,7 +33,7 @@ class ShapeRasterizer : public Rasterizer {
   /**
    * Creates a ShapeRasterizer from a shape.
    */
-  ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias);
+  ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, AAType aaType);
 
   /**
    * Rasterizes the shape into a ShapeBuffer. Unlike the makeBuffer() method, which always returns
@@ -47,7 +48,7 @@ class ShapeRasterizer : public Rasterizer {
 
  private:
   std::shared_ptr<Shape> shape = nullptr;
-  bool antiAlias = true;
+  AAType aaType = AAType::None;
 
   std::shared_ptr<Data> makeTriangles(const Path& finalPath) const;
 
