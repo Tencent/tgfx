@@ -385,4 +385,22 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
   }
 }
 
+TGFX_TEST(SVGRenderTest, ReferenceStyleSVG) {
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/refStyle.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
+                               static_cast<int>(rootNode->getHeight().value()));
+  auto* canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/referenceStyle"));
+}
+
 }  // namespace tgfx
