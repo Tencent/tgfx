@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/SVGValue.h"
 
 namespace tgfx {
 enum class SVGAttribute {
@@ -26,8 +27,9 @@ enum class SVGAttribute {
   Color,
   ColorInterpolation,
   ColorInterpolationFilters,
-  Cx,  // <circle>, <ellipse>, <radialGradient>: center x position
-  Cy,  // <circle>, <ellipse>, <radialGradient>: center y position
+  Cx,     // <circle>, <ellipse>, <radialGradient>: center x position
+  Cy,     // <circle>, <ellipse>, <radialGradient>: center y position
+  Class,  // css style class iri
   Fill,
   FillOpacity,
   FillRule,
@@ -106,6 +108,7 @@ struct SVGPresentationAttributes {
   // uninherited
   SVGProperty<SVGNumberType, false> Opacity;
   SVGProperty<SVGFuncIRI, false> ClipPath;
+  SVGProperty<SVGStringType, false> Class;
   SVGProperty<SVGDisplay, false> Display;
   SVGProperty<SVGFuncIRI, false> Mask;
   SVGProperty<SVGFuncIRI, false> Filter;

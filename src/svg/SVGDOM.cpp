@@ -54,12 +54,14 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper>
   // Convert the XML structure to an SVG structure, translating XML elements and attributes into
   // SVG elements and attributes
   SVGIDMapper mapper;
-  ConstructionContext constructionContext(&mapper);
+  CSSMapper cssMapper;
+  ConstructionContext constructionContext(&mapper, &cssMapper);
   auto root =
       SVGNodeConstructor::ConstructSVGNode(constructionContext, xmlDom->getRootNode().get());
   if (!root || root->tag() != SVGTag::Svg) {
     return nullptr;
   }
+  SVGNodeConstructor::SetClassStyleAttributes(*root, cssMapper);
 
   // Create SVGDOM with the root node and ID mapper
   return std::shared_ptr<SVGDOM>(new SVGDOM(std::static_pointer_cast<SVGRoot>(root),
