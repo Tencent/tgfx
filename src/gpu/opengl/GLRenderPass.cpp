@@ -178,4 +178,63 @@ void GLRenderPass::onClear(const Rect& scissor, Color color) {
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
 }
+
+void GLRenderPass::onCopyToTexture(Texture* texture, int srcX, int srcY) {
+  auto gpu = context->gpu();
+  if (_renderTarget->sampleCount() > 1) {
+    if (copyAsBlit(texture, srcX, srcY)) {
+      return;
+    }
+    auto bounds = Rect::MakeXYWH(srcX, srcY, texture->width(), texture->height());
+    gpu->resolveRenderTarget(_renderTarget.get(), bounds);
+  }
+  gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcX, srcY);
+  // Reset the render target after the copy operation.
+  auto gl = GLFunctions::Get(context);
+  gl->bindFramebuffer(GL_FRAMEBUFFER,
+                      static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID());
+}
+
+bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
+  auto caps = GLCaps::Get(context);
+  if (!caps->usesMSAARenderBuffers() || caps->msFBOType == MSFBOType::ES_Apple) {
+    return false;
+  }
+  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
+  if (!caps->isFormatRenderable(glSampler->format)) {
+    return false;
+  }
+  if (frameBuffer == nullptr) {
+    frameBuffer = GLFrameBuffer::Make(context);
+    if (frameBuffer == nullptr) {
+      return false;
+    }
+  }
+  auto gl = GLFunctions::Get(context);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, glSampler->id,
+                           0);
+  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID();
+#ifndef TGFX_BUILD_FOR_WEB
+  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
+    return false;
+  }
+#endif
+  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, sourceFrameBufferID);
+  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer->id());
+  gl->disable(GL_SCISSOR_TEST);
+  auto right = srcX + texture->width();
+  auto bottom = srcY + texture->height();
+  gl->blitFramebuffer(srcX, srcY, right, bottom, 0, 0, texture->width(), texture->height(),
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
+    gl->bindTexture(glSampler->target, glSampler->id);
+    gl->generateMipmap(glSampler->target);
+  }
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, 0, 0);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
+  return true;
+}
+
 }  // namespace tgfx

@@ -20,6 +20,7 @@
 
 #include "gpu/RenderPass.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLFrameBuffer.h"
 #include "gpu/opengl/GLVertexArray.h"
 #include "gpu/ops/Op.h"
 
@@ -36,11 +37,14 @@ class GLRenderPass : public RenderPass {
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
   void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
   void onClear(const Rect& scissor, Color color) override;
+  void onCopyToTexture(Texture* texture, int srcX, int srcY) override;
 
  private:
   std::shared_ptr<GLVertexArray> vertexArray = nullptr;
+  std::shared_ptr<GLFrameBuffer> frameBuffer = nullptr;
   std::shared_ptr<GLBuffer> sharedVertexBuffer = nullptr;
 
   void draw(const std::function<void()>& func);
+  bool copyAsBlit(Texture* texture, int srcX, int srcY);
 };
 }  // namespace tgfx
