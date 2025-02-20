@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Font.h"
 #include "ScalerContext.h"
+#include "utils/Profiling.h"
 
 namespace tgfx {
 
@@ -34,6 +35,7 @@ class GlyphImageGenerator : public ImageGenerator {
 
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
+    TRACE_EVENT_NAME("imageDecode");
     return scalerContext->generateImage(glyphID, tryHardware);
   }
 

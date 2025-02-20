@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/Texture.h"
 
@@ -37,6 +38,7 @@ ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey t
 }
 
 bool ShapeBufferUploadTask::execute(Context* context) {
+  TRACE_EVENT_NAME("shapeBufferUpload");
   if (uniqueKey.strongCount() <= 0) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;

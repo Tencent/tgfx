@@ -20,6 +20,7 @@
 #include "core/PathTriangulator.h"
 #include "tgfx/core/Mask.h"
 #include "utils/Log.h"
+#include "utils/Profiling.h"
 
 namespace tgfx {
 ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape,
@@ -28,6 +29,7 @@ ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> s
 }
 
 std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) const {
+  TRACE_EVENT_NAME("makeRasterized");
   auto finalPath = shape->getPath();
   if (finalPath.isEmpty() && finalPath.isInverseFillType()) {
     finalPath.reset();
@@ -40,6 +42,7 @@ std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) c
 }
 
 std::shared_ptr<ImageBuffer> ShapeRasterizer::onMakeBuffer(bool tryHardware) const {
+  TRACE_EVENT_NAME("imageDecode");
   auto finalPath = shape->getPath();
   return makeImageBuffer(finalPath, tryHardware);
 }

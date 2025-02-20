@@ -23,6 +23,7 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
+#include "utils/Profiling.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/codecs/webp/WebpCodec.h"
@@ -134,6 +135,7 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
+  TRACE_EVENT_NAME("imageDecode");
   auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;
