@@ -103,14 +103,7 @@ void RenderPass::resolve(const Rect& bounds) {
 
 void RenderPass::copyToTexture(Texture* texture, int srcX, int srcY) {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  auto gpu = context->gpu();
-  if (_renderTarget->sampleCount() > 1) {
-    auto bounds = Rect::MakeXYWH(srcX, srcY, texture->width(), texture->height());
-    gpu->resolveRenderTarget(_renderTarget.get(), bounds);
-  }
-  gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcX, srcY);
-  // Reset the render target after the copy operation.
-  onBindRenderTarget();
+  onCopyToTexture(texture, srcX, srcY);
 }
 
 }  // namespace tgfx

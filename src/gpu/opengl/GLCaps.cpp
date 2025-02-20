@@ -181,7 +181,7 @@ GLCaps::GLCaps(const GLInfo& info) {
   }
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
-  initFSAASupport(info);
+  initMSAASupport(info);
   initFormatMap(info);
 }
 
@@ -379,8 +379,8 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
         if (temp[count - 1] == 1) {
           --count;
         }
-        // We initialize our supported values with 1 (no msaa) and reverse the order
-        // returned by GL so that the array is ascending.
+        // We initialize our supported values with 1 (no msaa) and reverse the order returned by GL
+        // so that the array is ascending.
         pixelFormatMap[pixelFormat].colorSampleCounts.push_back(1);
         for (int j = 0; j < count; ++j) {
           pixelFormatMap[pixelFormat].colorSampleCounts.push_back(temp[count - j - 1]);
@@ -388,8 +388,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
         delete[] temp;
       }
     } else {
-      // Fake out the table using some semi-standard counts up to the max allowed sample
-      // count.
+      // Fake out the table using some semi-standard counts up to the max allowed sample count.
       int maxSampleCnt = 1;
       if (MSFBOType::ES_IMG_MsToTexture == msFBOType) {
         info.getIntegerv(GL_MAX_SAMPLES_IMG, &maxSampleCnt);
@@ -429,15 +428,17 @@ static MSFBOType GetMSFBOType_GLES(uint32_t version, const GLInfo& glInterface) 
   return MSFBOType::None;
 }
 
-void GLCaps::initFSAASupport(const GLInfo& info) {
+void GLCaps::initMSAASupport(const GLInfo& info) {
   if (standard == GLStandard::GL) {
     if (version >= GL_VER(3, 0) || info.hasExtension("GL_ARB_framebuffer_object") ||
         (info.hasExtension("GL_EXT_framebuffer_multisample") &&
          info.hasExtension("GL_EXT_framebuffer_blit"))) {
       msFBOType = MSFBOType::Standard;
+      blitRectsMustMatchForMSAASrc = false;
     }
   } else if (standard == GLStandard::GLES) {
     msFBOType = GetMSFBOType_GLES(version, info);
+    blitRectsMustMatchForMSAASrc = true;
   } else if (standard == GLStandard::WebGL) {
     // No support in WebGL
     msFBOType = MSFBOType::None;

@@ -73,6 +73,7 @@ class RenderPass {
   virtual void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) = 0;
   virtual void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;
+  virtual void onCopyToTexture(Texture* texture, int srcX, int srcY) = 0;
 
   Context* context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;

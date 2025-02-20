@@ -135,6 +135,16 @@ unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& 
   return shader;
 }
 
+void ClearGLError(Context* context) {
+#ifdef TGFX_BUILD_FOR_WEB
+  USE(context);
+#else
+  auto gl = GLFunctions::Get(context);
+  while (gl->getError() != GL_NO_ERROR) {
+  }
+#endif
+}
+
 bool CheckGLErrorImpl(Context* context, std::string file, int line) {
 #ifdef TGFX_BUILD_FOR_WEB
   USE(context);

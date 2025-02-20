@@ -416,7 +416,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   auto proxyProvider = renderTarget->getContext()->proxyProvider();
   textureProxy = proxyProvider->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
-      PixelFormat::RGBA_8888, false, renderTarget->origin());
+      renderTarget->format(), false, renderTarget->origin());
   auto dstTextureCopyOp = DstTextureCopyOp::Make(textureProxy, static_cast<int>(bounds.x()),
                                                  static_cast<int>(bounds.y()));
   if (dstTextureCopyOp == nullptr) {

@@ -115,10 +115,12 @@ void DrawingManager::addResourceTask(std::unique_ptr<ResourceTask> resourceTask)
 }
 
 bool DrawingManager::flush() {
-  for (auto& compositor : compositors) {
+  while (!compositors.empty()) {
+    auto compositor = compositors.back();
+    compositors.pop_back();
+    // the makeClosed() method may add more compositors to the list.
     compositor->makeClosed();
   }
-  compositors = {};
 
   if (resourceTasks.empty() && renderTasks.empty()) {
     return false;
