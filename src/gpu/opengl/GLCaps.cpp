@@ -299,9 +299,10 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   vertexArrayObjectSupport = version >= GL_VER(2, 0) ||
                              info.hasExtension("GL_OES_vertex_array_object") ||
                              info.hasExtension("OES_vertex_array_object");
-  textureRedSupport = false;
-  multisampleDisableSupport = false;  // no WebGL support
+  textureRedSupport = version >= GL_VER(2, 0);
+  multisampleDisableSupport = false;
   textureBarrierSupport = false;
+  frameBufferFetchSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
@@ -342,7 +343,8 @@ void GLCaps::initFormatMap(const GLInfo& info) {
   }
   // ES 2.0 requires that the internal/external formats match.
   bool useSizedTexFormats =
-      (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)));
+      (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)) ||
+       (standard == GLStandard::WebGL && version >= GL_VER(2, 0)));
   bool useSizedRbFormats = standard == GLStandard::GLES || standard == GLStandard::WebGL;
 
   for (auto& item : pixelFormatMap) {
@@ -440,8 +442,11 @@ void GLCaps::initMSAASupport(const GLInfo& info) {
     msFBOType = GetMSFBOType_GLES(version, info);
     blitRectsMustMatchForMSAASrc = true;
   } else if (standard == GLStandard::WebGL) {
-    // No support in WebGL
-    msFBOType = MSFBOType::None;
+    // No support in WebGL 1, but there is for 2.0
+    if (version >= GL_VER(2, 0)) {
+      msFBOType = MSFBOType::Standard;
+      blitRectsMustMatchForMSAASrc = true;
+    }
   }
 
   // We disable MSAA across the board for Intel GPUs for performance reasons.
