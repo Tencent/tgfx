@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,19 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
+#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 
 namespace tgfx {
-class BlurImageFilter : public ImageFilter {
+
+class GLGaussianBlur1DFragmentProcessor : public GaussianBlur1DFragmentProcessor {
  public:
-  BlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode)
-      : ImageFilter(), blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
-  }
+  GLGaussianBlur1DFragmentProcessor(std::unique_ptr<FragmentProcessor> processor, float sigma,
+                                    GaussianBlurDirection direction, float stepLength);
 
-  float blurrinessX = 0.0f;
-  float blurrinessY = 0.0f;
-  TileMode tileMode = TileMode::Decal;
+  void emitCode(EmitArgs& args) const override;
 
- protected:
-  Type type() const override {
-    return Type::Blur;
-  }
+ private:
+  void onSetData(UniformBuffer* uniformBuffer) const override;
 };
 
 }  // namespace tgfx

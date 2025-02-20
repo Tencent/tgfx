@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,30 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-class BlurImageFilter : public ImageFilter {
- public:
-  BlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode)
-      : ImageFilter(), blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
-  }
 
-  float blurrinessX = 0.0f;
-  float blurrinessY = 0.0f;
-  TileMode tileMode = TileMode::Decal;
+enum class GaussianBlurDirection { Horizontal, Vertical };
+
+class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
+ public:
+  static std::unique_ptr<GaussianBlur1DFragmentProcessor> Make(
+      std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
+      float stepLength);
+
+  std::string name() const override {
+    return "GaussianBlur1DFragmentProcessor";
+  }
 
  protected:
-  Type type() const override {
-    return Type::Blur;
-  }
-};
+  DEFINE_PROCESSOR_CLASS_ID
 
+  GaussianBlur1DFragmentProcessor(std::unique_ptr<FragmentProcessor> processor, float sigma,
+                                  GaussianBlurDirection direction, float stepLength);
+
+  float sigma = 0.f;
+  GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
+  float stepLength = 1.f;
+};
 }  // namespace tgfx

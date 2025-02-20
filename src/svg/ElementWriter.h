@@ -23,7 +23,6 @@
 #include "ResourceStore.h"
 #include "SVGUtils.h"
 #include "core/FillStyle.h"
-#include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
@@ -101,7 +100,7 @@ class ElementWriter {
   std::string addRadialGradientDef(const GradientInfo& info);
   std::string addUnsupportedGradientDef(const GradientInfo& info);
 
-  void addBlurImageFilter(const BlurImageFilter* filter);
+  void addBlurImageFilter(const ImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
 
