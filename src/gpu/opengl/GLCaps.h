@@ -117,6 +117,7 @@ class GLCaps : public Caps {
   bool unpackRowLengthSupport = false;
   bool textureRedSupport = false;
   MSFBOType msFBOType = MSFBOType::None;
+  bool blitRectsMustMatchForMSAASrc = false;
   bool frameBufferFetchRequiresEnablePerSample = false;
   std::string frameBufferFetchColorName;
   std::string frameBufferFetchExtensionString;
@@ -157,6 +158,6 @@ class GLCaps : public Caps {
   void initGLSupport(const GLInfo& info);
   void initGLESSupport(const GLInfo& info);
   void initWebGLSupport(const GLInfo& info);
-  void initFSAASupport(const GLInfo& info);
+  void initMSAASupport(const GLInfo& info);
 };
 }  // namespace tgfx

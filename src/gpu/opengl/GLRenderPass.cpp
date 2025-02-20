@@ -108,8 +108,8 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   if (_program == nullptr) {
     return false;
   }
+  ClearGLError(context);
   auto gl = GLFunctions::Get(context);
-  CheckGLError(context);
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   UpdateScissor(context, scissorRect);
@@ -200,8 +200,11 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   if (!caps->usesMSAARenderBuffers() || caps->msFBOType == MSFBOType::ES_Apple) {
     return false;
   }
+  if (caps->blitRectsMustMatchForMSAASrc && (srcX != 0 || srcY != 0)) {
+    return false;
+  }
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  if (!caps->isFormatRenderable(glSampler->format)) {
+  if (glSampler->format != _renderTarget->format()) {
     return false;
   }
   if (frameBuffer == nullptr) {
@@ -210,6 +213,7 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
       return false;
     }
   }
+  ClearGLError(context);
   auto gl = GLFunctions::Get(context);
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, glSampler->id,
@@ -228,11 +232,16 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   auto bottom = srcY + texture->height();
   gl->blitFramebuffer(srcX, srcY, right, bottom, 0, 0, texture->width(), texture->height(),
                       GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  if (!CheckGLError(context)) {
+    gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
+    return false;
+  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, 0, 0);
   if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
     gl->bindTexture(glSampler->target, glSampler->id);
     gl->generateMipmap(glSampler->target);
   }
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, 0, 0);
   gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
   return true;
 }

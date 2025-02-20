@@ -29,7 +29,7 @@ namespace drawers {
 static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto progressBar = tgfx::Layer::Make();
   progressBar->setMatrix(tgfx::Matrix::MakeTrans(24, 670));
-  progressBar->setBlendMode(tgfx::BlendMode::PlusLighter);
+  progressBar->setBlendMode(tgfx::BlendMode::ColorDodge);
   auto backLineLayer = tgfx::ShapeLayer::Make();
   auto backLinePath = tgfx::Path();
   backLinePath.lineTo(327, 0);

@@ -40,7 +40,7 @@ std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, Pixe
   DEBUG_ASSERT(mipLevelCount > 0);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
-  CheckGLError(context);
+  ClearGLError(context);
   auto gl = GLFunctions::Get(context);
   auto sampler = std::make_unique<GLSampler>();
   gl->genTextures(1, &(sampler->id));

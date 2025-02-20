@@ -49,7 +49,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
 
 static bool RenderbufferStorageMSAA(Context* context, int sampleCount, PixelFormat pixelFormat,
                                     int width, int height) {
-  CheckGLError(context);
+  ClearGLError(context);
   auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
   auto format = caps->getTextureFormat(pixelFormat).sizedFormat;
