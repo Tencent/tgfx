@@ -217,9 +217,9 @@ if (TGFX_BUILD_SVG)
 endif ()
 
 if (TGFX_USE_FASTER_BLUR)
-    list(FILTER TGFX_FILES EXCLUDE REGEX ".*GaussianBlur.*")
+    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*GaussianBlur.*")
 else ()
-    list(FILTER TGFX_FILES EXCLUDE REGEX ".*DualBlur.*")
+    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*DualBlur.*")
 endif ()
 
 if (TGFX_USE_FREETYPE)
