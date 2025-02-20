@@ -67,6 +67,11 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
 
   /**
+   * Discard all pending operations.
+   */
+  void discardAll();
+
+  /**
    * Close the compositor and submit the composed render task to the render queue. After closing,
    * the compositor is no longer valid.
    */

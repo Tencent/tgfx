@@ -26,9 +26,15 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                             Surface* surface)
-    : renderTarget(std::move(renderTarget)), renderFlags(renderFlags), surface(surface) {
+RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                             bool clearAll, Surface* surface)
+    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
+  if (clearAll) {
+    auto drawingManager = renderTarget->getContext()->drawingManager();
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    opsCompositor->fillRect(renderTarget->bounds(), MCState{},
+                            {Color::Transparent(), BlendMode::Src});
+  }
 }
 
 Rect RenderContext::getClipBounds(const Path& clip) {
@@ -40,8 +46,7 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   auto& clip = state.clip;
-  auto discardContent =
-      clip.isInverseFillType() && clip.isEmpty() && style.hasOnlyColor() && style.isOpaque();
+  auto discardContent = clip.isInverseFillType() && clip.isEmpty() && style.isOpaque();
   if (auto compositor = getOpsCompositor(discardContent)) {
     compositor->fillRect(renderTarget->bounds(), MCState{clip}, style.makeWithMatrix(state.matrix));
   }
@@ -248,6 +253,8 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+  } else if (discardContent) {
+    opsCompositor->discardAll();
   }
   return opsCompositor.get();
 }

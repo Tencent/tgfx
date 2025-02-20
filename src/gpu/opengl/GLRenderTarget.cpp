@@ -134,8 +134,7 @@ static bool CreateRenderBuffer(const Texture* texture, unsigned& frameBufferID,
 #endif
 }
 
-std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int sampleCount,
-                                                     bool clearAll) {
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int sampleCount) {
   if (texture == nullptr || texture->isYUV()) {
     return nullptr;
   }
@@ -169,12 +168,6 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
     return nullptr;
   }
 #endif
-  if (clearAll) {
-    gl->viewport(0, 0, texture->width(), texture->height());
-    gl->disable(GL_SCISSOR_TEST);
-    gl->clearColor(0, 0, 0, 0);
-    gl->clear(GL_COLOR_BUFFER_BIT);
-  }
   auto rt = new GLRenderTarget(texture->width(), texture->height(), texture->origin(), sampleCount,
                                glSampler->format, glSampler->target);
   rt->frameBufferRead = frameBufferRead;

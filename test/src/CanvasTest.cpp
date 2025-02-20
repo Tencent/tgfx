@@ -109,6 +109,46 @@ TGFX_TEST(CanvasTest, TileMode) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_rgbaaa"));
 }
 
+TGFX_TEST(CanvasTest, DiscardContent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  int width = 100;
+  int height = 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  surface->renderContext->flush();
+  auto* drawingManager = context->drawingManager();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  EXPECT_TRUE(task->ops.size() == 1);
+
+  Paint paint;
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 0.8f});
+  canvas->drawRect(Rect::MakeWH(50, 50), paint);
+  paint.setBlendMode(BlendMode::Src);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  surface->renderContext->flush();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
+  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks[1].get());
+  EXPECT_TRUE(task->ops.size() == 1);
+
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
+  canvas->drawRect(Rect::MakeWH(50, 50), paint);
+  paint.setBlendMode(BlendMode::SrcOver);
+  paint.setShader(Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{static_cast<float>(width), static_cast<float>(height)},
+      {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
+  canvas->drawPaint(paint);
+  surface->renderContext->flush();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
+  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks[2].get());
+  EXPECT_TRUE(task->ops.size() == 1);
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
+}
+
 TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   ContextScope scope;
   auto context = scope.getContext();

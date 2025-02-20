@@ -132,7 +132,7 @@ PictureImage::~PictureImage() {
 
 bool PictureImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
                           uint32_t renderFlags) const {
-  RenderContext renderContext(renderTarget, renderFlags);
+  RenderContext renderContext(renderTarget, renderFlags, true);
   MCState replayState(matrix ? *matrix : Matrix::I());
   picture->playback(&renderContext, replayState);
   renderContext.flush();
