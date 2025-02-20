@@ -88,14 +88,15 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
 }
 
 DualBlurImageFilter::DualBlurImageFilter(Point blurOffset, float downScaling, int iteration,
-                                 TileMode tileMode, float scaleFactor)
+                                         TileMode tileMode, float scaleFactor)
     : blurOffset(blurOffset), downScaling(downScaling), iteration(iteration), tileMode(tileMode),
       scaleFactor(scaleFactor) {
 }
 
-void DualBlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                           std::unique_ptr<FragmentProcessor> imageProcessor, float scaleFactor,
-                           bool isDown) const {
+void DualBlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
+                               uint32_t renderFlags,
+                               std::unique_ptr<FragmentProcessor> imageProcessor, float scaleFactor,
+                               bool isDown) const {
   auto blurProcessor =
       DualBlurFragmentProcessor::Make(isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
                                       std::move(imageProcessor), blurOffset * scaleFactor);
@@ -109,8 +110,8 @@ Rect DualBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
-                                                                const Rect& clipBounds,
-                                                                const TPArgs& args) const {
+                                                                    const Rect& clipBounds,
+                                                                    const TPArgs& args) const {
   if (FloatNearlyZero(scaleFactor)) {
     return nullptr;
   }

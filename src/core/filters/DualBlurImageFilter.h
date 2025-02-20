@@ -25,7 +25,7 @@ namespace tgfx {
 class DualBlurImageFilter : public ImageFilter {
  public:
   DualBlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode,
-                  float scaleFactor);
+                      float scaleFactor);
 
   Point blurOffset;
   float downScaling;

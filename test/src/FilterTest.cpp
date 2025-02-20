@@ -164,7 +164,7 @@ TGFX_TEST(FilterTest, Blur) {
   canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
   canvas->save();
   canvas->concat(imageMatrix);
-  paint.setImageFilter(ImageFilter::Blur(130, 0, TileMode::Decal));
+  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Decal));
   canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
@@ -176,7 +176,7 @@ TGFX_TEST(FilterTest, Blur) {
   canvas->concat(imageMatrix);
   Point filterOffset = Point::Zero();
   auto cropRect = Rect::MakeXYWH(0, 0, image->width(), image->height());
-  auto filterImage = image->makeWithFilter(ImageFilter::Blur(0, 130, TileMode::Repeat),
+  auto filterImage = image->makeWithFilter(ImageFilter::Blur(130, 130, TileMode::Repeat),
                                            &filterOffset, &cropRect);
   ASSERT_TRUE(filterImage != nullptr);
   EXPECT_EQ(filterImage->width(), image->width());
