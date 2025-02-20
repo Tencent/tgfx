@@ -18,7 +18,7 @@
 
 #include <math.h>
 #include <vector>
-#include "core/filters/BlurImageFilter.h"
+#include "core/filters/DualBlurImageFilter.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -720,9 +720,9 @@ TGFX_TEST(LayerTest, blurLayerFilter) {
   EXPECT_EQ(blur->blurrinessX(), 130.f);
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
-  auto imageFilter = std::static_pointer_cast<BlurImageFilter>(blur->getImageFilter(0.5f));
+  auto imageFilter = std::static_pointer_cast<DualBlurImageFilter>(blur->getImageFilter(0.5f));
   auto imageFilter2 =
-      std::static_pointer_cast<BlurImageFilter>(ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
+      std::static_pointer_cast<DualBlurImageFilter>(ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
   EXPECT_EQ(imageFilter->blurOffset, imageFilter2->blurOffset);
   EXPECT_EQ(imageFilter->downScaling, imageFilter2->downScaling);
   EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);

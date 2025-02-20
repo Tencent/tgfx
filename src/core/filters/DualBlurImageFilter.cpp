@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BlurImageFilter.h"
+#include "DualBlurImageFilter.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
@@ -82,18 +82,18 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   }
   auto x = Get(blurrinessX);
   auto y = Get(blurrinessY);
-  return std::make_shared<BlurImageFilter>(
+  return std::make_shared<DualBlurImageFilter>(
       Point::Make(std::get<2>(x), std::get<2>(y)), std::max(std::get<1>(x), std::get<1>(y)),
       std::max(std::get<0>(x), std::get<0>(y)), tileMode, std::min(std::get<3>(x), std::get<3>(y)));
 }
 
-BlurImageFilter::BlurImageFilter(Point blurOffset, float downScaling, int iteration,
+DualBlurImageFilter::DualBlurImageFilter(Point blurOffset, float downScaling, int iteration,
                                  TileMode tileMode, float scaleFactor)
     : blurOffset(blurOffset), downScaling(downScaling), iteration(iteration), tileMode(tileMode),
       scaleFactor(scaleFactor) {
 }
 
-void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
+void DualBlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
                            std::unique_ptr<FragmentProcessor> imageProcessor, float scaleFactor,
                            bool isDown) const {
   auto blurProcessor =
@@ -103,12 +103,12 @@ void BlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint
   drawingManager->fillRTWithFP(std::move(renderTarget), std::move(blurProcessor), renderFlags);
 }
 
-Rect BlurImageFilter::onFilterBounds(const Rect& srcRect) const {
+Rect DualBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   auto mul = static_cast<float>(std::pow(2, iteration)) / (scaleFactor * downScaling);
   return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
 }
 
-std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
+std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
                                                                 const Rect& clipBounds,
                                                                 const TPArgs& args) const {
   if (FloatNearlyZero(scaleFactor)) {
@@ -198,7 +198,7 @@ std::shared_ptr<TextureProxy> BlurImageFilter::lockTextureProxy(std::shared_ptr<
   return lastRenderTarget->getTextureProxy();
 }
 
-std::unique_ptr<FragmentProcessor> BlurImageFilter::asFragmentProcessor(
+std::unique_ptr<FragmentProcessor> DualBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, uvMatrix);

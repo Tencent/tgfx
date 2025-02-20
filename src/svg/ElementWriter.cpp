@@ -260,7 +260,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
   return resources;
 }
 
-void ElementWriter::addBlurImageFilter(const BlurImageFilter* filter) {
+void ElementWriter::addBlurImageFilter(const ImageFilter* filter) {
   ElementWriter blurElement("feGaussianBlur", writer);
   auto blurSize = filter->filterBounds(Rect::MakeEmpty()).size();
   blurElement.addAttribute("stdDeviation", std::max(blurSize.width / 4.f, blurSize.height / 4.f));
