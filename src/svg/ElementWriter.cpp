@@ -24,6 +24,7 @@
 #include "core/CanvasState.h"
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
+#include "core/filters/BlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
@@ -260,10 +261,10 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
   return resources;
 }
 
-void ElementWriter::addBlurImageFilter(const ImageFilter* filter) {
+void ElementWriter::addBlurImageFilter(const BlurImageFilter* filter) {
   ElementWriter blurElement("feGaussianBlur", writer);
-  auto blurSize = filter->filterBounds(Rect::MakeEmpty()).size();
-  blurElement.addAttribute("stdDeviation", std::max(blurSize.width / 4.f, blurSize.height / 4.f));
+  blurElement.addAttribute("stdDeviation",
+                           std::max(filter->blurrinessX, filter->blurrinessY) / 2.f);
   blurElement.addAttribute("result", "blur");
 }
 
@@ -278,9 +279,11 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
-    auto blurSize = filter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
-    blurElement.addAttribute("stdDeviation", std::max(blurSize.width / 4.f, blurSize.height / 4.f));
-    blurElement.addAttribute("result", "blur");
+    if (const auto* blurFilter = Caster::AsBlurImageFilter(filter->blurFilter.get())) {
+      blurElement.addAttribute("stdDeviation",
+                               std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
+      blurElement.addAttribute("result", "blur");
+    }
   }
   {
     ElementWriter colorMatrixElement("feColorMatrix", writer);
@@ -329,8 +332,10 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
-    auto blurSize = filter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
-    blurElement.addAttribute("stdDeviation", std::max(blurSize.width / 4.f, blurSize.height / 4.f));
+    if (const auto* blurFilter = Caster::AsBlurImageFilter(filter->blurFilter.get())) {
+      blurElement.addAttribute("stdDeviation",
+                               std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
+    }
   }
   {
     ElementWriter compositeElement("feComposite", writer);
