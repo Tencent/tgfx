@@ -76,10 +76,10 @@ const MatrixShader* Caster::AsMatrixShader(const Shader* shader) {
   return nullptr;
 }
 
-const ImageFilter* Caster::AsBlurImageFilter(const ImageFilter* imageFilter) {
+const BlurImageFilter* Caster::AsBlurImageFilter(const ImageFilter* imageFilter) {
   DEBUG_ASSERT(imageFilter != nullptr);
   if (imageFilter->type() == ImageFilter::Type::Blur) {
-    return imageFilter;
+    return static_cast<const BlurImageFilter*>(imageFilter);
   }
   return nullptr;
 }

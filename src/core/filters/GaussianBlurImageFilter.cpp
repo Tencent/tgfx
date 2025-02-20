@@ -38,8 +38,9 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
 
-GaussianBlurImageFilter::GaussianBlurImageFilter(float sigmaX, float sigmaY, TileMode tileMode)
-    : sigmaX(sigmaX), sigmaY(sigmaY), tileMode(tileMode) {
+GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
+                                                 TileMode tileMode)
+    : BlurImageFilter(blurrinessX, blurrinessY, tileMode) {
 }
 
 static void Blur1D(std::unique_ptr<FragmentProcessor> source,
@@ -74,9 +75,9 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
-  const float maxSigma = std::max(sigmaX, sigmaY);
+  const float maxSigma = std::max(blurrinessX, blurrinessY);
   float scaleFactor = 1.0f;
-  bool blur2D = sigmaX > 0 && sigmaY > 0;
+  bool blur2D = blurrinessX > 0 && blurrinessY > 0;
 
   Rect boundsWillSample = clipBounds;
   if (blur2D) {
@@ -112,7 +113,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {}, &uvMatrix);
 
   if (blur2D) {
-    Blur1D(std::move(sourceProcessor), renderTarget, sigmaX * scaleFactor,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
 
     // blur and scale the texture to the clip bounds.
@@ -132,17 +133,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
       return nullptr;
     }
 
-    Blur1D(std::move(sourceProcessor), renderTarget, sigmaY * scaleFactor,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
            GaussianBlurDirection::Vertical, boundsWillSample.height() / scaledBounds.height(),
            args.renderFlags);
     return renderTarget->getTextureProxy();
   }
 
-  if (sigmaX > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, sigmaX * scaleFactor,
+  if (blurrinessX > 0) {
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
-  } else if (sigmaY > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, sigmaY * scaleFactor,
+  } else if (blurrinessY > 0) {
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
            GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
   }
 
@@ -155,7 +156,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 }
 
 Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return srcRect.makeOutset(2.f * sigmaX, 2.f * sigmaY);
+  return srcRect.makeOutset(2.f * blurrinessX, 2.f * blurrinessY);
 }
 
 std::unique_ptr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(

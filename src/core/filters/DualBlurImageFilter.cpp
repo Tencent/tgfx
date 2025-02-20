@@ -80,17 +80,17 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
-  auto x = Get(blurrinessX);
-  auto y = Get(blurrinessY);
-  return std::make_shared<DualBlurImageFilter>(
-      Point::Make(std::get<2>(x), std::get<2>(y)), std::max(std::get<1>(x), std::get<1>(y)),
-      std::max(std::get<0>(x), std::get<0>(y)), tileMode, std::min(std::get<3>(x), std::get<3>(y)));
+  return std::make_shared<DualBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
 
-DualBlurImageFilter::DualBlurImageFilter(Point blurOffset, float downScaling, int iteration,
-                                         TileMode tileMode, float scaleFactor)
-    : blurOffset(blurOffset), downScaling(downScaling), iteration(iteration), tileMode(tileMode),
-      scaleFactor(scaleFactor) {
+DualBlurImageFilter::DualBlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode)
+    : BlurImageFilter(blurrinessX, blurrinessY, tileMode) {
+  auto x = Get(blurrinessX);
+  auto y = Get(blurrinessY);
+  iteration = std::max(std::get<0>(x), std::get<0>(y));
+  downScaling = std::max(std::get<1>(x), std::get<1>(y));
+  blurOffset = Point::Make(std::get<2>(x), std::get<2>(y));
+  scaleFactor = std::min(std::get<3>(x), std::get<3>(y));
 }
 
 void DualBlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,

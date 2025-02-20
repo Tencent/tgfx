@@ -18,26 +18,21 @@
 
 #pragma once
 
+#include "BlurImageFilter.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class DualBlurImageFilter : public ImageFilter {
+class DualBlurImageFilter : public BlurImageFilter {
  public:
-  DualBlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode,
-                      float scaleFactor);
+  DualBlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode);
 
   Point blurOffset;
   float downScaling;
   int iteration;
-  TileMode tileMode;
   float scaleFactor = 1.0f;
 
  protected:
-  Type type() const override {
-    return Type::Blur;
-  }
-
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,

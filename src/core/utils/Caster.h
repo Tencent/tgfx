@@ -18,6 +18,7 @@
 
 #include <memory>
 #include "core/filters/AlphaThresholdColorFilter.h"
+#include "core/filters/BlurImageFilter.h"
 #include "core/filters/ComposeColorFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -59,7 +60,7 @@ class Caster {
 
   static const MatrixShader* AsMatrixShader(const Shader* shader);
 
-  static const ImageFilter* AsBlurImageFilter(const ImageFilter* imageFilter);
+  static const BlurImageFilter* AsBlurImageFilter(const ImageFilter* imageFilter);
 
   static const DropShadowImageFilter* AsDropShadowImageFilter(const ImageFilter* imageFilter);
 
