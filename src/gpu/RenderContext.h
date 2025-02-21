@@ -26,8 +26,8 @@
 namespace tgfx {
 class RenderContext : public DrawContext {
  public:
-  RenderContext(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                Surface* surface = nullptr);
+  RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                bool clearAll = false, Surface* surface = nullptr);
 
   Context* getContext() const {
     return renderTarget->getContext();

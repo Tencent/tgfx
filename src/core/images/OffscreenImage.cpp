@@ -36,7 +36,7 @@ std::shared_ptr<TextureProxy> OffscreenImage::onLockTextureProxy(const TPArgs& a
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, args.mipmapped,
                                                    ImageOrigin::TopLeft, args.renderFlags);
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format, 1, true);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
   if (renderTarget == nullptr) {
     return nullptr;
   }

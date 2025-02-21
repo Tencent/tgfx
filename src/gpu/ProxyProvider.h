@@ -121,12 +121,10 @@ class ProxyProvider {
                                                    bool adopted = false);
   /**
    * Creates an empty RenderTargetProxy with specified width, height, format, sample count,
-   * mipmap state and origin. If clearAll is true, the entire render target will be cleared
-   * to transparent black.
+   * mipmap state and origin.
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
-      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1,
-      bool clearAll = false);
+      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1);
 
   /**
    * Creates a render target proxy for the given BackendRenderTarget.
