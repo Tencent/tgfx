@@ -19,6 +19,8 @@ endif ()
 set(CMAKE_CXX_STANDARD 20)
 
 include(cmake/server.cmake)
+list(APPEND TRACY_LIBS
+        TracyServer)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)

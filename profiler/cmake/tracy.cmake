@@ -43,8 +43,6 @@ set(PROFILER_FILES
 )
 list(TRANSFORM PROFILER_FILES PREPEND "${TRACY_PATH}/profiler/")
 
-list(APPEND TRACY_LIBS
-    TracyServer)
 
 if(NOT EMSCRIPTEN)
     list(APPEND TRACY_LIBS TracyNfd)

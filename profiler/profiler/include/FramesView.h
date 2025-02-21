@@ -95,11 +95,11 @@ private:
 
   //Left button
   float viewOffset = 0.0f;
-  size_t selectedStartFrame;
-  size_t selectedEndFrame;
   bool isLeftDagging;
   QPoint lastLeftDragPos;
-  size_t dragStartFrame;
+  int selectedStartFrame;
+  int selectedEndFrame;
+  int dragStartFrame;
 
   //RightButton
   bool isRightDragging = false;
