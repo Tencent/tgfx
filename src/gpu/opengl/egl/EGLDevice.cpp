@@ -151,6 +151,8 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
       return nullptr;
     }
   }
+  // Disable vsync by default to make swap buffer non-blocking.
+  eglSwapInterval(eglDisplay, 0);
   auto device = std::shared_ptr<EGLDevice>(new EGLDevice(eglContext));
   device->externallyOwned = externallyOwned;
   device->eglDisplay = eglDisplay;
