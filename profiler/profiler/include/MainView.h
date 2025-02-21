@@ -27,7 +27,6 @@
 #include "TracyWorker.hpp"
 #include "Utility.h"
 #include "View.h"
-#include "src/profiler/TracyConfig.hpp"
 
 class MainView: public QWidget {
   Q_OBJECT

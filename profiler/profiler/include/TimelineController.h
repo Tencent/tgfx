@@ -33,7 +33,7 @@ public:
 
   void firstFrameExpired();
   void begin();
-  void end(double pxns, const tgfx::Point& wpos, bool vcenter, float yMin, float yMax, tgfx::Canvas* canvas, const AppHost* appHost);
+  void end(float pxns, const tgfx::Point& wpos, float yMin, float yMax, tgfx::Canvas* canvas, const AppHost* appHost);
 
   template<class T, class U>
   void addItem(U* data) {

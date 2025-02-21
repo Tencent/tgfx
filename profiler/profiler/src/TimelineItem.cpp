@@ -20,13 +20,12 @@
 #include "TimelineView.h"
 #include "src/profiler/IconsFontAwesome6.h"
 
-TimelineItem::TimelineItem(TimelineView& view, tracy::Worker& worker, const void* key)
-  : key(key)
-  , height(0)
+TimelineItem::TimelineItem(TimelineView& view, tracy::Worker& worker)
+  : height(0)
   , visible(true)
   , showFull(true)
-  , timelineView(view)
   , worker(worker)
+  , timelineView(view)
 {
 
 }
@@ -83,7 +82,7 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
   const auto yPos = wpos.y + yBegin;
   const auto dpos = wpos + tgfx::Point( 0.5f, 0.5f );
 
-  yEnd += ostep;
+  yEnd += static_cast<int>(ostep);
   if (showFull) {
     if (!drawContent(ctx, yEnd, canvas) && !timelineView.getViewData()->drawEmptyLabels) {
       drawFinished();
@@ -123,7 +122,7 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     // TODO hove event
   }
 
-  yEnd += 0.2f * ostep;
+  yEnd += static_cast<int>(0.2f * ostep);
   adjustThreadHeight(firstFrame, yBegin, yEnd);
   drawFinished();
 }

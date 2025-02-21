@@ -22,6 +22,7 @@
 #include <iostream>
 
 #include "TracyEvent.hpp"
+#include "src/profiler/TracyColor.hpp"
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -43,6 +44,15 @@ enum ViewMode {
   LastRange
 };
 
+enum class ShortenName : uint8_t
+{
+  Never,
+  Always,
+  OnlyNormalize,
+  NoSpace,
+  NoSpaceAndNormalize,
+};
+
 class AppHost {
 public:
   explicit AppHost(int width = 1280, int height = 720, float density = 1.0f);
@@ -61,13 +71,20 @@ private:
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
 };
 
-enum class ShortenName : uint8_t
+struct Config
 {
-  Never,
-  Always,
-  OnlyNormalize,
-  NoSpace,
-  NoSpaceAndNormalize,
+  bool threadedRendering = true;
+  bool focusLostLimit = true;
+  int targetFps = 60;
+  double horizontalScrollMultiplier = 1.0;
+  double verticalScrollMultiplier = 1.0;
+  bool memoryLimit = false;
+  size_t memoryLimitPercent = 80;
+  bool achievements = false;
+  bool achievementsAsked = false;
+  int dynamicColors = 1;
+  bool forceColors = false;
+  int shortenName = (int)ShortenName::NoSpaceAndNormalize;
 };
 
 tgfx::Color getTgfxColor(uint32_t color);

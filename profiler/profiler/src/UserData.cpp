@@ -32,8 +32,6 @@
 constexpr auto FileDescription = "description";
 constexpr auto FileTimeline = "timeline";
 constexpr auto FileOptions = "options";
-constexpr auto FileAnnotations = "annotations";
-constexpr auto FileSourceSubstitutions = "srcsub";
 
 enum : uint32_t { VersionTimeline = 0 };
 enum : uint32_t { VersionOptions = 7 };
@@ -55,10 +53,11 @@ UserData::UserData( const char* program, uint64_t time )
   if( f )
   {
     fseek( f, 0, SEEK_END );
-    const auto sz = ftell( f );
+    auto sz = ftell( f );
     fseek( f, 0, SEEK_SET );
-    auto buf = std::unique_ptr<char[]>( new char[sz] );
-    fread( buf.get(), 1, sz, f );
+    auto size = static_cast<unsigned long>(sz);
+    auto buf = std::unique_ptr<char[]>( new char[size] );
+    fread( buf.get(), 1, size_t(sz), f );
     fclose( f );
     description.assign( buf.get(), buf.get() + sz );
   }
@@ -122,25 +121,25 @@ void UserData::LoadState( ViewData& data )
             if( ini )
             {
                 int v;
-                if( ini_sget( ini, "options", "drawGpuZones", "%d", &v ) ) data.drawGpuZones = v;
-                if( ini_sget( ini, "options", "drawZones", "%d", &v ) ) data.drawZones = v;
-                if( ini_sget( ini, "options", "drawLocks", "%d", &v ) ) data.drawLocks = v;
-                if( ini_sget( ini, "options", "drawPlots", "%d", &v ) ) data.drawPlots = v;
-                if( ini_sget( ini, "options", "onlyContendedLocks", "%d", &v ) ) data.onlyContendedLocks = v;
-                if( ini_sget( ini, "options", "drawEmptyLabels", "%d", &v ) ) data.drawEmptyLabels = v;
-                if( ini_sget( ini, "options", "drawFrameTargets", "%d", &v ) ) data.drawFrameTargets = v;
-                if( ini_sget( ini, "options", "drawContextSwitches", "%d", &v ) ) data.drawContextSwitches = v;
-                if( ini_sget( ini, "options", "darkenContextSwitches", "%d", &v ) ) data.darkenContextSwitches = v;
-                if( ini_sget( ini, "options", "drawCpuData", "%d", &v ) ) data.drawCpuData = v;
-                if( ini_sget( ini, "options", "drawCpuUsageGraph", "%d", &v ) ) data.drawCpuUsageGraph = v;
-                if( ini_sget( ini, "options", "drawSamples", "%d", &v ) ) data.drawSamples = v;
-                if( ini_sget( ini, "options", "dynamicColors", "%d", &v ) ) data.dynamicColors = v;
-                if( ini_sget( ini, "options", "inheritParentColors", "%d", &v ) ) data.inheritParentColors = v;
-                if( ini_sget( ini, "options", "forceColors", "%d", &v ) ) data.forceColors = v;
-                if( ini_sget( ini, "options", "ghostZones", "%d", &v ) ) data.ghostZones = v;
-                if( ini_sget( ini, "options", "frameTarget", "%d", &v ) ) data.frameTarget = v;
+                if( ini_sget( ini, "options", "drawGpuZones", "%d", &v ) ) data.drawGpuZones = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawZones", "%d", &v ) ) data.drawZones = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawLocks", "%d", &v ) ) data.drawLocks = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawPlots", "%d", &v ) ) data.drawPlots = (uint8_t)v;
+                if( ini_sget( ini, "options", "onlyContendedLocks", "%d", &v ) ) data.onlyContendedLocks = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawEmptyLabels", "%d", &v ) ) data.drawEmptyLabels = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawFrameTargets", "%d", &v ) ) data.drawFrameTargets = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawContextSwitches", "%d", &v ) ) data.drawContextSwitches = (uint8_t)v;
+                if( ini_sget( ini, "options", "darkenContextSwitches", "%d", &v ) ) data.darkenContextSwitches = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawCpuData", "%d", &v ) ) data.drawCpuData = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawCpuUsageGraph", "%d", &v ) ) data.drawCpuUsageGraph = (uint8_t)v;
+                if( ini_sget( ini, "options", "drawSamples", "%d", &v ) ) data.drawSamples = (uint8_t)v;
+                if( ini_sget( ini, "options", "dynamicColors", "%d", &v ) ) data.dynamicColors = (uint8_t)v;
+                if( ini_sget( ini, "options", "inheritParentColors", "%d", &v ) ) data.inheritParentColors = (uint8_t)v;
+                if( ini_sget( ini, "options", "forceColors", "%d", &v ) ) data.forceColors = (uint8_t)v;
+                if( ini_sget( ini, "options", "ghostZones", "%d", &v ) ) data.ghostZones = (uint8_t)v;
+                if( ini_sget( ini, "options", "frameTarget", "%d", &v ) ) data.frameTarget = (uint8_t)v;
                 if( ini_sget( ini, "options", "shortenName", "%d", &v ) ) data.shortenName = (ShortenName)v;
-                if( ini_sget( ini, "options", "plotHeight", "%d", &v ) ) data.plotHeight = v;
+                if( ini_sget( ini, "options", "plotHeight", "%d", &v ) ) data.plotHeight = (uint8_t)v;
                 ini_free( ini );
             }
         }

@@ -86,7 +86,7 @@ void MainView::discardConnect() {
 
 void MainView::connectClient(const char* address, const uint16_t port) {
   toolView->setParent(nullptr);
-  tracy::Config config;
+  Config config;
   centorView = new View(address, port, this->width(), config, this);
   if (!centorView->isConnected()) {
     discardConnect();
@@ -102,7 +102,7 @@ void MainView::openFile() {
     if (file) {
       toolView->setParent(nullptr);
 
-      tracy::Config config;
+      Config config;
       centorView = new View(*file, this->width(), config, this);
       layout->addWidget(centorView);
       Q_EMIT statusChange(ProfilerStatus::ReadFile);
@@ -114,7 +114,7 @@ void MainView::openFile() {
 
 void MainView::openWebsocketServer() {
   toolView->setParent(nullptr);
-  tracy::Config config;
+  Config config;
   centorView = new View(this->width(), config, this);
   if (!centorView->isConnected()) {
     discardConnect();

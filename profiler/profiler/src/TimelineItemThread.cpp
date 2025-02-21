@@ -23,10 +23,9 @@
 #include "src/profiler/TracyTimelineDraw.hpp"
 
 constexpr float MinVisSize = 3;
-constexpr float MinCtxSize = 4;
 
 TimelineItemThread::TimelineItemThread(TimelineView& view, tracy::Worker& worker, const tracy::ThreadData* thread)
-  : TimelineItem(view, worker, thread)
+  : TimelineItem(view, worker)
   , threadData(thread) {
   auto name = worker.GetThreadName(thread->id);
   if (strncmp(name, "Tracy", 6) == 0) {
@@ -125,29 +124,10 @@ int TimelineItemThread::preprocessZoneLevel(const TimelineContext& ctx, const V&
 }
 
 void TimelineItemThread::preprocess(const TimelineContext& ctx, tracy::TaskDispatch& td,
-                                    bool visible, int yPos) {
+                                    bool visible) {
   td.Queue([this, &ctx, visible] {
     depth = preprocessZoneLevel(ctx, threadData->timeline, 0, visible, 0);
   });
-
-  const auto viewData = timelineView.getViewData();
-  if (viewData->drawContextSwitches) {
-    // TODO draw context switches
-  }
-
-  hasSamples = false;
-  if (viewData->drawSamples && !threadData->samples.empty()) {
-    // TODO draw samples
-  }
-
-  hasMessage = false;
-  td.Queue([this, &ctx, visible, yPos] {
-    // TODO process message
-  });
-
-  if (viewData->drawLocks) {
-    // TODO process locks
-  }
 }
 
 void TimelineItemThread::drawFinished() {

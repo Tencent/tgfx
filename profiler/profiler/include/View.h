@@ -29,7 +29,6 @@
 #include "TracyFileWrite.hpp"
 #include "TracyWorker.hpp"
 #include "UserData.h"
-#include "src/profiler/TracyConfig.hpp"
 
 class SaveFileDialog: public QDialog {
   Q_OBJECT
@@ -52,9 +51,9 @@ private:
 class View : public QWidget {
   Q_OBJECT
 public:
-  View(int width, const tracy::Config& config, QWidget* parent = nullptr);
-  View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent = nullptr);
-  View(tracy::FileRead& file, int width, const tracy::Config& config, QWidget* parent = nullptr);
+  View(int width, const Config& config, QWidget* parent = nullptr);
+  View(const char* addr, uint16_t port, int width, const Config& config, QWidget* parent = nullptr);
+  View(tracy::FileRead& file, int width, const Config& config, QWidget* parent = nullptr);
 
   ~View();
 
@@ -82,7 +81,7 @@ private:
   std::thread saveThread;
   std::string filenameStaging;
 
-  const tracy::Config& config;
+  const Config& config;
   FramesView* framesView;
   TimelineView* timelineView;
   SaveFileDialog* saveFileDialog;

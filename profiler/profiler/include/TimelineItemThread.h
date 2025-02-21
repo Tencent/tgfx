@@ -25,7 +25,7 @@ class TimelineItemThread: public TimelineItem {
 public:
   TimelineItemThread(TimelineView& view, tracy::Worker& worker, const tracy::ThreadData* key);
 
-  void preprocess(const TimelineContext& ctx, tracy::TaskDispatch& td, bool visible, int yPos) override;
+  void preprocess(const TimelineContext& ctx, tracy::TaskDispatch& td, bool visible) override;
 
   uint32_t headerColor() const override;
   uint32_t headerColorInactive() const override;
@@ -46,8 +46,4 @@ private:
   std::vector<tracy::TimelineDraw> draws;
   int depth;
   bool showFull;
-  bool hasSamples;
-  bool hasMessage;
-private:
-
 };

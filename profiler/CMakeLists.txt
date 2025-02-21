@@ -17,8 +17,8 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
 endif ()
 
 set(CMAKE_CXX_STANDARD 20)
-add_definitions(-DQT_NO_KEYWORDS -Wno-shorten-64-to-32)
-include(cmake/tracy.cmake)
+
+include(cmake/server.cmake)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -32,6 +32,9 @@ if (NOT CMAKE_PREFIX_PATH)
     endif ()
     include("./QTCMAKE.cfg")
 endif ()
+
+add_definitions(-DQT_NO_KEYWORDS -Wno-shorten-64-to-32)
+list(APPEND PROFILER_COMPILE_OPTIONS -Wno-error)
 
 option(TGFX_ENABLE_PROFILING "Enable Profiling" OFF)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./tgfx)
@@ -88,9 +91,8 @@ elseif (WIN32)
     list(APPEND TGFX_PROFILER_LIBS ${ws2_32_LIB})
 endif ()
 
-list(APPEND TGFX_PROFILER_INCLUDE
-        profiler/include
-        ${TRACY_PATH})
+list(APPEND TGFX_PROFILER_SRC
+        profiler/include)
 
 
 file(GLOB TGFX_PROFILER_FILES
@@ -114,7 +116,8 @@ file(GLOB TGFX_PROFILER_FILES
         profiler/src/ProfilerWindow.cpp
         profiler/src/ProfilerApplication.cpp)
 
-add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${SERVER_FILES} ${PROFILER_FILES} ${COMMON_FILES} ${QT_RESOURCES})
-target_include_directories(Profiler PRIVATE ${TGFX_PROFILER_INCLUDE})
-target_link_libraries(Profiler ${TGFX_PROFILER_LIBS} ${TRACY_LIBS} tgfx)
-target_link_options(Profiler PRIVATE ${TRACY_OPTION})
+add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${QT_RESOURCES})
+target_include_directories(Profiler PUBLIC ${TGFX_PROFILER_SRC})
+target_include_directories(Profiler SYSTEM PRIVATE ${TRACY_INCLUDE})
+target_link_libraries(Profiler tgfx ${TGFX_PROFILER_LIBS} ${TRACY_LIBS})
+#target_compile_options(Profiler PUBLIC ${PROFILER_COMPILE_OPTIONS})

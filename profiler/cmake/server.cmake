@@ -10,6 +10,7 @@ set(TRACY_COMMON_SOURCES
         TracyStackFrames.cpp
         TracySystem.cpp
 )
+include(${CMAKE_CURRENT_LIST_DIR}/tracy.cmake)
 
 list(TRANSFORM TRACY_COMMON_SOURCES PREPEND "${TRACY_COMMON_DIR}/")
 
@@ -29,9 +30,10 @@ set(TRACY_SERVER_SOURCES
 
 list(TRANSFORM TRACY_SERVER_SOURCES PREPEND "${TRACY_SERVER_DIR}/")
 
-add_library(TracyServer STATIC EXCLUDE_FROM_ALL ${TRACY_COMMON_SOURCES} ${TRACY_SERVER_SOURCES})
-target_include_directories(TracyServer PUBLIC ${TRACY_COMMON_DIR} ${TRACY_SERVER_DIR})
+add_library(TracyServer STATIC EXCLUDE_FROM_ALL ${TRACY_COMMON_SOURCES} ${TRACY_SERVER_SOURCES} ${SERVER_FILES} ${PROFILER_FILES} ${COMMON_FILES})
+target_include_directories(TracyServer SYSTEM PUBLIC ${TRACY_COMMON_DIR} ${TRACY_SERVER_DIR})
 target_link_libraries(TracyServer PUBLIC TracyCapstone TracyZstd PPQSort::PPQSort)
+target_compile_options(TracyServer PRIVATE -w)
 if(NO_STATISTICS)
     target_compile_definitions(TracyServer PUBLIC TRACY_NO_STATISTICS)
 endif()

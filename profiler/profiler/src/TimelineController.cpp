@@ -41,39 +41,39 @@ void TimelineController::begin() {
   items.clear();
 }
 
-void TimelineController::end(double pxns, const tgfx::Point& wpos, bool vcenter, float yMin, float yMax, tgfx::Canvas* canvas, const AppHost* appHost) {
+void TimelineController::end(float pxns, const tgfx::Point& wpos, float yMin, float yMax, tgfx::Canvas* canvas, const AppHost* appHost) {
   const auto viewData = view.getViewData();
   TimelineContext context;
-  context.w = view.width() - 1;
+  context.w = static_cast<float>(view.width()) - 1;
   context.ty = MaxHeight;
   context.sty = 10;
   context.scale = 1;
   context.yMin = yMin;
   context.yMax = yMax;
   context.pxns = pxns;
-  context.nspx = 1.0 / pxns;
+  context.nspx = 1.0f / pxns;
   context.vStart = viewData->zvStart;
   context.vEnd = viewData->zvEnd;
   context.wpos = wpos;
 
-  int yOffset = 0;
+  float yOffset = 0.f;
   for(auto& item: items) {
     if (item->isVisible()) {
       const auto yPos = wpos.y + yOffset;
       const bool visible = firstFrame || (yPos < yMax && yPos + item->getHeight() >= yMin);
-      item->preprocess(context, taskDispatch, visible, yPos);
+      item->preprocess(context, taskDispatch, visible);
     }
-    yOffset += firstFrame ? 0 : item->getHeight();
+    yOffset += firstFrame ? 0 : float(item->getHeight());
   }
   taskDispatch.Sync();
 
   yOffset = 0;
   for(auto& item : items) {
     auto currentFrameItemHeight = item->getHeight();
-    item->draw(firstFrame, context, yOffset, canvas, appHost);
+    item->draw(firstFrame, context, int(yOffset), canvas, appHost);
     if (firstFrame) {
       currentFrameItemHeight = item->getHeight();
     }
-    yOffset += currentFrameItemHeight;
+    yOffset += float(currentFrameItemHeight);
   }
 }

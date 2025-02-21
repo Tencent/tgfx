@@ -18,14 +18,13 @@
 
 #pragma once
 #include <tgfx/gpu/opengl/qt/QGLWindow.h>
-#include <QGraphicsView>
 #include <QQuickItem>
 #include "TracyWorker.hpp"
 #include "ViewData.h"
 
 #define FRAME_VIEW_HEIGHT 50
 
-constexpr uint64_t MaxFrameTime = 50 * 1000 * 1000;
+constexpr int64_t MaxFrameTime = 50 * 1000 * 1000;
 
 class TimelineView;
 class FramesView : public QQuickItem {
@@ -46,7 +45,7 @@ public:
   void mouseReleaseEvent(QMouseEvent *event) override;
   void hoverMoveEvent(QHoverEvent* event) override;
 
-  uint64_t getFrameNumber(const tracy::FrameData& frameData, int i);
+  uint64_t getFrameNumber(const tracy::FrameData& frameData, uint64_t i);
 
   unsigned long long getWorker() const { return (unsigned long long)worker; }
   void setWorker(unsigned long long _worker) {
@@ -96,11 +95,11 @@ private:
 
   //Left button
   float viewOffset = 0.0f;
-  int selectedStartFrame;
-  int selectedEndFrame;
+  size_t selectedStartFrame;
+  size_t selectedEndFrame;
   bool isLeftDagging;
   QPoint lastLeftDragPos;
-  int dragStartFrame;
+  size_t dragStartFrame;
 
   //RightButton
   bool isRightDragging = false;

@@ -45,8 +45,8 @@ static const char* compressionDesc[] = {
 };
 
 SaveFileDialog::SaveFileDialog(std::string& filename, QWidget* parent)
-  : filename(filename)
-  , QDialog(parent) {
+  : QDialog(parent)
+  , filename(filename){
   initWidget();
   initConnect();
 }
@@ -140,35 +140,35 @@ void SaveFileDialog::zstdLevelChanged(){
   static_cast<QRadioButton*>(compressionLayout->itemAt(int(3))->widget())->setChecked(true);
 }
 
-View::View(int width, const tracy::Config& config, QWidget* parent)
-  : width(width)
-  , viewMode(ViewMode::LastFrames)
+View::View(int width, const Config& config, QWidget* parent)
+  : QWidget(parent)
+  , width(width)
   , worker(config.memoryLimit == 0 ? -1 :
   ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ))
+  , viewMode(ViewMode::LastFrames)
   , config(config)
-  , QWidget(parent)
 {
   initView();
 }
 
-View::View(const char* addr, uint16_t port, int width, const tracy::Config& config, QWidget* parent)
-  : width(width)
-  , viewMode(ViewMode::LastFrames)
+View::View(const char* addr, uint16_t port, int width, const Config& config, QWidget* parent)
+  : QWidget(parent)
+  , width(width)
   , worker(addr, port, config.memoryLimit == 0 ? -1 :
     ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ) )
+  , viewMode(ViewMode::LastFrames)
   , config(config)
-  , QWidget(parent)
 {
   initView();
 }
 
-View::View(tracy::FileRead& file, int width, const tracy::Config& config, QWidget* parent)
-  : width(width)
-  , viewMode(ViewMode::Paused)
+View::View(tracy::FileRead& file, int width, const Config& config, QWidget* parent)
+  : QWidget(parent)
+  , width(width)
   , worker(file)
+  , viewMode(ViewMode::Paused)
   , userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime())
-  , config(config)
-  , QWidget(parent) {
+  , config(config){
   initView();
   userData.StateShouldBePreserved();
   userData.LoadState(viewData);
@@ -215,7 +215,7 @@ void View::saveFile() {
     if( sz < 7 || memcmp( fn + sz - 6, ".tracy", 6 ) != 0 )
     {
       char tmp[1024];
-      sprintf( tmp, "%s.tracy", fn );
+      snprintf( tmp, 1024, "%s.tracy", fn );
       filenameStaging = tmp;
     }
     else
@@ -293,7 +293,7 @@ void View::ViewImpl() {
   layout->addWidget(timelineWidget);
 }
 
-void View::timerEvent(QTimerEvent* event) {
+void View::timerEvent(QTimerEvent*) {
   if (worker.HasData() && connectDialog) {
     connectDialog->close();
     killTimer(timerId);

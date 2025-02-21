@@ -25,7 +25,7 @@ struct TimelineContext
 {
   float w, ty, sty, scale;
   float yMin, yMax;
-  double pxns, nspx;
+  float pxns, nspx;
   int64_t vStart, vEnd;
   tgfx::Point wpos;
   bool hover;

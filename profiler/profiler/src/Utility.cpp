@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Utility.h"
-#include <tgfx/core/Paint.h>
-#include <tgfx/layers/TextLayer.h>
+#include "tgfx/core/Paint.h"
+#include "tgfx/layers/TextLayer.h"
+
 #include <QFontMetrics>
 #include <filesystem>
-#include <src/profiler/TracyColor.hpp>
 
 // Short list based on GetTypes() in TracySourceTokenizer.cpp
 constexpr const char* TypesList[] = {
@@ -73,10 +73,10 @@ bool AppHost::updateScreen(int width, int height, float density) {
 }
 
 tgfx::Color getTgfxColor(uint32_t color) {
-  auto r = (color      ) & 0xFF;
-  auto g = (color >>  8) & 0xFF;
-  auto b = (color >> 16) & 0xFF;
-  auto a = (color >> 24) & 0xFF;
+  uint8_t r = (color      ) & 0xFF;
+  uint8_t g = (color >>  8) & 0xFF;
+  uint8_t b = (color >> 16) & 0xFF;
+  uint8_t a = (color >> 24) & 0xFF;
   return tgfx::Color::FromRGBA(r, g, b, a);
 }
 
@@ -181,7 +181,7 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
     {
         auto start = ptr;
         while( ptr < end && *ptr != '<' ) ptr++;
-        memcpy( dst, start, ptr - start + 1 );
+        memcpy( dst, start, size_t(ptr - start + 1) );
         dst += ptr - start + 1;
         if( ptr == end ) break;
         cnt++;
@@ -204,7 +204,7 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
     {
         auto start = ptr;
         while( ptr < end && *ptr != '(' ) ptr++;
-        memcpy( dst, start, ptr - start + 1 );
+        memcpy( dst, start, size_t(ptr - start + 1) );
         dst += ptr - start + 1;
         if( ptr == end ) break;
         cnt++;
@@ -250,7 +250,7 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
         if( !*match ) break;
     }
 
-    tsz = getTextSize(appHost, ptr, end - ptr);
+    tsz = getTextSize(appHost, ptr, static_cast<size_t>(end - ptr));
 
     if( type == ShortenName::OnlyNormalize || tsz.width() < zsz ) return ptr;
 
@@ -262,7 +262,7 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
         p++;
         while( p < end && *p == ':' ) p++;
         ptr = p;
-        tsz = getTextSize(appHost, ptr, end - ptr);
+        tsz = getTextSize(appHost, ptr, static_cast<size_t>(end - ptr));
         if( tsz.width() < zsz ) return ptr;
     }
 }

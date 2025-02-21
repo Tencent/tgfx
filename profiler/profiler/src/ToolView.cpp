@@ -25,8 +25,8 @@
 #include "TracyFileRead.hpp"
 #include "ToolView.h"
 
-ClientItem::ClientItem(ClientData& data, QWidget* parent):
-  data(data), QWidget(parent){
+ClientItem::ClientItem(ClientData& data, QWidget* parent)
+  : QWidget(parent), data(data) {
   initWidget();
 }
 
@@ -48,10 +48,11 @@ void ClientItem::initWidget() {
   layout->addWidget(procNameLable);
 }
 
-ToolView::ToolView(QWidget* parent) :
-  port(8086),
-  resolv(port),
-  QWidget(parent) {
+ToolView::ToolView(QWidget* parent)
+  : QWidget(parent)
+  , port(8086)
+  , resolv(port)
+{
   startTimer(1);
   setAttribute(Qt::WA_StyledBackground);
   setStyleSheet("background-color: grey;");
@@ -193,7 +194,7 @@ void ToolView::handleClient(uint64_t clientId) {
   auto data = dataIter->second;
 
   std::string text;
-  sprintf(text.data(), "%s(%s)", data.procName.c_str(), data.address.c_str());
+  snprintf(text.data(), 1024, "%s(%s)", data.procName.c_str(), data.address.c_str());
   auto item = new QListWidgetItem(text.c_str(), clientWidget);
   item->setTextAlignment(Qt::AlignCenter);
   clientWidget->addItem(item);
@@ -264,8 +265,8 @@ void ToolView::updateBroadcastClients()
                   memcpy(&bm, msg, len);
                   protoVer = bm.protocolVersion;
                   strcpy(procname, bm.programName);
-                  activeTime = bm.activeTime;
-                  listenPort = bm.listenPort;
+                  activeTime = (int32_t)bm.activeTime;
+                  listenPort = (uint16_t)bm.listenPort;
                   pid = 0;
                   break;
               }
@@ -275,7 +276,7 @@ void ToolView::updateBroadcastClients()
                   memcpy(&bm, msg, len);
                   protoVer = bm.protocolVersion;
                   strcpy(procname, bm.programName);
-                  activeTime = bm.activeTime;
+                  activeTime = (int32_t)bm.activeTime;
                   listenPort = 8086;
                   pid = 0;
                   break;
