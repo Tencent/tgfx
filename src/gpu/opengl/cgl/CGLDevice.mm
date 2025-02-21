@@ -76,6 +76,9 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool extern
         return nullptr;
       }
     }
+    // Disable vsync by default to make Window::present() non-blocking.
+    GLint swapInterval = 0;
+    CGLSetParameter(cglContext, kCGLCPSwapInterval, &swapInterval);
     auto device = std::shared_ptr<CGLDevice>(new CGLDevice(cglContext));
     device->externallyOwned = externallyOwned;
     device->weakThis = device;
