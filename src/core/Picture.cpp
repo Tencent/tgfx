@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
+
+#include "MemoryCache.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/TransformContext.h"
@@ -25,13 +27,14 @@
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
-Picture::Picture(std::vector<Record*> records, bool hasUnboundedFill)
-    : records(std::move(records)), _hasUnboundedFill(hasUnboundedFill) {
+Picture::Picture(std::shared_ptr<MemoryCache> memoryCache, std::vector<Record*> records, bool hasUnboundedFill)
+    : records(std::move(records)), _hasUnboundedFill(hasUnboundedFill), memoryCache(std::move(memoryCache)) {
 }
 
 Picture::~Picture() {
   for (auto& record : records) {
-    delete record;
+    record->~Record();
+    memoryCache->release(record);
   }
 }
 

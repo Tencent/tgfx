@@ -21,10 +21,13 @@
 #include <functional>
 #include "core/DrawContext.h"
 #include "core/Records.h"
+#include "core/MemoryCache.h"
 
 namespace tgfx {
 class RecordingContext : public DrawContext {
  public:
+  RecordingContext();
+
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
   void clear();
@@ -55,5 +58,6 @@ class RecordingContext : public DrawContext {
 
  private:
   std::vector<Record*> records = {};
+  std::shared_ptr<MemoryCache> memoryCache = nullptr;
 };
 }  // namespace tgfx

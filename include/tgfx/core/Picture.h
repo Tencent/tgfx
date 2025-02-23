@@ -28,6 +28,7 @@ class DrawContext;
 class SVGExportContext;
 class MCState;
 class Image;
+class MemoryCache;
 
 /**
  * The Picture class captures the drawing commands made on a Canvas, which can be replayed later.
@@ -66,8 +67,9 @@ class Picture {
  private:
   std::vector<Record*> records = {};
   bool _hasUnboundedFill = false;
+  std::shared_ptr<MemoryCache> memoryCache = nullptr;
 
-  Picture(std::vector<Record*> records, bool hasUnboundedFill);
+  Picture(std::shared_ptr<MemoryCache> memoryCache, std::vector<Record*> records, bool hasUnboundedFill);
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 
