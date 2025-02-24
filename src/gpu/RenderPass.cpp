@@ -73,7 +73,6 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   _indexBuffer = std::move(indexBuffer);
   _vertexBuffer = nullptr;
   _vertexData = std::move(vertexData);
-  ;
 }
 
 void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
@@ -107,5 +106,4 @@ void RenderPass::copyToTexture(Texture* texture, int srcX, int srcY) {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   onCopyToTexture(texture, srcX, srcY);
 }
-
 }  // namespace tgfx
