@@ -35,6 +35,7 @@ constexpr const char* TypesList[] = {
 AppHost::AppHost(int width, int height, float density)
     : _width(width), _height(height), _density(density) {
 }
+
 void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface) {
   if (name.empty()) {
     return;
@@ -70,6 +71,10 @@ bool AppHost::updateScreen(int width, int height, float density) {
   _height = height;
   _density = density;
   return true;
+}
+
+bool isEqual(float num1, float num2) {
+  return abs(num1 - num2) < 0.00001;
 }
 
 tgfx::Color getTgfxColor(uint32_t color) {
@@ -142,6 +147,9 @@ void drawLine(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t c
 }
 
 void drawLine(tgfx::Canvas* canvas, float x0, float y0, float x1, float y1, uint32_t color) {
+  if (isEqual(x0, x1) && isEqual(y0, y1)) {
+    return;
+  }
   tgfx::Paint paint;
   paint.setColor(getTgfxColor(color));
   canvas->drawLine(x0 , y0 , x1 , y1 , paint);

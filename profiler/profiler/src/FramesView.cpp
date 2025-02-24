@@ -200,7 +200,7 @@ void FramesView::createAppHost() {
 void FramesView::setViewToLastFrames() {
   auto total = worker->GetFrameCount( *frames );
 
-  viewData->zvStart = worker->GetFrameBegin( *frames, std::max<size_t>( 0, total - 4 ) );
+  viewData->zvStart = worker->GetFrameBegin( *frames, (size_t)std::max( 0, int(total) - 4 ) );
   if( total == 1 ) {
     viewData->zvEnd = worker->GetLastTime();
   }
