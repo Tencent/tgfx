@@ -27,14 +27,17 @@
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
-Picture::Picture(std::shared_ptr<MemoryCache> memoryCache, std::vector<Record*> records, bool hasUnboundedFill)
-    : records(std::move(records)), _hasUnboundedFill(hasUnboundedFill), memoryCache(std::move(memoryCache)) {
+Picture::Picture(std::shared_ptr<MemoryCache> memoryCache, std::shared_ptr<RecordList> records, bool hasUnboundedFill)
+    : memoryCache(std::move(memoryCache)), records(std::move(records)), _hasUnboundedFill(hasUnboundedFill) {
 }
 
 Picture::~Picture() {
-  for (auto& record : records) {
+  auto record = records->front();
+  while (record != nullptr) {
+    const auto next = record->next;
     record->~Record();
     memoryCache->release(record);
+    record = next;
   }
 }
 
@@ -60,8 +63,10 @@ void Picture::playback(DrawContext* drawContext, const MCState& state) const {
   } else if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
     return;
   }
-  for (auto& record : records) {
+  auto record = records->front();
+  while (record != nullptr) {
     record->playback(drawContext);
+    record = record->next;
   }
 }
 
@@ -89,10 +94,10 @@ static bool GetClipRect(const Path& clip, const Matrix* matrix, Rect* clipRect) 
 
 std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
                                         const ISize* clipSize) const {
-  if (records.size() != 1) {
+  if (records->size() != 1) {
     return nullptr;
   }
-  auto record = records[0];
+  auto record = records->front();
   if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
     return nullptr;
   }

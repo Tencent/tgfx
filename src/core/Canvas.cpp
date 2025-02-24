@@ -462,7 +462,7 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state,
       drawContext->drawImage(std::move(image), {}, drawState, style);
       return;
     }
-  } else if (picture->records.size() == 1 && style.maskFilter == nullptr) {
+  } else if (picture->records->size() == 1 && style.maskFilter == nullptr) {
     LayerUnrollContext layerContext(drawContext, style);
     picture->playback(&layerContext, state);
     if (layerContext.hasUnrolled()) {

@@ -1254,8 +1254,8 @@ TGFX_TEST(CanvasTest, Picture) {
   paint.setImageFilter(nullptr);
   auto imagePicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(imagePicture != nullptr);
-  ASSERT_TRUE(imagePicture->records.size() == 1);
-  EXPECT_EQ(imagePicture->records[0]->type(), RecordType::DrawImage);
+  ASSERT_TRUE(imagePicture->records->size() == 1);
+  EXPECT_EQ(imagePicture->records->front()->type(), RecordType::DrawImage);
 
   surface = Surface::Make(context, image->width() - 200, image->height() - 200);
   canvas = surface->getCanvas();

@@ -30,7 +30,7 @@ class RecordingContext : public DrawContext {
 
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
-  void clear();
+  void clear()const;
 
   void drawStyle(const MCState& state, const FillStyle& style) override;
 
@@ -57,7 +57,9 @@ class RecordingContext : public DrawContext {
                  const MCState& state, const FillStyle& style) override;
 
  private:
-  std::vector<Record*> records = {};
   std::shared_ptr<MemoryCache> memoryCache = nullptr;
+  std::shared_ptr<RecordList> records = nullptr;
+
+  void checkRecordsAndInit();
 };
 }  // namespace tgfx

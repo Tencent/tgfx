@@ -32,7 +32,6 @@ Canvas* Recorder::beginRecording() {
   }
   if (activelyRecording) {
     canvas->resetStateStack();
-    recordingContext->clear();
   } else {
     activelyRecording = true;
   }

@@ -46,6 +46,57 @@ class Record {
   virtual void playback(DrawContext* context) const = 0;
 
   MCState state;
+
+  Record *next = nullptr;
+};
+
+class RecordList final {
+public:
+  RecordList() = default;
+
+  ~RecordList() = default;
+
+  size_t size() const {
+    return count;
+  }
+
+  bool empty() const {
+    if (head != nullptr && tail != nullptr) {
+      return false;
+    }
+
+    return true;
+  }
+
+  Record *front() const {
+    return head;
+  }
+
+  Record *back() const {
+    return tail;
+  }
+
+  void clear() {
+    head = nullptr;
+    tail = nullptr;
+    count = 0;
+  }
+
+  void addRecord(Record *record) {
+    if (head == nullptr) {
+      head = record;
+    } else {
+      tail->next = record;
+    }
+
+    tail = record;
+    count++;
+  }
+
+private:
+  Record *head = nullptr;
+  Record *tail = nullptr;
+  size_t count = 0;
 };
 
 class DrawStyle : public Record {
