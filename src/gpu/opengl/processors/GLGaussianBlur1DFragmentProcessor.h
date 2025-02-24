@@ -16,27 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureResolveTask.h"
-#include "gpu/Gpu.h"
+#pragma once
+
+#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 
 namespace tgfx {
-TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
-    : RenderTask(std::move(renderTargetProxy)) {
-}
 
-bool TextureResolveTask::execute(Gpu* gpu) {
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
-    LOGE("TextureResolveTask::execute() Failed to get render target!");
-    return false;
-  }
-  if (renderTarget->sampleCount() > 1) {
-    gpu->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
-  }
-  auto texture = renderTargetProxy->getTexture();
-  if (texture != nullptr && texture->hasMipmaps()) {
-    gpu->regenerateMipmapLevels(texture->getSampler());
-  }
-  return true;
-}
+class GLGaussianBlur1DFragmentProcessor : public GaussianBlur1DFragmentProcessor {
+ public:
+  GLGaussianBlur1DFragmentProcessor(std::unique_ptr<FragmentProcessor> processor, float sigma,
+                                    GaussianBlurDirection direction, float stepLength);
+
+  void emitCode(EmitArgs& args) const override;
+
+ private:
+  void onSetData(UniformBuffer* uniformBuffer) const override;
+};
+
 }  // namespace tgfx

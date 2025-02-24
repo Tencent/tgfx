@@ -24,14 +24,16 @@
 namespace tgfx {
 
 struct ConstructionContext {
-  explicit ConstructionContext(SVGIDMapper* mapper) : parentNode(nullptr), nodeIDMapper(mapper) {
+  explicit ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper)
+      : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper) {
   }
   ConstructionContext(const ConstructionContext& other, const std::shared_ptr<SVGNode>& newParent)
-      : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper) {
+      : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper), cssMapper(other.cssMapper) {
   }
 
   SVGNode* parentNode;
   SVGIDMapper* nodeIDMapper;
+  CSSMapper* cssMapper;
 };
 
 using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
@@ -46,6 +48,8 @@ class SVGNodeConstructor {
                                                    const DOMNode* xmlNode);
 
   static bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value);
+
+  static void SetClassStyleAttributes(SVGNode& root, const CSSMapper& mapper);
 
  private:
   static void ParseNodeAttributes(const DOMNode* xmlNode, const std::shared_ptr<SVGNode>& svgNode,
@@ -69,6 +73,8 @@ class SVGNodeConstructor {
   static bool SetStringAttribute(SVGNode& node, SVGAttribute attr, const std::string& stringValue);
 
   static bool SetIRIAttribute(SVGNode& node, SVGAttribute attr, const std::string& stringValue);
+
+  static void ParseCSSStyle(const DOMNode* xmlNode, CSSMapper* mapper);
 
   static std::unordered_map<std::string, AttrParseInfo> attributeParseInfo;
 };

@@ -20,6 +20,7 @@
 
 #include "core/DataProvider.h"
 #include "core/ImageDecoder.h"
+#include "gpu/AAType.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -68,7 +69,7 @@ class ProxyProvider {
    * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to
    * the GPU.
    */
-  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, bool antiAlias,
+  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 
@@ -120,12 +121,10 @@ class ProxyProvider {
                                                    bool adopted = false);
   /**
    * Creates an empty RenderTargetProxy with specified width, height, format, sample count,
-   * mipmap state and origin. If clearAll is true, the entire render target will be cleared
-   * to transparent black.
+   * mipmap state and origin.
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
-      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1,
-      bool clearAll = false);
+      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1);
 
   /**
    * Creates a render target proxy for the given BackendRenderTarget.

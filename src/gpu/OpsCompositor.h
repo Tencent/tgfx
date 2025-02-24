@@ -67,10 +67,9 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
 
   /**
-   * Copy the contents of the render target to the given texture.
+   * Discard all pending operations.
    */
-  void copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                     const Point& dstPoint);
+  void discardAll();
 
   /**
    * Close the compositor and submit the composed render task to the render queue. After closing,
@@ -111,7 +110,7 @@ class OpsCompositor {
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
   std::unique_ptr<FragmentProcessor> getClipMaskFP(const Path& clip, AAType aaType,
                                                    Rect* scissorRect);
-  DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds);
+  DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, const FillStyle& style,
                  const Rect& localBounds, const Rect& deviceBounds);
 };

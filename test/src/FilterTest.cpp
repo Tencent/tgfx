@@ -19,7 +19,6 @@
 #include <memory>
 #include <vector>
 #include "CornerPinEffect.h"
-#include "core/filters/BlurImageFilter.h"
 #include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -399,8 +398,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   {
     auto imageFilter = ImageFilter::Blur(20, 30);
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
-    auto blurFilter = std::static_pointer_cast<BlurImageFilter>(imageFilter);
-    Size blurSize = blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    Size blurSize = imageFilter->filterBounds(Rect::MakeEmpty()).size();
     EXPECT_EQ(blurSize.width, 18.f);
     EXPECT_EQ(blurSize.height, 36.f);
   }

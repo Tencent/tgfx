@@ -48,7 +48,10 @@ class Gpu {
   virtual void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
                            size_t rowBytes) = 0;
 
-  virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
+  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
+                                         int srcX, int srcY) = 0;
+
+  virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) = 0;
 
   virtual void regenerateMipmapLevels(const TextureSampler* sampler) = 0;
 

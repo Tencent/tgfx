@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureResolveTask.h"
-#include "gpu/Gpu.h"
+#include "GLFrameBuffer.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
-    : RenderTask(std::move(renderTargetProxy)) {
+std::shared_ptr<GLFrameBuffer> GLFrameBuffer::Make(Context* context) {
+  auto gl = GLFunctions::Get(context);
+  unsigned id = 0;
+  gl->genFramebuffers(1, &id);
+  if (id == 0) {
+    return nullptr;
+  }
+  return Resource::AddToCache(context, new GLFrameBuffer(id));
 }
 
-bool TextureResolveTask::execute(Gpu* gpu) {
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
-    LOGE("TextureResolveTask::execute() Failed to get render target!");
-    return false;
+GLFrameBuffer::GLFrameBuffer(unsigned int id) : _id(id) {
+}
+
+void GLFrameBuffer::onReleaseGPU() {
+  auto gl = GLFunctions::Get(context);
+  if (_id > 0) {
+    gl->deleteFramebuffers(1, &_id);
+    _id = 0;
   }
-  if (renderTarget->sampleCount() > 1) {
-    gpu->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
-  }
-  auto texture = renderTargetProxy->getTexture();
-  if (texture != nullptr && texture->hasMipmaps()) {
-    gpu->regenerateMipmapLevels(texture->getSampler());
-  }
-  return true;
 }
 }  // namespace tgfx

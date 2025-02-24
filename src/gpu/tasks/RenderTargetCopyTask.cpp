@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureResolveTask.h"
-#include "gpu/Gpu.h"
+#include "RenderTargetCopyTask.h"
 
 namespace tgfx {
-TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
-    : RenderTask(std::move(renderTargetProxy)) {
+RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                                           std::shared_ptr<TextureProxy> dest)
+    : RenderTask(std::move(source)), dest(std::move(dest)) {
 }
 
-bool TextureResolveTask::execute(Gpu* gpu) {
+bool RenderTargetCopyTask::execute(Gpu* gpu) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
-    LOGE("TextureResolveTask::execute() Failed to get render target!");
+    LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
     return false;
   }
-  if (renderTarget->sampleCount() > 1) {
-    gpu->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
+  auto texture = dest->getTexture();
+  if (texture == nullptr) {
+    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
+    return false;
   }
-  auto texture = renderTargetProxy->getTexture();
-  if (texture != nullptr && texture->hasMipmaps()) {
-    gpu->regenerateMipmapLevels(texture->getSampler());
-  }
+  DEBUG_ASSERT(renderTarget->width() == texture->width() &&
+               renderTarget->height() == texture->height());
+  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
   return true;
 }
+
 }  // namespace tgfx

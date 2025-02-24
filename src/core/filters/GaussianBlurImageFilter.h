@@ -18,27 +18,26 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "BlurImageFilter.h"
+#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-class GLFrameBuffer : public Resource {
+class GaussianBlurImageFilter : public BlurImageFilter {
  public:
-  static std::shared_ptr<GLFrameBuffer> Make(Context* context);
-
-  explicit GLFrameBuffer(unsigned id);
-
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
-  unsigned id() const {
-    return _id;
-  }
+  GaussianBlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode);
 
  protected:
-  void onReleaseGPU() override;
+  Rect onFilterBounds(const Rect& srcRect) const override;
 
- private:
-  unsigned _id = 0;
+  std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
+                                                 const Rect& clipBounds,
+                                                 const TPArgs& args) const override;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                         const FPArgs& args,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

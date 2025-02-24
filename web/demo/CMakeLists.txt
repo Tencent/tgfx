@@ -19,7 +19,7 @@ if (DEFINED EMSCRIPTEN)
     add_executable(hello2d ${HELLO_2D_FILES})
     list(APPEND H2D_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
     list(APPEND H2D_LINK_OPTIONS --no-entry -lembind -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0 -sEXPORT_NAME='Hello2D' -sWASM=1 -sASYNCIFY
-            -sUSE_WEBGL2=1 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify'] -sMODULARIZE=1
+            -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify'] -sMODULARIZE=1
             -sENVIRONMENT='web,worker' -sEXPORT_ES6=1 -sUSE_ES6_IMPORT_META=0
             -sPROXY_POSIX_SOCKETS=1 -sWEBSOCKET_SUBPROTOCOL=binary -lwebsocket.js)
     if (EMSCRIPTEN_PTHREADS)
@@ -27,7 +27,7 @@ if (DEFINED EMSCRIPTEN)
                 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sPROXY_TO_PTHREAD=1
                 -sEXIT_RUNTIME=0 -sINVOKE_RUN=0 -sMALLOC=mimalloc)
         list(APPEND H2D_COMPILE_OPTIONS -fPIC -pthread)
-    else()
+    else ()
         list(APPEND H2D_LINK_OPTIONS -sALLOW_MEMORY_GROWTH=1)
     endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")

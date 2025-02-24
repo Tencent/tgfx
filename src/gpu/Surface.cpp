@@ -36,8 +36,8 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
   auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipmapped,
-                                       ImageOrigin::TopLeft, true);
-  return MakeFrom(std::move(proxy), renderFlags);
+                                       ImageOrigin::TopLeft);
+  return MakeFrom(std::move(proxy), renderFlags, true);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
@@ -61,17 +61,17 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef h
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           uint32_t renderFlags) {
+                                           uint32_t renderFlags, bool clearAll) {
   if (renderTargetProxy == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), renderFlags));
+  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), renderFlags, clearAll));
 }
 
-Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
+Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll)
     : _uniqueID(UniqueID::Next()) {
   DEBUG_ASSERT(proxy != nullptr);
-  renderContext = new RenderContext(std::move(proxy), renderFlags, this);
+  renderContext = new RenderContext(std::move(proxy), renderFlags, clearAll, this);
 }
 
 Surface::~Surface() {
@@ -150,14 +150,14 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   }
   auto renderTarget = renderContext->renderTarget;
   auto drawingManager = getContext()->drawingManager();
-  auto textureProxy = renderTarget->getTextureProxy();
-  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
-    textureProxy = renderTarget->makeTextureProxy();
-    renderContext->copyToTexture(textureProxy, Rect::MakeWH(width(), height()), Point::Zero());
-  }
   if (!renderContext->flush()) {
     // TODO(domchen): Remove the unnecessary resolve task.
     drawingManager->addTextureResolveTask(renderContext->renderTarget);
+  }
+  auto textureProxy = renderTarget->getTextureProxy();
+  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
+    textureProxy = renderTarget->makeTextureProxy();
+    drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
   }
   cachedImage = TextureImage::Wrap(std::move(textureProxy));
   return cachedImage;
@@ -208,6 +208,7 @@ bool Surface::aboutToDraw(bool discardContent) {
     return true;
   }
   auto isUnique = cachedImage.use_count() == 1;
+  auto oldContent = discardContent ? nullptr : cachedImage;
   cachedImage = nullptr;
   if (isUnique) {
     return true;
@@ -222,13 +223,7 @@ bool Surface::aboutToDraw(bool discardContent) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
     return false;
   }
-  if (!discardContent) {
-    auto newTextureProxy = newRenderTarget->getTextureProxy();
-    renderContext->copyToTexture(std::move(newTextureProxy), Rect::MakeWH(width(), height()),
-                                 Point::Zero());
-    renderContext->flush();
-  }
-  renderContext->renderTarget = std::move(newRenderTarget);
+  renderContext->replaceRenderTarget(std::move(newRenderTarget), std::move(oldContent));
   return true;
 }
 

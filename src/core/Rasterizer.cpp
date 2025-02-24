@@ -43,7 +43,8 @@ std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height, Path pat
   if (shape == nullptr) {
     return nullptr;
   }
-  return std::make_shared<ShapeRasterizer>(width, height, std::move(shape), antiAlias);
+  auto aaType = antiAlias ? AAType::Coverage : AAType::None;
+  return std::make_shared<ShapeRasterizer>(width, height, std::move(shape), aaType);
 }
 
 std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
@@ -51,7 +52,8 @@ std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
   if (shape == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::make_shared<ShapeRasterizer>(width, height, std::move(shape), antiAlias);
+  auto aaType = antiAlias ? AAType::Coverage : AAType::None;
+  return std::make_shared<ShapeRasterizer>(width, height, std::move(shape), aaType);
 }
 
 bool Rasterizer::asyncSupport() const {

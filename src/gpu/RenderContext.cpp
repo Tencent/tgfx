@@ -26,9 +26,15 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                             Surface* surface)
-    : renderTarget(std::move(renderTarget)), renderFlags(renderFlags), surface(surface) {
+RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                             bool clearAll, Surface* surface)
+    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
+  if (clearAll) {
+    auto drawingManager = renderTarget->getContext()->drawingManager();
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    opsCompositor->fillRect(renderTarget->bounds(), MCState{},
+                            {Color::Transparent(), BlendMode::Src});
+  }
 }
 
 Rect RenderContext::getClipBounds(const Path& clip) {
@@ -40,9 +46,8 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 
 void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
   auto& clip = state.clip;
-  auto discardContent =
-      clip.isInverseFillType() && clip.isEmpty() && style.hasOnlyColor() && style.isOpaque();
-  if (auto compositor = getOpsCompositor(false, discardContent)) {
+  auto discardContent = clip.isInverseFillType() && clip.isEmpty() && style.isOpaque();
+  if (auto compositor = getOpsCompositor(discardContent)) {
     compositor->fillRect(renderTarget->bounds(), MCState{clip}, style.makeWithMatrix(state.matrix));
   }
 }
@@ -111,16 +116,6 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
   }
 }
 
-AAType RenderContext::getAAType(const FillStyle& style) const {
-  if (renderTarget->sampleCount() > 1) {
-    return AAType::MSAA;
-  }
-  if (style.antiAlias) {
-    return AAType::Coverage;
-  }
-  return AAType::None;
-}
-
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const Stroke* stroke, const MCState& state,
                                      const FillStyle& style) {
@@ -148,9 +143,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   newState.matrix.preConcat(invert);
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto aaType = getAAType(style);
-  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList),
-                                         aaType == AAType::Coverage, rasterizeMatrix, stroke);
+  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), style.antiAlias,
+                                         rasterizeMatrix, stroke);
   auto image = Image::MakeFrom(std::move(rasterizer));
   if (image == nullptr) {
     return;
@@ -242,13 +236,6 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
   }
 }
 
-void RenderContext::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                                  const Point& dstPoint) {
-  if (auto compositor = getOpsCompositor(true)) {
-    compositor->copyToTexture(std::move(textureProxy), srcRect, dstPoint);
-  }
-}
-
 bool RenderContext::flush() {
   if (opsCompositor != nullptr) {
     auto closed = opsCompositor->isClosed();
@@ -259,14 +246,32 @@ bool RenderContext::flush() {
   return false;
 }
 
-OpsCompositor* RenderContext::getOpsCompositor(bool readOnly, bool discardContent) {
-  if (!readOnly && surface && !surface->aboutToDraw(discardContent)) {
+OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
+  if (surface && !surface->aboutToDraw(discardContent)) {
     return nullptr;
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+  } else if (discardContent) {
+    opsCompositor->discardAll();
   }
   return opsCompositor.get();
 }
+
+void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
+                                        std::shared_ptr<Image> oldContent) {
+  renderTarget = std::move(newRenderTarget);
+  if (oldContent != nullptr) {
+    DEBUG_ASSERT(oldContent->width() == renderTarget->width() &&
+                 oldContent->height() == renderTarget->height());
+    auto drawingManager = renderTarget->getContext()->drawingManager();
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    FillStyle fillStyle = {Color::White(), BlendMode::Src};
+    fillStyle.antiAlias = false;
+    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{},
+                             fillStyle);
+  }
+}
+
 }  // namespace tgfx

@@ -47,22 +47,19 @@ class AutoLayerForImageFilter {
 };
 
 static FillStyle CreateFillStyle(const Paint& paint) {
-
-  FillStyle style = {};
   auto shader = paint.getShader();
   Color color = {};
   if (shader && shader->asColor(&color)) {
     color.alpha *= paint.getAlpha();
-    style.color = color;
     shader = nullptr;
   } else {
-    style.color = paint.getColor();
+    color = paint.getColor();
   }
+  FillStyle style = {color, paint.getBlendMode()};
   style.shader = shader;
   style.antiAlias = paint.isAntiAlias();
   style.colorFilter = paint.getColorFilter();
   style.maskFilter = paint.getMaskFilter();
-  style.blendMode = paint.getBlendMode();
   return style;
 }
 

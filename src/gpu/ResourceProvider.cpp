@@ -22,6 +22,14 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
+static constexpr uint16_t kMaxNumAAQuads = 512;  // max possible: (1 << 13) - 1;
+static constexpr uint16_t kVerticesPerAAQuad = 8;
+static constexpr uint16_t kIndicesPerAAQuad = 30;
+
+static constexpr uint16_t kMaxNumNonAAQuads = 1024;  // max possible: (1 << 14) - 1;
+static constexpr uint16_t kVerticesPerNonAAQuad = 4;
+static constexpr uint16_t kIndicesPerNonAAQuad = 6;
+
 class PatternedIndexBufferProvider : public DataProvider {
  public:
   PatternedIndexBufferProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t reps,
@@ -84,10 +92,6 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::aaQuadIndexBuffer() {
   return _aaQuadIndexBuffer;
 }
 
-static constexpr uint16_t kMaxNumNonAAQuads = 1 << 8;  // max possible: (1 << 14) - 1;
-static constexpr uint16_t kVerticesPerNonAAQuad = 4;
-static constexpr uint16_t kIndicesPerNonAAQuad = 6;
-
 std::shared_ptr<GpuBufferProxy> ResourceProvider::createNonAAQuadIndexBuffer() {
   // clang-format off
   static constexpr uint16_t kNonAAQuadIndexPattern[] = {
@@ -106,10 +110,6 @@ uint16_t ResourceProvider::MaxNumNonAAQuads() {
 uint16_t ResourceProvider::NumIndicesPerNonAAQuad() {
   return kIndicesPerNonAAQuad;
 }
-
-static constexpr uint16_t kMaxNumAAQuads = 1 << 6;  // max possible: (1 << 13) - 1;
-static constexpr uint16_t kVerticesPerAAQuad = 8;
-static constexpr uint16_t kIndicesPerAAQuad = 30;
 
 std::shared_ptr<GpuBufferProxy> ResourceProvider::createAAQuadIndexBuffer() {
   // clang-format off

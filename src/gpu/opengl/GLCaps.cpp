@@ -181,7 +181,7 @@ GLCaps::GLCaps(const GLInfo& info) {
   }
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
-  initFSAASupport(info);
+  initMSAASupport(info);
   initFormatMap(info);
 }
 
@@ -299,9 +299,10 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   vertexArrayObjectSupport = version >= GL_VER(2, 0) ||
                              info.hasExtension("GL_OES_vertex_array_object") ||
                              info.hasExtension("OES_vertex_array_object");
-  textureRedSupport = false;
-  multisampleDisableSupport = false;  // no WebGL support
+  textureRedSupport = version >= GL_VER(2, 0);
+  multisampleDisableSupport = false;
   textureBarrierSupport = false;
+  frameBufferFetchSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
@@ -342,7 +343,8 @@ void GLCaps::initFormatMap(const GLInfo& info) {
   }
   // ES 2.0 requires that the internal/external formats match.
   bool useSizedTexFormats =
-      (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)));
+      (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)) ||
+       (standard == GLStandard::WebGL && version >= GL_VER(2, 0)));
   bool useSizedRbFormats = standard == GLStandard::GLES || standard == GLStandard::WebGL;
 
   for (auto& item : pixelFormatMap) {
@@ -379,8 +381,8 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
         if (temp[count - 1] == 1) {
           --count;
         }
-        // We initialize our supported values with 1 (no msaa) and reverse the order
-        // returned by GL so that the array is ascending.
+        // We initialize our supported values with 1 (no msaa) and reverse the order returned by GL
+        // so that the array is ascending.
         pixelFormatMap[pixelFormat].colorSampleCounts.push_back(1);
         for (int j = 0; j < count; ++j) {
           pixelFormatMap[pixelFormat].colorSampleCounts.push_back(temp[count - j - 1]);
@@ -388,8 +390,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
         delete[] temp;
       }
     } else {
-      // Fake out the table using some semi-standard counts up to the max allowed sample
-      // count.
+      // Fake out the table using some semi-standard counts up to the max allowed sample count.
       int maxSampleCnt = 1;
       if (MSFBOType::ES_IMG_MsToTexture == msFBOType) {
         info.getIntegerv(GL_MAX_SAMPLES_IMG, &maxSampleCnt);
@@ -415,30 +416,37 @@ static MSFBOType GetMSFBOType_GLES(uint32_t version, const GLInfo& glInterface) 
   // ES3 driver bugs on at least one device with a tiled GPU (N10).
   if (glInterface.hasExtension("GL_EXT_multisampled_render_to_texture")) {
     return MSFBOType::ES_EXT_MsToTexture;
-  } else if (glInterface.hasExtension("GL_IMG_multisampled_render_to_texture")) {
+  }
+  if (glInterface.hasExtension("GL_IMG_multisampled_render_to_texture")) {
     return MSFBOType::ES_IMG_MsToTexture;
-  } else if (version >= GL_VER(3, 0) ||
-             glInterface.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
-             glInterface.hasExtension("GL_ANGLE_framebuffer_multisample")) {
+  }
+  if (version >= GL_VER(3, 0) || glInterface.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
+      glInterface.hasExtension("GL_ANGLE_framebuffer_multisample")) {
     return MSFBOType::Standard;
-  } else if (glInterface.hasExtension("GL_APPLE_framebuffer_multisample")) {
+  }
+  if (glInterface.hasExtension("GL_APPLE_framebuffer_multisample")) {
     return MSFBOType::ES_Apple;
   }
   return MSFBOType::None;
 }
 
-void GLCaps::initFSAASupport(const GLInfo& info) {
+void GLCaps::initMSAASupport(const GLInfo& info) {
   if (standard == GLStandard::GL) {
     if (version >= GL_VER(3, 0) || info.hasExtension("GL_ARB_framebuffer_object") ||
         (info.hasExtension("GL_EXT_framebuffer_multisample") &&
          info.hasExtension("GL_EXT_framebuffer_blit"))) {
       msFBOType = MSFBOType::Standard;
+      blitRectsMustMatchForMSAASrc = false;
     }
   } else if (standard == GLStandard::GLES) {
     msFBOType = GetMSFBOType_GLES(version, info);
+    blitRectsMustMatchForMSAASrc = true;
   } else if (standard == GLStandard::WebGL) {
-    // No support in WebGL
-    msFBOType = MSFBOType::None;
+    // No support in WebGL 1, but there is for 2.0
+    if (version >= GL_VER(2, 0)) {
+      msFBOType = MSFBOType::Standard;
+      blitRectsMustMatchForMSAASrc = true;
+    }
   }
 
   // We disable MSAA across the board for Intel GPUs for performance reasons.

@@ -16,27 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureResolveTask.h"
-#include "gpu/Gpu.h"
+#pragma once
+
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
-    : RenderTask(std::move(renderTargetProxy)) {
-}
 
-bool TextureResolveTask::execute(Gpu* gpu) {
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
-    LOGE("TextureResolveTask::execute() Failed to get render target!");
-    return false;
+enum class GaussianBlurDirection { Horizontal, Vertical };
+
+class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
+ public:
+  static std::unique_ptr<GaussianBlur1DFragmentProcessor> Make(
+      std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
+      float stepLength);
+
+  std::string name() const override {
+    return "GaussianBlur1DFragmentProcessor";
   }
-  if (renderTarget->sampleCount() > 1) {
-    gpu->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
-  }
-  auto texture = renderTargetProxy->getTexture();
-  if (texture != nullptr && texture->hasMipmaps()) {
-    gpu->regenerateMipmapLevels(texture->getSampler());
-  }
-  return true;
-}
+
+ protected:
+  DEFINE_PROCESSOR_CLASS_ID
+
+  GaussianBlur1DFragmentProcessor(std::unique_ptr<FragmentProcessor> processor, float sigma,
+                                  GaussianBlurDirection direction, float stepLength);
+
+  float sigma = 0.f;
+  GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
+  float stepLength = 1.f;
+};
 }  // namespace tgfx

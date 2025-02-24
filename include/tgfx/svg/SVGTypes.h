@@ -78,8 +78,8 @@ class SVGProperty {
     return _state == SVGPropertyState::Value;
   }
 
-  T* getMaybeNull() const {
-    return _value.value_or(nullptr);
+  std::optional<T> get() const {
+    return _value;
   }
 
   void set(SVGPropertyState state) {

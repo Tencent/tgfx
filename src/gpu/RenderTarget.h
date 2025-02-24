@@ -40,8 +40,7 @@ class RenderTarget : public Resource {
    * Creates a new RenderTarget which uses specified Texture as pixel storage. The caller must
    * ensure the texture is valid for the lifetime of the returned RenderTarget.
    */
-  static std::shared_ptr<RenderTarget> MakeFrom(const Texture* texture, int sampleCount = 1,
-                                                bool clearAll = false);
+  static std::shared_ptr<RenderTarget> MakeFrom(const Texture* texture, int sampleCount = 1);
 
   /**
    * Returns the display width of the render target.

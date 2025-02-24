@@ -188,9 +188,10 @@ class Surface {
   uint32_t _contentVersion = 1u;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           uint32_t renderFlags = 0);
+                                           uint32_t renderFlags = 0, bool clearAll = false);
 
-  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0);
+  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0,
+          bool clearAll = false);
 
   bool aboutToDraw(bool discardContent = false);
 

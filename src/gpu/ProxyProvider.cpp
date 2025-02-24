@@ -129,7 +129,7 @@ static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& cli
 }
 
 std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_ptr<Shape> shape,
-                                                                  bool antiAlias,
+                                                                  AAType aaType,
                                                                   const Rect& clipBounds,
                                                                   uint32_t renderFlags) {
   if (shape == nullptr) {
@@ -153,7 +153,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
     uniqueKey =
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
   }
-  if (antiAlias) {
+  if (aaType != AAType::None) {
     // Add a 1-pixel outset to preserve anti-aliasing results.
     shapeBounds.outset(1.0f, 1.0f);
   } else {
@@ -175,7 +175,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-  auto rasterizer = std::make_shared<ShapeRasterizer>(width, height, std::move(shape), antiAlias);
+  auto rasterizer = std::make_shared<ShapeRasterizer>(width, height, std::move(shape), aaType);
   std::unique_ptr<ShapeBufferProvider> provider = nullptr;
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     provider = std::make_unique<AsyncShapeBufferProvider>(std::move(rasterizer));
@@ -302,8 +302,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
-    std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount,
-    bool clearAll) {
+    std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -313,8 +312,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto uniqueKey = UniqueKey::Make();
-  auto task =
-      RenderTargetCreateTask::MakeFrom(uniqueKey, textureProxy, format, sampleCount, clearAll);
+  auto task = RenderTargetCreateTask::MakeFrom(uniqueKey, textureProxy, format, sampleCount);
   if (task == nullptr) {
     return nullptr;
   }

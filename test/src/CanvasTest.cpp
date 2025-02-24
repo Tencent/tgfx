@@ -109,6 +109,46 @@ TGFX_TEST(CanvasTest, TileMode) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_rgbaaa"));
 }
 
+TGFX_TEST(CanvasTest, DiscardContent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  int width = 100;
+  int height = 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  surface->renderContext->flush();
+  auto* drawingManager = context->drawingManager();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  EXPECT_TRUE(task->ops.size() == 1);
+
+  Paint paint;
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 0.8f});
+  canvas->drawRect(Rect::MakeWH(50, 50), paint);
+  paint.setBlendMode(BlendMode::Src);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  surface->renderContext->flush();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
+  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks[1].get());
+  EXPECT_TRUE(task->ops.size() == 1);
+
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
+  canvas->drawRect(Rect::MakeWH(50, 50), paint);
+  paint.setBlendMode(BlendMode::SrcOver);
+  paint.setShader(Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{static_cast<float>(width), static_cast<float>(height)},
+      {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
+  canvas->drawPaint(paint);
+  surface->renderContext->flush();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
+  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks[2].get());
+  EXPECT_TRUE(task->ops.size() == 1);
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
+}
+
 TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -755,7 +795,9 @@ TGFX_TEST(CanvasTest, saveLayer) {
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   Font font(typeface, 30.f);
   font.setFauxBold(true);
+  paint.setAntiAlias(false);
   canvas->drawSimpleText("Hello TGFX", 50, 400, font, paint);
+  paint.setAntiAlias(true);
   auto atlas = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(atlas != nullptr);
   Matrix matrix[2] = {Matrix::I(), Matrix::MakeTrans(150, 0)};
@@ -1048,7 +1090,7 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   auto sampler = CreateRectangleTexture(context, 110, 110);
   ASSERT_TRUE(sampler.id > 0);
   auto backendTexture = BackendTexture(sampler, 110, 110);
-  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft);
+  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, 4);
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -1304,8 +1346,8 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
   auto surfaceHeight = (static_cast<float>(padding + image->height())) * scale *
                        ceil(sizeof(blendModes) / sizeof(BlendMode) / 4.0f) * 2;
 
-  auto surface =
-      Surface::Make(context, static_cast<int>(offset * 4), static_cast<int>(surfaceHeight));
+  auto surface = Surface::Make(context, static_cast<int>(offset * 4),
+                               static_cast<int>(surfaceHeight), false, 4);
   auto canvas = surface->getCanvas();
 
   Paint backPaint;

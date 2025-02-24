@@ -26,6 +26,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/SVGValue.h"
 
 namespace tgfx {
 
@@ -152,6 +153,7 @@ class SVGNode {
 
   // Non-inheritable presentation attributes
   SVG_PRES_ATTR(ClipPath, SVGFuncIRI, false)
+  SVG_PRES_ATTR(Class, SVGStringType, false)
   SVG_PRES_ATTR(Display, SVGDisplay, false)
   SVG_PRES_ATTR(Mask, SVGFuncIRI, false)
   SVG_PRES_ATTR(Filter, SVGFuncIRI, false)

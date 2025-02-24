@@ -16,6 +16,7 @@ option(TGFX_USE_SWIFTSHADER "Allow build with SwiftShader library" OFF)
 option(TGFX_BUILD_SVG "Allow build the svg module" OFF)
 option(TGFX_BUILD_DRAWERS "Build the tgfx-drawers library" OFF)
 option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
+option(TGFX_USE_FASTER_BLUR "Use faster blur algorithm instead of gaussian blur" ON)
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
@@ -82,6 +83,7 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_ENABLE_PROFILING: ${TGFX_ENABLE_PROFILING}")
 message("EMSCRIPTEN_PTHREADS: ${EMSCRIPTEN_PTHREADS}")
+message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -212,6 +214,12 @@ endif ()
 if (TGFX_BUILD_SVG)
     # SVG and PDF exports require glyphs to be convertible back to Unicode.
     list(APPEND TGFX_DEFINES TGFX_USE_GLYPH_TO_UNICODE)
+endif ()
+
+if (TGFX_USE_FASTER_BLUR)
+    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*GaussianBlur.*")
+else ()
+    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*DualBlur.*")
 endif ()
 
 if (TGFX_USE_FREETYPE)

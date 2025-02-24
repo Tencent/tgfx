@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,39 +18,23 @@
 
 #pragma once
 
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 class BlurImageFilter : public ImageFilter {
  public:
-  BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode,
-                  float scaleFactor);
+  BlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode)
+      : ImageFilter(), blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
+  }
 
-  Point blurOffset;
-  float downScaling;
-  int iteration;
-  TileMode tileMode;
-  float scaleFactor = 1.0f;
+  float blurrinessX = 0.0f;
+  float blurrinessY = 0.0f;
+  TileMode tileMode = TileMode::Decal;
 
  protected:
   Type type() const override {
     return Type::Blur;
   }
-
-  Rect onFilterBounds(const Rect& srcRect) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                 const Rect& clipBounds,
-                                                 const TPArgs& args) const override;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
-
-  void draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-            std::unique_ptr<FragmentProcessor> imageProcessor, const Size& imageSize,
-            bool isDown) const;
 };
+
 }  // namespace tgfx

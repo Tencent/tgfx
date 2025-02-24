@@ -24,7 +24,8 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/ops/ClearOp.h"
-#include "gpu/ops/CopyOp.h"
+#include "gpu/ops/DstTextureCopyOp.h"
+#include "gpu/ops/ResolveOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -114,19 +115,22 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   }
   auto aaType = getAAType(style);
   auto proxyProvider = renderTarget->getContext()->proxyProvider();
-  auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType == AAType::Coverage,
-                                                       clipBounds, renderFlags);
+  auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), style.color.premultiply(), uvMatrix, aaType);
   addDrawOp(std::move(drawOp), clip, style, localBounds, deviceBounds);
 }
 
-void OpsCompositor::copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                                  const Point& dstPoint) {
-  flushPendingOps();
-  auto op = CopyOp::Make(std::move(textureProxy), srcRect, dstPoint);
-  if (op != nullptr) {
-    ops.push_back(std::move(op));
+void OpsCompositor::discardAll() {
+  ops.clear();
+  if (pendingType != PendingOpType::Unknown) {
+    pendingType = PendingOpType::Unknown;
+    pendingClip = {};
+    pendingStyle = {};
+    pendingImage = nullptr;
+    pendingSampling = {};
+    pendingRects.clear();
+    pendingRRects.clear();
   }
 }
 
@@ -231,11 +235,12 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   if (!style.hasOnlyColor() || !style.isOpaque() || !state.matrix.rectStaysRect()) {
     return false;
   }
+  auto deviceBounds = renderTarget->bounds();
   auto& clip = state.clip;
   auto clipRect = Rect::MakeEmpty();
   if (clip.isInverseFillType()) {
     if (clip.isEmpty()) {
-      clipRect = renderTarget->bounds();
+      clipRect = deviceBounds;
     } else {
       return false;
     }
@@ -249,6 +254,10 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   }
   bounds.round();
   FlipYIfNeeded(&bounds, renderTarget);
+  if (bounds == deviceBounds) {
+    // discard all previous ops if the clear rect covers the entire render target.
+    ops.clear();
+  }
   auto format = renderTarget->format();
   auto caps = renderTarget->getContext()->caps();
   const auto& writeSwizzle = caps->getWriteSwizzle(format);
@@ -286,7 +295,8 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const FillStyle& style, b
   if (!BlendModeAsCoeff(style.blendMode)) {
     auto caps = renderTarget->getContext()->caps();
     if (!caps->frameBufferFetchSupport &&
-        (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr)) {
+        (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr ||
+         renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
   }
@@ -318,7 +328,7 @@ std::pair<std::optional<Rect>, bool> OpsCompositor::getClipRect(const Path& clip
 
 std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AAType aaType) {
   auto uniqueKey = PathRef::GetUniqueKey(clip);
-  if (aaType == AAType::Coverage) {
+  if (aaType != AAType::None) {
     static const auto AntialiasFlag = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &AntialiasFlag, 1);
   }
@@ -338,22 +348,22 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto shape = Shape::MakeFrom(clip);
     shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
     auto proxyProvider = renderTarget->getContext()->proxyProvider();
-    auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType == AAType::Coverage,
-                                                         clipBounds, renderFlags);
+    auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), Color::White(), uvMatrix, aaType);
-    auto target = RenderTargetProxy::MakeFallback(context, width, height, true, 1, false,
-                                                  ImageOrigin::TopLeft, true);
-    if (target == nullptr) {
+    auto clipRenderTarget = RenderTargetProxy::MakeFallback(context, width, height, true);
+    if (clipRenderTarget == nullptr) {
       return nullptr;
     }
-    clipTexture = target->getTextureProxy();
-    std::vector<std::unique_ptr<Op>> ops = {};
+    clipTexture = clipRenderTarget->getTextureProxy();
+    std::vector<std::unique_ptr<Op> > ops = {};
+    auto clearOp = ClearOp::Make(Color::Transparent(), clipRenderTarget->bounds());
+    ops.push_back(std::move(clearOp));
     ops.push_back(std::move(drawOp));
-    drawingManager->addOpsRenderTask(std::move(target), std::move(ops));
+    drawingManager->addOpsRenderTask(std::move(clipRenderTarget), std::move(ops));
   } else {
     auto rasterizer =
-        Rasterizer::MakeFrom(width, height, clip, aaType == AAType::Coverage, rasterizeMatrix);
+        Rasterizer::MakeFrom(width, height, clip, aaType != AAType::None, rasterizeMatrix);
     clipTexture = context->proxyProvider()->createTextureProxy({}, rasterizer, false, renderFlags);
   }
   clipKey = uniqueKey;
@@ -391,34 +401,47 @@ std::unique_ptr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip
       DeviceSpaceTextureEffect::Make(std::move(textureProxy), uvMatrix));
 }
 
-DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds) {
+DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
   auto caps = renderTarget->getContext()->caps();
   if (caps->frameBufferFetchSupport) {
     return {};
   }
+  auto bounds = Rect::MakeEmpty();
+  auto textureProxy = caps->textureBarrierSupport ? renderTarget->getTextureProxy() : nullptr;
+  if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
+    bounds = deviceBounds;
+    if (aaType != AAType::None) {
+      bounds.outset(1.0f, 1.0f);
+    }
+    bounds.roundOut();
+    if (!bounds.intersect(renderTarget->bounds())) {
+      return {};
+    }
+    FlipYIfNeeded(&bounds, renderTarget);
+  }
   DstTextureInfo dstTextureInfo = {};
-  auto textureProxy = renderTarget->getTextureProxy();
-  if (caps->textureBarrierSupport && textureProxy != nullptr) {
+  if (textureProxy != nullptr) {
+    if (renderTarget->sampleCount() > 1) {
+      auto resolveOp = ResolveOp::Make(bounds);
+      if (resolveOp) {
+        ops.push_back(std::move(resolveOp));
+      }
+    }
     dstTextureInfo.textureProxy = std::move(textureProxy);
     dstTextureInfo.requiresBarrier = true;
     return dstTextureInfo;
   }
-  auto bounds = renderTarget->bounds();
-  if (!bounds.intersect(deviceBounds)) {
-    return {};
-  }
-  FlipYIfNeeded(&bounds, renderTarget);
-  bounds.roundOut();
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
-  auto context = renderTarget->getContext();
-  textureProxy = context->proxyProvider()->createTextureProxy(
+  auto proxyProvider = renderTarget->getContext()->proxyProvider();
+  textureProxy = proxyProvider->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
-      PixelFormat::RGBA_8888, false, renderTarget->origin());
-  auto op = CopyOp::Make(textureProxy, bounds, Point::Zero());
-  if (op == nullptr) {
+      renderTarget->format(), false, renderTarget->origin());
+  auto dstTextureCopyOp = DstTextureCopyOp::Make(textureProxy, static_cast<int>(bounds.x()),
+                                                 static_cast<int>(bounds.y()));
+  if (dstTextureCopyOp == nullptr) {
     return {};
   }
-  ops.push_back(std::move(op));
+  ops.push_back(std::move(dstTextureCopyOp));
   dstTextureInfo.textureProxy = std::move(textureProxy);
   return dstTextureInfo;
 }
@@ -458,7 +481,7 @@ void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, cons
   op->setScissorRect(scissorRect);
   op->setBlendMode(style.blendMode);
   if (!BlendModeAsCoeff(style.blendMode)) {
-    auto dstTextureInfo = makeDstTextureInfo(deviceBounds);
+    auto dstTextureInfo = makeDstTextureInfo(deviceBounds, aaType);
     auto xferProcessor = PorterDuffXferProcessor::Make(style.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }

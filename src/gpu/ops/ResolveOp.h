@@ -19,21 +19,18 @@
 #pragma once
 
 #include "Op.h"
-#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class CopyOp : public Op {
+class ResolveOp : public Op {
  public:
-  static std::unique_ptr<CopyOp> Make(std::shared_ptr<TextureProxy> textureProxy,
-                                      const Rect& srcRect, const Point& dstPoint);
+  static std::unique_ptr<ResolveOp> Make(const Rect& bounds);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  CopyOp(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect, const Point& dstPoint);
+  Rect bounds = Rect::MakeEmpty();
 
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  Rect srcRect = Rect::MakeEmpty();
-  Point dstPoint = Point::Zero();
+  explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
+  }
 };
 }  // namespace tgfx
