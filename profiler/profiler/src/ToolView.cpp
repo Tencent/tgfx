@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -152,21 +152,21 @@ void ToolView::connectAddress() {
   auto addr = textCombobox->currentText();
   auto byteArray = addr.toLatin1();
   auto aptr = byteArray.data();
-  while( *aptr == ' ' || *aptr == '\t' ) aptr++;
+  while(*aptr == ' ' || *aptr == '\t') aptr++;
   auto aend = aptr;
-  while( *aend && *aend != ' ' && *aend != '\t' ) aend++;
+  while(*aend && *aend != ' ' && *aend != '\t') aend++;
 
-  if( aptr != aend ) {
+  if(aptr != aend) {
 
     auto mainView = static_cast<MainView*>(this->parent());
-    std::string address( aptr, aend );
+    std::string address(aptr, aend);
 
     auto adata = address.data();
     auto ptr = adata + address.size() - 1;
-    while( ptr > adata && *ptr != ':' ) ptr--;
+    while(ptr > adata && *ptr != ':') ptr--;
     if (*ptr == ':') {
-      std::string addrPart = std::string( adata, ptr );
-      uint16_t portPart = (uint16_t)atoi( ptr+1 );
+      std::string addrPart = std::string(adata, ptr);
+      uint16_t portPart = (uint16_t)atoi(ptr+1);
       mainView->connectClient(addrPart.c_str(), portPart);
     }
     else {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -97,7 +97,7 @@ void MainView::connectClient(const char* address, const uint16_t port) {
 }
 
 void MainView::openFile() {
-  tracy::Fileselector::OpenFile( "tracy", "Tracy Profiler trace file", [&]( const char* fn ) {
+  tracy::Fileselector::OpenFile("tracy", "Tracy Profiler trace file", [&](const char* fn) {
     auto file = std::shared_ptr<tracy::FileRead>(tracy::FileRead::Open(fn));
     if (file) {
       toolView->setParent(nullptr);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -474,7 +474,7 @@ void TimelineView::drawZonelist(const TimelineContext& ctx, const std::vector<tr
           tgfx::Point lp3 = dpos + tgfx::Point(p1.x + p2.x - 1, p1.y);
           drawLine(canvas, lp1, lp2, lp3, zoneColor.accentColor);
 
-          const auto darkColor = tracy::DarkenColor( zoneColor.color );
+          const auto darkColor = tracy::DarkenColor(zoneColor.color);
           lp1 = dpos + tgfx::Point(p1.x, p1.y + p2.y);
           lp2 = dpos + tgfx::Point(p1.x + p2.x - 1, p1.y + p2.y);
           lp3 = dpos + tgfx::Point(p1.x + p2.x - 1, p1.y);
@@ -590,12 +590,12 @@ void TimelineView::drawTimeline(tgfx::Canvas* canvas) {
 }
 
 void TimelineView::zoomToRange(int64_t start, int64_t end, bool pause) {
-  if( start == end )
+  if(start == end)
   {
     end = start + 1;
   }
 
-  if( pause )
+  if(pause)
   {
     *viewMode = ViewMode::Paused;
   }
@@ -605,7 +605,7 @@ void TimelineView::zoomToRange(int64_t start, int64_t end, bool pause) {
     const auto rangeCurr = viewData->zvEnd - viewData->zvStart;
     const auto rangeDest = end - start;
     zoomAnim.start0 = viewData->zvStart;
-    zoomAnim.start1 = viewData->zvStart - ( rangeDest - rangeCurr );
+    zoomAnim.start1 = viewData->zvStart - (rangeDest - rangeCurr);
     zoomAnim.end0 = viewData->zvEnd;
     zoomAnim.end1 = viewData->zvEnd;
   }
@@ -717,13 +717,13 @@ void TimelineView::mouseMoveEvent(QMouseEvent* event) {
     if (dpx != 0) {
       viewData->zvStart -= dpx;
       viewData->zvEnd -= dpx;
-      if( viewData->zvStart < -1000ll * 1000 * 1000 * 60 * 60 * 24 * 5 )
+      if(viewData->zvStart < -1000ll * 1000 * 1000 * 60 * 60 * 24 * 5)
       {
         const auto range = viewData->zvEnd - viewData->zvStart;
         viewData->zvStart = -1000ll * 1000 * 1000 * 60 * 60 * 24 * 5;
         viewData->zvEnd = viewData->zvStart + range;
       }
-      else if( viewData->zvEnd > 1000ll * 1000 * 1000 * 60 * 60 * 24 * 5 )
+      else if(viewData->zvEnd > 1000ll * 1000 * 1000 * 60 * 60 * 24 * 5)
       {
         const auto range = viewData->zvEnd - viewData->zvStart;
         viewData->zvEnd = 1000ll * 1000 * 1000 * 60 * 60 * 24 * 5;

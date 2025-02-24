@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -100,5 +100,5 @@ void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& t
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, float y, uint32_t color, const char* text);
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color, const char* text);
 
-uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic );
+uint32_t getThreadColor(uint64_t thread, int depth, bool dynamic);
 const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name, tgfx::Rect tsz, float zsz);

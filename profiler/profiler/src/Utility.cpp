@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -78,16 +78,16 @@ bool isEqual(float num1, float num2) {
 }
 
 tgfx::Color getTgfxColor(uint32_t color) {
-  uint8_t r = (color      ) & 0xFF;
+  uint8_t r = (color     ) & 0xFF;
   uint8_t g = (color >>  8) & 0xFF;
   uint8_t b = (color >> 16) & 0xFF;
   uint8_t a = (color >> 24) & 0xFF;
   return tgfx::Color::FromRGBA(r, g, b, a);
 }
 
-uint32_t getThreadColor( uint64_t thread, int depth, bool dynamic ) {
-  if( !dynamic ) return 0xFFCC5555;
-  return tracy::GetHsvColor( thread, depth );
+uint32_t getThreadColor(uint64_t thread, int depth, bool dynamic) {
+  if(!dynamic) return 0xFFCC5555;
+  return tracy::GetHsvColor(thread, depth);
 }
 
 tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize) {
@@ -100,7 +100,7 @@ tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize
     strText = std::string(text, textSize);
   }
   auto typeface = appHost->getTypeface("default");
-  tgfx::Font font(typeface, FontSize );
+  tgfx::Font font(typeface, FontSize);
   auto textBlob = tgfx::TextBlob::MakeFrom(strText, font);
   auto rect = textBlob->getBounds();
   TextSizeMap.emplace(strText, rect);
@@ -159,7 +159,7 @@ void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& t
   tgfx::Paint paint;
   paint.setColor(getTgfxColor(color));
   auto typeface = appHost->getTypeface("default");
-  tgfx::Font font(typeface, FontSize );
+  tgfx::Font font(typeface, FontSize);
   canvas->drawSimpleText(text, x , y , font, paint);
 }
 
@@ -174,31 +174,31 @@ void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, flo
 }
 
 const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name, tgfx::Rect tsz, float zsz) {
-    assert( type != ShortenName::Never );
-    if( name[0] == '<' || name[0] == '[' ) return name;
-    if( type == ShortenName::Always ) zsz = 0;
+    assert(type != ShortenName::Never);
+    if(name[0] == '<' || name[0] == '[') return name;
+    if(type == ShortenName::Always) zsz = 0;
 
     static char buf[64*1024];
     char tmp[64*1024];
 
-    auto end = name + strlen( name );
+    auto end = name + strlen(name);
     auto ptr = name;
     auto dst = tmp;
     int cnt = 0;
     for(;;)
     {
         auto start = ptr;
-        while( ptr < end && *ptr != '<' ) ptr++;
-        memcpy( dst, start, size_t(ptr - start + 1) );
+        while(ptr < end && *ptr != '<') ptr++;
+        memcpy(dst, start, size_t(ptr - start + 1));
         dst += ptr - start + 1;
-        if( ptr == end ) break;
+        if(ptr == end) break;
         cnt++;
         ptr++;
-        while( cnt > 0 )
+        while(cnt > 0)
         {
-            if( ptr == end ) break;
-            if( *ptr == '<' ) cnt++;
-            else if( *ptr == '>' ) cnt--;
+            if(ptr == end) break;
+            if(*ptr == '<') cnt++;
+            else if(*ptr == '>') cnt--;
             ptr++;
         }
         *dst++ = '>';
@@ -211,24 +211,24 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
     for(;;)
     {
         auto start = ptr;
-        while( ptr < end && *ptr != '(' ) ptr++;
-        memcpy( dst, start, size_t(ptr - start + 1) );
+        while(ptr < end && *ptr != '(') ptr++;
+        memcpy(dst, start, size_t(ptr - start + 1));
         dst += ptr - start + 1;
-        if( ptr == end ) break;
+        if(ptr == end) break;
         cnt++;
         ptr++;
-        while( cnt > 0 )
+        while(cnt > 0)
         {
-            if( ptr == end ) break;
-            if( *ptr == '(' ) cnt++;
-            else if( *ptr == ')' ) cnt--;
+            if(ptr == end) break;
+            if(*ptr == '(') cnt++;
+            else if(*ptr == ')') cnt--;
             ptr++;
         }
         *dst++ = ')';
     }
 
     end = dst-1;
-    if( end - buf > 6 && memcmp( end-6, " const", 6 ) == 0 )
+    if(end - buf > 6 && memcmp(end-6, " const", 6) == 0)
     {
         dst[-7] = '\0';
         end -= 6;
@@ -238,39 +238,39 @@ const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char
     for(;;)
     {
         auto match = TypesList;
-        while( *match )
+        while(*match)
         {
             auto m = *match;
             auto p = ptr;
-            while( *m )
+            while(*m)
             {
-                if( *m != *p ) break;
+                if(*m != *p) break;
                 m++;
                 p++;
             }
-            if( !*m )
+            if(!*m)
             {
                 ptr = p;
                 break;
             }
             match++;
         }
-        if( !*match ) break;
+        if(!*match) break;
     }
 
     tsz = getTextSize(appHost, ptr, static_cast<size_t>(end - ptr));
 
-    if( type == ShortenName::OnlyNormalize || tsz.width() < zsz ) return ptr;
+    if(type == ShortenName::OnlyNormalize || tsz.width() < zsz) return ptr;
 
     for(;;)
     {
         auto p = ptr;
-        while( p < end && *p != ':' ) p++;
-        if( p == end ) return ptr;
+        while(p < end && *p != ':') p++;
+        if(p == end) return ptr;
         p++;
-        while( p < end && *p == ':' ) p++;
+        while(p < end && *p == ':') p++;
         ptr = p;
         tsz = getTextSize(appHost, ptr, static_cast<size_t>(end - ptr));
-        if( tsz.width() < zsz ) return ptr;
+        if(tsz.width() < zsz) return ptr;
     }
 }

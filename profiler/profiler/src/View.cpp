@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -144,7 +144,7 @@ View::View(int width, const Config& config, QWidget* parent)
   : QWidget(parent)
   , width(width)
   , worker(config.memoryLimit == 0 ? -1 :
-  ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ))
+  (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100))
   , viewMode(ViewMode::LastFrames)
   , config(config)
 {
@@ -155,7 +155,7 @@ View::View(const char* addr, uint16_t port, int width, const Config& config, QWi
   : QWidget(parent)
   , width(width)
   , worker(addr, port, config.memoryLimit == 0 ? -1 :
-    ( config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100 ) )
+    (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100))
   , viewMode(ViewMode::LastFrames)
   , config(config)
 {
@@ -210,12 +210,12 @@ void View::changeViewMode(bool pause) {
 }
 
 void View::saveFile() {
-  auto cb = [this]( const char* fn ) {
-    const auto sz = strlen( fn );
-    if( sz < 7 || memcmp( fn + sz - 6, ".tracy", 6 ) != 0 )
+  auto cb = [this](const char* fn) {
+    const auto sz = strlen(fn);
+    if(sz < 7 || memcmp(fn + sz - 6, ".tracy", 6) != 0)
     {
       char tmp[1024];
-      snprintf( tmp, 1024, "%s.tracy", fn );
+      snprintf(tmp, 1024, "%s.tracy", fn);
       filenameStaging = tmp;
     }
     else
@@ -223,7 +223,7 @@ void View::saveFile() {
       filenameStaging = fn;
     }
   };
-  tracy::Fileselector::SaveFile( "tracy", "Tracy Profiler trace file", cb );
+  tracy::Fileselector::SaveFile("tracy", "Tracy Profiler trace file", cb);
 
   if (!filenameStaging.empty()) {
     saveFileDialog = new SaveFileDialog(filenameStaging, this);

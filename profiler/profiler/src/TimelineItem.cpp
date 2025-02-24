@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -36,24 +36,24 @@ void TimelineItem::adjustThreadHeight(bool firstFrame, int yBegin, int yEnd) {
   const auto baseMove = 1.0;
 
   const auto newHeight = yEnd - yBegin;
-  if( firstFrame )
+  if(firstFrame)
   {
     height = newHeight;
   }
-  else if( height != newHeight )
+  else if(height != newHeight)
   {
     const auto diff = newHeight - height;
     // const auto preClampMove = diff * speed * ImGui::GetIO().DeltaTime;
     const auto preClampMove = diff * speed * 1;
-    if( diff > 0 )
+    if(diff > 0)
     {
       const auto move = preClampMove + baseMove;
-      height = int( std::min<double>( height + move, newHeight ) );
+      height = int(std::min<double>(height + move, newHeight));
     }
     else
     {
       const auto move = preClampMove - baseMove;
-      height = int( std::max<double>( height + move, newHeight ) );
+      height = int(std::max<double>(height + move, newHeight));
     }
   }
 }
@@ -80,7 +80,7 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
   const auto ostep = ty + 1;
   const auto& wpos = ctx.wpos;
   const auto yPos = wpos.y + yBegin;
-  const auto dpos = wpos + tgfx::Point( 0.5f, 0.5f );
+  const auto dpos = wpos + tgfx::Point(0.5f, 0.5f);
 
   yEnd += static_cast<int>(ostep);
   if (showFull) {

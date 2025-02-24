@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -45,7 +45,7 @@ void FramesView::initView() {
 }
 
 uint64_t FramesView::getFrameNumber(const tracy::FrameData& frameData, uint64_t i) {
-  if( frameData.name == 0 ) {
+  if(frameData.name == 0) {
     const auto offset = worker->GetFrameOffset();
     if(offset == 0) {
       return i;
@@ -64,11 +64,11 @@ uint32_t GetFrameColor(uint64_t time, uint64_t target) {
 }
 
 int GetFrameWidth(int frameScale) {
-  return frameScale == 0 ? 4 : ( frameScale < 0 ? 6 : 1 );
+  return frameScale == 0 ? 4 : (frameScale < 0 ? 6 : 1);
 }
 
 int GetFrameGroup(int frameScale) {
-  return frameScale < 2 ? 1 : ( 1 << ( frameScale - 1 ) );
+  return frameScale < 2 ? 1 : (1 << (frameScale - 1));
 };
 
 void FramesView::draw() {
@@ -111,9 +111,9 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
       setViewToLastFrames();
     }
     else {
-      assert( *viewMode == ViewMode::LastRange );
+      assert(*viewMode == ViewMode::LastRange);
       const auto delta = worker->GetLastTime() - viewData->zvEnd;
-      if( delta != 0 )
+      if(delta != 0)
       {
         viewData->zvStart += delta;
         viewData->zvEnd += delta;
@@ -142,7 +142,7 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     }
     else {
       auto p1 = tgfx::Point(1.f + i,(float)height() -2 - frameHeight);
-      auto p2 = tgfx::Point(1.f + i,(float)height() -2 );
+      auto p2 = tgfx::Point(1.f + i,(float)height() -2);
       drawLine(canvas,p1,p2,color);
     }
     i++;
@@ -170,7 +170,7 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
       drawRect(canvas, 2.f + fx0 , 0 , fx1 - fx0, h, 0x55DD22DD);
       auto p1 = tgfx::Point(2.f + fx0 , -1.f);
       auto p2 = tgfx::Point(2.f + fx0,h - 1.f);
-      auto p3 = tgfx::Point(fx1, -1.f );
+      auto p3 = tgfx::Point(fx1, -1.f);
       auto p4 = tgfx::Point(fx1, h - 1.f);
 
       drawLine(canvas,p1,p2,0x55FF55FF);
@@ -198,16 +198,16 @@ void FramesView::createAppHost() {
 }
 
 void FramesView::setViewToLastFrames() {
-  auto total = worker->GetFrameCount( *frames );
+  auto total = worker->GetFrameCount(*frames);
 
-  viewData->zvStart = worker->GetFrameBegin( *frames, (size_t)std::max( 0, int(total) - 4 ) );
-  if( total == 1 ) {
+  viewData->zvStart = worker->GetFrameBegin(*frames, (size_t)std::max(0, int(total) - 4));
+  if(total == 1) {
     viewData->zvEnd = worker->GetLastTime();
   }
   else {
-    viewData->zvEnd = worker->GetFrameBegin( *frames, total - 1 );
+    viewData->zvEnd = worker->GetFrameBegin(*frames, total - 1);
   }
-  if( viewData->zvEnd == viewData->zvStart ) {
+  if(viewData->zvEnd == viewData->zvStart) {
     viewData->zvEnd = worker->GetLastTime();
   }
 }

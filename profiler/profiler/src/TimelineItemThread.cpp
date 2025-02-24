@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -41,7 +41,7 @@ int TimelineItemThread::preprocessZoneLevel(const TimelineContext& ctx, const tr
   }
   else {
     return preprocessZoneLevel<tracy::VectorAdapterPointer<tracy::ZoneEvent>>
-    ( ctx, vec, depth, visible, inheritedColor );
+    (ctx, vec, depth, visible, inheritedColor);
   }
 }
 
@@ -51,40 +51,39 @@ int TimelineItemThread::preprocessZoneLevel(const TimelineContext& ctx, const V&
   const auto vEnd = ctx.vEnd;
   const auto nspx = ctx.nspx;
 
-  // const auto MinVisNs = int64_t( round( GetScale() * MinVisSize * nspx ) );
   const auto MinVisNs = int64_t(round(MinVisSize * nspx));
 
-  auto it = std::lower_bound( vec.begin(), vec.end(), vStart, [this] ( const auto& l, const auto& r ) { Adapter a; return worker.GetZoneEnd( a(l) ) < r; } );
-  if( it == vec.end() ) return depth;
+  auto it = std::lower_bound(vec.begin(), vec.end(), vStart, [this] (const auto& l, const auto& r) { Adapter a; return worker.GetZoneEnd(a(l)) < r; });
+  if(it == vec.end()) return depth;
 
-  const auto zitend = std::lower_bound( it, vec.end(), vEnd, [] ( const auto& l, const auto& r ) { Adapter a; return a(l).Start() < r; } );
+  const auto zitend = std::lower_bound(it, vec.end(), vEnd, [] (const auto& l, const auto& r) { Adapter a; return a(l).Start() < r; });
   if(it == zitend) return depth;
 
   Adapter a;
-  if(!a(*it).IsEndValid() && worker.GetZoneEnd( a(*it)) < vStart) return depth;
-  if(worker.GetZoneEnd( a(*(zitend-1))) < vStart) return depth;
+  if(!a(*it).IsEndValid() && worker.GetZoneEnd(a(*it)) < vStart) return depth;
+  if(worker.GetZoneEnd(a(*(zitend-1))) < vStart) return depth;
 
   int maxdepth = depth + 1;
-  while( it < zitend )
+  while(it < zitend)
   {
       auto& ev = a(*it);
-      const auto end = worker.GetZoneEnd( ev );
+      const auto end = worker.GetZoneEnd(ev);
       const auto zsz = end - ev.Start();
-      if( zsz < MinVisNs )
+      if(zsz < MinVisNs)
       {
           auto nextTime = end + MinVisNs;
           auto next = it + 1;
           for(;;)
           {
-              next = std::lower_bound( next, zitend, nextTime, [this] ( const auto& l, const auto& r ) { Adapter a; return worker.GetZoneEnd( a(l) ) < r; } );
-              if( next == zitend ) break;
+              next = std::lower_bound(next, zitend, nextTime, [this] (const auto& l, const auto& r) { Adapter a; return worker.GetZoneEnd(a(l)) < r; });
+              if(next == zitend) break;
               auto prev = next - 1;
-              const auto pt = worker.GetZoneEnd( a(*prev) );
-              const auto nt = worker.GetZoneEnd( a(*next) );
-              if( nt - pt >= MinVisNs ) break;
+              const auto pt = worker.GetZoneEnd(a(*prev));
+              const auto nt = worker.GetZoneEnd(a(*next));
+              if(nt - pt >= MinVisNs) break;
               nextTime = nt + MinVisNs;
           }
-          if( visible ) draws.emplace_back( tracy::TimelineDraw { tracy::TimelineDrawType::Folded, uint16_t( depth ), (void**)&ev, worker.GetZoneEnd( a(*(next-1)) ), uint32_t( next - it ), inheritedColor } );
+          if(visible) draws.emplace_back(tracy::TimelineDraw { tracy::TimelineDrawType::Folded, uint16_t(depth), (void**)&ev, worker.GetZoneEnd(a(*(next-1))), uint32_t(next - it), inheritedColor });
           it = next;
       }
       else
@@ -92,31 +91,31 @@ int TimelineItemThread::preprocessZoneLevel(const TimelineContext& ctx, const V&
           const auto hasChildren = ev.HasChildren();
           auto currentInherited = inheritedColor;
           auto childrenInherited = inheritedColor;
-          if( timelineView.getViewData()->inheritParentColors )
+          if(timelineView.getViewData()->inheritParentColors)
           {
               uint32_t color = 0;
-              if( worker.HasZoneExtra( ev ) )
+              if(worker.HasZoneExtra(ev))
               {
-                  const auto& extra = worker.GetZoneExtra( ev );
+                  const auto& extra = worker.GetZoneExtra(ev);
                   color = extra.color.Val();
               }
-              if( color == 0 )
+              if(color == 0)
               {
-                  auto& srcloc = worker.GetSourceLocation( ev.SrcLoc() );
+                  auto& srcloc = worker.GetSourceLocation(ev.SrcLoc());
                   color = srcloc.color;
               }
-              if( color != 0 )
+              if(color != 0)
               {
                   currentInherited = color | 0xFF000000;
-                  if( hasChildren ) childrenInherited = tracy::DarkenColorSlightly(color);
+                  if(hasChildren) childrenInherited = tracy::DarkenColorSlightly(color);
               }
           }
-          if( hasChildren )
+          if(hasChildren)
           {
-              const auto d = preprocessZoneLevel( ctx, worker.GetZoneChildren( ev.Child() ), depth + 1, visible, childrenInherited );
-              if( d > maxdepth ) maxdepth = d;
+              const auto d = preprocessZoneLevel(ctx, worker.GetZoneChildren(ev.Child()), depth + 1, visible, childrenInherited);
+              if(d > maxdepth) maxdepth = d;
           }
-          if( visible ) draws.emplace_back(tracy::TimelineDraw {tracy::TimelineDrawType::Zone, uint16_t( depth ), (void**)&ev, 0, 0, currentInherited } );
+          if(visible) draws.emplace_back(tracy::TimelineDraw {tracy::TimelineDrawType::Zone, uint16_t(depth), (void**)&ev, 0, 0, currentInherited });
           ++it;
       }
     }
@@ -141,15 +140,15 @@ bool TimelineItemThread::drawContent(const TimelineContext& ctx, int& offset, tg
 
 uint32_t TimelineItemThread::headerColor() const {
   auto& crash = worker.GetCrashEvent();
-  if( crash.thread == threadData->id ) return 0xFF2222FF;
-  if( threadData->isFiber ) return 0xFF88FF88;
+  if(crash.thread == threadData->id) return 0xFF2222FF;
+  if(threadData->isFiber) return 0xFF88FF88;
   return 0xFFFFFFFF;
 }
 
 uint32_t TimelineItemThread::headerColorInactive() const {
   auto& crash = worker.GetCrashEvent();
-  if( crash.thread == threadData->id ) return 0xFF111188;
-  if( threadData->isFiber ) return 0xFF448844;
+  if(crash.thread == threadData->id) return 0xFF111188;
+  if(threadData->isFiber) return 0xFF448844;
   return 0xFF888888;
 }
 
@@ -158,6 +157,6 @@ uint32_t TimelineItemThread::headlineColor() const {
 }
 
 const char* TimelineItemThread::headerLable() const {
-  return worker.GetThreadName( threadData->id );
+  return worker.GetThreadName(threadData->id);
 }
 
