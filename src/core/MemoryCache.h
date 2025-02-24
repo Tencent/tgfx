@@ -40,6 +40,10 @@ class MemoryCache final {
 
     void resetCache();
 
+    size_t memoryBlockIncrementBytes() const { return blockIncrementBytes; }
+
+    size_t memoryBlockNum() const { return blockNum; }
+
     class Block final {
       public:
         explicit Block(size_t allocationSize)
@@ -78,7 +82,7 @@ class MemoryCache final {
     static constexpr size_t kMinAllocationSize = 1 << 12;
 
     size_t blockIncrementBytes = kMinAllocationSize;
-
+    size_t blockNum = 0;
     Block *head = nullptr;
     Block *tail = nullptr;
     Block *current = nullptr;

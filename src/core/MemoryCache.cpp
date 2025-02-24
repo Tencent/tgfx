@@ -24,10 +24,10 @@ namespace tgfx {
 MemoryCache::MemoryCache(size_t blockIncrementBytes) {
   blockIncrementBytes = blockIncrementBytes < kMinAllocationSize ? kMinAllocationSize : blockIncrementBytes;
   this->blockIncrementBytes = AlignedAllocSize(blockIncrementBytes);
-  void *buffer = malloc(this->blockIncrementBytes);
-  head = new(buffer) Block(this->blockIncrementBytes);
+  head = createNewBlock(this->blockIncrementBytes);
   tail = head;
   current = head;
+  blockNum++;
 }
 
 MemoryCache::~MemoryCache() {
@@ -62,6 +62,7 @@ void *MemoryCache::allocate(size_t size) {
       block = createNewBlock(size);
       current->next = block;
       current = block;
+      blockNum++;
 
       offset = current->cursor;
       endCursor = offset + size;
@@ -112,7 +113,6 @@ MemoryCache::Block *MemoryCache::createNewBlock(size_t size) const {
   size_t allocSize = size < blockIncrementBytes ? blockIncrementBytes : AlignedAllocSize(size);
   void *buffer = malloc(allocSize);
   auto *block = new(buffer) Block(allocSize);
-
   return block;
 }
 
