@@ -238,7 +238,7 @@ void ToolView::updateBroadcastClients()
               uint64_t pid;
 
               switch(broadcastVersion) {
-              case 3: {
+                case 3: {
                   tracy::BroadcastMessage bm;
                   memcpy(&bm, msg, len);
                   protoVer = bm.protocolVersion;
@@ -247,8 +247,8 @@ void ToolView::updateBroadcastClients()
                   listenPort = bm.listenPort;
                   pid = bm.pid;
                   break;
-              }
-              case 2: {
+                }
+                case 2: {
                   if(len > sizeof(tracy::BroadcastMessage_v2)) continue;
                   tracy::BroadcastMessage_v2 bm;
                   memcpy(&bm, msg, len);
@@ -258,8 +258,8 @@ void ToolView::updateBroadcastClients()
                   listenPort = bm.listenPort;
                   pid = 0;
                   break;
-              }
-              case 1: {
+                }
+                case 1: {
                   if(len > sizeof(tracy::BroadcastMessage_v1)) continue;
                   tracy::BroadcastMessage_v1 bm;
                   memcpy(&bm, msg, len);
@@ -269,8 +269,8 @@ void ToolView::updateBroadcastClients()
                   listenPort = (uint16_t)bm.listenPort;
                   pid = 0;
                   break;
-              }
-              case 0: {
+                }
+                case 0: {
                   if(len > sizeof(tracy::BroadcastMessage_v0)) continue;
                   tracy::BroadcastMessage_v0 bm;
                   memcpy(&bm, msg, len);
@@ -280,10 +280,14 @@ void ToolView::updateBroadcastClients()
                   listenPort = 8086;
                   pid = 0;
                   break;
-              }
-              default:
+                }
+                default: {
+                  activeTime = 0;
+                  listenPort = 0;
+                  pid = 0;
                   assert(false);
                   break;
+                }
               }
 
               auto address = addr.GetText();
