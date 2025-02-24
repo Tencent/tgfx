@@ -95,9 +95,17 @@ void RenderPass::clear(const Rect& scissor, Color color) {
   onClear(scissor, color);
 }
 
-void RenderPass::copyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) {
+void RenderPass::resolve(const Rect& bounds) {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  onCopyTo(texture, srcRect, dstPoint);
+  auto gpu = context->gpu();
+  gpu->resolveRenderTarget(_renderTarget.get(), bounds);
+  // Reset the render target after the resolve operation.
+  onBindRenderTarget();
+}
+
+void RenderPass::copyToTexture(Texture* texture, int srcX, int srcY) {
+  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
+  onCopyToTexture(texture, srcX, srcY);
 }
 
 }  // namespace tgfx

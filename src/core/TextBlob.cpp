@@ -30,9 +30,6 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const std::string& text, const Font
   const char* textStart = text.data();
   const char* textStop = textStart + text.size();
   GlyphRun glyphRun = GlyphRun(font, {}, {});
-  auto glyphSize = UTF::CountUTF8(textStart, text.size());
-  glyphRun.glyphs.reserve(static_cast<size_t>(glyphSize));
-  glyphRun.positions.reserve(static_cast<size_t>(glyphSize));
   // Use half the font size as width for spaces
   auto emptyAdvance = font.getSize() / 2.0f;
   float xOffset = 0;
