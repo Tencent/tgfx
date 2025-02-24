@@ -21,76 +21,85 @@
 
 namespace tgfx {
 class MemoryCache final {
-  public:
-    explicit MemoryCache(size_t blockIncrementBytes = kMinAllocationSize);
+ public:
+  explicit MemoryCache(size_t blockIncrementBytes = kMinAllocationSize);
 
-    MemoryCache(const MemoryCache &) = delete;
+  MemoryCache(const MemoryCache&) = delete;
 
-    MemoryCache &operator=(const MemoryCache &) = delete;
+  MemoryCache& operator=(const MemoryCache&) = delete;
 
-    MemoryCache(MemoryCache &&) = delete;
+  MemoryCache(MemoryCache&&) = delete;
 
-    MemoryCache &operator=(MemoryCache &&) = delete;
+  MemoryCache& operator=(MemoryCache&&) = delete;
 
-    ~MemoryCache();
+  ~MemoryCache();
 
-    void *allocate(size_t size);
+  void* allocate(size_t size);
 
-    void release(const void *ptr) const;
+  void release(const void* ptr) const;
 
-    void resetCache();
+  void resetCache();
 
-    size_t memoryBlockIncrementBytes() const { return blockIncrementBytes; }
+  size_t memoryBlockIncrementBytes() const {
+    return blockIncrementBytes;
+  }
 
-    size_t memoryBlockNum() const { return blockNum; }
+  size_t memoryBlockNum() const {
+    return blockNum;
+  }
 
-    class Block final {
-      public:
-        explicit Block(size_t allocationSize)
-          : size(allocationSize), cursor(kBlockStart) {
-        }
+  class Block final {
+   public:
+    explicit Block(size_t allocationSize) : size(allocationSize), cursor(kBlockStart) {
+    }
 
-        ~Block() = default;
+    ~Block() = default;
 
-        void *ptr(size_t offset) {
-          return reinterpret_cast<char *>(this) + offset;
-        }
+    void* ptr(size_t offset) {
+      return reinterpret_cast<char*>(this) + offset;
+    }
 
-        const void *ptr(size_t offset) const { return const_cast<Block *>(this)->ptr(offset); }
+    const void* ptr(size_t offset) const {
+      return const_cast<Block*>(this)->ptr(offset);
+    }
 
-        void ref() { ++refCount; }
-        void unref() { --refCount; }
+    void ref() {
+      ++refCount;
+    }
+    void unref() {
+      --refCount;
+    }
 
-        void reset() {
-          cursor = kBlockStart;
-          refCount = 0;
-        }
+    void reset() {
+      cursor = kBlockStart;
+      refCount = 0;
+    }
 
-      private:
-        Block *next = nullptr;
-        size_t size = 0;
-        size_t cursor = 0;
-        size_t refCount = 0;
+   private:
+    Block* next = nullptr;
+    size_t size = 0;
+    size_t cursor = 0;
+    size_t refCount = 0;
 
-        friend class MemoryCache;
-    };
+    friend class MemoryCache;
+  };
 
-    static constexpr size_t kBlockStart = sizeof(Block);
+  static constexpr size_t kBlockStart = sizeof(Block);
 
-  private:
-    // smallest block size allocated on the heap, 4096 bytes.
-    static constexpr size_t kMinAllocationSize = 1 << 12;
+ private:
+  // smallest block size allocated on the heap, 4096 bytes.
+  static constexpr size_t kMinAllocationSize = 1 << 12;
 
-    size_t blockIncrementBytes = kMinAllocationSize;
-    size_t blockNum = 0;
-    Block *head = nullptr;
-    Block *tail = nullptr;
-    Block *current = nullptr;
+  size_t blockIncrementBytes = kMinAllocationSize;
+  size_t blockNum = 0;
+  Block* head = nullptr;
+  Block* tail = nullptr;
+  Block* current = nullptr;
 
-    Block *findOwnerBlock(const void *ptr) const;
+  Block* findOwnerBlock(const void* ptr) const;
 
-    Block *createNewBlock(size_t size) const;
+  Block* createNewBlock(size_t size) const;
 
-    static size_t AlignedAllocSize(size_t size);
+  static size_t AlignedAllocSize(size_t size);
 };
-} // tgfx
+}  // namespace tgfx

@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MemoryCache.h"
-
 #include <memory>
 
 namespace tgfx {
 MemoryCache::MemoryCache(size_t blockIncrementBytes) {
-  blockIncrementBytes = blockIncrementBytes < kMinAllocationSize ? kMinAllocationSize : blockIncrementBytes;
+  blockIncrementBytes =
+      blockIncrementBytes < kMinAllocationSize ? kMinAllocationSize : blockIncrementBytes;
   this->blockIncrementBytes = AlignedAllocSize(blockIncrementBytes);
   head = createNewBlock(this->blockIncrementBytes);
   tail = head;
@@ -31,7 +31,7 @@ MemoryCache::MemoryCache(size_t blockIncrementBytes) {
 }
 
 MemoryCache::~MemoryCache() {
-  auto *block = head;
+  auto* block = head;
   while (block != nullptr) {
     const auto next = block->next;
     free(block);
@@ -39,7 +39,7 @@ MemoryCache::~MemoryCache() {
   }
 }
 
-void *MemoryCache::allocate(size_t size) {
+void* MemoryCache::allocate(size_t size) {
   if (size == 0) {
     return nullptr;
   }
@@ -47,7 +47,7 @@ void *MemoryCache::allocate(size_t size) {
   size_t offset = current->cursor;
   size_t endCursor = offset + size;
   if (endCursor > current->size) {
-    auto *block = current->next;
+    auto* block = current->next;
     while (block != nullptr) {
       offset = block->cursor;
       endCursor = offset + size;
@@ -75,12 +75,12 @@ void *MemoryCache::allocate(size_t size) {
   return current->ptr(offset);
 }
 
-void MemoryCache::release(const void *ptr) const {
+void MemoryCache::release(const void* ptr) const {
   if (ptr == nullptr) {
     return;
   }
 
-  auto *block = findOwnerBlock(ptr);
+  auto* block = findOwnerBlock(ptr);
   if (block == nullptr) {
     return;
   }
@@ -88,7 +88,7 @@ void MemoryCache::release(const void *ptr) const {
 }
 
 void MemoryCache::resetCache() {
-  Block *block = head;
+  Block* block = head;
   while (block != nullptr) {
     block->reset();
     block = block->next;
@@ -96,8 +96,8 @@ void MemoryCache::resetCache() {
   current = head;
 }
 
-MemoryCache::Block *MemoryCache::findOwnerBlock(const void *ptr) const {
-  auto *block = head;
+MemoryCache::Block* MemoryCache::findOwnerBlock(const void* ptr) const {
+  auto* block = head;
   while (block != nullptr) {
     const auto start = reinterpret_cast<uintptr_t>(block->ptr(0));
     const auto current = reinterpret_cast<uintptr_t>(ptr);
@@ -109,10 +109,10 @@ MemoryCache::Block *MemoryCache::findOwnerBlock(const void *ptr) const {
   return nullptr;
 }
 
-MemoryCache::Block *MemoryCache::createNewBlock(size_t size) const {
+MemoryCache::Block* MemoryCache::createNewBlock(size_t size) const {
   size_t allocSize = size < blockIncrementBytes ? blockIncrementBytes : AlignedAllocSize(size);
-  void *buffer = malloc(allocSize);
-  auto *block = new(buffer) Block(allocSize);
+  void* buffer = malloc(allocSize);
+  auto* block = new (buffer) Block(allocSize);
   return block;
 }
 
@@ -121,4 +121,4 @@ size_t MemoryCache::AlignedAllocSize(size_t size) {
   const size_t mask = size > (1 << 15) ? ((1 << 12) - 1) : (alignof(std::max_align_t) - 1);
   return (size + mask) & ~mask;
 }
-} // tgfx
+}  // namespace tgfx

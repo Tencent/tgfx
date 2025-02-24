@@ -47,11 +47,11 @@ class Record {
 
   MCState state;
 
-  Record *next = nullptr;
+  Record* next = nullptr;
 };
 
 class RecordList final {
-public:
+ public:
   RecordList() = default;
 
   ~RecordList() = default;
@@ -68,11 +68,11 @@ public:
     return true;
   }
 
-  Record *front() const {
+  Record* front() const {
     return head;
   }
 
-  Record *back() const {
+  Record* back() const {
     return tail;
   }
 
@@ -82,7 +82,7 @@ public:
     count = 0;
   }
 
-  void addRecord(Record *record) {
+  void addRecord(Record* record) {
     if (head == nullptr) {
       head = record;
     } else {
@@ -93,9 +93,9 @@ public:
     count++;
   }
 
-private:
-  Record *head = nullptr;
-  Record *tail = nullptr;
+ private:
+  Record* head = nullptr;
+  Record* tail = nullptr;
   size_t count = 0;
 };
 

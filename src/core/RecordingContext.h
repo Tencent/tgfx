@@ -20,8 +20,8 @@
 
 #include <functional>
 #include "core/DrawContext.h"
-#include "core/Records.h"
 #include "core/MemoryCache.h"
+#include "core/Records.h"
 
 namespace tgfx {
 class RecordingContext : public DrawContext {
@@ -30,7 +30,7 @@ class RecordingContext : public DrawContext {
 
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
-  void clear()const;
+  void clear() const;
 
   void drawStyle(const MCState& state, const FillStyle& style) override;
 

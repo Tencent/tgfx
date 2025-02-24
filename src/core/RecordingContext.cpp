@@ -53,22 +53,22 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
     switch (record->type()) {
       case RecordType::DrawStyle:
         hasUnboundedFill = true;
-      break;
+        break;
       case RecordType::DrawShape:
         if (static_cast<DrawShape*>(record)->shape->isInverseFillType()) {
           hasUnboundedFill = true;
         }
-      break;
+        break;
       case RecordType::DrawPicture:
         if (static_cast<DrawPicture*>(record)->picture->hasUnboundedFill()) {
           hasUnboundedFill = true;
         }
-      break;
+        break;
       case RecordType::DrawLayer:
         if (static_cast<DrawLayer*>(record)->picture->hasUnboundedFill()) {
           hasUnboundedFill = true;
         }
-      break;
+        break;
       default:
         break;
     }
@@ -101,7 +101,7 @@ void RecordingContext::drawStyle(const MCState& state, const FillStyle& style) {
     clear();
   }
   if (style.color.alpha > 0.0f) {
-    void *buffer = memoryCache->allocate(sizeof(DrawStyle));
+    void* buffer = memoryCache->allocate(sizeof(DrawStyle));
     checkRecordsAndInit();
     records->addRecord(new (buffer) DrawStyle(state, style));
   }
@@ -122,7 +122,7 @@ void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const
 void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const FillStyle& style) {
   DEBUG_ASSERT(shape != nullptr);
-  void *buffer = memoryCache->allocate(sizeof(DrawShape));
+  void* buffer = memoryCache->allocate(sizeof(DrawShape));
   checkRecordsAndInit();
   records->addRecord(new (buffer) DrawShape(std::move(shape), state, style));
 }
@@ -130,7 +130,7 @@ void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
 void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const MCState& state, const FillStyle& style) {
   DEBUG_ASSERT(image != nullptr);
-  void *buffer = memoryCache->allocate(sizeof(DrawImage));
+  void* buffer = memoryCache->allocate(sizeof(DrawImage));
   checkRecordsAndInit();
   records->addRecord(new (buffer) DrawImage(std::move(image), sampling, state, style));
 }
@@ -139,7 +139,7 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
                                      const SamplingOptions& sampling, const MCState& state,
                                      const FillStyle& style) {
   DEBUG_ASSERT(image != nullptr);
-  void *buffer = memoryCache->allocate(sizeof(DrawImageRect));
+  void* buffer = memoryCache->allocate(sizeof(DrawImageRect));
   checkRecordsAndInit();
   records->addRecord(new (buffer) DrawImageRect(std::move(image), rect, sampling, state, style));
 }
@@ -148,11 +148,12 @@ void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
                                         const Stroke* stroke, const MCState& state,
                                         const FillStyle& style) {
   if (stroke) {
-    void *buffer = memoryCache->allocate(sizeof(StrokeGlyphRunList));
+    void* buffer = memoryCache->allocate(sizeof(StrokeGlyphRunList));
     checkRecordsAndInit();
-    records->addRecord(new (buffer) StrokeGlyphRunList(std::move(glyphRunList), *stroke, state, style));
+    records->addRecord(new (buffer)
+                           StrokeGlyphRunList(std::move(glyphRunList), *stroke, state, style));
   } else {
-    void *buffer = memoryCache->allocate(sizeof(DrawGlyphRunList));
+    void* buffer = memoryCache->allocate(sizeof(DrawGlyphRunList));
     checkRecordsAndInit();
     records->addRecord(new (buffer) DrawGlyphRunList(std::move(glyphRunList), state, style));
   }
@@ -162,7 +163,7 @@ void RecordingContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> filter, const MCState& state,
                                  const FillStyle& style) {
   DEBUG_ASSERT(picture != nullptr);
-  void *buffer = memoryCache->allocate(sizeof(DrawLayer));
+  void* buffer = memoryCache->allocate(sizeof(DrawLayer));
   checkRecordsAndInit();
   records->addRecord(new (buffer) DrawLayer(std::move(picture), std::move(filter), state, style));
 }
@@ -170,7 +171,7 @@ void RecordingContext::drawLayer(std::shared_ptr<Picture> picture,
 void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   DEBUG_ASSERT(picture != nullptr);
   if (picture->records->size() > MaxPictureDrawsToUnrollInsteadOfReference) {
-    void *buffer = memoryCache->allocate(sizeof(DrawPicture));
+    void* buffer = memoryCache->allocate(sizeof(DrawPicture));
     checkRecordsAndInit();
     records->addRecord(new (buffer) DrawPicture(picture, state));
   } else {
