@@ -51,6 +51,11 @@ class PictureImage : public OffscreenImage {
     return Type::Picture;
   }
 
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
+
   bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
 
  private:

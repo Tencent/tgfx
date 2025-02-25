@@ -20,6 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
+#include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
@@ -52,13 +53,26 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
                               const FillStyle& style) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
+
+  auto clipRect = getClipBounds(state.clip);
+  auto invertMatrix = Matrix::I();
+  if (!state.matrix.invert(&invertMatrix)) {
+    return;
+  }
+
+  invertMatrix.mapRect(&clipRect);
+  auto finalRect = rect;
+  if (!finalRect.intersect(clipRect)) {
+    return;
+  }
+
   if (!canAppend(PendingOpType::Image, state.clip, style) || pendingImage != image ||
       pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Image, state.clip, style);
     pendingImage = std::move(image);
     pendingSampling = sampling;
   }
-  pendingRects.emplace_back(rect, state.matrix, style.color.premultiply());
+  pendingRects.emplace_back(finalRect, state.matrix, style.color.premultiply());
 }
 
 void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -451,6 +465,10 @@ void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, cons
   if (style.maskFilter) {
     if (auto processor = style.maskFilter->asFragmentProcessor(args, nullptr)) {
       op->addCoverageFP(std::move(processor));
+    } else if (auto shaderMaskFilter = Caster::AsShaderMaskFilter(style.maskFilter.get())) {
+      if (!shaderMaskFilter->isInverted()) {
+        return;
+      }
     }
   }
   Rect scissorRect = Rect::MakeEmpty();

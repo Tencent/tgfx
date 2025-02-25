@@ -70,10 +70,14 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (uvMatrix != nullptr) {
     shadowMatrix.preConcat(*uvMatrix);
   }
+  auto shadowRect = args.drawRect;
+  shadowRect.outset(abs(dx), abs(dy));
+  auto shadowArgs = args;
+  shadowArgs.drawRect = shadowRect;
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
+    shadowProcessor = blurFilter->asFragmentProcessor(source, shadowArgs, sampling, &shadowMatrix);
   } else {
-    shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+    shadowProcessor = FragmentProcessor::Make(source, shadowArgs, TileMode::Decal, TileMode::Decal,
                                               sampling, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {

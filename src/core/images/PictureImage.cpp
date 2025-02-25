@@ -23,6 +23,7 @@
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 static bool CheckStyleAndClipForMask(const FillStyle& style, const Path& clip, int width,
@@ -130,8 +131,56 @@ PictureImage::~PictureImage() {
   delete matrix;
 }
 
+std::unique_ptr<FragmentProcessor> PictureImage::asFragmentProcessor(
+    const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+    const Matrix* uvMatrix) const {
+  auto proxyProvider = args.context->proxyProvider();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(uniqueKey);
+  if (textureProxy != nullptr) {
+    return TiledTextureEffect::Make(std::move(textureProxy), tileModeX, tileModeY, sampling,
+                                    uvMatrix, isAlphaOnly());
+  }
+
+  auto drawBounds = args.drawRect;
+  if (uvMatrix) {
+    drawBounds = uvMatrix->mapRect(drawBounds);
+  }
+  auto rect = Rect::MakeWH(_width, _height);
+  if (drawBounds.contains(rect)) {
+    return OffscreenImage::asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
+  }
+  if (!rect.intersect(drawBounds)) {
+    return nullptr;
+  }
+  rect.roundOut();
+
+  auto mipmapped = sampling.mipmapMode != MipmapMode::None && hasMipmaps();
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  textureProxy = proxyProvider->createTextureProxy(
+      UniqueKey::Make(), static_cast<int>(rect.width()), static_cast<int>(rect.height()), format,
+      mipmapped, ImageOrigin::TopLeft, args.renderFlags);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format, 1, true);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  if (!onDraw(renderTarget, args.renderFlags)) {
+    return nullptr;
+  }
+
+  auto matrix = Matrix::MakeTrans(-rect.left, -rect.top);
+  if (uvMatrix) {
+    matrix.preConcat(*uvMatrix);
+  }
+  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
+                                  &matrix, isAlphaOnly());
+}
+
 bool PictureImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
                           uint32_t renderFlags) const {
+  if (renderTarget == nullptr) {
+    return false;
+  }
   RenderContext renderContext(renderTarget, renderFlags);
   MCState replayState(matrix ? *matrix : Matrix::I());
   picture->playback(&renderContext, replayState);
