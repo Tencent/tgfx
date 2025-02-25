@@ -30,8 +30,8 @@ Picture::Picture(std::shared_ptr<MemoryCache> memoryCache, std::shared_ptr<Recor
                  bool hasUnboundedFill)
     : memoryCache(std::move(memoryCache)), records(std::move(records)),
       _hasUnboundedFill(hasUnboundedFill) {
-  DEBUG_ASSERT(memoryCache != nullptr);
-  DEBUG_ASSERT(records != nullptr);
+  DEBUG_ASSERT(memoryCache == nullptr);
+  DEBUG_ASSERT(records == nullptr);
 }
 
 Picture::~Picture() {
