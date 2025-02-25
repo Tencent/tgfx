@@ -19,7 +19,6 @@
 #pragma once
 
 #include <windows.h>
-#include <string>
 
 DECLARE_HANDLE(HPBUFFER);
 

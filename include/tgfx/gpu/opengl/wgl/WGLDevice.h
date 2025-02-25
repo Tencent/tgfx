@@ -19,7 +19,6 @@
 #pragma once
 
 #include <windows.h>
-#include <atomic>
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
