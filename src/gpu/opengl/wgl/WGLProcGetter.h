@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/opengl/GLProcGetter.h"
 #include <windows.h>
+#include "gpu/opengl/GLProcGetter.h"
 
 namespace tgfx {
-class WGLProcGetter : public GLProcGetter{
+class WGLProcGetter : public GLProcGetter {
  public:
   WGLProcGetter();
 
@@ -33,6 +33,4 @@ class WGLProcGetter : public GLProcGetter{
  private:
   HMODULE fLibrary;
 };
-} // namespace tgfx
-
-
+}  // namespace tgfx

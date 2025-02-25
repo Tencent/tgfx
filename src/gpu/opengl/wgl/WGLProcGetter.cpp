@@ -24,13 +24,13 @@ WGLProcGetter::WGLProcGetter() {
   fLibrary = LoadLibraryA("opengl32.dll");
 }
 
-WGLProcGetter::~WGLProcGetter(){
+WGLProcGetter::~WGLProcGetter() {
   if (fLibrary) {
     FreeLibrary(fLibrary);
   }
 }
 
-void* WGLProcGetter::getProcAddress(const char name[]) const{
+void* WGLProcGetter::getProcAddress(const char name[]) const {
   DEBUG_ASSERT(wglGetCurrentContext());
   if (auto* p = GetProcAddress(fLibrary, name)) {
     return p;
@@ -41,7 +41,7 @@ void* WGLProcGetter::getProcAddress(const char name[]) const{
   return nullptr;
 }
 
-std::unique_ptr<GLProcGetter> GLProcGetter::Make(){
+std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
   return std::make_unique<WGLProcGetter>();
 }
 

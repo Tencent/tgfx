@@ -38,7 +38,7 @@ class WGLExtensions {
 
   BOOL swapInterval(int interval) const;
 
-  HPBUFFER createPbuffer(HDC,int,int,int,const int*) const;
+  HPBUFFER createPbuffer(HDC, int, int, int, const int*) const;
 
   HDC getPbufferDC(HPBUFFER) const;
 

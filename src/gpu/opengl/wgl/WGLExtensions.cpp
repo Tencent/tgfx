@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/wgl/WGLExtensions.h"
-#include "core/utils/Log.h"
 #include <mutex>
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -31,10 +31,10 @@ namespace tgfx {
 #define TEMP_CLASS STR_LIT("TempClass")
 static HWND CreateTempWindow() {
   HINSTANCE instance = GetModuleHandle(nullptr);
-  RECT windowRect{0,8,0,8};
+  RECT windowRect{0, 8, 0, 8};
 
   WNDCLASS wc;
-  wc.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
+  wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
   wc.lpfnWndProc = static_cast<WNDPROC>(DefWindowProc);
   wc.cbClsExtra = 0;
   wc.cbWndExtra = 0;
@@ -52,17 +52,11 @@ static HWND CreateTempWindow() {
   DWORD style = WS_SYSMENU;
   DWORD exStyle = WS_EX_CLIENTEDGE;
 
-  AdjustWindowRectEx(&windowRect,style,false, exStyle);
-  HWND hWnd = CreateWindowEx(exStyle,
-                              TEMP_CLASS,
-                              STR_LIT("PlaceholderWindows"),
-                              WS_CLIPCHILDREN|WS_CLIPSIBLINGS|style,
-                              0,0,
-                              windowRect.right - windowRect.left,
-                              windowRect.bottom - windowRect.top,
-                              nullptr, nullptr,
-                              instance,
-                              nullptr);
+  AdjustWindowRectEx(&windowRect, style, false, exStyle);
+  HWND hWnd = CreateWindowEx(exStyle, TEMP_CLASS, STR_LIT("PlaceholderWindows"),
+                             WS_CLIPCHILDREN | WS_CLIPSIBLINGS | style, 0, 0,
+                             windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
+                             nullptr, nullptr, instance, nullptr);
   if (hWnd == nullptr) {
     UnregisterClass(TEMP_CLASS, instance);
     return nullptr;
@@ -77,16 +71,15 @@ static void DestroyTempWindow(HWND hWnd) {
   UnregisterClass(TEMP_CLASS, instance);
 }
 
-#define GET_PROC(NAME, SUFFIX) wgl##NAME = \
-(NAME##Proc) wglGetProcAddress("wgl" #NAME #SUFFIX)
+#define GET_PROC(NAME, SUFFIX) wgl##NAME = (NAME##Proc)wglGetProcAddress("wgl" #NAME #SUFFIX)
 
-using GetExtensionsStringProc = const char* (WINAPI *)(HDC);
-using ChoosePixelFormatProc = BOOL (WINAPI*)(HDC, const int *, const FLOAT *, UINT, int *, UINT *);
-using SwapIntervalProc = BOOL (WINAPI*)(int);
-using CreatePbufferProc = HPBUFFER (WINAPI*)(HDC,int,int,int,const int*);
-using GetPbufferDCProc = HDC (WINAPI*)(HPBUFFER);
-using ReleasePbufferDCProc = int (WINAPI*)(HPBUFFER,HDC);
-using DestroyPbufferProc = BOOL (WINAPI*)(HPBUFFER);
+using GetExtensionsStringProc = const char*(WINAPI*)(HDC);
+using ChoosePixelFormatProc = BOOL(WINAPI*)(HDC, const int*, const FLOAT*, UINT, int*, UINT*);
+using SwapIntervalProc = BOOL(WINAPI*)(int);
+using CreatePbufferProc = HPBUFFER(WINAPI*)(HDC, int, int, int, const int*);
+using GetPbufferDCProc = HDC(WINAPI*)(HPBUFFER);
+using ReleasePbufferDCProc = int(WINAPI*)(HPBUFFER, HDC);
+using DestroyPbufferProc = BOOL(WINAPI*)(HPBUFFER);
 
 static GetExtensionsStringProc wglGetExtensionsString = nullptr;
 static ChoosePixelFormatProc wglChoosePixelFormat = nullptr;
@@ -96,17 +89,17 @@ static GetPbufferDCProc wglGetPbufferDC = nullptr;
 static ReleasePbufferDCProc wglReleasePbufferDC = nullptr;
 static DestroyPbufferProc wglDestroyPbuffer = nullptr;
 
-WGLExtensions::WGLExtensions(){
+WGLExtensions::WGLExtensions() {
   static std::once_flag flag;
-  std::call_once(flag, [this]{
+  std::call_once(flag, [this] {
     HDC oldDC = wglGetCurrentDC();
     HGLRC oldGLRC = wglGetCurrentContext();
 
     PIXELFORMATDESCRIPTOR pfd;
-    ZeroMemory(&pfd,sizeof(pfd));
+    ZeroMemory(&pfd, sizeof(pfd));
     pfd.nSize = sizeof(pfd);
     pfd.nVersion = 1;
-    pfd.dwFlags = PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL;
     pfd.iPixelType = PFD_TYPE_RGBA;
     pfd.cColorBits = 32;
     pfd.cDepthBits = 0;
@@ -116,17 +109,17 @@ WGLExtensions::WGLExtensions(){
     HWND hWnd = CreateTempWindow();
     if (hWnd) {
       HDC dc = GetDC(hWnd);
-      int format = ChoosePixelFormat(dc,&pfd);
+      int format = ChoosePixelFormat(dc, &pfd);
       SetPixelFormat(dc, format, &pfd);
       HGLRC glrc = wglCreateContext(dc);
       DEBUG_ASSERT(glrc);
-      wglMakeCurrent(dc,glrc);
+      wglMakeCurrent(dc, glrc);
       GET_PROC(GetExtensionsString, ARB);
       GET_PROC(ChoosePixelFormat, ARB);
       GET_PROC(SwapInterval, EXT);
       GET_PROC(CreatePbuffer, ARB);
       GET_PROC(GetPbufferDC, ARB);
-      GET_PROC(ReleasePbufferDC,ARB);
+      GET_PROC(ReleasePbufferDC, ARB);
       GET_PROC(DestroyPbuffer, ARB);
       wglMakeCurrent(dc, nullptr);
       wglDeleteContext(glrc);
@@ -136,7 +129,7 @@ WGLExtensions::WGLExtensions(){
   });
 }
 
-bool WGLExtensions::hasExtension(HDC dc, const char* ext) const{
+bool WGLExtensions::hasExtension(HDC dc, const char* ext) const {
   if (nullptr == wglGetExtensionsString) {
     return false;
   }
@@ -154,42 +147,33 @@ bool WGLExtensions::hasExtension(HDC dc, const char* ext) const{
     if (0 == extensionString[n]) {
       return false;
     }
-    extensionString += n+1;
+    extensionString += n + 1;
   }
 }
 
-
-BOOL WGLExtensions::choosePixelFormat(HDC hdc,
-                                      const int* attribIList,
-                                      const FLOAT* attribFList,
-                                      UINT maxFormats,
-                                      int* formats,
-                                      UINT* numFormats) const{
-  return wglChoosePixelFormat(hdc, attribIList, attribFList,
-                              maxFormats, formats, numFormats);
+BOOL WGLExtensions::choosePixelFormat(HDC hdc, const int* attribIList, const FLOAT* attribFList,
+                                      UINT maxFormats, int* formats, UINT* numFormats) const {
+  return wglChoosePixelFormat(hdc, attribIList, attribFList, maxFormats, formats, numFormats);
 }
 
-BOOL WGLExtensions::swapInterval(int interval) const{
+BOOL WGLExtensions::swapInterval(int interval) const {
   return wglSwapInterval(interval);
 }
 
-HPBUFFER WGLExtensions::createPbuffer(HDC dc,
-                                      int pixelFormat,
-                                      int width,
-                                      int height,
-                                      const int* attribList) const{
-  return wglCreatePbuffer(dc,pixelFormat,width,height,attribList);
+HPBUFFER WGLExtensions::createPbuffer(HDC dc, int pixelFormat, int width, int height,
+                                      const int* attribList) const {
+  return wglCreatePbuffer(dc, pixelFormat, width, height, attribList);
 }
 
-HDC WGLExtensions::getPbufferDC(HPBUFFER hPbuffer) const{
+HDC WGLExtensions::getPbufferDC(HPBUFFER hPbuffer) const {
   return wglGetPbufferDC(hPbuffer);
 }
 
-int WGLExtensions::releasePbufferDC(HPBUFFER hPbuffer, HDC dc) const{
-  return wglReleasePbufferDC(hPbuffer,dc);
+int WGLExtensions::releasePbufferDC(HPBUFFER hPbuffer, HDC dc) const {
+  return wglReleasePbufferDC(hPbuffer, dc);
 }
 
-BOOL WGLExtensions::destroyPbuffer(HPBUFFER hPbuffer) const{
+BOOL WGLExtensions::destroyPbuffer(HPBUFFER hPbuffer) const {
   return wglDestroyPbuffer(hPbuffer);
 }
 

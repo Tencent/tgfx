@@ -30,11 +30,11 @@ class WGLWindow : public Window {
   static std::shared_ptr<WGLWindow> MakeFrom(HWND hWnd, HGLRC sharedContext = nullptr);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context *context) override;
+  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
   HWND nativeWindow{nullptr};
   explicit WGLWindow(std::shared_ptr<Device> device);
 };
-} // namespace tgfx
+}  // namespace tgfx

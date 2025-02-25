@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/GLDevice.h"
-#include <atomic>
 #include <windows.h>
+#include <atomic>
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
 class WGLDevice : public GLDevice {
@@ -32,7 +32,7 @@ class WGLDevice : public GLDevice {
 
   ~WGLDevice() override;
 
-  bool sharableWith(void *nativeConext) const override;
+  bool sharableWith(void* nativeConext) const override;
 
  protected:
   bool onMakeCurrent() override;
@@ -54,4 +54,4 @@ class WGLDevice : public GLDevice {
   friend class GLDevice;
   friend class WGLWindow;
 };
-} // namespace tgfx
+}  // namespace tgfx
