@@ -16,43 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "WGLProcGetter.h"
+#include "core/utils/Log.h"
 
-#ifndef UNICODE
-#define UNICODE
-#endif
+namespace tgfx {
+WGLProcGetter::WGLProcGetter() {
+  fLibrary = LoadLibraryA("opengl32.dll");
+}
 
-#include <Windows.h>
-#include <Windowsx.h>
-#include <functional>
-#include <memory>
-#include <string>
-#include "drawers/Drawer.h"
-#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
+WGLProcGetter::~WGLProcGetter(){
+  if (fLibrary) {
+    FreeLibrary(fLibrary);
+  }
+}
 
-namespace hello2d {
-class TGFXWindow {
- public:
-  TGFXWindow();
-  virtual ~TGFXWindow();
+void* WGLProcGetter::getProcAddress(const char name[]) const{
+  DEBUG_ASSERT(wglGetCurrentContext());
+  if (auto* p = GetProcAddress(fLibrary, name)) {
+    return p;
+  }
+  if (auto* p = wglGetProcAddress(name)) {
+    return p;
+  }
+  return nullptr;
+}
 
-  bool open();
+std::unique_ptr<GLProcGetter> GLProcGetter::Make(){
+  return std::make_unique<WGLProcGetter>();
+}
 
- private:
-  HWND windowHandle = nullptr;
-  int lastDrawIndex = 0;
-  std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
-
-  static WNDCLASS RegisterWindowClass();
-  static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-
-  LRESULT handleMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-
-  void destroy();
-  void centerAndShow();
-  float getPixelRatio();
-  void createAppHost();
-  void draw();
-};
-}  // namespace hello2d
+}  // namespace tgfx

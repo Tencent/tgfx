@@ -18,41 +18,21 @@
 
 #pragma once
 
-#ifndef UNICODE
-#define UNICODE
-#endif
+#include "gpu/opengl/GLProcGetter.h"
+#include <windows.h>
 
-#include <Windows.h>
-#include <Windowsx.h>
-#include <functional>
-#include <memory>
-#include <string>
-#include "drawers/Drawer.h"
-#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
-
-namespace hello2d {
-class TGFXWindow {
+namespace tgfx {
+class WGLProcGetter : public GLProcGetter{
  public:
-  TGFXWindow();
-  virtual ~TGFXWindow();
+  WGLProcGetter();
 
-  bool open();
+  ~WGLProcGetter() override;
+
+  void* getProcAddress(const char name[]) const override;
 
  private:
-  HWND windowHandle = nullptr;
-  int lastDrawIndex = 0;
-  std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
-
-  static WNDCLASS RegisterWindowClass();
-  static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-
-  LRESULT handleMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-
-  void destroy();
-  void centerAndShow();
-  float getPixelRatio();
-  void createAppHost();
-  void draw();
+  HMODULE fLibrary;
 };
-}  // namespace hello2d
+} // namespace tgfx
+
+

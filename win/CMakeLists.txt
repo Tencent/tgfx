@@ -30,12 +30,6 @@ else ()
     list(APPEND HELLO_2D_LIBS ${USER32})
 endif ()
 
-list(APPEND HELLO_2D_INCLUDES ../vendor/angle/include)
-file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libEGL.dll)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/angle/win/${ARCH}/libEGL.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libGLESv2.dll)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/angle/win/${ARCH}/libGLESv2.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
 set(TGFX_BUILD_DRAWERS ON)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -43,5 +37,5 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./tgfx)
 
 file(GLOB_RECURSE HELLO_2D_SOURCE_FILES src/*.*)
 add_executable(Hello2D WIN32 ${HELLO_2D_SOURCE_FILES} app.rc)
-target_include_directories(Hello2D PRIVATE ${HELLO_2D_INCLUDES} src)
+target_include_directories(Hello2D PRIVATE src)
 target_link_libraries(Hello2D tgfx-drawers tgfx ${HELLO_2D_LIBS})

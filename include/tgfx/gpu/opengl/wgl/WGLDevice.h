@@ -18,41 +18,40 @@
 
 #pragma once
 
-#ifndef UNICODE
-#define UNICODE
-#endif
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include <atomic>
+#include <windows.h>
 
-#include <Windows.h>
-#include <Windowsx.h>
-#include <functional>
-#include <memory>
-#include <string>
-#include "drawers/Drawer.h"
-#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
-
-namespace hello2d {
-class TGFXWindow {
+namespace tgfx {
+class WGLDevice : public GLDevice {
  public:
-  TGFXWindow();
-  virtual ~TGFXWindow();
+  /**
+   * Creates a WGLDevice with the existing HWND and HGLRC
+   */
+  static std::shared_ptr<WGLDevice> MakeFrom(HWND hWnd, HGLRC sharedContext);
 
-  bool open();
+  ~WGLDevice() override;
+
+  bool sharableWith(void *nativeConext) const override;
+
+ protected:
+  bool onMakeCurrent() override;
+  void onClearCurrent() override;
 
  private:
-  HWND windowHandle = nullptr;
-  int lastDrawIndex = 0;
-  std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  HDC dc = nullptr;
+  HGLRC glContext = nullptr;
+  HGLRC sharedContext = nullptr;
 
-  static WNDCLASS RegisterWindowClass();
-  static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
+  HDC oldDc = nullptr;
+  HGLRC oldContext = nullptr;
 
-  LRESULT handleMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
+  explicit WGLDevice(HGLRC nativeHandle);
 
-  void destroy();
-  void centerAndShow();
-  float getPixelRatio();
-  void createAppHost();
-  void draw();
+  static std::shared_ptr<WGLDevice> Wrap(HDC dc, HGLRC context, HGLRC sharedContext,
+                                         bool externallyOwned);
+
+  friend class GLDevice;
+  friend class WGLWindow;
 };
-}  // namespace hello2d
+} // namespace tgfx

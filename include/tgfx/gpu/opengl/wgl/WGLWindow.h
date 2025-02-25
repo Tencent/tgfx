@@ -18,41 +18,23 @@
 
 #pragma once
 
-#ifndef UNICODE
-#define UNICODE
-#endif
+#include "WGLDevice.h"
+#include "tgfx/gpu/Window.h"
 
-#include <Windows.h>
-#include <Windowsx.h>
-#include <functional>
-#include <memory>
-#include <string>
-#include "drawers/Drawer.h"
-#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
-
-namespace hello2d {
-class TGFXWindow {
+namespace tgfx {
+class WGLWindow : public Window {
  public:
-  TGFXWindow();
-  virtual ~TGFXWindow();
+  /**
+   * Creates a new window from a HWND with specialed shared context.
+   */
+  static std::shared_ptr<WGLWindow> MakeFrom(HWND hWnd, HGLRC sharedContext = nullptr);
 
-  bool open();
+ protected:
+  std::shared_ptr<Surface> onCreateSurface(Context *context) override;
+  void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
-  HWND windowHandle = nullptr;
-  int lastDrawIndex = 0;
-  std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
-
-  static WNDCLASS RegisterWindowClass();
-  static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-
-  LRESULT handleMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
-
-  void destroy();
-  void centerAndShow();
-  float getPixelRatio();
-  void createAppHost();
-  void draw();
+  HWND nativeWindow{nullptr};
+  explicit WGLWindow(std::shared_ptr<Device> device);
 };
-}  // namespace hello2d
+} // namespace tgfx

@@ -18,41 +18,32 @@
 
 #pragma once
 
-#ifndef UNICODE
-#define UNICODE
-#endif
-
-#include <Windows.h>
-#include <Windowsx.h>
-#include <functional>
-#include <memory>
+#include <windows.h>
 #include <string>
-#include "drawers/Drawer.h"
-#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 
-namespace hello2d {
-class TGFXWindow {
+DECLARE_HANDLE(HPBUFFER);
+
+namespace tgfx {
+class WGLExtensions {
  public:
-  TGFXWindow();
-  virtual ~TGFXWindow();
+  WGLExtensions();
 
-  bool open();
+  /**
+ * Determines if an extension is available for a given DC.
+ * it is necessary to check this before calling other class functions.
+  */
+  bool hasExtension(HDC dc, const char* ext) const;
 
- private:
-  HWND windowHandle = nullptr;
-  int lastDrawIndex = 0;
-  std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  BOOL choosePixelFormat(HDC hdc, const int*, const FLOAT*, UINT, int*, UINT*) const;
 
-  static WNDCLASS RegisterWindowClass();
-  static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
+  BOOL swapInterval(int interval) const;
 
-  LRESULT handleMessage(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
+  HPBUFFER createPbuffer(HDC,int,int,int,const int*) const;
 
-  void destroy();
-  void centerAndShow();
-  float getPixelRatio();
-  void createAppHost();
-  void draw();
+  HDC getPbufferDC(HPBUFFER) const;
+
+  int releasePbufferDC(HPBUFFER, HDC) const;
+
+  BOOL destroyPbuffer(HPBUFFER) const;
 };
-}  // namespace hello2d
+}  // namespace tgfx
