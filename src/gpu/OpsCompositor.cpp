@@ -216,11 +216,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
       if (needLocalBounds || needDeviceBounds) {
         for (auto& rRectPaint : pendingRRects) {
           auto rect = rRectPaint.viewMatrix.mapRect(rRectPaint.rRect.rect);
-          if (rect.intersect(clipBounds)) {
-            deviceBounds.join(rect);
-          }
+          deviceBounds.join(rect);
         }
         localBounds = deviceBounds;
+        if (!localBounds.intersect(clipBounds)) {
+          localBounds = Rect::MakeEmpty();
+        }
       }
       pendingRRects.clear();
       break;
