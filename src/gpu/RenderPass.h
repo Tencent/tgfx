@@ -68,10 +68,14 @@ class RenderPass {
   }
 
   virtual void onBindRenderTarget() = 0;
+  virtual void onUnbindRenderTarget() = 0;
   virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                            const Rect& drawBounds) = 0;
-  virtual void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) = 0;
-  virtual void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) = 0;
+  virtual bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                             std::shared_ptr<GpuBuffer> vertexBuffer,
+                             std::shared_ptr<Data> vertexData) = 0;
+  virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
+                      bool drawIndexed) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;
   virtual void onCopyToTexture(Texture* texture, int srcX, int srcY) = 0;
 
@@ -79,14 +83,9 @@ class RenderPass {
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;
   std::shared_ptr<Texture> _renderTargetTexture = nullptr;
   Program* _program = nullptr;
-  std::shared_ptr<GpuBuffer> _indexBuffer = nullptr;
-  std::shared_ptr<GpuBuffer> _vertexBuffer = nullptr;
-  std::shared_ptr<Data> _vertexData = nullptr;
 
  private:
   enum class DrawPipelineStatus { Ok = 0, NotConfigured, FailedToBind };
-
-  void resetActiveBuffers();
 
   DrawPipelineStatus drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 };
