@@ -20,7 +20,6 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-#include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
@@ -53,7 +52,6 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
                               const FillStyle& style) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-
   if (!canAppend(PendingOpType::Image, state.clip, style) || pendingImage != image ||
       pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Image, state.clip, style);
@@ -106,10 +104,16 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto deviceBounds = Rect::MakeEmpty();
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(style);
   auto& clip = state.clip;
-  auto clipBounds = getClipBounds(clip);
+  auto clipBounds = clip.isEmpty() ? renderTarget->bounds() : getClipBounds(clip);
   if (needLocalBounds) {
-    localBounds = shape->isInverseFillType() ? ToLocalBounds(clipBounds, state.matrix)
-                                             : shape->getBounds(maxScale);
+    if (shape->isInverseFillType()) {
+      localBounds = ToLocalBounds(clipBounds, state.matrix);
+    } else {
+      localBounds = shape->getBounds(maxScale);
+      if (!localBounds.intersect(clipBounds)) {
+        localBounds.setEmpty();
+      }
+    }
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
   if (needDeviceBounds) {
@@ -148,12 +152,7 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const FillSt
 
 static Rect clipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
                             const Rect& clipBounds) {
-  auto invertMatrix = Matrix::I();
-  if (!viewMatrix.invert(&invertMatrix)) {
-    return Rect::MakeEmpty();
-  }
-  auto result = clipBounds;
-  invertMatrix.mapRect(&result);
+  auto result = ToLocalBounds(clipBounds, viewMatrix);
   if (!result.intersect(localBounds)) {
     return Rect::MakeEmpty();
   }
@@ -180,11 +179,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
   auto aaType = getAAType(style);
   auto clipBounds = Rect::MakeEmpty();
   if (needLocalBounds) {
-    if (clip.isInverseFillType() || clip.isEmpty()) {
-      clipBounds = renderTarget->bounds();
-    } else {
-      clipBounds = clip.getBounds();
-    }
+    clipBounds = clip.isEmpty() ? renderTarget->bounds() : getClipBounds(clip);
   }
   switch (type) {
     case PendingOpType::Rect:
