@@ -88,6 +88,15 @@ static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
   return localBounds;
 }
 
+static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
+                            const Rect& clipBounds) {
+  auto result = ToLocalBounds(clipBounds, viewMatrix);
+  if (!result.intersect(localBounds)) {
+    return Rect::MakeEmpty();
+  }
+  return result;
+}
+
 void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const FillStyle& style) {
   DEBUG_ASSERT(shape != nullptr);
@@ -104,15 +113,13 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto deviceBounds = Rect::MakeEmpty();
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(style);
   auto& clip = state.clip;
-  auto clipBounds = clip.isEmpty() ? renderTarget->bounds() : getClipBounds(clip);
+  auto clipBounds = getClipBounds(clip);
   if (needLocalBounds) {
     if (shape->isInverseFillType()) {
       localBounds = ToLocalBounds(clipBounds, state.matrix);
     } else {
       localBounds = shape->getBounds(maxScale);
-      if (!localBounds.intersect(clipBounds)) {
-        localBounds.setEmpty();
-      }
+      localBounds = ClipLocalBounds(localBounds, state.matrix, clipBounds);
     }
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
@@ -150,15 +157,6 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const FillSt
   return size < maxRecords;
 }
 
-static Rect clipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
-                            const Rect& clipBounds) {
-  auto result = ToLocalBounds(clipBounds, viewMatrix);
-  if (!result.intersect(localBounds)) {
-    return Rect::MakeEmpty();
-  }
-  return result;
-}
-
 void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle style) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
@@ -179,7 +177,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
   auto aaType = getAAType(style);
   auto clipBounds = Rect::MakeEmpty();
   if (needLocalBounds) {
-    clipBounds = clip.isEmpty() ? renderTarget->bounds() : getClipBounds(clip);
+    clipBounds = getClipBounds(clip);
   }
   switch (type) {
     case PendingOpType::Rect:
@@ -195,7 +193,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
       drawOp = RectDrawOp::Make(context, pendingRects, aaType, renderFlags);
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
-          localBounds.join(clipLocalBounds(rect.rect, rect.viewMatrix, clipBounds));
+          localBounds.join(ClipLocalBounds(rect.rect, rect.viewMatrix, clipBounds));
         }
       }
       if (needDeviceBounds) {
