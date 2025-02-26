@@ -54,25 +54,13 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
 
-  auto clipRect = getClipBounds(state.clip);
-  auto invertMatrix = Matrix::I();
-  if (!state.matrix.invert(&invertMatrix)) {
-    return;
-  }
-
-  invertMatrix.mapRect(&clipRect);
-  auto finalRect = rect;
-  if (!finalRect.intersect(clipRect)) {
-    return;
-  }
-
   if (!canAppend(PendingOpType::Image, state.clip, style) || pendingImage != image ||
       pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Image, state.clip, style);
     pendingImage = std::move(image);
     pendingSampling = sampling;
   }
-  pendingRects.emplace_back(finalRect, state.matrix, style.color.premultiply());
+  pendingRects.emplace_back(rect, state.matrix, style.color.premultiply());
 }
 
 void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const FillStyle& style) {
@@ -158,6 +146,20 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const FillSt
   return size < maxRecords;
 }
 
+static Rect clipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
+                            const Rect& clipBounds) {
+  auto invertMatrix = Matrix::I();
+  if (!viewMatrix.invert(&invertMatrix)) {
+    return Rect::MakeEmpty();
+  }
+  auto result = clipBounds;
+  invertMatrix.mapRect(&result);
+  if (!result.intersect(localBounds)) {
+    return Rect::MakeEmpty();
+  }
+  return result;
+}
+
 void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle style) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
@@ -176,6 +178,14 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(style, type == PendingOpType::Image);
   auto context = renderTarget->getContext();
   auto aaType = getAAType(style);
+  auto clipBounds = Rect::MakeEmpty();
+  if (needLocalBounds) {
+    if (clip.isInverseFillType() || clip.isEmpty()) {
+      clipBounds = renderTarget->bounds();
+    } else {
+      clipBounds = clip.getBounds();
+    }
+  }
   switch (type) {
     case PendingOpType::Rect:
       if (pendingRects.size() == 1) {
@@ -190,7 +200,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
       drawOp = RectDrawOp::Make(context, pendingRects, aaType, renderFlags);
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
-          localBounds.join(rect.rect);
+          localBounds.join(clipLocalBounds(rect.rect, rect.viewMatrix, clipBounds));
         }
       }
       if (needDeviceBounds) {
@@ -206,7 +216,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
       if (needLocalBounds || needDeviceBounds) {
         for (auto& rRectPaint : pendingRRects) {
           auto rect = rRectPaint.viewMatrix.mapRect(rRectPaint.rRect.rect);
-          deviceBounds.join(rect);
+          if (rect.intersect(clipBounds)) {
+            deviceBounds.join(rect);
+          }
         }
         localBounds = deviceBounds;
       }
@@ -484,10 +496,9 @@ void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, cons
   if (style.maskFilter) {
     if (auto processor = style.maskFilter->asFragmentProcessor(args, nullptr)) {
       op->addCoverageFP(std::move(processor));
-    } else if (auto shaderMaskFilter = Caster::AsShaderMaskFilter(style.maskFilter.get())) {
-      if (!shaderMaskFilter->isInverted()) {
-        return;
-      }
+    } else {
+      // if mask is empty, nothing to draw
+      return;
     }
   }
   Rect scissorRect = Rect::MakeEmpty();
