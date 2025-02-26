@@ -58,6 +58,9 @@ class PictureImage : public OffscreenImage {
 
   bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
 
+  bool drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
+                   Matrix* extraMatrix) const;
+
  private:
   int _width = 0;
   int _height = 0;

@@ -164,11 +164,11 @@ std::unique_ptr<FragmentProcessor> PictureImage::asFragmentProcessor(
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  if (!onDraw(renderTarget, args.renderFlags)) {
+  auto matrix = Matrix::MakeTrans(-rect.left, -rect.top);
+
+  if (!drawPicture(renderTarget, args.renderFlags, &matrix)) {
     return nullptr;
   }
-
-  auto matrix = Matrix::MakeTrans(-rect.left, -rect.top);
   if (uvMatrix) {
     matrix.preConcat(*uvMatrix);
   }
@@ -178,13 +178,23 @@ std::unique_ptr<FragmentProcessor> PictureImage::asFragmentProcessor(
 
 bool PictureImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
                           uint32_t renderFlags) const {
+  return drawPicture(renderTarget, renderFlags, nullptr);
+}
+
+bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
+                               uint32_t renderFlags, Matrix* extraMatrix) const {
   if (renderTarget == nullptr) {
     return false;
   }
   RenderContext renderContext(renderTarget, renderFlags);
-  MCState replayState(matrix ? *matrix : Matrix::I());
+  auto totalMatrix = extraMatrix ? *extraMatrix : Matrix::I();
+  if (matrix) {
+    totalMatrix.preConcat(*matrix);
+  }
+  MCState replayState(totalMatrix);
   picture->playback(&renderContext, replayState);
   renderContext.flush();
   return true;
 }
+
 }  // namespace tgfx
