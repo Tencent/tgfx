@@ -135,6 +135,19 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   addDrawOp(std::move(drawOp), clip, style, localBounds, deviceBounds);
 }
 
+void OpsCompositor::discardAll() {
+  ops.clear();
+  if (pendingType != PendingOpType::Unknown) {
+    pendingType = PendingOpType::Unknown;
+    pendingClip = {};
+    pendingStyle = {};
+    pendingImage = nullptr;
+    pendingSampling = {};
+    pendingRects.clear();
+    pendingRRects.clear();
+  }
+}
+
 bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const FillStyle& style) const {
   if (pendingType != type || pendingClip != clip || !pendingStyle.isEqual(style, true)) {
     return false;
@@ -236,11 +249,12 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   if (!style.hasOnlyColor() || !style.isOpaque() || !state.matrix.rectStaysRect()) {
     return false;
   }
+  auto deviceBounds = renderTarget->bounds();
   auto& clip = state.clip;
   auto clipRect = Rect::MakeEmpty();
   if (clip.isInverseFillType()) {
     if (clip.isEmpty()) {
-      clipRect = renderTarget->bounds();
+      clipRect = deviceBounds;
     } else {
       return false;
     }
@@ -254,6 +268,10 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   }
   bounds.round();
   FlipYIfNeeded(&bounds, renderTarget);
+  if (bounds == deviceBounds) {
+    // discard all previous ops if the clear rect covers the entire render target.
+    ops.clear();
+  }
   auto format = renderTarget->format();
   auto caps = renderTarget->getContext()->caps();
   const auto& writeSwizzle = caps->getWriteSwizzle(format);
@@ -347,15 +365,16 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto shapeProxy = proxyProvider->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), Color::White(), uvMatrix, aaType);
-    auto target = RenderTargetProxy::MakeFallback(context, width, height, true, 1, false,
-                                                  ImageOrigin::TopLeft, true);
-    if (target == nullptr) {
+    auto clipRenderTarget = RenderTargetProxy::MakeFallback(context, width, height, true);
+    if (clipRenderTarget == nullptr) {
       return nullptr;
     }
-    clipTexture = target->getTextureProxy();
+    clipTexture = clipRenderTarget->getTextureProxy();
     std::vector<std::unique_ptr<Op> > ops = {};
+    auto clearOp = ClearOp::Make(Color::Transparent(), clipRenderTarget->bounds());
+    ops.push_back(std::move(clearOp));
     ops.push_back(std::move(drawOp));
-    drawingManager->addOpsRenderTask(std::move(target), std::move(ops));
+    drawingManager->addOpsRenderTask(std::move(clipRenderTarget), std::move(ops));
   } else {
     auto rasterizer =
         Rasterizer::MakeFrom(width, height, clip, aaType != AAType::None, rasterizeMatrix);

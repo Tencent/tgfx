@@ -160,7 +160,7 @@ std::unique_ptr<FragmentProcessor> PictureImage::asFragmentProcessor(
   textureProxy = proxyProvider->createTextureProxy(
       UniqueKey::Make(), static_cast<int>(rect.width()), static_cast<int>(rect.height()), format,
       mipmapped, ImageOrigin::TopLeft, args.renderFlags);
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format, 1, true);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format, 1);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -186,7 +186,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
-  RenderContext renderContext(renderTarget, renderFlags);
+  RenderContext renderContext(renderTarget, renderFlags, true);
   auto totalMatrix = extraMatrix ? *extraMatrix : Matrix::I();
   if (matrix) {
     totalMatrix.preConcat(*matrix);

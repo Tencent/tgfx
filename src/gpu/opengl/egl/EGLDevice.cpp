@@ -151,6 +151,13 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
       return nullptr;
     }
   }
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (!externallyOwned) {
+    // Disable vsync on Android to make buffer swapping non-blocking, as the platform already has an
+    // animation frame callback with vsync.
+    eglSwapInterval(eglDisplay, 0);
+  }
+#endif
   auto device = std::shared_ptr<EGLDevice>(new EGLDevice(eglContext));
   device->externallyOwned = externallyOwned;
   device->eglDisplay = eglDisplay;
