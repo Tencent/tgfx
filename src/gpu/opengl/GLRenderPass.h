@@ -32,10 +32,14 @@ class GLRenderPass : public RenderPass {
 
  protected:
   void onBindRenderTarget() override;
+  void onUnbindRenderTarget() override;
   bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                    const Rect& scissorRect) override;
-  void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
-  void onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
+  bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                     std::shared_ptr<GpuBuffer> vertexBuffer,
+                     std::shared_ptr<Data> vertexData) override;
+  void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
+              bool drawIndexed) override;
   void onClear(const Rect& scissor, Color color) override;
   void onCopyToTexture(Texture* texture, int srcX, int srcY) override;
 
@@ -44,7 +48,6 @@ class GLRenderPass : public RenderPass {
   std::shared_ptr<GLFrameBuffer> frameBuffer = nullptr;
   std::shared_ptr<GLBuffer> sharedVertexBuffer = nullptr;
 
-  void draw(const std::function<void()>& func);
   bool copyAsBlit(Texture* texture, int srcX, int srcY);
 };
 }  // namespace tgfx

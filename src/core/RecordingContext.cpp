@@ -69,8 +69,8 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
 void RecordingContext::clear() {
   for (auto& record : records) {
     delete record;
-    records.clear();
   }
+  records.clear();
 }
 
 void RecordingContext::drawStyle(const MCState& state, const FillStyle& style) {
