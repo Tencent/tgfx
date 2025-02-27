@@ -16,37 +16,43 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <windows.h>
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "WGLContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-class WGLContext;
-class WGLDevice : public GLDevice {
- public:
-  /**
-   * Creates a WGLDevice with the existing HWND and HGLRC
-   */
-  static std::shared_ptr<WGLDevice> MakeFrom(HWND hWnd, HGLRC sharedContext);
 
-  ~WGLDevice() override;
+WGLContext::WGLContext(HGLRC sharedContext) : sharedContext(sharedContext) {
+}
 
-  bool sharableWith(void* nativeConext) const override;
+void WGLContext::initializeContext() {
+  DEBUG_ASSERT(!deviceContext);
+  DEBUG_ASSERT(!glContext);
+  onInitializeContext();
+}
 
- protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+void WGLContext::destroyContext() {
+  onDestroyContext();
+}
 
- private:
-  std::unique_ptr<WGLContext> wglContext;
+bool WGLContext::makeCurrent() {
+  oldGLContext = wglGetCurrentContext();
+  oldDeviceContext = wglGetCurrentDC();
+  if (oldGLContext == glContext) {
+    return true;
+  }
+  if (!wglMakeCurrent(deviceContext, glContext)) {
+    return false;
+  }
+  return true;
+}
 
-  explicit WGLDevice(HGLRC nativeHandle);
-
-  static std::shared_ptr<WGLDevice> Wrap(std::unique_ptr<WGLContext> wglContext,
-                                         bool externallyOwned);
-
-  friend class GLDevice;
-  friend class WGLWindow;
-};
+void WGLContext::clearCurrent() {
+  if (oldGLContext == glContext) {
+    return;
+  }
+  wglMakeCurrent(deviceContext, nullptr);
+  if (oldDeviceContext != nullptr) {
+    wglMakeCurrent(oldDeviceContext, oldGLContext);
+  }
+}
 }  // namespace tgfx

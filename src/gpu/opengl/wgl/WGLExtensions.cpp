@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,11 +16,55 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/opengl/wgl/WGLExtensions.h"
+#include "WGLExtensions.h"
+#include <GL/GL.h>
 #include <mutex>
+#include <vector>
 #include "core/utils/Log.h"
+#include "wgl.h"
 
 namespace tgfx {
+void GetPixelFormatsToTry(HDC deviceContext, const WGLExtensions& extensions, int formatsToTry[2]) {
+  std::vector<int> iAttributes{WGL_DRAW_TO_WINDOW_ARB,
+                               TRUE,
+                               WGL_DOUBLE_BUFFER_ARB,
+                               TRUE,
+                               WGL_ACCELERATION_ARB,
+                               WGL_FULL_ACCELERATION_ARB,
+                               WGL_SUPPORT_OPENGL_ARB,
+                               TRUE,
+                               WGL_COLOR_BITS_ARB,
+                               24,
+                               WGL_ALPHA_BITS_ARB,
+                               8,
+                               WGL_STENCIL_BITS_ARB,
+                               8,
+                               0,
+                               0};
+
+  int* format = formatsToTry[0] ? &formatsToTry[0] : &formatsToTry[1];
+  unsigned numFormats;
+  constexpr float fAttributes[] = {0, 0};
+  extensions.choosePixelFormat(deviceContext, iAttributes.data(), fAttributes, 1, format,
+                               &numFormats);
+}
+
+HGLRC CreateGLContext(HDC deviceContext, const WGLExtensions& extensions, HGLRC sharedContext) {
+  HDC oldDeviceContext = wglGetCurrentDC();
+  HGLRC oldGLContext = wglGetCurrentContext();
+
+  HGLRC glContext = wglCreateContext(deviceContext);
+  if (glContext == nullptr) {
+    LOGE("CreateGLContext() wglCreateContext failed.");
+    return nullptr;
+  }
+  if (sharedContext != nullptr && !wglShareLists(sharedContext, glContext)) {
+    wglDeleteContext(glContext);
+    return nullptr;
+  }
+  wglMakeCurrent(oldDeviceContext, oldGLContext);
+  return glContext;
+}
 
 #if defined(UNICODE)
 #define STR_LIT(X) L## #X

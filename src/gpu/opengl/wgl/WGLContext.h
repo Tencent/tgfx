@@ -19,34 +19,45 @@
 #pragma once
 
 #include <windows.h>
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "WGLExtensions.h"
 
 namespace tgfx {
-class WGLContext;
-class WGLDevice : public GLDevice {
+class WGLContext {
  public:
-  /**
-   * Creates a WGLDevice with the existing HWND and HGLRC
-   */
-  static std::shared_ptr<WGLDevice> MakeFrom(HWND hWnd, HGLRC sharedContext);
+  explicit WGLContext(HGLRC sharedContext);
 
-  ~WGLDevice() override;
+  virtual ~WGLContext() = default;
 
-  bool sharableWith(void* nativeConext) const override;
+  bool makeCurrent();
+
+  void clearCurrent();
+
+  HDC getDeviceContext() const {
+    return deviceContext;
+  }
+
+  HGLRC getGLContext() const {
+    return glContext;
+  }
+
+  HGLRC getSharedContext() const {
+    return sharedContext;
+  }
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  HDC deviceContext = nullptr;
+  HGLRC glContext = nullptr;
+  HGLRC sharedContext = nullptr;
 
- private:
-  std::unique_ptr<WGLContext> wglContext;
+  HDC oldDeviceContext = nullptr;
+  HGLRC oldGLContext = nullptr;
 
-  explicit WGLDevice(HGLRC nativeHandle);
+  WGLExtensions extensions;
 
-  static std::shared_ptr<WGLDevice> Wrap(std::unique_ptr<WGLContext> wglContext,
-                                         bool externallyOwned);
+  void initializeContext();
+  void destroyContext();
 
-  friend class GLDevice;
-  friend class WGLWindow;
+  virtual void onDestroyContext() = 0;
+  virtual void onInitializeContext() = 0;
 };
-}  // namespace tgfx
+}  //namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,31 +18,20 @@
 
 #pragma once
 
-#include <windows.h>
-
-DECLARE_HANDLE(HPBUFFER);
+#include "WGLContext.h"
+#include "WGLExtensions.h"
 
 namespace tgfx {
-class WGLExtensions {
+class WGLPbufferContext : public WGLContext {
  public:
-  WGLExtensions();
+  explicit WGLPbufferContext(HGLRC sharedContext);
 
-  /**
- * Determines if an extension is available for a given DC.
- * it is necessary to check this before calling other class functions.
-  */
-  bool hasExtension(HDC dc, const char* ext) const;
+  ~WGLPbufferContext() override;
 
-  BOOL choosePixelFormat(HDC hdc, const int*, const FLOAT*, UINT, int*, UINT*) const;
+ private:
+  HPBUFFER pBuffer = nullptr;
 
-  BOOL swapInterval(int interval) const;
-
-  HPBUFFER createPbuffer(HDC, int, int, int, const int*) const;
-
-  HDC getPbufferDC(HPBUFFER) const;
-
-  int releasePbufferDC(HPBUFFER, HDC) const;
-
-  BOOL destroyPbuffer(HPBUFFER) const;
+  void onInitializeContext() override;
+  void onDestroyContext() override;
 };
 }  // namespace tgfx

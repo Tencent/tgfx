@@ -18,35 +18,18 @@
 
 #pragma once
 
-#include <windows.h>
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "WGLContext.h"
 
 namespace tgfx {
-class WGLContext;
-class WGLDevice : public GLDevice {
+class WGLWindowContext : public WGLContext {
  public:
-  /**
-   * Creates a WGLDevice with the existing HWND and HGLRC
-   */
-  static std::shared_ptr<WGLDevice> MakeFrom(HWND hWnd, HGLRC sharedContext);
-
-  ~WGLDevice() override;
-
-  bool sharableWith(void* nativeConext) const override;
-
- protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  WGLWindowContext(HWND hWnd, HGLRC sharedContext);
+  ~WGLWindowContext() override;
 
  private:
-  std::unique_ptr<WGLContext> wglContext;
+  HWND hWnd = nullptr;
 
-  explicit WGLDevice(HGLRC nativeHandle);
-
-  static std::shared_ptr<WGLDevice> Wrap(std::unique_ptr<WGLContext> wglContext,
-                                         bool externallyOwned);
-
-  friend class GLDevice;
-  friend class WGLWindow;
+  void onInitializeContext() override;
+  void onDestroyContext() override;
 };
 }  // namespace tgfx

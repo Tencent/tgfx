@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,8 @@
 
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include <GL/GL.h>
+#include "WGLContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND hWnd, HGLRC sharedContext) {
@@ -56,7 +58,8 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
 
 void WGLWindow::onPresent(Context* context, int64_t presentationTime) {
   auto device = std::static_pointer_cast<WGLDevice>(this->device);
-  SwapBuffers(device->dc);
+  DEBUG_ASSERT(device->wglContext != nullptr);
+  SwapBuffers(device->wglContext->getDeviceContext());
 }
 
 }  // namespace tgfx

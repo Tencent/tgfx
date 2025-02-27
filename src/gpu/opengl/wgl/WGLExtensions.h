@@ -19,34 +19,35 @@
 #pragma once
 
 #include <windows.h>
-#include "tgfx/gpu/opengl/GLDevice.h"
+
+DECLARE_HANDLE(HPBUFFER);
 
 namespace tgfx {
-class WGLContext;
-class WGLDevice : public GLDevice {
+class WGLExtensions {
  public:
+  WGLExtensions();
+
   /**
-   * Creates a WGLDevice with the existing HWND and HGLRC
+   * Determines if an extension is available for a given DC.
+   * it is necessary to check this before calling other class functions.
    */
-  static std::shared_ptr<WGLDevice> MakeFrom(HWND hWnd, HGLRC sharedContext);
+  bool hasExtension(HDC dc, const char* ext) const;
 
-  ~WGLDevice() override;
+  BOOL choosePixelFormat(HDC hdc, const int*, const FLOAT*, UINT, int*, UINT*) const;
 
-  bool sharableWith(void* nativeConext) const override;
+  BOOL swapInterval(int interval) const;
 
- protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  HPBUFFER createPbuffer(HDC, int, int, int, const int*) const;
 
- private:
-  std::unique_ptr<WGLContext> wglContext;
+  HDC getPbufferDC(HPBUFFER) const;
 
-  explicit WGLDevice(HGLRC nativeHandle);
+  int releasePbufferDC(HPBUFFER, HDC) const;
 
-  static std::shared_ptr<WGLDevice> Wrap(std::unique_ptr<WGLContext> wglContext,
-                                         bool externallyOwned);
-
-  friend class GLDevice;
-  friend class WGLWindow;
+  BOOL destroyPbuffer(HPBUFFER) const;
 };
+
+void GetPixelFormatsToTry(HDC deviceContext, const WGLExtensions& extensions, int formatsToTry[2]);
+
+HGLRC CreateGLContext(HDC deviceContext, const WGLExtensions& extensions, HGLRC sharedContext);
+
 }  // namespace tgfx
