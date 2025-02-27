@@ -18,16 +18,17 @@
 
 #pragma once
 
-#include "core/images/OffscreenImage.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
  * PictureImage is an image that draws a Picture.
  */
-class PictureImage : public OffscreenImage {
+class PictureImage : public Image {
  public:
-  PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width, int height,
-               const Matrix* matrix = nullptr);
+  PictureImage(std::shared_ptr<Picture> picture, int width, int height,
+               const Matrix* matrix = nullptr, bool mipmapped = false);
 
   ~PictureImage() override;
 
@@ -43,6 +44,12 @@ class PictureImage : public OffscreenImage {
     return false;
   }
 
+  bool hasMipmaps() const override {
+    return mipmapped;
+  }
+
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
 
@@ -51,10 +58,19 @@ class PictureImage : public OffscreenImage {
     return Type::Picture;
   }
 
-  bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* uvMatrix) const override;
+
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  bool drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
+                   const Point* offset) const;
 
  private:
   int _width = 0;
   int _height = 0;
+  bool mipmapped = false;
 };
 }  // namespace tgfx

@@ -1297,7 +1297,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   auto textImage = Image::MakeFrom(textRecord, width, height, &matrix);
-  EXPECT_EQ(textRecord.use_count(), 1);
+  EXPECT_EQ(textRecord.use_count(), 2);
   ASSERT_TRUE(textImage != nullptr);
 
   surface = Surface::Make(context, textImage->width(), textImage->height());
@@ -1318,7 +1318,7 @@ TGFX_TEST(CanvasTest, Picture) {
   width = static_cast<int>(bounds.width());
   height = static_cast<int>(bounds.height());
   auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix);
-  EXPECT_EQ(patRecord.use_count(), 1);
+  EXPECT_EQ(patRecord.use_count(), 2);
   ASSERT_TRUE(pathImage != nullptr);
 
   surface = Surface::Make(context, pathImage->width(), pathImage->height());
