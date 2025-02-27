@@ -21,6 +21,7 @@
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -82,24 +83,42 @@ std::unique_ptr<FragmentProcessor> PictureImage::asFragmentProcessor(
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto matrix = Matrix::MakeTrans(-rect.left, -rect.top);
-  if (!drawPicture(renderTarget, args.renderFlags, matrix)) {
+  Point offset = Point::Make(-rect.left, -rect.top);
+  if (!drawPicture(renderTarget, args.renderFlags, &offset)) {
     return nullptr;
   }
+  auto finalUVMatrix = Matrix::MakeTrans(offset.x, offset.y);
   if (uvMatrix) {
-    matrix.preConcat(*uvMatrix);
+    finalUVMatrix.preConcat(*uvMatrix);
   }
   return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
-                                  &matrix, isAlphaOnly());
+                                  &finalUVMatrix, isAlphaOnly());
+}
+
+std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto renderTarget = RenderTargetProxy::MakeFallback(args.context, width(), height(),
+                                                      isAlphaOnly() && alphaRenderable, 1,
+                                                      hasMipmaps() && args.mipmapped);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
+    return nullptr;
+  }
+  return renderTarget->getTextureProxy();
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
-                               uint32_t renderFlags, const Matrix& extraMatrix) const {
+                               uint32_t renderFlags, const Point* offset) const {
   if (renderTarget == nullptr) {
     return false;
   }
   RenderContext renderContext(renderTarget, renderFlags, true);
-  auto totalMatrix = extraMatrix;
+  auto totalMatrix = Matrix::I();
+  if (offset) {
+    totalMatrix.preTranslate(offset->x, offset->y);
+  }
   if (matrix) {
     totalMatrix.preConcat(*matrix);
   }
