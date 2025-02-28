@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ProfilerWindow.h"
 #include <qguiapplication.h>
 #include <qscreen.h>
 #include <QToolBar>
-#include "MainView.h"
+#include "view/MainView.h"
+#include "ProfilerWindow.h"
 
 ProfilerWindow::ProfilerWindow(QMainWindow* parent): QMainWindow(parent) {
   initWindow();

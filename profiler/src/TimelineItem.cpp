@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TimelineItem.h"
-#include "TimelineView.h"
 #include "src/profiler/IconsFontAwesome6.h"
+#include "view/TimelineView.h"
 
 TimelineItem::TimelineItem(TimelineView& view, tracy::Worker& worker)
   : height(0)
@@ -80,7 +80,7 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
   const auto ostep = ty + 1;
   const auto& wpos = ctx.wpos;
   const auto yPos = wpos.y + yBegin;
-  const auto dpos = wpos + tgfx::Point(0.5f, 0.5f);
+  const auto dpos = wpos + tgfx::Point{0.5f, 0.5f};
 
   yEnd += static_cast<int>(ostep);
   if (showFull) {
@@ -92,7 +92,7 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     }
   }
 
-  drawOverlay(wpos + tgfx::Point(0, yBegin), wpos + tgfx::Point(w, yEnd));
+  drawOverlay(wpos + tgfx::Point{0.f, static_cast<float>(yBegin)}, wpos + tgfx::Point{w, static_cast<float>(yEnd)});
 
   const auto hdrOffset = yBegin;
   const bool drawHeader = yPos + ty >= ctx.yMin && yPos <= ctx.yMax;
@@ -100,20 +100,20 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     const auto color = headerColor();
     const auto colorInactive = headerColorInactive();
     if (showFull) {
-      tgfx::Point point = wpos + tgfx::Point(0, hdrOffset + ty);
+      tgfx::Point point = wpos + tgfx::Point{0.f, hdrOffset + ty};
       drawText(canvas, appHost, ICON_FA_CARET_DOWN, point.x, point.y, color);
     }
     else {
-      tgfx::Point point = wpos + tgfx::Point(0, hdrOffset + ty);
+      tgfx::Point point = wpos + tgfx::Point{0, hdrOffset + ty};
       drawText(canvas, appHost, ICON_FA_CARET_RIGHT, point.x, point.y, color);
     }
 
     const auto lable = headerLable();
-    tgfx::Point point = wpos + tgfx::Point(ty, hdrOffset + ty);
+    tgfx::Point point = wpos + tgfx::Point{ty, hdrOffset + ty};
     drawText(canvas, appHost, lable, point.x, point.y, showFull ? color : colorInactive);
     if (showFull) {
-      tgfx::Point p1 = dpos + tgfx::Point(0, hdrOffset + ty + 1);
-      tgfx::Point p2 = dpos + tgfx::Point(w, hdrOffset + ty + 1);
+      tgfx::Point p1 = dpos + tgfx::Point{0, hdrOffset + ty + 1};
+      tgfx::Point p2 = dpos + tgfx::Point{w, hdrOffset + ty + 1};
       drawLine(canvas, p1, p2, headlineColor());
     }
   }

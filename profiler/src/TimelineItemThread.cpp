@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TimelineItemThread.h"
-#include <src/profiler/TracyColor.hpp>
 #include "TracyColor.hpp"
-#include "View.h"
+#include "view/View.h"
+#include "src/profiler/TracyColor.hpp"
 #include "src/profiler/TracyTimelineDraw.hpp"
 
 constexpr float MinVisSize = 3;

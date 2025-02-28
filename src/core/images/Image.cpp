@@ -45,7 +45,6 @@ class PixelDataConverter : public ImageGenerator {
 
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
-    TRACE_EVENT_NAME("imageDecode");
     Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);
     if (bitmap.isEmpty()) {
       return nullptr;

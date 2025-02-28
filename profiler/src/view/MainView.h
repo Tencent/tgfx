@@ -18,28 +18,41 @@
 
 #pragma once
 
-#include "MainView.h"
+#include <QGraphicsView>
+#include <QMainWindow>
+#include <QVBoxLayout>
+#include <QWidget>
+#include <thread>
+#include "view/ToolView.h"
+#include "TracyWorker.hpp"
+#include "Utility.h"
+#include "View.h"
 
-class ProfilerWindow: public QMainWindow {
+class MainView: public QWidget {
   Q_OBJECT
 public:
-  ProfilerWindow(QMainWindow* parent = nullptr);
-  void initWindow();
-  void initConnect();
-  void changeViewMode();
-  void reversalPlayAction();
-  void changePlayAction(bool pause);
-  Q_SLOT void pushPlayAction();
-  Q_SLOT void updateToolBar(ProfilerStatus status);
-protected:
-  void initToolBar();
-private:
-  bool pause = false;
+  static std::thread loadThread;
 
-  MainView* mainView;
-  QToolBar* topBar;
-  QAction* quitAction;
-  QAction* saveFileAction;
-  QAction* playAction;
-  QAction* discardAction;
+  MainView(QWidget* parent = nullptr);
+  ~MainView();
+
+  void connectClient(const char* address, uint16_t port);
+  void openFile();
+  void openToolView();
+  void openWebsocketServer();
+
+  void changeViewModeButton(bool pause);
+  Q_SLOT void changeViewMode(bool pause);
+  Q_SLOT void quitReadFile();
+  Q_SLOT void saveFile();
+  Q_SLOT void discardConnect();
+  Q_SIGNAL void statusChange(ProfilerStatus status);
+protected:
+  void initToolView();
+  void reopenToolView();
+private:
+  QWidget* toolView;
+  QWidget* connectView;
+  View* centorView;
+  QVBoxLayout* layout;
 };

@@ -20,12 +20,10 @@
 #include <stdint.h>
 #include <QColor>
 #include <iostream>
-
-#include "TracyEvent.hpp"
-#include "src/profiler/TracyColor.hpp"
-
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
+#include "TracyEvent.hpp"
+#include "src/profiler/TracyColor.hpp"
 
 static std::unordered_map<std::string, tgfx::Rect> TextSizeMap;
 const auto FontSize = 15;

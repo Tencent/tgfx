@@ -16,12 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <QFontMetrics>
+#include <filesystem>
 #include "Utility.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/layers/TextLayer.h"
-
-#include <QFontMetrics>
-#include <filesystem>
 
 // Short list based on GetTypes() in TracySourceTokenizer.cpp
 constexpr const char* TypesList[] = {

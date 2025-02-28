@@ -24,7 +24,7 @@
 namespace tgfx {
 std::unique_ptr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
                                                  std::unique_ptr<GeometryProcessor> gp) {
-  TRACE_EVENT_NAME("createPipeline");
+  TRACE_EVENT_NAME("CreatePipeline");
   auto numColorProcessors = colors.size();
   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.resize(numColorProcessors + coverages.size());

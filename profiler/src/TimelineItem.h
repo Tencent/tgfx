@@ -20,8 +20,8 @@
 
 #include <QPainter>
 #include "tgfx/core/Canvas.h"
-#include "TracyTaskDispatch.hpp"
 #include "TimelineContext.h"
+#include "TracyTaskDispatch.hpp"
 #include "TracyWorker.hpp"
 #include "Utility.h"
 

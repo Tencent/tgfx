@@ -16,11 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "MainView.h"
-#include <qevent.h>
 #include <QQmlContext>
-#include <QVBoxLayout>
-#include "FramesView.h"
+#include "MainView.h"
 #include "ProfilerWindow.h"
 #include "ToolView.h"
 #include "TracyFileRead.hpp"

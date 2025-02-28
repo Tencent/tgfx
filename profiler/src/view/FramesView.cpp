@@ -16,16 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "FramesView.h"
 #include <qevent.h>
 #include <sys/socket.h>
 #include <tgfx/gpu/opengl/qt/QGLWindow.h>
 #include <QSGImageNode>
 #include <QToolTip>
-
-#include "TracyPrint.hpp"
 #include "TimelineView.h"
-#include "FramesView.h"
-
+#include "TracyPrint.hpp"
 
 FramesView::FramesView(QQuickItem* parent): QQuickItem(parent) {
   setFlag(ItemHasContents, true);
@@ -136,13 +134,13 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     auto color = GetFrameColor(static_cast<uint64_t>(frameTime), frameTarget);
 
     if (frameWidth != 1) {
-      auto p1 = tgfx::Point(2.f + i * frameWidth, (float)height() - 1.f - frameHeight);
-      auto p2 = tgfx::Point((float)frameWidth + i * frameWidth - p1.x, (float)height() - 1.f - p1.y);
+      auto p1 = tgfx::Point{2.f + i * frameWidth, (float)height() - 1.f - frameHeight};
+      auto p2 = tgfx::Point{(float)frameWidth + i * frameWidth - p1.x, (float)height() - 1.f - p1.y};
       drawRect(canvas, p1, p2, color);
     }
     else {
-      auto p1 = tgfx::Point(1.f + i,(float)height() -2 - frameHeight);
-      auto p2 = tgfx::Point(1.f + i,(float)height() -2);
+      auto p1 = tgfx::Point{1.f + i,(float)height() -2 - frameHeight};
+      auto p2 = tgfx::Point{1.f + i,(float)height() -2};
       drawLine(canvas,p1,p2,color);
     }
     i++;
@@ -168,10 +166,10 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     auto h = static_cast<float>(height());
     if(x1 - x0 >= 3) {
       drawRect(canvas, 2.f + fx0 , 0 , fx1 - fx0, h, 0x55DD22DD);
-      auto p1 = tgfx::Point(2.f + fx0 , -1.f);
-      auto p2 = tgfx::Point(2.f + fx0,h - 1.f);
-      auto p3 = tgfx::Point(fx1, -1.f);
-      auto p4 = tgfx::Point(fx1, h - 1.f);
+      auto p1 = tgfx::Point{2.f + fx0 , -1.f};
+      auto p2 = tgfx::Point{2.f + fx0,h - 1.f};
+      auto p3 = tgfx::Point{fx1, -1.f};
+      auto p4 = tgfx::Point{fx1, h - 1.f};
 
       drawLine(canvas,p1,p2,0x55FF55FF);
       drawLine(canvas, p3 , p4, 0x55FF55FF);
@@ -239,26 +237,26 @@ QSGNode* FramesView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 }
 
 void FramesView::drawBackground(tgfx::Canvas* canvas) {
-  const auto dpos = tgfx::Point(0, 0);
+  const auto dpos = tgfx::Point{0.f, 0.f};
 
   const uint64_t frameTarget = 1000 * 1000 * 1000 / viewData->frameTarget;
 
   auto p1 =
       dpos +
-      tgfx::Point(0, round((float)height() - (float)height() * frameTarget * 2 / MaxFrameTime));
-  auto p2 = dpos + tgfx::Point((float)width(), round((float)height() -
-                                              (float)height() * frameTarget * 2 / MaxFrameTime));
+      tgfx::Point{0, round((float)height() - (float)height() * frameTarget * 2 / MaxFrameTime)};
+  auto p2 = dpos + tgfx::Point{(float)width(), round((float)height() -
+                                              (float)height() * frameTarget * 2 / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x442222DD);
 
-  p1 = dpos + tgfx::Point(0, round((float)height() - float(height() * frameTarget / MaxFrameTime)));
+  p1 = dpos + tgfx::Point{0, round((float)height() - float(height() * frameTarget / MaxFrameTime))};
   p2 = dpos +
-       tgfx::Point((float)width(), round((float)height() - (float)height() * frameTarget / MaxFrameTime));
+       tgfx::Point{(float)width(), round((float)height() - (float)height() * frameTarget / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x4422DDDD);
 
   p1 = dpos +
-       tgfx::Point(0, round((float)height() - (float)height() * frameTarget / 2 / MaxFrameTime));
-  p2 = dpos + tgfx::Point((float)width(), round((float)height() -
-                                         (float)height() * frameTarget / 2 / MaxFrameTime));
+       tgfx::Point{0, round((float)height() - (float)height() * frameTarget / 2 / MaxFrameTime)};
+  p2 = dpos + tgfx::Point{(float)width(), round((float)height() -
+                                         (float)height() * frameTarget / 2 / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x4422DD22);
 }
 

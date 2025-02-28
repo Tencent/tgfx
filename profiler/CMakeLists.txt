@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
 project(TGFXProfiler)
 
+include(../third_party/vendor_tools/vendor.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_compile_definitions(CXX_17)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
@@ -16,11 +19,11 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-DDEBUG)
 endif ()
 
-set(CMAKE_CXX_STANDARD 20)
-
-include(cmake/server.cmake)
-list(APPEND TRACY_LIBS
-        TracyServer)
+list(APPEND TGFX_STATIC_VENDORS tracyServer)
+list(APPEND TGFX_PROFILER_INCLUDE
+        ../third_party/tracy/server
+        ../third_party/tracy/profiler
+        ../third_party/tracy/public/common)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -93,33 +96,35 @@ elseif (WIN32)
     list(APPEND TGFX_PROFILER_LIBS ${ws2_32_LIB})
 endif ()
 
-list(APPEND TGFX_PROFILER_SRC
-        profiler/include)
+list(APPEND TGFX_PROFILER_SRC src)
 
 
 file(GLOB TGFX_PROFILER_FILES
-        profiler/include/View.h
-        profiler/include/MainView.h
-        profiler/include/ToolView.h
-        profiler/include/FramesView.h
-        profiler/include/TimelineView.h
-        profiler/include/ProfilerWindow.h
-        profiler/main.cpp
-        profiler/src/MainView.cpp
-        profiler/src/ToolView.cpp
-        profiler/src/TimelineView.cpp
-        profiler/src/TimelineItem.cpp
-        profiler/src/TimelineItemThread.cpp
-        profiler/src/TimelineController.cpp
-        profiler/src/FramesView.cpp
-        profiler/src/Utility.cpp
-        profiler/src/UserData.cpp
-        profiler/src/View.cpp
-        profiler/src/ProfilerWindow.cpp
-        profiler/src/ProfilerApplication.cpp)
+        src/main.cpp
+        src/view/View.h
+        src/view/MainView.h
+        src/view/ToolView.h
+        src/view/FramesView.h
+        src/view/TimelineView.h
+        src/ProfilerWindow.h
+        src/view/MainView.cpp
+        src/view/ToolView.cpp
+        src/view/TimelineView.cpp
+        src/TimelineItem.cpp
+        src/TimelineItemThread.cpp
+        src/TimelineController.cpp
+        src/view/FramesView.cpp
+        src/Utility.cpp
+        src/UserData.cpp
+        src/view/View.cpp
+        src/ProfilerWindow.cpp
+        src/ProfilerApplication.cpp)
+
+find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES)
+list(APPEND TGFX_PROFILER_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})
 
 add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${QT_RESOURCES})
+add_dependencies(Profiler tgfx-vendor)
 target_include_directories(Profiler PUBLIC ${TGFX_PROFILER_SRC})
-target_include_directories(Profiler SYSTEM PRIVATE ${TRACY_INCLUDE})
-target_link_libraries(Profiler tgfx ${TGFX_PROFILER_LIBS} ${TRACY_LIBS})
-#target_compile_options(Profiler PUBLIC ${PROFILER_COMPILE_OPTIONS})
+target_include_directories(Profiler SYSTEM PRIVATE ${TGFX_PROFILER_INCLUDE})
+target_link_libraries(Profiler tgfx ${TGFX_PROFILER_LIBS})

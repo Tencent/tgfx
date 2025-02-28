@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "View.h"
 #include <QGroupBox>
 #include <QLabel>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QRadioButton>
 #include <QSpinBox>
-#include <src/profiler/TracyFileselector.hpp>
+#include "src/profiler/TracyFileselector.hpp"
+#include "View.h"
 #include "FramesView.h"
 #include "TimelineView.h"
 #include "TracySysUtil.hpp"

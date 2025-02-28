@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/gpu/opengl/qt/QGLWindow.h>
-#include <QQuickItem>
 #include "TracyWorker.hpp"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include "ViewData.h"
 
 #define FRAME_VIEW_HEIGHT 50

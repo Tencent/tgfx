@@ -16,16 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "UserData.h"
-#include <assert.h>
 #include <memory>
-
 #ifdef _WIN32
 #  include <stdio.h>
 #else
 #  include <unistd.h>
 #endif
 
+#include "UserData.h"
 #include "src/ini.h"
 #include "src/profiler/TracyStorage.hpp"
 

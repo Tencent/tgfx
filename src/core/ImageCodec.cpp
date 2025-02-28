@@ -135,7 +135,6 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
-  TRACE_EVENT_NAME("imageDecode");
   auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;

@@ -18,41 +18,28 @@
 
 #pragma once
 
-#include <ToolView.h>
-#include <QGraphicsView>
-#include <QMainWindow>
-#include <QVBoxLayout>
-#include <QWidget>
-#include <thread>
-#include "TracyWorker.hpp"
-#include "Utility.h"
-#include "View.h"
+#include "view/MainView.h"
 
-class MainView: public QWidget {
+class ProfilerWindow: public QMainWindow {
   Q_OBJECT
 public:
-  static std::thread loadThread;
-
-  MainView(QWidget* parent = nullptr);
-  ~MainView();
-
-  void connectClient(const char* address, uint16_t port);
-  void openFile();
-  void openToolView();
-  void openWebsocketServer();
-
-  void changeViewModeButton(bool pause);
-  Q_SLOT void changeViewMode(bool pause);
-  Q_SLOT void quitReadFile();
-  Q_SLOT void saveFile();
-  Q_SLOT void discardConnect();
-  Q_SIGNAL void statusChange(ProfilerStatus status);
+  ProfilerWindow(QMainWindow* parent = nullptr);
+  void initWindow();
+  void initConnect();
+  void changeViewMode();
+  void reversalPlayAction();
+  void changePlayAction(bool pause);
+  Q_SLOT void pushPlayAction();
+  Q_SLOT void updateToolBar(ProfilerStatus status);
 protected:
-  void initToolView();
-  void reopenToolView();
+  void initToolBar();
 private:
-  QWidget* toolView;
-  QWidget* connectView;
-  View* centorView;
-  QVBoxLayout* layout;
+  bool pause = false;
+
+  MainView* mainView;
+  QToolBar* topBar;
+  QAction* quitAction;
+  QAction* saveFileAction;
+  QAction* playAction;
+  QAction* discardAction;
 };

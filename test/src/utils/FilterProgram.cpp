@@ -22,7 +22,7 @@
 namespace tgfx {
 std::unique_ptr<FilterProgram> FilterProgram::Make(Context* context, const std::string& vertex,
                                                    const std::string& fragment) {
-  TRACE_EVENT_NAME("createFilterProgram");
+  TRACE_EVENT_NAME("CreateFilterProgram");
   auto gl = GLFunctions::Get(context);
   auto program = CreateGLProgram(context, vertex, fragment);
   if (program == 0) {

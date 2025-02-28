@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/core/Point.h>
 #include <memory>
 #include <optional>
+#include "tgfx/core/Point.h"
 #include "TimelineItem.h"
-#include "Utility.h"
 #include "TimelineItemThread.h"
+#include "Utility.h"
 
 class View;
 

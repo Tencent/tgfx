@@ -107,7 +107,7 @@ void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
 }
 
 std::unique_ptr<Program> Pipeline::createProgram(Context* context) const {
-  TRACE_EVENT_NAME("createProgram");
+  TRACE_EVENT_NAME("CreateProgram");
   return ProgramBuilder::CreateProgram(context, this);
 }
 

@@ -18,7 +18,7 @@
 
 #pragma once
 #include <QGraphicsView>
-#include <src/profiler/TracyTimelineDraw.hpp>
+#include "src/profiler/TracyTimelineDraw.hpp"
 #include "TimelineItem.h"
 
 class TimelineItemThread: public TimelineItem {

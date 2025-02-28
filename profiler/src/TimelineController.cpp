@@ -18,7 +18,7 @@
 
 #include "TimelineController.h"
 #include "TimelineContext.h"
-#include "View.h"
+#include "view/View.h"
 
 TimelineController::TimelineController(TimelineView& view, tracy::Worker& worker, bool threading)
   : view(view)

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "Utility.h"
 #include <QObject>
+#include "Utility.h"
 
 struct ViewData: QObject {
   int64_t zvStart = 0;

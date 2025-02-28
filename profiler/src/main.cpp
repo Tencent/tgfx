@@ -16,34 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include <QFont>
+#include "ProfilerApplication.h"
+#include "ProfilerWindow.h"
+#include "qwidget.h"
 
-#include <memory>
-#include <stdint.h>
-#include <stdio.h>
-#include <string>
-#include <vector>
-#include "ViewData.h"
+int main(int argc, char *argv[])
+{
+  QApplication::setApplicationName("Profiler");
+  QApplication::setOrganizationName("org.tgfx");
+  QSurfaceFormat defaultFormat = QSurfaceFormat();
+  defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
+  defaultFormat.setVersion(3, 2);
+  defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
+  QSurfaceFormat::setDefaultFormat(defaultFormat);
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+#else
+  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
 
-class UserData{
-public:
-  UserData();
-  UserData(const char* program, uint64_t time);
+  QApplication app(argc, argv);
 
-  bool Valid() const { return !program.empty(); }
+  ProfilerWindow* window = new ProfilerWindow;
+  window->show();
 
-  void LoadState(ViewData& data);
-  void SaveState(const ViewData& data);
-  void StateShouldBePreserved();
-
-private:
-  FILE* OpenFile(const char* filename, bool write);
-  void Remove(const char* filename);
-
-  std::string program;
-  uint64_t time;
-
-  std::string description;
-
-  bool preserveState;
-};
+  return app.exec();
+}

@@ -21,9 +21,9 @@
 #include <QPushButton>
 #include <QListWidgetItem>
 #include <QWidget>
-#include "TracySocket.hpp"
 #include "tracy_robin_hood.h"
-#include "profiler/src/ResolvService.hpp"
+#include "TracySocket.hpp"
+#include "src/ResolvService.hpp"
 
 struct ClientData
 {
