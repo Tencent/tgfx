@@ -100,6 +100,17 @@ void GLRenderPass::onBindRenderTarget() {
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
+  if (vertexArray) {
+    gl->bindVertexArray(vertexArray->id());
+  }
+}
+
+void GLRenderPass::onUnbindRenderTarget() {
+  auto gl = GLFunctions::Get(context);
+  if (vertexArray) {
+    gl->bindVertexArray(0);
+  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
@@ -121,40 +132,18 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   return true;
 }
 
-static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
-
-void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
-  auto func = [&]() {
-    auto gl = GLFunctions::Get(context);
-    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(baseVertex),
-                   static_cast<int>(vertexCount));
-  };
-  draw(func);
-}
-
-void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
-  auto func = [&]() {
-    auto gl = GLFunctions::Get(context);
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                   std::static_pointer_cast<GLBuffer>(_indexBuffer)->bufferID());
-    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
-                     GL_UNSIGNED_SHORT, reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  };
-  draw(func);
-}
-
-void GLRenderPass::draw(const std::function<void()>& func) {
+bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                                 std::shared_ptr<GpuBuffer> vertexBuffer,
+                                 std::shared_ptr<Data> vertexData) {
   auto gl = GLFunctions::Get(context);
-  if (vertexArray) {
-    gl->bindVertexArray(vertexArray->id());
-  }
-  if (_vertexBuffer) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(_vertexBuffer)->bufferID());
-  } else {
+  if (vertexBuffer) {
+    gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
+  } else if (vertexData) {
     gl->bindBuffer(GL_ARRAY_BUFFER, sharedVertexBuffer->bufferID());
-    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertexData->size()),
-                   _vertexData->data(), GL_STATIC_DRAW);
+    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertexData->size()), vertexData->data(),
+                   GL_STATIC_DRAW);
+  } else {
+    return false;
   }
   auto* program = static_cast<GLProgram*>(_program);
   for (const auto& attribute : program->vertexAttributes()) {
@@ -164,12 +153,25 @@ void GLRenderPass::draw(const std::function<void()>& func) {
                             reinterpret_cast<void*>(attribute.offset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
-  func();
-  if (vertexArray) {
-    gl->bindVertexArray(0);
+  if (indexBuffer) {
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                   std::static_pointer_cast<GLBuffer>(indexBuffer)->bufferID());
   }
-  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-  CheckGLError(context);
+  return true;
+}
+
+static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
+
+void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
+                          bool drawIndexed) {
+  auto gl = GLFunctions::Get(context);
+  if (drawIndexed) {
+    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(count),
+                     GL_UNSIGNED_SHORT, reinterpret_cast<void*>(offset * sizeof(uint16_t)));
+  } else {
+    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(offset),
+                   static_cast<int>(count));
+  }
 }
 
 void GLRenderPass::onClear(const Rect& scissor, Color color) {

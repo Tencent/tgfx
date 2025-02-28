@@ -2125,4 +2125,26 @@ TGFX_TEST(LayerTest, InvalidMask) {
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/InvalidMask"));
 }
+
+TGFX_TEST(LayerTest, LargeScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList list;
+  auto shapeLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeWH(10000, 10000));
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto imagePattern = ImagePattern::Make(image);
+  imagePattern->setMatrix(Matrix::MakeTrans(-20, -20));
+  shapeLayer->setFillStyle(imagePattern);
+  shapeLayer->setPath(path);
+  list.root()->addChild(shapeLayer);
+
+  auto surface = Surface::Make(context, 1000, 1000);
+
+  shapeLayer->setMatrix(Matrix::MakeScale(256, 256));
+  list.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LargeScale"));
+}
 }  // namespace tgfx

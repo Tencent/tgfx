@@ -88,6 +88,15 @@ static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
   return localBounds;
 }
 
+static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
+                            const Rect& clipBounds) {
+  auto result = ToLocalBounds(clipBounds, viewMatrix);
+  if (!result.intersect(localBounds)) {
+    return Rect::MakeEmpty();
+  }
+  return result;
+}
+
 void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const FillStyle& style) {
   DEBUG_ASSERT(shape != nullptr);
@@ -106,8 +115,12 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
   if (needLocalBounds) {
-    localBounds = shape->isInverseFillType() ? ToLocalBounds(clipBounds, state.matrix)
-                                             : shape->getBounds(maxScale);
+    if (shape->isInverseFillType()) {
+      localBounds = ToLocalBounds(clipBounds, state.matrix);
+    } else {
+      localBounds = shape->getBounds(maxScale);
+      localBounds = ClipLocalBounds(localBounds, state.matrix, clipBounds);
+    }
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
   if (needDeviceBounds) {
@@ -162,6 +175,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(style, type == PendingOpType::Image);
   auto context = renderTarget->getContext();
   auto aaType = getAAType(style);
+  auto clipBounds = Rect::MakeEmpty();
+  if (needLocalBounds) {
+    clipBounds = getClipBounds(clip);
+  }
   switch (type) {
     case PendingOpType::Rect:
       if (pendingRects.size() == 1) {
@@ -176,7 +193,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
       drawOp = RectDrawOp::Make(context, pendingRects, aaType, renderFlags);
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
-          localBounds.join(rect.rect);
+          localBounds.join(ClipLocalBounds(rect.rect, rect.viewMatrix, clipBounds));
         }
       }
       if (needDeviceBounds) {
@@ -195,6 +212,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle sty
           deviceBounds.join(rect);
         }
         localBounds = deviceBounds;
+        if (!localBounds.intersect(clipBounds)) {
+          localBounds = Rect::MakeEmpty();
+        }
       }
       pendingRRects.clear();
       break;
@@ -470,6 +490,9 @@ void OpsCompositor::addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, cons
   if (style.maskFilter) {
     if (auto processor = style.maskFilter->asFragmentProcessor(args, nullptr)) {
       op->addCoverageFP(std::move(processor));
+    } else {
+      // if mask is empty, nothing to draw
+      return;
     }
   }
   Rect scissorRect = Rect::MakeEmpty();
