@@ -17,19 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "WGLContext.h"
+#include <tgfx/gpu/opengl/wgl/WGLDevice.h>
+#include "WGLUtil.h"
 
 namespace tgfx {
-class WGLWindowContext : public WGLContext {
+class WGLPbufferDevice final : public WGLDevice {
  public:
-  WGLWindowContext(HWND hWnd, HGLRC sharedContext);
-  ~WGLWindowContext() override;
+  ~WGLPbufferDevice() override;
 
  private:
-  HWND hWnd = nullptr;
+  HPBUFFER pBuffer = nullptr;
 
-  void onInitializeContext() override;
-  void onDestroyContext() override;
+  explicit WGLPbufferDevice(HGLRC nativeHandle);
+
+  friend class GLDevice;
 };
 }  // namespace tgfx

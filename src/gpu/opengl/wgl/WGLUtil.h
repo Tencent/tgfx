@@ -16,43 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "WGLContext.h"
-#include "core/utils/Log.h"
+#pragma once
+
+#include <windows.h>
 
 namespace tgfx {
+DECLARE_HANDLE(HPBUFFER);
+/**
+ * Determines if an extension is available. it is necessary
+ * to check this before calling other class functions.
+ */
+bool HasExtension(const char* ext);
 
-WGLContext::WGLContext(HGLRC sharedContext) : sharedContext(sharedContext) {
-}
+BOOL ChoosePixelFormat(HDC, const int*, const FLOAT*, UINT, int*, UINT*);
 
-void WGLContext::initializeContext() {
-  DEBUG_ASSERT(!deviceContext);
-  DEBUG_ASSERT(!glContext);
-  onInitializeContext();
-}
+HPBUFFER CreatePbuffer(HDC, int, int, int, const int*);
 
-void WGLContext::destroyContext() {
-  onDestroyContext();
-}
+HDC GetPbufferDC(HPBUFFER);
 
-bool WGLContext::makeCurrent() {
-  oldGLContext = wglGetCurrentContext();
-  oldDeviceContext = wglGetCurrentDC();
-  if (oldGLContext == glContext) {
-    return true;
-  }
-  if (!wglMakeCurrent(deviceContext, glContext)) {
-    return false;
-  }
-  return true;
-}
+int ReleasePbufferDC(HPBUFFER, HDC);
 
-void WGLContext::clearCurrent() {
-  if (oldGLContext == glContext) {
-    return;
-  }
-  wglMakeCurrent(deviceContext, nullptr);
-  if (oldDeviceContext != nullptr) {
-    wglMakeCurrent(oldDeviceContext, oldGLContext);
-  }
-}
+BOOL DestroyPbuffer(HPBUFFER);
+
+void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
+
+HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext);
+
 }  // namespace tgfx

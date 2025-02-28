@@ -34,7 +34,8 @@ class WGLWindow : public Window {
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
-  HWND nativeWindow{nullptr};
+  HWND nativeWindow = nullptr;
+
   explicit WGLWindow(std::shared_ptr<Device> device);
 };
 }  // namespace tgfx

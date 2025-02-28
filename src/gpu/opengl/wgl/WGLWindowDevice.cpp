@@ -16,17 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "WGLWindowContext.h"
-#include "core/utils/Log.h"
+#include "WGLWindowDevice.h"
+#include "WGLUtil.h"
 
 namespace tgfx {
-HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext, const WGLExtensions& extensions) {
-  if (!extensions.hasExtension(deviceContext, "WGL_ARB_pixel_format")) {
+static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {
+  if (!HasExtension("WGL_ARB_pixel_format")) {
     return nullptr;
   }
   bool set = false;
   int pixelFormatsToTry[2] = {-1, -1};
-  GetPixelFormatsToTry(deviceContext, extensions, pixelFormatsToTry);
+  GetPixelFormatsToTry(deviceContext, pixelFormatsToTry);
   for (auto f = 0; !set && pixelFormatsToTry[f] && f < 2; ++f) {
     PIXELFORMATDESCRIPTOR descriptor;
     DescribePixelFormat(deviceContext, pixelFormatsToTry[f], sizeof(descriptor), &descriptor);
@@ -36,38 +36,57 @@ HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext, const WGLExtensio
   if (!set) {
     return nullptr;
   }
-
-  return CreateGLContext(deviceContext, extensions, sharedContext);
+  return CreateGLContext(deviceContext, sharedContext);
 }
 
-WGLWindowContext::WGLWindowContext(HWND hWnd, HGLRC sharedContext)
-    : WGLContext(sharedContext), hWnd(hWnd) {
-  initializeContext();
-}
-
-WGLWindowContext::~WGLWindowContext() {
-  destroyContext();
-}
-
-void WGLWindowContext::onInitializeContext() {
+std::shared_ptr<WGLDevice> WGLDevice::Wrap(HWND hWnd, HGLRC sharedContext, bool externallyOwned) {
+  HDC deviceContext = nullptr;
+  HGLRC glContext = nullptr;
   if (hWnd != nullptr) {
     deviceContext = GetDC(hWnd);
-    glContext = CreateWGLContext(deviceContext, sharedContext, extensions);
+    glContext = CreateWGLContext(deviceContext, sharedContext);
   } else {
     deviceContext = wglGetCurrentDC();
     glContext = wglGetCurrentContext();
   }
 
-  if (deviceContext == nullptr || glContext == nullptr) {
-    LOGE("WGLWindowContext::onInitializeContext() initializeWGLContext failed!");
+  auto glDevice = GLDevice::Get(glContext);
+  if (glDevice != nullptr) {
+    return std::static_pointer_cast<WGLDevice>(glDevice);
   }
+  if (glContext == nullptr) {
+    return nullptr;
+  }
+
+  auto oldDeviceContext = wglGetCurrentDC();
+  auto oldGLContext = wglGetCurrentContext();
+  if (oldGLContext != glContext) {
+    auto result = wglMakeCurrent(deviceContext, glContext);
+    if (!result) {
+      return nullptr;
+    }
+  }
+  auto device = std::shared_ptr<WGLWindowDevice>(new WGLWindowDevice(glContext));
+  device->externallyOwned = externallyOwned;
+  device->deviceContext = deviceContext;
+  device->glContext = glContext;
+  device->sharedContext = sharedContext;
+  device->hWnd = hWnd;
+  device->weakThis = device;
+  if (oldGLContext != glContext) {
+    wglMakeCurrent(oldDeviceContext, oldGLContext);
+  }
+  return device;
 }
 
-void WGLWindowContext::onDestroyContext() {
-  if (hWnd == nullptr) {
+WGLWindowDevice::WGLWindowDevice(HGLRC nativeHandle) : WGLDevice(nativeHandle) {
+}
+
+WGLWindowDevice::~WGLWindowDevice() {
+  releaseAll();
+  if (externallyOwned || hWnd == nullptr) {
     return;
   }
-
   if (glContext != nullptr) {
     wglDeleteContext(glContext);
     glContext = nullptr;

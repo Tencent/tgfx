@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "WGLPbufferContext.h"
+#include "WGLPbufferDevice.h"
 #include <mutex>
+#include "WGLUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
-
 static HWND CreateParentWindow() {
   static ATOM windowClass = 0;
   const auto hInstance = (HINSTANCE)GetModuleHandle(nullptr);
@@ -51,22 +51,20 @@ static HWND CreateParentWindow() {
     LOGE("CreateParentWindow() create window failed.");
     return nullptr;
   }
-
   return window;
 }
 
-bool CreatePbufferContext(HDC parentDC, HGLRC sharedContext, const WGLExtensions& extensions,
-                          HPBUFFER& pBuffer, HDC& deviceContext, HGLRC& glContext) {
-  if (!extensions.hasExtension(parentDC, "WGL_ARB_pixel_format") ||
-      !extensions.hasExtension(parentDC, "WGL_ARB_pbuffer")) {
+bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, HPBUFFER& pBuffer,
+                          HDC& deviceContext, HGLRC& glContext) {
+  if (!HasExtension("WGL_ARB_pixel_format") || !HasExtension("WGL_ARB_pbuffer")) {
     return false;
   }
 
   static int pixelFormat = -1;
   static std::once_flag flag;
-  std::call_once(flag, [parentDC, &extensions] {
+  std::call_once(flag, [parentDeviceContext] {
     int pixelFormatsToTry[2] = {-1, -1};
-    GetPixelFormatsToTry(parentDC, extensions, pixelFormatsToTry);
+    GetPixelFormatsToTry(parentDeviceContext, pixelFormatsToTry);
     pixelFormat = pixelFormatsToTry[0];
   });
 
@@ -74,62 +72,83 @@ bool CreatePbufferContext(HDC parentDC, HGLRC sharedContext, const WGLExtensions
     return false;
   }
 
-  pBuffer = extensions.createPbuffer(parentDC, pixelFormat, 1, 1, nullptr);
+  pBuffer = CreatePbuffer(parentDeviceContext, pixelFormat, 1, 1, nullptr);
   if (pBuffer != nullptr) {
-    deviceContext = extensions.getPbufferDC(pBuffer);
+    deviceContext = GetPbufferDC(pBuffer);
     if (deviceContext != nullptr) {
-      glContext = CreateGLContext(deviceContext, extensions, sharedContext);
+      glContext = CreateGLContext(deviceContext, sharedContext);
       if (glContext != nullptr) {
         return true;
       }
-      extensions.releasePbufferDC(pBuffer, deviceContext);
+      ReleasePbufferDC(pBuffer, deviceContext);
+      deviceContext = nullptr;
     }
-    extensions.destroyPbuffer(pBuffer);
+    DestroyPbuffer(pBuffer);
+    pBuffer = nullptr;
   }
-
   return false;
 }
 
-WGLPbufferContext::WGLPbufferContext(HGLRC sharedContext) : WGLContext(sharedContext) {
-  initializeContext();
-}
+std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
+  HWND window = nullptr;
+  HDC parentDeviceContext = nullptr;
+  HPBUFFER pBuffer = nullptr;
+  HDC deviceContext = nullptr;
+  HGLRC glContext = nullptr;
+  bool result = false;
+  do {
+    window = CreateParentWindow();
+    if (window == nullptr) {
+      LOGE("GLDevice::Make() create window failed!");
+      break;
+    }
+    parentDeviceContext = GetDC(window);
+    if (parentDeviceContext == nullptr) {
+      LOGE("GLDevice::Make() get deivce context failed!");
+      break;
+    }
+    if (!CreatePbufferContext(parentDeviceContext, static_cast<HGLRC>(sharedContext), pBuffer,
+                              deviceContext, glContext)) {
+      LOGE("GLDevice::Make() create pbuffer context failed!");
+      break;
+    }
+    result = true;
+  } while (false);
 
-WGLPbufferContext::~WGLPbufferContext() {
-  destroyContext();
-}
-
-void WGLPbufferContext::onInitializeContext() {
-  HWND window = CreateParentWindow();
-  if (window == nullptr) {
-    LOGE("WGLPbufferContext::onInitializeContext() create window failed!");
-    return;
-  }
-  HDC parentDeviceContext = GetDC(window);
-  if (parentDeviceContext == nullptr) {
-    LOGE("WGLPbufferContext::onInitializeContext() get deivce context failed!");
-    DestroyWindow((window));
-    return;
-  }
-  bool result = CreatePbufferContext(parentDeviceContext, sharedContext, extensions, pBuffer,
-                                     deviceContext, glContext);
-  if (!result) {
-    LOGE("WGLPbufferContext::onInitializeContext() create pbuffer context failed!");
-  }
   ReleaseDC(window, parentDeviceContext);
   DestroyWindow(window);
+
+  if (!result) {
+    return nullptr;
+  }
+
+  auto device = std::shared_ptr<WGLPbufferDevice>(new WGLPbufferDevice(glContext));
+  device->externallyOwned = false;
+  device->deviceContext = deviceContext;
+  device->glContext = glContext;
+  device->sharedContext = static_cast<HGLRC>(sharedContext);
+  device->pBuffer = pBuffer;
+  device->weakThis = device;
+
+  return device;
 }
 
-void WGLPbufferContext::onDestroyContext() {
-  if (pBuffer == nullptr) {
+WGLPbufferDevice::WGLPbufferDevice(HGLRC nativeHandle) : WGLDevice(nativeHandle) {
+}
+
+WGLPbufferDevice::~WGLPbufferDevice() {
+  releaseAll();
+  if (externallyOwned || pBuffer == nullptr) {
     return;
   }
   if (glContext != nullptr) {
     wglDeleteContext(glContext);
     glContext = nullptr;
   }
+
   if (deviceContext != nullptr) {
-    extensions.releasePbufferDC(pBuffer, deviceContext);
-    extensions.destroyPbuffer(pBuffer);
+    ReleasePbufferDC(pBuffer, deviceContext);
+    DestroyPbuffer(pBuffer);
     deviceContext = nullptr;
   }
   pBuffer = nullptr;

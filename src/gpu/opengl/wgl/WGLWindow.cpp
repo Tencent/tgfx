@@ -18,7 +18,6 @@
 
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include <GL/GL.h>
-#include "WGLContext.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -58,8 +57,7 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
 
 void WGLWindow::onPresent(Context* context, int64_t presentationTime) {
   auto device = std::static_pointer_cast<WGLDevice>(this->device);
-  DEBUG_ASSERT(device->wglContext != nullptr);
-  SwapBuffers(device->wglContext->getDeviceContext());
+  SwapBuffers(device->deviceContext);
 }
 
 }  // namespace tgfx

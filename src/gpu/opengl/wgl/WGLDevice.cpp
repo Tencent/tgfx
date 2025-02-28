@@ -17,11 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/wgl/WGLDevice.h"
-#include <GL/GL.h>
-#include "WGLExtensions.h"
-#include "WGLPbufferContext.h"
-#include "WGLWindowContext.h"
-#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -31,88 +26,39 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
   if (glDevice != nullptr) {
     return std::static_pointer_cast<WGLDevice>(glDevice);
   }
-
-  std::unique_ptr<WGLContext> wglContext = std::make_unique<WGLWindowContext>(nullptr, nullptr);
-  return WGLDevice::Wrap(std::move(wglContext), true);
-}
-
-std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
-  std::unique_ptr<WGLContext> wglContext =
-      std::make_unique<WGLPbufferContext>(static_cast<HGLRC>(sharedContext));
-  return WGLDevice::Wrap(std::move(wglContext), false);
+  return WGLDevice::Wrap(nullptr, nullptr, true);
 }
 
 std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND hWnd, HGLRC sharedContext) {
-  if (hWnd == nullptr) {
-    return nullptr;
-  }
-
-  std::unique_ptr<WGLContext> wglContext = std::make_unique<WGLWindowContext>(hWnd, sharedContext);
-
-  if (wglContext == nullptr) {
-    LOGE("WGLDevice::MakeFrom() CreateWGLContext failed!");
-    return nullptr;
-  }
-  return WGLDevice::Wrap(std::move(wglContext), false);
-}
-
-std::shared_ptr<WGLDevice> WGLDevice::Wrap(std::unique_ptr<WGLContext> wglContext,
-                                           bool externallyOwned) {
-  if (wglContext == nullptr) {
-    return nullptr;
-  }
-  HGLRC glContext = wglContext->getGLContext();
-  auto glDevice = GLDevice::Get(glContext);
-  if (glDevice != nullptr) {
-    return std::static_pointer_cast<WGLDevice>(glDevice);
-  }
-  if (glContext == nullptr) {
-    return nullptr;
-  }
-
-  auto oldDeviceContext = wglGetCurrentDC();
-  auto oldGLContext = wglGetCurrentContext();
-  if (oldGLContext != glContext) {
-    auto result = wglContext->makeCurrent();
-    if (!result) {
-      return nullptr;
-    }
-  }
-  auto device = std::shared_ptr<WGLDevice>(new WGLDevice(glContext));
-  device->externallyOwned = externallyOwned;
-  device->wglContext = std::move(wglContext);
-  device->weakThis = device;
-  if (oldGLContext != glContext) {
-    wglMakeCurrent(oldDeviceContext, oldGLContext);
-  }
-  return device;
+  return WGLDevice::Wrap(hWnd, sharedContext, false);
 }
 
 WGLDevice::WGLDevice(HGLRC nativeHandle) : GLDevice(nativeHandle) {
 }
 
-WGLDevice::~WGLDevice() {
-  releaseAll();
-  if (externallyOwned) {
-    return;
-  }
-  //wglContext->destroyContext() will be called when destructed;
-}
-
 bool WGLDevice::sharableWith(void* nativeConext) const {
-  if (wglContext == nullptr) {
-    return false;
-  }
-  return nativeHandle == nativeConext || wglContext->getSharedContext() == nativeConext;
+  return nativeHandle == nativeConext || sharedContext == nativeConext;
 }
 
 bool WGLDevice::onMakeCurrent() {
-  DEBUG_ASSERT(wglContext != nullptr);
-  return wglContext->makeCurrent();
+  oldGLContext = wglGetCurrentContext();
+  oldDeviceContext = wglGetCurrentDC();
+  if (oldGLContext == glContext) {
+    return true;
+  }
+  if (!wglMakeCurrent(deviceContext, glContext)) {
+    return false;
+  }
+  return true;
 }
 
 void WGLDevice::onClearCurrent() {
-  DEBUG_ASSERT(wglContext != nullptr);
-  wglContext->clearCurrent();
+  if (oldGLContext == glContext) {
+    return;
+  }
+  wglMakeCurrent(deviceContext, nullptr);
+  if (oldDeviceContext != nullptr) {
+    wglMakeCurrent(oldDeviceContext, oldGLContext);
+  }
 }
 }  // namespace tgfx

@@ -30,7 +30,7 @@ class WGLDevice : public GLDevice {
    */
   static std::shared_ptr<WGLDevice> MakeFrom(HWND hWnd, HGLRC sharedContext);
 
-  ~WGLDevice() override;
+  ~WGLDevice() override = default;
 
   bool sharableWith(void* nativeConext) const override;
 
@@ -38,13 +38,17 @@ class WGLDevice : public GLDevice {
   bool onMakeCurrent() override;
   void onClearCurrent() override;
 
- private:
-  std::unique_ptr<WGLContext> wglContext;
+ protected:
+  HDC deviceContext = nullptr;
+  HGLRC glContext = nullptr;
+  HGLRC sharedContext = nullptr;
+
+  HDC oldDeviceContext = nullptr;
+  HGLRC oldGLContext = nullptr;
 
   explicit WGLDevice(HGLRC nativeHandle);
 
-  static std::shared_ptr<WGLDevice> Wrap(std::unique_ptr<WGLContext> wglContext,
-                                         bool externallyOwned);
+  static std::shared_ptr<WGLDevice> Wrap(HWND hWnd, HGLRC sharedContext, bool externallyOwned);
 
   friend class GLDevice;
   friend class WGLWindow;
