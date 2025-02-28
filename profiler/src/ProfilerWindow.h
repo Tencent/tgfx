@@ -20,9 +20,9 @@
 
 #include "view/MainView.h"
 
-class ProfilerWindow: public QMainWindow {
+class ProfilerWindow : public QMainWindow {
   Q_OBJECT
-public:
+ public:
   ProfilerWindow(QMainWindow* parent = nullptr);
   void initWindow();
   void initConnect();
@@ -31,9 +31,11 @@ public:
   void changePlayAction(bool pause);
   Q_SLOT void pushPlayAction();
   Q_SLOT void updateToolBar(ProfilerStatus status);
-protected:
+
+ protected:
   void initToolBar();
-private:
+
+ private:
   bool pause = false;
 
   MainView* mainView;

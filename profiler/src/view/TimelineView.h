@@ -19,21 +19,20 @@
 #pragma once
 
 #include <QGraphicsLineItem>
+#include "FramesView.h"
 #include "TimelineController.h"
 #include "TracyWorker.hpp"
 #include "ViewData.h"
 #include "src/profiler/TracyTimelineDraw.hpp"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
-#include "FramesView.h"
 
-class TimelineView: public QQuickItem {
+class TimelineView : public QQuickItem {
   Q_OBJECT
   Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
   Q_PROPERTY(ViewData* viewData READ getViewDataPtr WRITE setViewData)
   Q_PROPERTY(unsigned long long viewMode READ getViewMode WRITE setViewMode)
-public:
-  struct Region
-  {
+ public:
+  struct Region {
     bool active = false;
     int64_t start;
     int64_t end;
@@ -88,9 +87,10 @@ public:
 
   void draw();
   void drawThread(const TimelineContext& context, const tracy::ThreadData& thread,
-      const std::vector<tracy::TimelineDraw>& draw, int& _offset, int depth, tgfx::Canvas* canvas);
+                  const std::vector<tracy::TimelineDraw>& draw, int& _offset, int depth,
+                  tgfx::Canvas* canvas);
   void drawZonelist(const TimelineContext& ctx, const std::vector<tracy::TimelineDraw>& drawList,
-    int offset, uint64_t tid, tgfx::Canvas* canvas);
+                    int offset, uint64_t tid, tgfx::Canvas* canvas);
   void drawMouseLine(tgfx::Canvas* canvas);
   void drawTimeline(tgfx::Canvas* canvas);
   void drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd, int& yMin);
@@ -102,9 +102,9 @@ public:
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void hoverMoveEvent(QHoverEvent* event) override;
-  void hoverLeaveEvent(QHoverEvent *event) override;
+  void hoverLeaveEvent(QHoverEvent* event) override;
 
- //hovered functions.
+  //hovered functions.
   void showZoneInfo(const tracy::ZoneEvent& ev);
   void showZoneToolTip(const tracy::ZoneEvent& ev);
 
@@ -114,13 +114,18 @@ public:
   uint64_t getFrameNumber(const tracy::FrameData& fd, int i) const;
   uint32_t getZoneColor(const tracy::ZoneEvent& ev, uint64_t thread, int depth);
   uint32_t getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth);
-  ZoneColorData getZoneColorData(const tracy::ZoneEvent& ev, uint64_t thread, int depth, uint32_t inheritedColor);
+  ZoneColorData getZoneColorData(const tracy::ZoneEvent& ev, uint64_t thread, int depth,
+                                 uint32_t inheritedColor);
 
   static tgfx::Color getColor(uint32_t color);
 
-  ViewData* getViewData() { return viewData; }
+  ViewData* getViewData() {
+    return viewData;
+  }
 
-  unsigned long long getWorker() const { return (unsigned long long)worker; }
+  unsigned long long getWorker() const {
+    return (unsigned long long)worker;
+  }
   void setWorker(unsigned long long _worker) {
     worker = (tracy::Worker*)(_worker);
     frameData = worker->GetFramesBase();
@@ -128,25 +133,35 @@ public:
   }
 
   Q_SIGNAL void changeViewMode(ViewMode mode);
-  ViewData* getViewDataPtr() const { return viewData; }
-  void setViewData(ViewData* _viewData) { viewData = _viewData; }
+  ViewData* getViewDataPtr() const {
+    return viewData;
+  }
+  void setViewData(ViewData* _viewData) {
+    viewData = _viewData;
+  }
 
-  unsigned long long getViewMode() const {return (unsigned long long)viewMode;}
-  void setViewMode(unsigned long long _viewMode) { viewMode = (ViewMode*)_viewMode; }
+  unsigned long long getViewMode() const {
+    return (unsigned long long)viewMode;
+  }
+  void setViewMode(unsigned long long _viewMode) {
+    viewMode = (ViewMode*)_viewMode;
+  }
 
-  void setFramesView(FramesView* framesView) { m_framesView = framesView; }
+  void setFramesView(FramesView* framesView) {
+    m_framesView = framesView;
+  }
 
-protected:
+ protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
   tracy_force_inline bool& vis(const void* ptr) {
     auto it = visMap.find(ptr);
-    if(it == visMap.end()) {
+    if (it == visMap.end()) {
       it = visMap.emplace(ptr, true).first;
     }
     return it->second;
   }
 
-private:
+ private:
   tracy::unordered_flat_map<const void*, bool> visMap;
   tracy::Vector<const tracy::ThreadData*> threadOrder;
   tracy::Vector<const tracy::ThreadData*> threadReinsert;

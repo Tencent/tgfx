@@ -23,14 +23,14 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <thread>
-#include "view/ToolView.h"
 #include "TracyWorker.hpp"
 #include "Utility.h"
 #include "View.h"
+#include "view/ToolView.h"
 
-class MainView: public QWidget {
+class MainView : public QWidget {
   Q_OBJECT
-public:
+ public:
   static std::thread loadThread;
 
   MainView(QWidget* parent = nullptr);
@@ -47,10 +47,12 @@ public:
   Q_SLOT void saveFile();
   Q_SLOT void discardConnect();
   Q_SIGNAL void statusChange(ProfilerStatus status);
-protected:
+
+ protected:
   void initToolView();
   void reopenToolView();
-private:
+
+ private:
   QWidget* toolView;
   QWidget* connectView;
   View* centorView;

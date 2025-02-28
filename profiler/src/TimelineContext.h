@@ -21,8 +21,7 @@
 #include <stdint.h>
 #include "tgfx/core/Point.h"
 
-struct TimelineContext
-{
+struct TimelineContext {
   float w, ty, sty, scale;
   float yMin, yMax;
   float pxns, nspx;

@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <QDialog>
 #include <QPushButton>
 #include <QQmlApplicationEngine>
 #include <QSpinBox>
-#include <QDialog>
 #include <QWidget>
 #include "FramesView.h"
 #include "TimelineController.h"
@@ -30,16 +30,18 @@
 #include "TracyWorker.hpp"
 #include "UserData.h"
 
-class SaveFileDialog: public QDialog {
+class SaveFileDialog : public QDialog {
   Q_OBJECT
-public:
+ public:
   SaveFileDialog(std::string& filename, QWidget* parent = nullptr);
   void initWidget();
   void initConnect();
   QSpinBox* createSpinBox(int min, int max, int step, int defaultValue);
-  void getValue(std::string& filename, int& compressionChosse, int& zstdLevel, int& compressionStreams);
+  void getValue(std::string& filename, int& compressionChosse, int& zstdLevel,
+                int& compressionStreams);
   Q_SLOT void zstdLevelChanged();
-private:
+
+ private:
   std::string filename;
   QLayout* compressionLayout;
   QSpinBox* zstdSpinBox;
@@ -50,16 +52,20 @@ private:
 
 class View : public QWidget {
   Q_OBJECT
-public:
+ public:
   View(int width, const Config& config, QWidget* parent = nullptr);
   View(const char* addr, uint16_t port, int width, const Config& config, QWidget* parent = nullptr);
   View(tracy::FileRead& file, int width, const Config& config, QWidget* parent = nullptr);
 
   ~View();
 
-  ViewData& getViewData() {return viewData;}
+  ViewData& getViewData() {
+    return viewData;
+  }
   bool save();
-  bool isConnected() const { return connected; }
+  bool isConnected() const {
+    return connected;
+  }
 
   void changeViewMode(bool pause);
   void saveFile();
@@ -68,7 +74,8 @@ public:
   Q_SLOT void changeViewModeButton(ViewMode mode);
 
   void timerEvent(QTimerEvent* event) override;
-private:
+
+ private:
   bool connected = false;
   int width;
   tracy::Worker worker;

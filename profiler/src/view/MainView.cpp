@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <QQmlContext>
 #include "MainView.h"
+#include <QQmlContext>
 #include "ProfilerWindow.h"
 #include "ToolView.h"
 #include "TracyFileRead.hpp"
 #include "View.h"
 #include "src/profiler/TracyFileselector.hpp"
 
-MainView::MainView(QWidget* parent): QWidget(parent) {
+MainView::MainView(QWidget* parent) : QWidget(parent) {
   setAttribute(Qt::WA_StyledBackground);
   setStyleSheet("background-color: black;");
   initToolView();
@@ -48,7 +48,7 @@ void MainView::reopenToolView() {
   layout->addWidget(toolView);
 }
 
-void MainView::saveFile(){
+void MainView::saveFile() {
   if (centorView) {
     centorView->saveFile();
   }
@@ -65,7 +65,7 @@ void MainView::changeViewMode(bool pause) {
   }
 }
 
-void MainView::quitReadFile(){
+void MainView::quitReadFile() {
   if (centorView) {
     delete centorView;
     centorView = nullptr;

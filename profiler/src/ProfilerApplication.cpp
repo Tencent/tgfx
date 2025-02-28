@@ -18,11 +18,10 @@
 
 #include "ProfilerApplication.h"
 
-ProfilerApplication::ProfilerApplication(int& argc, char** argv): QApplication(argc, argv) {
+ProfilerApplication::ProfilerApplication(int& argc, char** argv) : QApplication(argc, argv) {
   setApplicationVersion(ProfilerVersion);
 }
 
 bool ProfilerApplication::event(QEvent* event) {
   return QApplication::event(event);
 }
-

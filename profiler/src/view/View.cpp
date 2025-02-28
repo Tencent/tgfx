@@ -16,37 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "View.h"
 #include <QGroupBox>
 #include <QLabel>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QRadioButton>
 #include <QSpinBox>
-#include "src/profiler/TracyFileselector.hpp"
-#include "View.h"
 #include "FramesView.h"
+#include "MainView.h"
 #include "TimelineView.h"
 #include "TracySysUtil.hpp"
-#include "MainView.h"
+#include "src/profiler/TracyFileselector.hpp"
 
-static const char* compressionName[] = {
-  "LZ4",
-  "LZ4 HC",
-  "LZ4 HC extreme",
-  "Zstd",
-  nullptr
-};
+static const char* compressionName[] = {"LZ4", "LZ4 HC", "LZ4 HC extreme", "Zstd", nullptr};
 static const char* compressionDesc[] = {
-  "Fastest save, fast load time, big file size",
-  "Slow save, fastest load time, reasonable file size",
-  "Very slow save, fastest load time, file smaller than LZ4 HC",
-  "Configurable save time (fast-slowest), reasonable load time, smallest file size",
-  nullptr
-};
+    "Fastest save, fast load time, big file size",
+    "Slow save, fastest load time, reasonable file size",
+    "Very slow save, fastest load time, file smaller than LZ4 HC",
+    "Configurable save time (fast-slowest), reasonable load time, smallest file size", nullptr};
 
 SaveFileDialog::SaveFileDialog(std::string& filename, QWidget* parent)
-  : QDialog(parent)
-  , filename(filename){
+    : QDialog(parent), filename(filename) {
   initWidget();
   initConnect();
 }
@@ -110,9 +101,10 @@ void SaveFileDialog::initWidget() {
   // layout->addLayout(buttonLayout, 0, Qt::AlignLeft | Qt::AlignBottom);
 }
 
-void SaveFileDialog::getValue(std::string& fn, int& compressionChosse, int& zstdLevel, int& compressionStreams) {
+void SaveFileDialog::getValue(std::string& fn, int& compressionChosse, int& zstdLevel,
+                              int& compressionStreams) {
   int i = 0;
-  while(compressionName[i]) {
+  while (compressionName[i]) {
     if (static_cast<QRadioButton*>(compressionLayout->itemAt(int(i))->widget())->isChecked()) {
       compressionChosse = i;
     }
@@ -123,16 +115,17 @@ void SaveFileDialog::getValue(std::string& fn, int& compressionChosse, int& zstd
   fn = filename;
 }
 
-void SaveFileDialog::initConnect(){
+void SaveFileDialog::initConnect() {
   connect(zstdSpinBox, &QSpinBox::valueChanged, this, &SaveFileDialog::zstdLevelChanged);
   connect(confirmButton, &QPushButton::clicked, (View*)parentWidget(), &View::save);
   connect(cancelButton, &QPushButton::clicked, this, &QDialog::close);
 }
 
-void SaveFileDialog::zstdLevelChanged(){
+void SaveFileDialog::zstdLevelChanged() {
   int i = 0;
   while (compressionName[i]) {
-    if (i != 3 &&  static_cast<QRadioButton*>(compressionLayout->itemAt(int(i))->widget())->isChecked()) {
+    if (i != 3 &&
+        static_cast<QRadioButton*>(compressionLayout->itemAt(int(i))->widget())->isChecked()) {
       static_cast<QRadioButton*>(compressionLayout->itemAt(int(i))->widget())->setChecked(false);
     }
     ++i;
@@ -141,34 +134,27 @@ void SaveFileDialog::zstdLevelChanged(){
 }
 
 View::View(int width, const Config& config, QWidget* parent)
-  : QWidget(parent)
-  , width(width)
-  , worker(config.memoryLimit == 0 ? -1 :
-  (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100))
-  , viewMode(ViewMode::LastFrames)
-  , config(config)
-{
+    : QWidget(parent), width(width),
+      worker(config.memoryLimit == 0
+                 ? -1
+                 : (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100)),
+      viewMode(ViewMode::LastFrames), config(config) {
   initView();
 }
 
 View::View(const char* addr, uint16_t port, int width, const Config& config, QWidget* parent)
-  : QWidget(parent)
-  , width(width)
-  , worker(addr, port, config.memoryLimit == 0 ? -1 :
-    (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100))
-  , viewMode(ViewMode::LastFrames)
-  , config(config)
-{
+    : QWidget(parent), width(width),
+      worker(addr, port,
+             config.memoryLimit == 0
+                 ? -1
+                 : (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100)),
+      viewMode(ViewMode::LastFrames), config(config) {
   initView();
 }
 
 View::View(tracy::FileRead& file, int width, const Config& config, QWidget* parent)
-  : QWidget(parent)
-  , width(width)
-  , worker(file)
-  , viewMode(ViewMode::Paused)
-  , userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime())
-  , config(config){
+    : QWidget(parent), width(width), worker(file), viewMode(ViewMode::Paused),
+      userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime()), config(config) {
   initView();
   userData.StateShouldBePreserved();
   userData.LoadState(viewData);
@@ -212,14 +198,11 @@ void View::changeViewMode(bool pause) {
 void View::saveFile() {
   auto cb = [this](const char* fn) {
     const auto sz = strlen(fn);
-    if(sz < 7 || memcmp(fn + sz - 6, ".tracy", 6) != 0)
-    {
+    if (sz < 7 || memcmp(fn + sz - 6, ".tracy", 6) != 0) {
       char tmp[1024];
       snprintf(tmp, 1024, "%s.tracy", fn);
       filenameStaging = tmp;
-    }
-    else
-    {
+    } else {
       filenameStaging = fn;
     }
   };
@@ -242,14 +225,14 @@ bool View::save() {
   saveFileDialog->getValue(fn, intComp, zlevel, streams);
   auto comp = tracy::FileCompression(intComp);
   std::unique_ptr<tracy::FileWrite> f(tracy::FileWrite::Open(fn.c_str(), comp, zlevel, streams));
-  if(!f) {
+  if (!f) {
     return false;
   }
   userData.StateShouldBePreserved();
   saveThread = std::thread([this, f{std::move(f)}] {
-      std::lock_guard<std::mutex> lock(worker.GetDataLock());
-      worker.Write(*f, false);
-      f->Finish();
+    std::lock_guard<std::mutex> lock(worker.GetDataLock());
+    worker.Write(*f, false);
+    f->Finish();
   });
   saveThread.join();
   filenameStaging = "";

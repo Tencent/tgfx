@@ -23,18 +23,20 @@
 #include <string>
 #include "ViewData.h"
 
-class UserData{
-public:
+class UserData {
+ public:
   UserData();
   UserData(const char* program, uint64_t time);
 
-  bool Valid() const { return !program.empty(); }
+  bool Valid() const {
+    return !program.empty();
+  }
 
   void LoadState(ViewData& data);
   void SaveState(const ViewData& data);
   void StateShouldBePreserved();
 
-private:
+ private:
   FILE* OpenFile(const char* filename, bool write);
   void Remove(const char* filename);
 

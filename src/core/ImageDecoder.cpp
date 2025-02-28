@@ -80,11 +80,10 @@ class AsyncImageDecoder : public ImageDecoder {
  public:
   AsyncImageDecoder(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
       : imageGenerator(std::move(generator)) {
-    task = DataTask<ImageBuffer>::Run(
-        [generator = imageGenerator, tryHardware]() {
-          TRACE_EVENT_NAME("ImageDecode");
-          return generator->makeBuffer(tryHardware);
-        });
+    task = DataTask<ImageBuffer>::Run([generator = imageGenerator, tryHardware]() {
+      TRACE_EVENT_NAME("ImageDecode");
+      return generator->makeBuffer(tryHardware);
+    });
   }
 
   int width() const override {

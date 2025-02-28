@@ -18,8 +18,8 @@
 
 #pragma once
 #include "TracyWorker.hpp"
-#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include "ViewData.h"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 #define FRAME_VIEW_HEIGHT 50
 
@@ -31,7 +31,7 @@ class FramesView : public QQuickItem {
   Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
   Q_PROPERTY(ViewData* viewData READ getViewDataPtr WRITE setViewData)
   Q_PROPERTY(unsigned long long viewMode READ getViewMode WRITE setViewMode)
-public:
+ public:
   FramesView(QQuickItem* parent = nullptr);
   ~FramesView();
   void initView();
@@ -40,19 +40,23 @@ public:
 
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
-  void mousePressEvent(QMouseEvent *event) override;
-  void mouseReleaseEvent(QMouseEvent *event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
   void hoverMoveEvent(QHoverEvent* event) override;
 
   uint64_t getFrameNumber(const tracy::FrameData& frameData, uint64_t i);
 
-  unsigned long long getWorker() const { return (unsigned long long)worker; }
+  unsigned long long getWorker() const {
+    return (unsigned long long)worker;
+  }
   void setWorker(unsigned long long _worker) {
     worker = (tracy::Worker*)(_worker);
     frames = worker->GetFramesBase();
   }
 
-  ViewData* getViewDataPtr() const { return viewData; }
+  ViewData* getViewDataPtr() const {
+    return viewData;
+  }
   void setViewData(ViewData* _viewData) {
     viewData = _viewData;
     if (viewData) {
@@ -61,10 +65,16 @@ public:
   }
 
   //set timelineView
-  void setTimelineView(TimelineView* timelineView){m_timelineView = timelineView;}
+  void setTimelineView(TimelineView* timelineView) {
+    m_timelineView = timelineView;
+  }
 
-  unsigned long long getViewMode() const {return (unsigned long long)viewMode;}
-  void setViewMode(unsigned long long _viewMode) { viewMode = (ViewMode*)_viewMode; }
+  unsigned long long getViewMode() const {
+    return (unsigned long long)viewMode;
+  }
+  void setViewMode(unsigned long long _viewMode) {
+    viewMode = (ViewMode*)_viewMode;
+  }
 
   //hover information utility.
   void showFrameTip(const tracy::FrameData* frames);
@@ -72,13 +82,13 @@ public:
   //signals
   Q_SIGNAL void changeViewMode(ViewMode mode);
 
-protected:
+ protected:
   void draw();
   void drawFrames(tgfx::Canvas* canvas);
   void drawBackground(tgfx::Canvas* canvas);
   QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
 
-private:
+ private:
   tracy::Worker* worker = nullptr;
   ViewData* viewData;
   ViewMode* viewMode;
@@ -103,6 +113,4 @@ private:
   //RightButton
   bool isRightDragging = false;
   QPoint lastRightDragPos;
-
-
 };

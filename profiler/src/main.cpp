@@ -21,8 +21,7 @@
 #include "ProfilerWindow.h"
 #include "qwidget.h"
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char* argv[]) {
   QApplication::setApplicationName("Profiler");
   QApplication::setOrganizationName("org.tgfx");
   QSurfaceFormat defaultFormat = QSurfaceFormat();

@@ -19,23 +19,24 @@
 #pragma once
 #include <memory>
 #include <optional>
-#include "tgfx/core/Point.h"
 #include "TimelineItem.h"
 #include "TimelineItemThread.h"
 #include "Utility.h"
+#include "tgfx/core/Point.h"
 
 class View;
 
 class TimelineController {
-public:
+ public:
   TimelineController(TimelineView& view, tracy::Worker& worker, bool threading);
   ~TimelineController();
 
   void firstFrameExpired();
   void begin();
-  void end(float pxns, const tgfx::Point& wpos, float yMin, float yMax, tgfx::Canvas* canvas, const AppHost* appHost);
+  void end(float pxns, const tgfx::Point& wpos, float yMin, float yMax, tgfx::Canvas* canvas,
+           const AppHost* appHost);
 
-  template<class T, class U>
+  template <class T, class U>
   void addItem(U* data) {
     auto it = itemMap.find(data);
     if (it == itemMap.end()) {
@@ -44,13 +45,13 @@ public:
     items.emplace_back(it->second.get());
   }
 
-  tracy_force_inline TimelineItem& getItem(const void* data){
+  tracy_force_inline TimelineItem& getItem(const void* data) {
     auto it = itemMap.find(data);
     assert(it != itemMap.end());
     return *it->second;
   }
 
-private:
+ private:
   std::vector<TimelineItem*> items;
   tracy::unordered_flat_map<const void*, std::unique_ptr<TimelineItem>> itemMap;
   bool firstFrame;

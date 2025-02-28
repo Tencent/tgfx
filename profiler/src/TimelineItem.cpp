@@ -21,13 +21,7 @@
 #include "view/TimelineView.h"
 
 TimelineItem::TimelineItem(TimelineView& view, tracy::Worker& worker)
-  : height(0)
-  , visible(true)
-  , showFull(true)
-  , worker(worker)
-  , timelineView(view)
-{
-
+    : height(0), visible(true), showFull(true), worker(worker), timelineView(view) {
 }
 
 void TimelineItem::adjustThreadHeight(bool firstFrame, int yBegin, int yEnd) {
@@ -36,29 +30,24 @@ void TimelineItem::adjustThreadHeight(bool firstFrame, int yBegin, int yEnd) {
   const auto baseMove = 1.0;
 
   const auto newHeight = yEnd - yBegin;
-  if(firstFrame)
-  {
+  if (firstFrame) {
     height = newHeight;
-  }
-  else if(height != newHeight)
-  {
+  } else if (height != newHeight) {
     const auto diff = newHeight - height;
     // const auto preClampMove = diff * speed * ImGui::GetIO().DeltaTime;
     const auto preClampMove = diff * speed * 1;
-    if(diff > 0)
-    {
+    if (diff > 0) {
       const auto move = preClampMove + baseMove;
       height = int(std::min<double>(height + move, newHeight));
-    }
-    else
-    {
+    } else {
       const auto move = preClampMove - baseMove;
       height = int(std::max<double>(height + move, newHeight));
     }
   }
 }
 
-void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset, tgfx::Canvas* canvas, const AppHost* appHost) {
+void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
+                        tgfx::Canvas* canvas, const AppHost* appHost) {
   const auto yBegin = yOffset;
   auto yEnd = yOffset;
 
@@ -87,12 +76,13 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     if (!drawContent(ctx, yEnd, canvas) && !timelineView.getViewData()->drawEmptyLabels) {
       drawFinished();
       yEnd = yBegin;
-      adjustThreadHeight(firstFrame, yBegin,yEnd);
+      adjustThreadHeight(firstFrame, yBegin, yEnd);
       return;
     }
   }
 
-  drawOverlay(wpos + tgfx::Point{0.f, static_cast<float>(yBegin)}, wpos + tgfx::Point{w, static_cast<float>(yEnd)});
+  drawOverlay(wpos + tgfx::Point{0.f, static_cast<float>(yBegin)},
+              wpos + tgfx::Point{w, static_cast<float>(yEnd)});
 
   const auto hdrOffset = yBegin;
   const bool drawHeader = yPos + ty >= ctx.yMin && yPos <= ctx.yMax;
@@ -102,8 +92,7 @@ void TimelineItem::draw(bool firstFrame, const TimelineContext ctx, int yOffset,
     if (showFull) {
       tgfx::Point point = wpos + tgfx::Point{0.f, hdrOffset + ty};
       drawText(canvas, appHost, ICON_FA_CARET_DOWN, point.x, point.y, color);
-    }
-    else {
+    } else {
       tgfx::Point point = wpos + tgfx::Point{0, hdrOffset + ty};
       drawText(canvas, appHost, ICON_FA_CARET_RIGHT, point.x, point.y, color);
     }

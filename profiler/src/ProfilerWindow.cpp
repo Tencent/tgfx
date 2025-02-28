@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "ProfilerWindow.h"
 #include <qguiapplication.h>
 #include <qscreen.h>
 #include <QToolBar>
 #include "view/MainView.h"
-#include "ProfilerWindow.h"
 
-ProfilerWindow::ProfilerWindow(QMainWindow* parent): QMainWindow(parent) {
+ProfilerWindow::ProfilerWindow(QMainWindow* parent) : QMainWindow(parent) {
   initWindow();
   initConnect();
   updateToolBar(ProfilerStatus::None);
@@ -36,16 +36,15 @@ void ProfilerWindow::initToolBar() {
   quitAction = new QAction(QIcon(":/icons/power.png"), tr("&quit"), this);
   topBar->addAction(quitAction);
 
-  saveFileAction = new QAction(QIcon(":/icons/save.png"),tr("&save"), this);
+  saveFileAction = new QAction(QIcon(":/icons/save.png"), tr("&save"), this);
   topBar->addAction(saveFileAction);
 
-  playAction = new QAction(QIcon(":/icons/pause.png"),tr("&pause"), this);
+  playAction = new QAction(QIcon(":/icons/pause.png"), tr("&pause"), this);
   topBar->addAction(playAction);
 
-  discardAction = new QAction(QIcon(":/icons/discard.png"),tr("&dicard"), this);
+  discardAction = new QAction(QIcon(":/icons/discard.png"), tr("&dicard"), this);
   topBar->addAction(discardAction);
 }
-
 
 void ProfilerWindow::updateToolBar(ProfilerStatus status) {
   if (status != ProfilerStatus::Connect) {
@@ -73,8 +72,7 @@ void ProfilerWindow::changePlayAction(bool pause) {
   if (pause) {
     playAction->setIcon(QIcon(":/icons/next.png"));
     playAction->setToolTip(tr("&start"));
-  }
-  else {
+  } else {
     playAction->setIcon(QIcon(":/icons/pause.png"));
     playAction->setToolTip(tr("&pause"));
   }

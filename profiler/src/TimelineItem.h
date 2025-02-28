@@ -19,39 +19,53 @@
 #pragma once
 
 #include <QPainter>
-#include "tgfx/core/Canvas.h"
 #include "TimelineContext.h"
 #include "TracyTaskDispatch.hpp"
 #include "TracyWorker.hpp"
 #include "Utility.h"
+#include "tgfx/core/Canvas.h"
 
 class TimelineView;
 
 class TimelineItem {
-public:
+ public:
   TimelineItem(TimelineView& view, tracy::Worker& worker);
   virtual ~TimelineItem() = default;
 
-  void draw(bool firstFrame, const TimelineContext ctx, int yOffset, tgfx::Canvas* canvas, const AppHost* appHost);
+  void draw(bool firstFrame, const TimelineContext ctx, int yOffset, tgfx::Canvas* canvas,
+            const AppHost* appHost);
   virtual void preprocess(const TimelineContext& ctx, tracy::TaskDispatch& td, bool visible) = 0;
   virtual uint32_t headerColor() const = 0;
   virtual uint32_t headerColorInactive() const = 0;
   virtual uint32_t headlineColor() const = 0;
   virtual const char* headerLable() const = 0;
 
-  virtual void setVisible(bool v) { visible = v; }
-  virtual bool isVisible() { return visible; }
-  virtual bool isEmpty() { return false; }
-  virtual void drawOverlay(const tgfx::Point&, const tgfx::Point&) {}
+  virtual void setVisible(bool v) {
+    visible = v;
+  }
+  virtual bool isVisible() {
+    return visible;
+  }
+  virtual bool isEmpty() {
+    return false;
+  }
+  virtual void drawOverlay(const tgfx::Point&, const tgfx::Point&) {
+  }
 
-  int getHeight() const {return height;}
-protected:
+  int getHeight() const {
+    return height;
+  }
+
+ protected:
   virtual bool drawContent(const TimelineContext& ctx, int& offset, tgfx::Canvas* painter) = 0;
-  virtual void drawFinished() {}
+  virtual void drawFinished() {
+  }
   void adjustThreadHeight(bool firstFrame, int yBegin, int yEnd);
-private:
+
+ private:
   int height;
-protected:
+
+ protected:
   bool visible;
   bool showFull;
   tracy::Worker& worker;

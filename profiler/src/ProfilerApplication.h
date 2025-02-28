@@ -21,11 +21,10 @@
 #include "ProfilerWindow.h"
 
 class ProfilerApplication : public QApplication {
-public:
+ public:
   const QString ProfilerVersion = "1.0.0";
 
   ProfilerApplication(int& argc, char** argv);
 
   bool event(QEvent* event);
 };
-

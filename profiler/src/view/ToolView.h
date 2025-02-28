@@ -18,15 +18,14 @@
 
 #pragma once
 #include <QComboBox>
-#include <QPushButton>
 #include <QListWidgetItem>
+#include <QPushButton>
 #include <QWidget>
-#include "tracy_robin_hood.h"
 #include "TracySocket.hpp"
 #include "src/ResolvService.hpp"
+#include "tracy_robin_hood.h"
 
-struct ClientData
-{
+struct ClientData {
   int64_t time;
   uint32_t protocolVersion;
   int32_t activeTime;
@@ -36,20 +35,21 @@ struct ClientData
   std::string address;
 };
 
-class ClientItem: public QWidget {
-public:
+class ClientItem : public QWidget {
+ public:
   ClientItem(ClientData& data, QWidget* parent);
   void initWidget();
-private:
+
+ private:
   ClientData& data;
 };
 
-class ToolView: public QWidget {
+class ToolView : public QWidget {
   Q_OBJECT
-public:
+ public:
   ToolView(QWidget* parent);
   ~ToolView();
-  void paintEvent(QPaintEvent *event) override;
+  void paintEvent(QPaintEvent* event) override;
   void timerEvent(QTimerEvent* event) override;
   void updateBroadcastClients();
 
@@ -62,7 +62,8 @@ public:
   Q_SLOT void connectClient(QListWidgetItem* currenItem);
   Q_SLOT void handleClient(uint64_t clinetId);
   Q_SIGNAL void addClient(uint64_t clinetId);
-private:
+
+ private:
   QComboBox* textCombobox;
   QPushButton* connectButton;
   QPushButton* openFileButton;
