@@ -30,11 +30,13 @@ else ()
     list(APPEND HELLO_2D_LIBS ${USER32})
 endif ()
 
-list(APPEND HELLO_2D_INCLUDES ../vendor/angle/include)
-file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libEGL.dll)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/angle/win/${ARCH}/libEGL.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libGLESv2.dll)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/angle/win/${ARCH}/libGLESv2.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+if (TGFX_USE_ANGLE)
+    list(APPEND HELLO_2D_INCLUDES ../vendor/angle/include)
+    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libEGL.dll)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/angle/win/${ARCH}/libEGL.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/libGLESv2.dll)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/angle/win/${ARCH}/libGLESv2.dll DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+endif ()
 
 set(TGFX_BUILD_DRAWERS ON)
 
