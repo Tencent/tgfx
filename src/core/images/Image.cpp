@@ -24,6 +24,7 @@
 #include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/Profiling.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"

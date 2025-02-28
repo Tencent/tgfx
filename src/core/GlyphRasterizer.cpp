@@ -18,6 +18,7 @@
 
 #include "GlyphRasterizer.h"
 #include "tgfx/core/Mask.h"
+#include "utils/Profiling.h"
 
 namespace tgfx {
 GlyphRasterizer::GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList,

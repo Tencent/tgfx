@@ -18,6 +18,7 @@
 
 #include "ImageDecoder.h"
 #include "core/utils/DataTask.h"
+#include "utils/Profiling.h"
 
 namespace tgfx {
 
@@ -66,6 +67,7 @@ class ImageGeneratorWrapper : public ImageDecoder {
   }
 
   std::shared_ptr<ImageBuffer> decode() const override {
+    TRACE_EVENT_NAME("ImageDecode");
     return imageGenerator->makeBuffer(tryHardware);
   }
 
@@ -78,8 +80,10 @@ class AsyncImageDecoder : public ImageDecoder {
  public:
   AsyncImageDecoder(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
       : imageGenerator(std::move(generator)) {
-    task = DataTask<ImageBuffer>::Run(
-        [generator = imageGenerator, tryHardware]() { return generator->makeBuffer(tryHardware); });
+    task = DataTask<ImageBuffer>::Run([generator = imageGenerator, tryHardware]() {
+      TRACE_EVENT_NAME("ImageDecode");
+      return generator->makeBuffer(tryHardware);
+    });
   }
 
   int width() const override {

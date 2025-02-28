@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderPass.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 
 namespace tgfx {
@@ -101,5 +102,4 @@ void RenderPass::copyToTexture(Texture* texture, int srcX, int srcY) {
   onCopyToTexture(texture, srcX, srcY);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 }
-
 }  // namespace tgfx

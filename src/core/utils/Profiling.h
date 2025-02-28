@@ -29,21 +29,22 @@
 #endif
 
 #define TRACE_EVENT ZoneScopedN(TRACE_FUNC)
+#define TRACE_EVENT_NAME(name) ZoneScopedN(name)
 #define TRACE_EVENT_COLOR(color) ZoneScopedNC(TRACE_FUNC, color)
 
 #define FRAME_MARK FrameMark
+#define FRAME_MARK_START FrameMarkStart(nullptr)
+#define FRAME_MARK_END FrameMarkEnd(nullptr)
 
 #define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
-
-#define TRACY_COLOR_YELLOW tracy::Color::ColorType::Yellow
-#define TRACY_COLOR_GREEN tracy::Color::ColorType::Green
-#define TRACY_COLOR_GREENYELLOW tracy::Color::ColorType::GreenYellow
-
 #else
 #define TRACE_EVENT
+#define TRACE_EVENT_NAME(name)
 #define TRACE_EVENT_COLOR(color)
 
 #define FRAME_MARK
+#define FRAME_MARK_START
+#define FRAME_MARK_END
 
 #define TRACE_THREAD_NAME(name)
 #endif
