@@ -19,8 +19,9 @@
 #pragma once
 
 #include "ResourceProxy.h"
-#include "core/DataProvider.h"
+#include "core/DataSource.h"
 #include "gpu/GpuBuffer.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 class GpuBufferProxy : public ResourceProxy {
@@ -34,7 +35,7 @@ class GpuBufferProxy : public ResourceProxy {
    * Creates a GpuBufferProxy from the given data provider.
    */
   static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context,
-                                                  std::unique_ptr<DataProvider> dataProvider,
+                                                  std::unique_ptr<DataSource<Data>> source,
                                                   BufferType bufferType, uint32_t renderFlags);
 
   /**

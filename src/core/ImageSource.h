@@ -16,29 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DecoderImage.h"
-#include "BufferImage.h"
-#include "gpu/ProxyProvider.h"
+#pragma once
+
+#include "core/DataSource.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
-std::shared_ptr<Image> DecoderImage::MakeFrom(UniqueKey uniqueKey,
-                                              std::shared_ptr<ImageDecoder> decoder) {
-  if (decoder == nullptr) {
-    return nullptr;
+/**
+ * A DataSource that decodes an image and provides an ImageBuffer.
+ */
+class ImageSource : public DataSource<ImageBuffer> {
+ public:
+  /**
+   * Create an image source from the specified ImageGenerator. If asyncDecoding is true, the
+   * returned image source schedules an asynchronous image-decoding task immediately. Otherwise, the
+   * image will be decoded synchronously when the getData() method is called.
+   */
+  static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                              bool tryHardware = true, bool asyncDecoding = true);
+
+  ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
+
+  std::shared_ptr<ImageBuffer> getData() const override {
+    return generator->makeBuffer(tryHardware);
   }
-  auto image =
-      std::shared_ptr<DecoderImage>(new DecoderImage(std::move(uniqueKey), std::move(decoder)));
-  image->weakThis = image;
-  return image;
-}
 
-DecoderImage::DecoderImage(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder)
-    : ResourceImage(std::move(uniqueKey)), decoder(std::move(decoder)) {
-}
-
-std::shared_ptr<TextureProxy> DecoderImage::onLockTextureProxy(const TPArgs& args,
-                                                               const UniqueKey& key) const {
-  return args.context->proxyProvider()->createTextureProxy(key, decoder, args.mipmapped,
-                                                           args.renderFlags);
-}
+ private:
+  std::shared_ptr<ImageGenerator> generator = nullptr;
+  bool tryHardware = true;
+};
 }  // namespace tgfx

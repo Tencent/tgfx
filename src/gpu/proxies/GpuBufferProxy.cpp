@@ -32,13 +32,13 @@ std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
 }
 
 std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
-                                                         std::unique_ptr<DataProvider> dataProvider,
+                                                         std::unique_ptr<DataSource<Data>> source,
                                                          BufferType bufferType,
                                                          uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  return context->proxyProvider()->createGpuBufferProxy({}, std::move(dataProvider), bufferType,
+  return context->proxyProvider()->createGpuBufferProxy({}, std::move(source), bufferType,
                                                         renderFlags);
 }
 

@@ -27,7 +27,7 @@ bool OpsRenderTask::execute(Gpu* gpu) {
   }
   auto renderPass = gpu->getRenderPass();
   if (!renderPass->begin(renderTargetProxy->getRenderTarget(), renderTargetProxy->getTexture())) {
-    LOGE("OpsTask::execute() Failed to initialize the render pass!");
+    LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return false;
   }
   auto tempOps = std::move(ops);

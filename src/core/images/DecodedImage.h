@@ -19,40 +19,45 @@
 #pragma once
 
 #include "GeneratorImage.h"
-#include "core/ImageDecoder.h"
+#include "core/DataSource.h"
 
 namespace tgfx {
 /**
- * DecoderImage wraps an ImageDecoder that can decode ImageBuffers asynchronously.
+ * DecodedImage wraps an image source that can asynchronously decode ImageBuffers.
  */
-class DecoderImage : public ResourceImage {
+class DecodedImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(UniqueKey uniqueKey,
-                                         std::shared_ptr<ImageDecoder> decoder);
+                                         std::shared_ptr<ImageGenerator> generator,
+                                         bool tryHardware, bool asyncDecoding);
 
   int width() const override {
-    return decoder->width();
+    return _width;
   }
 
   int height() const override {
-    return decoder->height();
+    return _height;
   }
 
   bool isAlphaOnly() const override {
-    return decoder->isAlphaOnly();
+    return _alphaOnly;
   }
 
  protected:
   Type type() const override {
-    return Type::Decoder;
+    return Type::Decoded;
   }
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const override;
 
  private:
-  std::shared_ptr<ImageDecoder> decoder = nullptr;
+  int _width = 0;
+  int _height = 0;
+  bool _alphaOnly = false;
+  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
 
-  DecoderImage(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder);
+  DecodedImage(UniqueKey uniqueKey, int width, int height, bool alphaOnly,
+               std::shared_ptr<DataSource<ImageBuffer>> source);
 };
 }  // namespace tgfx

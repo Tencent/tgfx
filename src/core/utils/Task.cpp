@@ -20,18 +20,36 @@
 #include "core/utils/TaskGroup.h"
 
 namespace tgfx {
+class BlockTask : public Task {
+ public:
+  explicit BlockTask(std::function<void()> block) : block(std::move(block)) {
+  }
+
+ protected:
+  void onExecute() override {
+    block();
+  }
+
+ private:
+  std::function<void()> block;
+};
+
 std::shared_ptr<Task> Task::Run(std::function<void()> block) {
   if (block == nullptr) {
     return nullptr;
   }
-  auto task = std::shared_ptr<Task>(new Task(std::move(block)));
-  if (!TaskGroup::GetInstance()->pushTask(task)) {
-    task->execute();
-  }
+  auto task = std::make_shared<BlockTask>(std::move(block));
+  Run(task);
   return task;
 }
 
-Task::Task(std::function<void()> block) : block(std::move(block)) {
+void Task::Run(std::shared_ptr<Task> task) {
+  if (task == nullptr) {
+    return;
+  }
+  if (!TaskGroup::GetInstance()->pushTask(task)) {
+    task->execute();
+  }
 }
 
 void Task::wait() {
@@ -44,11 +62,11 @@ void Task::wait() {
   if (oldStatus == TaskStatus::Queueing) {
     if (_status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
                                       std::memory_order_relaxed)) {
-      block();
+      onExecute();
       oldStatus = TaskStatus::Executing;
       while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
-                                            std::memory_order_acq_rel, std::memory_order_relaxed))
-        ;
+                                            std::memory_order_acq_rel, std::memory_order_relaxed)) {
+      }
       return;
     }
   }
@@ -71,17 +89,13 @@ void Task::execute() {
   if (oldStatus == TaskStatus::Queueing &&
       _status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
                                     std::memory_order_relaxed)) {
-    block();
+    onExecute();
     oldStatus = TaskStatus::Executing;
     while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
-                                          std::memory_order_acq_rel, std::memory_order_relaxed))
-      ;
+                                          std::memory_order_acq_rel, std::memory_order_relaxed)) {
+    }
     std::unique_lock<std::mutex> autoLock(locker);
     condition.notify_all();
   }
-}
-
-TaskStatus Task::status() const {
-  return _status.load(std::memory_order_relaxed);
 }
 }  // namespace tgfx

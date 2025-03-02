@@ -18,8 +18,10 @@
 
 #include "ResourceProvider.h"
 #include "GradientCache.h"
+#include "core/DataSource.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 static constexpr uint16_t kMaxNumAAQuads = 512;  // max possible: (1 << 13) - 1;
@@ -30,7 +32,7 @@ static constexpr uint16_t kMaxNumNonAAQuads = 1024;  // max possible: (1 << 14) 
 static constexpr uint16_t kVerticesPerNonAAQuad = 4;
 static constexpr uint16_t kIndicesPerNonAAQuad = 6;
 
-class PatternedIndexBufferProvider : public DataProvider {
+class PatternedIndexBufferProvider : public DataSource<Data> {
  public:
   PatternedIndexBufferProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t reps,
                                uint16_t vertCount)

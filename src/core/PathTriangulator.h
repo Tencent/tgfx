@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "DataProvider.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {

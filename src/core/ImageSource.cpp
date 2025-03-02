@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DataProvider.h"
+#include "ImageSource.h"
 
 namespace tgfx {
-class DataWrapper : public DataProvider {
- public:
-  explicit DataWrapper(std::shared_ptr<Data> data) : data(std::move(data)) {
+std::unique_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
+    std::shared_ptr<ImageGenerator> generator, bool tryHardware, bool asyncDecoding) {
+  if (generator == nullptr) {
+    return nullptr;
   }
-
-  std::shared_ptr<Data> getData() const override {
-    return data;
+  auto asyncSupport = generator->asyncSupport();
+  auto imageSource = std::make_unique<ImageSource>(std::move(generator), tryHardware);
+  if (!asyncDecoding || !asyncSupport) {
+    return imageSource;
   }
+  return Async(std::move(imageSource));
+}
 
- private:
-  std::shared_ptr<Data> data = nullptr;
-};
-
-std::unique_ptr<DataProvider> DataProvider::Wrap(std::shared_ptr<Data> data) {
-  return std::make_unique<DataWrapper>(std::move(data));
+ImageSource::ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
+    : generator(std::move(generator)), tryHardware(tryHardware) {
 }
 }  // namespace tgfx
