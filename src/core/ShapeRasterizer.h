@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "DataSource.h"
 #include "core/Rasterizer.h"
 #include "core/ShapeBuffer.h"
 #include "gpu/AAType.h"
@@ -28,7 +29,7 @@ namespace tgfx {
 /**
  * ShapeRasterizer converts a shape into its rasterized form.
  */
-class ShapeRasterizer : public Rasterizer {
+class ShapeRasterizer : public Rasterizer, public DataSource<ShapeBuffer> {
  public:
   /**
    * Creates a ShapeRasterizer from a shape.
@@ -41,7 +42,7 @@ class ShapeRasterizer : public Rasterizer {
    * an image buffer, depending on the shape's complexity. This method aims to balance performance
    * and memory usage. Returns nullptr if rasterization fails.
    */
-  std::shared_ptr<ShapeBuffer> makeRasterized(bool tryHardware = true) const;
+  std::shared_ptr<ShapeBuffer> getData() const override;
 
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;

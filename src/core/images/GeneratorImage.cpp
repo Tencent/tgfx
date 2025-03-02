@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GeneratorImage.h"
-#include "DecoderImage.h"
+#include "DecodedImage.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
@@ -44,8 +44,7 @@ std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryH
       return nullptr;
     }
   }
-  auto decoder = ImageDecoder::MakeFrom(generator, tryHardware, true);
-  return DecoderImage::MakeFrom(uniqueKey, std::move(decoder));
+  return DecodedImage::MakeFrom(uniqueKey, generator, tryHardware, true);
 }
 
 std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(const TPArgs& args,

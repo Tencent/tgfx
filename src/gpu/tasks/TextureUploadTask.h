@@ -19,24 +19,24 @@
 #pragma once
 
 #include "ResourceTask.h"
-#include "core/ImageDecoder.h"
+#include "core/ImageSource.h"
 
 namespace tgfx {
 class TextureUploadTask : public ResourceTask {
  public:
   /*
-   * Creates a TextureUploadTask to generate a texture using the given image decoder.
+   * Creates a TextureUploadTask to generate a texture using the given image source.
    */
-  static std::unique_ptr<TextureUploadTask> MakeFrom(UniqueKey uniqueKey,
-                                                     std::shared_ptr<ImageDecoder> imageDecoder,
-                                                     bool mipmapped = false);
+  static std::unique_ptr<TextureUploadTask> MakeFrom(
+      UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped = false);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  std::shared_ptr<ImageDecoder> decoder = nullptr;
+  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
   bool mipmapped = false;
 
-  TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped);
+  TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
+                    bool mipmapped);
 };
 }  // namespace tgfx
