@@ -65,12 +65,11 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
+  std::unique_ptr<RenderPass> renderPass = nullptr;
   std::vector<std::unique_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::unique_ptr<TextureFlattenTask>> flattenTasks = {};
   std::vector<std::unique_ptr<RenderTask>> renderTasks = {};
   std::vector<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<size_t> resourceTaskMap = {};
-
-  friend class RenderQueue;
 };
 }  // namespace tgfx

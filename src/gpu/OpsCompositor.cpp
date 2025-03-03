@@ -151,10 +151,12 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const FillSt
   if (pendingType != type || pendingClip != clip || !pendingStyle.isEqual(style, true)) {
     return false;
   }
-  auto maxRecords = static_cast<size_t>(style.antiAlias ? ResourceProvider::MaxNumAAQuads()
-                                                        : ResourceProvider::MaxNumNonAAQuads());
-  auto size = pendingType == PendingOpType::RRect ? pendingRRects.size() : pendingRects.size();
-  return size < maxRecords;
+  if (pendingType == PendingOpType::RRect) {
+    return pendingRRects.size() < ResourceProvider::MaxNumRRects();
+  }
+  auto maxRects = static_cast<size_t>(style.antiAlias ? ResourceProvider::MaxNumAAQuads()
+                                                      : ResourceProvider::MaxNumNonAAQuads());
+  return pendingRects.size() < maxRects;
 }
 
 void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, FillStyle style) {

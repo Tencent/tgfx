@@ -38,8 +38,6 @@ class Gpu {
     return context;
   }
 
-  virtual std::shared_ptr<RenderPass> getRenderPass() = 0;
-
   virtual std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                         int mipLevelCount) = 0;
 

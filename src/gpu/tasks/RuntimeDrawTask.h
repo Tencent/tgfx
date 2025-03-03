@@ -28,7 +28,7 @@ class RuntimeDrawTask : public RenderTask {
                   std::vector<std::shared_ptr<TextureProxy>> inputs,
                   std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
-  bool execute(Gpu* gpu) override;
+  bool execute(RenderPass* renderPass) override;
 
  private:
   std::vector<std::shared_ptr<TextureProxy>> inputs;

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/RenderPass.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
@@ -31,7 +32,7 @@ class TextureFlattenTask {
   /**
    * Executes the task to flatten the texture.
    */
-  bool execute(Context* context);
+  bool execute(RenderPass* renderPass);
 
  private:
   UniqueKey uniqueKey = {};

@@ -44,6 +44,11 @@ static AttribLayout GetAttribLayout(SLType type) {
   return {false, 0, 0};
 }
 
+std::unique_ptr<RenderPass> RenderPass::Make(Context* context) {
+  DEBUG_ASSERT(context != nullptr);
+  return std::make_unique<GLRenderPass>(context);
+}
+
 GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
   if (GLCaps::Get(context)->vertexArrayObjectSupport) {
     vertexArray = GLVertexArray::Make(context);

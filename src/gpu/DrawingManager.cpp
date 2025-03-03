@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
@@ -114,6 +113,19 @@ void DrawingManager::addResourceTask(std::unique_ptr<ResourceTask> resourceTask)
   }
 }
 
+template <typename T>
+void ClearAndReserveSize(std::vector<T>& list) {
+  auto size = list.size();
+  auto capacity = list.capacity();
+  auto nextSize = (size << 1) - (size >> 1);  // 1.5 * size
+  if (capacity > nextSize) {
+    list = std::vector<T>{};
+    list.reserve(size);
+  } else {
+    list.clear();
+  }
+}
+
 bool DrawingManager::flush() {
   while (!compositors.empty()) {
     auto compositor = compositors.back();
@@ -128,9 +140,12 @@ bool DrawingManager::flush() {
   for (auto& task : resourceTasks) {
     task->execute(context);
   }
-  resourceTasks.resize(0);
+  ClearAndReserveSize(resourceTasks);
   resourceTaskMap = {};
 
+  if (renderPass == nullptr) {
+    renderPass = RenderPass::Make(context);
+  }
   std::vector<TextureFlattenTask*> validFlattenTasks = {};
   validFlattenTasks.reserve(flattenTasks.size());
   for (auto& task : flattenTasks) {
@@ -139,13 +154,13 @@ bool DrawingManager::flush() {
     }
   }
   for (auto& task : validFlattenTasks) {
-    task->execute(context);
+    task->execute(renderPass.get());
   }
-  flattenTasks.resize(0);
+  ClearAndReserveSize(flattenTasks);
   for (auto& task : renderTasks) {
-    task->execute(context->gpu());
+    task->execute(renderPass.get());
   }
-  renderTasks.resize(0);
+  ClearAndReserveSize(renderTasks);
   return true;
 }
 }  // namespace tgfx

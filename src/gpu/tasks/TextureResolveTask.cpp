@@ -24,12 +24,13 @@ TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> render
     : RenderTask(std::move(renderTargetProxy)) {
 }
 
-bool TextureResolveTask::execute(Gpu* gpu) {
+bool TextureResolveTask::execute(RenderPass* renderPass) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("TextureResolveTask::execute() Failed to get render target!");
     return false;
   }
+  auto gpu = renderPass->getContext()->gpu();
   if (renderTarget->sampleCount() > 1) {
     gpu->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
   }
