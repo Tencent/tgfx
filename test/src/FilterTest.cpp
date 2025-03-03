@@ -588,7 +588,8 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     EXPECT_EQ(gradientType, GradientType::Diamond);
     EXPECT_EQ(info.colors, colors);
     EXPECT_EQ(info.positions, positions);
-    EXPECT_EQ(info.points[0], center);
+    EXPECT_FLOAT_EQ(info.points[0].x, center.x);
+    EXPECT_FLOAT_EQ(info.points[0].y, center.y);
     EXPECT_FLOAT_EQ(info.radiuses[0], halfDiagonal);
   }
 }
