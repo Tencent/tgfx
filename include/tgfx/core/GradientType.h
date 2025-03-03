@@ -43,9 +43,9 @@ enum class GradientType {
    */
   Conic,
   /**
-  * Diamond gradients are defined by a center point and a radius. The color gradient is drawn from
-  * the center point to the edge of the radius.
-  */
+   * Diamond gradients are defined by a center point and a half-diagonal. The color gradient is
+   * drawn from the center point to the vertices of the diamond.
+   */
   Diamond
 };
 

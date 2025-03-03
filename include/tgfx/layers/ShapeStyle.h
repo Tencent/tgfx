@@ -56,23 +56,23 @@ class ShapeStyle : public LayerProperty {
   void setBlendMode(BlendMode value);
 
   /**
-  * Returns the transformation matrix applied to the ShapeStyle.
-  */
+   * Returns the transformation matrix applied to the ShapeStyle.
+   */
   const Matrix& matrix() const {
     return _matrix;
   }
 
   /**
-  * Sets the transformation matrix applied to the ShapeStyle.
-  */
+   * Sets the transformation matrix applied to the ShapeStyle.
+   */
   void setMatrix(const Matrix& value);
 
  protected:
   std::shared_ptr<Shader> getShader() const;
 
   /**
-  * Returns the current shader that will be used to draw the shape.
-  */
+   * Returns the current shader that will be used to draw the shape.
+   */
   virtual std::shared_ptr<Shader> onGetShader() const = 0;
 
  private:
