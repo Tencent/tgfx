@@ -101,5 +101,4 @@ void RenderPass::copyToTexture(Texture* texture, int srcX, int srcY) {
   onCopyToTexture(texture, srcX, srcY);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 }
-
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,36 +15,35 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
-#ifdef TGFX_ENABLE_PROFILING
-#define TRACY_ENABLE
 
-#include "public/common/TracySystem.hpp"
-#include "public/tracy/Tracy.hpp"
+#include <stdint.h>
+#include <stdio.h>
+#include <string>
+#include "ViewData.h"
 
-#if defined(_MSC_VER)
-#define TRACE_FUNC __FUNCSIG__
-#else
-#define TRACE_FUNC __PRETTY_FUNCTION__
-#endif
+class UserData {
+ public:
+  UserData();
+  UserData(const char* program, uint64_t time);
 
-#define TRACE_EVENT ZoneScopedN(TRACE_FUNC)
-#define TRACE_EVENT_NAME(name) ZoneScopedN(name)
-#define TRACE_EVENT_COLOR(color) ZoneScopedNC(TRACE_FUNC, color)
+  bool Valid() const {
+    return !program.empty();
+  }
 
-#define FRAME_MARK FrameMark
-#define FRAME_MARK_START FrameMarkStart(nullptr)
-#define FRAME_MARK_END FrameMarkEnd(nullptr)
+  void LoadState(ViewData& data);
+  void SaveState(const ViewData& data);
+  void StateShouldBePreserved();
 
-#define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
-#else
-#define TRACE_EVENT
-#define TRACE_EVENT_NAME(name)
-#define TRACE_EVENT_COLOR(color)
+ private:
+  FILE* OpenFile(const char* filename, bool write);
+  void Remove(const char* filename);
 
-#define FRAME_MARK
-#define FRAME_MARK_START
-#define FRAME_MARK_END
+  std::string program;
+  uint64_t time;
 
-#define TRACE_THREAD_NAME(name)
-#endif
+  std::string description;
+
+  bool preserveState;
+};
