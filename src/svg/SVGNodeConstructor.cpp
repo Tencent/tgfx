@@ -435,6 +435,7 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
     }
     //can't find the element factory
     DEBUG_ASSERT(false);
+    return nullptr;
   };
 
   auto node = makeNode(context, elementName);
