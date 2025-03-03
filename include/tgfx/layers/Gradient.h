@@ -159,7 +159,7 @@ class LinearGradient : public Gradient {
   void setEndPoint(const Point& endPoint);
 
  protected:
-  std::shared_ptr<Shader> getShader() const override;
+  std::shared_ptr<Shader> onGetShader() const override;
 
  private:
   Point _startPoint = Point::Zero();
@@ -209,7 +209,7 @@ class RadialGradient : public Gradient {
   void setRadius(float radius);
 
  protected:
-  std::shared_ptr<Shader> getShader() const override;
+  std::shared_ptr<Shader> onGetShader() const override;
 
  private:
   Point _center = Point::Zero();
@@ -271,7 +271,7 @@ class ConicGradient : public Gradient {
   void setEndAngle(float endAngle);
 
  protected:
-  std::shared_ptr<Shader> getShader() const override;
+  std::shared_ptr<Shader> onGetShader() const override;
 
  private:
   Point _center = Point::Zero();

@@ -41,27 +41,14 @@ class ImagePattern : public ShapeStyle {
                                             TileMode tileModeY = TileMode::Clamp,
                                             const SamplingOptions& sampling = {});
 
-  /**
-   * Returns the transformation matrix applied to the ImagePattern.
-   */
-  const Matrix& matrix() const {
-    return _matrix;
-  }
-
-  /**
-   * Sets the transformation matrix applied to the ImagePattern.
-   */
-  void setMatrix(const Matrix& value);
-
  protected:
-  std::shared_ptr<Shader> getShader() const override;
+  std::shared_ptr<Shader> onGetShader() const override;
 
  private:
   std::shared_ptr<Image> image = nullptr;
   TileMode tileModeX = TileMode::Clamp;
   TileMode tileModeY = TileMode::Clamp;
   SamplingOptions sampling = {};
-  Matrix _matrix = Matrix::I();
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
                const SamplingOptions& sampling);

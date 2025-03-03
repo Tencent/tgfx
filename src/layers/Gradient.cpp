@@ -74,7 +74,7 @@ void LinearGradient::setStartPoint(const Point& startPoint) {
   invalidate();
 }
 
-std::shared_ptr<Shader> LinearGradient::getShader() const {
+std::shared_ptr<Shader> LinearGradient::onGetShader() const {
   return Shader::MakeLinearGradient(_startPoint, _endPoint, _colors, _positions);
 }
 
@@ -94,7 +94,7 @@ void RadialGradient::setRadius(float radius) {
   invalidate();
 }
 
-std::shared_ptr<Shader> RadialGradient::getShader() const {
+std::shared_ptr<Shader> RadialGradient::onGetShader() const {
   return Shader::MakeRadialGradient(_center, _radius, _colors, _positions);
 }
 
@@ -122,7 +122,7 @@ void ConicGradient::setEndAngle(float endAngle) {
   invalidate();
 }
 
-std::shared_ptr<Shader> ConicGradient::getShader() const {
+std::shared_ptr<Shader> ConicGradient::onGetShader() const {
   return Shader::MakeConicGradient(_center, _startAngle, _endAngle, _colors, _positions);
 }
 }  // namespace tgfx
