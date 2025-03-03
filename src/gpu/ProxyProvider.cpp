@@ -121,6 +121,9 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   static const auto TriangleShapeType = UniqueID::Next();
   static const auto TextureShapeType = UniqueID::Next();
   auto triangleKey = UniqueKey::Append(uniqueKey, &TriangleShapeType, 1);
+  // The triangle and texture proxies might be created by previous tasks that are still in progress.
+  // One of them might not have the corresponding resources in the cache yet, so we need to wrap
+  // both of them into the GpuShapeProxy.
   auto triangleProxy = findOrWrapGpuBufferProxy(triangleKey);
   auto textureKey = UniqueKey::Append(uniqueKey, &TextureShapeType, 1);
   auto textureProxy = findOrWrapTextureProxy(textureKey);

@@ -22,7 +22,7 @@
 
 namespace tgfx {
 template <typename T>
-class DataSourceWrapper;
+class DataWrapper;
 
 template <typename T>
 class AsyncDataSource;
@@ -40,7 +40,7 @@ class DataSource {
     if (data == nullptr) {
       return nullptr;
     }
-    return std::make_unique<DataSourceWrapper<T>>(std::move(data));
+    return std::make_unique<DataWrapper<T>>(std::move(data));
   }
 
   /**
@@ -67,9 +67,9 @@ class DataSource {
  * DataSourceWrapper wraps the existing data into a DataSource.
  */
 template <typename T>
-class DataSourceWrapper : public DataSource<T> {
+class DataWrapper : public DataSource<T> {
  public:
-  explicit DataSourceWrapper(std::shared_ptr<T> data) : data(std::move(data)) {
+  explicit DataWrapper(std::shared_ptr<T> data) : data(std::move(data)) {
   }
 
   std::shared_ptr<T> getData() const override {
