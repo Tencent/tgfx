@@ -24,10 +24,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class RenderPass;
-
 class RenderTarget;
-
 class Texture;
 
 class Gpu {

@@ -25,7 +25,7 @@
 
 namespace tgfx {
 static constexpr uint16_t kMaxNumNonAAQuads = 2048;  // max possible: (1 << 14) - 1;
-static constexpr uint16_t kMaxNumAAQuads = 128;      // max possible: (1 << 13) - 1;
+static constexpr uint16_t kMaxNumAAQuads = 512;      // max possible: (1 << 13) - 1;
 static constexpr uint16_t kMaxNumRRect = 512;
 
 class PatternedIndexBufferProvider : public DataSource<Data> {
