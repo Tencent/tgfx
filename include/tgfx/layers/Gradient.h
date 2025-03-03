@@ -28,6 +28,7 @@ namespace tgfx {
 class LinearGradient;
 class RadialGradient;
 class ConicGradient;
+class DiamondGradient;
 
 /**
  * The base class for all gradient types that can be drawn on a shape layer.
@@ -81,6 +82,21 @@ class Gradient : public ShapeStyle {
   static std::shared_ptr<ConicGradient> MakeConic(const Point& center, float startAngle,
                                                   float endAngle, const std::vector<Color>& colors,
                                                   const std::vector<float>& positions = {});
+
+  /**
+   * Returns a shape style that generates a diamond gradient given a center point and half-diagonal
+   * length. The color gradient is drawn from the center point to the vertices of the diamond.
+   * @param center The center of the diamond
+   * @param halfDiagonal Must be positive. The half-length between two opposite vertices of the
+   * diamond.
+   * @param colors The array of colors, to be distributed around the center, within the gradient
+   * angle range.
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
+   */
+  static std::shared_ptr<DiamondGradient> MakeDiamond(const Point& center, float halfDiagonal,
+                                                      const std::vector<Color>& colors,
+                                                      const std::vector<float>& positions = {});
 
   /**
    * Returns the gradient type. Possible values are GradientType::Linear, GradientType::Radial, and
@@ -281,6 +297,56 @@ class ConicGradient : public Gradient {
   ConicGradient(const Point& center, float startAngle, float endAngle,
                 const std::vector<Color>& colors, const std::vector<float>& positions)
       : Gradient(colors, positions), _center(center), _startAngle(startAngle), _endAngle(endAngle) {
+  }
+
+  friend class Gradient;
+};
+
+/**
+ * Represents a diamond gradient that can be drawn on a shape layer.
+ */
+class DiamondGradient : public Gradient {
+ public:
+  GradientType type() const override {
+    return GradientType::Diamond;
+  }
+
+  /**
+   * Returns the center of the diamond for this gradient. The center point corresponds to the first
+   * stop of the gradient.
+   */
+  const Point& center() const {
+    return _center;
+  }
+
+  /**
+   * Sets the center of the diamond for this gradient.
+   */
+  void setCenter(const Point& center);
+
+  /**
+   * Returns the halfDiagonal of the diamond for this gradient. The half-length between two opposite
+   * vertices of the diamond.
+   */
+  float halfDiagonal() const {
+    return _halfDiagonal;
+  }
+
+  /**
+   * Sets the half-Diagonal of the diamond for this gradient. The value must be positive.
+   */
+  void setHalfDiagonal(float halfDiagonal);
+
+ protected:
+  std::shared_ptr<Shader> onGetShader() const override;
+
+ private:
+  Point _center = Point::Zero();
+  float _halfDiagonal = 0;
+
+  DiamondGradient(const Point& center, float halfDiagonal, const std::vector<Color>& colors,
+                  const std::vector<float>& positions)
+      : Gradient(colors, positions), _center(center), _halfDiagonal(halfDiagonal) {
   }
 
   friend class Gradient;

@@ -19,6 +19,7 @@
 #include <math.h>
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
+#include "core/shaders/GradientShader.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -2146,5 +2147,44 @@ TGFX_TEST(LayerTest, LargeScale) {
   shapeLayer->setMatrix(Matrix::MakeScale(256, 256));
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LargeScale"));
+}
+
+TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList list;
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+
+  auto layer = ShapeLayer::Make();
+  layer->setPath(path);
+  auto matrix = Matrix::MakeScale(0.5f, 1.f);
+  auto layerStyle =
+      Gradient::MakeDiamond(Point::Make(100, 50), 50, {Color::Red(), Color::Blue()}, {0, 1});
+  layerStyle->setMatrix(matrix);
+  layer->setFillStyle(layerStyle);
+  list.root()->addChild(layer);
+
+  auto layer2 = ShapeLayer::Make();
+  layer2->setPath(path);
+  auto imageStyle = ImagePattern::Make(MakeImage("resources/apitest/imageReplacement.png"),
+                                       TileMode::Decal, TileMode::Decal);
+  imageStyle->setMatrix(matrix);
+  layer2->setFillStyle(imageStyle);
+  layer2->setMatrix(Matrix::MakeTrans(100, 0));
+  list.root()->addChild(layer2);
+
+  auto layer3 = ShapeLayer::Make();
+  layer3->setPath(path);
+  auto solidStyle = SolidColor::Make(Color::Red());
+  solidStyle->setMatrix(matrix);
+  layer3->setFillStyle(solidStyle);
+  layer3->setMatrix(Matrix::MakeTrans(200, 0));
+  list.root()->addChild(layer3);
+
+  auto surface = Surface::Make(context, 300, 100);
+  list.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
 }
 }  // namespace tgfx
