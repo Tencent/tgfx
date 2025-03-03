@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ShapeStyle.h"
+#pragma once
+
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-void ShapeStyle::setAlpha(float value) {
-  if (_alpha == value) {
-    return;
-  }
-  _alpha = value;
-  invalidate();
-}
+class DiamondGradientLayout : public FragmentProcessor {
+ public:
+  static std::unique_ptr<DiamondGradientLayout> Make(Matrix matrix);
 
-void ShapeStyle::setBlendMode(BlendMode value) {
-  if (_blendMode == value) {
-    return;
+  std::string name() const override {
+    return "DiamondGradientLayout";
   }
-  _blendMode = value;
-  invalidate();
-}
 
-void ShapeStyle::setMatrix(const Matrix& value) {
-  if (_matrix == value) {
-    return;
-  }
-  _matrix = value;
-  invalidate();
-}
+ protected:
+  DEFINE_PROCESSOR_CLASS_ID
 
-std::shared_ptr<Shader> ShapeStyle::getShader() const {
-  auto shader = onGetShader();
-  if (!shader) {
-    return nullptr;
-  }
-  return shader->makeWithMatrix(_matrix);
-}
+  explicit DiamondGradientLayout(Matrix matrix);
 
+  CoordTransform coordTransform;
+};
 }  // namespace tgfx
