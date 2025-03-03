@@ -22,6 +22,7 @@
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"
+#include "gpu/processors/DiamondGradientLayout.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
 #include "gpu/processors/LinearGradientLayout.h"
 #include "gpu/processors/RadialGradientLayout.h"
@@ -290,6 +291,47 @@ GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
   return GradientType::Conic;
 }
 
+static Matrix DiamondRadiusToUnitMatrix(const Point& center, float radius) {
+  float inv = 1.4142f / radius;  // sqrt(2) / radius to calculate the w/h of the diamond
+  auto matrix = Matrix::MakeTrans(-center.x, -center.y);
+  matrix.postScale(inv, inv);
+  matrix.postRotate(45);
+  return matrix;
+}
+
+static std::tuple<Point, float> UnitMatrixToDiamondRadial(const Matrix& matrix) {
+  auto invertMatrix = matrix;
+  invertMatrix.postRotate(-45);
+  invertMatrix.invert(&invertMatrix);
+  std::array<Point, 2> points{Point::Make(0, 0), Point::Make(1, 0)};
+  invertMatrix.mapPoints(points.data(), 2);
+  return {points[0], Point::Distance(points[0], points[1]) / 1.4142f};
+}
+
+DiamondGradientShader::DiamondGradientShader(const Point& center, float radius,
+                                             const std::vector<Color>& colors,
+                                             const std::vector<float>& positions)
+    : GradientShader(colors, positions, DiamondRadiusToUnitMatrix(center, radius)) {
+}
+
+std::unique_ptr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
+    const FPArgs& args, const Matrix* uvMatrix) const {
+  auto totalMatrix = pointsToUnit;
+  if (uvMatrix != nullptr) {
+    totalMatrix.preConcat(*uvMatrix);
+  }
+  return MakeGradient(args.context, *this, DiamondGradientLayout::Make(totalMatrix));
+}
+
+GradientType DiamondGradientShader::asGradient(GradientInfo* info) const {
+  if (info) {
+    info->colors = originalColors;
+    info->positions = originalPositions;
+    std::tie(info->points[0], info->radiuses[0]) = UnitMatrixToDiamondRadial(pointsToUnit);
+  }
+  return GradientType::Diamond;
+}
+
 std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,
                                                    const std::vector<Color>& colors,
                                                    const std::vector<float>& positions) {
@@ -344,4 +386,24 @@ std::shared_ptr<Shader> Shader::MakeConicGradient(const Point& center, float sta
   shader->weakThis = shader;
   return shader;
 }
+
+std::shared_ptr<Shader> Shader::MakeDiamondGradient(const Point& center, float radius,
+                                                    const std::vector<Color>& colors,
+                                                    const std::vector<float>& positions) {
+  if (radius < 0 || colors.empty()) {
+    return nullptr;
+  }
+  if (1 == colors.size()) {
+    return Shader::MakeColorShader(colors[0]);
+  }
+
+  if (FloatNearlyZero(radius, DegenerateThreshold)) {
+    // Degenerate gradient optimization, and no special logic needed for clamped radial gradient
+    return Shader::MakeColorShader(colors[colors.size() - 1]);
+  }
+  auto shader = std::make_shared<DiamondGradientShader>(center, radius, colors, positions);
+  shader->weakThis = shader;
+  return shader;
+}
+
 }  // namespace tgfx

@@ -108,4 +108,16 @@ class ConicGradientShader : public GradientShader {
   float bias;
   float scale;
 };
+
+class DiamondGradientShader : public GradientShader {
+ public:
+  DiamondGradientShader(const Point& center, float radius, const std::vector<Color>& colors,
+                        const std::vector<float>& positions);
+
+  GradientType asGradient(GradientInfo*) const override;
+
+ protected:
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                         const Matrix* uvMatrix) const override;
+};
 }  // namespace tgfx
