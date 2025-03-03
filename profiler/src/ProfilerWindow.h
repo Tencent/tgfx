@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "view/MainView.h"
+#include "MainView.h"
 
 class ProfilerWindow : public QMainWindow {
   Q_OBJECT

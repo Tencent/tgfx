@@ -5,7 +5,6 @@ include(../third_party/vendor_tools/vendor.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-add_compile_definitions(CXX_17)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
@@ -97,28 +96,7 @@ elseif (WIN32)
 endif ()
 
 list(APPEND TGFX_PROFILER_SRC src)
-
-
-file(GLOB TGFX_PROFILER_FILES
-        src/main.cpp
-        src/view/View.h
-        src/view/MainView.h
-        src/view/ToolView.h
-        src/view/FramesView.h
-        src/view/TimelineView.h
-        src/ProfilerWindow.h
-        src/view/MainView.cpp
-        src/view/ToolView.cpp
-        src/view/TimelineView.cpp
-        src/TimelineItem.cpp
-        src/TimelineItemThread.cpp
-        src/TimelineController.cpp
-        src/view/FramesView.cpp
-        src/Utility.cpp
-        src/UserData.cpp
-        src/view/View.cpp
-        src/ProfilerWindow.cpp
-        src/ProfilerApplication.cpp)
+file(GLOB TGFX_PROFILER_FILES src/*.*)
 
 find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES)
 list(APPEND TGFX_PROFILER_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})

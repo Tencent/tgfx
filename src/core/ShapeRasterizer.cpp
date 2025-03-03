@@ -28,7 +28,7 @@ ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> s
 }
 
 std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) const {
-  TRACE_EVENT_NAME("VectorRasterized");
+  TRACE_EVENT_NAME("VectorRasterize");
   auto finalPath = shape->getPath();
   if (finalPath.isEmpty() && finalPath.isInverseFillType()) {
     finalPath.reset();

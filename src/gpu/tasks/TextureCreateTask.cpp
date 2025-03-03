@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureCreateTask.h"
-#include "core/utils/Profiling.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
@@ -38,7 +37,6 @@ TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height,
 }
 
 std::shared_ptr<Resource> TextureCreateTask::onMakeResource(Context* context) {
-  TRACE_EVENT_NAME("CreateResource");
   auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
   if (texture == nullptr) {
     LOGE("TextureCreateTask::onMakeResource() Failed to create the texture!");

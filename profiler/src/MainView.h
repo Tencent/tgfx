@@ -23,10 +23,10 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <thread>
+#include "ToolView.h"
 #include "TracyWorker.hpp"
 #include "Utility.h"
 #include "View.h"
-#include "view/ToolView.h"
 
 class MainView : public QWidget {
   Q_OBJECT

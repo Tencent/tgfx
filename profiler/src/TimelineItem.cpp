@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TimelineItem.h"
+#include "TimelineView.h"
 #include "src/profiler/IconsFontAwesome6.h"
-#include "view/TimelineView.h"
 
 TimelineItem::TimelineItem(TimelineView& view, tracy::Worker& worker)
     : height(0), visible(true), showFull(true), worker(worker), timelineView(view) {

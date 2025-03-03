@@ -19,7 +19,6 @@
 #include "GLProgramBuilder.h"
 #include "GLContext.h"
 #include "GLUtil.h"
-#include "core/utils/Profiling.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,

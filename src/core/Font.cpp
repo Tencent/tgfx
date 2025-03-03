@@ -18,7 +18,6 @@
 
 #include "tgfx/core/Font.h"
 #include "ScalerContext.h"
-#include "utils/Profiling.h"
 
 namespace tgfx {
 

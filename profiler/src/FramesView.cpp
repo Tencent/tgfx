@@ -19,11 +19,11 @@
 #include "FramesView.h"
 #include <qevent.h>
 #include <sys/socket.h>
-#include <tgfx/gpu/opengl/qt/QGLWindow.h>
 #include <QSGImageNode>
 #include <QToolTip>
 #include "TimelineView.h"
 #include "TracyPrint.hpp"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 FramesView::FramesView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);

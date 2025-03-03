@@ -20,7 +20,7 @@
 #include <qguiapplication.h>
 #include <qscreen.h>
 #include <QToolBar>
-#include "view/MainView.h"
+#include "MainView.h"
 
 ProfilerWindow::ProfilerWindow(QMainWindow* parent) : QMainWindow(parent) {
   initWindow();
