@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../../include/tgfx/core/Task.h"
+#include "tgfx/core/Task.h"
 
 namespace tgfx {
 template <typename T>

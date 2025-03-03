@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "../../core/DataSource.h"
 #include "ResourceTask.h"
+#include "core/DataSource.h"
 #include "core/ShapeBuffer.h"
 
 namespace tgfx {
