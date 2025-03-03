@@ -17,14 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectDrawOp.h"
+#include "core/DataSource.h"
 #include "gpu/Gpu.h"
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
-class RectCoverageVerticesProvider : public DataProvider {
+class RectCoverageVerticesProvider : public DataSource<Data> {
  public:
   RectCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
@@ -78,7 +80,7 @@ class RectCoverageVerticesProvider : public DataProvider {
   bool hasColor = false;
 };
 
-class RectNonCoverageVerticesProvider : public DataProvider {
+class RectNonCoverageVerticesProvider : public DataSource<Data> {
  public:
   RectNonCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
@@ -136,19 +138,18 @@ std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector
   } else if (rects.size() > 1) {
     drawOp->indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
   }
-  std::unique_ptr<DataProvider> dataProvider = nullptr;
+  std::unique_ptr<DataSource<Data>> source = nullptr;
   if (aaType == AAType::Coverage) {
-    dataProvider = std::make_unique<RectCoverageVerticesProvider>(rects, !uniformColor.has_value());
+    source = std::make_unique<RectCoverageVerticesProvider>(rects, !uniformColor.has_value());
   } else {
-    dataProvider =
-        std::make_unique<RectNonCoverageVerticesProvider>(rects, !uniformColor.has_value());
+    source = std::make_unique<RectNonCoverageVerticesProvider>(rects, !uniformColor.has_value());
   }
   if (rects.size() > 1) {
     drawOp->vertexBufferProxy =
-        GpuBufferProxy::MakeFrom(context, std::move(dataProvider), BufferType::Vertex, renderFlags);
+        GpuBufferProxy::MakeFrom(context, std::move(source), BufferType::Vertex, renderFlags);
   } else {
     // If we only have one rect, it is not worth the async task overhead.
-    drawOp->vertexData = dataProvider->getData();
+    drawOp->vertexData = source->getData();
   }
   return drawOp;
 }

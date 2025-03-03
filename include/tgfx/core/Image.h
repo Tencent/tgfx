@@ -292,7 +292,7 @@ class Image {
   enum class Type {
     Buffer,
     Codec,
-    Decoder,
+    Decoded,
     Filter,
     Generator,
     Mipmap,

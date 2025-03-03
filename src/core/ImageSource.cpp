@@ -16,29 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DecoderImage.h"
-#include "BufferImage.h"
-#include "gpu/ProxyProvider.h"
+#include "ImageSource.h"
 
 namespace tgfx {
-std::shared_ptr<Image> DecoderImage::MakeFrom(UniqueKey uniqueKey,
-                                              std::shared_ptr<ImageDecoder> decoder) {
-  if (decoder == nullptr) {
+std::unique_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
+    std::shared_ptr<ImageGenerator> generator, bool tryHardware, bool asyncDecoding) {
+  if (generator == nullptr) {
     return nullptr;
   }
-  auto image =
-      std::shared_ptr<DecoderImage>(new DecoderImage(std::move(uniqueKey), std::move(decoder)));
-  image->weakThis = image;
-  return image;
+  if (asyncDecoding && !generator->asyncSupport()) {
+    // The generator may have built-in async decoding support which will not block the main thread.
+    // Therefore, we should trigger the decoding ASAP.
+    auto buffer = generator->makeBuffer(tryHardware);
+    return Wrap(std::move(buffer));
+  }
+  auto imageSource = std::make_unique<ImageSource>(std::move(generator), tryHardware);
+  if (asyncDecoding) {
+    return Async(std::move(imageSource));
+  }
+  return imageSource;
 }
 
-DecoderImage::DecoderImage(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder)
-    : ResourceImage(std::move(uniqueKey)), decoder(std::move(decoder)) {
-}
-
-std::shared_ptr<TextureProxy> DecoderImage::onLockTextureProxy(const TPArgs& args,
-                                                               const UniqueKey& key) const {
-  return args.context->proxyProvider()->createTextureProxy(key, decoder, args.mipmapped,
-                                                           args.renderFlags);
+ImageSource::ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
+    : generator(std::move(generator)), tryHardware(tryHardware) {
 }
 }  // namespace tgfx

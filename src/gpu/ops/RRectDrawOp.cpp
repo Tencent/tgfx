@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
+#include "core/DataSource.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -107,7 +109,7 @@ void WriteColor(float* vertices, int& index, const Color& color) {
   vertices[index++] = color.alpha;
 }
 
-class RRectVerticesProvider : public DataProvider {
+class RRectVerticesProvider : public DataSource<Data> {
  public:
   RRectVerticesProvider(std::vector<RRectPaint> rRectPaints, AAType aaType, bool useScale)
       : rRectPaints(std::move(rRectPaints)), aaType(aaType), useScale(useScale) {
@@ -229,7 +231,7 @@ class RRectVerticesProvider : public DataProvider {
   bool useScale = false;
 };
 
-class RRectIndicesProvider : public DataProvider {
+class RRectIndicesProvider : public DataSource<Data> {
  public:
   explicit RRectIndicesProvider(size_t rectSize) : rectSize(rectSize) {
   }
