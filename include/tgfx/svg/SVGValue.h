@@ -43,7 +43,7 @@ class SVGValue {
 
   template <typename T>
   const T* as() const {
-    return _type == T::_type ? static_cast<const T*>(this) : nullptr;
+    return _type == T::classType ? static_cast<const T*>(this) : nullptr;
   }
 
  protected:
@@ -57,6 +57,8 @@ class SVGValue {
 template <typename T, SVGValue::Type ValueType>
 class SVGWrapperValue final : public SVGValue {
  public:
+  static constexpr Type classType = ValueType;
+
   explicit SVGWrapperValue(const T& v) : INHERITED(ValueType), wrappedValue(v) {
   }
 

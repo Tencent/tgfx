@@ -105,10 +105,10 @@ class Image {
 
   /**
    * Creates an Image from the given picture with the specified width, height, and matrix.
-   * The picture will be drawn onto the Image using the provided matrix. The picture is not
-   * immediately turned into raster pixels; instead, the returned Image holds a reference to the
-   * picture and defers rasterization until it is actually required. Note: This method may return a
-   * different type of Image other than PictureImage if the picture is simple enough.
+   * The picture will be drawn onto the Image using the provided matrix.The returned Image holds a
+   * reference to the picture and replays the drawing commands until it is actually required.
+   * Note: This method may return a different type of Image other than PictureImage if the picture
+   * is simple enough.
    * @param picture A stream of drawing commands.
    * @param width The width of the Image.
    * @param height The height of the Image.
@@ -248,12 +248,12 @@ class Image {
   /**
    * Returns a rasterized Image scaled by the specified rasterizationScale. A rasterized Image can
    * be cached as an independent GPU resource for repeated drawing. By default, an Image directly
-   * backed by an ImageBuffer, an ImageGenerator, a GPU texture, or a Picture is rasterized. Other
-   * images aren’t rasterized unless implicitly created by this method. For example, if you create
-   * a subset Image from a rasterized Image, the subset Image doesn’t create its own GPU cache but
-   * uses the full resolution cache created by the original Image. If you want the subset Image to
-   * create its own GPU cache, call makeRasterized() on the subset Image. The returned Image always
-   * has the same mipmap state as the original Image.
+   * backed by an ImageBuffer, an ImageGenerator, or a GPU texture is rasterized. Other image aren’t
+   * rasterized unless implicitly created by this method. For example, if you create a subset Image
+   * from a rasterized Image, the subset Image doesn’t create its own GPU cache but uses the full
+   * resolution cache created by the original Image. If you want the subset Image to create its own
+   * GPU cache, call makeRasterized() on the subset Image. The returned Image always has the same
+   * mipmap state as the original Image.
    * @param rasterizationScale The factor to scale the Image by when rasterizing. The default value
    * is 1.0, indicating that the Image should be rasterized at its current size. If the value is
    * greater than 1.0, it may result in blurring.
@@ -292,7 +292,7 @@ class Image {
   enum class Type {
     Buffer,
     Codec,
-    Decoder,
+    Decoded,
     Filter,
     Generator,
     Mipmap,

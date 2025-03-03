@@ -22,25 +22,25 @@
 
 namespace tgfx {
 std::unique_ptr<GpuBufferUploadTask> GpuBufferUploadTask::MakeFrom(
-    UniqueKey uniqueKey, BufferType bufferType, std::unique_ptr<DataProvider> provider) {
-  if (provider == nullptr) {
+    UniqueKey uniqueKey, BufferType bufferType, std::unique_ptr<DataSource<Data>> source) {
+  if (source == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<GpuBufferUploadTask>(
-      new GpuBufferUploadTask(std::move(uniqueKey), bufferType, std::move(provider)));
+      new GpuBufferUploadTask(std::move(uniqueKey), bufferType, std::move(source)));
 }
 
 GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
-                                         std::unique_ptr<DataProvider> provider)
-    : ResourceTask(std::move(uniqueKey)), bufferType(bufferType), provider(std::move(provider)) {
+                                         std::unique_ptr<DataSource<Data>> source)
+    : ResourceTask(std::move(uniqueKey)), bufferType(bufferType), source(std::move(source)) {
 }
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {
   TRACE_EVENT_NAME("GpuBufferUpload");
-  if (provider == nullptr) {
+  if (source == nullptr) {
     return nullptr;
   }
-  auto data = provider->getData();
+  auto data = source->getData();
   if (data == nullptr || data->empty()) {
     LOGE("GpuBufferUploadTask::onMakeResource() Failed to get data!");
     return nullptr;
@@ -49,8 +49,8 @@ std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) 
   if (gpuBuffer == nullptr) {
     LOGE("GpuBufferUploadTask::onMakeResource failed to upload the GpuBuffer!");
   } else {
-    // Free the data provider immediately to reduce memory pressure.
-    provider = nullptr;
+    // Free the data source immediately to reduce memory pressure.
+    source = nullptr;
   }
   return gpuBuffer;
 }

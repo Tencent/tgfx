@@ -18,25 +18,31 @@
 
 #pragma once
 
-#include "tgfx/core/Data.h"
+#include "core/DataSource.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
 /**
- * DataProvider defers the data generation until it is needed.
+ * A DataSource that decodes an image and provides an ImageBuffer.
  */
-class DataProvider {
+class ImageSource : public DataSource<ImageBuffer> {
  public:
   /**
-   * Wraps the existing data into a DataProvider.
+   * Create an image source from the specified ImageGenerator. If asyncDecoding is true, the
+   * returned image source schedules an asynchronous image-decoding task immediately. Otherwise, the
+   * image will be decoded synchronously when the getData() method is called.
    */
-  static std::unique_ptr<DataProvider> Wrap(std::shared_ptr<Data> data);
+  static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                              bool tryHardware = true, bool asyncDecoding = true);
 
-  virtual ~DataProvider() = default;
+  ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
 
-  /**
-   * Generates the data. DataProvider does not cache the data, each call to getData() will
-   * generate a new data.
-   */
-  virtual std::shared_ptr<Data> getData() const = 0;
+  std::shared_ptr<ImageBuffer> getData() const override {
+    return generator->makeBuffer(tryHardware);
+  }
+
+ private:
+  std::shared_ptr<ImageGenerator> generator = nullptr;
+  bool tryHardware = true;
 };
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #include "ShaderMaskFilter.h"
 #include "core/utils/Caster.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -41,6 +42,9 @@ bool ShaderMaskFilter::isEqual(const MaskFilter* maskFilter) const {
 std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto processor = FragmentProcessor::Make(shader, args, uvMatrix);
+  if (processor == nullptr && inverted) {
+    return ConstColorProcessor::Make(Color::White(), InputMode::Ignore);
+  }
   return FragmentProcessor::MulInputByChildAlpha(std::move(processor), inverted);
 }
 }  // namespace tgfx

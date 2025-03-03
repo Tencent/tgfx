@@ -22,25 +22,26 @@
 
 namespace tgfx {
 std::unique_ptr<TextureUploadTask> TextureUploadTask::MakeFrom(
-    UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder, bool mipmapped) {
-  if (decoder == nullptr) {
+    UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped) {
+  if (source == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<TextureUploadTask>(
-      new TextureUploadTask(std::move(uniqueKey), std::move(decoder), mipmapped));
+      new TextureUploadTask(std::move(uniqueKey), std::move(source), mipmapped));
 }
 
-TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder,
+TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,
+                                     std::shared_ptr<DataSource<ImageBuffer>> source,
                                      bool mipmapped)
-    : ResourceTask(std::move(uniqueKey)), decoder(std::move(decoder)), mipmapped(mipmapped) {
+    : ResourceTask(std::move(uniqueKey)), source(std::move(source)), mipmapped(mipmapped) {
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
   TRACE_EVENT_NAME("TextureUpload");
-  if (decoder == nullptr) {
+  if (source == nullptr) {
     return nullptr;
   }
-  auto imageBuffer = decoder->decode();
+  auto imageBuffer = source->getData();
   if (imageBuffer == nullptr) {
     LOGE("TextureUploadTask::onMakeResource() Failed to decode the image!");
     return nullptr;
@@ -49,8 +50,8 @@ std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
   if (texture == nullptr) {
     LOGE("TextureUploadTask::onMakeResource() Failed to upload the texture!");
   } else {
-    // Free the decoded image buffer immediately to reduce memory pressure.
-    decoder = nullptr;
+    // Free the image source immediately to reduce memory pressure.
+    source = nullptr;
   }
   return texture;
 }
