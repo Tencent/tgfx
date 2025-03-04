@@ -71,8 +71,8 @@ class DrawContext {
   /**
    * Draws a GlyphRunList with the specified MCState, Fill, and optional Stroke.
    */
-  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
-                                const MCState& state, const Fill& fill) = 0;
+  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                                const Fill& fill, const Stroke* stroke) = 0;
 
   /**
    * Draws a Picture with the specified MCState.

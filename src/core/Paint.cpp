@@ -31,32 +31,6 @@ void Paint::setShader(std::shared_ptr<Shader> newShader) {
   }
 }
 
-static bool AffectsAlpha(const ColorFilter* cf) {
-  return cf && !cf->isAlphaUnchanged();
-}
-
-bool Paint::nothingToDraw() const {
-  switch (fill.blendMode) {
-    case BlendMode::SrcOver:
-    case BlendMode::SrcATop:
-    case BlendMode::DstOut:
-    case BlendMode::DstOver:
-    case BlendMode::PlusLighter:
-      if (fill.color.alpha == 0) {
-        return !AffectsAlpha(fill.colorFilter.get()) && imageFilter == nullptr;
-      }
-      break;
-    case BlendMode::Dst:
-      return true;
-    default:
-      break;
-  }
-  if (PaintStyle::Stroke == style && stroke.width <= 0.0f) {
-    return true;
-  }
-  return false;
-}
-
 void Paint::reset() {
   stroke = Stroke(0);
   fill = {};

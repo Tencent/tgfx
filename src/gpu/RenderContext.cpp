@@ -46,9 +46,13 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 
 void RenderContext::drawFill(const MCState& state, const Fill& fill) {
   auto& clip = state.clip;
-  auto discardContent = clip.isInverseFillType() && clip.isEmpty() && fill.isOpaque();
-  if (auto compositor = getOpsCompositor(discardContent)) {
-    compositor->fillRect(renderTarget->bounds(), MCState{clip}, fill.makeWithMatrix(state.matrix));
+  if (clip.isEmpty() && clip.isInverseFillType()) {
+    if (auto compositor = getOpsCompositor(fill.isOpaque())) {
+      compositor->fillRect(renderTarget->bounds(), {}, fill.makeWithMatrix(state.matrix));
+    }
+  } else {
+    auto shape = Shape::MakeFrom(clip);
+    drawShape(std::move(shape), {}, fill.makeWithMatrix(state.matrix));
   }
 }
 
@@ -119,7 +123,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const Stroke* stroke, const MCState& state, const Fill& fill) {
+                                     const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   if (glyphRunList->hasColor()) {
     drawColorGlyphs(std::move(glyphRunList), state, fill);

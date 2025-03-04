@@ -30,6 +30,9 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   if (stroke == nullptr) {
     return shape;
   }
+  if (stroke->width <= 0.0f) {
+    return nullptr;
+  }
   if (shape->type() != Type::Matrix) {
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
   }

@@ -191,8 +191,8 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state, 
 }
 
 void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                        const Stroke* stroke, const MCState& state,
-                                        const Fill& fill) {
+                                        const MCState& state, const Fill& fill,
+                                        const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   bool hasFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
 

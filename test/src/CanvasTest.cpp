@@ -666,8 +666,6 @@ TGFX_TEST(CanvasTest, simpleShape) {
   ASSERT_TRUE(image != nullptr);
   Paint paint;
   paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(0));
-  EXPECT_TRUE(paint.nothingToDraw());
   paint.setStrokeWidth(2);
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   auto point = Point::Make(width / 2, height / 2);

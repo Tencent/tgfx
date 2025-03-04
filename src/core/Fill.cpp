@@ -44,6 +44,25 @@ bool Fill::isOpaque() const {
   return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
 }
 
+bool Fill::nothingToDraw() const {
+  switch (blendMode) {
+    case BlendMode::SrcOver:
+    case BlendMode::SrcATop:
+    case BlendMode::DstOut:
+    case BlendMode::DstOver:
+    case BlendMode::PlusLighter:
+      if (color.alpha == 0) {
+        return !colorFilter || colorFilter->isAlphaUnchanged();
+      }
+      break;
+    case BlendMode::Dst:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
 Fill Fill::makeWithMatrix(const Matrix& matrix) const {
   auto fill = *this;
   if (fill.shader) {

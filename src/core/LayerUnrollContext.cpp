@@ -65,10 +65,10 @@ void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect&
 }
 
 void LayerUnrollContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                          const Stroke* stroke, const MCState& state,
-                                          const Fill& fill) {
+                                          const MCState& state, const Fill& fill,
+                                          const Stroke* stroke) {
   // We assume that glyphs within a single GlyphRunList usually do not overlap.
-  drawContext->drawGlyphRunList(std::move(glyphRunList), stroke, state, merge(fill));
+  drawContext->drawGlyphRunList(std::move(glyphRunList), state, merge(fill), stroke);
   unrolled = true;
 }
 

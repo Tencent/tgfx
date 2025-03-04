@@ -112,10 +112,10 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
 }
 
 void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                        const Stroke* stroke, const MCState& state,
-                                        const Fill& fill) {
+                                        const MCState& state, const Fill& fill,
+                                        const Stroke* stroke) {
   if (stroke) {
-    records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), *stroke, state, fill));
+    records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), state, fill, *stroke));
   } else {
     records.push_back(new DrawGlyphRunList(std::move(glyphRunList), state, fill));
   }
