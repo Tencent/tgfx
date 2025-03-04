@@ -132,7 +132,7 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::ConvertTextToPaths, state, style);
-  pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncoding());
+  pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
   }
@@ -225,7 +225,7 @@ void SVGExportContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& g
     ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                               exportFlags & SVGExportFlags::ConvertTextToPaths, state, style,
                               stroke);
-    pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncoding());
+    pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
     if (path.getFillType() == PathFillType::EvenOdd) {
       pathElement.addAttribute("fill-rule", "evenodd");
     }
@@ -322,7 +322,7 @@ bool SVGExportContext::RequiresViewportReset(const FillStyle& fill) {
   return false;
 }
 
-PathEncoding SVGExportContext::PathEncoding() {
+PathEncoding SVGExportContext::PathEncodingType() {
   return PathEncoding::Absolute;
 }
 
@@ -352,7 +352,7 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
         }
       } else {
         element = std::make_unique<ElementWriter>("path", writer);
-        element->addPathAttributes(clipPath, tgfx::SVGExportContext::PathEncoding());
+        element->addPathAttributes(clipPath, tgfx::SVGExportContext::PathEncodingType());
         if (clipPath.getFillType() == PathFillType::EvenOdd) {
           element->addAttribute("clip-rule", "evenodd");
         }
