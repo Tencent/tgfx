@@ -167,7 +167,7 @@ class DrawGlyphRunList : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawGlyphRunList(glyphRunList, nullptr, state, fill);
+    context->drawGlyphRunList(glyphRunList, state, fill, nullptr);
   }
 
   Fill fill;
@@ -176,8 +176,8 @@ class DrawGlyphRunList : public Record {
 
 class StrokeGlyphRunList : public DrawGlyphRunList {
  public:
-  StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke& stroke,
-                     MCState state, Fill fill)
+  StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, MCState state, Fill fill,
+                     const Stroke& stroke)
       : DrawGlyphRunList(std::move(glyphRunList), std::move(state), std::move(fill)),
         stroke(stroke) {
   }
@@ -187,7 +187,7 @@ class StrokeGlyphRunList : public DrawGlyphRunList {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawGlyphRunList(glyphRunList, &stroke, state, fill);
+    context->drawGlyphRunList(glyphRunList, state, fill, &stroke);
   }
 
   Stroke stroke;

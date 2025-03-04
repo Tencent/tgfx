@@ -252,11 +252,6 @@ class Paint {
   }
 
   /**
-   * Returns true if the Paint prevents any drawing.
-   */
-  bool nothingToDraw() const;
-
-  /**
    * Sets all Paint contents to their initial values. This is equivalent to replacing Paint with the
    * result of Paint().
    */

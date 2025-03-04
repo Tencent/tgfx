@@ -42,8 +42,8 @@ class MeasureContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state,
                      const Fill& fill) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
-                        const MCState& state, const Fill& fill) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                        const Fill& fill, const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
@@ -53,7 +53,9 @@ class MeasureContext : public DrawContext {
  private:
   Rect bounds = Rect::MakeEmpty();
 
-  void addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded = false);
-  void addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded = false);
+  void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
+                      bool unbounded = false);
+  void addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
+                       bool unbounded = false);
 };
 }  // namespace tgfx

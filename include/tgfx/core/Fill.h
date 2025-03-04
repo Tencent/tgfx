@@ -78,6 +78,11 @@ class Fill {
   bool isOpaque() const;
 
   /**
+   * Returns true if the Paint prevents any drawing.
+   */
+  bool nothingToDraw() const;
+
+  /**
    * Returns a new Fill applying the given matrix to the shader and mask filter.
    */
   Fill makeWithMatrix(const Matrix& matrix) const;

@@ -426,12 +426,16 @@ class Canvas {
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
-  void drawClip(const Fill& fill);
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
+  void drawTextBlob(const TextBlob* textBlob, const MCState& state, const Fill& fill,
+                    const Stroke* stroke);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
+  void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
+                 const Color colors[], size_t count, const SamplingOptions& sampling,
+                 const Fill& fill);
   void resetStateStack();
 
   friend class Surface;
