@@ -73,20 +73,9 @@ class Fill {
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
 
   /**
-   * Returns true if the Fill contains only a color and no shader, mask filter, or color filter.
-   */
-  bool hasOnlyColor() const;
-
-  /**
    * Returns true if the Fill is guaranteed to produce only opaque colors.
    */
   bool isOpaque() const;
-
-  /**
-   * Returns true if the Fill is equal to the given style. If ignoreColor is true, the color
-   * is not compared.
-   */
-  bool isEqual(const Fill& fill, bool ignoreColor = false) const;
 
   /**
    * Returns a new Fill applying the given matrix to the shader and mask filter.

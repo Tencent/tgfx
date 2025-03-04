@@ -20,6 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
+#include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
@@ -147,8 +148,37 @@ void OpsCompositor::discardAll() {
   }
 }
 
+static bool CompareFill(const Fill& a, const Fill& b) {
+  // Ignore the color differences.
+  if (a.antiAlias != b.antiAlias || a.blendMode != b.blendMode) {
+    return false;
+  }
+  if (a.shader) {
+    if (!b.shader || !Caster::Compare(a.shader.get(), b.shader.get())) {
+      return false;
+    }
+  } else if (b.shader) {
+    return false;
+  }
+  if (a.maskFilter) {
+    if (!b.maskFilter || !Caster::Compare(a.maskFilter.get(), b.maskFilter.get())) {
+      return false;
+    }
+  } else if (b.maskFilter) {
+    return false;
+  }
+  if (a.colorFilter) {
+    if (!b.colorFilter || !Caster::Compare(a.colorFilter.get(), b.colorFilter.get())) {
+      return false;
+    }
+  } else if (b.colorFilter) {
+    return false;
+  }
+  return true;
+}
+
 bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill) const {
-  if (pendingType != type || pendingClip != clip || !pendingFill.isEqual(fill, true)) {
+  if (pendingType != type || pendingClip != clip || !CompareFill(pendingFill, fill)) {
     return false;
   }
   if (pendingType == PendingOpType::RRect) {
@@ -253,8 +283,12 @@ static void FlipYIfNeeded(Rect* rect, std::shared_ptr<RenderTargetProxy> renderT
   }
 }
 
+static bool HasColorOnly(const Fill& fill) {
+  return !fill.shader && !fill.maskFilter && !fill.colorFilter;
+}
+
 bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fill& fill) {
-  if (!fill.hasOnlyColor() || !fill.isOpaque() || !state.matrix.rectStaysRect()) {
+  if (!HasColorOnly(fill) || !fill.isOpaque() || !state.matrix.rectStaysRect()) {
     return false;
   }
   auto deviceBounds = renderTarget->bounds();
