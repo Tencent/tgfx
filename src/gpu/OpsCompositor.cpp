@@ -23,7 +23,6 @@
 #include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ResourceProvider.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/DstTextureCopyOp.h"
 #include "gpu/ops/ResolveOp.h"
@@ -153,26 +152,22 @@ static bool CompareFill(const Fill& a, const Fill& b) {
   if (a.antiAlias != b.antiAlias || a.blendMode != b.blendMode) {
     return false;
   }
-  if (a.shader) {
-    if (!b.shader || !Caster::Compare(a.shader.get(), b.shader.get())) {
+  if (a.shader != b.shader) {
+    if (!a.shader || !b.shader || !Caster::Compare(a.shader.get(), b.shader.get())) {
       return false;
     }
-  } else if (b.shader) {
-    return false;
   }
-  if (a.maskFilter) {
-    if (!b.maskFilter || !Caster::Compare(a.maskFilter.get(), b.maskFilter.get())) {
+  if (a.maskFilter != b.maskFilter) {
+    if (!a.maskFilter || !b.maskFilter ||
+        !Caster::Compare(a.maskFilter.get(), b.maskFilter.get())) {
       return false;
     }
-  } else if (b.maskFilter) {
-    return false;
   }
-  if (a.colorFilter) {
-    if (!b.colorFilter || !Caster::Compare(a.colorFilter.get(), b.colorFilter.get())) {
+  if (a.colorFilter != b.colorFilter) {
+    if (!a.colorFilter || !b.colorFilter ||
+        !Caster::Compare(a.colorFilter.get(), b.colorFilter.get())) {
       return false;
     }
-  } else if (b.colorFilter) {
-    return false;
   }
   return true;
 }
@@ -181,12 +176,18 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
   if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill)) {
     return false;
   }
-  if (pendingType == PendingOpType::RRect) {
-    return pendingRRects.size() < ResourceProvider::MaxNumRRects();
+  switch (pendingType) {
+    case PendingOpType::Rect:
+      if (fill.antiAlias) {
+        return pendingRects.size() < RectDrawOp::MaxNumAARects;
+      }
+      return pendingRects.size() < RectDrawOp::MaxNumNonAARects;
+    case PendingOpType::RRect:
+      return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
+    default:
+      break;
   }
-  auto maxRects = static_cast<size_t>(fill.antiAlias ? ResourceProvider::MaxNumAAQuads()
-                                                     : ResourceProvider::MaxNumNonAAQuads());
-  return pendingRects.size() < maxRects;
+  return true;
 }
 
 void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {

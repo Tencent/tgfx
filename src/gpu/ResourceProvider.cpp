@@ -20,14 +20,12 @@
 #include "GradientCache.h"
 #include "core/DataSource.h"
 #include "core/utils/Log.h"
+#include "ops/RRectDrawOp.h"
+#include "ops/RectDrawOp.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
-static constexpr uint16_t kMaxNumNonAAQuads = 2048;  // max possible: (1 << 14) - 1;
-static constexpr uint16_t kMaxNumAAQuads = 512;      // max possible: (1 << 13) - 1;
-static constexpr uint16_t kMaxNumRRect = 512;
-
 class PatternedIndexBufferProvider : public DataSource<Data> {
  public:
   PatternedIndexBufferProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t reps,
@@ -88,15 +86,12 @@ static constexpr uint16_t kNonAAQuadIndexPattern[] = {
 std::shared_ptr<GpuBufferProxy> ResourceProvider::nonAAQuadIndexBuffer() {
   if (_nonAAQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
-        kNonAAQuadIndexPattern, kIndicesPerNonAAQuad, kMaxNumNonAAQuads, kVerticesPerNonAAQuad);
+        kNonAAQuadIndexPattern, kIndicesPerNonAAQuad, RectDrawOp::MaxNumNonAARects,
+        kVerticesPerNonAAQuad);
     _nonAAQuadIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }
   return _nonAAQuadIndexBuffer;
-}
-
-uint16_t ResourceProvider::MaxNumNonAAQuads() {
-  return kMaxNumNonAAQuads;
 }
 
 uint16_t ResourceProvider::NumIndicesPerNonAAQuad() {
@@ -119,15 +114,11 @@ static constexpr uint16_t kAAQuadIndexPattern[] = {
 std::shared_ptr<GpuBufferProxy> ResourceProvider::aaQuadIndexBuffer() {
   if (_aaQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
-        kAAQuadIndexPattern, kIndicesPerAAQuad, kMaxNumAAQuads, kVerticesPerAAQuad);
+        kAAQuadIndexPattern, kIndicesPerAAQuad, RectDrawOp::MaxNumAARects, kVerticesPerAAQuad);
     _aaQuadIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }
   return _aaQuadIndexBuffer;
-}
-
-uint16_t ResourceProvider::MaxNumAAQuads() {
-  return kMaxNumAAQuads;
 }
 
 uint16_t ResourceProvider::NumIndicesPerAAQuad() {
@@ -203,15 +194,11 @@ class RRectIndicesProvider : public DataSource<Data> {
 
 std::shared_ptr<GpuBufferProxy> ResourceProvider::rRectIndexBuffer() {
   if (_rRectIndexBuffer == nullptr) {
-    auto provider = std::make_unique<RRectIndicesProvider>(kMaxNumRRect);
+    auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects);
     _rRectIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }
   return _rRectIndexBuffer;
-}
-
-uint16_t ResourceProvider::MaxNumRRects() {
-  return kMaxNumRRect;
 }
 
 uint16_t ResourceProvider::NumIndicesPerRRect() {
