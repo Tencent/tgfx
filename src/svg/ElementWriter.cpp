@@ -39,7 +39,7 @@
 
 namespace tgfx {
 
-Resources::Resources(const FillStyle& fill) {
+Resources::Resources(const Fill& fill) {
   paintColor = ToSVGColor(fill.color);
 }
 
@@ -59,7 +59,7 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
 
 ElementWriter::ElementWriter(const std::string& name, Context* context,
                              SVGExportContext* svgContext, XMLWriter* writer, ResourceStore* bucket,
-                             bool disableWarning, const MCState& state, const FillStyle& fill,
+                             bool disableWarning, const MCState& state, const Fill& fill,
                              const Stroke* stroke)
     : writer(writer), resourceStore(bucket), disableWarning(disableWarning) {
   Resources resource = addResources(fill, context, svgContext);
@@ -84,7 +84,7 @@ void ElementWriter::reportUnsupportedElement(const char* message) const {
   }
 }
 
-void ElementWriter::addFillAndStroke(const FillStyle& fill, const Stroke* stroke,
+void ElementWriter::addFillAndStroke(const Fill& fill, const Stroke* stroke,
                                      const Resources& resources) {
   if (!stroke) {  //fill draw
     static const std::string defaultFill = "black";
@@ -360,7 +360,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
 }
 
-Resources ElementWriter::addResources(const FillStyle& fill, Context* context,
+Resources ElementWriter::addResources(const Fill& fill, Context* context,
                                       SVGExportContext* svgContext) {
   Resources resources(fill);
 

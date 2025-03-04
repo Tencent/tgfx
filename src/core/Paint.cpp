@@ -19,15 +19,16 @@
 #include "tgfx/core/Paint.h"
 
 namespace tgfx {
-void Paint::reset() {
-  style = PaintStyle::Fill;
-  color = Color::White();
-  stroke = Stroke(0);
-  shader = nullptr;
-  maskFilter = nullptr;
-  colorFilter = nullptr;
-  imageFilter = nullptr;
-  blendMode = BlendMode::SrcOver;
+void Paint::setShader(std::shared_ptr<Shader> newShader) {
+  fill.shader = std::move(newShader);
+  if (fill.shader) {
+    Color color = {};
+    if (fill.shader->asColor(&color)) {
+      color.alpha *= getAlpha();
+      fill.color = color;
+      fill.shader = nullptr;
+    }
+  }
 }
 
 static bool AffectsAlpha(const ColorFilter* cf) {
@@ -35,14 +36,14 @@ static bool AffectsAlpha(const ColorFilter* cf) {
 }
 
 bool Paint::nothingToDraw() const {
-  switch (blendMode) {
+  switch (fill.blendMode) {
     case BlendMode::SrcOver:
     case BlendMode::SrcATop:
     case BlendMode::DstOut:
     case BlendMode::DstOver:
     case BlendMode::PlusLighter:
-      if (color.alpha == 0) {
-        return !AffectsAlpha(colorFilter.get()) && imageFilter == nullptr;
+      if (fill.color.alpha == 0) {
+        return !AffectsAlpha(fill.colorFilter.get()) && imageFilter == nullptr;
       }
       break;
     case BlendMode::Dst:
@@ -50,9 +51,16 @@ bool Paint::nothingToDraw() const {
     default:
       break;
   }
-  if ((PaintStyle::Stroke == style) && (stroke.width <= 0.0f)) {
+  if (PaintStyle::Stroke == style && stroke.width <= 0.0f) {
     return true;
   }
   return false;
+}
+
+void Paint::reset() {
+  stroke = Stroke(0);
+  fill = {};
+  imageFilter = nullptr;
+  style = PaintStyle::Fill;
 }
 }  // namespace tgfx

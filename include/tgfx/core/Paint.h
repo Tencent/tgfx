@@ -18,10 +18,7 @@
 
 #pragma once
 
-#include "tgfx/core/Color.h"
-#include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/MaskFilter.h"
-#include "tgfx/core/Shader.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
@@ -45,45 +42,25 @@ enum class PaintStyle {
 class Paint {
  public:
   /**
-   * Sets all Paint contents to their initial values. This is equivalent to replacing Paint with the
-   * result of Paint().
-   */
-  void reset();
-
-  /**
    * Returns true if the edges of paths or images may be drawn with partial transparency. The
    * default value is true.
    */
   bool isAntiAlias() const {
-    return antiAlias;
+    return fill.antiAlias;
   }
 
   /**
    * Requests, but does not require, that edge pixels draw opaque or with partial transparency.
    */
   void setAntiAlias(bool aa) {
-    antiAlias = aa;
-  }
-
-  /**
-   * Returns whether the geometry is filled, stroked, or filled and stroked.
-   */
-  PaintStyle getStyle() const {
-    return style;
-  }
-
-  /**
-   * Sets whether the geometry is filled, stroked, or filled and stroked.
-   */
-  void setStyle(PaintStyle newStyle) {
-    style = newStyle;
+    fill.antiAlias = aa;
   }
 
   /**
    * Retrieves alpha and RGB, unpremultiplied, as four floating point values.
    */
-  Color getColor() const {
-    return color;
+  const Color& getColor() const {
+    return fill.color;
   }
 
   /**
@@ -91,21 +68,85 @@ class Paint {
    * unpremultiplied.
    */
   void setColor(Color newColor) {
-    color = newColor;
+    fill.color = newColor;
   }
 
   /**
    * Retrieves alpha from the color used when stroking and filling.
    */
   float getAlpha() const {
-    return color.alpha;
+    return fill.color.alpha;
   }
 
   /**
    * Replaces alpha, leaving RGB unchanged.
    */
   void setAlpha(float newAlpha) {
-    color.alpha = newAlpha;
+    fill.color.alpha = newAlpha;
+  }
+
+  /**
+   * Returns optional colors used when filling a path if previously set, such as a gradient.
+   */
+  std::shared_ptr<Shader> getShader() const {
+    return fill.shader;
+  }
+
+  /**
+   * Sets optional colors used when filling a path, such as a gradient. If nullptr, color is used
+   * instead. The shader remains unaffected by the canvas matrix and always exists in the coordinate
+   * space of the associated surface.
+   */
+  void setShader(std::shared_ptr<Shader> newShader);
+
+  /**
+   * Returns the mask filter used to modify the alpha channel of the paint when drawing.
+   */
+  std::shared_ptr<MaskFilter> getMaskFilter() const {
+    return fill.maskFilter;
+  }
+
+  /**
+   * Sets the mask filter used to modify the alpha channel of the paint when drawing.
+   */
+  void setMaskFilter(std::shared_ptr<MaskFilter> newMaskFilter) {
+    fill.maskFilter = std::move(newMaskFilter);
+  }
+
+  /**
+   * Returns the color filter used to modify the color of the paint when drawing.
+   */
+  std::shared_ptr<ColorFilter> getColorFilter() const {
+    return fill.colorFilter;
+  }
+
+  /**
+   * Sets the color filter used to modify the color of the paint when drawing.
+   */
+  void setColorFilter(std::shared_ptr<ColorFilter> newColorFilter) {
+    fill.colorFilter = std::move(newColorFilter);
+  }
+
+  /**
+   * Returns the blend mode used to combine the paint with the destination pixels.
+   */
+  BlendMode getBlendMode() const {
+    return fill.blendMode;
+  }
+
+  /**
+   * Sets the blend mode used to combine the paint with the destination pixels.
+   */
+  void setBlendMode(BlendMode mode) {
+    fill.blendMode = mode;
+  }
+
+  /**
+   * Returns the Fill object containing the color, blend mode, antialiasing, shader, mask filter,
+   * and color filter.
+   */
+  const Fill& getFill() const {
+    return fill;
   }
 
   /**
@@ -182,50 +223,6 @@ class Paint {
   }
 
   /**
-   * Returns optional colors used when filling a path if previously set, such as a gradient.
-   */
-  std::shared_ptr<Shader> getShader() const {
-    return shader;
-  }
-
-  /**
-   * Sets optional colors used when filling a path, such as a gradient. If nullptr, color is used
-   * instead. The shader remains unaffected by the canvas matrix and always exists in the coordinate
-   * space of the associated surface.
-   */
-  void setShader(std::shared_ptr<Shader> newShader) {
-    shader = std::move(newShader);
-  }
-
-  /**
-   * Returns the mask filter used to modify the alpha channel of the paint when drawing.
-   */
-  std::shared_ptr<MaskFilter> getMaskFilter() const {
-    return maskFilter;
-  }
-
-  /**
-   * Sets the mask filter used to modify the alpha channel of the paint when drawing.
-   */
-  void setMaskFilter(std::shared_ptr<MaskFilter> newMaskFilter) {
-    maskFilter = std::move(newMaskFilter);
-  }
-
-  /**
-   * Returns the color filter used to modify the color of the paint when drawing.
-   */
-  std::shared_ptr<ColorFilter> getColorFilter() const {
-    return colorFilter;
-  }
-
-  /**
-   * Sets the color filter used to modify the color of the paint when drawing.
-   */
-  void setColorFilter(std::shared_ptr<ColorFilter> newColorFilter) {
-    colorFilter = std::move(newColorFilter);
-  }
-
-  /**
    * Returns the image filter used to take the input drawings as an offscreen image and alter them
    * before drawing them back to the destination.
    */
@@ -241,17 +238,17 @@ class Paint {
   }
 
   /**
-   * Returns the blend mode used to combine the paint with the destination pixels.
+   * Returns whether the geometry is filled, stroked, or filled and stroked.
    */
-  BlendMode getBlendMode() const {
-    return blendMode;
+  PaintStyle getStyle() const {
+    return style;
   }
 
   /**
-   * Sets the blend mode used to combine the paint with the destination pixels.
+   * Sets whether the geometry is filled, stroked, or filled and stroked.
    */
-  void setBlendMode(BlendMode mode) {
-    blendMode = mode;
+  void setStyle(PaintStyle newStyle) {
+    style = newStyle;
   }
 
   /**
@@ -259,15 +256,16 @@ class Paint {
    */
   bool nothingToDraw() const;
 
+  /**
+   * Sets all Paint contents to their initial values. This is equivalent to replacing Paint with the
+   * result of Paint().
+   */
+  void reset();
+
  private:
-  bool antiAlias = true;
-  PaintStyle style = PaintStyle::Fill;
-  Color color = Color::White();
+  Fill fill = {};
   Stroke stroke = {};
-  std::shared_ptr<Shader> shader = nullptr;
-  std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  std::shared_ptr<ColorFilter> colorFilter = nullptr;
   std::shared_ptr<ImageFilter> imageFilter = nullptr;
-  BlendMode blendMode = BlendMode::SrcOver;
+  PaintStyle style = PaintStyle::Fill;
 };
 }  // namespace tgfx
