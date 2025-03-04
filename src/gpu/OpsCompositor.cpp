@@ -178,7 +178,7 @@ static bool CompareFill(const Fill& a, const Fill& b) {
 }
 
 bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill) const {
-  if (pendingType != type || pendingClip != clip || !CompareFill(pendingFill, fill)) {
+  if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill)) {
     return false;
   }
   if (pendingType == PendingOpType::RRect) {

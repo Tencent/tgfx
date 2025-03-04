@@ -93,26 +93,28 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
                                   const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(image->isAlphaOnly() || fill.shader == nullptr);
-  auto imageRect = rect;
-  auto imageState = state;
-  auto imageFill = fill;
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
+  }
+  auto samplingOptions = sampling;
+  if (samplingOptions.mipmapMode != MipmapMode::None && !state.matrix.hasNonIdentityScale()) {
+    // There is no scaling for the source image, so we can disable mipmaps to save memory.
+    samplingOptions.mipmapMode = MipmapMode::None;
+  }
   auto subsetImage = Caster::AsSubsetImage(image.get());
-  if (subsetImage != nullptr) {
+  if (subsetImage == nullptr) {
+    compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
+  } else {
     // Unwrap the subset image to maximize the merging of draw calls.
+    auto imageRect = rect;
+    auto imageState = state;
     auto& subset = subsetImage->bounds;
     imageRect.offset(subset.left, subset.top);
     imageState.matrix.preTranslate(-subset.left, -subset.top);
     auto offsetMatrix = Matrix::MakeTrans(subset.left, subset.top);
-    imageFill = fill.makeWithMatrix(offsetMatrix);
-    image = subsetImage->source;
-  }
-  auto options = sampling;
-  if (options.mipmapMode != MipmapMode::None && !imageState.matrix.hasNonIdentityScale()) {
-    // There is no scaling for the source image, so we can disable mipmaps to save memory.
-    options.mipmapMode = MipmapMode::None;
-  }
-  if (auto compositor = getOpsCompositor()) {
-    compositor->fillImage(std::move(image), imageRect, options, imageState, imageFill);
+    compositor->fillImage(subsetImage->source, imageRect, samplingOptions, imageState,
+                          fill.makeWithMatrix(offsetMatrix));
   }
 }
 
@@ -252,6 +254,9 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    if (surface) {
+      surface->contentChanged();
+    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
