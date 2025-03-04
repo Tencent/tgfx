@@ -22,7 +22,7 @@
 
 namespace tgfx {
 enum class RecordType {
-  DrawStyle,
+  DrawFill,
   DrawRect,
   DrawRRect,
   DrawShape,
@@ -48,26 +48,26 @@ class Record {
   MCState state;
 };
 
-class DrawStyle : public Record {
+class DrawFill : public Record {
  public:
-  DrawStyle(MCState state, FillStyle style) : Record(std::move(state)), style(std::move(style)) {
+  DrawFill(MCState state, Fill fill) : Record(std::move(state)), fill(std::move(fill)) {
   }
 
   RecordType type() const override {
-    return RecordType::DrawStyle;
+    return RecordType::DrawFill;
   }
 
   void playback(DrawContext* context) const override {
-    context->drawStyle(state, style);
+    context->drawFill(state, fill);
   }
 
-  FillStyle style;
+  Fill fill;
 };
 
 class DrawRect : public Record {
  public:
-  DrawRect(const Rect& rect, MCState state, FillStyle style)
-      : Record(std::move(state)), style(std::move(style)), rect(rect) {
+  DrawRect(const Rect& rect, MCState state, Fill fill)
+      : Record(std::move(state)), fill(std::move(fill)), rect(rect) {
   }
 
   RecordType type() const override {
@@ -75,17 +75,17 @@ class DrawRect : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawRect(rect, state, style);
+    context->drawRect(rect, state, fill);
   }
 
-  FillStyle style;
+  Fill fill;
   Rect rect;
 };
 
 class DrawRRect : public Record {
  public:
-  DrawRRect(const RRect& rRect, MCState state, FillStyle style)
-      : Record(std::move(state)), style(std::move(style)), rRect(rRect) {
+  DrawRRect(const RRect& rRect, MCState state, Fill fill)
+      : Record(std::move(state)), fill(std::move(fill)), rRect(rRect) {
   }
 
   RecordType type() const override {
@@ -93,17 +93,17 @@ class DrawRRect : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawRRect(rRect, state, style);
+    context->drawRRect(rRect, state, fill);
   }
 
-  FillStyle style;
+  Fill fill;
   RRect rRect;
 };
 
 class DrawShape : public Record {
  public:
-  DrawShape(std::shared_ptr<Shape> shape, MCState state, FillStyle style)
-      : Record(std::move(state)), style(std::move(style)), shape(std::move(shape)) {
+  DrawShape(std::shared_ptr<Shape> shape, MCState state, Fill fill)
+      : Record(std::move(state)), fill(std::move(fill)), shape(std::move(shape)) {
   }
 
   RecordType type() const override {
@@ -111,18 +111,17 @@ class DrawShape : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawShape(shape, state, style);
+    context->drawShape(shape, state, fill);
   }
 
-  FillStyle style;
+  Fill fill;
   std::shared_ptr<Shape> shape;
 };
 
 class DrawImage : public Record {
  public:
-  DrawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, MCState state,
-            FillStyle style)
-      : Record(std::move(state)), style(std::move(style)), image(std::move(image)),
+  DrawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, MCState state, Fill fill)
+      : Record(std::move(state)), fill(std::move(fill)), image(std::move(image)),
         sampling(sampling) {
   }
 
@@ -131,10 +130,10 @@ class DrawImage : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawImage(image, sampling, state, style);
+    context->drawImage(image, sampling, state, fill);
   }
 
-  FillStyle style;
+  Fill fill;
   std::shared_ptr<Image> image;
   SamplingOptions sampling;
 };
@@ -142,8 +141,8 @@ class DrawImage : public Record {
 class DrawImageRect : public DrawImage {
  public:
   DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                MCState state, FillStyle style)
-      : DrawImage(std::move(image), sampling, std::move(state), std::move(style)), rect(rect) {
+                MCState state, Fill fill)
+      : DrawImage(std::move(image), sampling, std::move(state), std::move(fill)), rect(rect) {
   }
 
   RecordType type() const override {
@@ -151,7 +150,7 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawImageRect(image, rect, sampling, state, style);
+    context->drawImageRect(image, rect, sampling, state, fill);
   }
 
   Rect rect;
@@ -159,8 +158,8 @@ class DrawImageRect : public DrawImage {
 
 class DrawGlyphRunList : public Record {
  public:
-  DrawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, MCState state, FillStyle style)
-      : Record(std::move(state)), style(std::move(style)), glyphRunList(std::move(glyphRunList)) {
+  DrawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, MCState state, Fill fill)
+      : Record(std::move(state)), fill(std::move(fill)), glyphRunList(std::move(glyphRunList)) {
   }
 
   RecordType type() const override {
@@ -168,18 +167,18 @@ class DrawGlyphRunList : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawGlyphRunList(glyphRunList, nullptr, state, style);
+    context->drawGlyphRunList(glyphRunList, nullptr, state, fill);
   }
 
-  FillStyle style;
+  Fill fill;
   std::shared_ptr<GlyphRunList> glyphRunList;
 };
 
 class StrokeGlyphRunList : public DrawGlyphRunList {
  public:
   StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke& stroke,
-                     MCState state, FillStyle style)
-      : DrawGlyphRunList(std::move(glyphRunList), std::move(state), std::move(style)),
+                     MCState state, Fill fill)
+      : DrawGlyphRunList(std::move(glyphRunList), std::move(state), std::move(fill)),
         stroke(stroke) {
   }
 
@@ -188,7 +187,7 @@ class StrokeGlyphRunList : public DrawGlyphRunList {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawGlyphRunList(glyphRunList, &stroke, state, style);
+    context->drawGlyphRunList(glyphRunList, &stroke, state, fill);
   }
 
   Stroke stroke;
@@ -214,8 +213,8 @@ class DrawPicture : public Record {
 class DrawLayer : public Record {
  public:
   DrawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter, MCState state,
-            FillStyle style)
-      : Record(std::move(state)), style(std::move(style)), picture(std::move(picture)),
+            Fill fill)
+      : Record(std::move(state)), fill(std::move(fill)), picture(std::move(picture)),
         filter(std::move(filter)) {
   }
 
@@ -224,10 +223,10 @@ class DrawLayer : public Record {
   }
 
   void playback(DrawContext* context) const override {
-    context->drawLayer(picture, filter, state, style);
+    context->drawLayer(picture, filter, state, fill);
   }
 
-  FillStyle style;
+  Fill fill;
   std::shared_ptr<Picture> picture;
   std::shared_ptr<ImageFilter> filter;
 };

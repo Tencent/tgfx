@@ -27,29 +27,28 @@ class MeasureContext : public DrawContext {
     return bounds;
   }
 
-  void drawStyle(const MCState& state, const FillStyle& style) override;
+  void drawFill(const MCState& state, const Fill& fill) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override;
+  void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                 const FillStyle& style) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const FillStyle& style) override;
+                 const MCState& state, const Fill& fill) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                      const SamplingOptions& sampling, const MCState& state,
-                     const FillStyle& style) override;
+                     const Fill& fill) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
-                        const MCState& state, const FillStyle& style) override;
+                        const MCState& state, const Fill& fill) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const FillStyle& style) override;
+                 const MCState& state, const Fill& fill) override;
 
  private:
   Rect bounds = Rect::MakeEmpty();

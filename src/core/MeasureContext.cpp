@@ -20,39 +20,37 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-void MeasureContext::drawStyle(const MCState& state, const FillStyle&) {
+void MeasureContext::drawFill(const MCState& state, const Fill&) {
   addDeviceBounds(state.clip, Rect::MakeEmpty(), true);
 }
 
-void MeasureContext::drawRect(const Rect& rect, const MCState& state, const FillStyle&) {
+void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill&) {
   addLocalBounds(state, rect);
 }
 
-void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle&) {
+void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill&) {
   addLocalBounds(state, rRect.rect);
 }
 
-void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const FillStyle&) {
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill&) {
   auto localBounds = shape->getBounds(state.matrix.getMaxScale());
   addLocalBounds(state, localBounds, shape->isInverseFillType());
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const FillStyle&) {
+                               const MCState& state, const Fill&) {
   DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
   addLocalBounds(state, rect);
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
-                                   const MCState& state, const FillStyle&) {
+                                   const MCState& state, const Fill&) {
   addLocalBounds(state, rect);
 }
 
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const Stroke* stroke, const MCState& state,
-                                      const FillStyle&) {
+                                      const Stroke* stroke, const MCState& state, const Fill&) {
   auto localBounds = glyphRunList->getBounds(state.matrix.getMaxScale());
   if (stroke) {
     stroke->applyToBounds(&localBounds);
@@ -62,7 +60,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
 
 void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                               const FillStyle&) {
+                               const Fill&) {
   DEBUG_ASSERT(picture != nullptr);
   auto deviceBounds = picture->getBounds(&state.matrix);
   if (imageFilter) {
