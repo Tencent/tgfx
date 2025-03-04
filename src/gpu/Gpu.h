@@ -24,10 +24,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class RenderPass;
-
 class RenderTarget;
-
 class Texture;
 
 class Gpu {
@@ -37,8 +34,6 @@ class Gpu {
   Context* getContext() {
     return context;
   }
-
-  virtual std::shared_ptr<RenderPass> getRenderPass() = 0;
 
   virtual std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                         int mipLevelCount) = 0;

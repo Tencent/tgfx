@@ -21,6 +21,7 @@
 #include "core/utils/MathExtra.h"
 #include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
+#include "gpu/ResourceProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
@@ -57,50 +58,6 @@ namespace tgfx {
 // For filled rrects that need to provide a distance vector we reuse the overstroke
 // geometry but make the inner rect degenerate (either a point or a horizontal or
 // vertical line).
-
-// clang-format off
-static const uint16_t gOverstrokeRRectIndices[] = {
-  // overstroke quads
-  // we place this at the beginning so that we can skip these indices when rendering normally
-  16, 17, 19, 16, 19, 18,
-  19, 17, 23, 19, 23, 21,
-  21, 23, 22, 21, 22, 20,
-  22, 16, 18, 22, 18, 20,
-
-  // corners
-  0, 1, 5, 0, 5, 4,
-  2, 3, 7, 2, 7, 6,
-  8, 9, 13, 8, 13, 12,
-  10, 11, 15, 10, 15, 14,
-
-  // edges
-  1, 2, 6, 1, 6, 5,
-  4, 5, 9, 4, 9, 8,
-  6, 7, 11, 6, 11, 10,
-  9, 10, 14, 9, 14, 13,
-
-  // center
-  // we place this at the end so that we can ignore these indices when not rendering as filled
-  5, 6, 10, 5, 10, 9,
-};
-// clang-format on
-
-static constexpr int kOverstrokeIndicesCount = 6 * 4;
-static constexpr int kCornerIndicesCount = 6 * 4;
-static constexpr int kEdgeIndicesCount = 6 * 4;
-static constexpr int kCenterIndicesCount = 6;
-
-// fill and standard stroke indices skip the overstroke "ring"
-static const uint16_t* gStandardRRectIndices = gOverstrokeRRectIndices + kOverstrokeIndicesCount;
-
-// overstroke count is arraysize minus the center indices
-// static constexpr int kIndicesPerOverstrokeRRect =
-//    kOverstrokeIndicesCount + kCornerIndicesCount + kEdgeIndicesCount;
-// fill count skips overstroke indices and includes center
-static constexpr size_t kIndicesPerFillRRect =
-    kCornerIndicesCount + kEdgeIndicesCount + kCenterIndicesCount;
-// stroke count is fill count minus center indices
-// static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
 void WriteColor(float* vertices, int& index, const Color& color) {
   vertices[index++] = color.red;
@@ -231,29 +188,6 @@ class RRectVerticesProvider : public DataSource<Data> {
   bool useScale = false;
 };
 
-class RRectIndicesProvider : public DataSource<Data> {
- public:
-  explicit RRectIndicesProvider(size_t rectSize) : rectSize(rectSize) {
-  }
-
-  std::shared_ptr<Data> getData() const override {
-    auto bufferSize = rectSize * kIndicesPerFillRRect * sizeof(uint16_t);
-    Buffer buffer(bufferSize);
-    auto indices = reinterpret_cast<uint16_t*>(buffer.data());
-    int index = 0;
-    for (size_t i = 0; i < rectSize; ++i) {
-      auto offset = static_cast<uint16_t>(i * 16);
-      for (size_t j = 0; j < kIndicesPerFillRRect; ++j) {
-        indices[index++] = gStandardRRectIndices[j] + offset;
-      }
-    }
-    return buffer.release();
-  }
-
- private:
-  size_t rectSize = 0;
-};
-
 static bool UseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
@@ -265,9 +199,7 @@ std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = std::unique_ptr<RRectDrawOp>(new RRectDrawOp(aaType, rects.size()));
-  auto indexProvider = std::make_unique<RRectIndicesProvider>(rects.size());
-  drawOp->indexBufferProxy =
-      GpuBufferProxy::MakeFrom(context, std::move(indexProvider), BufferType::Index, renderFlags);
+  drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer();
   auto useScale = UseScale(context);
   auto vertexProvider = std::make_unique<RRectVerticesProvider>(rects, aaType, useScale);
   if (rects.size() > 1) {
@@ -310,6 +242,7 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   } else {
     renderPass->bindBuffers(indexBuffer, vertexData);
   }
-  renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * kIndicesPerFillRRect);
+  auto numIndicesPerRRect = ResourceProvider::NumIndicesPerRRect();
+  renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }
 }  // namespace tgfx

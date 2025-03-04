@@ -26,8 +26,6 @@ class GLGpu : public Gpu {
  public:
   static std::unique_ptr<Gpu> Make(Context* context);
 
-  std::shared_ptr<RenderPass> getRenderPass() override;
-
   std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                 int mipLevelCount) override;
 
@@ -52,8 +50,6 @@ class GLGpu : public Gpu {
   bool submitToGpu(bool syncCpu) override;
 
  private:
-  std::shared_ptr<RenderPass> renderPass = nullptr;
-
   explicit GLGpu(Context* context) : Gpu(context) {
   }
 };

@@ -29,7 +29,7 @@ class OpsRenderTask : public RenderTask {
       : RenderTask(std::move(renderTargetProxy)), ops(std::move(ops)) {
   }
 
-  bool execute(Gpu* gpu) override;
+  bool execute(RenderPass* renderPass) override;
 
  private:
   std::vector<std::unique_ptr<Op>> ops = {};
