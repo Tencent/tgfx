@@ -21,16 +21,13 @@
 namespace tgfx {
 
 std::shared_ptr<GLDevice> GLDevice::Current() {
-  auto context = wglGetCurrentContext();
-  auto glDevice = GLDevice::Get(context);
+  auto glContext = wglGetCurrentContext();
+  auto glDevice = GLDevice::Get(glContext);
   if (glDevice != nullptr) {
     return std::static_pointer_cast<WGLDevice>(glDevice);
   }
-  return WGLDevice::Wrap(nullptr, nullptr, true);
-}
-
-std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND hWnd, HGLRC sharedContext) {
-  return WGLDevice::Wrap(hWnd, sharedContext, false);
+  HDC deviceContext = wglGetCurrentDC();
+  return WGLDevice::Wrap(nullptr, deviceContext, glContext, nullptr, true);
 }
 
 WGLDevice::WGLDevice(HGLRC nativeHandle) : GLDevice(nativeHandle) {

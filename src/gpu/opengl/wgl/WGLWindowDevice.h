@@ -26,7 +26,7 @@ class WGLWindowDevice final : public WGLDevice {
   ~WGLWindowDevice() override;
 
  private:
-  HWND hWnd = nullptr;
+  HWND nativeWindow = nullptr;
 
   explicit WGLWindowDevice(HGLRC nativeHandle);
 

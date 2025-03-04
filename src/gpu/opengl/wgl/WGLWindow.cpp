@@ -21,17 +21,17 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND hWnd, HGLRC sharedContext) {
-  if (hWnd == nullptr) {
+std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext) {
+  if (nativeWindow == nullptr) {
     return nullptr;
   }
 
-  auto device = WGLDevice::MakeFrom(hWnd, sharedContext);
+  auto device = WGLDevice::MakeFrom(nativeWindow, sharedContext);
   if (device == nullptr) {
     return nullptr;
   }
   auto wglWindow = std::shared_ptr<WGLWindow>(new WGLWindow(device));
-  wglWindow->nativeWindow = hWnd;
+  wglWindow->nativeWindow = nativeWindow;
   return wglWindow;
 }
 
@@ -55,9 +55,9 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void WGLWindow::onPresent(Context* context, int64_t presentationTime) {
-  auto device = std::static_pointer_cast<WGLDevice>(this->device);
-  SwapBuffers(device->deviceContext);
+void WGLWindow::onPresent(Context*, int64_t) {
+  const auto wglDevice = std::static_pointer_cast<WGLDevice>(this->device);
+  SwapBuffers(wglDevice->deviceContext);
 }
 
 }  // namespace tgfx

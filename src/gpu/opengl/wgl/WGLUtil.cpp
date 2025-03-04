@@ -56,20 +56,20 @@ static HWND CreateTempWindow() {
   DWORD exStyle = WS_EX_CLIENTEDGE;
 
   AdjustWindowRectEx(&windowRect, style, false, exStyle);
-  HWND hWnd = CreateWindowEx(exStyle, TEMP_CLASS, STR_LIT("PlaceholderWindows"),
-                             WS_CLIPCHILDREN | WS_CLIPSIBLINGS | style, 0, 0,
-                             windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
-                             nullptr, nullptr, instance, nullptr);
-  if (hWnd == nullptr) {
+  HWND nativeWindow = CreateWindowEx(
+      exStyle, TEMP_CLASS, STR_LIT("PlaceholderWindows"), WS_CLIPCHILDREN | WS_CLIPSIBLINGS | style,
+      0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, nullptr,
+      nullptr, instance, nullptr);
+  if (nativeWindow == nullptr) {
     UnregisterClass(TEMP_CLASS, instance);
     return nullptr;
   }
-  ShowWindow(hWnd, SW_HIDE);
-  return hWnd;
+  ShowWindow(nativeWindow, SW_HIDE);
+  return nativeWindow;
 }
 
-static void DestroyTempWindow(HWND hWnd) {
-  DestroyWindow(hWnd);
+static void DestroyTempWindow(HWND nativeWindow) {
+  DestroyWindow(nativeWindow);
   HINSTANCE instance = GetModuleHandle(nullptr);
   UnregisterClass(TEMP_CLASS, instance);
 }
@@ -135,9 +135,9 @@ static void InitialiseWGL() {
   descriptor.cStencilBits = 8;
   descriptor.iLayerType = PFD_MAIN_PLANE;
 
-  HWND hWnd = CreateTempWindow();
-  if (hWnd) {
-    HDC deviceContet = GetDC(hWnd);
+  HWND nativeWindow = CreateTempWindow();
+  if (nativeWindow) {
+    HDC deviceContet = GetDC(nativeWindow);
     int format = ChoosePixelFormat(deviceContet, &descriptor);
     SetPixelFormat(deviceContet, format, &descriptor);
     HGLRC glContext = wglCreateContext(deviceContet);
@@ -152,43 +152,50 @@ static void InitialiseWGL() {
     initialiseExtensions(deviceContet);
     wglMakeCurrent(deviceContet, nullptr);
     wglDeleteContext(glContext);
-    DestroyTempWindow(hWnd);
+    DestroyTempWindow(nativeWindow);
   }
   wglMakeCurrent(oldDeviceContext, oldGLContext);
 }
 
-class GlobalInitializer {
- public:
-  GlobalInitializer() {
-    InitialiseWGL();
+static std::atomic<const WGLExtensions*> globalExtensions = {nullptr};
+const WGLExtensions* WGLExtensions::Get() {
+  auto extensions = globalExtensions.load(std::memory_order_relaxed);
+  if (!extensions) {
+    static WGLExtensions instance;
+    extensions = &instance;
   }
-};
-static GlobalInitializer globalInitializer;
+  return extensions;
+}
 
-bool HasExtension(const char* ext) {
+WGLExtensions::WGLExtensions() {
+  InitialiseWGL();
+}
+
+bool WGLExtensions::hasExtension(const char* ext) const {
   return ExtensionList.find(ext) != ExtensionList.end();
 }
 
-BOOL ChoosePixelFormat(HDC deviceContext, const int* attribIList, const FLOAT* attribFList,
-                       UINT maxFormats, int* formats, UINT* numFormats) {
+BOOL WGLExtensions::choosePixelFormat(HDC deviceContext, const int* attribIList,
+                                      const FLOAT* attribFList, UINT maxFormats, int* formats,
+                                      UINT* numFormats) const {
   return wglChoosePixelFormat(deviceContext, attribIList, attribFList, maxFormats, formats,
                               numFormats);
 }
 
-HPBUFFER CreatePbuffer(HDC deviceContext, int pixelFormat, int width, int height,
-                       const int* attribList) {
+HPBUFFER WGLExtensions::createPbuffer(HDC deviceContext, int pixelFormat, int width, int height,
+                                      const int* attribList) const {
   return wglCreatePbuffer(deviceContext, pixelFormat, width, height, attribList);
 }
 
-HDC GetPbufferDC(HPBUFFER hPbuffer) {
+HDC WGLExtensions::getPbufferDC(HPBUFFER hPbuffer) const {
   return wglGetPbufferDC(hPbuffer);
 }
 
-int ReleasePbufferDC(HPBUFFER hPbuffer, HDC deviceContext) {
+int WGLExtensions::releasePbufferDC(HPBUFFER hPbuffer, HDC deviceContext) const {
   return wglReleasePbufferDC(hPbuffer, deviceContext);
 }
 
-BOOL DestroyPbuffer(HPBUFFER hPbuffer) {
+BOOL WGLExtensions::destroyPbuffer(HPBUFFER hPbuffer) const {
   return wglDestroyPbuffer(hPbuffer);
 }
 
@@ -213,7 +220,9 @@ void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
   int* format = formatsToTry[0] ? &formatsToTry[0] : &formatsToTry[1];
   unsigned numFormats;
   constexpr float fAttributes[] = {0, 0};
-  wglChoosePixelFormat(deviceContext, iAttributes.data(), fAttributes, 1, format, &numFormats);
+  auto* extensions = WGLExtensions::Get();
+  extensions->choosePixelFormat(deviceContext, iAttributes.data(), fAttributes, 1, format,
+                                &numFormats);
 }
 
 HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {

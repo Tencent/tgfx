@@ -21,7 +21,8 @@
 
 namespace tgfx {
 static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {
-  if (!HasExtension("WGL_ARB_pixel_format")) {
+  auto* extensions = WGLExtensions::Get();
+  if (!extensions->hasExtension("WGL_ARB_pixel_format")) {
     return nullptr;
   }
   bool set = false;
@@ -39,17 +40,17 @@ static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {
   return CreateGLContext(deviceContext, sharedContext);
 }
 
-std::shared_ptr<WGLDevice> WGLDevice::Wrap(HWND hWnd, HGLRC sharedContext, bool externallyOwned) {
-  HDC deviceContext = nullptr;
-  HGLRC glContext = nullptr;
-  if (hWnd != nullptr) {
-    deviceContext = GetDC(hWnd);
-    glContext = CreateWGLContext(deviceContext, sharedContext);
-  } else {
-    deviceContext = wglGetCurrentDC();
-    glContext = wglGetCurrentContext();
+std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedContext) {
+  if (nativeWindow == nullptr) {
+    return nullptr;
   }
+  HDC deviceContext = GetDC(nativeWindow);
+  HGLRC glContext = CreateWGLContext(deviceContext, sharedContext);
+  return WGLDevice::Wrap(nativeWindow, deviceContext, glContext, sharedContext, false);
+}
 
+std::shared_ptr<WGLDevice> WGLDevice::Wrap(HWND nativeWindow, HDC deviceContext, HGLRC glContext,
+                                           HGLRC sharedContext, bool externallyOwned) {
   auto glDevice = GLDevice::Get(glContext);
   if (glDevice != nullptr) {
     return std::static_pointer_cast<WGLDevice>(glDevice);
@@ -71,10 +72,13 @@ std::shared_ptr<WGLDevice> WGLDevice::Wrap(HWND hWnd, HGLRC sharedContext, bool 
   device->deviceContext = deviceContext;
   device->glContext = glContext;
   device->sharedContext = sharedContext;
-  device->hWnd = hWnd;
+  device->nativeWindow = nativeWindow;
   device->weakThis = device;
   if (oldGLContext != glContext) {
-    wglMakeCurrent(oldDeviceContext, oldGLContext);
+    wglMakeCurrent(deviceContext, nullptr);
+    if (oldDeviceContext) {
+      wglMakeCurrent(oldDeviceContext, oldGLContext);
+    }
   }
   return device;
 }
@@ -84,7 +88,7 @@ WGLWindowDevice::WGLWindowDevice(HGLRC nativeHandle) : WGLDevice(nativeHandle) {
 
 WGLWindowDevice::~WGLWindowDevice() {
   releaseAll();
-  if (externallyOwned || hWnd == nullptr) {
+  if (externallyOwned || nativeWindow == nullptr) {
     return;
   }
   if (glContext != nullptr) {
@@ -93,10 +97,10 @@ WGLWindowDevice::~WGLWindowDevice() {
   }
 
   if (deviceContext != nullptr) {
-    ReleaseDC(hWnd, deviceContext);
+    ReleaseDC(nativeWindow, deviceContext);
     deviceContext = nullptr;
   }
-  hWnd = nullptr;
+  nativeWindow = nullptr;
 }
 
 }  // namespace tgfx

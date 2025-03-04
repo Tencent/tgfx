@@ -56,7 +56,9 @@ static HWND CreateParentWindow() {
 
 bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, HPBUFFER& pBuffer,
                           HDC& deviceContext, HGLRC& glContext) {
-  if (!HasExtension("WGL_ARB_pixel_format") || !HasExtension("WGL_ARB_pbuffer")) {
+  auto* extensions = WGLExtensions::Get();
+  if (!extensions->hasExtension("WGL_ARB_pixel_format") ||
+      !extensions->hasExtension("WGL_ARB_pbuffer")) {
     return false;
   }
 
@@ -72,18 +74,18 @@ bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, HPBUFFER
     return false;
   }
 
-  pBuffer = CreatePbuffer(parentDeviceContext, pixelFormat, 1, 1, nullptr);
+  pBuffer = extensions->createPbuffer(parentDeviceContext, pixelFormat, 1, 1, nullptr);
   if (pBuffer != nullptr) {
-    deviceContext = GetPbufferDC(pBuffer);
+    deviceContext = extensions->getPbufferDC(pBuffer);
     if (deviceContext != nullptr) {
       glContext = CreateGLContext(deviceContext, sharedContext);
       if (glContext != nullptr) {
         return true;
       }
-      ReleasePbufferDC(pBuffer, deviceContext);
+      extensions->releasePbufferDC(pBuffer, deviceContext);
       deviceContext = nullptr;
     }
-    DestroyPbuffer(pBuffer);
+    extensions->destroyPbuffer(pBuffer);
     pBuffer = nullptr;
   }
   return false;
@@ -146,9 +148,10 @@ WGLPbufferDevice::~WGLPbufferDevice() {
     glContext = nullptr;
   }
 
+  auto* extensions = WGLExtensions::Get();
   if (deviceContext != nullptr) {
-    ReleasePbufferDC(pBuffer, deviceContext);
-    DestroyPbuffer(pBuffer);
+    extensions->releasePbufferDC(pBuffer, deviceContext);
+    extensions->destroyPbuffer(pBuffer);
     deviceContext = nullptr;
   }
   pBuffer = nullptr;

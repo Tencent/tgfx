@@ -22,15 +22,12 @@
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
-class WGLContext;
 class WGLDevice : public GLDevice {
  public:
   /**
    * Creates a WGLDevice with the existing HWND and HGLRC
    */
-  static std::shared_ptr<WGLDevice> MakeFrom(HWND hWnd, HGLRC sharedContext);
-
-  ~WGLDevice() override = default;
+  static std::shared_ptr<WGLDevice> MakeFrom(HWND nativeWindow, HGLRC sharedContext);
 
   bool sharableWith(void* nativeConext) const override;
 
@@ -48,7 +45,8 @@ class WGLDevice : public GLDevice {
 
   explicit WGLDevice(HGLRC nativeHandle);
 
-  static std::shared_ptr<WGLDevice> Wrap(HWND hWnd, HGLRC sharedContext, bool externallyOwned);
+  static std::shared_ptr<WGLDevice> Wrap(HWND nativeWindow, HDC deviceContext, HGLRC glContext,
+                                         HGLRC sharedContext, bool externallyOwned);
 
   friend class GLDevice;
   friend class WGLWindow;

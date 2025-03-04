@@ -300,7 +300,7 @@ If you prefer using Visual Studio IDE, open the `x64 Native Tools Command Prompt
 run the following command in the `win/` directory:
 
 ```
-cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_CONFIGURATION_TYPES="Debug" -DCMAKE_BUILD_TYPE=Debug -B ./Debug-x64
+cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_CONFIGURATION_TYPES="Debug" -B ./Debug-x64
 ```
 
 This will generate a project for the `x64` architecture with the `Debug` configuration. To generate 

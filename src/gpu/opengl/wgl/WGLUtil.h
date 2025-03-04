@@ -22,21 +22,33 @@
 
 namespace tgfx {
 DECLARE_HANDLE(HPBUFFER);
-/**
- * Determines if an extension is available. it is necessary
- * to check this before calling other class functions.
- */
-bool HasExtension(const char* ext);
 
-BOOL ChoosePixelFormat(HDC, const int*, const FLOAT*, UINT, int*, UINT*);
+class WGLExtensions {
+ public:
+  /**
+   * Returns the static WGLExtensions instance
+   */
+  static const WGLExtensions* Get();
 
-HPBUFFER CreatePbuffer(HDC, int, int, int, const int*);
+  /**
+   * Determines if an extension is available. it is necessary
+   * to check this before calling other class functions.
+   */
+  bool hasExtension(const char* ext) const;
 
-HDC GetPbufferDC(HPBUFFER);
+  BOOL choosePixelFormat(HDC, const int*, const FLOAT*, UINT, int*, UINT*) const;
 
-int ReleasePbufferDC(HPBUFFER, HDC);
+  HPBUFFER createPbuffer(HDC, int, int, int, const int*) const;
 
-BOOL DestroyPbuffer(HPBUFFER);
+  HDC getPbufferDC(HPBUFFER) const;
+
+  int releasePbufferDC(HPBUFFER, HDC) const;
+
+  BOOL destroyPbuffer(HPBUFFER) const;
+
+ private:
+  explicit WGLExtensions();
+};
 
 void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
 
