@@ -28,7 +28,7 @@
 #include <memory>
 #include <string>
 #include "drawers/Drawer.h"
-#include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 
 namespace hello2d {
 class TGFXWindow {
@@ -41,7 +41,7 @@ class TGFXWindow {
  private:
   HWND windowHandle = nullptr;
   int lastDrawIndex = 0;
-  std::shared_ptr<tgfx::EGLWindow> tgfxWindow = nullptr;
+  std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<drawers::AppHost> appHost = nullptr;
 
   static WNDCLASS RegisterWindowClass();

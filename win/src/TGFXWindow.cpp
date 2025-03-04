@@ -200,7 +200,7 @@ void TGFXWindow::createAppHost() {
 
 void TGFXWindow::draw() {
   if (!tgfxWindow) {
-    tgfxWindow = tgfx::EGLWindow::MakeFrom(windowHandle);
+    tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
   }
   if (tgfxWindow == nullptr) {
     return;
