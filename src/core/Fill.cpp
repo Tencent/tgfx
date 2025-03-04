@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillStyle.h"
+#include "tgfx/core/Fill.h"
 #include "core/utils/Caster.h"
 #include "gpu/Blend.h"
 
@@ -35,11 +35,11 @@ static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
   return OpacityType::Unknown;
 }
 
-bool FillStyle::hasOnlyColor() const {
+bool Fill::hasOnlyColor() const {
   return !shader && !maskFilter && !colorFilter;
 }
 
-bool FillStyle::isOpaque() const {
+bool Fill::isOpaque() const {
   if (maskFilter) {
     return false;
   }
@@ -49,43 +49,43 @@ bool FillStyle::isOpaque() const {
   return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
 }
 
-bool FillStyle::isEqual(const FillStyle& style, bool ignoreColor) const {
-  if (antiAlias != style.antiAlias || blendMode != style.blendMode ||
-      (!ignoreColor && color != style.color)) {
+bool Fill::isEqual(const Fill& fill, bool ignoreColor) const {
+  if (antiAlias != fill.antiAlias || blendMode != fill.blendMode ||
+      (!ignoreColor && color != fill.color)) {
     return false;
   }
   if (shader) {
-    if (!style.shader || !Caster::Compare(shader.get(), style.shader.get())) {
+    if (!fill.shader || !Caster::Compare(shader.get(), fill.shader.get())) {
       return false;
     }
-  } else if (style.shader) {
+  } else if (fill.shader) {
     return false;
   }
   if (maskFilter) {
-    if (!style.maskFilter || !Caster::Compare(maskFilter.get(), style.maskFilter.get())) {
+    if (!fill.maskFilter || !Caster::Compare(maskFilter.get(), fill.maskFilter.get())) {
       return false;
     }
-  } else if (style.maskFilter) {
+  } else if (fill.maskFilter) {
     return false;
   }
   if (colorFilter) {
-    if (!style.colorFilter || !Caster::Compare(colorFilter.get(), style.colorFilter.get())) {
+    if (!fill.colorFilter || !Caster::Compare(colorFilter.get(), fill.colorFilter.get())) {
       return false;
     }
-  } else if (style.colorFilter) {
+  } else if (fill.colorFilter) {
     return false;
   }
   return true;
 }
 
-FillStyle FillStyle::makeWithMatrix(const Matrix& matrix) const {
-  auto fillStyle = *this;
-  if (fillStyle.shader) {
-    fillStyle.shader = fillStyle.shader->makeWithMatrix(matrix);
+Fill Fill::makeWithMatrix(const Matrix& matrix) const {
+  auto fill = *this;
+  if (fill.shader) {
+    fill.shader = fill.shader->makeWithMatrix(matrix);
   }
-  if (fillStyle.maskFilter) {
-    fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(matrix);
+  if (fill.maskFilter) {
+    fill.maskFilter = fill.maskFilter->makeWithMatrix(matrix);
   }
-  return fillStyle;
+  return fill;
 }
 }  // namespace tgfx

@@ -81,11 +81,11 @@ void ShapeLayer::removeFillStyles() {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fill) {
-  if (fill == nullptr) {
+void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+  if (fillStyle == nullptr) {
     removeFillStyles();
   } else {
-    setFillStyles({std::move(fill)});
+    setFillStyles({std::move(fillStyle)});
   }
 }
 

@@ -25,25 +25,37 @@
 
 namespace tgfx {
 /**
- * FillStyle specifies how the geometry of a drawing operation is filled.
+ * Fill specifies how the geometry of a drawing operation is filled.
  */
-class FillStyle {
+class Fill {
  public:
-  FillStyle() = default;
+  /**
+   * Constructs a Fill with default values.
+   */
+  Fill() = default;
 
-  FillStyle(const Color& color, BlendMode blendMode) : color(color), blendMode(blendMode) {
+  /**
+   * Constructs a Fill with the specified color, blend mode, and antialiasing.
+   */
+  Fill(const Color& color, BlendMode blendMode, bool antiAlias = true)
+      : color(color), blendMode(blendMode), antiAlias(antiAlias) {
   }
+
+  /**
+   * The input color, unpremultiplied, as four floating point values.
+   */
+  Color color = Color::White();
+
+  /**
+   * The blend mode used to combine the fill with the destination pixels.
+   */
+  BlendMode blendMode = BlendMode::SrcOver;
 
   /**
    * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
    * default value is true.
    */
   bool antiAlias = true;
-
-  /**
-   * The input color, unpremultiplied, as four floating point values.
-   */
-  Color color = Color::White();
 
   /**
    * Optional colors used when filling a geometry if set, such as a gradient.
@@ -61,29 +73,24 @@ class FillStyle {
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
 
   /**
-   * The blend mode used to combine the fill with the destination pixels.
-   */
-  BlendMode blendMode = BlendMode::SrcOver;
-
-  /**
-   * Returns true if the FillStyle contains only a color and no shader, mask filter, or color filter.
+   * Returns true if the Fill contains only a color and no shader, mask filter, or color filter.
    */
   bool hasOnlyColor() const;
 
   /**
-   * Returns true if the FillStyle is guaranteed to produce only opaque colors.
+   * Returns true if the Fill is guaranteed to produce only opaque colors.
    */
   bool isOpaque() const;
 
   /**
-   * Returns true if the FillStyle is equal to the given style. If ignoreColor is true, the color
+   * Returns true if the Fill is equal to the given style. If ignoreColor is true, the color
    * is not compared.
    */
-  bool isEqual(const FillStyle& style, bool ignoreColor = false) const;
+  bool isEqual(const Fill& fill, bool ignoreColor = false) const;
 
   /**
-   * Returns a new FillStyle applying the given matrix to the shader and mask filter.
+   * Returns a new Fill applying the given matrix to the shader and mask filter.
    */
-  FillStyle makeWithMatrix(const Matrix& matrix) const;
+  Fill makeWithMatrix(const Matrix& matrix) const;
 };
 }  // namespace tgfx
