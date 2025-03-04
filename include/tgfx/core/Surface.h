@@ -194,6 +194,7 @@ class Surface {
           bool clearAll = false);
 
   bool aboutToDraw(bool discardContent = false);
+  void contentChanged();
 
   void forceResolveRenderTarget();
 
