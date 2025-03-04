@@ -23,12 +23,12 @@
 #include "ElementWriter.h"
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
-#include "core/FillStyle.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
@@ -70,18 +70,18 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
   }
 }
 
-void SVGExportContext::drawStyle(const MCState& state, const FillStyle& style) {
-  auto fillStyle = style;
-  if (fillStyle.shader) {
-    fillStyle.shader = fillStyle.shader->makeWithMatrix(state.matrix);
+void SVGExportContext::drawFill(const MCState& state, const Fill& fill) {
+  auto newFill = fill;
+  if (newFill.shader) {
+    newFill.shader = newFill.shader->makeWithMatrix(state.matrix);
   }
-  if (fillStyle.maskFilter) {
-    fillStyle.maskFilter = fillStyle.maskFilter->makeWithMatrix(state.matrix);
+  if (newFill.maskFilter) {
+    newFill.maskFilter = newFill.maskFilter->makeWithMatrix(state.matrix);
   }
-  drawRect(viewBox, MCState{state.clip}, fillStyle);
+  drawRect(viewBox, MCState{state.clip}, newFill);
 }
 
-void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& fill) {
+void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
 
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(fill)) {
@@ -105,8 +105,7 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
   }
 }
 
-void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state,
-                                 const FillStyle& fill) {
+void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill) {
   applyClipPath(state.clip);
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
@@ -127,11 +126,11 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state,
 }
 
 void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const FillStyle& style) {
+                                 const Fill& fill) {
   applyClipPath(state.clip);
   auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, style);
+                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncoding());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -139,15 +138,15 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const FillStyle& style) {
+                                 const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, style);
+  return drawImageRect(std::move(image), rect, sampling, state, fill);
 }
 
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions&, const MCState& state,
-                                     const FillStyle& style) {
+                                     const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   Bitmap bitmap = ImageExportToBitmap(context, image);
   if (!bitmap.isEmpty()) {
@@ -162,12 +161,11 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
     newState.matrix.postScale(scaleX, scaleY);
     newState.matrix.postTranslate(transX, transY);
 
-    exportPixmap(Pixmap(bitmap), newState, style);
+    exportPixmap(Pixmap(bitmap), newState, fill);
   }
 }
 
-void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
-                                    const FillStyle& style) {
+void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state, const Fill& fill) {
   auto dataUri = AsDataUri(pixmap);
   if (!dataUri) {
     return;
@@ -187,14 +185,14 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
   {
     applyClipPath(state.clip);
     ElementWriter imageUse("use", context, this, writer.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::ConvertTextToPaths, state, style);
+                           exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
 
 void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                        const Stroke* stroke, const MCState& state,
-                                        const FillStyle& style) {
+                                        const MCState& state, const Fill& fill,
+                                        const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   bool hasFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
 
@@ -204,26 +202,26 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
   if (hasFont) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
         exportFlags & SVGExportFlags::ConvertTextToPaths) {
-      exportGlyphsAsPath(glyphRunList, state, style, stroke);
+      exportGlyphsAsPath(glyphRunList, state, fill, stroke);
     } else {
-      exportGlyphsAsText(glyphRunList, state, style, stroke);
+      exportGlyphsAsText(glyphRunList, state, fill, stroke);
     }
   } else {
     if (glyphRunList->hasColor()) {
-      exportGlyphsAsImage(glyphRunList, state, style);
+      exportGlyphsAsImage(glyphRunList, state, fill);
     } else {
-      exportGlyphsAsPath(glyphRunList, state, style, stroke);
+      exportGlyphsAsPath(glyphRunList, state, fill, stroke);
     }
   }
 }
 
 void SVGExportContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& glyphRunList,
-                                          const MCState& state, const FillStyle& style,
+                                          const MCState& state, const Fill& fill,
                                           const Stroke* stroke) {
   Path path;
   if (glyphRunList->getPath(&path)) {
     ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, style,
+                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill,
                               stroke);
     pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncoding());
     if (path.getFillType() == PathFillType::EvenOdd) {
@@ -233,11 +231,11 @@ void SVGExportContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& g
 }
 
 void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& glyphRunList,
-                                          const MCState& state, const FillStyle& style,
+                                          const MCState& state, const Fill& fill,
                                           const Stroke* stroke) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     ElementWriter textElement("text", context, this, writer.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, style,
+                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill,
                               stroke);
 
     Font font;
@@ -253,7 +251,7 @@ void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& g
 }
 
 void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList,
-                                           const MCState& state, const FillStyle& style) {
+                                           const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
   if (scale <= 0) {
@@ -280,7 +278,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill);
     }
   }
 }
@@ -292,7 +290,7 @@ void SVGExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCSta
 
 void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                                 const FillStyle&) {
+                                 const Fill&) {
   DEBUG_ASSERT(picture != nullptr);
   Resources resources;
   if (imageFilter) {
@@ -310,7 +308,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   }
 }
 
-bool SVGExportContext::RequiresViewportReset(const FillStyle& fill) {
+bool SVGExportContext::RequiresViewportReset(const Fill& fill) {
   auto shader = fill.shader;
   if (!shader) {
     return false;

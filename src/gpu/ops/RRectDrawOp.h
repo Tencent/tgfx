@@ -35,6 +35,11 @@ struct RRectPaint {
 class RRectDrawOp : public DrawOp {
  public:
   /**
+   * The maximum number of round rects that can be drawn in a single draw call.
+   */
+  static constexpr uint16_t MaxNumRRects = 512;
+
+  /**
    * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
    * the device space.
    */

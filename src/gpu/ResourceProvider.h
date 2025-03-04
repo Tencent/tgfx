@@ -36,19 +36,13 @@ class ResourceProvider {
 
   std::shared_ptr<GpuBufferProxy> nonAAQuadIndexBuffer();
 
-  static uint16_t MaxNumNonAAQuads();
-
   static uint16_t NumIndicesPerNonAAQuad();
 
   std::shared_ptr<GpuBufferProxy> aaQuadIndexBuffer();
 
-  static uint16_t MaxNumAAQuads();
-
   static uint16_t NumIndicesPerAAQuad();
 
   std::shared_ptr<GpuBufferProxy> rRectIndexBuffer();
-
-  static uint16_t MaxNumRRects();
 
   static uint16_t NumIndicesPerRRect();
 

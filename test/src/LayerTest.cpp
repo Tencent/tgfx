@@ -1126,27 +1126,36 @@ TGFX_TEST(LayerTest, ContentVersion) {
   shapeLayer->setPath(path);
   shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0)));
   displayList.root()->addChild(shapeLayer);
+  context->flush();
   auto contentVersion = surface->contentVersion();
   displayList.render(surface.get());
+  context->flush();
   EXPECT_NE(surface->contentVersion(), contentVersion);
   contentVersion = surface->contentVersion();
   displayList.render(surface.get());
+  context->flush();
   EXPECT_EQ(surface->contentVersion(), contentVersion);
   displayList.render(surface.get(), false);
+  context->flush();
   EXPECT_NE(surface->contentVersion(), contentVersion);
   contentVersion = surface->contentVersion();
   surface->getCanvas()->clear();
+  context->flush();
   EXPECT_NE(surface->contentVersion(), contentVersion);
   contentVersion = surface->contentVersion();
   displayList.render(surface.get());
+  context->flush();
   EXPECT_NE(surface->contentVersion(), contentVersion);
   contentVersion = surface->contentVersion();
 
   auto surface2 = Surface::Make(context, 100, 100);
+  context->flush();
   EXPECT_EQ(surface2->contentVersion(), 1u);
   displayList.render(surface2.get());
+  context->flush();
   EXPECT_NE(surface2->contentVersion(), 1u);
   displayList.render(surface.get());
+  context->flush();
   EXPECT_NE(surface->contentVersion(), contentVersion);
 }
 

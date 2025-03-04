@@ -94,13 +94,13 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     return nullptr;
   }
   auto imageRecord = static_cast<const DrawImage*>(record);
-  auto& style = imageRecord->style;
-  if (style.maskFilter || style.colorFilter) {
+  auto& fill = imageRecord->fill;
+  if (fill.maskFilter || fill.colorFilter) {
     return nullptr;
   }
   auto image = imageRecord->image;
   if (image->isAlphaOnly()) {
-    if (style.shader || style.color != Color::White()) {
+    if (fill.shader || fill.color != Color::White()) {
       return nullptr;
     }
   }
