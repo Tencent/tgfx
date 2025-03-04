@@ -19,20 +19,15 @@
 #pragma once
 
 #include "ResourceTask.h"
+#include "core/DataSource.h"
 #include "core/ShapeBuffer.h"
 
 namespace tgfx {
-class ShapeBufferProvider {
- public:
-  virtual ~ShapeBufferProvider() = default;
-
-  virtual std::shared_ptr<ShapeBuffer> getBuffer() const = 0;
-};
-
 class ShapeBufferUploadTask : public ResourceTask {
  public:
   static std::unique_ptr<ShapeBufferUploadTask> MakeFrom(
-      UniqueKey trianglesKey, UniqueKey textureKey, std::unique_ptr<ShapeBufferProvider> provider);
+      UniqueKey trianglesKey, UniqueKey textureKey,
+      std::unique_ptr<DataSource<ShapeBuffer>> source);
 
   bool execute(Context* context) override;
 
@@ -44,9 +39,9 @@ class ShapeBufferUploadTask : public ResourceTask {
 
  private:
   UniqueKey textureKey = {};
-  std::unique_ptr<ShapeBufferProvider> provider = nullptr;
+  std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
 
   ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
-                        std::unique_ptr<ShapeBufferProvider> provider);
+                        std::unique_ptr<DataSource<ShapeBuffer>> source);
 };
 }  // namespace tgfx

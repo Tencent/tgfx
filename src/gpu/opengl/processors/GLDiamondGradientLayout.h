@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DataProvider.h"
+#pragma once
+
+#include "gpu/processors/DiamondGradientLayout.h"
 
 namespace tgfx {
-class DataWrapper : public DataProvider {
+class GLDiamondGradientLayout : public DiamondGradientLayout {
  public:
-  explicit DataWrapper(std::shared_ptr<Data> data) : data(std::move(data)) {
-  }
+  explicit GLDiamondGradientLayout(Matrix matrix);
 
-  std::shared_ptr<Data> getData() const override {
-    return data;
-  }
-
- private:
-  std::shared_ptr<Data> data = nullptr;
+  void emitCode(EmitArgs& args) const override;
 };
-
-std::unique_ptr<DataProvider> DataProvider::Wrap(std::shared_ptr<Data> data) {
-  return std::make_unique<DataWrapper>(std::move(data));
-}
 }  // namespace tgfx

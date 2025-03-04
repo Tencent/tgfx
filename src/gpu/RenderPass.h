@@ -19,6 +19,7 @@
 #pragma once
 
 #include "Program.h"
+#include "gpu/Gpu.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -38,6 +39,8 @@ enum class PrimitiveType {
 
 class RenderPass {
  public:
+  static std::unique_ptr<RenderPass> Make(Context* context);
+
   virtual ~RenderPass() = default;
 
   Context* getContext() {

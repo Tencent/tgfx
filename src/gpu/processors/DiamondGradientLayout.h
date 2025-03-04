@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,22 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "core/ImageSource.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-class TextureUploadTask : public ResourceTask {
+class DiamondGradientLayout : public FragmentProcessor {
  public:
-  /*
-   * Creates a TextureUploadTask to generate a texture using the given image source.
-   */
-  static std::unique_ptr<TextureUploadTask> MakeFrom(
-      UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped = false);
+  static std::unique_ptr<DiamondGradientLayout> Make(Matrix matrix);
 
-  std::shared_ptr<Resource> onMakeResource(Context* context) override;
+  std::string name() const override {
+    return "DiamondGradientLayout";
+  }
 
- private:
-  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
-  bool mipmapped = false;
+ protected:
+  DEFINE_PROCESSOR_CLASS_ID
 
-  TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
-                    bool mipmapped);
+  explicit DiamondGradientLayout(Matrix matrix);
+
+  CoordTransform coordTransform;
 };
 }  // namespace tgfx

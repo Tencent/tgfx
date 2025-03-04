@@ -32,7 +32,6 @@ namespace tgfx {
 class Pipeline;
 class Image;
 class Shader;
-class RenderQueue;
 
 class FPArgs {
  public:

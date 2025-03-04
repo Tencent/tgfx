@@ -18,41 +18,31 @@
 
 #pragma once
 
-#include "GeneratorImage.h"
-#include "core/ImageDecoder.h"
+#include "core/DataSource.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
 /**
- * DecoderImage wraps an ImageDecoder that can decode ImageBuffers asynchronously.
+ * A DataSource that decodes an image and provides an ImageBuffer.
  */
-class DecoderImage : public ResourceImage {
+class ImageSource : public DataSource<ImageBuffer> {
  public:
-  static std::shared_ptr<Image> MakeFrom(UniqueKey uniqueKey,
-                                         std::shared_ptr<ImageDecoder> decoder);
+  /**
+   * Create an image source from the specified ImageGenerator. If asyncDecoding is true, the
+   * returned image source schedules an asynchronous image-decoding task immediately. Otherwise, the
+   * image will be decoded synchronously when the getData() method is called.
+   */
+  static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                              bool tryHardware = true, bool asyncDecoding = true);
 
-  int width() const override {
-    return decoder->width();
+  ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
+
+  std::shared_ptr<ImageBuffer> getData() const override {
+    return generator->makeBuffer(tryHardware);
   }
-
-  int height() const override {
-    return decoder->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return decoder->isAlphaOnly();
-  }
-
- protected:
-  Type type() const override {
-    return Type::Decoder;
-  }
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
 
  private:
-  std::shared_ptr<ImageDecoder> decoder = nullptr;
-
-  DecoderImage(UniqueKey uniqueKey, std::shared_ptr<ImageDecoder> decoder);
+  std::shared_ptr<ImageGenerator> generator = nullptr;
+  bool tryHardware = true;
 };
 }  // namespace tgfx

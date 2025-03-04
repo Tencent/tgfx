@@ -31,7 +31,7 @@ void SolidColor::setColor(const Color& color) {
   invalidate();
 }
 
-std::shared_ptr<Shader> SolidColor::getShader() const {
+std::shared_ptr<Shader> SolidColor::onGetShader() const {
   return Shader::MakeColorShader(_color);
 }
 }  // namespace tgfx

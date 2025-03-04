@@ -62,7 +62,22 @@ class Task {
   static std::shared_ptr<Task> Run(std::function<void()> block);
 
   /**
-   * Advises the Task that it should stop executing its code block. Cancellation does not affect the
+   * Submits a Task for asynchronous execution immediately. Hold a reference to the Task if you want
+   * to cancel it or wait for it to finish execution. Does nothing if the Task is nullptr.
+   */
+  static void Run(std::shared_ptr<Task> task);
+
+  virtual ~Task() = default;
+
+  /**
+   * Return the current status of the Task.
+   */
+  TaskStatus status() const {
+    return _status.load(std::memory_order_relaxed);
+  }
+
+  /**
+   * Requests the Task to skip executing its Runnable object. Cancellation does not affect the
    * execution of a Task that has already begun.
    */
   void cancel();
@@ -74,18 +89,14 @@ class Task {
    */
   void wait();
 
-  /**
-   * Return the current status of the Task.
-   */
-  TaskStatus status() const;
+ protected:
+  virtual void onExecute() = 0;
 
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
-  std::function<void()> block = nullptr;
   std::atomic<TaskStatus> _status = TaskStatus::Queueing;
 
-  explicit Task(std::function<void()> block);
   void execute();
 
   friend class TaskGroup;

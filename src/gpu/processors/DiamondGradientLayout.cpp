@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Data.h"
+#include "DiamondGradientLayout.h"
 
 namespace tgfx {
-/**
- * DataProvider defers the data generation until it is needed.
- */
-class DataProvider {
- public:
-  /**
-   * Wraps the existing data into a DataProvider.
-   */
-  static std::unique_ptr<DataProvider> Wrap(std::shared_ptr<Data> data);
-
-  virtual ~DataProvider() = default;
-
-  /**
-   * Generates the data. DataProvider does not cache the data, each call to getData() will
-   * generate a new data.
-   */
-  virtual std::shared_ptr<Data> getData() const = 0;
-};
+DiamondGradientLayout::DiamondGradientLayout(Matrix matrix)
+    : FragmentProcessor(ClassID()), coordTransform(matrix) {
+  addCoordTransform(&coordTransform);
+}
 }  // namespace tgfx

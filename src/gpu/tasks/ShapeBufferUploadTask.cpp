@@ -22,18 +22,18 @@
 
 namespace tgfx {
 std::unique_ptr<ShapeBufferUploadTask> ShapeBufferUploadTask::MakeFrom(
-    UniqueKey trianglesKey, UniqueKey textureKey, std::unique_ptr<ShapeBufferProvider> provider) {
-  if (provider == nullptr) {
+    UniqueKey trianglesKey, UniqueKey textureKey, std::unique_ptr<DataSource<ShapeBuffer>> source) {
+  if (source == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<ShapeBufferUploadTask>(new ShapeBufferUploadTask(
-      std::move(trianglesKey), std::move(textureKey), std::move(provider)));
+  return std::unique_ptr<ShapeBufferUploadTask>(
+      new ShapeBufferUploadTask(std::move(trianglesKey), std::move(textureKey), std::move(source)));
 }
 
 ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
-                                             std::unique_ptr<ShapeBufferProvider> provider)
+                                             std::unique_ptr<DataSource<ShapeBuffer>> source)
     : ResourceTask(std::move(trianglesKey)), textureKey(std::move(textureKey)),
-      provider(std::move(provider)) {
+      source(std::move(source)) {
 }
 
 bool ShapeBufferUploadTask::execute(Context* context) {
@@ -41,10 +41,10 @@ bool ShapeBufferUploadTask::execute(Context* context) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;
   }
-  if (provider == nullptr) {
+  if (source == nullptr) {
     return false;
   }
-  auto shapeBuffer = provider->getBuffer();
+  auto shapeBuffer = source->getData();
   if (shapeBuffer == nullptr) {
     // No need to log an error here; the shape might not be a filled path or could be invisible.
     return false;
@@ -66,8 +66,8 @@ bool ShapeBufferUploadTask::execute(Context* context) {
     }
     texture->assignUniqueKey(textureKey);
   }
-  // Free the data provider immediately to reduce memory pressure.
-  provider = nullptr;
+  // Free the data source immediately to reduce memory pressure.
+  source = nullptr;
   return true;
 }
 }  // namespace tgfx
