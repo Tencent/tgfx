@@ -33,7 +33,7 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
   int attributeCount = 2;
   if (!uniformColor.has_value()) {
     attributeCount++;
-    color = {"inColor", SLType::Float4};
+    color = {"inColor", SLType::UByte4Color};
   }
   setVertexAttributes(&position, attributeCount);
 }

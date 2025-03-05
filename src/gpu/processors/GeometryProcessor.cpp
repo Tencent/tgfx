@@ -42,6 +42,8 @@ static constexpr size_t VertexAttribTypeSize(SLType type) {
       return 3 * sizeof(int32_t);
     case SLType::Int4:
       return 4 * sizeof(int32_t);
+    case SLType::UByte4Color:
+      return 4 * sizeof(uint8_t);
     default:
       return 0;
   }

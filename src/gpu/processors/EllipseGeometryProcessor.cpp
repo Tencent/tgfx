@@ -24,7 +24,7 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
     : GeometryProcessor(ClassID()), width(width), height(height), stroke(stroke),
       useScale(useScale) {
   inPosition = {"inPosition", SLType::Float2};
-  inColor = {"inColor", SLType::Float4};
+  inColor = {"inColor", SLType::UByte4Color};
   if (useScale) {
     inEllipseOffset = {"inEllipseOffset", SLType::Float3};
   } else {

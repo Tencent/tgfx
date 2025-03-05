@@ -26,6 +26,14 @@
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
+static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
+  auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
+  bytes[0] = static_cast<uint8_t>(color.red * 255);
+  bytes[1] = static_cast<uint8_t>(color.green * 255);
+  bytes[2] = static_cast<uint8_t>(color.blue * 255);
+  bytes[3] = static_cast<uint8_t>(color.alpha * 255);
+}
+
 class RectCoverageVerticesProvider : public DataSource<Data> {
  public:
   RectCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor)
@@ -33,7 +41,7 @@ class RectCoverageVerticesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 9 : 5);
+    auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 6 : 5);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
     auto index = 0;
@@ -63,11 +71,7 @@ class RectCoverageVerticesProvider : public DataSource<Data> {
           vertices[index++] = normalQuad.point(k).x;
           vertices[index++] = normalQuad.point(k).y;
           if (hasColor) {
-            auto& color = rectPaint.color;
-            vertices[index++] = color.red;
-            vertices[index++] = color.green;
-            vertices[index++] = color.blue;
-            vertices[index++] = color.alpha;
+            WriteUByte4Color(vertices, index, rectPaint.color);
           }
         }
       }
@@ -87,7 +91,7 @@ class RectNonCoverageVerticesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto floatCount = rectPaints.size() * 4 * (hasColor ? 8 : 4);
+    auto floatCount = rectPaints.size() * 4 * (hasColor ? 5 : 4);
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
     auto index = 0;
@@ -102,11 +106,7 @@ class RectNonCoverageVerticesProvider : public DataSource<Data> {
         vertices[index++] = localQuad.point(j - 1).x;
         vertices[index++] = localQuad.point(j - 1).y;
         if (hasColor) {
-          auto& color = rectPaint.color;
-          vertices[index++] = color.red;
-          vertices[index++] = color.green;
-          vertices[index++] = color.blue;
-          vertices[index++] = color.alpha;
+          WriteUByte4Color(vertices, index, rectPaint.color);
         }
       }
     }
