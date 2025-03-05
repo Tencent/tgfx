@@ -41,7 +41,7 @@ class RectCoverageVerticesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    size_t perVertexCount = useUVCoord ? 5 : 5;
+    size_t perVertexCount = useUVCoord ? 5 : 3;
     if (hasColor) {
       perVertexCount += 1;
     }
