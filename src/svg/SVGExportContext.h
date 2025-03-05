@@ -108,7 +108,7 @@ class SVGExportContext : public DrawContext {
 
   void applyClipPath(const Path& clipPath);
 
-  static PathEncoding PathEncoding();
+  static PathEncoding PathEncodingType();
 
   uint32_t exportFlags = {};
   Context* context = nullptr;
