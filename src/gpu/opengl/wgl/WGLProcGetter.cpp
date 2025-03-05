@@ -32,11 +32,11 @@ WGLProcGetter::~WGLProcGetter() {
 
 void* WGLProcGetter::getProcAddress(const char name[]) const {
   DEBUG_ASSERT(wglGetCurrentContext());
-  if (auto* p = GetProcAddress(fLibrary, name)) {
-    return p;
+  if (auto address = GetProcAddress(fLibrary, name)) {
+    return address;
   }
-  if (auto* p = wglGetProcAddress(name)) {
-    return p;
+  if (auto address = wglGetProcAddress(name)) {
+    return address;
   }
   return nullptr;
 }
@@ -44,5 +44,4 @@ void* WGLProcGetter::getProcAddress(const char name[]) const {
 std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
   return std::make_unique<WGLProcGetter>();
 }
-
 }  // namespace tgfx

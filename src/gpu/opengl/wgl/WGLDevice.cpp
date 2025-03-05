@@ -26,7 +26,7 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
   if (glDevice != nullptr) {
     return std::static_pointer_cast<WGLDevice>(glDevice);
   }
-  HDC deviceContext = wglGetCurrentDC();
+  auto deviceContext = wglGetCurrentDC();
   return WGLDevice::Wrap(nullptr, deviceContext, glContext, nullptr, true);
 }
 

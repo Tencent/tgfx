@@ -23,35 +23,23 @@
 namespace tgfx {
 DECLARE_HANDLE(HPBUFFER);
 
-class WGLExtensions {
- public:
-  /**
-   * Returns the static WGLExtensions instance
-   */
-  static const WGLExtensions* Get();
+/**
+ * This function initializes a device context (DC) and creates an OpenGL context
+ * associated with the provided window handle (HWND). If successful, the device context
+ * and OpenGL context are returned through the output parameters.
+ */
+bool CreateWGLContext(HWND nativeWindow, HGLRC sharedContext, HDC& deviceContext, HGLRC& glContext);
 
-  /**
-   * Determines if an extension is available. it is necessary
-   * to check this before calling other class functions.
-   */
-  bool hasExtension(const char* ext) const;
+/**
+ * This function creates a pbuffer, initializes a device context (DC) and creates an OpenGL context
+ * associated with the pbuffer (HPBUFFER). If successful, the pbuffer, device context
+ * and OpenGL context are returned through the output parameters.
+ */
+bool CreatePbufferContext(HGLRC sharedContext, HPBUFFER& pBuffer, HDC& deviceContext,
+                          HGLRC& glContext);
 
-  BOOL choosePixelFormat(HDC, const int*, const FLOAT*, UINT, int*, UINT*) const;
+bool ReleasePbufferDC(HPBUFFER pBuffer, HDC deviceContext);
 
-  HPBUFFER createPbuffer(HDC, int, int, int, const int*) const;
-
-  HDC getPbufferDC(HPBUFFER) const;
-
-  int releasePbufferDC(HPBUFFER, HDC) const;
-
-  BOOL destroyPbuffer(HPBUFFER) const;
-
- private:
-  explicit WGLExtensions();
-};
-
-void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
-
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext);
+bool DestroyPbuffer(HPBUFFER pBuffer);
 
 }  // namespace tgfx

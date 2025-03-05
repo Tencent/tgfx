@@ -18,6 +18,7 @@
 
 #include "WGLUtil.h"
 #include <GL/GL.h>
+#include <mutex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -25,53 +26,39 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-#if defined(UNICODE)
-#define STR_LIT(X) L## #X
-#else
-#define STR_LIT(X) #X
-#endif
-
-#define TEMP_CLASS STR_LIT("TempClass")
+#define TEMP_CLASS TEXT("TempClass")
+static ATOM WindowClass = 0;
 static HWND CreateTempWindow() {
   HINSTANCE instance = GetModuleHandle(nullptr);
-  RECT windowRect{0, 8, 0, 8};
+  if (!WindowClass) {
+    WNDCLASS wc;
+    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+    wc.lpfnWndProc = static_cast<WNDPROC>(DefWindowProc);
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = instance;
+    wc.hIcon = LoadIcon(nullptr, IDI_WINLOGO);
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = nullptr;
+    wc.lpszMenuName = nullptr;
+    wc.lpszClassName = TEMP_CLASS;
 
-  WNDCLASS wc;
-  wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-  wc.lpfnWndProc = static_cast<WNDPROC>(DefWindowProc);
-  wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
-  wc.hInstance = instance;
-  wc.hIcon = LoadIcon(nullptr, IDI_WINLOGO);
-  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-  wc.hbrBackground = nullptr;
-  wc.lpszMenuName = nullptr;
-  wc.lpszClassName = TEMP_CLASS;
-
-  if (!RegisterClass(&wc)) {
-    return nullptr;
+    WindowClass = RegisterClass(&wc);
+    if (!WindowClass) {
+      LOGE("CreateTempWindow() register window class failed.");
+      return nullptr;
+    }
   }
 
-  DWORD style = WS_SYSMENU;
-  DWORD exStyle = WS_EX_CLIENTEDGE;
-
-  AdjustWindowRectEx(&windowRect, style, false, exStyle);
-  HWND nativeWindow = CreateWindowEx(
-      exStyle, TEMP_CLASS, STR_LIT("PlaceholderWindows"), WS_CLIPCHILDREN | WS_CLIPSIBLINGS | style,
-      0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, nullptr,
-      nullptr, instance, nullptr);
+  auto nativeWindow =
+      CreateWindow(TEMP_CLASS, TEXT("PlaceholderWindow"), WS_POPUP | WS_CLIPCHILDREN, 0, 0, 8, 8,
+                   nullptr, nullptr, instance, nullptr);
   if (nativeWindow == nullptr) {
     UnregisterClass(TEMP_CLASS, instance);
     return nullptr;
   }
-  ShowWindow(nativeWindow, SW_HIDE);
-  return nativeWindow;
-}
 
-static void DestroyTempWindow(HWND nativeWindow) {
-  DestroyWindow(nativeWindow);
-  HINSTANCE instance = GetModuleHandle(nullptr);
-  UnregisterClass(TEMP_CLASS, instance);
+  return nativeWindow;
 }
 
 #define GET_PROC(NAME, SUFFIX) wgl##NAME = (NAME##Proc)wglGetProcAddress("wgl" #NAME #SUFFIX)
@@ -100,29 +87,37 @@ static GetPbufferDCProc wglGetPbufferDC = nullptr;
 static ReleasePbufferDCProc wglReleasePbufferDC = nullptr;
 static DestroyPbufferProc wglDestroyPbuffer = nullptr;
 
-static std::set<std::string> ExtensionList;
+static bool Initialised = false;
+static bool PixelFormtSupport = false;
+static bool PBufferSupport = false;
 
-static void initialiseExtensions(HDC deviceContext) {
+static void InitialiseExtensions(HDC deviceContext) {
   if (deviceContext == nullptr || wglGetExtensionsString == nullptr) {
-    LOGE("initialiseExtensions() context is invalid");
+    LOGE("InitialiseExtensions() context is invalid");
     return;
   }
   const char* extensionString = wglGetExtensionsString(deviceContext);
   if (extensionString == nullptr) {
-    LOGE("initialiseExtensions() extentionString is nullptr");
+    LOGE("InitialiseExtensions() extentionString is nullptr");
     return;
   }
   std::stringstream extensionStream;
   std::string element;
   extensionStream << extensionString;
+  std::set<std::string> extensionList;
   while (extensionStream >> element) {
-    ExtensionList.insert(element);
+    extensionList.insert(element);
   }
+  PixelFormtSupport = extensionList.find("WGL_ARB_pixel_format") != extensionList.end();
+  PBufferSupport = extensionList.find("WGL_ARB_pbuffer") != extensionList.end();
 }
 
 static void InitialiseWGL() {
-  HDC oldDeviceContext = wglGetCurrentDC();
-  HGLRC oldGLContext = wglGetCurrentContext();
+  if (Initialised) {
+    return;
+  }
+  auto oldDeviceContext = wglGetCurrentDC();
+  auto oldGLContext = wglGetCurrentContext();
 
   PIXELFORMATDESCRIPTOR descriptor;
   ZeroMemory(&descriptor, sizeof(descriptor));
@@ -149,57 +144,16 @@ static void InitialiseWGL() {
     GET_PROC(GetPbufferDC, ARB);
     GET_PROC(ReleasePbufferDC, ARB);
     GET_PROC(DestroyPbuffer, ARB);
-    initialiseExtensions(deviceContet);
+    InitialiseExtensions(deviceContet);
     wglMakeCurrent(deviceContet, nullptr);
     wglDeleteContext(glContext);
-    DestroyTempWindow(nativeWindow);
+    DestroyWindow(nativeWindow);
   }
   wglMakeCurrent(oldDeviceContext, oldGLContext);
+  Initialised = true;
 }
 
-static std::atomic<const WGLExtensions*> globalExtensions = {nullptr};
-const WGLExtensions* WGLExtensions::Get() {
-  auto extensions = globalExtensions.load(std::memory_order_relaxed);
-  if (!extensions) {
-    static WGLExtensions instance;
-    extensions = &instance;
-  }
-  return extensions;
-}
-
-WGLExtensions::WGLExtensions() {
-  InitialiseWGL();
-}
-
-bool WGLExtensions::hasExtension(const char* ext) const {
-  return ExtensionList.find(ext) != ExtensionList.end();
-}
-
-BOOL WGLExtensions::choosePixelFormat(HDC deviceContext, const int* attribIList,
-                                      const FLOAT* attribFList, UINT maxFormats, int* formats,
-                                      UINT* numFormats) const {
-  return wglChoosePixelFormat(deviceContext, attribIList, attribFList, maxFormats, formats,
-                              numFormats);
-}
-
-HPBUFFER WGLExtensions::createPbuffer(HDC deviceContext, int pixelFormat, int width, int height,
-                                      const int* attribList) const {
-  return wglCreatePbuffer(deviceContext, pixelFormat, width, height, attribList);
-}
-
-HDC WGLExtensions::getPbufferDC(HPBUFFER hPbuffer) const {
-  return wglGetPbufferDC(hPbuffer);
-}
-
-int WGLExtensions::releasePbufferDC(HPBUFFER hPbuffer, HDC deviceContext) const {
-  return wglReleasePbufferDC(hPbuffer, deviceContext);
-}
-
-BOOL WGLExtensions::destroyPbuffer(HPBUFFER hPbuffer) const {
-  return wglDestroyPbuffer(hPbuffer);
-}
-
-void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
+static void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
   std::vector<int> iAttributes{WGL_DRAW_TO_WINDOW,
                                TRUE,
                                WGL_DOUBLE_BUFFER,
@@ -217,19 +171,16 @@ void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
                                0,
                                0};
 
-  int* format = formatsToTry[0] ? &formatsToTry[0] : &formatsToTry[1];
+  auto format = formatsToTry[0] ? &formatsToTry[0] : &formatsToTry[1];
   unsigned numFormats;
   constexpr float fAttributes[] = {0, 0};
-  auto* extensions = WGLExtensions::Get();
-  extensions->choosePixelFormat(deviceContext, iAttributes.data(), fAttributes, 1, format,
-                                &numFormats);
+  wglChoosePixelFormat(deviceContext, iAttributes.data(), fAttributes, 1, format, &numFormats);
 }
 
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
-  HDC oldDeviceContext = wglGetCurrentDC();
-  HGLRC oldGLContext = wglGetCurrentContext();
-
-  HGLRC glContext = wglCreateContext(deviceContext);
+static HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
+  auto oldDeviceContext = wglGetCurrentDC();
+  auto oldGLContext = wglGetCurrentContext();
+  auto glContext = wglCreateContext(deviceContext);
   if (glContext == nullptr) {
     LOGE("CreateGLContext() wglCreateContext failed.");
     return nullptr;
@@ -242,4 +193,109 @@ HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
   return glContext;
 }
 
+bool CreateWGLContext(HWND nativeWindow, HGLRC sharedContext, HDC& deviceContext,
+                      HGLRC& glContext) {
+  InitialiseWGL();
+  if (!PixelFormtSupport) {
+    return false;
+  }
+  deviceContext = GetDC(nativeWindow);
+  auto set = false;
+  int pixelFormatsToTry[2] = {-1, -1};
+  GetPixelFormatsToTry(deviceContext, pixelFormatsToTry);
+  for (auto f = 0; !set && pixelFormatsToTry[f] && f < 2; ++f) {
+    PIXELFORMATDESCRIPTOR descriptor;
+    DescribePixelFormat(deviceContext, pixelFormatsToTry[f], sizeof(descriptor), &descriptor);
+    set = SetPixelFormat(deviceContext, pixelFormatsToTry[f], &descriptor);
+  }
+
+  auto releaseDC = [&]() {
+    ReleaseDC(nativeWindow, deviceContext);
+    deviceContext = nullptr;
+  };
+
+  if (!set) {
+    releaseDC();
+    return nullptr;
+  }
+  glContext = CreateGLContext(deviceContext, sharedContext);
+  if (glContext == nullptr) {
+    releaseDC();
+    return false;
+  }
+  return true;
+}
+
+bool CreatePbufferContext(HGLRC sharedContext, HPBUFFER& pBuffer, HDC& deviceContext,
+                          HGLRC& glContext) {
+  InitialiseWGL();
+  if (!PBufferSupport || !PixelFormtSupport) {
+    return false;
+  }
+  HWND window = nullptr;
+  HDC parentDeviceContext = nullptr;
+  auto result = false;
+  do {
+    window = CreateTempWindow();
+    if (window == nullptr) {
+      LOGE("CreatePbufferContext() create window failed!");
+      break;
+    }
+    parentDeviceContext = GetDC(window);
+    if (parentDeviceContext == nullptr) {
+      LOGE("CreatePbufferContext() get deivce context failed!");
+      break;
+    }
+    static auto pixelFormat = -1;
+    static std::once_flag flag;
+    std::call_once(flag, [parentDeviceContext] {
+      int pixelFormatsToTry[2] = {-1, -1};
+      GetPixelFormatsToTry(parentDeviceContext, pixelFormatsToTry);
+      pixelFormat = pixelFormatsToTry[0];
+    });
+    if (pixelFormat == -1) {
+      break;
+    }
+    pBuffer = wglCreatePbuffer(parentDeviceContext, pixelFormat, 1, 1, nullptr);
+    if (pBuffer == nullptr) {
+      LOGE("CreatePbufferContext() create pbuffer failed!");
+      break;
+    }
+    deviceContext = wglGetPbufferDC(pBuffer);
+    if (deviceContext != nullptr) {
+      glContext = CreateGLContext(deviceContext, sharedContext);
+      if (glContext != nullptr) {
+        result = true;
+        break;
+      }
+      wglReleasePbufferDC(pBuffer, deviceContext);
+      deviceContext = nullptr;
+    }
+    wglDestroyPbuffer(pBuffer);
+    pBuffer = nullptr;
+  } while (false);
+
+  ReleaseDC(window, parentDeviceContext);
+  DestroyWindow(window);
+  return result;
+}
+
+bool ReleasePbufferDC(HPBUFFER pBuffer, HDC deviceContext) {
+  InitialiseWGL();
+  if (!PBufferSupport) {
+    return false;
+  }
+  if (pBuffer == nullptr) {
+    return false;
+  }
+  return wglReleasePbufferDC(pBuffer, deviceContext) == 1;
+}
+
+bool DestroyPbuffer(HPBUFFER pBuffer) {
+  InitialiseWGL();
+  if (!PBufferSupport) {
+    return false;
+  }
+  return wglDestroyPbuffer(pBuffer);
+}
 }  // namespace tgfx
