@@ -127,6 +127,9 @@ std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
       case SLType::Int4:
         type = Uniform::Type::Int4;
         break;
+      case SLType::UByte4Color:
+        type = Uniform::Type::Float4;
+        break;
       default:
         type = std::nullopt;
         break;
