@@ -21,7 +21,8 @@
 
 namespace tgfx {
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                                               std::optional<Color> uniformColor)
+                                                               std::optional<Color> uniformColor,
+                                                               bool useUVCoord)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa),
       uniformColor(uniformColor) {
   if (aa == AAType::Coverage) {
@@ -29,7 +30,9 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
   } else {
     position = {"aPosition", SLType::Float2};
   }
-  localCoord = {"localCoord", SLType::Float2};
+  if (useUVCoord) {
+    uvCoord = {"uvCoord", SLType::Float2};
+  }
   int attributeCount = 2;
   if (!uniformColor.has_value()) {
     attributeCount++;

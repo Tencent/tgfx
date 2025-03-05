@@ -134,11 +134,11 @@ class GeometryProcessor : public Processor {
                               FPCoordTransformIter* transformIter) const;
 
   /**
-   * Emit transformed local coords from the vertex shader as a uniform matrix and varying per
-   * coord-transform. localCoordsVar must be a 2-component vector.
+   * Emit transformed uv coords from the vertex shader as a uniform matrix and varying per
+   * coord-transform. uvCoordsVar must be a 2-component vector.
    */
   void emitTransforms(VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
-                      UniformHandler* uniformHandler, const ShaderVar& localCoordsVar,
+                      UniformHandler* uniformHandler, const ShaderVar& uvCoordsVar,
                       FPCoordTransformHandler* transformHandler) const;
 
  private:

@@ -223,7 +223,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       }
     // fallthrough
     case PendingOpType::Image:
-      drawOp = RectDrawOp::Make(context, pendingRects, aaType, renderFlags);
+      drawOp = RectDrawOp::Make(context, pendingRects, needLocalBounds, aaType, renderFlags);
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
           localBounds.join(ClipLocalBounds(rect.rect, rect.viewMatrix, clipBounds));

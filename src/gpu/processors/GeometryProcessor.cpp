@@ -89,12 +89,11 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBu
 
 void GeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
                                        VaryingHandler* varyingHandler,
-                                       UniformHandler* uniformHandler,
-                                       const ShaderVar& localCoordsVar,
+                                       UniformHandler* uniformHandler, const ShaderVar& uvCoordsVar,
                                        FPCoordTransformHandler* transformHandler) const {
-  std::string localCoords = "vec3(";
-  localCoords += localCoordsVar.name();
-  localCoords += ", 1)";
+  std::string uvCoords = "vec3(";
+  uvCoords += uvCoordsVar.name();
+  uvCoords += ", 1)";
   int i = 0;
   while (transformHandler->nextCoordTransform() != nullptr) {
     std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
@@ -108,7 +107,7 @@ void GeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
     transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
 
     vertexBuilder->codeAppendf("%s = (%s * %s).xy;", varying.vsOut().c_str(), uniName.c_str(),
-                               localCoords.c_str());
+                               uvCoords.c_str());
     ++i;
   }
 }

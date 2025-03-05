@@ -36,12 +36,16 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class RectCoverageVerticesProvider : public DataSource<Data> {
  public:
-  RectCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor)
-      : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
+  RectCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor, bool useUVCoord)
+      : rectPaints(std::move(rectPaints)), hasColor(hasColor), useUVCoord(useUVCoord) {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto floatCount = rectPaints.size() * 2 * 4 * (hasColor ? 6 : 5);
+    size_t perVertexCount = useUVCoord ? 5 : 5;
+    if (hasColor) {
+      perVertexCount += 1;
+    }
+    auto floatCount = rectPaints.size() * 2 * 4 * perVertexCount;
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
     auto index = 0;
@@ -56,20 +60,21 @@ class RectCoverageVerticesProvider : public DataSource<Data> {
       auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
       auto outsetBounds = rect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
-
-      auto normalInsetQuad = Quad::MakeFrom(insetBounds);
-      auto normalOutsetQuad = Quad::MakeFrom(outsetBounds);
+      auto uvInsetQuad = Quad::MakeFrom(insetBounds);
+      auto uvOutsetQuad = Quad::MakeFrom(outsetBounds);
 
       for (int j = 0; j < 2; ++j) {
         const auto& quad = j == 0 ? insetQuad : outsetQuad;
-        const auto& normalQuad = j == 0 ? normalInsetQuad : normalOutsetQuad;
+        const auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
         auto coverage = j == 0 ? 1.0f : 0.0f;
         for (size_t k = 0; k < 4; ++k) {
           vertices[index++] = quad.point(k).x;
           vertices[index++] = quad.point(k).y;
           vertices[index++] = coverage;
-          vertices[index++] = normalQuad.point(k).x;
-          vertices[index++] = normalQuad.point(k).y;
+          if (useUVCoord) {
+            vertices[index++] = uvQuad.point(k).x;
+            vertices[index++] = uvQuad.point(k).y;
+          }
           if (hasColor) {
             WriteUByte4Color(vertices, index, rectPaint.color);
           }
@@ -82,16 +87,21 @@ class RectCoverageVerticesProvider : public DataSource<Data> {
  private:
   std::vector<RectPaint> rectPaints = {};
   bool hasColor = false;
+  bool useUVCoord = false;
 };
 
 class RectNonCoverageVerticesProvider : public DataSource<Data> {
  public:
-  RectNonCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor)
-      : rectPaints(std::move(rectPaints)), hasColor(hasColor) {
+  RectNonCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor, bool useUVCoord)
+      : rectPaints(std::move(rectPaints)), hasColor(hasColor), useUVCoord(useUVCoord) {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto floatCount = rectPaints.size() * 4 * (hasColor ? 5 : 4);
+    size_t perVertexCount = useUVCoord ? 4 : 2;
+    if (hasColor) {
+      perVertexCount += 1;
+    }
+    auto floatCount = rectPaints.size() * 4 * perVertexCount;
     Buffer buffer(floatCount * sizeof(float));
     auto vertices = reinterpret_cast<float*>(buffer.data());
     auto index = 0;
@@ -99,12 +109,14 @@ class RectNonCoverageVerticesProvider : public DataSource<Data> {
       auto& viewMatrix = rectPaint.viewMatrix;
       auto& rect = rectPaint.rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
-      auto localQuad = Quad::MakeFrom(rect);
+      auto uvQuad = Quad::MakeFrom(rect);
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
-        vertices[index++] = localQuad.point(j - 1).x;
-        vertices[index++] = localQuad.point(j - 1).y;
+        if (useUVCoord) {
+          vertices[index++] = uvQuad.point(j - 1).x;
+          vertices[index++] = uvQuad.point(j - 1).y;
+        }
         if (hasColor) {
           WriteUByte4Color(vertices, index, rectPaint.color);
         }
@@ -116,14 +128,15 @@ class RectNonCoverageVerticesProvider : public DataSource<Data> {
  private:
   std::vector<RectPaint> rectPaints = {};
   bool hasColor = false;
+  bool useUVCoord = false;
 };
 
 std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector<RectPaint>& rects,
-                                             AAType aaType, uint32_t renderFlags) {
+                                             bool useUVCoord, AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
-  auto drawOp = std::unique_ptr<RectDrawOp>(new RectDrawOp(aaType, rects.size()));
+  auto drawOp = std::unique_ptr<RectDrawOp>(new RectDrawOp(aaType, rects.size(), useUVCoord));
   auto& firstColor = rects[0].color;
   std::optional<Color> uniformColor = firstColor;
   for (auto& rectPaint : rects) {
@@ -140,9 +153,11 @@ std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector
   }
   std::unique_ptr<DataSource<Data>> source = nullptr;
   if (aaType == AAType::Coverage) {
-    source = std::make_unique<RectCoverageVerticesProvider>(rects, !uniformColor.has_value());
+    source = std::make_unique<RectCoverageVerticesProvider>(rects, !uniformColor.has_value(),
+                                                            useUVCoord);
   } else {
-    source = std::make_unique<RectNonCoverageVerticesProvider>(rects, !uniformColor.has_value());
+    source = std::make_unique<RectNonCoverageVerticesProvider>(rects, !uniformColor.has_value(),
+                                                               useUVCoord);
   }
   if (rects.size() > 1) {
     drawOp->vertexBufferProxy =
@@ -154,7 +169,8 @@ std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector
   return drawOp;
 }
 
-RectDrawOp::RectDrawOp(AAType aaType, size_t rectCount) : DrawOp(aaType), rectCount(rectCount) {
+RectDrawOp::RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord)
+    : DrawOp(aaType), rectCount(rectCount), useUVCoord(useUVCoord) {
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
@@ -174,10 +190,10 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   } else if (vertexData == nullptr) {
     return;
   }
-  auto pipeline =
-      createPipeline(renderPass, QuadPerEdgeAAGeometryProcessor::Make(
-                                     renderPass->renderTarget()->width(),
-                                     renderPass->renderTarget()->height(), aaType, uniformColor));
+  auto pipeline = createPipeline(
+      renderPass, QuadPerEdgeAAGeometryProcessor::Make(renderPass->renderTarget()->width(),
+                                                       renderPass->renderTarget()->height(), aaType,
+                                                       uniformColor, useUVCoord));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   if (vertexBuffer) {
     renderPass->bindBuffers(indexBuffer, vertexBuffer);

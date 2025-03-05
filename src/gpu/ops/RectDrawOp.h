@@ -49,15 +49,16 @@ class RectDrawOp : public DrawOp {
    * of each rect.
    */
   static std::unique_ptr<RectDrawOp> Make(Context* context, const std::vector<RectPaint>& rects,
-                                          AAType aaType, uint32_t renderFlags);
+                                          bool useUVCoord, AAType aaType, uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  RectDrawOp(AAType aaType, size_t rectCount);
+  RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord);
 
   size_t rectCount = 0;
   std::optional<Color> uniformColor = std::nullopt;
+  bool useUVCoord = false;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   std::shared_ptr<Data> vertexData = nullptr;
