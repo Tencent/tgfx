@@ -48,11 +48,12 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
 
   fragBuilder->codeAppendf("float sigma = %s;", sigmaName.c_str());
-  fragBuilder->codeAppend("int radius = int(ceil(2 * sigma));");
+  fragBuilder->codeAppend("int radius = int(ceil(2.0 * sigma));");
   fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
   fragBuilder->codeAppend("float total = 0.0;");
 
-  fragBuilder->codeAppend("for (int i = -radius; i <= radius; ++i) {");
+  fragBuilder->codeAppend("for (int j = 0; j <= 2 * 6; ++j) {");
+  fragBuilder->codeAppend("int i = j - radius;");
   fragBuilder->codeAppend("float weight = exp(-float(i*i) / (2.0*sigma*sigma));");
   fragBuilder->codeAppend("total += weight;");
 
@@ -62,6 +63,7 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   });
 
   fragBuilder->codeAppendf("sum += %s * weight;", tempColor.c_str());
+  fragBuilder->codeAppend("if (i == radius) { break; }");
   fragBuilder->codeAppend("}");
   fragBuilder->codeAppendf("%s = sum / total;", args.outputColor.c_str());
 }
