@@ -18,17 +18,18 @@
 
 #pragma once
 #include <QDialog>
-#include <QPushButton>
 #include <QQmlApplicationEngine>
 #include <QSpinBox>
-#include <QWidget>
 #include "FramesView.h"
+#include "MainView.h"
+#include "StatisticView.h"
 #include "TimelineController.h"
 #include "TimelineView.h"
 #include "TracyFileRead.hpp"
 #include "TracyFileWrite.hpp"
 #include "TracyWorker.hpp"
 #include "UserData.h"
+#include "ViewData.h"
 
 class SaveFileDialog : public QDialog {
   Q_OBJECT
@@ -72,8 +73,15 @@ class View : public QWidget {
   void initView();
   void ViewImpl();
   Q_SLOT void changeViewModeButton(ViewMode mode);
+  Q_SLOT void openStatisticsView();
 
   void timerEvent(QTimerEvent* event) override;
+
+  const char* sourceSubstitution(const char* srcFile) const;
+  bool validateSourceAge() const {return validateSrcAge;}
+
+
+  Range m_statRange;
 
  private:
   bool connected = false;
@@ -91,7 +99,15 @@ class View : public QWidget {
   const Config& config;
   FramesView* framesView;
   TimelineView* timelineView;
+  QMainWindow* statMainWindow;
+  StatisticsView* statisticsView;
+  SourceView* sourceView;
   SaveFileDialog* saveFileDialog;
   QDialog* connectDialog;
   int timerId;
+
+  //source file regex member...
+  std::vector<SourceRegex> srcSubstitutions;
+  bool srcRegexValid = true;
+  bool validateSrcAge = true;
 };

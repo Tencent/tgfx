@@ -18,6 +18,7 @@
 
 #pragma once
 #include <QObject>
+#include <regex>
 #include "Utility.h"
 
 struct ViewData : QObject {
@@ -49,3 +50,28 @@ struct ViewData : QObject {
   uint32_t plotHeight = 100;
   double pxns = 0.0;
 };
+
+struct Range
+{
+  int64_t min = 0;
+  int64_t max = 0;
+  bool active = false;
+};
+
+struct RangeSlim
+{
+  bool operator==( const Range& other ) const { return other.active == active && other.min == min && other.max == max; }
+  bool operator!=( const Range& other ) const { return !(*this == other); }
+  void operator=( const Range& other ) { active = other.active; min = other.min; max = other.max; }
+
+  int64_t min, max;
+  bool active = false;
+};
+
+struct SourceRegex
+{
+  std::string pattern;
+  std::string target;
+  std::regex regex;
+};
+

@@ -32,7 +32,7 @@ void ProfilerWindow::initToolBar() {
 
   topBar = new QToolBar(tr("Tools"), this);
   topBar->setMovable(false);
-  // topBar->setStyleSheet("background-color: blue");
+  //topBar->setStyleSheet("background-color: blue");
   quitAction = new QAction(QIcon(":/icons/power.png"), tr("&quit"), this);
   topBar->addAction(quitAction);
 
@@ -44,6 +44,9 @@ void ProfilerWindow::initToolBar() {
 
   discardAction = new QAction(QIcon(":/icons/discard.png"), tr("&dicard"), this);
   topBar->addAction(discardAction);
+
+  statisticsAction = new QAction(QIcon(":/icons/statistics.png"), tr("&statistics"), this);
+  topBar->addAction(statisticsAction);
 }
 
 void ProfilerWindow::updateToolBar(ProfilerStatus status) {
@@ -55,6 +58,7 @@ void ProfilerWindow::updateToolBar(ProfilerStatus status) {
   saveFileAction->setEnabled(status == ProfilerStatus::Connect);
   playAction->setEnabled(status == ProfilerStatus::Connect);
   discardAction->setEnabled(status == ProfilerStatus::Connect);
+  statisticsAction->setEnabled(status == ProfilerStatus::Connect || status == ProfilerStatus::ReadFile);
 }
 
 void ProfilerWindow::changeViewMode() {
@@ -101,4 +105,5 @@ void ProfilerWindow::initConnect() {
   connect(quitAction, &QAction::triggered, mainView, &MainView::quitReadFile);
   connect(discardAction, &QAction::triggered, mainView, &MainView::discardConnect);
   connect(playAction, &QAction::triggered, this, &ProfilerWindow::pushPlayAction);
+  connect(statisticsAction, &QAction::triggered, mainView,&MainView::statView);
 }

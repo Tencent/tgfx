@@ -8,5 +8,6 @@
         <file>icons/next.png</file>
         <file>icons/stop.png</file>
         <file>icons/discard.png</file>
+        <file>icons/statistics.png</file>
     </qresource>
 </RCC>

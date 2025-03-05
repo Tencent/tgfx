@@ -44,4 +44,5 @@ class ProfilerWindow : public QMainWindow {
   QAction* saveFileAction;
   QAction* playAction;
   QAction* discardAction;
+  QAction* statisticsAction;
 };

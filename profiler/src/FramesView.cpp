@@ -335,13 +335,15 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
           selectedEndFrame = sel;
         }
 
+        const auto t0 = worker->GetFrameBegin(*frames, size_t(selectedStartFrame));
+        const auto t1 = worker->GetFrameEnd(*frames, size_t(selectedEndFrame));
+        viewData->zvStart = t0;
+        viewData->zvEnd = t1;
+
         if (m_timelineView) {
-          const auto t0 = worker->GetFrameBegin(*frames, size_t(selectedStartFrame));
-          const auto t1 = worker->GetFrameEnd(*frames, size_t(selectedEndFrame));
-          viewData->zvStart = t0;
-          viewData->zvEnd = t1;
           m_timelineView->zoomToRange(t0, t1, false);
         }
+        Q_EMIT statRangeChanged(t0, t1, true);
       }
     }
     event->accept();
@@ -386,15 +388,15 @@ void FramesView::mouseReleaseEvent(QMouseEvent* event) {
       if (sel == dragStartFrame) {
         selectedStartFrame = sel;
         selectedEndFrame = sel;
+        int64_t startTime = worker->GetFrameBegin(*frames, static_cast<size_t>(sel));
+        int64_t endTime = worker->GetFrameEnd(*frames, static_cast<size_t>(sel));
+        viewData->zvStart = startTime;
+        viewData->zvEnd = endTime;
+        if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
         if (m_timelineView) {
-          int64_t startTime = worker->GetFrameBegin(*frames, static_cast<size_t>(sel));
-          int64_t endTime = worker->GetFrameEnd(*frames, static_cast<size_t>(sel));
-          viewData->zvStart = startTime;
-          viewData->zvEnd = endTime;
-          if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
-
           m_timelineView->zoomToRange(startTime, endTime, false);
         }
+        Q_EMIT statRangeChanged(startTime, endTime, true);
       }
     }
     update();

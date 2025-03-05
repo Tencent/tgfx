@@ -23,6 +23,7 @@
 #include <QQmlContext>
 #include <QRadioButton>
 #include <QSpinBox>
+#include <QDockWidget>
 #include "FramesView.h"
 #include "MainView.h"
 #include "TimelineView.h"
@@ -162,11 +163,27 @@ View::View(tracy::FileRead& file, int width, const Config& config, QWidget* pare
 
 View::~View() {
   userData.SaveState(viewData);
+  if (statisticsView) {
+    statisticsView->close();
+    statisticsView->deleteLater();
+    statisticsView = nullptr;
+  }
 }
 
 void View::changeViewModeButton(ViewMode mode) {
   auto mainView = (MainView*)parentWidget();
   mainView->changeViewModeButton(mode == ViewMode::Paused);
+}
+
+void View::openStatisticsView() {
+  if(!statisticsView) {
+    statisticsView = new StatisticsView(worker, viewData, this, framesView, sourceView);
+    statisticsView->setAttribute(Qt::WA_DeleteOnClose);
+    connect(statisticsView, &QObject::destroyed, this, [this](){statisticsView = nullptr;});
+  }
+  //statisticsView->raise();
+  statisticsView->show();
+  statisticsView->activateWindow();
 }
 
 void View::initView() {
@@ -281,4 +298,15 @@ void View::timerEvent(QTimerEvent*) {
     connectDialog->close();
     killTimer(timerId);
   }
+}
+
+const char* View::sourceSubstitution(const char* srcFile) const {
+  if(!srcRegexValid || srcSubstitutions.empty()) return srcFile;
+  static std::string res, tmp;
+  res.assign(srcFile);
+  for(auto& v : srcSubstitutions) {
+    tmp = std::regex_replace(res, v.regex, v.target);
+    std::swap(tmp, res);
+  }
+  return res.c_str();
 }

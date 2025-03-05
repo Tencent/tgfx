@@ -21,7 +21,6 @@
 #include "ProfilerWindow.h"
 #include "ToolView.h"
 #include "TracyFileRead.hpp"
-#include "View.h"
 #include "src/profiler/TracyFileselector.hpp"
 
 MainView::MainView(QWidget* parent) : QWidget(parent) {
@@ -67,7 +66,7 @@ void MainView::changeViewMode(bool pause) {
 
 void MainView::quitReadFile() {
   if (centorView) {
-    delete centorView;
+    centorView->deleteLater();
     centorView = nullptr;
   }
   reopenToolView();
@@ -79,6 +78,12 @@ void MainView::discardConnect() {
     centorView = nullptr;
   }
   reopenToolView();
+}
+
+void MainView::statView() {
+  if(centorView) {
+    centorView->openStatisticsView();
+  }
 }
 
 void MainView::connectClient(const char* address, const uint16_t port) {

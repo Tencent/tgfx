@@ -81,6 +81,7 @@ class FramesView : public QQuickItem {
 
   //signals
   Q_SIGNAL void changeViewMode(ViewMode mode);
+  Q_SIGNAL void statRangeChanged(int64_t startTime, int64_t endTime, bool acive);
 
  protected:
   void draw();

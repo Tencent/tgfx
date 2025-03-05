@@ -23,11 +23,11 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <thread>
-#include "ToolView.h"
 #include "TracyWorker.hpp"
 #include "Utility.h"
 #include "View.h"
 
+class View;
 class MainView : public QWidget {
   Q_OBJECT
  public:
@@ -41,11 +41,13 @@ class MainView : public QWidget {
   void openToolView();
   void openWebsocketServer();
 
+
   void changeViewModeButton(bool pause);
   Q_SLOT void changeViewMode(bool pause);
   Q_SLOT void quitReadFile();
   Q_SLOT void saveFile();
   Q_SLOT void discardConnect();
+  Q_SLOT void statView();
   Q_SIGNAL void statusChange(ProfilerStatus status);
 
  protected:
