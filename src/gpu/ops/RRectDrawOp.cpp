@@ -59,11 +59,12 @@ namespace tgfx {
 // geometry but make the inner rect degenerate (either a point or a horizontal or
 // vertical line).
 
-void WriteColor(float* vertices, int& index, const Color& color) {
-  vertices[index++] = color.red;
-  vertices[index++] = color.green;
-  vertices[index++] = color.blue;
-  vertices[index++] = color.alpha;
+static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
+  auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
+  bytes[0] = static_cast<uint8_t>(color.red * 255);
+  bytes[1] = static_cast<uint8_t>(color.green * 255);
+  bytes[2] = static_cast<uint8_t>(color.blue * 255);
+  bytes[3] = static_cast<uint8_t>(color.alpha * 255);
 }
 
 class RRectVerticesProvider : public DataSource<Data> {
@@ -73,7 +74,7 @@ class RRectVerticesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto floatCount = rRectPaints.size() * 4 * 48;
+    auto floatCount = rRectPaints.size() * 4 * 36;
     if (useScale) {
       floatCount += rRectPaints.size() * 4 * 4;
     }
@@ -122,7 +123,7 @@ class RRectVerticesProvider : public DataSource<Data> {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        WriteColor(vertices, index, color);
+        WriteUByte4Color(vertices, index, color);
         vertices[index++] = xMaxOffset;
         vertices[index++] = yOuterOffsets[i];
         if (useScale) {
@@ -137,7 +138,7 @@ class RRectVerticesProvider : public DataSource<Data> {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        WriteColor(vertices, index, color);
+        WriteUByte4Color(vertices, index, color);
         vertices[index++] = FLOAT_NEARLY_ZERO;
         vertices[index++] = yOuterOffsets[i];
         if (useScale) {
@@ -152,7 +153,7 @@ class RRectVerticesProvider : public DataSource<Data> {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        WriteColor(vertices, index, color);
+        WriteUByte4Color(vertices, index, color);
         vertices[index++] = FLOAT_NEARLY_ZERO;
         vertices[index++] = yOuterOffsets[i];
         if (useScale) {
@@ -167,7 +168,7 @@ class RRectVerticesProvider : public DataSource<Data> {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        WriteColor(vertices, index, color);
+        WriteUByte4Color(vertices, index, color);
         vertices[index++] = xMaxOffset;
         vertices[index++] = yOuterOffsets[i];
         if (useScale) {

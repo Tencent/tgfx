@@ -32,7 +32,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   RectPaint rectPaint = {bounds, Matrix::I()};
-  auto op = RectDrawOp::Make(renderTarget->getContext(), {rectPaint}, AAType::None, renderFlags);
+  auto op =
+      RectDrawOp::Make(renderTarget->getContext(), {rectPaint}, true, AAType::None, renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
   std::vector<std::unique_ptr<Op>> ops = {};
