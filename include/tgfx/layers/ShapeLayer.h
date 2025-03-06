@@ -105,7 +105,7 @@ class ShapeLayer : public Layer {
   /**
    * Replace the current list of fill styles with the given fill style.
    */
-  void setFillStyle(std::shared_ptr<ShapeStyle> fill);
+  void setFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
 
   /**
    * Adds a fill style to the end of the existing fill styles.

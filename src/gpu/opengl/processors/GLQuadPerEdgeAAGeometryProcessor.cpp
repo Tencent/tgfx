@@ -20,14 +20,14 @@
 
 namespace tgfx {
 std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
-    int width, int height, AAType aa, std::optional<Color> uniformColor) {
+    int width, int height, AAType aa, std::optional<Color> uniformColor, bool useUVCoord) {
   return std::unique_ptr<QuadPerEdgeAAGeometryProcessor>(
-      new GLQuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor));
+      new GLQuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor, useUVCoord));
 }
 
 GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(
-    int width, int height, AAType aa, std::optional<Color> uniformColor)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor) {
+    int width, int height, AAType aa, std::optional<Color> uniformColor, bool useUVCoord)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor, useUVCoord) {
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -38,7 +38,8 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
 
   varyingHandler->emitAttributes(*this);
 
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, localCoord.asShaderVar(),
+  auto uvCoordsVar = uvCoord.isInitialized() ? uvCoord.asShaderVar() : position.asShaderVar();
+  emitTransforms(vertBuilder, varyingHandler, uniformHandler, uvCoordsVar,
                  args.fpCoordTransformHandler);
 
   if (aa == AAType::Coverage) {

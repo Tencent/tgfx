@@ -58,7 +58,8 @@ void ProfilerWindow::updateToolBar(ProfilerStatus status) {
   saveFileAction->setEnabled(status == ProfilerStatus::Connect);
   playAction->setEnabled(status == ProfilerStatus::Connect);
   discardAction->setEnabled(status == ProfilerStatus::Connect);
-  statisticsAction->setEnabled(status == ProfilerStatus::Connect || status == ProfilerStatus::ReadFile);
+  statisticsAction->setEnabled(status == ProfilerStatus::Connect ||
+                               status == ProfilerStatus::ReadFile);
 }
 
 void ProfilerWindow::changeViewMode() {
@@ -105,5 +106,5 @@ void ProfilerWindow::initConnect() {
   connect(quitAction, &QAction::triggered, mainView, &MainView::quitReadFile);
   connect(discardAction, &QAction::triggered, mainView, &MainView::discardConnect);
   connect(playAction, &QAction::triggered, this, &ProfilerWindow::pushPlayAction);
-  connect(statisticsAction, &QAction::triggered, mainView,&MainView::statView);
+  connect(statisticsAction, &QAction::triggered, mainView, &MainView::statView);
 }

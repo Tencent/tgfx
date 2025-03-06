@@ -20,6 +20,7 @@
 
 #include "core/DataSource.h"
 #include "tgfx/core/ImageGenerator.h"
+#include "utils/Profiling.h"
 
 namespace tgfx {
 /**
@@ -38,6 +39,7 @@ class ImageSource : public DataSource<ImageBuffer> {
   ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
 
   std::shared_ptr<ImageBuffer> getData() const override {
+    TRACE_EVENT_NAME("ImageDecode");
     return generator->makeBuffer(tryHardware);
   }
 

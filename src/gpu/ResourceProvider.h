@@ -36,26 +36,23 @@ class ResourceProvider {
 
   std::shared_ptr<GpuBufferProxy> nonAAQuadIndexBuffer();
 
-  static uint16_t MaxNumNonAAQuads();
-
   static uint16_t NumIndicesPerNonAAQuad();
 
   std::shared_ptr<GpuBufferProxy> aaQuadIndexBuffer();
 
-  static uint16_t MaxNumAAQuads();
-
   static uint16_t NumIndicesPerAAQuad();
+
+  std::shared_ptr<GpuBufferProxy> rRectIndexBuffer();
+
+  static uint16_t NumIndicesPerRRect();
 
   void releaseAll();
 
  private:
-  std::shared_ptr<GpuBufferProxy> createNonAAQuadIndexBuffer();
-
-  std::shared_ptr<GpuBufferProxy> createAAQuadIndexBuffer();
-
   Context* context = nullptr;
   GradientCache* _gradientCache = nullptr;
-  std::shared_ptr<GpuBufferProxy> _aaQuadIndexBuffer;
-  std::shared_ptr<GpuBufferProxy> _nonAAQuadIndexBuffer;
+  std::shared_ptr<GpuBufferProxy> _aaQuadIndexBuffer = nullptr;
+  std::shared_ptr<GpuBufferProxy> _nonAAQuadIndexBuffer = nullptr;
+  std::shared_ptr<GpuBufferProxy> _rRectIndexBuffer = nullptr;
 };
 }  // namespace tgfx

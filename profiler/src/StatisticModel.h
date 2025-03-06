@@ -18,20 +18,15 @@
 
 #pragma once
 
-#include "TracyVector.hpp"
 #include "SourceContents.h"
+#include "TracyVector.hpp"
 #include "ViewData.h"
-
 
 class StatisticsModel : public QAbstractTableModel {
   Q_OBJECT
 
-public:
-  enum class AccumulationMode {
-    SelfOnly,
-    AllChildren,
-    NonReentrantChildren
-  };
+ public:
+  enum class AccumulationMode { SelfOnly, AllChildren, NonReentrantChildren };
 
   enum Column {
     NameColumn,
@@ -72,14 +67,24 @@ public:
   int rowCount(const QModelIndex& parent = QModelIndex()) const override;
   int columnCount(const QModelIndex& parent = QModelIndex()) const override;
   QVariant data(const QModelIndex& index, int role) const override;
-  QVariant headerData(int section, Qt::Orientation orientation, int role ) const override;
+  QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
   void sort(int column, Qt::SortOrder order) override;
 
-  size_t getTotalZoneCount() const {return totalZoneCount;}
-  size_t getVisibleZoneCount() const {return srcData.size();}
-  tracy::Worker& getWorker() const {return worker;}
-  SourceContents getSource() const {return source;}
-  const tracy::Vector<SrcLocZonesSlim>& getSrcData() const {return srcData;}
+  size_t getTotalZoneCount() const {
+    return totalZoneCount;
+  }
+  size_t getVisibleZoneCount() const {
+    return srcData.size();
+  }
+  tracy::Worker& getWorker() const {
+    return worker;
+  }
+  SourceContents getSource() const {
+    return source;
+  }
+  const tracy::Vector<SrcLocZonesSlim>& getSrcData() const {
+    return srcData;
+  }
   int64_t getZoneChildTimeFast(const tracy::ZoneEvent& zone);
   uint32_t getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth);
   uint32_t getStrLocColor(const tracy::SourceLocation& srcloc, int depth);
@@ -92,9 +97,15 @@ public:
   void openSource(const char* fileName, int line, const tracy::Worker& worker, const View* view);
   void parseSource(const char* fileName, const tracy::Worker& worker, const View* view);
 
-  AccumulationMode accumulationMode() const {return statAccumulationMode;}
-  StatMode statisticMode() const {return statisticsMode;}
-  QString FilterText() const {return filterText;}
+  AccumulationMode accumulationMode() const {
+    return statAccumulationMode;
+  }
+  StatMode statisticMode() const {
+    return statisticsMode;
+  }
+  QString FilterText() const {
+    return filterText;
+  }
 
   Q_SLOT void setAccumulationMode(AccumulationMode mode);
   Q_SLOT void setStatisticsMode(StatMode mode);
@@ -107,19 +118,19 @@ public:
   Q_SIGNAL void filterTextChanged();
   Q_SIGNAL void statisticsUpdated();
 
-protected:
+ protected:
   void refreshInstrumentationData();
   void refreshSamplingData();
   void refreshGpuData();
-  bool matchFilter(const QString&  name, const QString& location) const;
+  bool matchFilter(const QString& name, const QString& location) const;
 
-private:
+ private:
   View* view;
   ViewData& viewData;
   tracy::Worker& worker;
 
   tracy::Vector<SrcLocZonesSlim> srcData;
-  tracy::unordered_flat_map<int16_t,StatCache> statCache;
+  tracy::unordered_flat_map<int16_t, StatCache> statCache;
   tracy::unordered_flat_map<uint32_t, uint32_t> sourceFiles;
 
   AccumulationMode statAccumulationMode;

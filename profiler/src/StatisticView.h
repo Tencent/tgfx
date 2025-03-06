@@ -33,8 +33,9 @@ class StatisticsModel;
 class StatisticsView : public QWidget {
   Q_OBJECT
 
-public:
-  explicit StatisticsView( tracy::Worker& workerRef, ViewData& viewDataRef,View* view ,FramesView* framesView,SourceView* srcView,  QWidget* parent = nullptr);
+ public:
+  explicit StatisticsView(tracy::Worker& workerRef, ViewData& viewDataRef, View* view,
+                          FramesView* framesView, SourceView* srcView, QWidget* parent = nullptr);
 
   Q_SLOT void updateColumnSizes();
   Q_SLOT void updateZoneCountLabels();
@@ -50,9 +51,11 @@ public:
   bool srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker, View* view);
   void showContentMenu(const QPoint& pos);
 
-  StatisticsModel* getModel() const {return model;}
+  StatisticsModel* getModel() const {
+    return model;
+  }
 
-private:
+ private:
   tracy::Worker& worker;
   ViewData& viewData;
   View* view;
@@ -69,5 +72,3 @@ private:
   QLabel* mvisibleZonesLabel;
   const char* srcViewFile;
 };
-
-

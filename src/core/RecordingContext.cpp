@@ -38,7 +38,7 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
       continue;
     }
     switch (record->type()) {
-      case RecordType::DrawStyle:
+      case RecordType::DrawFill:
         hasUnboundedFill = true;
         break;
       case RecordType::DrawShape:
@@ -73,59 +73,59 @@ void RecordingContext::clear() {
   records.clear();
 }
 
-void RecordingContext::drawStyle(const MCState& state, const FillStyle& style) {
-  if (state.clip.isInverseFillType() && state.clip.isEmpty() && style.isOpaque()) {
-    // The clip is wide open, and the style is opaque, so we can discard all previous records as
+void RecordingContext::drawFill(const MCState& state, const Fill& fill) {
+  if (state.clip.isInverseFillType() && state.clip.isEmpty() && fill.isOpaque()) {
+    // The clip is wide open, and the fill is opaque, so we can discard all previous records as
     // they are now invisible.
     clear();
   }
-  if (style.color.alpha > 0.0f) {
-    records.push_back(new DrawStyle(state, style));
+  if (fill.color.alpha > 0.0f) {
+    records.push_back(new DrawFill(state, fill));
   }
 }
 
-void RecordingContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
-  records.push_back(new DrawRect(rect, state, style));
+void RecordingContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+  records.push_back(new DrawRect(rect, state, fill));
 }
 
-void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) {
-  records.push_back(new DrawRRect(rRect, state, style));
+void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+  records.push_back(new DrawRRect(rRect, state, fill));
 }
 
 void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const FillStyle& style) {
+                                 const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
-  records.push_back(new DrawShape(std::move(shape), state, style));
+  records.push_back(new DrawShape(std::move(shape), state, fill));
 }
 
 void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const FillStyle& style) {
+                                 const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  records.push_back(new DrawImage(std::move(image), sampling, state, style));
+  records.push_back(new DrawImage(std::move(image), sampling, state, fill));
 }
 
 void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions& sampling, const MCState& state,
-                                     const FillStyle& style) {
+                                     const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  records.push_back(new DrawImageRect(std::move(image), rect, sampling, state, style));
+  records.push_back(new DrawImageRect(std::move(image), rect, sampling, state, fill));
 }
 
 void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                        const Stroke* stroke, const MCState& state,
-                                        const FillStyle& style) {
+                                        const MCState& state, const Fill& fill,
+                                        const Stroke* stroke) {
   if (stroke) {
-    records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), *stroke, state, style));
+    records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), state, fill, *stroke));
   } else {
-    records.push_back(new DrawGlyphRunList(std::move(glyphRunList), state, style));
+    records.push_back(new DrawGlyphRunList(std::move(glyphRunList), state, fill));
   }
 }
 
 void RecordingContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> filter, const MCState& state,
-                                 const FillStyle& style) {
+                                 const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
-  records.push_back(new DrawLayer(std::move(picture), std::move(filter), state, style));
+  records.push_back(new DrawLayer(std::move(picture), std::move(filter), state, fill));
 }
 
 void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {

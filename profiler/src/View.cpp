@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "View.h"
+#include <QDockWidget>
 #include <QGroupBox>
 #include <QLabel>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QRadioButton>
 #include <QSpinBox>
-#include <QDockWidget>
 #include "FramesView.h"
 #include "MainView.h"
 #include "TimelineView.h"
@@ -176,10 +176,10 @@ void View::changeViewModeButton(ViewMode mode) {
 }
 
 void View::openStatisticsView() {
-  if(!statisticsView) {
+  if (!statisticsView) {
     statisticsView = new StatisticsView(worker, viewData, this, framesView, sourceView);
     statisticsView->setAttribute(Qt::WA_DeleteOnClose);
-    connect(statisticsView, &QObject::destroyed, this, [this](){statisticsView = nullptr;});
+    connect(statisticsView, &QObject::destroyed, this, [this]() { statisticsView = nullptr; });
   }
   //statisticsView->raise();
   statisticsView->show();
@@ -301,10 +301,10 @@ void View::timerEvent(QTimerEvent*) {
 }
 
 const char* View::sourceSubstitution(const char* srcFile) const {
-  if(!srcRegexValid || srcSubstitutions.empty()) return srcFile;
+  if (!srcRegexValid || srcSubstitutions.empty()) return srcFile;
   static std::string res, tmp;
   res.assign(srcFile);
-  for(auto& v : srcSubstitutions) {
+  for (auto& v : srcSubstitutions) {
     tmp = std::regex_replace(res, v.regex, v.target);
     std::swap(tmp, res);
   }

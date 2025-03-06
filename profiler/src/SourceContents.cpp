@@ -20,13 +20,9 @@
 #include <vector>
 #include "View.h"
 
-SourceContents::SourceContents():
-  files(nullptr),
-  fileStringIdx(0),
-  mdata(nullptr),
-  mdataSize(0),
-  dataBuf(nullptr),
-  dataBufSize(0){
+SourceContents::SourceContents()
+    : files(nullptr), fileStringIdx(0), mdata(nullptr), mdataSize(0), dataBuf(nullptr),
+      dataBufSize(0) {
 }
 
 SourceContents::~SourceContents() {
@@ -34,26 +30,25 @@ SourceContents::~SourceContents() {
 }
 
 void SourceContents::Parse(const char* fileName, const tracy::Worker& worker, const View* view) {
-  if(files == fileName) return;
+  if (files == fileName) return;
 
   files = fileName;
   fileStringIdx = worker.FindStringIdx(fileName);
   lines.clear();
 
-  if(fileName) {
+  if (fileName) {
     size_t sz;
     const auto srcCache = worker.GetSourceFileFromCache(fileName);
-    if(srcCache.data != nullptr) {
+    if (srcCache.data != nullptr) {
       mdata = srcCache.data;
       mdataSize = srcCache.len;
       sz = srcCache.len;
-    }
-    else {
+    } else {
       FILE* f = fopen(view->sourceSubstitution(fileName), "rb");
-      if(f) {
-        if(fseek(f, 0, SEEK_END) == 0) {
+      if (f) {
+        if (fseek(f, 0, SEEK_END) == 0) {
           long pos = ftell(f);
-          if(pos < 0) {
+          if (pos < 0) {
             fclose(f);
             files = nullptr;
             return;
@@ -61,7 +56,7 @@ void SourceContents::Parse(const char* fileName, const tracy::Worker& worker, co
 
           sz = static_cast<size_t>(pos);
           fseek(f, 0, SEEK_SET);
-          if(sz > dataBufSize) {
+          if (sz > dataBufSize) {
             delete[] dataBuf;
             dataBuf = new char[sz];
             dataBufSize = sz;
@@ -71,23 +66,21 @@ void SourceContents::Parse(const char* fileName, const tracy::Worker& worker, co
           mdata = dataBuf;
           mdataSize = sz;
           fclose(f);
-        }
-        else {
+        } else {
           fclose(f);
           files = nullptr;
           return;
         }
-      }
-      else {
+      } else {
         files = nullptr;
       }
     }
-    if(files) Tokenize(mdata, sz);
+    if (files) Tokenize(mdata, sz);
   }
 }
 
 void SourceContents::Parse(const char* source) {
-  if(source == mdata) return;
+  if (source == mdata) return;
   const size_t len = strlen(source);
 
   files = nullptr;
@@ -99,33 +92,32 @@ void SourceContents::Parse(const char* source) {
 
 void SourceContents::Tokenize(const char* txt, size_t sz) {
   Tokenizer tokenizer;
-  for(;;) {
+  for (;;) {
     auto end = txt;
     auto offset = static_cast<size_t>(end - mdata);
-    while(*end != '\n' && *end != '\r' && offset < sz) {
+    while (*end != '\n' && *end != '\r' && offset < sz) {
       end++;
       offset = static_cast<size_t>(end - mdata);
     }
 
     lines.emplace_back(Tokenizer::Line{txt, end, tokenizer.tokenize(txt, end)});
-    if(offset == sz) break;
-    if(*end == '\n') {
+    if (offset == sz) break;
+    if (*end == '\n') {
       end++;
       offset = static_cast<size_t>(end - mdata);
-      if(offset < sz && *end == '\r') {
+      if (offset < sz && *end == '\r') {
+        end++;
+        offset = static_cast<size_t>(end - mdata);
+      }
+    } else if (*end == '\r') {
+      end++;
+      offset = static_cast<size_t>(end - mdata);
+      if (offset < sz && *end == '\n') {
         end++;
         offset = static_cast<size_t>(end - mdata);
       }
     }
-    else if(*end == '\r') {
-      end++;
-      offset = static_cast<size_t>(end - mdata);
-      if(offset < sz && *end == '\n') {
-        end++;
-        offset = static_cast<size_t>(end - mdata);
-      }
-    }
-    if(offset == sz) break;
+    if (offset == sz) break;
     txt = end;
   }
 }

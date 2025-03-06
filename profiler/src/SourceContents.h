@@ -17,30 +17,44 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "TracyWorker.hpp"
 #include <vector>
 #include "SourceTokenizer.h"
+#include "TracyWorker.hpp"
 
 class View;
 
 class SourceContents {
-public:
+ public:
   SourceContents();
   ~SourceContents();
 
   void Parse(const char* fileName, const tracy::Worker& worker, const View* view);
   void Parse(const char* source);
 
-  const std::vector<Tokenizer::Line>& get() const {return lines;}
-  bool empty() const {return lines.empty();}
+  const std::vector<Tokenizer::Line>& get() const {
+    return lines;
+  }
+  bool empty() const {
+    return lines.empty();
+  }
 
-  const char* filename() const {return files;}
-  uint32_t idx() const {return fileStringIdx;}
-  bool isCached() const {return mdata != dataBuf;}
-  const char* data() const {return mdata;}
-  size_t dataSize() const {return mdataSize;}
+  const char* filename() const {
+    return files;
+  }
+  uint32_t idx() const {
+    return fileStringIdx;
+  }
+  bool isCached() const {
+    return mdata != dataBuf;
+  }
+  const char* data() const {
+    return mdata;
+  }
+  size_t dataSize() const {
+    return mdataSize;
+  }
 
-private:
+ private:
   void Tokenize(const char* txt, size_t sz);
 
   const char* files;

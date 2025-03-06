@@ -40,6 +40,13 @@ std::shared_ptr<ConicGradient> Gradient::MakeConic(const Point& center, float st
       new ConicGradient(center, startAngle, endAngle, colors, positions));
 }
 
+std::shared_ptr<DiamondGradient> Gradient::MakeDiamond(const Point& center, float halfDiagonal,
+                                                       const std::vector<Color>& colors,
+                                                       const std::vector<float>& positions) {
+  return std::shared_ptr<DiamondGradient>(
+      new DiamondGradient(center, halfDiagonal, colors, positions));
+}
+
 void Gradient::setColors(std::vector<Color> colors) {
   if (_colors.size() == colors.size() &&
       std::equal(_colors.begin(), _colors.end(), colors.begin())) {
@@ -74,7 +81,7 @@ void LinearGradient::setStartPoint(const Point& startPoint) {
   invalidate();
 }
 
-std::shared_ptr<Shader> LinearGradient::getShader() const {
+std::shared_ptr<Shader> LinearGradient::onGetShader() const {
   return Shader::MakeLinearGradient(_startPoint, _endPoint, _colors, _positions);
 }
 
@@ -94,7 +101,7 @@ void RadialGradient::setRadius(float radius) {
   invalidate();
 }
 
-std::shared_ptr<Shader> RadialGradient::getShader() const {
+std::shared_ptr<Shader> RadialGradient::onGetShader() const {
   return Shader::MakeRadialGradient(_center, _radius, _colors, _positions);
 }
 
@@ -122,7 +129,28 @@ void ConicGradient::setEndAngle(float endAngle) {
   invalidate();
 }
 
-std::shared_ptr<Shader> ConicGradient::getShader() const {
+std::shared_ptr<Shader> ConicGradient::onGetShader() const {
   return Shader::MakeConicGradient(_center, _startAngle, _endAngle, _colors, _positions);
 }
+
+void DiamondGradient::setCenter(const Point& center) {
+  if (_center == center) {
+    return;
+  }
+  _center = center;
+  invalidate();
+}
+
+void DiamondGradient::setHalfDiagonal(float halfDiagonal) {
+  if (_halfDiagonal == halfDiagonal) {
+    return;
+  }
+  _halfDiagonal = halfDiagonal;
+  invalidate();
+}
+
+std::shared_ptr<Shader> DiamondGradient::onGetShader() const {
+  return Shader::MakeDiamondGradient(_center, _halfDiagonal, _colors, _positions);
+}
+
 }  // namespace tgfx

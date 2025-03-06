@@ -35,6 +35,7 @@ enum class SLType {
   Int2,
   Int3,
   Int4,
+  UByte4Color,
   Texture2DSampler,
   TextureExternalSampler,
   Texture2DRectSampler,
