@@ -21,7 +21,6 @@
 #include <set>
 #include <sstream>
 #include <string>
-#include <vector>
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -128,51 +127,5 @@ WGLInterface InitialiseWGL() {
 const WGLInterface* WGLInterface::Get() {
   static WGLInterface instance = InitialiseWGL();
   return &instance;
-}
-
-void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
-  auto wglInterface = WGLInterface::Get();
-  if (!wglInterface->pixelFormatSupport) {
-    return;
-  }
-
-  std::vector<int> intAttributes{WGL_DRAW_TO_WINDOW,
-                                 TRUE,
-                                 WGL_DOUBLE_BUFFER,
-                                 TRUE,
-                                 WGL_ACCELERATION,
-                                 WGL_FULL_ACCELERATION,
-                                 WGL_SUPPORT_OPENGL,
-                                 TRUE,
-                                 WGL_COLOR_BITS,
-                                 24,
-                                 WGL_ALPHA_BITS,
-                                 8,
-                                 WGL_STENCIL_BITS,
-                                 8,
-                                 0,
-                                 0};
-
-  auto format = formatsToTry[0] ? &formatsToTry[0] : &formatsToTry[1];
-  unsigned numFormats = 0;
-  constexpr float floatAttributes[] = {0, 0};
-  wglInterface->wglChoosePixelFormat(deviceContext, intAttributes.data(), floatAttributes, 1,
-                                     format, &numFormats);
-}
-
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
-  auto oldDeviceContext = wglGetCurrentDC();
-  auto oldGLContext = wglGetCurrentContext();
-  auto glContext = wglCreateContext(deviceContext);
-  if (glContext == nullptr) {
-    LOGE("CreateGLContext() wglCreateContext failed.");
-    return nullptr;
-  }
-  if (sharedContext != nullptr && !wglShareLists(sharedContext, glContext)) {
-    wglDeleteContext(glContext);
-    return nullptr;
-  }
-  wglMakeCurrent(oldDeviceContext, oldGLContext);
-  return glContext;
 }
 }  // namespace tgfx

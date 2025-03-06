@@ -18,6 +18,7 @@
 
 #include "WGLWindowDevice.h"
 #include "WGLInterface.h"
+#include "WGLUtil.h"
 
 namespace tgfx {
 static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {

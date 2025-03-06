@@ -19,6 +19,7 @@
 #include "WGLPbufferDevice.h"
 #include <mutex>
 #include "WGLInterface.h"
+#include "WGLUtil.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {

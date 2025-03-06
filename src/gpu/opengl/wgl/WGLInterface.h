@@ -59,9 +59,4 @@ class WGLInterface {
   ReleasePbufferDCProc wglReleasePbufferDC = nullptr;
   DestroyPbufferProc wglDestroyPbuffer = nullptr;
 };
-
-void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
-
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext);
-
 }  // namespace tgfx
