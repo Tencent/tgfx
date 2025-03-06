@@ -80,6 +80,10 @@ class CustomPathGlyphFace : public GlyphFace {
   }
 
   Rect getBounds(GlyphID glyphID) const override {
+    if (glyphID == 100) {
+      return Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
+    }
+
     if (glyphID < 1 || glyphID > 3) {
       return Rect::MakeEmpty();
     }
@@ -454,6 +458,8 @@ TGFX_TEST(GlyphFaceTest, MakeTextBlobWithGlyphFace) {
   shapeLayer5->setStrokeStyle(strokeStyle5);
   shapeLayer5->setLineWidth(10.0f);
   shapeLayer5->setStrokeAlign(StrokeAlign::Center);
+  shapeLayer5->setLineDashPattern({10.0f, 10.0f});
+  shapeLayer5->setLineDashPhase(5.0f);
   auto fillStyle5 = SolidColor::Make(Color::Blue());
   shapeLayer5->setFillStyle(fillStyle5);
   rootLayer->addChild(shapeLayer5);
@@ -465,6 +471,8 @@ TGFX_TEST(GlyphFaceTest, MakeTextBlobWithGlyphFace) {
   shapeLayer6->setStrokeStyle(strokeStyle6);
   shapeLayer6->setLineWidth(10.0f);
   shapeLayer6->setStrokeAlign(StrokeAlign::Inside);
+  shapeLayer6->setLineDashPattern({10.0f, 10.0f});
+  shapeLayer6->setLineDashPhase(5.0f);
   auto fillStyle6 = SolidColor::Make(Color::Blue());
   shapeLayer6->setFillStyle(fillStyle6);
   rootLayer->addChild(shapeLayer6);
