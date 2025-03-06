@@ -44,9 +44,16 @@ TimelineView::TimelineView(QQuickItem* parent) : QQuickItem(parent) {
   setAcceptedMouseButtons(Qt::AllButtons);
   setAcceptHoverEvents(true);
   createAppHost();
+  initConnect();
 }
 
 TimelineView::~TimelineView() {
+}
+
+
+void TimelineView::initConnect() {
+  connect(this, &TimelineView::showZoneToolTipSignal, this, &TimelineView::showZoneToolTip);
+  connect(this, &TimelineView::showFlodedToolTipSignal, this, &TimelineView::showFlodedToolTip);
 }
 
 uint32_t TimelineView::getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth) {
@@ -373,12 +380,9 @@ void TimelineView::drawZonelist(const TimelineContext& ctx,
             mouseData.y <= p1.y + p2.y) {
           hoverData.zoneHover = &ev;
           if (v.num > 1) {
-            QString tooltip = QString("Zone too small to display: %1\n").arg(v.num);
-            tooltip += QString("Excution time: %1")
-                           .arg(QString::fromStdString(tracy::TimeToString(rend - ev.Start())));
-            QToolTip::showText(QCursor::pos(), tooltip);
+            emit showFlodedToolTipSignal(v.num, rend - ev.Start());
           } else {
-            showZoneToolTip(ev);
+            emit showZoneToolTipSignal(ev);
           }
           const auto hoverBorderColor = 0xFFFFFFFF;
           const auto thickness = tgfx::Point{1.f, 1.f};
@@ -414,7 +418,7 @@ void TimelineView::drawZonelist(const TimelineContext& ctx,
         if (mouseData.x >= p1.x && mouseData.x <= p1.x + p2.x && mouseData.y >= p1.y &&
             mouseData.y <= p1.y + p2.y) {
           hoverData.zoneHover = &ev;
-          showZoneToolTip(ev);
+          emit showZoneToolTipSignal(ev);
           hightLight = true;
         }
 
@@ -597,11 +601,8 @@ void TimelineView::createAppHost() {
   auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
 #else
   auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
-  auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
-  auto emojiTypeface = tgfx::Typeface::MakeFromPath(std::string(emojiPath.toLocal8Bit()));
 #endif
   appHost->addTypeface("default", defaultTypeface);
-  appHost->addTypeface("emoji", emojiTypeface);
 }
 
 void TimelineView::draw() {
@@ -818,6 +819,14 @@ void TimelineView::showZoneToolTip(const tracy::ZoneEvent& ev) {
   }
   QToolTip::showText(QCursor::pos(), ZoneMsg);
 }
+
+void TimelineView::showFlodedToolTip(uint32_t num, uint64_t time) {
+  QString tooltip = QString("Zone too small to display: %1\n").arg(num);
+  tooltip += QString("Excution time: %1")
+                 .arg(QString::fromStdString(tracy::TimeToString(time)));
+  QToolTip::showText(QCursor::pos(), tooltip);
+}
+
 
 void TimelineView::hoverLeaveEvent(QHoverEvent* event) {
   QToolTip::hideText();

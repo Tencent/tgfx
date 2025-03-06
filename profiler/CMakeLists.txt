@@ -37,7 +37,6 @@ if (NOT CMAKE_PREFIX_PATH)
     include("./QTCMAKE.cfg")
 endif ()
 
-add_definitions(-DQT_NO_KEYWORDS -Wno-shorten-64-to-32)
 list(APPEND PROFILER_COMPILE_OPTIONS -Wno-error)
 
 option(TGFX_ENABLE_PROFILING "Enable Profiling" OFF)

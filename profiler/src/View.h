@@ -97,13 +97,13 @@ class View : public QWidget {
   std::string filenameStaging;
 
   const Config& config;
-  FramesView* framesView;
-  TimelineView* timelineView;
-  QMainWindow* statMainWindow;
-  StatisticsView* statisticsView;
-  SourceView* sourceView;
-  SaveFileDialog* saveFileDialog;
-  QDialog* connectDialog;
+  FramesView* framesView = nullptr;
+  TimelineView* timelineView = nullptr;
+  QMainWindow* statMainWindow = nullptr;
+  StatisticsView* statisticsView = nullptr;
+  SourceView* sourceView = nullptr;
+  SaveFileDialog* saveFileDialog = nullptr;
+  QDialog* connectDialog = nullptr;
   int timerId;
 
   //source file regex member...

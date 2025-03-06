@@ -76,9 +76,6 @@ class FramesView : public QQuickItem {
     viewMode = (ViewMode*)_viewMode;
   }
 
-  //hover information utility.
-  void showFrameTip(const tracy::FrameData* frames);
-
   //signals
   Q_SIGNAL void changeViewMode(ViewMode mode);
   Q_SIGNAL void statRangeChanged(int64_t startTime, int64_t endTime, bool acive);

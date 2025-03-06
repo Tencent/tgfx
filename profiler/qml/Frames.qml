@@ -7,6 +7,8 @@ Window {
     visible: true
     width: _width
     height: 50
+    flags: Qt.FramelessWindowHint
+    color: "transparent"
 
     FramesView {
         id: framesView

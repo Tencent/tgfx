@@ -18,7 +18,6 @@
 
 #include "FramesView.h"
 #include <qevent.h>
-#include <sys/socket.h>
 #include <QSGImageNode>
 #include <QToolTip>
 #include "TimelineView.h"
@@ -188,11 +187,8 @@ void FramesView::createAppHost() {
   auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
 #else
   auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
-  auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
-  auto emojiTypeface = tgfx::Typeface::MakeFromPath(std::string(emojiPath.toLocal8Bit()));
 #endif
   appHost->addTypeface("default", defaultTypeface);
-  appHost->addTypeface("emoji", emojiTypeface);
 }
 
 void FramesView::setViewToLastFrames() {
@@ -361,7 +357,6 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
     }
     update();
     event->accept();
-    return;
   }
 }
 
