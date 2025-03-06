@@ -90,7 +90,8 @@
     },
     "GlyphFaceTest": {
         "GlyphFaceSimple": "1edd823",
-        "GlyphFaceWithStyle": "4032de2"
+        "GlyphFaceWithStyle": "4032de2",
+        "MakeTextBlobWithGlyphFace": "efbebd1"
     },
     "ImageReaderTest": {
         "update_bitmap": "1edd823",
