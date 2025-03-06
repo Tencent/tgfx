@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/utils/MathExtra.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
 #include "tgfx/layers/TextLayer.h"
-#include "core/utils/MathExtra.h"
-#include "tgfx/core/Canvas.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -364,14 +364,9 @@ TGFX_TEST(GlyphFaceTest, MakeTextBlobWithGlyphFace) {
   // text: 找个地方吃饭
   // GlyphID: 13917 8741 11035 14739 10228 27929
   GlyphID glyphIDs[] = {13917, 8741, 11035, 14739, 10228, 27929};
-  Point positions[] = {
-    Point::Make(150.0f, 150.0f),
-    Point::Make(250.0f, 150.0f),
-    Point::Make(350.0f, 150.0f),
-    Point::Make(450.0f, 150.0f),
-    Point::Make(550.0f, 150.0f),
-    Point::Make(650.0f, 150.0f)
-  };
+  Point positions[] = {Point::Make(150.0f, 150.0f), Point::Make(250.0f, 150.0f),
+                       Point::Make(350.0f, 150.0f), Point::Make(450.0f, 150.0f),
+                       Point::Make(550.0f, 150.0f), Point::Make(650.0f, 150.0f)};
   auto textBlob = TextBlob::MakeFrom(glyphIDs, positions, 6, GlyphFace::Wrap(font));
   auto textShape = Shape::MakeFrom(textBlob);
 
@@ -437,7 +432,8 @@ TGFX_TEST(GlyphFaceTest, MakeTextBlobWithGlyphFace) {
   // Rect
   std::vector<GlyphID> glyphIDs2 = {100};
   std::vector<Point> positions2 = {{0.0f, 0.0f}};
-  auto textBlob2 = TextBlob::MakeFrom(glyphIDs2.data(), positions2.data(), 1, std::make_shared<CustomPathGlyphFace>());
+  auto textBlob2 = TextBlob::MakeFrom(glyphIDs2.data(), positions2.data(), 1,
+                                      std::make_shared<CustomPathGlyphFace>());
   auto textShape2 = Shape::MakeFrom(textBlob2);
 
   auto shapeLayer4 = ShapeLayer::Make();
