@@ -71,17 +71,17 @@ void StatisticsView::setupUI() {
   // auto samBtn = new QRadioButton(tr("Sampling"), this);
   // samBtn->setStyleSheet("QRadioButton {color:white;}");
   //
-  // auto gpuBtn = new QRadioButton(tr("GPU"), this);
-  // gpuBtn->setStyleSheet("QRadioButton {color:white;}");
+   auto gpuBtn = new QRadioButton(tr("GPU"), this);
+   gpuBtn->setStyleSheet("QRadioButton {color:white;}");
 
   insBtn->setChecked(true);
   modeGroup->addButton(insBtn, 0);
   // modeGroup->addButton(samBtn, 1);
-  // modeGroup->addButton(gpuBtn, 1);
+   modeGroup->addButton(gpuBtn, 1);
 
   toolBarLayout->addWidget(insBtn);
   // toolBarLayout->addWidget(samBtn);
-  // toolBarLayout->addWidget(gpuBtn);
+   toolBarLayout->addWidget(gpuBtn);
 
   //seperator
   auto sep1 = new QLabel("|", this);
@@ -214,7 +214,11 @@ void StatisticsView::setupTableView() {
   tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
   tableView->setSelectionMode(QAbstractItemView::SingleSelection);
   tableView->setSortingEnabled(true);
-  tableView->setAlternatingRowColors(true);
+  tableView->setStyleSheet(
+    "QTableView { background-color: #2D2D2D; color: white; gridline-color: #404040; }"
+    "QTableView::item:selected { background-color: #505050; color: white; }"
+    "QHeaderView::section { color: white; background-color: #2D2D2D; border: 1px solid #404040; }"
+  );
   tableView->horizontalHeader()->setStretchLastSection(true);
   tableView->horizontalHeader()->setSortIndicatorShown(true);
   tableView->horizontalHeader()->setSectionsMovable(true);
@@ -238,7 +242,7 @@ void StatisticsView::viewSource(const char* fileName, int line) {
   if(!srcView) {
     srcView = new SourceView(nullptr);
     srcView->setAttribute(Qt::WA_DeleteOnClose);
-
+    srcView->setStyleSheet("background-color: #2D2D2D;");
     connect(srcView, &QObject::destroyed, this, [this](){
         srcView = nullptr;
     });
@@ -339,12 +343,12 @@ void StatisticsView::onStatgeRangeChanged(int64_t start, int64_t end, bool activ
        view->m_statRange.min = viewData.zvStart;
        view->m_statRange.max = viewData.zvEnd;
        model->setStatRange(view->m_statRange.min, view->m_statRange.max, true);
-       model->refreshData();
+       //model->refreshData();
       }
       else {
         view->m_statRange.active = false;
         model->setStatRange(0, 0, false);
-        model->refreshData();
+        //model->refreshData();
       }
       updateZoneCountLabels();
     }
