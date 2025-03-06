@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Paint.h"
+#pragma once
+
+#include "gpu/processors/DiamondGradientLayout.h"
 
 namespace tgfx {
-void Paint::setShader(std::shared_ptr<Shader> newShader) {
-  fill.shader = std::move(newShader);
-  if (fill.shader) {
-    Color color = {};
-    if (fill.shader->asColor(&color)) {
-      color.alpha *= getAlpha();
-      fill.color = color;
-      fill.shader = nullptr;
-    }
-  }
-}
+class GLDiamondGradientLayout : public DiamondGradientLayout {
+ public:
+  explicit GLDiamondGradientLayout(Matrix matrix);
 
-void Paint::reset() {
-  stroke = Stroke(0);
-  fill = {};
-  imageFilter = nullptr;
-  style = PaintStyle::Fill;
-}
+  void emitCode(EmitArgs& args) const override;
+};
 }  // namespace tgfx

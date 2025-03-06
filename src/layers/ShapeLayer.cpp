@@ -81,11 +81,11 @@ void ShapeLayer::removeFillStyles() {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fill) {
-  if (fill == nullptr) {
+void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+  if (fillStyle == nullptr) {
     removeFillStyles();
   } else {
-    setFillStyles({std::move(fill)});
+    setFillStyles({std::move(fillStyle)});
   }
 }
 
@@ -244,10 +244,10 @@ ShapeLayer::~ShapeLayer() {
 }
 
 static bool NothingToDraw(ShapeStyle* style) {
-  Paint paint = {};
-  paint.setAlpha(style->alpha());
-  paint.setBlendMode(style->blendMode());
-  return paint.nothingToDraw();
+  Fill fill = {};
+  fill.color.alpha = style->alpha();
+  fill.blendMode = style->blendMode();
+  return fill.nothingToDraw();
 }
 
 std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {

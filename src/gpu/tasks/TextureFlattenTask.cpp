@@ -56,11 +56,10 @@ bool TextureFlattenTask::prepare(Context* context) {
   return true;
 }
 
-bool TextureFlattenTask::execute(Context* context) {
+bool TextureFlattenTask::execute(RenderPass* renderPass) {
   if (renderTarget == nullptr) {
     return false;
   }
-  auto renderPass = context->gpu()->getRenderPass();
   if (!renderPass->begin(renderTarget, flatTexture)) {
     LOGE("TextureFlattenTask::execute() Failed to initialize the render pass!");
     return false;
@@ -76,7 +75,8 @@ bool TextureFlattenTask::execute(Context* context) {
       DefaultGeometryProcessor::Make(Color::White(), renderTarget->width(), renderTarget->height(),
                                      AAType::None, Matrix::I(), Matrix::I());
   auto format = renderPass->renderTarget()->format();
-  const auto& swizzle = context->caps()->getWriteSwizzle(format);
+  auto caps = renderPass->getContext()->caps();
+  const auto& swizzle = caps->getWriteSwizzle(format);
   auto pipeline =
       std::make_unique<Pipeline>(std::move(geometryProcessor), std::move(fragmentProcessors), 1,
                                  nullptr, BlendMode::Src, &swizzle);

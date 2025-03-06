@@ -22,7 +22,6 @@
 #include <string>
 #include "ResourceStore.h"
 #include "SVGUtils.h"
-#include "core/FillStyle.h"
 #include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -32,6 +31,7 @@
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
@@ -48,7 +48,7 @@ class ElementWriter {
                 ResourceStore* bucket);
   ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
                 XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
-                const FillStyle& fill, const Stroke* stroke = nullptr);
+                const Fill& fill, const Stroke* stroke = nullptr);
   ~ElementWriter();
 
   void addAttribute(const std::string& name, const std::string& val);
@@ -66,7 +66,7 @@ class ElementWriter {
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
 
  private:
-  Resources addResources(const FillStyle& fill, Context* context, SVGExportContext* svgContext);
+  Resources addResources(const Fill& fill, Context* context, SVGExportContext* svgContext);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
@@ -94,7 +94,7 @@ class ElementWriter {
   void addShaderMaskResources(const std::shared_ptr<Shader>& shader, const std::string& filterID,
                               Context* context);
 
-  void addFillAndStroke(const FillStyle& fill, const Stroke* stroke, const Resources& resources);
+  void addFillAndStroke(const Fill& fill, const Stroke* stroke, const Resources& resources);
 
   void addGradientColors(const GradientInfo& info);
   std::string addLinearGradientDef(const GradientInfo& info);

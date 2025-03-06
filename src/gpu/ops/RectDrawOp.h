@@ -35,19 +35,30 @@ struct RectPaint {
 class RectDrawOp : public DrawOp {
  public:
   /**
+   * The maximum number of non-AA rects that can be drawn in a single draw call.
+   */
+  static constexpr uint16_t MaxNumNonAARects = 2048;  // max possible: (1 << 14) - 1;
+
+  /**
+   * The maximum number of AA rects that can be drawn in a single draw call.
+   */
+  static constexpr uint16_t MaxNumAARects = 512;  // max possible: (1 << 13) - 1;
+
+  /**
    * Create a new RectDrawOp for a list of RectPaints. The returned RectDrawOp is in the local space
    * of each rect.
    */
   static std::unique_ptr<RectDrawOp> Make(Context* context, const std::vector<RectPaint>& rects,
-                                          AAType aaType, uint32_t renderFlags);
+                                          bool useUVCoord, AAType aaType, uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  RectDrawOp(AAType aaType, size_t rectCount);
+  RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord);
 
   size_t rectCount = 0;
   std::optional<Color> uniformColor = std::nullopt;
+  bool useUVCoord = false;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   std::shared_ptr<Data> vertexData = nullptr;

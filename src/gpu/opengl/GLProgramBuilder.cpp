@@ -50,6 +50,7 @@ static constexpr std::pair<SLType, const char*> SLTypes[] = {
     {SLType::Int2, "ivec2"},
     {SLType::Int3, "ivec3"},
     {SLType::Int4, "ivec4"},
+    {SLType::UByte4Color, "vec4"},
     {SLType::Texture2DRectSampler, "sampler2DRect"},
     {SLType::TextureExternalSampler, "samplerExternalOES"},
     {SLType::Texture2DSampler, "sampler2D"},

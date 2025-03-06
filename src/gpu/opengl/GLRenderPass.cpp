@@ -30,10 +30,15 @@ struct AttribLayout {
 };
 
 static constexpr std::pair<SLType, AttribLayout> attribLayoutPair[] = {
-    {SLType::Float, {false, 1, GL_FLOAT}},  {SLType::Float2, {false, 2, GL_FLOAT}},
-    {SLType::Float3, {false, 3, GL_FLOAT}}, {SLType::Float4, {false, 4, GL_FLOAT}},
-    {SLType::Int, {false, 1, GL_INT}},      {SLType::Int2, {false, 2, GL_INT}},
-    {SLType::Int3, {false, 3, GL_INT}},     {SLType::Int4, {false, 4, GL_INT}}};
+    {SLType::Float, {false, 1, GL_FLOAT}},
+    {SLType::Float2, {false, 2, GL_FLOAT}},
+    {SLType::Float3, {false, 3, GL_FLOAT}},
+    {SLType::Float4, {false, 4, GL_FLOAT}},
+    {SLType::Int, {false, 1, GL_INT}},
+    {SLType::Int2, {false, 2, GL_INT}},
+    {SLType::Int3, {false, 3, GL_INT}},
+    {SLType::Int4, {false, 4, GL_INT}},
+    {SLType::UByte4Color, {true, 4, GL_UNSIGNED_BYTE}}};
 
 static AttribLayout GetAttribLayout(SLType type) {
   for (const auto& pair : attribLayoutPair) {
@@ -42,6 +47,11 @@ static AttribLayout GetAttribLayout(SLType type) {
     }
   }
   return {false, 0, 0};
+}
+
+std::unique_ptr<RenderPass> RenderPass::Make(Context* context) {
+  DEBUG_ASSERT(context != nullptr);
+  return std::make_unique<GLRenderPass>(context);
 }
 
 GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {

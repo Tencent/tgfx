@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Paint.h"
+#include "GLDiamondGradientLayout.h"
 
 namespace tgfx {
-void Paint::setShader(std::shared_ptr<Shader> newShader) {
-  fill.shader = std::move(newShader);
-  if (fill.shader) {
-    Color color = {};
-    if (fill.shader->asColor(&color)) {
-      color.alpha *= getAlpha();
-      fill.color = color;
-      fill.shader = nullptr;
-    }
-  }
+std::unique_ptr<DiamondGradientLayout> DiamondGradientLayout::Make(Matrix matrix) {
+  return std::unique_ptr<DiamondGradientLayout>(new GLDiamondGradientLayout(matrix));
 }
 
-void Paint::reset() {
-  stroke = Stroke(0);
-  fill = {};
-  imageFilter = nullptr;
-  style = PaintStyle::Fill;
+GLDiamondGradientLayout::GLDiamondGradientLayout(Matrix matrix) : DiamondGradientLayout(matrix) {
 }
+
+void GLDiamondGradientLayout::emitCode(EmitArgs& args) const {
+  auto* fragBuilder = args.fragBuilder;
+  const auto coord = (*args.transformedCoords)[0].name();
+  fragBuilder->codeAppendf("vec2 rotated = %s;", coord.c_str());
+  fragBuilder->codeAppendf("float t = max(abs(rotated.x), abs(rotated.y));");
+  fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
+}
+
 }  // namespace tgfx

@@ -42,6 +42,11 @@ enum class GradientType {
    * from the start angle to the end angle, wrapping around the center point.
    */
   Conic,
+  /**
+   * Diamond gradients are defined by a center point and a half-diagonal. The color gradient is
+   * drawn from the center point to the vertices of the diamond.
+   */
+  Diamond
 };
 
 }  // namespace tgfx

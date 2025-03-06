@@ -44,23 +44,27 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
 }
 
-void RenderContext::drawStyle(const MCState& state, const FillStyle& style) {
+void RenderContext::drawFill(const MCState& state, const Fill& fill) {
   auto& clip = state.clip;
-  auto discardContent = clip.isInverseFillType() && clip.isEmpty() && style.isOpaque();
-  if (auto compositor = getOpsCompositor(discardContent)) {
-    compositor->fillRect(renderTarget->bounds(), MCState{clip}, style.makeWithMatrix(state.matrix));
+  if (clip.isEmpty() && clip.isInverseFillType()) {
+    if (auto compositor = getOpsCompositor(fill.isOpaque())) {
+      compositor->fillRect(renderTarget->bounds(), {}, fill.makeWithMatrix(state.matrix));
+    }
+  } else {
+    auto shape = Shape::MakeFrom(clip);
+    drawShape(std::move(shape), {}, fill.makeWithMatrix(state.matrix));
   }
 }
 
-void RenderContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
+void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRect(rect, state, style);
+    compositor->fillRect(rect, state, fill);
   }
 }
 
-void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) {
+void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRRect(rRect, state, style);
+    compositor->fillRRect(rRect, state, fill);
   }
 }
 
@@ -75,53 +79,54 @@ static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
 }
 
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                              const FillStyle& style) {
+                              const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillShape(std::move(shape), state, style);
+    compositor->fillShape(std::move(shape), state, fill);
   }
 }
 
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                              const MCState& state, const FillStyle& style) {
+                              const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, style);
+  return drawImageRect(std::move(image), rect, sampling, state, fill);
 }
 
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                   const SamplingOptions& sampling, const MCState& state,
-                                  const FillStyle& style) {
+                                  const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  DEBUG_ASSERT(image->isAlphaOnly() || style.shader == nullptr);
-  auto imageRect = rect;
-  auto imageState = state;
-  auto imageStyle = style;
+  DEBUG_ASSERT(image->isAlphaOnly() || fill.shader == nullptr);
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
+  }
+  auto samplingOptions = sampling;
+  if (samplingOptions.mipmapMode != MipmapMode::None && !state.matrix.hasNonIdentityScale()) {
+    // There is no scaling for the source image, so we can disable mipmaps to save memory.
+    samplingOptions.mipmapMode = MipmapMode::None;
+  }
   auto subsetImage = Caster::AsSubsetImage(image.get());
-  if (subsetImage != nullptr) {
+  if (subsetImage == nullptr) {
+    compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
+  } else {
     // Unwrap the subset image to maximize the merging of draw calls.
+    auto imageRect = rect;
+    auto imageState = state;
     auto& subset = subsetImage->bounds;
     imageRect.offset(subset.left, subset.top);
     imageState.matrix.preTranslate(-subset.left, -subset.top);
     auto offsetMatrix = Matrix::MakeTrans(subset.left, subset.top);
-    imageStyle = style.makeWithMatrix(offsetMatrix);
-    image = subsetImage->source;
-  }
-  auto options = sampling;
-  if (options.mipmapMode != MipmapMode::None && !imageState.matrix.hasNonIdentityScale()) {
-    // There is no scaling for the source image, so we can disable mipmaps to save memory.
-    options.mipmapMode = MipmapMode::None;
-  }
-  if (auto compositor = getOpsCompositor()) {
-    compositor->fillImage(std::move(image), imageRect, options, imageState, imageStyle);
+    compositor->fillImage(subsetImage->source, imageRect, samplingOptions, imageState,
+                          fill.makeWithMatrix(offsetMatrix));
   }
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const Stroke* stroke, const MCState& state,
-                                     const FillStyle& style) {
+                                     const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   if (glyphRunList->hasColor()) {
-    drawColorGlyphs(std::move(glyphRunList), state, style);
+    drawColorGlyphs(std::move(glyphRunList), state, fill);
     return;
   }
   auto maxScale = state.matrix.getMaxScale();
@@ -143,13 +148,13 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   newState.matrix.preConcat(invert);
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), style.antiAlias,
+  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), fill.antiAlias,
                                          rasterizeMatrix, stroke);
   auto image = Image::MakeFrom(std::move(rasterizer));
   if (image == nullptr) {
     return;
   }
-  drawImage(std::move(image), {}, newState, style.makeWithMatrix(rasterizeMatrix));
+  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
 void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -158,8 +163,8 @@ void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState&
 }
 
 void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                              const MCState& state, const FillStyle& style) {
-  DEBUG_ASSERT(style.shader == nullptr);
+                              const MCState& state, const Fill& fill) {
+  DEBUG_ASSERT(fill.shader == nullptr);
   Matrix viewMatrix = {};
   Rect bounds = {};
   if (filter) {
@@ -202,11 +207,11 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
     return;
   }
   drawState.matrix.preConcat(invertMatrix);
-  drawImage(std::move(image), {}, drawState, style.makeWithMatrix(viewMatrix));
+  drawImage(std::move(image), {}, drawState, fill.makeWithMatrix(viewMatrix));
 }
 
 void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
-                                    const MCState& state, const FillStyle& style) {
+                                    const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
   if (scale <= 0) {
@@ -231,7 +236,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, style);
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill);
     }
   }
 }
@@ -253,6 +258,9 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    if (surface) {
+      surface->contentChanged();
+    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
@@ -267,10 +275,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    FillStyle fillStyle = {Color::White(), BlendMode::Src};
-    fillStyle.antiAlias = false;
-    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{},
-                             fillStyle);
+    Fill fill = {Color::White(), BlendMode::Src, false};
+    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill);
   }
 }
 

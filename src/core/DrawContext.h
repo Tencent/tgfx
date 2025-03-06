@@ -20,8 +20,8 @@
 
 #include <stack>
 #include "core/CanvasState.h"
-#include "core/FillStyle.h"
 #include "core/GlyphRunList.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
 
@@ -36,44 +36,43 @@ class DrawContext {
   virtual ~DrawContext() = default;
 
   /**
-   * Fills the entire clip area with the specified FillStyle.
+   * Fills the entire clip area with the specified Fill.
    */
-  virtual void drawStyle(const MCState& state, const FillStyle& style) = 0;
+  virtual void drawFill(const MCState& state, const Fill& fill) = 0;
 
   /**
-   * Draws a rectangle with the specified MCState and FillStyle.
+   * Draws a rectangle with the specified MCState and Fill.
    */
-  virtual void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) = 0;
+  virtual void drawRect(const Rect& rect, const MCState& state, const Fill& fill) = 0;
 
   /**
-   * Draws a rounded rectangle with the specified MCState and FillStyle.
+   * Draws a rounded rectangle with the specified MCState and Fill.
    */
-  virtual void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) = 0;
+  virtual void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) = 0;
 
   /**
-   * Draws a complex Shape with the specified MCState and FillStyle.
+   * Draws a complex Shape with the specified MCState and Fill.
    */
-  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                         const FillStyle& style) = 0;
+  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) = 0;
 
   /**
-   * Draws an Image with the specified SamplingOptions, MCState, and FillStyle.
+   * Draws an Image with the specified SamplingOptions, MCState, and Fill.
    */
   virtual void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                         const MCState& state, const FillStyle& style) = 0;
+                         const MCState& state, const Fill& fill) = 0;
 
   /**
-   * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and FillStyle.
+   * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and Fill.
    */
   virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                              const SamplingOptions& sampling, const MCState& state,
-                             const FillStyle& style) = 0;
+                             const Fill& fill) = 0;
 
   /**
-   * Draws a GlyphRunList with the specified MCState, FillStyle, and optional Stroke.
+   * Draws a GlyphRunList with the specified MCState, Fill, and optional Stroke.
    */
-  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
-                                const MCState& state, const FillStyle& style) = 0;
+  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                                const Fill& fill, const Stroke* stroke) = 0;
 
   /**
    * Draws a Picture with the specified MCState.
@@ -83,9 +82,9 @@ class DrawContext {
   /**
    * Draws a Picture into an offscreen layer. This offscreen layer is then passed to the image
    * filter (if not nullptr), which generates a new image. This new image is finally drawn using the
-   * specified FillStyle.
+   * specified Fill.
    */
   virtual void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                         const MCState& state, const FillStyle& style) = 0;
+                         const MCState& state, const Fill& fill) = 0;
 };
 }  // namespace tgfx

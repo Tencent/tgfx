@@ -34,7 +34,7 @@ class FragmentProcessor;
 /**
  * Shaders specify the source color(s) for what is being drawn. If a paint has no shader, then the
  * paint's color is used. If the paint has a shader, then the shader's color(s) are used instead,
- * but they are modulated by the paint's alpha. Shaders are in
+ * but they are modulated by the paint's alpha.
  */
 class Shader {
  public:
@@ -105,6 +105,20 @@ class Shader {
                                                    float endAngle, const std::vector<Color>& colors,
                                                    const std::vector<float>& positions = {});
 
+  /**
+   * Returns a shader that generates a diamond gradient given the center and half-diagonal. The
+   * color gradient is drawn from the center point to the vertices of the diamond.
+   * @param center The center of the diamond for this gradient
+   * @param halfDiagonal Must be positive. The half-diagonal of the diamond for this gradient.
+   * @param colors The array of colors, to be distributed between the center and edge of the circle.
+   * @param positions Maybe empty. The relative position of each corresponding color in the color
+   * array. If this is empty, the colors are distributed evenly between the start and end point.
+   * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
+   * be strictly increasing.
+   */
+  static std::shared_ptr<Shader> MakeDiamondGradient(const Point& center, float halfDiagonal,
+                                                     const std::vector<Color>& colors,
+                                                     const std::vector<float>& positions = {});
   virtual ~Shader() = default;
 
   /**

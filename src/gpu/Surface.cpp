@@ -200,10 +200,6 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
 }
 
 bool Surface::aboutToDraw(bool discardContent) {
-  do {
-    _contentVersion++;
-  } while (InvalidContentVersion == _contentVersion);
-
   if (cachedImage == nullptr) {
     return true;
   }
@@ -225,6 +221,12 @@ bool Surface::aboutToDraw(bool discardContent) {
   }
   renderContext->replaceRenderTarget(std::move(newRenderTarget), std::move(oldContent));
   return true;
+}
+
+void Surface::contentChanged() {
+  do {
+    _contentVersion++;
+  } while (InvalidContentVersion == _contentVersion);
 }
 
 void Surface::forceResolveRenderTarget() {

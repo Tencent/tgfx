@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/FillStyle.h"
 #include "core/PathRef.h"
 #include "core/Records.h"
 #include "core/images/ResourceImage.h"
@@ -33,6 +32,7 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
@@ -666,8 +666,6 @@ TGFX_TEST(CanvasTest, simpleShape) {
   ASSERT_TRUE(image != nullptr);
   Paint paint;
   paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(0));
-  EXPECT_TRUE(paint.nothingToDraw());
   paint.setStrokeWidth(2);
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   auto point = Point::Make(width / 2, height / 2);

@@ -18,7 +18,6 @@
 
 #include "DrawingManager.h"
 #include "core/utils/Profiling.h"
-#include "gpu/Gpu.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
@@ -34,7 +33,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   RectPaint rectPaint = {bounds, Matrix::I()};
-  auto op = RectDrawOp::Make(renderTarget->getContext(), {rectPaint}, AAType::None, renderFlags);
+  auto op =
+      RectDrawOp::Make(renderTarget->getContext(), {rectPaint}, true, AAType::None, renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
   std::vector<std::unique_ptr<Op>> ops = {};
@@ -115,6 +115,19 @@ void DrawingManager::addResourceTask(std::unique_ptr<ResourceTask> resourceTask)
   }
 }
 
+template <typename T>
+void ClearAndReserveSize(std::vector<T>& list) {
+  auto size = list.size();
+  auto capacity = list.capacity();
+  auto nextSize = (size << 1) - (size >> 1);  // 1.5 * size
+  if (capacity > nextSize) {
+    list = std::vector<T>{};
+    list.reserve(size);
+  } else {
+    list.clear();
+  }
+}
+
 bool DrawingManager::flush() {
   while (!compositors.empty()) {
     auto compositor = compositors.back();
@@ -130,9 +143,12 @@ bool DrawingManager::flush() {
     TRACE_EVENT_NAME("CreateResource");
     task->execute(context);
   }
-  resourceTasks.resize(0);
+  ClearAndReserveSize(resourceTasks);
   resourceTaskMap = {};
 
+  if (renderPass == nullptr) {
+    renderPass = RenderPass::Make(context);
+  }
   std::vector<TextureFlattenTask*> validFlattenTasks = {};
   validFlattenTasks.reserve(flattenTasks.size());
   for (auto& task : flattenTasks) {
@@ -141,13 +157,13 @@ bool DrawingManager::flush() {
     }
   }
   for (auto& task : validFlattenTasks) {
-    task->execute(context);
+    task->execute(renderPass.get());
   }
-  flattenTasks.resize(0);
+  ClearAndReserveSize(flattenTasks);
   for (auto& task : renderTasks) {
-    task->execute(context->gpu());
+    task->execute(renderPass.get());
   }
-  renderTasks.resize(0);
+  ClearAndReserveSize(renderTasks);
   return true;
 }
 }  // namespace tgfx

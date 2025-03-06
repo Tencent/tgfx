@@ -20,55 +20,55 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-void MeasureContext::drawStyle(const MCState& state, const FillStyle&) {
-  addDeviceBounds(state.clip, Rect::MakeEmpty(), true);
+void MeasureContext::drawFill(const MCState& state, const Fill& fill) {
+  addDeviceBounds(state.clip, fill, Rect::MakeEmpty(), true);
 }
 
-void MeasureContext::drawRect(const Rect& rect, const MCState& state, const FillStyle&) {
-  addLocalBounds(state, rect);
+void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+  addLocalBounds(state, fill, rect);
 }
 
-void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const FillStyle&) {
-  addLocalBounds(state, rRect.rect);
+void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+  addLocalBounds(state, fill, rRect.rect);
 }
 
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const FillStyle&) {
+                               const Fill& fill) {
   auto localBounds = shape->getBounds(state.matrix.getMaxScale());
-  addLocalBounds(state, localBounds, shape->isInverseFillType());
+  addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const FillStyle&) {
+                               const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
-  addLocalBounds(state, rect);
+  addLocalBounds(state, fill, rect);
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
-                                   const MCState& state, const FillStyle&) {
-  addLocalBounds(state, rect);
+                                   const MCState& state, const Fill& fill) {
+  addLocalBounds(state, fill, rect);
 }
 
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const Stroke* stroke, const MCState& state,
-                                      const FillStyle&) {
+                                      const MCState& state, const Fill& fill,
+                                      const Stroke* stroke) {
   auto localBounds = glyphRunList->getBounds(state.matrix.getMaxScale());
   if (stroke) {
     stroke->applyToBounds(&localBounds);
   }
-  addLocalBounds(state, localBounds);
+  addLocalBounds(state, fill, localBounds);
 }
 
 void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                               const FillStyle&) {
+                               const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
   auto deviceBounds = picture->getBounds(&state.matrix);
   if (imageFilter) {
     deviceBounds = imageFilter->filterBounds(deviceBounds);
   }
-  addDeviceBounds(state.clip, deviceBounds, picture->hasUnboundedFill());
+  addDeviceBounds(state.clip, fill, deviceBounds, picture->hasUnboundedFill());
 }
 
 void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -76,12 +76,17 @@ void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
   picture->playback(this, state);
 }
 
-void MeasureContext::addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {
+void MeasureContext::addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
+                                    bool unbounded) {
   auto deviceBounds = state.matrix.mapRect(localBounds);
-  addDeviceBounds(state.clip, deviceBounds, unbounded);
+  addDeviceBounds(state.clip, fill, deviceBounds, unbounded);
 }
 
-void MeasureContext::addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded) {
+void MeasureContext::addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
+                                     bool unbounded) {
+  if (fill.nothingToDraw()) {
+    return;
+  }
   if (clip.isInverseFillType()) {
     bounds.join(deviceBounds);
     return;
