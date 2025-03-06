@@ -18,22 +18,18 @@
 
 #include "StatisticView.h"
 #include <QButtonGroup>
+#include <QMenu>
 #include <QRadioButton>
 #include <QTableView>
-#include <QMenu>
 #include "MainView.h"
 #include "StatisticDelegate.h"
 
 /////*statistics view*/////
-StatisticsView::StatisticsView(tracy::Worker& workerRef,ViewData& viewDataRef ,View* view,FramesView* framesView,SourceView* srcView, QWidget* parent) : QWidget(parent),
-  worker(workerRef),
-  viewData(viewDataRef),
-  view(view),
-  framesView(framesView),
-  tableView(new QTableView(this)),
-  srcView(srcView)
-  {
-  model = new StatisticsModel(worker,viewData, view, this);
+StatisticsView::StatisticsView(tracy::Worker& workerRef, ViewData& viewDataRef, View* view,
+                               FramesView* framesView, SourceView* srcView, QWidget* parent)
+    : QWidget(parent), worker(workerRef), viewData(viewDataRef), view(view), framesView(framesView),
+      tableView(new QTableView(this)), srcView(srcView) {
+  model = new StatisticsModel(worker, viewData, view, this);
 
   int totalWidth = 500 + 400 + 120 + 80 + 100 + 30;
   int initHeight = 1500;
@@ -42,11 +38,10 @@ StatisticsView::StatisticsView(tracy::Worker& workerRef,ViewData& viewDataRef ,V
   setupUI();
   setupConnections();
 
-  if(layout()) {
+  if (layout()) {
     layout()->setSizeConstraint(QLayout::SetMinimumSize);
   }
   updateZoneCountLabels();
-
 }
 
 void StatisticsView::setupUI() {
@@ -64,7 +59,7 @@ void StatisticsView::setupUI() {
   //mode btn
   auto modeGroup = new QButtonGroup(this);
 
-  auto insBtn = new QRadioButton(tr("instrumentation"),this);
+  auto insBtn = new QRadioButton(tr("instrumentation"), this);
   insBtn->setStyleSheet("QRadioButton {color:white;}");
   insBtn->setChecked(true);
 
@@ -89,7 +84,7 @@ void StatisticsView::setupUI() {
   toolBarLayout->addWidget(sep1);
 
   //zone and visible
-  auto totalZonesLabel = new QLabel(tr("Total zone count:"),this);
+  auto totalZonesLabel = new QLabel(tr("Total zone count:"), this);
   totalZonesLabel->setStyleSheet("color: white;");
   mtotalZonesLabel = new QLabel(QStringLiteral("0"), this);
   mtotalZonesLabel->setStyleSheet("color: white;");
@@ -115,15 +110,16 @@ void StatisticsView::setupUI() {
   timingLabel->setStyleSheet("color: white;");
   accumulationModeCombo = new QComboBox(this);
   accumulationModeCombo->setStyleSheet(
-    "QComboBox {color: white; background: #404040; border: 1px solid #555555; padding: 2px;}"
-    "QComboBox::drop-down {border none;}");
+      "QComboBox {color: white; background: #404040; border: 1px solid #555555; padding: 2px;}"
+      "QComboBox::drop-down {border none;}");
 
   accumulationModeCombo->addItem(tr("Self only"),
-    QVariant::fromValue(StatisticsModel::AccumulationMode::SelfOnly));
-  accumulationModeCombo->addItem(tr("With children"),
-    QVariant::fromValue(StatisticsModel::AccumulationMode::AllChildren));
-  accumulationModeCombo->addItem(tr("Non-reentrant"),
-    QVariant::fromValue(StatisticsModel::AccumulationMode::NonReentrantChildren));
+                                 QVariant::fromValue(StatisticsModel::AccumulationMode::SelfOnly));
+  accumulationModeCombo->addItem(
+      tr("With children"), QVariant::fromValue(StatisticsModel::AccumulationMode::AllChildren));
+  accumulationModeCombo->addItem(
+      tr("Non-reentrant"),
+      QVariant::fromValue(StatisticsModel::AccumulationMode::NonReentrantChildren));
 
   toolBarLayout->addWidget(timingLabel);
   toolBarLayout->addWidget(accumulationModeCombo);
@@ -138,28 +134,31 @@ void StatisticsView::setupUI() {
   auto nameLabel = new QLabel(tr("Name"), this);
   nameLabel->setStyleSheet("color: white;");
   filterEdit = new QLineEdit(this);
-  filterEdit->setStyleSheet("QLineEdit {background: #404040; color: white; border: 1px solid #555555; padding: 4px;}");
+  filterEdit->setStyleSheet(
+      "QLineEdit {background: #404040; color: white; border: 1px solid #555555; padding: 4px;}");
   filterEdit->setPlaceholderText(tr("Enter filter Text..."));
 
   clearFilterButton = new QPushButton(tr("Clear"), this);
-  clearFilterButton->setStyleSheet("QPushButton {background: #404040; color: white; border: 1px solid #555555; padding: 4px 8px;}"
-    "QPushButton: hover {background: #505050;}");
+  clearFilterButton->setStyleSheet(
+      "QPushButton {background: #404040; color: white; border: 1px solid #555555; padding: 4px "
+      "8px;}"
+      "QPushButton: hover {background: #505050;}");
 
   filterLayout->addWidget(nameLabel);
   filterLayout->addWidget(filterEdit);
   filterLayout->addWidget(clearFilterButton);
   filterLayout->addStretch();
 
-  auto sep3 = new QLabel("|",this);
+  auto sep3 = new QLabel("|", this);
   sep3->setStyleSheet("color:#666666;");
   toolBarLayout->addWidget(sep3);
 
   limitRangeBtn = new QPushButton(tr("Limit Range"), this);
   limitRangeBtn->setStyleSheet(
-    "QPushButton {background: #404040; color: white; border: 1px solid #555555; padding: 4px 8px;}"
-    "QPushButton: hover{background: #505050;}"
-    "QPushButton: checked{background: #8B3A62; color: white;}"
-    );
+      "QPushButton {background: #404040; color: white; border: 1px solid #555555; padding: 4px "
+      "8px;}"
+      "QPushButton: hover{background: #505050;}"
+      "QPushButton: checked{background: #8B3A62; color: white;}");
   limitRangeBtn->setCheckable(true);
   toolBarLayout->addWidget(limitRangeBtn);
 
@@ -205,8 +204,8 @@ void StatisticsView::setupConnections() {
 
   connect(limitRangeBtn, &QPushButton::toggled, this, &StatisticsView::onLimitRangeToggled);
 
-  connect(tableView, &QTableView::customContextMenuRequested, this, &StatisticsView::showContentMenu);
-
+  connect(tableView, &QTableView::customContextMenuRequested, this,
+          &StatisticsView::showContentMenu);
 }
 
 void StatisticsView::setupTableView() {
@@ -235,17 +234,15 @@ void StatisticsView::viewSource(const char* fileName, int line) {
   srcViewFile = fileName;
   model->openSource(fileName, line, worker, view);
 
-  if(!srcView) {
+  if (!srcView) {
     srcView = new SourceView(nullptr);
     srcView->setAttribute(Qt::WA_DeleteOnClose);
 
-    connect(srcView, &QObject::destroyed, this, [this](){
-        srcView = nullptr;
-    });
+    connect(srcView, &QObject::destroyed, this, [this]() { srcView = nullptr; });
   }
 
   const auto& source = model->getSource();
-  if(!source.empty()) {
+  if (!source.empty()) {
     QString content = QString::fromStdString(std::string(source.data(), source.dataSize()));
     srcView->setWindowTitle(QString("Source: %1").arg(fileName));
     srcView->loadSource(content, line);
@@ -268,20 +265,20 @@ bool StatisticsView::srcFileValid(const char* fn, uint64_t olderThan, const trac
 
 void StatisticsView::showContentMenu(const QPoint& pos) {
   QModelIndex index = tableView->indexAt(pos);
-  if(!index.isValid() || index.column() != StatisticsModel::LocationColumn) {
+  if (!index.isValid() || index.column() != StatisticsModel::LocationColumn) {
     return;
   }
 
-  auto& srcloc = model->getSrcLocFromIndex(tableView->model()->index(index.row(), StatisticsModel::NameColumn));
+  auto& srcloc = model->getSrcLocFromIndex(
+      tableView->model()->index(index.row(), StatisticsModel::NameColumn));
   const char* fileName = worker.GetString(srcloc.file);
-  int line  = static_cast<int>(srcloc.line);
+  int line = static_cast<int>(srcloc.line);
 
   QMenu menu(this);
   QAction* viewSrcAction = menu.addAction(tr("view source"));
 
-  connect(viewSrcAction, &QAction::triggered, this, [this, fileName, line]() {
-    viewSource(fileName, line);
-  });
+  connect(viewSrcAction, &QAction::triggered, this,
+          [this, fileName, line]() { viewSource(fileName, line); });
 
   menu.exec(tableView->viewport()->mapToGlobal(pos));
 }
@@ -296,22 +293,21 @@ void StatisticsView::updateColumnSizes() {
   tableView->setColumnWidth(StatisticsModel::Column::MtpcColumn, 100);
   tableView->setColumnWidth(StatisticsModel::Column::ThreadCountColumn, 30);
 
-  tableView->horizontalHeader()
-  ->setSectionResizeMode(StatisticsModel::Column::NameColumn, QHeaderView::Interactive);
-  tableView->horizontalHeader()
-  ->setSectionResizeMode(StatisticsModel::Column::LocationColumn, QHeaderView::Interactive);
-  tableView->horizontalHeader()
-  ->setSectionResizeMode(StatisticsModel::Column::TotalTimeColumn, QHeaderView::Interactive);
-  tableView->horizontalHeader()
-  ->setSectionResizeMode(StatisticsModel::Column::CountColumn, QHeaderView::Interactive);
-  tableView->horizontalHeader()
-  ->setSectionResizeMode(StatisticsModel::Column::MtpcColumn, QHeaderView::Interactive);
-  tableView->horizontalHeader()
-  ->setSectionResizeMode(StatisticsModel::Column::ThreadCountColumn, QHeaderView::Interactive);
+  tableView->horizontalHeader()->setSectionResizeMode(StatisticsModel::Column::NameColumn,
+                                                      QHeaderView::Interactive);
+  tableView->horizontalHeader()->setSectionResizeMode(StatisticsModel::Column::LocationColumn,
+                                                      QHeaderView::Interactive);
+  tableView->horizontalHeader()->setSectionResizeMode(StatisticsModel::Column::TotalTimeColumn,
+                                                      QHeaderView::Interactive);
+  tableView->horizontalHeader()->setSectionResizeMode(StatisticsModel::Column::CountColumn,
+                                                      QHeaderView::Interactive);
+  tableView->horizontalHeader()->setSectionResizeMode(StatisticsModel::Column::MtpcColumn,
+                                                      QHeaderView::Interactive);
+  tableView->horizontalHeader()->setSectionResizeMode(StatisticsModel::Column::ThreadCountColumn,
+                                                      QHeaderView::Interactive);
 
   int totalWidth = 500 + 400 + 120 + 80 + 100 + 30;
   tableView->setMinimumWidth(totalWidth);
-
 }
 
 void StatisticsView::updateZoneCountLabels() {
@@ -322,7 +318,7 @@ void StatisticsView::updateZoneCountLabels() {
 }
 
 void StatisticsView::onStatgeRangeChanged(int64_t start, int64_t end, bool active) {
-  if(limitRangeBtn->isChecked()) {
+  if (limitRangeBtn->isChecked()) {
     view->m_statRange.min = start;
     view->m_statRange.max = end;
     model->setStatRange(start, end, active);
@@ -332,20 +328,19 @@ void StatisticsView::onStatgeRangeChanged(int64_t start, int64_t end, bool activ
 }
 
 //limit range
- void StatisticsView::onLimitRangeToggled(bool active) {
-   if(model) {
-     if(active) {
-       view->m_statRange.active = true;
-       view->m_statRange.min = viewData.zvStart;
-       view->m_statRange.max = viewData.zvEnd;
-       model->setStatRange(view->m_statRange.min, view->m_statRange.max, true);
-       model->refreshData();
-      }
-      else {
-        view->m_statRange.active = false;
-        model->setStatRange(0, 0, false);
-        model->refreshData();
-      }
-      updateZoneCountLabels();
+void StatisticsView::onLimitRangeToggled(bool active) {
+  if (model) {
+    if (active) {
+      view->m_statRange.active = true;
+      view->m_statRange.min = viewData.zvStart;
+      view->m_statRange.max = viewData.zvEnd;
+      model->setStatRange(view->m_statRange.min, view->m_statRange.max, true);
+      model->refreshData();
+    } else {
+      view->m_statRange.active = false;
+      model->setStatRange(0, 0, false);
+      model->refreshData();
     }
- }
+    updateZoneCountLabels();
+  }
+}

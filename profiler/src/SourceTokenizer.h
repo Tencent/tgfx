@@ -21,7 +21,7 @@
 #include <vector>
 
 class Tokenizer {
-public:
+ public:
   enum class TokenColor : uint8_t {
     Default,
     Comment,
@@ -52,7 +52,7 @@ public:
 
   std::vector<Token> tokenize(const char* begin, const char* end);
 
-private:
+ private:
   TokenColor identifyToken(const char*& begin, const char* end);
 
   bool isInComment;

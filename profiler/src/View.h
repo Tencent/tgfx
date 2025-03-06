@@ -78,8 +78,9 @@ class View : public QWidget {
   void timerEvent(QTimerEvent* event) override;
 
   const char* sourceSubstitution(const char* srcFile) const;
-  bool validateSourceAge() const {return validateSrcAge;}
-
+  bool validateSourceAge() const {
+    return validateSrcAge;
+  }
 
   Range m_statRange;
 

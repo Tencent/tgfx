@@ -50,7 +50,6 @@ TimelineView::TimelineView(QQuickItem* parent) : QQuickItem(parent) {
 TimelineView::~TimelineView() {
 }
 
-
 void TimelineView::initConnect() {
   connect(this, &TimelineView::showZoneToolTipSignal, this, &TimelineView::showZoneToolTip);
   connect(this, &TimelineView::showFlodedToolTipSignal, this, &TimelineView::showFlodedToolTip);
@@ -822,11 +821,9 @@ void TimelineView::showZoneToolTip(const tracy::ZoneEvent& ev) {
 
 void TimelineView::showFlodedToolTip(uint32_t num, int64_t time) {
   QString tooltip = QString("Zone too small to display: %1\n").arg(num);
-  tooltip += QString("Excution time: %1")
-                 .arg(QString::fromStdString(tracy::TimeToString(time)));
+  tooltip += QString("Excution time: %1").arg(QString::fromStdString(tracy::TimeToString(time)));
   QToolTip::showText(QCursor::pos(), tooltip);
 }
-
 
 void TimelineView::hoverLeaveEvent(QHoverEvent* event) {
   QToolTip::hideText();

@@ -21,30 +21,26 @@
 #include <QPainterPath>
 #include "View.h"
 
-StatisticsDelegate::StatisticsDelegate(StatisticsModel* model,View* v, QObject* parent) :  QStyledItemDelegate(parent),
-  hoverColor(51, 153, 255, 90 ),
-  textColor(255, 255, 255, 230),
-  iconSize(16, 16),
-  view(v),
-  model(model){
+StatisticsDelegate::StatisticsDelegate(StatisticsModel* model, View* v, QObject* parent)
+    : QStyledItemDelegate(parent), hoverColor(51, 153, 255, 90), textColor(255, 255, 255, 230),
+      iconSize(16, 16), view(v), model(model) {
 }
 
 StatisticsDelegate::~StatisticsDelegate() = default;
 
-void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const {
+void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
+                               const QModelIndex& index) const {
   QStyleOptionViewItem opt = option;
   initStyleOption(&opt, index);
 
-  if(index.column() == StatisticsModel::NameColumn) {
-      painter->save();
+  if (index.column() == StatisticsModel::NameColumn) {
+    painter->save();
 
-    if(opt.state & QStyle::State_Selected) {
+    if (opt.state & QStyle::State_Selected) {
       painter->fillRect(opt.rect, opt.palette.highlight());
-    }
-    else if(opt.state & QStyle::State_MouseOver) {
+    } else if (opt.state & QStyle::State_MouseOver) {
       painter->fillRect(opt.rect, hoverColor);
-    }
-    else {
+    } else {
       painter->fillRect(opt.rect, opt.palette.base());
     }
 
@@ -61,10 +57,9 @@ void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     QFont nameFont = opt.font;
     painter->setFont(nameFont);
 
-    if(opt.state & QStyle::State_Selected) {
+    if (opt.state & QStyle::State_Selected) {
       painter->setPen(opt.palette.highlightedText().color());
-    }
-    else {
+    } else {
       painter->setPen(textColor);
     }
 
@@ -73,8 +68,7 @@ void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
 
     painter->restore();
 
-    }
-  else if (index.column() == StatisticsModel::LocationColumn) {
+  } else if (index.column() == StatisticsModel::LocationColumn) {
 
     painter->save();
 
@@ -89,17 +83,15 @@ void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     painter->drawText(opt.rect.adjusted(3, 0, -3, 0), static_cast<int>(opt.displayAlignment),
                       index.data(Qt::DisplayRole).toString());
     painter->restore();
-  }
-  else if(index.column() == StatisticsModel::TotalTimeColumn) {
+  } else if (index.column() == StatisticsModel::TotalTimeColumn) {
     painter->save();
 
     QString timeStr = index.data(Qt::DisplayRole).toString();
     int64_t timeRange = 0;
-    if(view->m_statRange.active) {
+    if (view->m_statRange.active) {
       timeRange = view->m_statRange.max - view->m_statRange.min;
-      if(timeRange == 0) timeRange = 1;
-    }
-    else {
+      if (timeRange == 0) timeRange = 1;
+    } else {
       timeRange = model->getWorker().GetLastTime() - model->getWorker().GetFirstTime();
     }
 
@@ -110,11 +102,10 @@ void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     QString percentStr = QString("(%1%)").arg(percentage, 0, 'f', 2);
 
     QColor textColor;
-    if(opt.state & QStyle::State_Selected) {
+    if (opt.state & QStyle::State_Selected) {
       painter->fillRect(opt.rect, opt.palette.highlight());
       textColor = opt.palette.highlightedText().color();
-    }
-    else {
+    } else {
       painter->fillRect(opt.rect, opt.palette.base());
       textColor = opt.palette.text().color();
     }
@@ -135,14 +126,13 @@ void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     painter->drawText(percentRect, Qt::AlignVCenter | Qt::AlignLeft, percentStr);
 
     painter->restore();
-  }
-  else {
+  } else {
     QStyledItemDelegate::paint(painter, option, index);
   }
-
 }
 
-QSize StatisticsDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const {
+QSize StatisticsDelegate::sizeHint(const QStyleOptionViewItem& option,
+                                   const QModelIndex& index) const {
   QSize size = QStyledItemDelegate::sizeHint(option, index);
   size.setHeight(qMax(size.height(), iconSize.height() + 50));
   return size;
@@ -160,9 +150,3 @@ void StatisticsDelegate::drawStatusIcon(QPainter* painter, const QRect& rect,
   painter->setPen(QPen(QColor(200, 200, 200, 80), 1));
   painter->drawPath(path);
 }
-
-
-
-
-
-

@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SourceView.h"
-#include <QVBoxLayout>
-#include <QPlainTextEdit>
 #include <QPainter>
+#include <QPlainTextEdit>
+#include <QVBoxLayout>
 
- /////*source window*/////
+/////*source window*/////
 SourceView::SourceView(QWidget* parent) : QWidget(parent, Qt::Window) {
   setWindowFlags(Qt::Window);
   resize(800, 600);
@@ -38,7 +38,7 @@ SourceView::SourceView(QWidget* parent) : QWidget(parent, Qt::Window) {
   font.setPointSize(10);
   codeEditor->setFont(font);
 
-  layout->addWidget( codeEditor);
+  layout->addWidget(codeEditor);
 }
 
 void SourceView::loadSource(const QString& content, int highLightLine) {
@@ -109,9 +109,7 @@ void SourceTextColor::highlightBlock(const QString& text) {
   }
 }
 
-
-CodeEditor::CodeEditor(QWidget* parent) : QPlainTextEdit(parent)
-  {
+CodeEditor::CodeEditor(QWidget* parent) : QPlainTextEdit(parent) {
   lineNumberArea = new LineNumberArea(this);
 
   connect(this, &CodeEditor::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
@@ -125,10 +123,10 @@ CodeEditor::CodeEditor(QWidget* parent) : QPlainTextEdit(parent)
 int CodeEditor::lineNumberAreaWidth() {
   int digits = 1;
   int max = qMax(1, blockCount());
-  while(max >= 10) {
+  while (max >= 10) {
     max /= 10;
     ++digits;
-   }
+  }
   int space = 3 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits;
   return space;
 }
@@ -142,11 +140,12 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent* event) {
   int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
   int buttom = top + qRound(blockBoundingRect(block).height());
 
-  while(block.isValid() && top <= event->rect().bottom()) {
-    if(block.isVisible() && buttom >= event->rect().top()) {
+  while (block.isValid() && top <= event->rect().bottom()) {
+    if (block.isVisible() && buttom >= event->rect().top()) {
       QString number = QString::number(blockNumber + 1);
       painter.setPen(Qt::white);
-      painter.drawText(0, top, lineNumberArea->width() - 2, fontMetrics().height(), Qt::AlignRight, number);
+      painter.drawText(0, top, lineNumberArea->width() - 2, fontMetrics().height(), Qt::AlignRight,
+                       number);
     }
     block = block.next();
     top = buttom;
@@ -166,14 +165,11 @@ void CodeEditor::updateLineNumberAreaWidth(int /* newBlockCount */) {
 }
 
 void CodeEditor::updateLineNumberArea(const QRect& rect, int dy) {
-  if(dy)
-    lineNumberArea->scroll(0, dy);
+  if (dy) lineNumberArea->scroll(0, dy);
   else
     lineNumberArea->update(0, rect.y(), lineNumberArea->width(), rect.height());
 
-  if(rect.contains(viewport()->rect()))
-    updateLineNumberAreaWidth(0);
-
+  if (rect.contains(viewport()->rect())) updateLineNumberAreaWidth(0);
 }
 
 void CodeEditor::highlightCurrentLine() {
@@ -189,5 +185,3 @@ void CodeEditor::highlightCurrentLine() {
   }
   setExtraSelections(exSeleciton);
 }
-
-

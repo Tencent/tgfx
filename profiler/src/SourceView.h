@@ -17,81 +17,71 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "SourceTokenizer.h"
-#include <QWidget>
 #include <QPlainTextEdit>
 #include <QSyntaxHighlighter>
-
+#include <QWidget>
+#include "SourceTokenizer.h"
 
 /////source window/////
 class CodeEditor;
 class SourceView : public QWidget {
   Q_OBJECT
 
-public:
+ public:
   explicit SourceView(QWidget* parent = nullptr);
   void loadSource(const QString& content, int highLightLine);
 
-private:
+ private:
   CodeEditor* codeEditor = nullptr;
 };
 
 /////sourcetext format the color/////
 class SourceTextColor : public QSyntaxHighlighter {
-public:
-  explicit SourceTextColor(QTextDocument* parent): QSyntaxHighlighter(parent){}
+ public:
+  explicit SourceTextColor(QTextDocument* parent) : QSyntaxHighlighter(parent) {
+  }
 
-protected:
+ protected:
   void highlightBlock(const QString& text) override;
 
-private:
+ private:
   Tokenizer tokenizer;
 };
 
 /////source linenumber/////
 class CodeEditor : public QPlainTextEdit {
   Q_OBJECT
-public:
+ public:
   explicit CodeEditor(QWidget* parent = nullptr);
 
   int lineNumberAreaWidth();
   void lineNumberAreaPaintEvent(QPaintEvent* event);
 
-protected:
+ protected:
   void resizeEvent(QResizeEvent* event) override;
 
-private:
+ private:
   Q_SLOT void updateLineNumberAreaWidth(int newBlockCount);
-  Q_SLOT void updateLineNumberArea(const QRect &rect, int dy);
+  Q_SLOT void updateLineNumberArea(const QRect& rect, int dy);
   Q_SLOT void highlightCurrentLine();
 
-  QWidget *lineNumberArea;
+  QWidget* lineNumberArea;
 };
 
 class LineNumberArea : public QWidget {
-public:
-  explicit LineNumberArea(CodeEditor* editor) : QWidget(editor), codeEditor(editor){}
+ public:
+  explicit LineNumberArea(CodeEditor* editor) : QWidget(editor), codeEditor(editor) {
+  }
 
-  QSize sizeHint() const override { return QSize(codeEditor->lineNumberAreaWidth(), 0); }
+  QSize sizeHint() const override {
+    return QSize(codeEditor->lineNumberAreaWidth(), 0);
+  }
 
-protected:
-  void paintEvent(QPaintEvent* event) override {codeEditor->lineNumberAreaPaintEvent(event);}
+ protected:
+  void paintEvent(QPaintEvent* event) override {
+    codeEditor->lineNumberAreaPaintEvent(event);
+  }
 
-private:
+ private:
   CodeEditor* codeEditor;
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

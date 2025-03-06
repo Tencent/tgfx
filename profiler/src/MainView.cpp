@@ -81,7 +81,7 @@ void MainView::discardConnect() {
 }
 
 void MainView::statView() {
-  if(centorView) {
+  if (centorView) {
     centorView->openStatisticsView();
   }
 }
