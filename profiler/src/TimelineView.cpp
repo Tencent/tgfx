@@ -820,7 +820,7 @@ void TimelineView::showZoneToolTip(const tracy::ZoneEvent& ev) {
   QToolTip::showText(QCursor::pos(), ZoneMsg);
 }
 
-void TimelineView::showFlodedToolTip(uint32_t num, uint64_t time) {
+void TimelineView::showFlodedToolTip(uint32_t num, int64_t time) {
   QString tooltip = QString("Zone too small to display: %1\n").arg(num);
   tooltip += QString("Excution time: %1")
                  .arg(QString::fromStdString(tracy::TimeToString(time)));

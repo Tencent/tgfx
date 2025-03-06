@@ -108,7 +108,7 @@ class TimelineView : public QQuickItem {
   //hovered functions.
   void showZoneInfo(const tracy::ZoneEvent& ev);
   void showZoneToolTip(const tracy::ZoneEvent& ev);
-  void showFlodedToolTip(uint32_t num, uint64_t time);
+  void showFlodedToolTip(uint32_t num, int64_t time);
 
   const char* getFrameText(const tracy::FrameData& fd, int i, uint64_t ftime) const;
   const char* getFrameSetName(const tracy::FrameData& fd) const;
@@ -136,7 +136,7 @@ class TimelineView : public QQuickItem {
 
   Q_SIGNAL void changeViewMode(ViewMode mode);
   Q_SIGNAL void showZoneToolTipSignal(const tracy::ZoneEvent& ev);
-  Q_SIGNAL void showFlodedToolTipSignal(uint32_t num, uint64_t time);
+  Q_SIGNAL void showFlodedToolTipSignal(uint32_t num, int64_t time);
   ViewData* getViewDataPtr() const {
     return viewData;
   }
