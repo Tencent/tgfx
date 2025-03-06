@@ -17,20 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WGLWindowDevice.h"
-#include "WGLUtil.h"
+#include "WGLInterface.h"
 
 namespace tgfx {
+static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {
+  auto set = false;
+  int pixelFormatsToTry[2] = {-1, -1};
+  GetPixelFormatsToTry(deviceContext, pixelFormatsToTry);
+  for (auto f = 0; !set && pixelFormatsToTry[f] && f < 2; ++f) {
+    PIXELFORMATDESCRIPTOR descriptor;
+    DescribePixelFormat(deviceContext, pixelFormatsToTry[f], sizeof(descriptor), &descriptor);
+    set = SetPixelFormat(deviceContext, pixelFormatsToTry[f], &descriptor);
+  }
+
+  if (!set) {
+    return nullptr;
+  }
+  return CreateGLContext(deviceContext, sharedContext);
+}
 
 std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedContext) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
-  HDC deviceContext = nullptr;
-  HGLRC glContext = nullptr;
-  if (!CreateWGLContext(nativeWindow, sharedContext, deviceContext, glContext)) {
-    return nullptr;
+  auto deviceContext = GetDC(nativeWindow);
+  auto glContext = CreateWGLContext(deviceContext, sharedContext);
+  auto device = WGLDevice::Wrap(nativeWindow, deviceContext, glContext, sharedContext, false);
+  if (device == nullptr) {
+    ReleaseDC(nativeWindow, deviceContext);
   }
-  return WGLDevice::Wrap(nativeWindow, deviceContext, glContext, sharedContext, false);
+  return device;
 }
 
 std::shared_ptr<WGLDevice> WGLDevice::Wrap(HWND nativeWindow, HDC deviceContext, HGLRC glContext,

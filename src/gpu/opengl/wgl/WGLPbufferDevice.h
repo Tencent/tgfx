@@ -18,7 +18,7 @@
 
 #pragma once
 #include <tgfx/gpu/opengl/wgl/WGLDevice.h>
-#include "WGLUtil.h"
+#include "WGLInterface.h"
 
 namespace tgfx {
 class WGLPbufferDevice final : public WGLDevice {

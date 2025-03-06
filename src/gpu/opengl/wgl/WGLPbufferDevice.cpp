@@ -17,16 +17,108 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WGLPbufferDevice.h"
-#include "WGLUtil.h"
+#include <mutex>
+#include "WGLInterface.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
+static HWND CreateParentWindow() {
+  static ATOM windowClass = 0;
+  const auto hInstance = (HINSTANCE)GetModuleHandle(nullptr);
+  if (!windowClass) {
+    WNDCLASS wc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hbrBackground = nullptr;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
+    wc.hInstance = hInstance;
+    wc.lpfnWndProc = static_cast<WNDPROC>(DefWindowProc);
+    wc.lpszClassName = TEXT("WC_TGFX");
+    wc.lpszMenuName = nullptr;
+    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 
+    windowClass = RegisterClass(&wc);
+    if (!windowClass) {
+      LOGE("CreateParentWindow() register window class failed.");
+      return nullptr;
+    }
+  }
+
+  HWND window = CreateWindow(TEXT("WC_TGFX"), TEXT("INVISIBLE_WINDOW"), WS_OVERLAPPEDWINDOW, 0, 0,
+                             1, 1, nullptr, nullptr, hInstance, nullptr);
+  if (window == nullptr) {
+    LOGE("CreateParentWindow() create window failed.");
+    return nullptr;
+  }
+  return window;
+}
+
+bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, HPBUFFER& pBuffer,
+                          HDC& deviceContext, HGLRC& glContext) {
+  auto wglInterface = WGLInterface::Get();
+  if (!wglInterface->pixelFormatSupport || !wglInterface->pBufferSupport) {
+    return false;
+  }
+
+  static int pixelFormat = -1;
+  static std::once_flag flag;
+  std::call_once(flag, [parentDeviceContext] {
+    int pixelFormatsToTry[2] = {-1, -1};
+    GetPixelFormatsToTry(parentDeviceContext, pixelFormatsToTry);
+    pixelFormat = pixelFormatsToTry[0];
+  });
+
+  if (pixelFormat == -1) {
+    return false;
+  }
+
+  pBuffer = wglInterface->wglCreatePbuffer(parentDeviceContext, pixelFormat, 1, 1, nullptr);
+  if (pBuffer != nullptr) {
+    deviceContext = wglInterface->wglGetPbufferDC(pBuffer);
+    if (deviceContext != nullptr) {
+      glContext = CreateGLContext(deviceContext, sharedContext);
+      if (glContext != nullptr) {
+        return true;
+      }
+      wglInterface->wglReleasePbufferDC(pBuffer, deviceContext);
+      deviceContext = nullptr;
+    }
+    wglInterface->wglDestroyPbuffer(pBuffer);
+    pBuffer = nullptr;
+  }
+  return false;
+}
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
+  HWND window = nullptr;
+  HDC parentDeviceContext = nullptr;
   HPBUFFER pBuffer = nullptr;
   HDC deviceContext = nullptr;
   HGLRC glContext = nullptr;
+  bool result = false;
+  do {
+    window = CreateParentWindow();
+    if (window == nullptr) {
+      LOGE("GLDevice::Make() create window failed!");
+      break;
+    }
+    parentDeviceContext = GetDC(window);
+    if (parentDeviceContext == nullptr) {
+      LOGE("GLDevice::Make() get device context failed!");
+      break;
+    }
+    if (!CreatePbufferContext(parentDeviceContext, static_cast<HGLRC>(sharedContext), pBuffer,
+                              deviceContext, glContext)) {
+      LOGE("GLDevice::Make() create pbuffer context failed!");
+      break;
+    }
+    result = true;
+  } while (false);
 
-  if (!CreatePbufferContext(static_cast<HGLRC>(sharedContext), pBuffer, deviceContext, glContext)) {
+  ReleaseDC(window, parentDeviceContext);
+  DestroyWindow(window);
+
+  if (!result) {
     return nullptr;
   }
 
@@ -54,9 +146,10 @@ WGLPbufferDevice::~WGLPbufferDevice() {
     glContext = nullptr;
   }
 
-  if (deviceContext != nullptr) {
-    ReleasePbufferDC(pBuffer, deviceContext);
-    DestroyPbuffer(pBuffer);
+  if (auto wglInterface = WGLInterface::Get();
+      wglInterface->pBufferSupport && deviceContext != nullptr) {
+    wglInterface->wglReleasePbufferDC(pBuffer, deviceContext);
+    wglInterface->wglDestroyPbuffer(pBuffer);
     deviceContext = nullptr;
   }
   pBuffer = nullptr;
