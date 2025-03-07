@@ -453,9 +453,8 @@ void TimelineView::drawZonelist(const TimelineContext& ctx,
           const auto x =
               (ev.Start() - viewData->zvStart) * pxns + (zsz - tsz.width() + zoneMargin) / 2;
           if (x < 0 || x > w - tsz.width()) {
-            tgfx::Point topleft = wpos + tgfx::Point{p1.x, p1.y - 1};
-            tgfx::Point bottomright = wpos + tgfx::Point{p1.x + p2.x, p1.y + tsz.height() * 2};
-            auto rect = tgfx::Rect::MakeXYWH(topleft.x, topleft.y, bottomright.x, bottomright.y);
+            tgfx::Point bottomright = wpos + tgfx::Point{p2.x, tsz.height() * 2};
+            auto rect = tgfx::Rect::MakeXYWH(p1.x, p1.y, bottomright.x, bottomright.y);
             canvas->save();
             canvas->clipRect(rect);
             drawTextContrast(canvas, appHost.get(),

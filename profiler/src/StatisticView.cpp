@@ -42,7 +42,6 @@ StatisticsView::StatisticsView(tracy::Worker& workerRef, ViewData& viewDataRef, 
     layout()->setSizeConstraint(QLayout::SetMinimumSize);
   }
   updateZoneCountLabels();
-
 }
 
 void StatisticsView::setupUI() {
@@ -215,10 +214,10 @@ void StatisticsView::setupTableView() {
   tableView->setSelectionMode(QAbstractItemView::SingleSelection);
   tableView->setSortingEnabled(true);
   tableView->setStyleSheet(
-    "QTableView { background-color: #2D2D2D; color: white; gridline-color: #404040; }"
-    "QTableView::item:selected { background-color: #505050; color: white; }"
-    "QHeaderView::section { color: white; background-color: #2D2D2D; border: 1px solid #404040; }"
-  );
+      "QTableView { background-color: #2D2D2D; color: white; gridline-color: #404040; }"
+      "QTableView::item:selected { background-color: #505050; color: white; }"
+      "QHeaderView::section { color: white; background-color: #2D2D2D; border: 1px solid #404040; "
+      "}");
   tableView->horizontalHeader()->setStretchLastSection(true);
   tableView->horizontalHeader()->setSortIndicatorShown(true);
   tableView->horizontalHeader()->setSectionsMovable(true);
@@ -244,9 +243,7 @@ void StatisticsView::viewSource(const char* fileName, int line) {
     srcView->setAttribute(Qt::WA_DeleteOnClose);
     srcView->setStyleSheet("background-color: #2D2D2D;");
 
-    connect(srcView, &QObject::destroyed, this, [this](){
-      srcView = nullptr;
-    });
+    connect(srcView, &QObject::destroyed, this, [this]() { srcView = nullptr; });
   }
 
   const auto& source = model->getSource();
@@ -316,7 +313,6 @@ void StatisticsView::updateColumnSizes() {
 
   int totalWidth = 500 + 400 + 120 + 80 + 100 + 30;
   tableView->setMinimumWidth(totalWidth);
-
 }
 
 void StatisticsView::updateZoneCountLabels() {
