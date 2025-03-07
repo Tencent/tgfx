@@ -23,7 +23,7 @@ const banner = `////////////////////////////////////////////////////////////////
 `;
 
 const arch = process.env.ARCH;
-var fileName = (arch === 'wasm-mt'? 'index-mt': 'index');
+var fileName = (arch === 'wasm-mt'? 'index': 'index-st');
 
 const plugins = [
     esbuild({tsconfig: "tsconfig.json", minify: false}),
