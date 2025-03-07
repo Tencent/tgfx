@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <qabstractitemmodel.h>
 #include "SourceContents.h"
 #include "TracyVector.hpp"
 #include "ViewData.h"
