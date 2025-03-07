@@ -245,7 +245,7 @@ npm run build:debug
 
 With these steps completed, you can debug C++ files directly in Chrome DevTools.
 
-The above commands build and run a multithreaded version. To build a single-threaded version,
+The above commands build and run a multi-thread version. To build a single-thread version,
 just add the suffix ":st" to each command. For example:
 
 ```
