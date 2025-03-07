@@ -364,7 +364,11 @@ Rect OpsCompositor::getClipBounds(const Path& clip) {
   if (clip.isInverseFillType()) {
     return renderTarget->bounds();
   }
-  return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
+  auto bounds = clip.getBounds();
+  if (!bounds.intersect(renderTarget->bounds())) {
+    return Rect::MakeEmpty();
+  }
+  return bounds;
 }
 
 std::pair<std::optional<Rect>, bool> OpsCompositor::getClipRect(const Path& clip) {

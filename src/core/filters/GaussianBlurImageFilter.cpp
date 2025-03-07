@@ -104,9 +104,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return nullptr;
   }
 
-  Matrix uvMatrix = Matrix::MakeTrans(scaledBounds.left, scaledBounds.top);
-  uvMatrix.postScale(boundsWillSample.width() / scaledBounds.width(),
-                     boundsWillSample.height() / scaledBounds.height());
+  Matrix uvMatrix = Matrix::MakeTrans(boundsWillSample.left, boundsWillSample.top);
+  uvMatrix.preScale(boundsWillSample.width() / scaledBounds.width(),
+                    boundsWillSample.height() / scaledBounds.height());
   FPArgs fpArgs(args.context, args.renderFlags,
                 Rect::MakeWH(scaledBounds.width(), scaledBounds.height()));
 

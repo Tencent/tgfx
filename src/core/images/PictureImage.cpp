@@ -74,11 +74,11 @@ std::unique_ptr<FragmentProcessor> PictureImage::asFragmentProcessor(
     return nullptr;
   }
   rect.roundOut();
-
   auto mipmapped = sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, width(), height(), isAlphaOnly() && alphaRenderable, 1, mipmapped);
+      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
+      isAlphaOnly() && alphaRenderable, 1, mipmapped);
 
   if (renderTarget == nullptr) {
     return nullptr;
