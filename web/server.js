@@ -18,7 +18,7 @@ app.get('/', (req, res) => {
 
 const port = 8081;
 const args = process.argv.slice(2);
-var fileName = args.includes('wasm-mt') ? 'index-mt': 'index';
+var fileName = args.includes('wasm-mt') ? 'index': 'index-st';
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 
