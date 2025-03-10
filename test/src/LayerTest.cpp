@@ -2196,4 +2196,48 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
 }
+
+TGFX_TEST(LayerTest, RasterizedBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::Blue());
+  solidLayer->setWidth(150);
+  solidLayer->setHeight(150);
+  displayList->root()->addChild(solidLayer);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  displayList->root()->addChild(background);
+
+  auto layer = Layer::Make();
+  layer->setMatrix(Matrix::MakeTrans(30, 30));
+  layer->addChild(background);
+
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  child->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  child->setFillStyle(fillStyle);
+  child->setShouldRasterize(true);
+  child->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  layer->addChild(child);
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedBackground1"));
+
+  background->setMatrix(Matrix::MakeTrans(50, 50));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedBackground2"));
+
+  child->setMatrix(Matrix::MakeTrans(20, 20));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedBackground3"));
+}
 }  // namespace tgfx

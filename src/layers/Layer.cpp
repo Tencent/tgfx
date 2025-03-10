@@ -114,7 +114,7 @@ void Layer::setAlpha(float value) {
     return;
   }
   _alpha = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setBlendMode(BlendMode value) {
@@ -122,7 +122,7 @@ void Layer::setBlendMode(BlendMode value) {
     return;
   }
   _blendMode = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setPosition(const Point& value) {
@@ -131,7 +131,7 @@ void Layer::setPosition(const Point& value) {
   }
   _matrix.setTranslateX(value.x);
   _matrix.setTranslateY(value.y);
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setMatrix(const Matrix& value) {
@@ -139,7 +139,7 @@ void Layer::setMatrix(const Matrix& value) {
     return;
   }
   _matrix = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setVisible(bool value) {
@@ -147,7 +147,7 @@ void Layer::setVisible(bool value) {
     return;
   }
   bitFields.visible = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setShouldRasterize(bool value) {
@@ -155,7 +155,7 @@ void Layer::setShouldRasterize(bool value) {
     return;
   }
   bitFields.shouldRasterize = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setRasterizationScale(float value) {
@@ -166,7 +166,7 @@ void Layer::setRasterizationScale(float value) {
     return;
   }
   _rasterizationScale = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setAllowsEdgeAntialiasing(bool value) {
@@ -174,7 +174,7 @@ void Layer::setAllowsEdgeAntialiasing(bool value) {
     return;
   }
   bitFields.allowsEdgeAntialiasing = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setAllowsGroupOpacity(bool value) {
@@ -182,7 +182,7 @@ void Layer::setAllowsGroupOpacity(bool value) {
     return;
   }
   bitFields.allowsGroupOpacity = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
@@ -198,7 +198,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
     filter->attachToLayer(this);
   }
   rasterizedContent = nullptr;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setMask(std::shared_ptr<Layer> value) {
@@ -219,7 +219,7 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   if (_mask) {
     _mask->maskOwner = this;
   }
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setScrollRect(const Rect& rect) {
@@ -231,7 +231,7 @@ void Layer::setScrollRect(const Rect& rect) {
   } else {
     _scrollRect = std::make_unique<Rect>(rect);
   }
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value) {
@@ -247,7 +247,7 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
     layerStyle->attachToLayer(this);
   }
   rasterizedContent = nullptr;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
@@ -255,7 +255,7 @@ void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
     return;
   }
   bitFields.excludeChildEffectsInLayerStyle = value;
-  invalidateProperty();
+  invalidateVisualProperty();
 }
 
 bool Layer::addChild(std::shared_ptr<Layer> child) {
@@ -505,11 +505,11 @@ void Layer::invalidate() {
   }
 }
 
-void Layer::invalidateProperty() {
-  if (bitFields.propertyDirty) {
+void Layer::invalidateVisualProperty() {
+  if (bitFields.visualPropertyDirty) {
     return;
   }
-  bitFields.propertyDirty = true;
+  bitFields.visualPropertyDirty = true;
   invalidate();
 }
 
@@ -706,7 +706,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     drawDirectly(args, canvas, alpha);
   }
   if (args.cleanDirtyFlags) {
-    bitFields.propertyDirty = false;
+    bitFields.visualPropertyDirty = false;
   }
 }
 
@@ -806,7 +806,13 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
     if (child.get() == stopChild) {
       return false;
     }
-    if (!child->visible() || child->_alpha <= 0 || child->maskOwner) {
+    if (child->maskOwner) {
+      continue;
+    }
+    if (!child->visible() || child->_alpha <= 0) {
+      if (args.cleanDirtyFlags) {
+        child->bitFields.visualPropertyDirty = false;
+      }
       continue;
     }
     AutoCanvasRestore autoRestore(canvas);
@@ -814,7 +820,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
     if (child->_scrollRect) {
       canvas->clipRect(*child->_scrollRect);
     }
-    childArgs.backgroundChanged = childArgs.backgroundChanged || child->bitFields.propertyDirty;
+    childArgs.backgroundChanged =
+        childArgs.backgroundChanged || child->bitFields.visualPropertyDirty;
     child->drawLayer(childArgs, canvas, child->_alpha * alpha, child->_blendMode);
   }
   if (args.cleanDirtyFlags) {
