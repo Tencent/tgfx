@@ -245,13 +245,13 @@ npm run build:debug
 
 With these steps completed, you can debug C++ files directly in Chrome DevTools.
 
-The above commands build and run a single-threaded version. To build a multithreaded version,
-just add the suffix ":mt" to each command. For example:
+The above commands build and run a multithreaded version. To build a single-threaded version,
+just add the suffix ":st" to each command. For example:
 
 ```
-npm run build:mt
-npm run build:mt:debug
-npm run serser:mt
+npm run build:st
+npm run build:st:debug
+npm run serser:st
 ``` 
 
 To build the demo project in CLion, open the `Settings` panel and go to `Build, Execution, Deployment` > `CMake`.

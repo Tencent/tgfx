@@ -67,7 +67,8 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
   auto blur =
       ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
   Point backgroundOffset = Point::Zero();
-  auto blurBackground = extraSource->makeWithFilter(blur, &backgroundOffset);
+  auto clipRect = Rect::MakeWH(extraSource->width(), extraSource->height());
+  auto blurBackground = extraSource->makeWithFilter(blur, &backgroundOffset, &clipRect);
   backgroundOffset += extraSourceOffset;
 
   auto maskShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
