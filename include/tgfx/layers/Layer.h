@@ -531,9 +531,9 @@ class Layer {
 
  private:
   /**
-   * Marks the layer's children as changed and needing to be redrawn.
+   * Marks the layer's descendents as changed and needing to be redrawn.
    */
-  void invalidateChildren();
+  void invalidateDescendents();
 
   void onAttachToRoot(Layer* owner);
 

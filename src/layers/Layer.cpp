@@ -290,7 +290,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   _children.insert(_children.begin() + index, child);
   child->_parent = this;
   child->onAttachToRoot(_root);
-  invalidateChildren();
+  invalidateDescendents();
   return true;
 }
 
@@ -333,7 +333,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   child->_parent = nullptr;
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
-  invalidateChildren();
+  invalidateDescendents();
   return child;
 }
 
@@ -367,7 +367,7 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   }
   _children.erase(_children.begin() + oldIndex);
   _children.insert(_children.begin() + index, child);
-  invalidateChildren();
+  invalidateDescendents();
   return true;
 }
 
@@ -381,7 +381,7 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
     return false;
   }
   oldChild->removeFromParent();
-  invalidateChildren();
+  invalidateDescendents();
   return true;
 }
 
@@ -501,7 +501,7 @@ void Layer::invalidate() {
   if (maskOwner) {
     maskOwner->invalidateTransform();
   } else if (_parent) {
-    _parent->invalidateChildren();
+    _parent->invalidateDescendents();
   }
 }
 
@@ -522,7 +522,7 @@ void Layer::invalidateContent() {
   invalidate();
 }
 
-void Layer::invalidateChildren() {
+void Layer::invalidateDescendents() {
   if (bitFields.dirtyDescendents) {
     return;
   }
