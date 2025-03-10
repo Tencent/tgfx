@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderPass.h"
-#include "gpu/Gpu.h"
 #include "core/utils/Profiling.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
