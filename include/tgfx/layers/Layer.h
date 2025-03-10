@@ -490,7 +490,7 @@ class Layer {
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
    * the layer as dirty and does not update the layer content.
    */
-  void invalidate();
+  void invalidateVisualProperty();
 
   /**
    * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
@@ -581,9 +581,12 @@ class Layer {
 
   bool hasValidMask() const;
 
+  void invalidate();
+
   struct {
     bool contentDirty : 1;   // need to update content
     bool childrenDirty : 1;  // need to redraw child layers
+    bool visualPropertyDirty : 1;  // need to redraw the layer, property such as alpha, blendMode, matrix, etc.
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
