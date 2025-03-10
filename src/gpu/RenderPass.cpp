@@ -18,6 +18,7 @@
 
 #include "RenderPass.h"
 #include "gpu/Gpu.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
@@ -69,6 +70,7 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
 }
 
 void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
+  TRACE_DRAW(vertexCount - 2);
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
@@ -77,6 +79,7 @@ void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t ver
 }
 
 void RenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
+  TRACE_DRAW(indexCount / 3);
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }

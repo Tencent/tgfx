@@ -32,6 +32,10 @@
 #define TRACE_EVENT_NAME(name) ZoneScopedN(name)
 #define TRACE_EVENT_COLOR(color) ZoneScopedNC(TRACE_FUNC, color)
 
+#define TRACE_DRAWCALL FrameData(nullptr, tracy::FrameDataType::DrawCall, 1)
+#define TRACE_TRANGLES(num) FrameData(nullptr, tracy::FrameDataType::Trangles, num)
+#define TRACE_DRAW(tranglesNum) { TRACE_DRAWCALL; TRACE_TRANGLES(tranglesNum); }
+
 #define FRAME_MARK FrameMark
 #define FRAME_MARK_START FrameMarkStart(nullptr)
 #define FRAME_MARK_END FrameMarkEnd(nullptr)
@@ -41,6 +45,10 @@
 #define TRACE_EVENT
 #define TRACE_EVENT_NAME(name)
 #define TRACE_EVENT_COLOR(color)
+
+#define TRACE_DRAWCALL
+#define TRACE_TRANGLES(num)
+#define TRACE_DRAW(tranglesNum)
 
 #define FRAME_MARK
 #define FRAME_MARK_START

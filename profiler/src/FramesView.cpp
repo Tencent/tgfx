@@ -452,8 +452,10 @@ void FramesView::hoverMoveEvent(QHoverEvent* event) {
         }
       }
     }
-    text += QString("Time from start of program:%1")
-                .arg(tracy::TimeToStringExact(worker->GetFrameBegin(*frames, sele)));
+    text += QString("Time from start of program:%1\nDrawCall:%2\nTrangles:%3")
+                .arg(tracy::TimeToStringExact(worker->GetFrameBegin(*frames, sele)))
+                .arg(worker->GetFrameDrawCall(*frames, sele))
+                .arg(worker->GetFrameTrangles(*frames, sele));
 
     QPoint globalPos = QCursor::pos();
     QToolTip::showText(globalPos, text, nullptr);
