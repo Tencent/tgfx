@@ -584,9 +584,10 @@ class Layer {
   void invalidate();
 
   struct {
-    bool contentDirty : 1;   // need to update content
-    bool childrenDirty : 1;  // need to redraw child layers
-    bool visualPropertyDirty : 1;  // need to redraw the layer, property such as alpha, blendMode, matrix, etc.
+    bool contentDirty : 1;         // need to update content
+    bool childrenDirty : 1;        // need to redraw child layers
+    bool visualPropertyDirty : 1;  // need to redraw the layer, property such as alpha,
+                                   // blendMode, matrix, etc.
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;

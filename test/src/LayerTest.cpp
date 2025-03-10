@@ -2217,7 +2217,6 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   layer->setMatrix(Matrix::MakeTrans(30, 30));
   layer->addChild(background);
 
-
   auto child = ShapeLayer::Make();
   Path path;
   path.addRect(Rect::MakeWH(100, 100));
