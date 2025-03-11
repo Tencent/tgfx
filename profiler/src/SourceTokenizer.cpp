@@ -226,7 +226,9 @@ std::vector<Tokenizer::Token> Tokenizer::tokenize(const char* begin, const char*
 
 static bool tokenizeNumber(const char*& begin, const char* end) {
   const bool startNum = *begin >= '0' && *begin <= '9';
-  if (*begin != '+' && *begin != '-' && !startNum) return false;
+  if (*begin != '+' && *begin != '-' && !startNum) {
+    return false;
+  }
   begin++;
   bool hasNum = startNum;
   while (begin < end && ((*begin >= '0' && *begin <= '9') || *begin == '\'')) {
@@ -234,7 +236,9 @@ static bool tokenizeNumber(const char*& begin, const char* end) {
     begin++;
   }
 
-  if (!hasNum) return false;
+  if (!hasNum) {
+    return false;
+  }
   bool isFloat = false, isBinary = false;
   if (begin < end) {
     if (*begin == '.') {
@@ -257,20 +261,25 @@ static bool tokenizeNumber(const char*& begin, const char* end) {
     if (begin < end && (*begin == 'e' || *begin == 'E' || *begin == 'p' || *begin == 'P')) {
       isFloat = true;
       begin++;
-      if (begin < end && (*begin == '+' || *begin == '-')) begin++;
+      if (begin < end && (*begin == '+' || *begin == '-')) {
+        begin++;
+      }
       bool hasDigits = false;
       while (begin < end && ((*begin >= '0' && *begin <= '9') || (*begin >= 'a' && *begin <= 'f') ||
                              (*begin >= 'A' && *begin <= 'F') || *begin == '\'')) {
         hasDigits = true;
         begin++;
-      }
+                             }
       if (!hasDigits) return false;
     }
-    if (begin < end && (*begin == 'f' || *begin == 'F' || *begin == 'l' || *begin == 'L')) begin++;
+    if (begin < end && (*begin == 'f' || *begin == 'F' || *begin == 'l' || *begin == 'L')) {
+      begin++;
+    }
   }
   if (!isFloat) {
-    while (begin < end && (*begin == 'u' || *begin == 'U' || *begin == 'l' || *begin == 'L'))
+    while (begin < end && (*begin == 'u' || *begin == 'U' || *begin == 'l' || *begin == 'L')) {
       begin++;
+    }
   }
   return true;
 }
@@ -294,9 +303,15 @@ Tokenizer::TokenColor Tokenizer::identifyToken(const char*& begin, const char* e
 
   if (*begin == '\'') {
     begin++;
-    if (begin < end && *begin == '\\') begin++;
-    if (begin < end) begin++;
-    if (begin < end && *begin == '\'') begin++;
+    if (begin < end && *begin == '\\') {
+      begin++;
+    }
+    if (begin < end) {
+      begin++;
+    }
+    if (begin < end && *begin == '\'') {
+      begin++;
+    }
     return TokenColor::CharacterLiteral;
   }
 
@@ -312,15 +327,23 @@ Tokenizer::TokenColor Tokenizer::identifyToken(const char*& begin, const char* e
       char buf[25];
       memcpy(buf, tmp, len);
       buf[begin - tmp] = '\0';
-      if (keywords.find(buf) != keywords.end()) return TokenColor::Keyword;
-      if (types.find(buf) != types.end()) return TokenColor::Type;
-      if (special.find(buf) != special.end()) return TokenColor::Special;
+      if (keywords.find(buf) != keywords.end()) {
+        return TokenColor::Keyword;
+      }
+      if (types.find(buf) != types.end()) {
+        return TokenColor::Type;
+      }
+      if (special.find(buf) != special.end()) {
+        return TokenColor::Special;
+      }
     }
     return TokenColor::Default;
   }
 
   const char* tmp = begin;
-  if (tokenizeNumber(begin, end)) return TokenColor::Number;
+  if (tokenizeNumber(begin, end)) {
+    return TokenColor::Number;
+  }
   begin = tmp;
   if (*begin == '/' && end - begin > 1) {
     if (*(begin + 1) == '/') {
@@ -331,7 +354,9 @@ Tokenizer::TokenColor Tokenizer::identifyToken(const char*& begin, const char* e
     if (*(begin + 1) == '*') {
       begin += 2;
       for (;;) {
-        while (begin < end && *begin != '*') begin++;
+        while (begin < end && *begin != '*') {
+          begin++;
+        }
         if (begin == end) {
           isInComment = true;
           return TokenColor::Comment;
@@ -377,7 +402,9 @@ Tokenizer::TokenColor Tokenizer::identifyToken(const char*& begin, const char* e
     }
   }
 out:
-  if (begin != tmp) return TokenColor::Punctuation;
+  if (begin != tmp) {
+    return TokenColor::Punctuation;
+  }
   begin = end;
   return TokenColor::Default;
 }
