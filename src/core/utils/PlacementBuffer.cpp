@@ -39,7 +39,7 @@ PlacementBuffer::PlacementBuffer(size_t initBlockSize) : initBlockSize(initBlock
 
 PlacementBuffer::~PlacementBuffer() {
   for (auto& block : blocks) {
-    std::free(block.data);
+    free(block.data);
   }
 }
 
@@ -94,7 +94,7 @@ void PlacementBuffer::clear(size_t maxReuseSize) {
       totalBlockSize += block.size;
       reusedBlockCount++;
     } else {
-      std::free(block.data);
+      free(block.data);
     }
   }
   blocks.resize(reusedBlockCount);
@@ -111,7 +111,7 @@ bool PlacementBuffer::allocateNewBlock(size_t requestSize) {
     blockSize = NextBlockSize(blockSize);
   }
   blockSize = (blockSize + BLOCK_ALIGNMENT - 1) & ~(BLOCK_ALIGNMENT - 1);
-  auto data = static_cast<uint8_t*>(std::aligned_alloc(BLOCK_ALIGNMENT, blockSize));
+  auto data = static_cast<uint8_t*>(aligned_alloc(BLOCK_ALIGNMENT, blockSize));
   if (data == nullptr) {
     LOGE("PlacementBuffer::allocateNewBlock() Failed to allocate memory block size: %zu",
          blockSize);
