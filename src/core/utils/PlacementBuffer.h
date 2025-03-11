@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <limits>
 #include <vector>
 #include "core/utils/PlacementPtr.h"
 
@@ -68,7 +70,7 @@ class PlacementBuffer {
    * Resets the size to zero and clears all allocated blocks, but keeps the last block for reuse if
    * it is not larger than maxReuseSize.
    */
-  void clear(size_t maxReuseSize = SIZE_MAX);
+  void clear(size_t maxReuseSize = std::numeric_limits<size_t>::max());
 
  private:
   size_t initBlockSize = 0;
