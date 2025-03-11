@@ -269,7 +269,7 @@ static bool tokenizeNumber(const char*& begin, const char* end) {
                              (*begin >= 'A' && *begin <= 'F') || *begin == '\'')) {
         hasDigits = true;
         begin++;
-                             }
+      }
       if (!hasDigits) return false;
     }
     if (begin < end && (*begin == 'f' || *begin == 'F' || *begin == 'l' || *begin == 'L')) {
