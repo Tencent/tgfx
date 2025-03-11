@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include "Op.h"
 #include "gpu/AAType.h"
 #include "gpu/Pipeline.h"
