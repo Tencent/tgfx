@@ -45,7 +45,7 @@ class TimelineItemThread : public TimelineItem {
   int preprocessZoneLevel(const TimelineContext& ctx, const V& vec, int depth, bool visible,
                           const uint32_t inheritedColor);
 
-  const tracy::ThreadData* threadData;
+  const tracy::ThreadData* threadData = nullptr;
   std::vector<tracy::TimelineDraw> draws;
   int depth;
   bool showFull;

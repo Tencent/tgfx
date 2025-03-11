@@ -90,7 +90,9 @@ void StatisticsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& op
     int64_t timeRange = 0;
     if (view->m_statRange.active) {
       timeRange = view->m_statRange.max - view->m_statRange.min;
-      if (timeRange == 0) timeRange = 1;
+      if (timeRange == 0) {
+        timeRange = 1;
+      }
     } else {
       timeRange = model->getWorker().GetLastTime() - model->getWorker().GetFirstTime();
     }

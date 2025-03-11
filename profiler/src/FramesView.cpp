@@ -36,10 +36,6 @@ FramesView::FramesView(QQuickItem* parent) : QQuickItem(parent) {
 FramesView::~FramesView() {
 }
 
-void FramesView::initView() {
-  // setStyleSheet("background-color: rgb(77, 79, 73)");
-}
-
 uint64_t FramesView::getFrameNumber(const tracy::FrameData& frameData, uint64_t i) {
   if (frameData.name == 0) {
     const auto offset = worker->GetFrameOffset();
@@ -259,13 +255,14 @@ void FramesView::drawBackground(tgfx::Canvas* canvas) {
 void FramesView::wheelEvent(QWheelEvent* event) {
   auto mode = 1;
   auto wheel = event->angleDelta().y();
-  if (wheel > 0) {
+  if (wheel > 0 && viewData->frameScale < 4) {
     viewData->frameScale += mode;
-  } else if (wheel < 0) {
+    update();
+  } else if (wheel < 0 && viewData->frameScale > -2) {
     viewData->frameScale -= mode;
+    update();
   }
 
-  update();
   event->accept();
 }
 
@@ -288,7 +285,7 @@ void FramesView::mousePressEvent(QMouseEvent* event) {
         *viewMode = ViewMode::Paused;
         dragStartFrame = sel;
 
-        if (m_timelineView) {
+        if (timelineView) {
           viewData->zvStart = worker->GetFrameBegin(*frames, size_t(sel));
           viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel));
           if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
@@ -336,8 +333,8 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
         viewData->zvStart = t0;
         viewData->zvEnd = t1;
 
-        if (m_timelineView) {
-          m_timelineView->zoomToRange(t0, t1, false);
+        if (timelineView) {
+          timelineView->zoomToRange(t0, t1, false);
         }
         Q_EMIT statRangeChanged(t0, t1, true);
       }
@@ -388,8 +385,8 @@ void FramesView::mouseReleaseEvent(QMouseEvent* event) {
         viewData->zvStart = startTime;
         viewData->zvEnd = endTime;
         if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
-        if (m_timelineView) {
-          m_timelineView->zoomToRange(startTime, endTime, false);
+        if (timelineView) {
+          timelineView->zoomToRange(startTime, endTime, false);
         }
         Q_EMIT statRangeChanged(startTime, endTime, true);
       }

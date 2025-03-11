@@ -70,7 +70,7 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
 }
 
 void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
-  TRACE_DRAW(vertexCount - 2);
+  TRACE_DRAW(primitiveType == PrimitiveType::TriangleStrip ? vertexCount - 2 : vertexCount / 3);
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }

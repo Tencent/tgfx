@@ -36,6 +36,6 @@ class StatisticsDelegate : public QStyledItemDelegate {
   QColor hoverColor;
   QColor textColor;
   QSize iconSize;
-  View* view;
+  View* view = nullptr;
   StatisticsModel* model = nullptr;
 };
