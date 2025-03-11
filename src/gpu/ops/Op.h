@@ -18,10 +18,8 @@
 
 #pragma once
 
-#include <functional>
+#include "core/utils/PlacementList.h"
 #include "gpu/RenderTarget.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class RenderPass;

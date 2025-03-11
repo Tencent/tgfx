@@ -29,8 +29,7 @@
 namespace tgfx {
 class DrawingManager {
  public:
-  explicit DrawingManager(Context* context) : context(context) {
-  }
+  explicit DrawingManager(Context* context);
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
@@ -43,7 +42,7 @@ class DrawingManager {
                                                   uint32_t renderFlags);
 
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                        std::vector<std::unique_ptr<Op>> ops);
+                        std::vector<PlacementPtr<Op>> ops);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
@@ -65,10 +64,11 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
+  PlacementBuffer* drawingBuffer = nullptr;
   std::unique_ptr<RenderPass> renderPass = nullptr;
   std::vector<std::unique_ptr<ResourceTask>> resourceTasks = {};
   std::vector<std::unique_ptr<TextureFlattenTask>> flattenTasks = {};
-  std::vector<std::unique_ptr<RenderTask>> renderTasks = {};
+  PlacementList<RenderTask> renderTasks;
   std::vector<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<size_t> resourceTaskMap = {};
 };

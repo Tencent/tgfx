@@ -24,6 +24,10 @@
 #include "gpu/tasks/TextureResolveTask.h"
 
 namespace tgfx {
+DrawingManager::DrawingManager(Context* context)
+    : context(context), drawingBuffer(context->drawingBuffer()) {
+}
+
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   std::unique_ptr<FragmentProcessor> processor,
                                   uint32_t renderFlags) {
@@ -31,33 +35,32 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return false;
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  RectPaint rectPaint = {bounds, Matrix::I()};
-  auto op =
-      RectDrawOp::Make(renderTarget->getContext(), {rectPaint}, true, AAType::None, renderFlags);
+  PlacementList<RectPaint> rects;
+  rects.append(drawingBuffer, bounds, Matrix::I());
+  auto op = RectDrawOp::Make(renderTarget->getContext(), std::move(rects), true, AAType::None,
+                             renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
-  std::vector<std::unique_ptr<Op>> ops = {};
-  ops.push_back(std::move(op));
-  auto opsTask = std::make_unique<OpsRenderTask>(renderTarget, std::move(ops));
-  renderTasks.push_back(std::move(opsTask));
+  std::vector<PlacementPtr<Op>> ops;
+  ops.emplace_back(std::move(op));
+  renderTasks.append<OpsRenderTask>(drawingBuffer, renderTarget, std::move(ops));
   addTextureResolveTask(std::move(renderTarget));
   return true;
 }
 
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
     std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags) {
-  auto compositor = std::make_shared<OpsCompositor>(this, std::move(target), renderFlags);
+  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags);
   compositors.push_back(compositor);
   return compositor;
 }
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      std::vector<std::unique_ptr<Op>> ops) {
+                                      std::vector<PlacementPtr<Op>> ops) {
   if (renderTarget == nullptr || ops.empty()) {
     return;
   }
-  auto renderTask = std::make_unique<OpsRenderTask>(renderTarget, std::move(ops));
-  renderTasks.push_back(std::move(renderTask));
+  renderTasks.append<OpsRenderTask>(drawingBuffer, renderTarget, std::move(ops));
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -68,9 +71,8 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  auto task =
-      std::make_unique<RuntimeDrawTask>(renderTarget, std::move(inputs), std::move(effect), offset);
-  renderTasks.push_back(std::move(task));
+  renderTasks.append<RuntimeDrawTask>(drawingBuffer, renderTarget, std::move(inputs),
+                                      std::move(effect), offset);
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -79,8 +81,7 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> ta
   if (textureProxy == nullptr || (target->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
-  auto task = std::make_unique<TextureResolveTask>(std::move(target));
-  renderTasks.push_back(std::move(task));
+  renderTasks.append<TextureResolveTask>(drawingBuffer, std::move(target));
 }
 
 void DrawingManager::addTextureFlattenTask(std::unique_ptr<TextureFlattenTask> flattenTask) {
@@ -96,8 +97,7 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
     return;
   }
   DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
-  auto task = std::make_unique<RenderTargetCopyTask>(std::move(source), std::move(dest));
-  renderTasks.push_back(std::move(task));
+  renderTasks.append<RenderTargetCopyTask>(drawingBuffer, std::move(source), std::move(dest));
 }
 
 void DrawingManager::addResourceTask(std::unique_ptr<ResourceTask> resourceTask) {
@@ -159,9 +159,9 @@ bool DrawingManager::flush() {
   }
   ClearAndReserveSize(flattenTasks);
   for (auto& task : renderTasks) {
-    task->execute(renderPass.get());
+    task.execute(renderPass.get());
   }
-  ClearAndReserveSize(renderTasks);
+  renderTasks.clear();
   return true;
 }
 }  // namespace tgfx
