@@ -111,7 +111,7 @@ bool PlacementBuffer::allocateNewBlock(size_t requestSize) {
     blockSize = NextBlockSize(blockSize);
   }
   blockSize = (blockSize + BLOCK_ALIGNMENT - 1) & ~(BLOCK_ALIGNMENT - 1);
-  auto data = static_cast<uint8_t*>(aligned_alloc(BLOCK_ALIGNMENT, blockSize));
+  auto data = static_cast<uint8_t*>(malloc(blockSize));
   if (data == nullptr) {
     LOGE("PlacementBuffer::allocateNewBlock() Failed to allocate memory block size: %zu",
          blockSize);
