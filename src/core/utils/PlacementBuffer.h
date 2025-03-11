@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <limits>
 #include <vector>
+#include "core/utils/PlacementNode.h"
 #include "core/utils/PlacementPtr.h"
 
 namespace tgfx {
@@ -46,6 +47,23 @@ class PlacementBuffer {
       return nullptr;
     }
     return PlacementPtr<T>(new (memory) T(std::forward<Args>(args)...));
+  }
+
+  /**
+   * Creates a PlacementNode of the specified type in the PlacementBuffer. The node can then be
+   * added to a PlacementList. Returns nullptr if the allocation fails.
+   */
+  template <typename T, typename... Args>
+  PlacementNode<T> makeNode(Args&&... args) {
+    using Storage = typename PlacementNode<T>::Storage;
+    void* memory = alignedAllocate(PlacementNode<T>::ALIGNMENT, sizeof(Storage));
+    if (!memory) {
+      return nullptr;
+    }
+    auto storage = static_cast<Storage*>(memory);
+    storage->next = nullptr;
+    new (storage->memory) T(std::forward<Args>(args)...);
+    return PlacementNode<T>(storage);
   }
 
   /**

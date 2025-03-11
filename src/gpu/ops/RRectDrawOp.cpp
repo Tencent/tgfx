@@ -192,13 +192,13 @@ static bool UseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
 
-PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context, PlacementList<RRectPaint> rects,
-                                            AAType aaType, uint32_t renderFlags) {
+PlacementNode<RRectDrawOp> RRectDrawOp::Make(Context* context, PlacementList<RRectPaint> rects,
+                                             AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
   auto rectSize = rects.size();
-  auto drawOp = context->drawingBuffer()->make<RRectDrawOp>(aaType, rectSize);
+  auto drawOp = context->drawingBuffer()->makeNode<RRectDrawOp>(aaType, rectSize);
   drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer();
   auto useScale = UseScale(context);
   auto vertexProvider = std::make_unique<RRectVerticesProvider>(std::move(rects), aaType, useScale);

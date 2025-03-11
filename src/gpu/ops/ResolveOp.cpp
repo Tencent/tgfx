@@ -20,11 +20,11 @@
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-PlacementPtr<ResolveOp> ResolveOp::Make(Context* context, const Rect& bounds) {
+PlacementNode<ResolveOp> ResolveOp::Make(Context* context, const Rect& bounds) {
   if (bounds.isEmpty()) {
     return nullptr;
   }
-  return context->drawingBuffer()->make<ResolveOp>(bounds);
+  return context->drawingBuffer()->makeNode<ResolveOp>(bounds);
 }
 
 void ResolveOp::execute(RenderPass* renderPass) {

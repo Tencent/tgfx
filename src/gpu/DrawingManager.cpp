@@ -35,15 +35,14 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return false;
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  PlacementList<RectPaint> rects;
-  rects.append(drawingBuffer, bounds, Matrix::I());
-  auto op = RectDrawOp::Make(renderTarget->getContext(), std::move(rects), true, AAType::None,
+  auto rectPaint = drawingBuffer->makeNode<RectPaint>(bounds, Matrix::I());
+  auto op = RectDrawOp::Make(renderTarget->getContext(), {std::move(rectPaint)}, true, AAType::None,
                              renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
-  std::vector<PlacementPtr<Op>> ops;
-  ops.emplace_back(std::move(op));
-  renderTasks.append<OpsRenderTask>(drawingBuffer, renderTarget, std::move(ops));
+  PlacementList<Op> ops(std::move(op));
+  auto task = drawingBuffer->makeNode<OpsRenderTask>(renderTarget, std::move(ops));
+  renderTasks.append(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
   return true;
 }
@@ -52,15 +51,17 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
     std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags) {
   auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags);
   compositors.push_back(compositor);
+  compositor->cachedPosition = --compositors.end();
   return compositor;
 }
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      std::vector<PlacementPtr<Op>> ops) {
+                                      PlacementList<Op> ops) {
   if (renderTarget == nullptr || ops.empty()) {
     return;
   }
-  renderTasks.append<OpsRenderTask>(drawingBuffer, renderTarget, std::move(ops));
+  auto task = drawingBuffer->makeNode<OpsRenderTask>(renderTarget, std::move(ops));
+  renderTasks.append(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -71,8 +72,9 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  renderTasks.append<RuntimeDrawTask>(drawingBuffer, renderTarget, std::move(inputs),
-                                      std::move(effect), offset);
+  auto task = drawingBuffer->makeNode<RuntimeDrawTask>(renderTarget, std::move(inputs),
+                                                       std::move(effect), offset);
+  renderTasks.append(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -81,14 +83,18 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> ta
   if (textureProxy == nullptr || (target->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
-  renderTasks.append<TextureResolveTask>(drawingBuffer, std::move(target));
+  auto task = drawingBuffer->makeNode<TextureResolveTask>(std::move(target));
+  renderTasks.append(std::move(task));
 }
 
-void DrawingManager::addTextureFlattenTask(std::unique_ptr<TextureFlattenTask> flattenTask) {
-  if (flattenTask == nullptr) {
+void DrawingManager::addTextureFlattenTask(UniqueKey uniqueKey,
+                                           std::shared_ptr<TextureProxy> textureProxy) {
+  if (textureProxy == nullptr) {
     return;
   }
-  flattenTasks.push_back(std::move(flattenTask));
+  auto task =
+      drawingBuffer->makeNode<TextureFlattenTask>(std::move(uniqueKey), std::move(textureProxy));
+  flattenTasks.append(std::move(task));
 }
 
 void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
@@ -97,41 +103,28 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
     return;
   }
   DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
-  renderTasks.append<RenderTargetCopyTask>(drawingBuffer, std::move(source), std::move(dest));
+  auto task = drawingBuffer->makeNode<RenderTargetCopyTask>(std::move(source), std::move(dest));
+  renderTasks.append(std::move(task));
 }
 
-void DrawingManager::addResourceTask(std::unique_ptr<ResourceTask> resourceTask) {
+void DrawingManager::addResourceTask(PlacementNode<ResourceTask> resourceTask) {
   if (resourceTask == nullptr) {
     return;
   }
   auto result = resourceTaskMap.find(resourceTask->uniqueKey);
   if (result != resourceTaskMap.end()) {
-    // Replace the existing task with the new one.
-    resourceTasks[result->second] = std::move(resourceTask);
+    // Remove the unique key from the old task, so it will be skipped when the task is executed.
+    result->second->uniqueKey = {};
   } else {
-    resourceTaskMap[resourceTask->uniqueKey] = resourceTasks.size();
-    resourceTasks.push_back(std::move(resourceTask));
-  }
-}
-
-template <typename T>
-void ClearAndReserveSize(std::vector<T>& list) {
-  auto size = list.size();
-  auto capacity = list.capacity();
-  auto nextSize = (size << 1) - (size >> 1);  // 1.5 * size
-  if (capacity > nextSize) {
-    list = std::vector<T>{};
-    list.reserve(size);
-  } else {
-    list.clear();
+    resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
+    resourceTasks.append(std::move(resourceTask));
   }
 }
 
 bool DrawingManager::flush() {
   while (!compositors.empty()) {
     auto compositor = compositors.back();
-    compositors.pop_back();
-    // the makeClosed() method may add more compositors to the list.
+    // The makeClosed() method may add more compositors to the list.
     compositor->makeClosed();
   }
 
@@ -139,9 +132,9 @@ bool DrawingManager::flush() {
     return false;
   }
   for (auto& task : resourceTasks) {
-    task->execute(context);
+    task.execute(context);
   }
-  ClearAndReserveSize(resourceTasks);
+  resourceTasks.clear();
   resourceTaskMap = {};
 
   if (renderPass == nullptr) {
@@ -150,14 +143,14 @@ bool DrawingManager::flush() {
   std::vector<TextureFlattenTask*> validFlattenTasks = {};
   validFlattenTasks.reserve(flattenTasks.size());
   for (auto& task : flattenTasks) {
-    if (task->prepare(context)) {
-      validFlattenTasks.push_back(task.get());
+    if (task.prepare(context)) {
+      validFlattenTasks.push_back(&task);
     }
   }
   for (auto& task : validFlattenTasks) {
     task->execute(renderPass.get());
   }
-  ClearAndReserveSize(flattenTasks);
+  flattenTasks.clear();
   for (auto& task : renderTasks) {
     task.execute(renderPass.get());
   }

@@ -32,25 +32,19 @@ namespace tgfx {
 template <typename T>
 class PlacementList {
  public:
-  /**
-   * A node in the PlacementList.
-   */
-  struct Node {
-    Node* next;
-    uint8_t storage[sizeof(T)];
-
-    const T& data() const {
-      return *reinterpret_cast<const T*>(storage);
-    }
-
-    T& data() {
-      return *reinterpret_cast<T*>(storage);
-    }
-  };
+  using Node = typename PlacementNode<T>::Storage;
 
   explicit PlacementList() = default;
   PlacementList(const PlacementList&) = delete;
   PlacementList& operator=(const PlacementList&) = delete;
+
+  template <typename U>
+  PlacementList(PlacementNode<U>&& node)
+      : head(reinterpret_cast<Node*>(node.storage)), tail(reinterpret_cast<Node*>(node.storage)),
+        _size(1) {
+    static_assert(std::is_base_of_v<T, U>, "U must be derived from T");
+    node.storage = nullptr;
+  }
 
   PlacementList(PlacementList&& other) noexcept
       : head(other.head), tail(other.tail), _size(other._size) {
@@ -77,34 +71,21 @@ class PlacementList {
   }
 
   /**
-   * Adds a new element to the end of the list using the provided PlacementBuffer.
+   * Adds a new node to the end of the list.
    */
-  template <typename... Args>
-  void append(PlacementBuffer* buffer, Args&&... args) {
-    append<T>(buffer, std::forward<Args>(args)...);
-  }
-
-  /**
-   * Adds a new element to the end of the list using the provided PlacementBuffer.
-   */
-  template <typename U, typename... Args>
-  void append(PlacementBuffer* buffer, Args&&... args) {
-    DEBUG_ASSERT(buffer != nullptr);
+  template <typename U>
+  void append(PlacementNode<U>&& node) {
     static_assert(std::is_base_of_v<T, U>, "U must be derived from T");
-    auto memory = buffer->alignedAllocate(NODE_ALIGNMENT, sizeof(typename PlacementList<U>::Node));
-    if (memory == nullptr) {
-      return;
-    }
-    auto newNode = reinterpret_cast<Node*>(memory);
-    newNode->next = nullptr;
-    new (newNode->storage) U(std::forward<Args>(args)...);
+    DEBUG_ASSERT(node != nullptr);
+    auto newNode = reinterpret_cast<Node*>(node.storage);
+    node.storage = nullptr;
     if (tail == nullptr) {
       head = tail = newNode;
     } else {
       tail->next = newNode;
       tail = newNode;
     }
-    ++_size;
+    _size++;
   }
 
   /**
@@ -231,9 +212,6 @@ class PlacementList {
   }
 
  private:
-  // Aligning the nodes to the cache line size can improve iteration performance.
-  static constexpr size_t NODE_ALIGNMENT = 64;
-
   Node* head = nullptr;  ///< A pointer to the first node in the list.
   Node* tail = nullptr;  ///< A pointer to the last node in the list.
   size_t _size = 0;      ///< The number of elements in the list.

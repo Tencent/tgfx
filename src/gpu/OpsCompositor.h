@@ -85,9 +85,9 @@ class OpsCompositor {
 
  private:
   Context* context = nullptr;
+  std::list<std::shared_ptr<OpsCompositor>>::iterator cachedPosition;
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
-  std::vector<PlacementPtr<Op>> ops = {};
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   PendingOpType pendingType = PendingOpType::Unknown;
@@ -97,13 +97,10 @@ class OpsCompositor {
   SamplingOptions pendingSampling = {};
   PlacementList<RectPaint> pendingRects;
   PlacementList<RRectPaint> pendingRRects;
+  PlacementList<Op> ops;
 
   PlacementBuffer* drawingBuffer() const {
     return context->drawingBuffer();
-  }
-
-  DrawingManager* drawingManager() const {
-    return context->drawingManager();
   }
 
   ProxyProvider* proxyProvider() const {
@@ -121,7 +118,9 @@ class OpsCompositor {
   std::unique_ptr<FragmentProcessor> getClipMaskFP(const Path& clip, AAType aaType,
                                                    Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
-  void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
+  void addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const Fill& fill,
                  const Rect& localBounds, const Rect& deviceBounds);
+
+  friend class DrawingManager;
 };
 }  // namespace tgfx

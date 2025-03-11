@@ -131,14 +131,14 @@ class RectNonCoverageVerticesProvider : public DataSource<Data> {
   bool useUVCoord = false;
 };
 
-PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context, PlacementList<RectPaint> rects,
-                                          bool useUVCoord, AAType aaType, uint32_t renderFlags) {
+PlacementNode<RectDrawOp> RectDrawOp::Make(Context* context, PlacementList<RectPaint> rects,
+                                           bool useUVCoord, AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
   auto rectSize = rects.size();
   auto drawingBuffer = context->drawingBuffer();
-  auto drawOp = drawingBuffer->make<RectDrawOp>(aaType, rectSize, useUVCoord);
+  auto drawOp = drawingBuffer->makeNode<RectDrawOp>(aaType, rectSize, useUVCoord);
   auto& firstColor = rects.front().color;
   std::optional<Color> uniformColor = firstColor;
   for (auto& rectPaint : rects) {

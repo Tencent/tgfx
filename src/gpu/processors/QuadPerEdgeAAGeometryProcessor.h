@@ -50,5 +50,6 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   int height = 1;
   AAType aa = AAType::None;
   std::optional<Color> uniformColor = std::nullopt;
+  bool useUVCoord = false;
 };
 }  // namespace tgfx
