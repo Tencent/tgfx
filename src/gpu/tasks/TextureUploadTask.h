@@ -24,19 +24,13 @@
 namespace tgfx {
 class TextureUploadTask : public ResourceTask {
  public:
-  /*
-   * Creates a TextureUploadTask to generate a texture using the given image source.
-   */
-  static std::unique_ptr<TextureUploadTask> MakeFrom(
-      UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped = false);
+  TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
+                    bool mipmapped);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
   bool mipmapped = false;
-
-  TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
-                    bool mipmapped);
 };
 }  // namespace tgfx

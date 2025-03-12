@@ -29,8 +29,7 @@
 namespace tgfx {
 class DrawingManager {
  public:
-  explicit DrawingManager(Context* context) : context(context) {
-  }
+  explicit DrawingManager(Context* context);
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
@@ -42,8 +41,7 @@ class DrawingManager {
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags);
 
-  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                        std::vector<std::unique_ptr<Op>> ops);
+  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, PlacementList<Op> ops);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
@@ -51,12 +49,12 @@ class DrawingManager {
 
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
 
-  void addTextureFlattenTask(std::unique_ptr<TextureFlattenTask> flattenTask);
+  void addTextureFlattenTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy);
 
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest);
 
-  void addResourceTask(std::unique_ptr<ResourceTask> resourceTask);
+  void addResourceTask(PlacementNode<ResourceTask> resourceTask);
 
   /**
    * Returns true if any render tasks were executed.
@@ -65,11 +63,14 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
+  PlacementBuffer* drawingBuffer = nullptr;
   std::unique_ptr<RenderPass> renderPass = nullptr;
-  std::vector<std::unique_ptr<ResourceTask>> resourceTasks = {};
-  std::vector<std::unique_ptr<TextureFlattenTask>> flattenTasks = {};
-  std::vector<std::unique_ptr<RenderTask>> renderTasks = {};
-  std::vector<std::shared_ptr<OpsCompositor>> compositors = {};
-  ResourceKeyMap<size_t> resourceTaskMap = {};
+  PlacementList<ResourceTask> resourceTasks = {};
+  PlacementList<TextureFlattenTask> flattenTasks = {};
+  PlacementList<RenderTask> renderTasks = {};
+  std::list<std::shared_ptr<OpsCompositor>> compositors = {};
+  ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
+
+  friend class OpsCompositor;
 };
 }  // namespace tgfx

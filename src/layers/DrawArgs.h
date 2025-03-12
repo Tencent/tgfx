@@ -47,5 +47,7 @@ class DrawArgs {
   bool excludeEffects = false;
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
+  // Whether the background of the Layer has changed.
+  bool backgroundChanged = false;
 };
 }  // namespace tgfx

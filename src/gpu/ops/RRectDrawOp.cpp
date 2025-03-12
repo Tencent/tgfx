@@ -19,7 +19,6 @@
 #include "RRectDrawOp.h"
 #include "core/DataSource.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
@@ -69,7 +68,7 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class RRectVerticesProvider : public DataSource<Data> {
  public:
-  RRectVerticesProvider(std::vector<RRectPaint> rRectPaints, AAType aaType, bool useScale)
+  RRectVerticesProvider(PlacementList<RRectPaint> rRectPaints, AAType aaType, bool useScale)
       : rRectPaints(std::move(rRectPaints)), aaType(aaType), useScale(useScale) {
   }
 
@@ -184,7 +183,7 @@ class RRectVerticesProvider : public DataSource<Data> {
   }
 
  private:
-  std::vector<RRectPaint> rRectPaints;
+  PlacementList<RRectPaint> rRectPaints = {};
   AAType aaType = AAType::None;
   bool useScale = false;
 };
@@ -193,17 +192,17 @@ static bool UseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
 
-std::unique_ptr<RRectDrawOp> RRectDrawOp::Make(Context* context,
-                                               const std::vector<RRectPaint>& rects, AAType aaType,
-                                               uint32_t renderFlags) {
+PlacementNode<RRectDrawOp> RRectDrawOp::Make(Context* context, PlacementList<RRectPaint> rects,
+                                             AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
-  auto drawOp = std::unique_ptr<RRectDrawOp>(new RRectDrawOp(aaType, rects.size()));
+  auto rectSize = rects.size();
+  auto drawOp = context->drawingBuffer()->makeNode<RRectDrawOp>(aaType, rectSize);
   drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer();
   auto useScale = UseScale(context);
-  auto vertexProvider = std::make_unique<RRectVerticesProvider>(rects, aaType, useScale);
-  if (rects.size() > 1) {
+  auto vertexProvider = std::make_unique<RRectVerticesProvider>(std::move(rects), aaType, useScale);
+  if (rectSize > 1) {
     drawOp->vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexProvider),
                                                          BufferType::Vertex, renderFlags);
   } else {

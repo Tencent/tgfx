@@ -20,6 +20,7 @@
 
 #include "gpu/Texture.h"
 #include "gpu/proxies/GpuBufferProxy.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

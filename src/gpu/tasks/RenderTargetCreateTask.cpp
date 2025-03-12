@@ -22,13 +22,6 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::unique_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(
-    UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy, PixelFormat pixelFormat,
-    int sampleCount) {
-  return std::unique_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
-      std::move(uniqueKey), std::move(textureProxy), pixelFormat, sampleCount));
-}
-
 RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey,
                                                std::shared_ptr<TextureProxy> textureProxy,
                                                PixelFormat pixelFormat, int sampleCount)

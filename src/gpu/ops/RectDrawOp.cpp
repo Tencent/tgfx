@@ -18,7 +18,6 @@
 
 #include "RectDrawOp.h"
 #include "core/DataSource.h"
-#include "gpu/Gpu.h"
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
@@ -36,7 +35,7 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class RectCoverageVerticesProvider : public DataSource<Data> {
  public:
-  RectCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor, bool useUVCoord)
+  RectCoverageVerticesProvider(PlacementList<RectPaint> rectPaints, bool hasColor, bool useUVCoord)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor), useUVCoord(useUVCoord) {
   }
 
@@ -85,14 +84,15 @@ class RectCoverageVerticesProvider : public DataSource<Data> {
   }
 
  private:
-  std::vector<RectPaint> rectPaints = {};
+  PlacementList<RectPaint> rectPaints = {};
   bool hasColor = false;
   bool useUVCoord = false;
 };
 
 class RectNonCoverageVerticesProvider : public DataSource<Data> {
  public:
-  RectNonCoverageVerticesProvider(std::vector<RectPaint> rectPaints, bool hasColor, bool useUVCoord)
+  RectNonCoverageVerticesProvider(PlacementList<RectPaint> rectPaints, bool hasColor,
+                                  bool useUVCoord)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor), useUVCoord(useUVCoord) {
   }
 
@@ -126,18 +126,20 @@ class RectNonCoverageVerticesProvider : public DataSource<Data> {
   }
 
  private:
-  std::vector<RectPaint> rectPaints = {};
+  PlacementList<RectPaint> rectPaints = {};
   bool hasColor = false;
   bool useUVCoord = false;
 };
 
-std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector<RectPaint>& rects,
-                                             bool useUVCoord, AAType aaType, uint32_t renderFlags) {
+PlacementNode<RectDrawOp> RectDrawOp::Make(Context* context, PlacementList<RectPaint> rects,
+                                           bool useUVCoord, AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
-  auto drawOp = std::unique_ptr<RectDrawOp>(new RectDrawOp(aaType, rects.size(), useUVCoord));
-  auto& firstColor = rects[0].color;
+  auto rectSize = rects.size();
+  auto drawingBuffer = context->drawingBuffer();
+  auto drawOp = drawingBuffer->makeNode<RectDrawOp>(aaType, rectSize, useUVCoord);
+  auto& firstColor = rects.front().color;
   std::optional<Color> uniformColor = firstColor;
   for (auto& rectPaint : rects) {
     if (rectPaint.color != firstColor) {
@@ -148,18 +150,18 @@ std::unique_ptr<RectDrawOp> RectDrawOp::Make(Context* context, const std::vector
   drawOp->uniformColor = uniformColor;
   if (aaType == AAType::Coverage) {
     drawOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
-  } else if (rects.size() > 1) {
+  } else if (rectSize > 1) {
     drawOp->indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
   }
   std::unique_ptr<DataSource<Data>> source = nullptr;
   if (aaType == AAType::Coverage) {
-    source = std::make_unique<RectCoverageVerticesProvider>(rects, !uniformColor.has_value(),
-                                                            useUVCoord);
+    source = std::make_unique<RectCoverageVerticesProvider>(std::move(rects),
+                                                            !uniformColor.has_value(), useUVCoord);
   } else {
-    source = std::make_unique<RectNonCoverageVerticesProvider>(rects, !uniformColor.has_value(),
-                                                               useUVCoord);
+    source = std::make_unique<RectNonCoverageVerticesProvider>(
+        std::move(rects), !uniformColor.has_value(), useUVCoord);
   }
-  if (rects.size() > 1) {
+  if (rectSize > 1) {
     drawOp->vertexBufferProxy =
         GpuBufferProxy::MakeFrom(context, std::move(source), BufferType::Vertex, renderFlags);
   } else {
