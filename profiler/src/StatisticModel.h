@@ -148,7 +148,6 @@ class StatisticsModel : public QAbstractTableModel {
   void cacheFrameData() const;
 
  private:
-  View* view;
   View* view = nullptr;
   ViewData& viewData;
   tracy::Worker& worker;

@@ -64,7 +64,10 @@ class FramesView : public QQuickItem {
   }
 
   //set timelineView
+  void setTimelineView(TimelineView* _timelineView) {
+    timelineView = _timelineView;
   }
+
 
   unsigned long long getViewMode() const {
     return (unsigned long long)viewMode;

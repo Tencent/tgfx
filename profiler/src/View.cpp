@@ -165,11 +165,6 @@ View::View(tracy::FileRead& file, int width, const Config& config, QWidget* pare
 
 View::~View() {
   userData.SaveState(viewData);
-  if (statisticsView) {
-    statisticsView->close();
-    statisticsView->deleteLater();
-    statisticsView = nullptr;
-  }
 }
 
 void View::changeViewModeButton(ViewMode mode) {
