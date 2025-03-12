@@ -65,9 +65,9 @@ class DrawingManager {
   Context* context = nullptr;
   PlacementBuffer* drawingBuffer = nullptr;
   std::unique_ptr<RenderPass> renderPass = nullptr;
-  PlacementList<ResourceTask> resourceTasks;
-  PlacementList<TextureFlattenTask> flattenTasks;
-  PlacementList<RenderTask> renderTasks;
+  PlacementList<ResourceTask> resourceTasks = {};
+  PlacementList<TextureFlattenTask> flattenTasks = {};
+  PlacementList<RenderTask> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
 

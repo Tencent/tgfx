@@ -32,6 +32,6 @@ class OpsRenderTask : public RenderTask {
   bool execute(RenderPass* renderPass) override;
 
  private:
-  PlacementList<Op> ops;
+  PlacementList<Op> ops = {};
 };
 }  // namespace tgfx

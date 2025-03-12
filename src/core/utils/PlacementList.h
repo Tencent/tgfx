@@ -34,7 +34,7 @@ class PlacementList {
  public:
   using Node = typename PlacementNode<T>::Storage;
 
-  explicit PlacementList() = default;
+  PlacementList() = default;
   PlacementList(const PlacementList&) = delete;
   PlacementList& operator=(const PlacementList&) = delete;
 

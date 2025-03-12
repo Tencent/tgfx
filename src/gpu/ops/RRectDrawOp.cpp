@@ -183,7 +183,7 @@ class RRectVerticesProvider : public DataSource<Data> {
   }
 
  private:
-  PlacementList<RRectPaint> rRectPaints;
+  PlacementList<RRectPaint> rRectPaints = {};
   AAType aaType = AAType::None;
   bool useScale = false;
 };

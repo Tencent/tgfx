@@ -84,7 +84,7 @@ class RectCoverageVerticesProvider : public DataSource<Data> {
   }
 
  private:
-  PlacementList<RectPaint> rectPaints;
+  PlacementList<RectPaint> rectPaints = {};
   bool hasColor = false;
   bool useUVCoord = false;
 };
@@ -126,7 +126,7 @@ class RectNonCoverageVerticesProvider : public DataSource<Data> {
   }
 
  private:
-  PlacementList<RectPaint> rectPaints;
+  PlacementList<RectPaint> rectPaints = {};
   bool hasColor = false;
   bool useUVCoord = false;
 };

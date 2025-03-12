@@ -40,7 +40,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
                              renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
-  PlacementList<Op> ops(std::move(op));
+  PlacementList<Op> ops = {std::move(op)};
   auto task = drawingBuffer->makeNode<OpsRenderTask>(renderTarget, std::move(ops));
   renderTasks.append(std::move(task));
   addTextureResolveTask(std::move(renderTarget));

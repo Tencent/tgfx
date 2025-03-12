@@ -95,9 +95,9 @@ class OpsCompositor {
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
-  PlacementList<RectPaint> pendingRects;
-  PlacementList<RRectPaint> pendingRRects;
-  PlacementList<Op> ops;
+  PlacementList<RectPaint> pendingRects = {};
+  PlacementList<RRectPaint> pendingRRects = {};
+  PlacementList<Op> ops = {};
 
   PlacementBuffer* drawingBuffer() const {
     return context->drawingBuffer();

@@ -418,7 +418,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     }
     clipTexture = clipRenderTarget->getTextureProxy();
     auto clearOp = ClearOp::Make(context, Color::Transparent(), clipRenderTarget->bounds());
-    PlacementList<Op> ops(std::move(clearOp));
+    PlacementList<Op> ops = {std::move(clearOp)};
     ops.append(std::move(drawOp));
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(ops));
   } else {
