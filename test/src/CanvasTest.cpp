@@ -181,7 +181,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
+  EXPECT_EQ(static_cast<RectDrawOp*>(&task->ops.back())->rectCount, drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
 }
@@ -221,7 +221,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
+  EXPECT_EQ(static_cast<RRectDrawOp*>(&task->ops.back())->rectCount, drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
 }

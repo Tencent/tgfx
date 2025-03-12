@@ -23,7 +23,7 @@
 namespace tgfx {
 class ResolveOp : public Op {
  public:
-  static PlacementPtr<ResolveOp> Make(Context* context, const Rect& bounds);
+  static PlacementNode<ResolveOp> Make(Context* context, const Rect& bounds);
 
   explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
   }

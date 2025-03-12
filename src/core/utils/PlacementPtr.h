@@ -30,25 +30,49 @@ namespace tgfx {
 template <typename T>
 class PlacementPtr {
  public:
+  /**
+   * Constructs a PlacementPtr with the given pointer. The pointer must be allocated in a
+   * pre-allocated memory block.
+   */
   explicit PlacementPtr(T* pointer = nullptr) : pointer(pointer) {
   }
 
+  /**
+   * Constructs a PlacementPtr with a nullptr.
+   */
   PlacementPtr(std::nullptr_t) : pointer(nullptr) {
   }
 
+  /**
+   * Destroys the PlacementPtr and calls the destructor of the object.
+   */
   ~PlacementPtr() {
     if (pointer) {
       pointer->~T();
     }
   }
 
+  /**
+   * Constructs a PlacementPtr by moving the pointer from another PlacementPtr.
+   */
   PlacementPtr(PlacementPtr&& other) noexcept : pointer(other.pointer) {
+    other.pointer = nullptr;
+  }
+
+  /**
+   * Constructs a PlacementPtr by moving the pointer from another PlacementPtr of a different type.
+   */
+  template <typename U>
+  PlacementPtr(PlacementPtr<U>&& other) noexcept : pointer(other.pointer) {
     other.pointer = nullptr;
   }
 
   PlacementPtr(const PlacementPtr&) = delete;
   PlacementPtr& operator=(const PlacementPtr&) = delete;
 
+  /**
+   * Assigns a PlacementPtr to the PlacementPtr by moving the pointer from the other PlacementPtr.
+   */
   PlacementPtr& operator=(PlacementPtr&& other) noexcept {
     if (this != &other) {
       if (pointer) {
@@ -60,6 +84,9 @@ class PlacementPtr {
     return *this;
   }
 
+  /**
+   * Assigns a nullptr to the PlacementPtr.
+   */
   PlacementPtr& operator=(std::nullptr_t) noexcept {
     if (pointer) {
       pointer->~T();
@@ -68,11 +95,10 @@ class PlacementPtr {
     return *this;
   }
 
-  template <typename U>
-  PlacementPtr(PlacementPtr<U>&& other) noexcept : pointer(other.pointer) {
-    other.pointer = nullptr;
-  }
-
+  /**
+   * Assigns a PlacementPtr of a different type to the PlacementPtr by moving the pointer from the
+   * other PlacementPtr.
+   */
   template <typename U>
   PlacementPtr& operator=(PlacementPtr<U>&& other) noexcept {
     if (pointer != other.pointer) {
@@ -85,22 +111,37 @@ class PlacementPtr {
     return *this;
   }
 
+  /**
+   * Returns true if the PlacementPtr is equal to another PlacementPtr.
+   */
   bool operator==(const PlacementPtr& other) const {
     return pointer == other.pointer;
   }
 
+  /**
+   * Returns true if the PlacementPtr is not equal to another PlacementPtr.
+   */
   bool operator!=(const PlacementPtr& other) const {
     return pointer != other.pointer;
   }
 
+  /**
+   * Returns true if the PlacementPtr is not equal to a nullptr.
+   */
   explicit operator bool() const {
     return pointer != nullptr;
   }
 
+  /**
+   * Returns the raw pointer.
+   */
   T* get() const {
     return pointer;
   }
 
+  /**
+   * Resets the pointer to nullptr and calls the destructor of the object.
+   */
   void reset(T* ptr = nullptr) {
     if (pointer) {
       pointer->~T();

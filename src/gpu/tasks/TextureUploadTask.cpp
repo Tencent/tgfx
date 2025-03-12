@@ -20,15 +20,6 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::unique_ptr<TextureUploadTask> TextureUploadTask::MakeFrom(
-    UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped) {
-  if (source == nullptr) {
-    return nullptr;
-  }
-  return std::unique_ptr<TextureUploadTask>(
-      new TextureUploadTask(std::move(uniqueKey), std::move(source), mipmapped));
-}
-
 TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,
                                      std::shared_ptr<DataSource<ImageBuffer>> source,
                                      bool mipmapped)

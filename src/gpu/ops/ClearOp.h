@@ -24,7 +24,7 @@
 namespace tgfx {
 class ClearOp : public Op {
  public:
-  static PlacementPtr<ClearOp> Make(Context* context, Color color, const Rect& scissor);
+  static PlacementNode<ClearOp> Make(Context* context, Color color, const Rect& scissor);
 
   ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
   }
