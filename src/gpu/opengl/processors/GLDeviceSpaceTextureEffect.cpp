@@ -19,13 +19,12 @@
 #include "GLDeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
-    std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix) {
+PlacementPtr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
+    PlacementBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<DeviceSpaceTextureEffect>(
-      new GLDeviceSpaceTextureEffect(std::move(textureProxy), uvMatrix));
+  return buffer->make<GLDeviceSpaceTextureEffect>(std::move(textureProxy), uvMatrix);
 }
 
 GLDeviceSpaceTextureEffect::GLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,

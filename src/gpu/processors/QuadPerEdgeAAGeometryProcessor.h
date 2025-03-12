@@ -26,9 +26,10 @@
 namespace tgfx {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  public:
-  static std::unique_ptr<QuadPerEdgeAAGeometryProcessor> Make(int width, int height, AAType aa,
-                                                              std::optional<Color> uniformColor,
-                                                              bool useUVCoord);
+  static PlacementPtr<QuadPerEdgeAAGeometryProcessor> Make(PlacementBuffer* buffer, int width,
+                                                           int height, AAType aa,
+                                                           std::optional<Color> uniformColor,
+                                                           bool useUVCoord);
 
   std::string name() const override {
     return "QuadPerEdgeAAGeometryProcessor";

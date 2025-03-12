@@ -44,10 +44,10 @@ class ResourceImage : public Image {
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                            const UniqueKey& key) const = 0;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
-                                                         TileMode tileModeY,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
+                                                      TileMode tileModeY,
+                                                      const SamplingOptions& sampling,
+                                                      const Matrix* uvMatrix) const override;
 
   friend class MipmapImage;
 };

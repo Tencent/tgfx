@@ -24,7 +24,8 @@
 namespace tgfx {
 class SingleIntervalGradientColorizer : public FragmentProcessor {
  public:
-  static std::unique_ptr<SingleIntervalGradientColorizer> Make(Color start, Color end);
+  static PlacementPtr<SingleIntervalGradientColorizer> Make(PlacementBuffer* buffer, Color start,
+                                                            Color end);
 
   std::string name() const override {
     return "SingleIntervalGradientColorizer";

@@ -39,13 +39,12 @@ class DualBlurImageFilter : public BlurImageFilter {
                                                  const Rect& clipBounds,
                                                  const TPArgs& args) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                      const FPArgs& args,
+                                                      const SamplingOptions& sampling,
+                                                      const Matrix* uvMatrix) const override;
 
   void draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-            std::unique_ptr<FragmentProcessor> imageProcessor, float scaleFactor,
-            bool isDown) const;
+            PlacementPtr<FragmentProcessor> imageProcessor, float scaleFactor, bool isDown) const;
 };
 }  // namespace tgfx

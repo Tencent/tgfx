@@ -41,8 +41,8 @@ class ColorShader : public Shader {
 
   bool isEqual(const Shader* shader) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const Matrix* uvMatrix) const override;
 
  private:
   Color color;

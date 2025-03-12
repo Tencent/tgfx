@@ -19,10 +19,9 @@
 #include "GLSingleIntervalGradientColorizer.h"
 
 namespace tgfx {
-std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(Color start,
-                                                                                       Color end) {
-  return std::unique_ptr<SingleIntervalGradientColorizer>(
-      new GLSingleIntervalGradientColorizer(start, end));
+PlacementPtr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(
+    PlacementBuffer* buffer, Color start, Color end) {
+  return buffer->make<GLSingleIntervalGradientColorizer>(start, end);
 }
 
 GLSingleIntervalGradientColorizer::GLSingleIntervalGradientColorizer(Color start, Color end)

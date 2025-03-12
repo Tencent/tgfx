@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/PlacementList.h"
+#include "core/utils/PlacementBuffer.h"
 #include "gpu/RenderTarget.h"
 
 namespace tgfx {

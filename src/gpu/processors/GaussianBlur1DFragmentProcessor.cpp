@@ -21,7 +21,7 @@
 namespace tgfx {
 
 GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
-    std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
+    PlacementPtr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
     float stepLength)
     : FragmentProcessor(ClassID()), sigma(sigma), direction(direction), stepLength(stepLength) {
   registerChildProcessor(std::move(processor));

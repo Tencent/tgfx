@@ -20,19 +20,19 @@
 
 namespace tgfx {
 
-std::unique_ptr<GaussianBlur1DFragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
-    std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
-    float stepLength) {
+PlacementPtr<GaussianBlur1DFragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> processor, float sigma,
+    GaussianBlurDirection direction, float stepLength) {
   if (!processor) {
     return nullptr;
   }
 
-  return std::unique_ptr<GaussianBlur1DFragmentProcessor>(
-      new GLGaussianBlur1DFragmentProcessor(std::move(processor), sigma, direction, stepLength));
+  return buffer->make<GLGaussianBlur1DFragmentProcessor>(std::move(processor), sigma, direction,
+                                                         stepLength);
 }
 
 GLGaussianBlur1DFragmentProcessor::GLGaussianBlur1DFragmentProcessor(
-    std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
+    PlacementPtr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
     float stepLength)
     : GaussianBlur1DFragmentProcessor(std::move(processor), sigma, direction, stepLength) {
 }

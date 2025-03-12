@@ -21,7 +21,7 @@
 #include <cstddef>
 #include <utility>
 #include "core/utils/Log.h"
-#include "core/utils/PlacementBuffer.h"
+#include "core/utils/PlacementNode.h"
 
 namespace tgfx {
 /**
@@ -86,6 +86,26 @@ class PlacementList {
       tail = newNode;
     }
     _size++;
+  }
+
+  /**
+   * Moves nodes from another list and adds them to the end of this list.
+   */
+  void append(PlacementList&& other) {
+    if (other.head == nullptr) {
+      return;
+    }
+    if (tail == nullptr) {
+      head = other.head;
+      tail = other.tail;
+    } else {
+      tail->next = other.head;
+      tail = other.tail;
+    }
+    _size += other._size;
+    other.head = nullptr;
+    other.tail = nullptr;
+    other._size = 0;
   }
 
   /**

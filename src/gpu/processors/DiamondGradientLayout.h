@@ -23,7 +23,7 @@
 namespace tgfx {
 class DiamondGradientLayout : public FragmentProcessor {
  public:
-  static std::unique_ptr<DiamondGradientLayout> Make(Matrix matrix);
+  static PlacementPtr<DiamondGradientLayout> Make(PlacementBuffer* buffer, Matrix matrix);
 
   std::string name() const override {
     return "DiamondGradientLayout";

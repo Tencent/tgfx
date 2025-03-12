@@ -430,18 +430,19 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   return clipTexture;
 }
 
-std::unique_ptr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, AAType aaType,
-                                                                Rect* scissorRect) {
+PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, AAType aaType,
+                                                             Rect* scissorRect) {
   if (clip.isEmpty() && clip.isInverseFillType()) {
     return nullptr;
   }
+  auto buffer = context->drawingBuffer();
   auto [rect, useScissor] = getClipRect(clip);
   if (rect.has_value()) {
     if (!rect->isEmpty()) {
       *scissorRect = *rect;
       if (!useScissor) {
         scissorRect->roundOut();
-        return AARectEffect::Make(*rect);
+        return AARectEffect::Make(buffer, *rect);
       }
     }
     return nullptr;
@@ -457,8 +458,8 @@ std::unique_ptr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip
     flipYMatrix.postTranslate(0, -static_cast<float>(renderTarget->height()));
     uvMatrix.preConcat(flipYMatrix);
   }
-  return FragmentProcessor::MulInputByChildAlpha(
-      DeviceSpaceTextureEffect::Make(std::move(textureProxy), uvMatrix));
+  auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
+  return FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor));
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
@@ -522,7 +523,7 @@ void OpsCompositor::addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const 
     }
   }
   if (fill.colorFilter) {
-    if (auto processor = fill.colorFilter->asFragmentProcessor()) {
+    if (auto processor = fill.colorFilter->asFragmentProcessor(context)) {
       op->addColorFP(std::move(processor));
     }
   }
@@ -544,7 +545,8 @@ void OpsCompositor::addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const 
   op->setBlendMode(fill.blendMode);
   if (!BlendModeAsCoeff(fill.blendMode)) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds, aaType);
-    auto xferProcessor = PorterDuffXferProcessor::Make(fill.blendMode, std::move(dstTextureInfo));
+    auto xferProcessor =
+        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
   ops.append(std::move(op));

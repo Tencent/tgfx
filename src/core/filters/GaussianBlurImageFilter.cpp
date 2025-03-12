@@ -43,7 +43,7 @@ GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurri
     : BlurImageFilter(blurrinessX, blurrinessY, tileMode) {
 }
 
-static void Blur1D(std::unique_ptr<FragmentProcessor> source,
+static void Blur1D(PlacementPtr<FragmentProcessor> source,
                    std::shared_ptr<RenderTargetProxy> renderTarget, float sigma,
                    GaussianBlurDirection direction, float stepLength, uint32_t renderFlags) {
   if (!renderTarget) {
@@ -159,7 +159,7 @@ Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(2.f * blurrinessX, 2.f * blurrinessY);
 }
 
-std::unique_ptr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, uvMatrix);

@@ -30,8 +30,7 @@ DrawingManager::DrawingManager(Context* context)
 }
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                  std::unique_ptr<FragmentProcessor> processor,
-                                  uint32_t renderFlags) {
+                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags) {
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }

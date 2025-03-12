@@ -32,8 +32,9 @@ bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return other && threshold == other->threshold;
 }
 
-std::unique_ptr<FragmentProcessor> AlphaThresholdColorFilter::asFragmentProcessor() const {
-  return AlphaThresholdFragmentProcessor::Make(threshold);
+PlacementPtr<FragmentProcessor> AlphaThresholdColorFilter::asFragmentProcessor(
+    Context* context) const {
+  return AlphaThresholdFragmentProcessor::Make(context->drawingBuffer(), threshold);
 }
 
 }  // namespace tgfx

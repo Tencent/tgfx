@@ -73,10 +73,12 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     }
     vertexData = Data::MakeWithoutCopy(maskVertices.data(), maskVertices.size() * sizeof(float));
   }
-  auto pipeline = createPipeline(
-      renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
-                                                 renderPass->renderTarget()->height(), aaType,
-                                                 viewMatrix, realUVMatrix));
+  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto renderTarget = renderPass->renderTarget();
+  auto gp =
+      DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
+                                     renderTarget->height(), aaType, viewMatrix, realUVMatrix);
+  auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   auto vertexDataSize = vertexBuffer ? vertexBuffer->size() : vertexData->size();
   auto vertexCount = aaType == AAType::Coverage

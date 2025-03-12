@@ -192,10 +192,12 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   } else if (vertexData == nullptr) {
     return;
   }
-  auto pipeline = createPipeline(
-      renderPass, QuadPerEdgeAAGeometryProcessor::Make(renderPass->renderTarget()->width(),
-                                                       renderPass->renderTarget()->height(), aaType,
-                                                       uniformColor, useUVCoord));
+  auto renderTarget = renderPass->renderTarget();
+  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+                                                 renderTarget->height(), aaType, uniformColor,
+                                                 useUVCoord);
+  auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   if (vertexBuffer) {
     renderPass->bindBuffers(indexBuffer, vertexBuffer);

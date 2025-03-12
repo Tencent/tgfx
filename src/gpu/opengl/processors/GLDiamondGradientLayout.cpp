@@ -19,8 +19,9 @@
 #include "GLDiamondGradientLayout.h"
 
 namespace tgfx {
-std::unique_ptr<DiamondGradientLayout> DiamondGradientLayout::Make(Matrix matrix) {
-  return std::unique_ptr<DiamondGradientLayout>(new GLDiamondGradientLayout(matrix));
+PlacementPtr<DiamondGradientLayout> DiamondGradientLayout::Make(PlacementBuffer* buffer,
+                                                                Matrix matrix) {
+  return buffer->make<GLDiamondGradientLayout>(matrix);
 }
 
 GLDiamondGradientLayout::GLDiamondGradientLayout(Matrix matrix) : DiamondGradientLayout(matrix) {
