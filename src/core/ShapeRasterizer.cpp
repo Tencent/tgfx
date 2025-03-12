@@ -20,6 +20,7 @@
 #include "core/PathTriangulator.h"
 #include "tgfx/core/Mask.h"
 #include "utils/Log.h"
+#include "utils/Profiling.h"
 
 namespace tgfx {
 ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, AAType aaType)
@@ -27,6 +28,7 @@ ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> s
 }
 
 std::shared_ptr<ShapeBuffer> ShapeRasterizer::getData() const {
+  TRACE_EVENT_NAME("VectorRasterize");
   auto finalPath = shape->getPath();
   if (finalPath.isEmpty() && finalPath.isInverseFillType()) {
     finalPath.reset();

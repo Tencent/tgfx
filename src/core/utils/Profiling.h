@@ -29,21 +29,50 @@
 #endif
 
 #define TRACE_EVENT ZoneScopedN(TRACE_FUNC)
+#define TRACE_EVENT_NAME(name) ZoneScopedN(name)
 #define TRACE_EVENT_COLOR(color) ZoneScopedNC(TRACE_FUNC, color)
 
+#define TRACE_DRAWCALL FrameData(nullptr, tracy::FrameDataType::DrawCall, 1)
+#define TRACE_TRANGLES(num) FrameData(nullptr, tracy::FrameDataType::Trangles, num)
+#define TRACE_DRAW(tranglesNum)  \
+  {                              \
+    TRACE_DRAWCALL;              \
+    TRACE_TRANGLES(tranglesNum); \
+  }
+
 #define FRAME_MARK FrameMark
+#define FRAME_MARK_START FrameMarkStart(nullptr)
+#define FRAME_MARK_END FrameMarkEnd(nullptr)
 
-#define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
+static constexpr uint32_t INVALID_THREAD_NUMBER = 0;
+inline uint32_t GetThreadNumber() {
+  static std::atomic<uint32_t> nextID{1};
+  uint32_t number;
+  do {
+    number = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (number == INVALID_THREAD_NUMBER);
+  return number;
+}
 
-#define TRACY_COLOR_YELLOW tracy::Color::ColorType::Yellow
-#define TRACY_COLOR_GREEN tracy::Color::ColorType::Green
-#define TRACY_COLOR_GREENYELLOW tracy::Color::ColorType::GreenYellow
+inline std::string GetThreadName() {
+  char threadName[10] = {'\0'};
+  snprintf(threadName, 10, "Thread_%d", GetThreadNumber());
+  return threadName;
+}
 
+#define TRACE_THREAD tracy::SetThreadName(GetThreadName().c_str())
 #else
 #define TRACE_EVENT
+#define TRACE_EVENT_NAME(name)
 #define TRACE_EVENT_COLOR(color)
 
-#define FRAME_MARK
+#define TRACE_DRAWCALL
+#define TRACE_TRANGLES(num)
+#define TRACE_DRAW(tranglesNum)
 
-#define TRACE_THREAD_NAME(name)
+#define FRAME_MARK
+#define FRAME_MARK_START
+#define FRAME_MARK_END
+
+#define TRACE_THREAD
 #endif
