@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <QAbstractItemModel>
+#include <qabstractitemmodel.h>
 #include "SourceContents.h"
 #include "TracyVector.hpp"
 #include "ViewData.h"
@@ -149,6 +149,7 @@ class StatisticsModel : public QAbstractTableModel {
 
  private:
   View* view;
+  View* view = nullptr;
   ViewData& viewData;
   tracy::Worker& worker;
 

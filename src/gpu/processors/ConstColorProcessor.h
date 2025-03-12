@@ -26,7 +26,8 @@ enum class InputMode { Ignore = 0, ModulateRGBA = 1, ModulateA = 2 };
 
 class ConstColorProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<ConstColorProcessor> Make(Color color, InputMode inputMode);
+  static PlacementPtr<ConstColorProcessor> Make(PlacementBuffer* buffer, Color color,
+                                                InputMode inputMode);
 
   std::string name() const override {
     return "ConstColorProcessor";

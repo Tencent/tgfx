@@ -21,15 +21,6 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::unique_ptr<ShapeBufferUploadTask> ShapeBufferUploadTask::MakeFrom(
-    UniqueKey trianglesKey, UniqueKey textureKey, std::unique_ptr<DataSource<ShapeBuffer>> source) {
-  if (source == nullptr) {
-    return nullptr;
-  }
-  return std::unique_ptr<ShapeBufferUploadTask>(
-      new ShapeBufferUploadTask(std::move(trianglesKey), std::move(textureKey), std::move(source)));
-}
-
 ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
                                              std::unique_ptr<DataSource<ShapeBuffer>> source)
     : ResourceTask(std::move(trianglesKey)), textureKey(std::move(textureKey)),

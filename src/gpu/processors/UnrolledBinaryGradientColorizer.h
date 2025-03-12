@@ -25,8 +25,10 @@ namespace tgfx {
 class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
   static constexpr int kMaxColorCount = 16;
-  static std::unique_ptr<UnrolledBinaryGradientColorizer> Make(const Color* colors,
-                                                               const float* positions, int count);
+
+  static PlacementPtr<UnrolledBinaryGradientColorizer> Make(PlacementBuffer* buffer,
+                                                            const Color* colors,
+                                                            const float* positions, int count);
 
   std::string name() const override {
     return "UnrolledBinaryGradientColorizer";

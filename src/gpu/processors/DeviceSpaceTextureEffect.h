@@ -23,8 +23,9 @@
 namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<DeviceSpaceTextureEffect> Make(std::shared_ptr<TextureProxy> textureProxy,
-                                                        const Matrix& uvMatrix);
+  static PlacementPtr<DeviceSpaceTextureEffect> Make(PlacementBuffer* buffer,
+                                                     std::shared_ptr<TextureProxy> textureProxy,
+                                                     const Matrix& uvMatrix);
 
   std::string name() const override {
     return "DeviceSpaceTextureEffect";

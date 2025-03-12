@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <functional>
 #include "Op.h"
 #include "gpu/AAType.h"
 #include "gpu/Pipeline.h"
@@ -27,8 +26,7 @@
 namespace tgfx {
 class DrawOp : public Op {
  public:
-  std::unique_ptr<Pipeline> createPipeline(RenderPass* renderPass,
-                                           std::unique_ptr<GeometryProcessor> gp);
+  PlacementPtr<Pipeline> createPipeline(RenderPass* renderPass, PlacementPtr<GeometryProcessor> gp);
 
   const Rect& scissorRect() const {
     return _scissorRect;
@@ -42,15 +40,15 @@ class DrawOp : public Op {
     blendMode = mode;
   }
 
-  void setXferProcessor(std::unique_ptr<XferProcessor> processor) {
+  void setXferProcessor(PlacementPtr<XferProcessor> processor) {
     xferProcessor = std::move(processor);
   }
 
-  void addColorFP(std::unique_ptr<FragmentProcessor> colorProcessor) {
+  void addColorFP(PlacementPtr<FragmentProcessor> colorProcessor) {
     colors.emplace_back(std::move(colorProcessor));
   }
 
-  void addCoverageFP(std::unique_ptr<FragmentProcessor> coverageProcessor) {
+  void addCoverageFP(PlacementPtr<FragmentProcessor> coverageProcessor) {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
@@ -62,9 +60,9 @@ class DrawOp : public Op {
 
  private:
   Rect _scissorRect = Rect::MakeEmpty();
-  std::vector<std::unique_ptr<FragmentProcessor>> colors = {};
-  std::vector<std::unique_ptr<FragmentProcessor>> coverages = {};
-  std::unique_ptr<XferProcessor> xferProcessor = nullptr;
+  std::vector<PlacementPtr<FragmentProcessor>> colors = {};
+  std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
+  PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

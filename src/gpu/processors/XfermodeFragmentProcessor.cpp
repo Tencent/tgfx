@@ -20,14 +20,14 @@
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcessor(
-    std::unique_ptr<FragmentProcessor> src, BlendMode mode) {
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(std::move(src), nullptr, mode);
+PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcessor(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> src, BlendMode mode) {
+  return MakeFromTwoProcessors(buffer, std::move(src), nullptr, mode);
 }
 
-std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromDstProcessor(
-    std::unique_ptr<FragmentProcessor> dst, BlendMode mode) {
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(nullptr, std::move(dst), mode);
+PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromDstProcessor(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> dst, BlendMode mode) {
+  return MakeFromTwoProcessors(buffer, nullptr, std::move(dst), mode);
 }
 
 std::string XfermodeFragmentProcessor::name() const {
@@ -41,8 +41,8 @@ std::string XfermodeFragmentProcessor::name() const {
   }
 }
 
-XfermodeFragmentProcessor::XfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
-                                                     std::unique_ptr<FragmentProcessor> dst,
+XfermodeFragmentProcessor::XfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
+                                                     PlacementPtr<FragmentProcessor> dst,
                                                      BlendMode mode)
     : FragmentProcessor(ClassID()), mode(mode) {
   if (src && dst) {

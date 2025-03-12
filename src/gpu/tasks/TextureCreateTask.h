@@ -24,12 +24,8 @@
 namespace tgfx {
 class TextureCreateTask : public ResourceTask {
  public:
-  /**
-   * Creates a TextureCreateTask to create a texture using the specified size and format.
-   */
-  static std::unique_ptr<TextureCreateTask> MakeFrom(UniqueKey uniqueKey, int width, int height,
-                                                     PixelFormat format, bool mipmapped = false,
-                                                     ImageOrigin origin = ImageOrigin::TopLeft);
+  TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
+                    ImageOrigin origin);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
@@ -39,9 +35,6 @@ class TextureCreateTask : public ResourceTask {
   PixelFormat format = PixelFormat::RGBA_8888;
   bool mipmapped = false;
   ImageOrigin origin = ImageOrigin::TopLeft;
-
-  TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
-                    ImageOrigin origin);
 };
 
 }  // namespace tgfx

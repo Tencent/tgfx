@@ -26,13 +26,13 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-std::unique_ptr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GpuShapeProxy> shapeProxy,
-                                               Color color, const Matrix& uvMatrix, AAType aaType) {
+PlacementNode<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
+                                             const Matrix& uvMatrix, AAType aaType) {
   if (shapeProxy == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<ShapeDrawOp>(
-      new ShapeDrawOp(std::move(shapeProxy), color, uvMatrix, aaType));
+  auto drawingBuffer = shapeProxy->getContext()->drawingBuffer();
+  return drawingBuffer->makeNode<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
 }
 
 ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
@@ -73,10 +73,12 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     }
     vertexData = Data::MakeWithoutCopy(maskVertices.data(), maskVertices.size() * sizeof(float));
   }
-  auto pipeline = createPipeline(
-      renderPass, DefaultGeometryProcessor::Make(color, renderPass->renderTarget()->width(),
-                                                 renderPass->renderTarget()->height(), aaType,
-                                                 viewMatrix, realUVMatrix));
+  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto renderTarget = renderPass->renderTarget();
+  auto gp =
+      DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
+                                     renderTarget->height(), aaType, viewMatrix, realUVMatrix);
+  auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   auto vertexDataSize = vertexBuffer ? vertexBuffer->size() : vertexData->size();
   auto vertexCount = aaType == AAType::Coverage

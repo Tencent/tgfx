@@ -21,27 +21,26 @@
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors(
-    std::unique_ptr<FragmentProcessor> src, std::unique_ptr<FragmentProcessor> dst,
-    BlendMode mode) {
+PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> src,
+    PlacementPtr<FragmentProcessor> dst, BlendMode mode) {
   if (src == nullptr && dst == nullptr) {
     return nullptr;
   }
   switch (mode) {
     case BlendMode::Clear:
-      return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
+      return ConstColorProcessor::Make(buffer, Color::Transparent(), InputMode::Ignore);
     case BlendMode::Src:
       return src;
     case BlendMode::Dst:
       return dst;
     default:
-      return std::unique_ptr<XfermodeFragmentProcessor>(
-          new GLXfermodeFragmentProcessor(std::move(src), std::move(dst), mode));
+      return buffer->make<GLXfermodeFragmentProcessor>(std::move(src), std::move(dst), mode);
   }
 }
 
-GLXfermodeFragmentProcessor::GLXfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
-                                                         std::unique_ptr<FragmentProcessor> dst,
+GLXfermodeFragmentProcessor::GLXfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
+                                                         PlacementPtr<FragmentProcessor> dst,
                                                          BlendMode mode)
     : XfermodeFragmentProcessor(std::move(src), std::move(dst), mode) {
 }

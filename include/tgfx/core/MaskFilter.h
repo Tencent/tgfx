@@ -58,8 +58,8 @@ class MaskFilter {
   virtual bool isEqual(const MaskFilter* maskFilter) const = 0;
 
  private:
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                                 const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                              const Matrix* uvMatrix) const = 0;
 
   friend class OpsCompositor;
   friend class Caster;

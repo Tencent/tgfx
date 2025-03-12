@@ -19,8 +19,9 @@
 #include "ComposeFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> ComposeFragmentProcessor::Make(
-    std::unique_ptr<FragmentProcessor> first, std::unique_ptr<FragmentProcessor> second) {
+PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> first,
+    PlacementPtr<FragmentProcessor> second) {
   if (first == nullptr && second == nullptr) {
     return nullptr;
   }
@@ -30,7 +31,7 @@ std::unique_ptr<FragmentProcessor> ComposeFragmentProcessor::Make(
   if (second == nullptr) {
     return first;
   }
-  std::vector<std::unique_ptr<FragmentProcessor>> processors = {};
+  std::vector<PlacementPtr<FragmentProcessor>> processors = {};
   if (first->classID() == ComposeFragmentProcessor::ClassID()) {
     auto& children = static_cast<ComposeFragmentProcessor*>(first.get())->childProcessors;
     processors = std::move(children);
@@ -44,11 +45,11 @@ std::unique_ptr<FragmentProcessor> ComposeFragmentProcessor::Make(
   } else {
     processors.push_back(std::move(second));
   }
-  return Make(std::move(processors));
+  return Make(buffer, std::move(processors));
 }
 
 ComposeFragmentProcessor::ComposeFragmentProcessor(
-    std::vector<std::unique_ptr<FragmentProcessor>> processors)
+    std::vector<PlacementPtr<FragmentProcessor>> processors)
     : FragmentProcessor(ClassID()) {
   for (auto& processor : processors) {
     registerChildProcessor(std::move(processor));

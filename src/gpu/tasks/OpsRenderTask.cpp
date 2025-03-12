@@ -31,7 +31,7 @@ bool OpsRenderTask::execute(RenderPass* renderPass) {
   }
   auto tempOps = std::move(ops);
   for (auto& op : tempOps) {
-    op->execute(renderPass);
+    op.execute(renderPass);
   }
   renderPass->end();
   return true;

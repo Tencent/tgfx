@@ -56,7 +56,7 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
   return bounds;
 }
 
-std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   if (color.alpha <= 0) {
@@ -65,7 +65,7 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return nullptr;
   }
   source = source->makeRasterized();
-  std::unique_ptr<FragmentProcessor> shadowProcessor;
+  PlacementPtr<FragmentProcessor> shadowProcessor;
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix != nullptr) {
     shadowMatrix.preConcat(*uvMatrix);
@@ -79,16 +79,17 @@ std::unique_ptr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
-  auto colorProcessor = ConstColorProcessor::Make(color.premultiply(), InputMode::Ignore);
+  auto buffer = args.context->drawingBuffer();
+  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
+      buffer, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
   if (shadowOnly) {
     return colorShadowProcessor;
   }
   auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
                                                 TileMode::Decal, sampling, uvMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
+      buffer, std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }
 
 }  // namespace tgfx

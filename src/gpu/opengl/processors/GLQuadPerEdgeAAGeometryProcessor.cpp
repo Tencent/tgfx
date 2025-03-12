@@ -19,10 +19,11 @@
 #include "GLQuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
-    int width, int height, AAType aa, std::optional<Color> uniformColor, bool useUVCoord) {
-  return std::unique_ptr<QuadPerEdgeAAGeometryProcessor>(
-      new GLQuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor, useUVCoord));
+PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
+    PlacementBuffer* buffer, int width, int height, AAType aa, std::optional<Color> uniformColor,
+    bool useUVCoord) {
+  return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, uniformColor,
+                                                        useUVCoord);
 }
 
 GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(

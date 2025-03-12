@@ -37,9 +37,9 @@ class InnerShadowImageFilter : public ImageFilter {
     return Type::InnerShadow;
   }
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                      const FPArgs& args,
+                                                      const SamplingOptions& sampling,
+                                                      const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

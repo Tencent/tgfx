@@ -69,14 +69,15 @@ bool TextureFlattenTask::execute(RenderPass* renderPass) {
     LOGE("TextureFlattenTask::execute() Failed to create the color processor!");
     return false;
   }
-  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.push_back(std::move(colorProcessor));
-  auto geometryProcessor =
-      DefaultGeometryProcessor::Make(Color::White(), renderTarget->width(), renderTarget->height(),
-                                     AAType::None, Matrix::I(), Matrix::I());
+  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto geometryProcessor = DefaultGeometryProcessor::Make(
+      drawingBuffer, Color::White(), renderTarget->width(), renderTarget->height(), AAType::None,
+      Matrix::I(), Matrix::I());
   auto format = renderPass->renderTarget()->format();
   auto caps = renderPass->getContext()->caps();
   const auto& swizzle = caps->getWriteSwizzle(format);
+  std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
+  fragmentProcessors.emplace_back(std::move(colorProcessor));
   auto pipeline =
       std::make_unique<Pipeline>(std::move(geometryProcessor), std::move(fragmentProcessors), 1,
                                  nullptr, BlendMode::Src, &swizzle);

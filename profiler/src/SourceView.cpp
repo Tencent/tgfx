@@ -82,6 +82,7 @@ void SourceTextColor::highlightBlock(const QString& text) {
         format.setForeground(QColor(106, 153, 85));
         break;
 
+      case Tokenizer::TokenColor::CharacterLiteral:
       case Tokenizer::TokenColor::String:
         format.setForeground(QColor(206, 145, 120));
         break;
@@ -97,9 +98,6 @@ void SourceTextColor::highlightBlock(const QString& text) {
       case Tokenizer::TokenColor::Prprocessor:
         format.setForeground(QColor(197, 134, 192));
         break;
-
-      case Tokenizer::TokenColor::CharacterLiteral:
-        format.setForeground(QColor(206, 145, 120));
 
       default:
         format.setForeground(Qt::white);
@@ -165,11 +163,15 @@ void CodeEditor::updateLineNumberAreaWidth(int /* newBlockCount */) {
 }
 
 void CodeEditor::updateLineNumberArea(const QRect& rect, int dy) {
-  if (dy) lineNumberArea->scroll(0, dy);
-  else
+  if (dy) {
+    lineNumberArea->scroll(0, dy);
+  } else {
     lineNumberArea->update(0, rect.y(), lineNumberArea->width(), rect.height());
+  }
 
-  if (rect.contains(viewport()->rect())) updateLineNumberAreaWidth(0);
+  if (rect.contains(viewport()->rect())) {
+    updateLineNumberAreaWidth(0);
+  }
 }
 
 void CodeEditor::highlightCurrentLine() {

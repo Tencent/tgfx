@@ -151,22 +151,13 @@ View::View(const char* addr, uint16_t port, int width, const Config& config, QWi
              config.memoryLimit == 0
                  ? -1
                  : (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100)),
-m_frames(nullptr),
-      viewMode(ViewMode::LastFrames), config(config)
-
-{
-
-    initView();
+      viewMode(ViewMode::LastFrames), config(config) {
+  initView();
 }
 
 View::View(tracy::FileRead& file, int width, const Config& config, QWidget* parent)
-    : QWidget(parent),
-      width(width),
-      worker(file),
-      m_frames(worker.GetFramesBase()),
-      viewMode(ViewMode::Paused),
-      userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime()),
-      config(config) {
+    : QWidget(parent), width(width), worker(file), viewMode(ViewMode::Paused),
+      userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime()), config(config) {
   initView();
   userData.StateShouldBePreserved();
   userData.LoadState(viewData);
@@ -174,6 +165,11 @@ View::View(tracy::FileRead& file, int width, const Config& config, QWidget* pare
 
 View::~View() {
   userData.SaveState(viewData);
+  if (statisticsView) {
+    statisticsView->close();
+    statisticsView->deleteLater();
+    statisticsView = nullptr;
+  }
 }
 
 void View::changeViewModeButton(ViewMode mode) {
@@ -273,7 +269,6 @@ bool View::save() {
 void View::ViewImpl() {
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
-
 
   qmlRegisterType<ViewMode>("com.example", 1, 0, "ViewMode");
   qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");

@@ -34,7 +34,6 @@ class FramesView : public QQuickItem {
  public:
   FramesView(QQuickItem* parent = nullptr);
   ~FramesView();
-  void initView();
   void createAppHost();
   void setViewToLastFrames();
 
@@ -65,8 +64,6 @@ class FramesView : public QQuickItem {
   }
 
   //set timelineView
-  void setTimelineView(TimelineView* timelineView) {
-    m_timelineView = timelineView;
   }
 
   unsigned long long getViewMode() const {
@@ -88,10 +85,10 @@ class FramesView : public QQuickItem {
 
  private:
   tracy::Worker* worker = nullptr;
-  ViewData* viewData;
-  ViewMode* viewMode;
+  ViewData* viewData = nullptr;
+  ViewMode* viewMode = nullptr;
   const tracy::FrameData* frames = nullptr;
-  TimelineView* m_timelineView = nullptr;
+  TimelineView* timelineView = nullptr;
 
   uint64_t frameTarget;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;

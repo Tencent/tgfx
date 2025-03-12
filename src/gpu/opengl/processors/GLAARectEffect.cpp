@@ -19,8 +19,8 @@
 #include "GLAARectEffect.h"
 
 namespace tgfx {
-std::unique_ptr<AARectEffect> AARectEffect::Make(const Rect& rect) {
-  return std::unique_ptr<AARectEffect>(new GLAARectEffect(rect));
+PlacementPtr<AARectEffect> AARectEffect::Make(PlacementBuffer* buffer, const Rect& rect) {
+  return buffer->make<GLAARectEffect>(rect);
 }
 
 GLAARectEffect::GLAARectEffect(const Rect& rect) : AARectEffect(rect) {

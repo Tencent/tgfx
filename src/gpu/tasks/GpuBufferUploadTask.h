@@ -26,11 +26,8 @@
 namespace tgfx {
 class GpuBufferUploadTask : public ResourceTask {
  public:
-  /**
-   * Create a new GpuBufferUploadTask to generate a GpuBuffer with the given data source.
-   */
-  static std::unique_ptr<GpuBufferUploadTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
-                                                       std::unique_ptr<DataSource<Data>> source);
+  GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
+                      std::unique_ptr<DataSource<Data>> source);
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
@@ -38,8 +35,5 @@ class GpuBufferUploadTask : public ResourceTask {
  private:
   BufferType bufferType = BufferType::Vertex;
   std::unique_ptr<DataSource<Data>> source = nullptr;
-
-  GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
-                      std::unique_ptr<DataSource<Data>> source);
 };
 }  // namespace tgfx

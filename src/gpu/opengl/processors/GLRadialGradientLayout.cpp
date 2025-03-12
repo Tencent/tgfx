@@ -19,8 +19,9 @@
 #include "GLRadialGradientLayout.h"
 
 namespace tgfx {
-std::unique_ptr<RadialGradientLayout> RadialGradientLayout::Make(Matrix matrix) {
-  return std::unique_ptr<RadialGradientLayout>(new GLRadialGradientLayout(matrix));
+PlacementPtr<RadialGradientLayout> RadialGradientLayout::Make(PlacementBuffer* buffer,
+                                                              Matrix matrix) {
+  return buffer->make<GLRadialGradientLayout>(matrix);
 }
 
 GLRadialGradientLayout::GLRadialGradientLayout(Matrix matrix) : RadialGradientLayout(matrix) {

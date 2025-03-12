@@ -39,6 +39,6 @@ class ComposeColorFilter : public ColorFilter {
   std::shared_ptr<ColorFilter> inner = nullptr;
   std::shared_ptr<ColorFilter> outer = nullptr;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 };
 }  // namespace tgfx

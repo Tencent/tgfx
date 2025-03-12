@@ -52,23 +52,23 @@ class FragmentProcessor : public Processor {
    * Creates a fragment processor that will draw the given image with the given options. The both
    * tileModeX and tileModeY are set to TileMode::Clamp.
    */
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
-                                                 const SamplingOptions& sampling,
-                                                 const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
+                                              const SamplingOptions& sampling,
+                                              const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
    */
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
-                                                 TileMode tileModeX, TileMode tileModeY,
-                                                 const SamplingOptions& sampling,
-                                                 const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
+                                              TileMode tileModeX, TileMode tileModeY,
+                                              const SamplingOptions& sampling,
+                                              const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
-                                                 const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
+                                              const Matrix* uvMatrix = nullptr);
 
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
@@ -78,24 +78,26 @@ class FragmentProcessor : public Processor {
    *  an FP. It does so by returning a parent FP that multiplies the passed in FPs output by the
    *  parent's input alpha. The passed in FP will not receive an input color.
    */
-  static std::unique_ptr<FragmentProcessor> MulChildByInputAlpha(
-      std::unique_ptr<FragmentProcessor> child);
+  static PlacementPtr<FragmentProcessor> MulChildByInputAlpha(
+      PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> child);
 
   /**
    * Returns the input color, modulated by the child's alpha. The passed in FP will not receive an
    * input color.
    * @param inverted false: output = input * child.a; true: output = input * (1 - child.a)
    */
-  static std::unique_ptr<FragmentProcessor> MulInputByChildAlpha(
-      std::unique_ptr<FragmentProcessor> child, bool inverted = false);
+  static PlacementPtr<FragmentProcessor> MulInputByChildAlpha(PlacementBuffer* buffer,
+                                                              PlacementPtr<FragmentProcessor> child,
+                                                              bool inverted = false);
 
   /**
    * Returns a fragment processor that composes two fragment processors `f` and `g` into f(g(x)).
    * This is equivalent to running them in series (`g`, then `f`). This is not the same as
    * transfer-mode composition; there is no blending step.
    */
-  static std::unique_ptr<FragmentProcessor> Compose(std::unique_ptr<FragmentProcessor> f,
-                                                    std::unique_ptr<FragmentProcessor> g);
+  static PlacementPtr<FragmentProcessor> Compose(PlacementBuffer* buffer,
+                                                 PlacementPtr<FragmentProcessor> f,
+                                                 PlacementPtr<FragmentProcessor> g);
 
   size_t numTextureSamplers() const {
     return onCountTextureSamplers();
@@ -262,7 +264,7 @@ class FragmentProcessor : public Processor {
   void emitChild(size_t childIndex, const std::string& inputColor, EmitArgs& parentArgs) const;
 
  protected:
-  std::vector<std::unique_ptr<FragmentProcessor>> childProcessors;
+  std::vector<PlacementPtr<FragmentProcessor>> childProcessors = {};
 
   explicit FragmentProcessor(uint32_t classID) : Processor(classID) {
   }
@@ -276,7 +278,7 @@ class FragmentProcessor : public Processor {
    * processors will allow the ProgramBuilder to automatically handle their transformed coords and
    * texture accesses and mangle their uniform and output color names.
    */
-  size_t registerChildProcessor(std::unique_ptr<FragmentProcessor> child);
+  size_t registerChildProcessor(PlacementPtr<FragmentProcessor> child);
 
   /**
    * Fragment Processor subclasses call this from their constructor to register coordinate

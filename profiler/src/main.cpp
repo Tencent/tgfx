@@ -36,8 +36,7 @@ int main(int argc, char* argv[]) {
   QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 
-    QApplication app(argc, argv);
-
+  QApplication app(argc, argv);
 
   ProfilerWindow* window = new ProfilerWindow;
   window->show();

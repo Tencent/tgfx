@@ -19,10 +19,9 @@
 #include "GLTextureGradientColorizer.h"
 
 namespace tgfx {
-std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(
-    std::shared_ptr<Texture> gradient) {
-  return std::unique_ptr<TextureGradientColorizer>(
-      new GLTextureGradientColorizer(std::move(gradient)));
+PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
+    PlacementBuffer* buffer, std::shared_ptr<Texture> gradient) {
+  return buffer->make<GLTextureGradientColorizer>(std::move(gradient));
 }
 
 GLTextureGradientColorizer::GLTextureGradientColorizer(std::shared_ptr<Texture> gradient)

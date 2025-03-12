@@ -1798,24 +1798,24 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
-  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(child->bitFields.childrenDirty);
-  EXPECT_TRUE(root->bitFields.childrenDirty);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(child->bitFields.dirtyDescendents);
+  EXPECT_TRUE(root->bitFields.dirtyDescendents);
   displayList->render(surface.get());
 
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
-  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   child->setVisible(false);
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
-  EXPECT_TRUE(root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 }
 
 TGFX_TEST(LayerTest, DropShadowStyle) {
@@ -1947,11 +1947,11 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwner, layer2.get());
 
-  EXPECT_FALSE(layer2->bitFields.contentDirty);
+  EXPECT_FALSE(layer2->bitFields.dirtyContent);
   displayList->render(surface.get());
-  EXPECT_FALSE(layer->bitFields.childrenDirty);
+  EXPECT_FALSE(layer->bitFields.dirtyDescendents);
   mask->setAlpha(0.5f);
-  EXPECT_TRUE(layer->bitFields.childrenDirty);
+  EXPECT_TRUE(layer->bitFields.dirtyDescendents);
 
   layer2->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
@@ -2195,5 +2195,48 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   auto surface = Surface::Make(context, 300, 100);
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
+}
+
+TGFX_TEST(LayerTest, RasterizedBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::Blue());
+  solidLayer->setWidth(150);
+  solidLayer->setHeight(150);
+  displayList->root()->addChild(solidLayer);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  displayList->root()->addChild(background);
+
+  auto layer = Layer::Make();
+  layer->setMatrix(Matrix::MakeTrans(30, 30));
+  layer->addChild(background);
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  child->setPath(path);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  child->setFillStyle(fillStyle);
+  child->setShouldRasterize(true);
+  child->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  layer->addChild(child);
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedBackground1"));
+
+  background->setMatrix(Matrix::MakeTrans(50, 50));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedBackground2"));
+
+  child->setMatrix(Matrix::MakeTrans(20, 20));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedBackground3"));
 }
 }  // namespace tgfx

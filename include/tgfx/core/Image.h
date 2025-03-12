@@ -32,6 +32,8 @@
 #include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
+template <typename T>
+class PlacementPtr;
 class FPArgs;
 class TPArgs;
 class Context;
@@ -333,11 +335,11 @@ class Image {
    * @param sampling The sampling options used when sampling the Image.
    * @param uvMatrix The matrix used to transform the uv coordinates.
    */
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
-                                                                 const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                              TileMode tileModeX,
+                                                              TileMode tileModeY,
+                                                              const SamplingOptions& sampling,
+                                                              const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;

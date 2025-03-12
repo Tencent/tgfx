@@ -29,6 +29,10 @@ class GpuShapeProxy {
       : drawingMatrix(drawingMatrix), triangles(std::move(triangles)), texture(std::move(texture)) {
   }
 
+  Context* getContext() const {
+    return triangles ? triangles->getContext() : texture->getContext();
+  }
+
   /**
    * Returns the additional matrix needed to apply to the shape cache when drawing.
    */
