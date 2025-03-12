@@ -20,6 +20,7 @@
 #include <QDialog>
 #include <QQmlApplicationEngine>
 #include <QSpinBox>
+#include <QStackedWidget>
 #include "FramesView.h"
 #include "MainView.h"
 #include "StatisticView.h"
@@ -30,6 +31,7 @@
 #include "TracyWorker.hpp"
 #include "UserData.h"
 #include "ViewData.h"
+#include "TracyEvent.hpp"
 
 class SaveFileDialog : public QDialog {
   Q_OBJECT
@@ -84,24 +86,30 @@ class View : public QWidget {
 
   Range m_statRange;
 
+  const tracy::FrameData* GetFrames() const { return m_frames; }
+  void showTimelineView();
+
+
+
+
  private:
   bool connected = false;
   int width;
   tracy::Worker worker;
+  const tracy::FrameData* m_frames;
 
   ViewMode viewMode;
   ViewData viewData;
   UserData userData;
   QQmlApplicationEngine* timelineEngine;
   QQmlApplicationEngine* framesEngine;
+  QQmlApplicationEngine* statEngine;
   std::thread saveThread;
   std::string filenameStaging;
 
   const Config& config;
   FramesView* framesView = nullptr;
   TimelineView* timelineView = nullptr;
-  QMainWindow* statMainWindow = nullptr;
-  StatisticsView* statisticsView = nullptr;
   SourceView* sourceView = nullptr;
   SaveFileDialog* saveFileDialog = nullptr;
   QDialog* connectDialog = nullptr;
@@ -111,4 +119,7 @@ class View : public QWidget {
   std::vector<SourceRegex> srcSubstitutions;
   bool srcRegexValid = true;
   bool validateSrcAge = true;
+
+  QTabWidget* tabWidget = nullptr;
+  QWidget* statisticsWidget = nullptr;
 };

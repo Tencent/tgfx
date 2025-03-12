@@ -2,6 +2,7 @@
     <qresource prefix="/">
         <file>qml/Timeline.qml</file>
         <file>qml/Frames.qml</file>
+        <file>qml/Statistics.qml</file>
         <file>icons/power.png</file>
         <file>icons/save.png</file>
         <file>icons/pause.png</file>

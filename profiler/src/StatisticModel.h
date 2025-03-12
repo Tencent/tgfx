@@ -18,11 +18,12 @@
 
 #pragma once
 
-#include <qabstractitemmodel.h>
+#include <QAbstractItemModel>
 #include "SourceContents.h"
 #include "TracyVector.hpp"
 #include "ViewData.h"
 
+class View;
 class StatisticsModel : public QAbstractTableModel {
   Q_OBJECT
 
@@ -65,11 +66,19 @@ class StatisticsModel : public QAbstractTableModel {
   ~StatisticsModel();
 
   //init row and column
-  int rowCount(const QModelIndex& parent = QModelIndex()) const override;
-  int columnCount(const QModelIndex& parent = QModelIndex()) const override;
+  static constexpr int nameRole = Qt::UserRole + 1;
+  static constexpr int locationRole = Qt::UserRole + 2;
+  static constexpr int totalTimeRole = Qt::UserRole + 3;
+  static constexpr int countRole = Qt::UserRole + 4;
+  static constexpr int mtpcRole = Qt::UserRole + 5;
+  static constexpr int threadCountRole = Qt::UserRole + 6;
+
+  int rowCount(const QModelIndex& parent) const override;
+  int columnCount(const QModelIndex& parent) const override;
   QVariant data(const QModelIndex& index, int role) const override;
   QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
   void sort(int column, Qt::SortOrder order) override;
+  QHash<int, QByteArray> roleNames() const override;
 
   size_t getTotalZoneCount() const {
     return totalZoneCount;
@@ -85,6 +94,9 @@ class StatisticsModel : public QAbstractTableModel {
   }
   const tracy::Vector<SrcLocZonesSlim>& getSrcData() const {
     return srcData;
+  }
+  QString getFilterText() const {
+    return filterText;
   }
   int64_t getZoneChildTimeFast(const tracy::ZoneEvent& zone);
   uint32_t getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth);
@@ -119,11 +131,21 @@ class StatisticsModel : public QAbstractTableModel {
   Q_SIGNAL void filterTextChanged();
   Q_SIGNAL void statisticsUpdated();
 
+
+  //////*fps chart data*//////
+  QVector<float> getFpsValues() const;
+  float getMinFps() const;
+  float getMaxFps() const;
+  float getAvgFps() const;
+  void resetFrameDataCache() {_frameDataCached = false;}
+
  protected:
   void refreshInstrumentationData();
   void refreshSamplingData();
   void refreshGpuData();
   bool matchFilter(const QString& name, const QString& location) const;
+
+  void cacheFrameData() const;
 
  private:
   View* view;
@@ -146,4 +168,8 @@ class StatisticsModel : public QAbstractTableModel {
   int selectedLine = 0;
   uint64_t targetAddr;
   size_t totalZoneCount;
+
+  mutable QVector<float> _fpsValues;
+  mutable bool _frameDataCached = false;
+
 };

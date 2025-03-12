@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "View.h"
+#include <QtQuickControls2/qquickstyle.h>
 #include <QDockWidget>
 #include <QGroupBox>
 #include <QLabel>
@@ -24,6 +25,7 @@
 #include <QQmlContext>
 #include <QRadioButton>
 #include <QSpinBox>
+#include <QPushButton>
 #include "FramesView.h"
 #include "MainView.h"
 #include "TimelineView.h"
@@ -149,13 +151,22 @@ View::View(const char* addr, uint16_t port, int width, const Config& config, QWi
              config.memoryLimit == 0
                  ? -1
                  : (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100)),
-      viewMode(ViewMode::LastFrames), config(config) {
-  initView();
+m_frames(nullptr),
+      viewMode(ViewMode::LastFrames), config(config)
+
+{
+
+    initView();
 }
 
 View::View(tracy::FileRead& file, int width, const Config& config, QWidget* parent)
-    : QWidget(parent), width(width), worker(file), viewMode(ViewMode::Paused),
-      userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime()), config(config) {
+    : QWidget(parent),
+      width(width),
+      worker(file),
+      m_frames(worker.GetFramesBase()),
+      viewMode(ViewMode::Paused),
+      userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime()),
+      config(config) {
   initView();
   userData.StateShouldBePreserved();
   userData.LoadState(viewData);
@@ -163,11 +174,6 @@ View::View(tracy::FileRead& file, int width, const Config& config, QWidget* pare
 
 View::~View() {
   userData.SaveState(viewData);
-  if (statisticsView) {
-    statisticsView->close();
-    statisticsView->deleteLater();
-    statisticsView = nullptr;
-  }
 }
 
 void View::changeViewModeButton(ViewMode mode) {
@@ -176,14 +182,20 @@ void View::changeViewModeButton(ViewMode mode) {
 }
 
 void View::openStatisticsView() {
-  if (!statisticsView) {
-    statisticsView = new StatisticsView(worker, viewData, this, framesView, sourceView);
-    statisticsView->setAttribute(Qt::WA_DeleteOnClose);
-    connect(statisticsView, &QObject::destroyed, this, [this]() { statisticsView = nullptr; });
+  if(tabWidget->count() < 2) {
+    StatisticsView* statView = new StatisticsView(worker, viewData, this, framesView, nullptr, nullptr);
+    qmlRegisterType<StatisticsView>("TGFX.Profiler", 1, 0, "StatisticsView");
+    QQmlApplicationEngine* statEngine = new QQmlApplicationEngine(this);
+
+    statEngine->rootContext()->setContextProperty("statisticsView", statView);
+    statEngine->load(QUrl(QStringLiteral("qrc:/qml/Statistics.qml")));
+
+    QQuickWindow *statWindow = qobject_cast<QQuickWindow*>(statEngine->rootObjects().first());
+    statisticsWidget = createWindowContainer(statWindow);
+    tabWidget->addTab(statisticsWidget, "Statistic View");
+
   }
-  //statisticsView->raise();
-  statisticsView->show();
-  statisticsView->activateWindow();
+  tabWidget->setCurrentIndex(1);
 }
 
 void View::initView() {
@@ -201,6 +213,7 @@ void View::initView() {
     return;
   }
   connected = true;
+  m_frames = worker.GetFramesBase();
   ViewImpl();
 }
 
@@ -261,6 +274,7 @@ void View::ViewImpl() {
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
+
   qmlRegisterType<ViewMode>("com.example", 1, 0, "ViewMode");
   qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
   framesEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Frames.qml")));
@@ -269,7 +283,35 @@ void View::ViewImpl() {
   framesEngine->rootContext()->setContextProperty("_viewMode", (unsigned long long)&viewMode);
   auto quickWindow = static_cast<QQuickWindow*>(framesEngine->rootObjects().first());
   auto framesWidget = createWindowContainer(quickWindow);
-  framesWidget->setFixedHeight(50);
+  framesWidget->setFixedHeight(70);
+
+  layout->addWidget(framesWidget);
+
+  tabWidget = new QTabWidget(this);
+  tabWidget->setTabPosition(QTabWidget::South);
+  tabWidget->setStyleSheet(
+    "QTabWidget::pane {"
+    "border: 1px solid #555555;"
+    "background-color: #343131;"
+    "}"
+    "QTabBar::tab{"
+    "background-color: #3F3F3F;"
+    "color: white;"
+    "padding: 8px 16px;"
+    "border: 1px solid #555555;"
+    "border-bottom-color: #3F3F3F;"
+    "border-top-left-radius: 4px;"
+    "border-top-right-radius: 4px;"
+    "min-width: 100px;"
+    "}"
+    "QTabBar::tab:selected{"
+    "background-color: #555555;"
+    "border-bottom-color: #555555;"
+    "}"
+    "QTabBar::tab:hover{"
+    "background-color: #4A4A4A;"
+    "}"
+    );
 
   qmlRegisterType<tracy::Worker>("tracy", 1, 0, "TracyWorker");
   qmlRegisterType<TimelineView>("Timeline", 1, 0, "TimelineView");
@@ -279,6 +321,7 @@ void View::ViewImpl() {
   timelineEngine->rootContext()->setContextProperty("_viewMode", (unsigned long long)&viewMode);
   quickWindow = static_cast<QQuickWindow*>(timelineEngine->rootObjects().first());
   auto timelineWidget = createWindowContainer(quickWindow);
+  tabWidget->addTab(timelineWidget, "Timeline View");
 
   //connect
   auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
@@ -290,7 +333,7 @@ void View::ViewImpl() {
   framesView->setTimelineView(timelineView);
 
   layout->addWidget(framesWidget);
-  layout->addWidget(timelineWidget);
+  layout->addWidget(tabWidget);
 }
 
 void View::timerEvent(QTimerEvent*) {
@@ -309,4 +352,8 @@ const char* View::sourceSubstitution(const char* srcFile) const {
     std::swap(tmp, res);
   }
   return res.c_str();
+}
+
+void View::showTimelineView() {
+  tabWidget->setCurrentIndex(0);
 }

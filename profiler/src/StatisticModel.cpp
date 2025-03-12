@@ -1,9 +1,28 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 #include "StatisticModel.h"
 #include <QRegularExpression>
 #include <src/profiler/TracyColor.hpp>
 #include "TracyPrint.hpp"
 #include "View.h"
 #include "tracy_pdqsort.h"
+#include "TracyEvent.hpp"
 
 StatisticsModel::StatisticsModel(tracy::Worker& w, ViewData& vd, View* v, QObject* parent)
     : QAbstractTableModel(parent), view(v), viewData(vd), worker(w),
@@ -24,11 +43,58 @@ int StatisticsModel::columnCount(const QModelIndex& parent) const {
   return Column::ColumnCount;
 }
 
+QHash<int, QByteArray> StatisticsModel::roleNames() const {
+  QHash<int, QByteArray> roles;
+  roles[nameRole] = "Name";
+  roles[locationRole] = "Location";
+  roles[totalTimeRole] = "Totaltime";
+  roles[countRole] = "Count";
+  roles[mtpcRole] = "Mtpc";
+  roles[threadCountRole] = "Threadcount";
+  return roles;
+}
+
 QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid() || static_cast<size_t>(index.row()) >= srcData.size()) return QVariant();
+  if (!index.isValid() || static_cast<size_t>(index.row()) >= srcData.size()) {
+    return {QVariant()};
+  };
 
   const auto idx = static_cast<size_t>(index.row());
   const auto& entry = srcData[idx];
+
+  switch (role) {
+    case nameRole : {
+      auto& srcloc = worker.GetSourceLocation(entry.srcloc);
+      auto name = worker.GetString(srcloc.name.active ? srcloc.name : srcloc.function);
+      return QString::fromUtf8(name);
+    }
+
+    case locationRole : {
+      auto& srcloc = worker.GetSourceLocation(entry.srcloc);
+      QString location = worker.GetString(srcloc.file) + QStringLiteral(":") + QString::number(srcloc.line);
+      return location;
+    }
+
+    case totalTimeRole : {
+      double time = entry.total;
+      return tracy::TimeToString(static_cast<int64_t>(time));
+    }
+
+    case countRole : {
+      return QString::number(entry.numZones);
+    }
+
+    case mtpcRole : {
+      if (entry.numZones == 0) return QStringLiteral("0ms");
+      double mtpc = static_cast<double>(entry.total) / entry.numZones;
+      return QString::fromUtf8(tracy::TimeToString(static_cast<int64_t>(mtpc)));
+    }
+
+    case threadCountRole :
+      return QString::number(entry.numThreads);
+    default:
+      break;
+  }
 
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
@@ -62,11 +128,13 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
         return QString::number(entry.numThreads);
     }
   }
-  return QVariant();
+  return {QVariant()};
 }
 
 QVariant StatisticsModel::headerData(int section, Qt::Orientation orientation, int role) const {
-  if (role != Qt::DisplayRole || orientation != Qt::Horizontal) return QVariant();
+  if (role != Qt::DisplayRole || orientation != Qt::Horizontal) {
+    return {QVariant()};
+  }
   switch (section) {
     case NameColumn:
       return tr("Name");
@@ -87,7 +155,7 @@ QVariant StatisticsModel::headerData(int section, Qt::Orientation orientation, i
       return tr("MTPC");
 
     default:
-      return QVariant();
+      return {QVariant()};
   }
 }
 
@@ -263,6 +331,7 @@ bool StatisticsModel::matchFilter(const QString& name, const QString& location) 
   return true;
 }
 
+
 uint32_t StatisticsModel::getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth) {
   auto namehash = srcloc.namehash;
   if (namehash == 0 && srcloc.function.active) {
@@ -286,7 +355,6 @@ uint32_t StatisticsModel::getStrLocColor(const tracy::SourceLocation& srcloc, in
 }
 
 const tracy::SourceLocation& StatisticsModel::getSrcLocFromIndex(const QModelIndex& index) const {
-
   const auto& entry = srcData[static_cast<size_t>(index.row())];
   return worker.GetSourceLocation(entry.srcloc);
 }
@@ -321,7 +389,6 @@ void StatisticsModel::refreshData() {
 }
 
 void StatisticsModel::setStatRange(int64_t start, int64_t end, bool active) {
-
   view->m_statRange.active = active;
   if (view->m_statRange.active && view->m_statRange.min == 0 && view->m_statRange.max == 0) {
     view->m_statRange.min = start;
@@ -329,6 +396,7 @@ void StatisticsModel::setStatRange(int64_t start, int64_t end, bool active) {
   }
   refreshInstrumentationData();
 }
+
 
 void StatisticsModel::refreshInstrumentationData() {
   tracy::Vector<SrcLocZonesSlim> srcloc;
@@ -451,36 +519,37 @@ void StatisticsModel::refreshInstrumentationData() {
           }
         }
       }
-    } else {
-      for (auto it = slz.begin(); it != slz.end(); ++it) {
-        if (it->second.total != 0) {
+    }
+    else {
+      for (auto& entry : slz) {
+        if (entry.second.total != 0) {
           slzcnt++;
           size_t count = 0;
           int64_t total = 0;
           switch (statAccumulationMode) {
             case AccumulationMode::SelfOnly:
-              count = it->second.zones.size();
-              total = it->second.selfTotal;
+              count = entry.second.zones.size();
+              total = entry.second.selfTotal;
               break;
             case AccumulationMode::AllChildren:
-              count = it->second.zones.size();
-              total = it->second.total;
+              count = entry.second.zones.size();
+              total = entry.second.total;
               break;
             case AccumulationMode::NonReentrantChildren:
-              count = it->second.nonReentrantCount;
-              total = it->second.nonReentrantTotal;
+              count = entry.second.nonReentrantCount;
+              total = entry.second.nonReentrantTotal;
               break;
           }
 
           totalZoneCount = slzcnt;
 
-          auto& sl = worker.GetSourceLocation(it->first);
+          auto& sl = worker.GetSourceLocation(entry.first);
           QString name = worker.GetString(sl.name.active ? sl.name : sl.function);
           QString file = worker.GetString(sl.file);
 
           if (matchFilter(name, file)) {
             srcloc.push_back_no_space_check(SrcLocZonesSlim{
-                it->first, static_cast<uint16_t>(it->second.threadCnt.size()), count, total});
+                entry.first, static_cast<uint16_t>(entry.second.threadCnt.size()), count, total});
           }
         }
       }
@@ -603,3 +672,81 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
   }
   endResetModel();
 }
+
+
+//////*fps chart data*//////
+void StatisticsModel::cacheFrameData() const {
+  _fpsValues.clear();
+  _frameDataCached = false;
+
+  const auto frames = view->GetFrames();
+  if(!frames) {
+    return;
+  };
+
+  const auto sz = worker.GetFrameCount(*frames);
+
+  if(sz <= 1) {
+    return;
+  }
+
+  const int frameToShow = std::min(500, static_cast<int>(sz - 1));
+
+  _fpsValues.reserve(frameToShow);
+
+  const size_t startIdx = sz > static_cast<size_t>(frameToShow) ? sz - static_cast<size_t>(frameToShow) - 1 : 0;
+
+  for(size_t i = startIdx; i < sz - 1; ++i) {
+    const auto dt = worker.GetFrameTime(*frames, i);
+    const float fps = 1000000000.f / dt;
+    _fpsValues.push_back(fps);
+  }
+  _frameDataCached = true;
+}
+
+QVector<float> StatisticsModel::getFpsValues() const {
+  cacheFrameData();
+  return _fpsValues;
+}
+
+float StatisticsModel::getMinFps() const {
+  cacheFrameData();
+  if (_fpsValues.isEmpty()) {
+    return 0.0f;
+  };
+
+  float min = _fpsValues.first();
+  for (float value : _fpsValues) {
+    if (value < min) min = value;
+  }
+  return min;
+}
+
+float StatisticsModel::getMaxFps() const {
+  cacheFrameData();
+  if (_fpsValues.isEmpty()) {
+    return 0.0f;
+  }
+  float max = _fpsValues.first();
+  for (float value : _fpsValues) {
+    if (value > max) max = value;
+  }
+  return max;
+}
+
+float StatisticsModel::getAvgFps() const {
+  cacheFrameData();
+  if(_fpsValues.isEmpty()) {
+    return 0.0f;
+  }
+
+  float sum = 0.0f;
+  for(float value : _fpsValues) {
+    sum += value;
+  }
+  return sum / _fpsValues.size();
+}
+
+
+
+
