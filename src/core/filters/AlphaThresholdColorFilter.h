@@ -33,7 +33,7 @@ class AlphaThresholdColorFilter : public ColorFilter {
   bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 
   float threshold = 0.0f;
 };

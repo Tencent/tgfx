@@ -24,7 +24,8 @@
 namespace tgfx {
 class ColorMatrixFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<ColorMatrixFragmentProcessor> Make(const std::array<float, 20>& matrix);
+  static PlacementPtr<ColorMatrixFragmentProcessor> Make(PlacementBuffer* buffer,
+                                                         const std::array<float, 20>& matrix);
 
   std::string name() const override {
     return "ColorMatrixFragmentProcessor";

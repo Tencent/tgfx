@@ -76,7 +76,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   return renderTarget->getTextureProxy();
 }
 
-std::unique_ptr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, uvMatrix);

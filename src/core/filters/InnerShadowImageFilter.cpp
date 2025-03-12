@@ -45,7 +45,7 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
       shadowOnly(shadowOnly) {
 }
 
-std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   if (color.alpha <= 0) {
@@ -59,19 +59,19 @@ std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (uvMatrix != nullptr) {
     shadowMatrix.preConcat(*uvMatrix);
   }
-  std::unique_ptr<FragmentProcessor> invertShadowMask;
+  PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
     invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
   } else {
     invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                                sampling, &shadowMatrix);
   }
-
-  auto colorProcessor = ConstColorProcessor::Make(color.premultiply(), InputMode::Ignore);
+  auto buffer = args.context->drawingBuffer();
+  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
+      buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
 
   auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
                                                 TileMode::Decal, sampling, uvMatrix);
@@ -79,11 +79,11 @@ std::unique_ptr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (shadowOnly) {
     // mask the image with origin image
     return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-        std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcIn);
+        buffer, std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcIn);
   } else {
     // mask the image with origin image and draw the inner shadow mask on top
     return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-        std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcATop);
+        buffer, std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcATop);
   }
 }
 

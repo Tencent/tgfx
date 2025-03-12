@@ -28,24 +28,27 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
    * The color input to the returned processor is treated as the src and the passed in processor is
    * the dst.
    */
-  static std::unique_ptr<FragmentProcessor> MakeFromDstProcessor(
-      std::unique_ptr<FragmentProcessor> dst, BlendMode mode);
+  static PlacementPtr<FragmentProcessor> MakeFromDstProcessor(PlacementBuffer* buffer,
+                                                              PlacementPtr<FragmentProcessor> dst,
+                                                              BlendMode mode);
 
   /**
    * The color input to the returned processor is treated as the dst and the passed in processor is
    * the src.
    */
-  static std::unique_ptr<FragmentProcessor> MakeFromSrcProcessor(
-      std::unique_ptr<FragmentProcessor> src, BlendMode mode);
+  static PlacementPtr<FragmentProcessor> MakeFromSrcProcessor(PlacementBuffer* buffer,
+                                                              PlacementPtr<FragmentProcessor> src,
+                                                              BlendMode mode);
 
   /**
    * Takes the input color, which is assumed to be unpremultiplied, passes it as an opaque color
    * to both src and dst. The outputs of a src and dst are blended using mode and the original
    * input's alpha is applied to the blended color to produce a premul output.
    */
-  static std::unique_ptr<FragmentProcessor> MakeFromTwoProcessors(
-      std::unique_ptr<FragmentProcessor> src, std::unique_ptr<FragmentProcessor> dst,
-      BlendMode mode);
+  static PlacementPtr<FragmentProcessor> MakeFromTwoProcessors(PlacementBuffer* buffer,
+                                                               PlacementPtr<FragmentProcessor> src,
+                                                               PlacementPtr<FragmentProcessor> dst,
+                                                               BlendMode mode);
 
   std::string name() const override;
 
@@ -56,8 +59,8 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   enum class Child { DstChild, SrcChild, TwoChild };
 
-  XfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
-                            std::unique_ptr<FragmentProcessor> dst, BlendMode mode);
+  XfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
+                            PlacementPtr<FragmentProcessor> dst, BlendMode mode);
 
   Child child;
   BlendMode mode;

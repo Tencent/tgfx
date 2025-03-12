@@ -31,8 +31,8 @@ namespace tgfx {
  */
 class EllipseGeometryProcessor : public GeometryProcessor {
  public:
-  static std::unique_ptr<EllipseGeometryProcessor> Make(int width, int height, bool stroke,
-                                                        bool useScale);
+  static PlacementPtr<EllipseGeometryProcessor> Make(PlacementBuffer* buffer, int width, int height,
+                                                     bool stroke, bool useScale);
 
   std::string name() const override {
     return "EllipseGeometryProcessor";

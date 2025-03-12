@@ -22,9 +22,8 @@
 
 namespace tgfx {
 /**
- * A node that can be added to a PlacementList. The node's storage must be allocated in
- * pre-allocated memory. The node does not own the memory, so it only calls the destructor of the
- * object when it goes out of scope, without freeing the memory.
+ * A node that can be added to a PlacementList. It is similar to a PlacementPtr but uses more
+ * memory due to the extra pointer to the next node and memory alignment to speed up iteration.
  */
 template <typename T>
 class PlacementNode {
@@ -46,10 +45,16 @@ class PlacementNode {
   };
 
   /**
+   * Constructs a PlacementNode with a nullptr.
+   */
+  PlacementNode() : storage(nullptr) {
+  }
+
+  /**
    * Constructs a PlacementNode with the given node storage. The storage must be allocated in a
    * pre-allocated memory block.
    */
-  explicit PlacementNode(Storage* storage = nullptr) : storage(storage) {
+  explicit PlacementNode(Storage* storage) : storage(storage) {
   }
 
   /**

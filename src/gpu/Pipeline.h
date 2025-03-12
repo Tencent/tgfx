@@ -33,9 +33,9 @@ namespace tgfx {
  */
 class Pipeline : public ProgramInfo {
  public:
-  Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
-           std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-           size_t numColorProcessors, std::unique_ptr<XferProcessor> xferProcessor,
+  Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
+           std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
+           size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
            BlendMode blendMode, const Swizzle* outputSwizzle);
 
   size_t numColorFragmentProcessors() const {
@@ -85,12 +85,12 @@ class Pipeline : public ProgramInfo {
   std::string getMangledSuffix(const Processor* processor) const;
 
  private:
-  std::unique_ptr<GeometryProcessor> geometryProcessor = {};
-  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
+  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
+  std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   std::unordered_map<const Processor*, int> processorIndices = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
-  std::unique_ptr<XferProcessor> xferProcessor = nullptr;
+  PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendInfo _blendInfo = {};
   const Swizzle* _outputSwizzle = nullptr;
 

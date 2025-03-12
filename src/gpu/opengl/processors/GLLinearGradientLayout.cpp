@@ -19,8 +19,9 @@
 #include "GLLinearGradientLayout.h"
 
 namespace tgfx {
-std::unique_ptr<LinearGradientLayout> LinearGradientLayout::Make(Matrix matrix) {
-  return std::unique_ptr<LinearGradientLayout>(new GLLinearGradientLayout(matrix));
+PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(PlacementBuffer* buffer,
+                                                              Matrix matrix) {
+  return buffer->make<GLLinearGradientLayout>(matrix);
 }
 
 GLLinearGradientLayout::GLLinearGradientLayout(Matrix matrix) : LinearGradientLayout(matrix) {

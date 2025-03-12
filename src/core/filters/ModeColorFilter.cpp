@@ -64,9 +64,11 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return other && color == other->color && mode == other->mode;
 }
 
-std::unique_ptr<FragmentProcessor> ModeColorFilter::asFragmentProcessor() const {
-  return XfermodeFragmentProcessor::MakeFromSrcProcessor(
-      ConstColorProcessor::Make(color.premultiply(), InputMode::Ignore), mode);
+PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(Context* context) const {
+  auto processor =
+      ConstColorProcessor::Make(context->drawingBuffer(), color.premultiply(), InputMode::Ignore);
+  return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingBuffer(),
+                                                         std::move(processor), mode);
 }
 
 bool ModeColorFilter::isAlphaUnchanged() const {

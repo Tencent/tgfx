@@ -232,10 +232,12 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   } else if (vertexData == nullptr) {
     return;
   }
-  auto pipeline = createPipeline(
-      renderPass, EllipseGeometryProcessor::Make(renderPass->renderTarget()->width(),
-                                                 renderPass->renderTarget()->height(), false,
-                                                 UseScale(renderPass->getContext())));
+  auto renderTarget = renderPass->renderTarget();
+  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto gp =
+      EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
+                                     false, UseScale(renderPass->getContext()));
+  auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   if (vertexBuffer) {
     renderPass->bindBuffers(indexBuffer, vertexBuffer);

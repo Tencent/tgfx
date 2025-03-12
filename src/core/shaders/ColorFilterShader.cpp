@@ -35,13 +35,13 @@ bool ColorFilterShader::isEqual(const Shader* otherShader) const {
          Caster::Compare(shader.get(), other->shader.get());
 }
 
-std::unique_ptr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto fp1 = FragmentProcessor::Make(shader, args, uvMatrix);
   if (fp1 == nullptr) {
     return nullptr;
   }
-  auto fp2 = colorFilter->asFragmentProcessor();
-  return FragmentProcessor::Compose(std::move(fp1), std::move(fp2));
+  auto fp2 = colorFilter->asFragmentProcessor(args.context);
+  return FragmentProcessor::Compose(args.context->drawingBuffer(), std::move(fp1), std::move(fp2));
 }
 }  // namespace tgfx

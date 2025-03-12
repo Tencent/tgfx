@@ -41,9 +41,10 @@ bool ColorShader::isEqual(const Shader* shader) const {
   return other && color == other->color;
 }
 
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&,
-                                                                    const Matrix*) const {
-  return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
+PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs& args,
+                                                                 const Matrix*) const {
+  return ConstColorProcessor::Make(args.context->drawingBuffer(), color.premultiply(),
+                                   InputMode::ModulateA);
 }
 
 }  // namespace tgfx

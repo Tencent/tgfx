@@ -26,9 +26,9 @@ enum class GaussianBlurDirection { Horizontal, Vertical };
 
 class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<GaussianBlur1DFragmentProcessor> Make(
-      std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
-      float stepLength);
+  static PlacementPtr<GaussianBlur1DFragmentProcessor> Make(
+      PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> processor, float sigma,
+      GaussianBlurDirection direction, float stepLength);
 
   std::string name() const override {
     return "GaussianBlur1DFragmentProcessor";
@@ -37,7 +37,7 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  GaussianBlur1DFragmentProcessor(std::unique_ptr<FragmentProcessor> processor, float sigma,
+  GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
                                   GaussianBlurDirection direction, float stepLength);
 
   float sigma = 0.f;

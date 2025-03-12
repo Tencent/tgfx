@@ -31,10 +31,16 @@ template <typename T>
 class PlacementPtr {
  public:
   /**
+   * Constructs a PlacementPtr with a nullptr.
+   */
+  PlacementPtr() : pointer(nullptr) {
+  }
+
+  /**
    * Constructs a PlacementPtr with the given pointer. The pointer must be allocated in a
    * pre-allocated memory block.
    */
-  explicit PlacementPtr(T* pointer = nullptr) : pointer(pointer) {
+  explicit PlacementPtr(T* pointer) : pointer(pointer) {
   }
 
   /**

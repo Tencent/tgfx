@@ -24,7 +24,10 @@
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
+template <typename T>
+class PlacementPtr;
 class FragmentProcessor;
+class Context;
 
 /**
  * ColorFilter is the base class for filters that perform color transformations in the drawing
@@ -105,7 +108,7 @@ class ColorFilter {
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
 
  private:
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;

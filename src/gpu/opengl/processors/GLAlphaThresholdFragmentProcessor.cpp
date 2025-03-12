@@ -19,6 +19,11 @@
 #include "GLAlphaThresholdFragmentProcessor.h"
 
 namespace tgfx {
+PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
+    PlacementBuffer* buffer, float threshold) {
+  return buffer->make<GLAlphaThresholdFragmentProcessor>(threshold);
+}
+
 void GLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
   auto thresholdUniformName =

@@ -20,10 +20,10 @@
 #include "gpu/opengl/GLBlend.h"
 
 namespace tgfx {
-std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(
-    BlendMode blend, DstTextureInfo dstTextureInfo) {
-  return std::unique_ptr<PorterDuffXferProcessor>(
-      new GLPorterDuffXferProcessor(blend, std::move(dstTextureInfo)));
+PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(PlacementBuffer* buffer,
+                                                                    BlendMode blend,
+                                                                    DstTextureInfo dstTextureInfo) {
+  return buffer->make<GLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo));
 }
 
 GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)

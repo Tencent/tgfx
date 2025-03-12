@@ -36,7 +36,7 @@ class DrawingManager {
    * render target. Returns false if the render target or fragment processor is nullptr.
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                    std::unique_ptr<FragmentProcessor> processor, uint32_t renderFlags);
+                    PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags);

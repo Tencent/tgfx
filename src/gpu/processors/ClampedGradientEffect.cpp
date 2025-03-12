@@ -19,8 +19,8 @@
 #include "ClampedGradientEffect.h"
 
 namespace tgfx {
-ClampedGradientEffect::ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
-                                             std::unique_ptr<FragmentProcessor> gradLayout,
+ClampedGradientEffect::ClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
+                                             PlacementPtr<FragmentProcessor> gradLayout,
                                              Color leftBorderColor, Color rightBorderColor)
     : FragmentProcessor(ClassID()), leftBorderColor(leftBorderColor),
       rightBorderColor(rightBorderColor) {
