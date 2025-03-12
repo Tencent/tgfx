@@ -81,6 +81,8 @@ void InitialiseExtensions(HDC deviceContext, WGLInterface& wglInterface) {
   wglInterface.pixelFormatSupport =
       extensionList.find("WGL_ARB_pixel_format") != extensionList.end();
   wglInterface.pBufferSupport = extensionList.find("WGL_ARB_pbuffer") != extensionList.end();
+  wglInterface.swapIntervalSupport =
+      extensionList.find("WGL_EXT_swap_control") != extensionList.end();
 }
 
 WGLInterface InitialiseWGL() {
@@ -115,6 +117,7 @@ WGLInterface InitialiseWGL() {
     GET_PROC(GetPbufferDC, ARB);
     GET_PROC(ReleasePbufferDC, ARB);
     GET_PROC(DestroyPbuffer, ARB);
+    GET_PROC(SwapInterval, EXT);
     InitialiseExtensions(deviceContext, wglInterface);
     wglMakeCurrent(deviceContext, nullptr);
     wglDeleteContext(glContext);

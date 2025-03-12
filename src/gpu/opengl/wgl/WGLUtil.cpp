@@ -62,6 +62,13 @@ HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
     wglDeleteContext(glContext);
     return nullptr;
   }
+
+  if (wglMakeCurrent(deviceContext, glContext)) {
+    if (auto wglInterface = WGLInterface::Get(); wglInterface->swapIntervalSupport) {
+      wglInterface->wglSwapInterval(1);
+    }
+  }
+
   wglMakeCurrent(oldDeviceContext, oldGLContext);
   return glContext;
 }
