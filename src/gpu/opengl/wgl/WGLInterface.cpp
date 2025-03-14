@@ -61,14 +61,18 @@ static void DestroyTempWindow(HWND nativeWindow) {
   UnregisterClass(TEMP_CLASS, instance);
 }
 
-void InitialiseExtensions(HDC deviceContext, WGLInterface& wglInterface) {
-  if (deviceContext == nullptr || wglInterface.wglGetExtensionsString == nullptr) {
-    LOGE("InitialiseExtensions() context is invalid");
+void InitializeExtensions(HDC deviceContext, WGLInterface& wglInterface) {
+  if (deviceContext == nullptr) {
+    LOGE("InitializeExtensions() deviceContext is nullptr");
+    return;
+  }
+  if (wglInterface.wglGetExtensionsString == nullptr) {
+    LOGE("InitializeExtensions() wglGetExtensionsString == nullptr");
     return;
   }
   const char* extensionString = wglInterface.wglGetExtensionsString(deviceContext);
   if (extensionString == nullptr) {
-    LOGE("InitialiseExtensions() extentionString is nullptr");
+    LOGE("InitializeExtensions() extentionString is nullptr");
     return;
   }
   std::stringstream extensionStream;
@@ -85,7 +89,7 @@ void InitialiseExtensions(HDC deviceContext, WGLInterface& wglInterface) {
       extensionList.find("WGL_EXT_swap_control") != extensionList.end();
 }
 
-WGLInterface InitialiseWGL() {
+WGLInterface InitializeWGL() {
 #define GET_PROC(NAME, SUFFIX) \
   wglInterface.wgl##NAME = (NAME##Proc)wglGetProcAddress("wgl" #NAME #SUFFIX)
   WGLInterface wglInterface;
@@ -118,7 +122,7 @@ WGLInterface InitialiseWGL() {
     GET_PROC(ReleasePbufferDC, ARB);
     GET_PROC(DestroyPbuffer, ARB);
     GET_PROC(SwapInterval, EXT);
-    InitialiseExtensions(deviceContext, wglInterface);
+    InitializeExtensions(deviceContext, wglInterface);
     wglMakeCurrent(deviceContext, nullptr);
     wglDeleteContext(glContext);
     DestroyTempWindow(nativeWindow);
@@ -128,7 +132,7 @@ WGLInterface InitialiseWGL() {
 }
 
 const WGLInterface* WGLInterface::Get() {
-  static WGLInterface instance = InitialiseWGL();
+  static WGLInterface instance = InitializeWGL();
   return &instance;
 }
 }  // namespace tgfx
