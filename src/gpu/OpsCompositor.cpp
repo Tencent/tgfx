@@ -193,6 +193,16 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
   return true;
 }
 
+/**
+ * Returns true if the given rect counts as aligned with pixel boundaries.
+ */
+static bool IsPixelAligned(const Rect& rect) {
+  return fabsf(roundf(rect.left) - rect.left) <= BOUNDS_TOLERANCE &&
+         fabsf(roundf(rect.top) - rect.top) <= BOUNDS_TOLERANCE &&
+         fabsf(roundf(rect.right) - rect.right) <= BOUNDS_TOLERANCE &&
+         fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
+}
+
 void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
@@ -225,6 +235,18 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       }
     // fallthrough
     case PendingOpType::Image: {
+      if (aaType == AAType::Coverage) {
+        bool needCoverage = false;
+        for (auto& rectPaint : pendingRects) {
+          if (!rectPaint.viewMatrix.rectStaysRect() || !IsPixelAligned(rectPaint.rect)) {
+            needCoverage = true;
+            break;
+          }
+        }
+        if (!needCoverage) {
+          aaType = AAType::None;
+        }
+      }
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
           localBounds.join(ClipLocalBounds(rect.rect, rect.viewMatrix, clipBounds));
@@ -265,16 +287,6 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     drawOp->addColorFP(std::move(processor));
   }
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
-}
-
-/**
- * Returns true if the given rect counts as aligned with pixel boundaries.
- */
-static bool IsPixelAligned(const Rect& rect) {
-  return fabsf(roundf(rect.left) - rect.left) <= BOUNDS_TOLERANCE &&
-         fabsf(roundf(rect.top) - rect.top) <= BOUNDS_TOLERANCE &&
-         fabsf(roundf(rect.right) - rect.right) <= BOUNDS_TOLERANCE &&
-         fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
 }
 
 static void FlipYIfNeeded(Rect* rect, std::shared_ptr<RenderTargetProxy> renderTarget) {
