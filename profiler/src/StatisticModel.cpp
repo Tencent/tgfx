@@ -23,7 +23,7 @@
 #include "View.h"
 #include "tracy_pdqsort.h"
 
-StatisticsModel::StatisticsModel(tracy::Worker& w, ViewData& vd, View* v, QObject* parent)
+StatisticsModel::StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObject* parent)
     : QAbstractTableModel(parent), view(v), viewData(vd), worker(w),
       statAccumulationMode(AccumulationMode::SelfOnly), statisticsMode(StatMode::Instrumentation),
       sortOrder(Qt::AscendingOrder), statMode(0), targetAddr(0), totalZoneCount(0) {
@@ -54,7 +54,27 @@ QHash<int, QByteArray> StatisticsModel::roleNames() const {
   roles[countRole] = "Count";
   roles[mtpcRole] = "Mtpc";
   roles[threadCountRole] = "Threadcount";
+  roles[colorRole] = "color";
+  roles[percentageRole] = "percentage";
+  roles[totalTimeRawRole] = "totalTimeRaw";
   return roles;
+}
+
+void StatisticsModel::openSource(int row) {
+  auto& srcloc = getSrcLocFromIndex(index(row, StatisticsModel::LocationColumn));
+  const char* fileName = worker->GetString(srcloc.file);
+  int line = static_cast<int>(srcloc.line);
+
+  viewSource(fileName, line);
+}
+
+// void StatisticsModel::setAccumulationMode(int mode) {
+//   setAccumulationMode(static_cast<StatisticsModel::AccumulationMode>(mode));
+//   updateZoneCountLabels();
+// }
+
+void StatisticsModel::updateZoneCountLabels() {
+  Q_EMIT zoneCountChanged();
 }
 
 QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
@@ -67,14 +87,14 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
 
   switch (role) {
     case nameRole : {
-      auto& srcloc = worker.GetSourceLocation(entry.srcloc);
-      auto name = worker.GetString(srcloc.name.active ? srcloc.name : srcloc.function);
+      auto& srcloc = worker->GetSourceLocation(entry.srcloc);
+      auto name = worker->GetString(srcloc.name.active ? srcloc.name : srcloc.function);
       return QString::fromUtf8(name);
     }
 
     case locationRole : {
-      auto& srcloc = worker.GetSourceLocation(entry.srcloc);
-      QString location = worker.GetString(srcloc.file) + QStringLiteral(":") + QString::number(srcloc.line);
+      auto& srcloc = worker->GetSourceLocation(entry.srcloc);
+      QString location = worker->GetString(srcloc.file) + QStringLiteral(":") + QString::number(srcloc.line);
       return location;
     }
 
@@ -95,6 +115,31 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
 
     case threadCountRole :
       return QString::number(entry.numThreads);
+
+    case colorRole : {
+      auto& srcloc = worker->GetSourceLocation(entry.srcloc);
+      QColor color = QColor::fromRgba(getStrLocColor(srcloc, 0));
+      return color;
+    }
+
+    case percentageRole : {
+      int64_t timeRange = 0;
+      if (view->m_statRange.active) {
+        timeRange = view->m_statRange.max - view->m_statRange.min;
+        if (timeRange == 0) {
+          timeRange = 1;
+        }
+      } else {
+        timeRange = worker->GetLastTime() - worker->GetFirstTime();
+      }
+      double percentage = (timeRange > 0) ? (entry.total * 100.0 / timeRange) : 0.0;
+      return percentage;
+    }
+
+    case totalTimeRawRole : {
+      return QVariant::fromValue(entry.total);
+    }
+
     default:
       break;
   }
@@ -102,14 +147,14 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
       case NameColumn: {
-        auto& srcloc = worker.GetSourceLocation(entry.srcloc);
-        auto name = worker.GetString(srcloc.name.active ? srcloc.name : srcloc.function);
+        auto& srcloc = worker->GetSourceLocation(entry.srcloc);
+        auto name = worker->GetString(srcloc.name.active ? srcloc.name : srcloc.function);
         return name;
       }
 
       case LocationColumn: {
-        auto& srcloc = worker.GetSourceLocation(entry.srcloc);
-        QString location = worker.GetString(srcloc.file) + QString::number(srcloc.line);
+        auto& srcloc = worker->GetSourceLocation(entry.srcloc);
+        QString location = worker->GetString(srcloc.file) + QString::number(srcloc.line);
         return location;
       }
 
@@ -167,7 +212,7 @@ QVariant StatisticsModel::headerData(int section, Qt::Orientation orientation, i
 int64_t StatisticsModel::getZoneChildTimeFast(const tracy::ZoneEvent& zone) {
   int64_t time = 0;
   if (zone.HasChildren()) {
-    auto& children = worker.GetZoneChildren(zone.Child());
+    auto& children = worker->GetZoneChildren(zone.Child());
     if (children.is_magic()) {
       auto& vec = *(tracy::Vector<tracy::ZoneEvent>*)&children;
       for (auto& v : vec) {
@@ -186,19 +231,19 @@ int64_t StatisticsModel::getZoneChildTimeFast(const tracy::ZoneEvent& zone) {
 
 bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone) const {
 #ifndef TRACY_NO_STATISTICS
-  if (worker.AreSourceLocationZonesReady()) {
-    auto& slz = worker.GetZonesForSourceLocation(zone.SrcLoc());
+  if (worker->AreSourceLocationZonesReady()) {
+    auto& slz = worker->GetZonesForSourceLocation(zone.SrcLoc());
     if (!slz.zones.empty() && slz.zones.is_sorted()) {
       auto it = std::lower_bound(
           slz.zones.begin(), slz.zones.end(), zone.Start(),
           [](const auto& lhs, const auto& rhs) { return lhs.Zone()->Start() < rhs; });
       if (it != slz.zones.end() && it->Zone() == &zone) {
-        return isZoneReentry(zone, worker.DecompressThread(it->Thread()));
+        return isZoneReentry(zone, worker->DecompressThread(it->Thread()));
       }
     }
   }
 #endif
-  for (const auto& thread : worker.GetThreadData()) {
+  for (const auto& thread : worker->GetThreadData()) {
     const tracy::ZoneEvent* parent = nullptr;
     const tracy::Vector<tracy::short_ptr<tracy::ZoneEvent>>* timeline = &thread->timeline;
     if (timeline->empty()) continue;
@@ -220,7 +265,7 @@ bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone) const {
         if (parent->SrcLoc() == zone.SrcLoc()) {
           return true;
         }
-        timeline = &worker.GetZoneChildren(parent->Child());
+        timeline = &worker->GetZoneChildren(parent->Child());
       } else {
         auto it = std::upper_bound(timeline->begin(), timeline->end(), zone.Start(),
                                    [](const auto& l, const auto& r) { return l < r->Start(); });
@@ -237,7 +282,7 @@ bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone) const {
           break;
         }
         parent = *it;
-        timeline = &worker.GetZoneChildren(parent->Child());
+        timeline = &worker->GetZoneChildren(parent->Child());
       }
     }
   }
@@ -245,7 +290,7 @@ bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone) const {
 }
 
 bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone, uint64_t tid) const {
-  const auto thread = worker.GetThreadData(tid);
+  const auto thread = worker->GetThreadData(tid);
   const tracy::ZoneEvent* parent = nullptr;
   const tracy::Vector<tracy::short_ptr<tracy::ZoneEvent>>* timeline = &thread->timeline;
   if (timeline->empty()) return false;
@@ -267,13 +312,13 @@ bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone, uint64_t tid) 
         break;
       }
       parent = it;
-      timeline = &worker.GetZoneChildren(parent->Child());
+      timeline = &worker->GetZoneChildren(parent->Child());
     }
   }
   return false;
 }
 
-void StatisticsModel::openSource(const char* fileName, int line, const tracy::Worker& worker,
+void StatisticsModel::openSource(const char* fileName, int line, const tracy::Worker* worker,
                                  const View* view) {
   targetLine = line;
   selectedLine = line;
@@ -284,19 +329,45 @@ void StatisticsModel::openSource(const char* fileName, int line, const tracy::Wo
   assert(!source.empty());
 }
 
-void StatisticsModel::parseSource(const char* fileName, const tracy::Worker& worker,
+void StatisticsModel::parseSource(const char* fileName, const tracy::Worker* worker,
                                   const View* view) {
   if (source.filename() != fileName) {
     source.Parse(fileName, worker, view);
   }
 }
 
-void StatisticsModel::setAccumulationMode(AccumulationMode mode) {
-  if (statAccumulationMode != mode) {
-    statAccumulationMode = mode;
-    refreshData();
-    Q_EMIT accumulationModeChanged();
+void StatisticsModel::setAccumulationMode(int mode) {
+  auto newMode = static_cast<AccumulationMode>(mode);
+  if (statAccumulationMode == newMode) {
+    return;
   }
+  statAccumulationMode = newMode;
+  refreshData();
+  Q_EMIT accumulationModeChanged();
+}
+
+bool StatisticsModel::isRangeActive() const {
+  return view ? view->m_statRange.active : false;
+}
+
+void StatisticsModel::setRangeActive(bool active) {
+  if(!view) {
+    return;
+  }
+
+  if(view->m_statRange.active == active) {
+    return;
+  }
+
+  view->m_statRange.active = active;
+
+  if(!active) {
+    view->m_statRange.min = 0;
+    view->m_statRange.max = 0;
+  }
+  refreshData();
+  updateZoneCountLabels();
+  Q_EMIT rangeActiveChanged();
 }
 
 void StatisticsModel::setStatisticsMode(StatMode mode) {
@@ -361,10 +432,34 @@ bool StatisticsModel::matchFilter(const QString& name, const QString& location) 
   return true;
 }
 
-uint32_t StatisticsModel::getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth) {
+void StatisticsModel::viewSource(const char* fileName, int line) {
+  if(!fileName || !view) return;
+
+  srcViewFile = fileName;
+  openSource(fileName, line, worker, view);
+
+  if(!srcView) {
+    srcView = new SourceView(nullptr);
+    srcView->setAttribute(Qt::WA_DeleteOnClose);
+    srcView->setStyleSheet("background-color: #2D2D2D;");
+    connect(srcView, &QObject::destroyed, this, [this](){srcView = nullptr;});
+  }
+
+  const auto& source = getSource();
+  if(!source.empty()) {
+    QString content = QString::fromStdString(std::string(source.data(), source.dataSize()));
+    srcView->setWindowTitle(QString("Source: %1").arg(fileName));
+    srcView->loadSource(content, line);
+    srcView->show();
+    srcView->raise();
+    srcView->activateWindow();
+  }
+}
+
+uint32_t StatisticsModel::getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth) const {
   auto namehash = srcloc.namehash;
   if (namehash == 0 && srcloc.function.active) {
-    const auto f = worker.GetString(srcloc.function);
+    const auto f = worker->GetString(srcloc.function);
     namehash = static_cast<uint32_t>(tracy::charutil::hash(f));
     if (namehash == 0) {
       namehash++;
@@ -378,12 +473,12 @@ uint32_t StatisticsModel::getRawSrcLocColor(const tracy::SourceLocation& srcloc,
   }
 }
 
-uint32_t StatisticsModel::getStrLocColor(const tracy::SourceLocation& srcloc, int depth) {
+uint32_t StatisticsModel::getStrLocColor(const tracy::SourceLocation& srcloc, int depth) const {
   const auto color = srcloc.color;
-  if (color != 0 && !viewData.forceColors) {
+  if (color != 0 && !viewData->forceColors) {
     return color | 0xFF000000;
   }
-  if (viewData.dynamicColors == 0) {
+  if (viewData->dynamicColors == 0) {
     return 0xFFCC5555;
   }
   return getRawSrcLocColor(srcloc, depth);
@@ -391,11 +486,11 @@ uint32_t StatisticsModel::getStrLocColor(const tracy::SourceLocation& srcloc, in
 
 const tracy::SourceLocation& StatisticsModel::getSrcLocFromIndex(const QModelIndex& index) const {
   const auto& entry = srcData[static_cast<size_t>(index.row())];
-  return worker.GetSourceLocation(entry.srcloc);
+  return worker->GetSourceLocation(entry.srcloc);
 }
 
 void StatisticsModel::refreshData() {
-  if (!worker.HasData()) {
+  if (!worker->HasData()) {
     beginResetModel();
     srcData.clear();
     endResetModel();
@@ -404,7 +499,7 @@ void StatisticsModel::refreshData() {
 
   switch (statisticsMode) {
     case Instrumentation:
-      if (!worker.AreSourceLocationZonesReady()) {
+      if (!worker->AreSourceLocationZonesReady()) {
         beginResetModel();
         srcData.clear();
         endResetModel();
@@ -423,13 +518,18 @@ void StatisticsModel::refreshData() {
   }
 }
 
-void StatisticsModel::setStatRange(int64_t start, int64_t end, bool active) {
+void StatisticsModel::setStatRange(int64_t startTime, int64_t endTime, bool active) {
   view->m_statRange.active = active;
-  if (view->m_statRange.active && view->m_statRange.min == 0 && view->m_statRange.max == 0) {
-    view->m_statRange.min = start;
-    view->m_statRange.max = end;
+  if(active) {
+    view->m_statRange.min = startTime;
+    view->m_statRange.max = endTime;
+  }
+  else {
+    view->m_statRange.min = 0;
+    view->m_statRange.max = 0;
   }
   refreshInstrumentationData();
+  updateZoneCountLabels();
 }
 
 void StatisticsModel::refreshInstrumentationData() {
@@ -438,14 +538,14 @@ void StatisticsModel::refreshInstrumentationData() {
   srcData.clear();
 
   if (statMode == 0) {
-    if (!worker.HasData() || !worker.AreSourceLocationZonesReady()) {
+    if (!worker->HasData() || !worker->AreSourceLocationZonesReady()) {
       beginResetModel();
       srcData.clear();
       endResetModel();
       return;
     }
 
-    auto& slz = worker.GetSourceLocationZones();
+    auto& slz = worker->GetSourceLocationZones();
     srcloc.reserve(slz.size());
     uint32_t slzcnt = 0;
 
@@ -456,9 +556,9 @@ void StatisticsModel::refreshInstrumentationData() {
 
       for (auto it = slz.begin(); it != slz.end(); ++it) {
         if (it->second.total != 0 && it->second.min <= st) {
-          auto& sl = worker.GetSourceLocation(it->first);
-          QString name = worker.GetString(sl.name.active ? sl.name : sl.function);
-          QString file = worker.GetString(sl.file);
+          auto& sl = worker->GetSourceLocation(it->first);
+          QString name = worker->GetString(sl.name.active ? sl.name : sl.function);
+          QString file = worker->GetString(sl.file);
 
           if (!matchFilter(name, file)) {
             auto cit = statCache.find(it->first);
@@ -576,9 +676,9 @@ void StatisticsModel::refreshInstrumentationData() {
 
           totalZoneCount = slzcnt;
 
-          auto& sl = worker.GetSourceLocation(it->first);
-          QString name = worker.GetString(sl.name.active ? sl.name : sl.function);
-          QString file = worker.GetString(sl.file);
+          auto& sl = worker->GetSourceLocation(it->first);
+          QString name = worker->GetString(sl.name.active ? sl.name : sl.function);
+          QString file = worker->GetString(sl.file);
 
           if (matchFilter(name, file)) {
             srcloc.push_back_no_space_check(SrcLocZonesSlim{
@@ -605,7 +705,7 @@ void StatisticsModel::refreshGpuData() {
 
 void StatisticsModel::sort(int column, Qt::SortOrder order) {
   if (srcData.size() < 2) {
-    endResetModel();
+    //endResetModel();
     return;
   }
   beginResetModel();
@@ -616,14 +716,14 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
       if (ascendingOrder) {
         tracy::pdqsort_branchless(
             srcData.begin(), srcData.end(), [this](const auto& lhs, const auto& rhs) {
-              return strcmp(worker.GetZoneName(worker.GetSourceLocation(lhs.srcloc)),
-                            worker.GetZoneName(worker.GetSourceLocation(rhs.srcloc))) < 0;
+              return strcmp(worker->GetZoneName(worker->GetSourceLocation(lhs.srcloc)),
+                            worker->GetZoneName(worker->GetSourceLocation(rhs.srcloc))) < 0;
             });
       } else {
         tracy::pdqsort_branchless(
             srcData.begin(), srcData.end(), [this](const auto& lhs, const auto& rhs) {
-              return strcmp(worker.GetZoneName(worker.GetSourceLocation(lhs.srcloc)),
-                            worker.GetZoneName(worker.GetSourceLocation(rhs.srcloc))) > 0;
+              return strcmp(worker->GetZoneName(worker->GetSourceLocation(lhs.srcloc)),
+                            worker->GetZoneName(worker->GetSourceLocation(rhs.srcloc))) > 0;
             });
       }
       break;
@@ -632,17 +732,17 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
       if (ascendingOrder) {
         tracy::pdqsort_branchless(
             srcData.begin(), srcData.end(), [this](const auto& lhs, const auto& rhs) {
-              const auto& sll = worker.GetSourceLocation(lhs.srcloc);
-              const auto& slr = worker.GetSourceLocation(rhs.srcloc);
-              const auto cmp = strcmp(worker.GetString(sll.file), worker.GetString(slr.file));
+              const auto& sll = worker->GetSourceLocation(lhs.srcloc);
+              const auto& slr = worker->GetSourceLocation(rhs.srcloc);
+              const auto cmp = strcmp(worker->GetString(sll.file), worker->GetString(slr.file));
               return cmp == 0 ? sll.line < slr.line : cmp < 0;
             });
       } else {
         tracy::pdqsort_branchless(
             srcData.begin(), srcData.end(), [this](const auto& lhs, const auto& rhs) {
-              const auto& sll = worker.GetSourceLocation(lhs.srcloc);
-              const auto& slr = worker.GetSourceLocation(rhs.srcloc);
-              const auto cmp = strcmp(worker.GetString(sll.file), worker.GetString(slr.file));
+              const auto& sll = worker->GetSourceLocation(lhs.srcloc);
+              const auto& slr = worker->GetSourceLocation(rhs.srcloc);
+              const auto cmp = strcmp(worker->GetString(sll.file), worker->GetString(slr.file));
               return cmp == 0 ? sll.line > slr.line : cmp > 0;
             });
       }
@@ -706,78 +806,23 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
   endResetModel();
 }
 
-
-//////*fps chart data*//////
-void StatisticsModel::cacheFrameData() const {
-  _fpsValues.clear();
-  _frameDataCached = false;
-
-  const auto frames = view->GetFrames();
-  if(!frames) {
-    return;
-  };
-
-  const auto sz = worker.GetFrameCount(*frames);
-
-  if(sz <= 1) {
-    return;
-  }
-
-  const int frameToShow = std::min(500, static_cast<int>(sz - 1));
-
-  _fpsValues.reserve(frameToShow);
-
-  const size_t startIdx = sz > static_cast<size_t>(frameToShow) ? sz - static_cast<size_t>(frameToShow) - 1 : 0;
-
-  for(size_t i = startIdx; i < sz - 1; ++i) {
-    const auto dt = worker.GetFrameTime(*frames, i);
-    const float fps = 1000000000.f / dt;
-    _fpsValues.push_back(fps);
-  }
-  _frameDataCached = true;
+void StatisticsModel::clearFilter() {
+  setFilterText("");
+}
+void StatisticsModel::refreshTableData() {
+  refreshData();
+  updateZoneCountLabels();
 }
 
-QVector<float> StatisticsModel::getFpsValues() const {
-  cacheFrameData();
-  return _fpsValues;
-}
-
-float StatisticsModel::getMinFps() const {
-  cacheFrameData();
-  if (_fpsValues.isEmpty()) {
-    return 0.0f;
-  };
-
-  float min = _fpsValues.first();
-  for (float value : _fpsValues) {
-    if (value < min) min = value;
+bool StatisticsModel::srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker,
+                                   View* view) {
+  if (worker.GetSourceFileFromCache(fn).data != nullptr) return true;
+  struct stat buf = {};
+  if (stat(view->sourceSubstitution(fn), &buf) == 0 && (buf.st_mode & S_IFREG) != 0) {
+    if (!view->validateSourceAge()) return true;
+    return (uint64_t)buf.st_mtime < olderThan;
   }
-  return min;
-}
-
-float StatisticsModel::getMaxFps() const {
-  cacheFrameData();
-  if (_fpsValues.isEmpty()) {
-    return 0.0f;
-  }
-  float max = _fpsValues.first();
-  for (float value : _fpsValues) {
-    if (value > max) max = value;
-  }
-  return max;
-}
-
-float StatisticsModel::getAvgFps() const {
-  cacheFrameData();
-  if(_fpsValues.isEmpty()) {
-    return 0.0f;
-  }
-
-  float sum = 0.0f;
-  for(float value : _fpsValues) {
-    sum += value;
-  }
-  return sum / _fpsValues.size();
+  return false;
 }
 
 

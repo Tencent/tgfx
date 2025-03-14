@@ -28,7 +28,7 @@ class SourceContents {
   SourceContents();
   ~SourceContents();
 
-  void Parse(const char* fileName, const tracy::Worker& worker, const View* view);
+  void Parse(const char* fileName, const tracy::Worker* worker, const View* view);
   void Parse(const char* source);
 
   const std::vector<Tokenizer::Line>& get() const {

@@ -23,15 +23,16 @@
 #include <QStackedWidget>
 #include "FramesView.h"
 #include "MainView.h"
-#include "StatisticView.h"
+#include "SourceView.h"
+#include "StatisticModel.h"
 #include "TimelineController.h"
 #include "TimelineView.h"
+#include "TracyEvent.hpp"
 #include "TracyFileRead.hpp"
 #include "TracyFileWrite.hpp"
 #include "TracyWorker.hpp"
 #include "UserData.h"
 #include "ViewData.h"
-#include "TracyEvent.hpp"
 
 class SaveFileDialog : public QDialog {
   Q_OBJECT
@@ -110,7 +111,7 @@ class View : public QWidget {
   const Config& config;
   FramesView* framesView = nullptr;
   TimelineView* timelineView = nullptr;
-  SourceView* sourceView = nullptr;
+  StatisticsModel* statModel = nullptr;
   SaveFileDialog* saveFileDialog = nullptr;
   QDialog* connectDialog = nullptr;
   int timerId;

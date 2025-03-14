@@ -6,12 +6,12 @@ Window {
     id: wind
     visible: true
     width: _width
-    height: 50
+    height: 500
     flags: Qt.FramelessWindowHint
     color: "transparent"
 
     FramesView {
-        id: framesView
+        id: frameView
         worker: _worker
         viewData: _viewData
         viewMode: _viewMode

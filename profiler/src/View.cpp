@@ -21,13 +21,14 @@
 #include <QDockWidget>
 #include <QGroupBox>
 #include <QLabel>
+#include <QPushButton>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QRadioButton>
 #include <QSpinBox>
-#include <QPushButton>
 #include "FramesView.h"
 #include "MainView.h"
+#include "StatisticModel.h"
 #include "TimelineView.h"
 #include "TracySysUtil.hpp"
 #include "src/profiler/TracyFileselector.hpp"
@@ -174,11 +175,17 @@ void View::changeViewModeButton(ViewMode mode) {
 
 void View::openStatisticsView() {
   if(tabWidget->count() < 2) {
-    StatisticsView* statView = new StatisticsView(worker, viewData, this, framesView, nullptr, nullptr);
-    qmlRegisterType<StatisticsView>("TGFX.Profiler", 1, 0, "StatisticsView");
+    qmlRegisterType<StatisticsModel>("TGFX.Profiler", 1, 0, "StatisticsModel");
+    StatisticsModel* statModel = new StatisticsModel(&worker, &viewData, this, nullptr);
+    auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
+    framesView = framesWindow->findChild<FramesView*>("framesView");
+    if(framesView) {
+      connect(framesView, &FramesView::statRangeChanged, statModel, &StatisticsModel::setStatRange);
+    }
+
     QQmlApplicationEngine* statEngine = new QQmlApplicationEngine(this);
 
-    statEngine->rootContext()->setContextProperty("statisticsView", statView);
+    statEngine->rootContext()->setContextProperty("statisticsModel", statModel);
     statEngine->load(QUrl(QStringLiteral("qrc:/qml/Statistics.qml")));
 
     QQuickWindow *statWindow = qobject_cast<QQuickWindow*>(statEngine->rootObjects().first());
@@ -322,7 +329,7 @@ void View::ViewImpl() {
   timelineView->setFramesView(framesView);
   framesView->setTimelineView(timelineView);
 
-  layout->addWidget(framesWidget);
+  //layout->addWidget(framesWidget);
   layout->addWidget(tabWidget);
 }
 

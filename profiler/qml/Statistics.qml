@@ -7,43 +7,49 @@ import TGFX.Profiler 1.0
 Window {
     id: root
     visible: true
-    width: _width
+    width: 1920
     height: 800
     title: "Statistics View"
 
-    property int nameColumnWidth: 1000
-    property int locationColumnWidth: 900
+    readonly property real nameColumnRatio: 0.35
+    readonly property real locationColumnRatio: 0.35
+    readonly property real flaexibleColumnsRatio: nameColumnRatio + locationColumnRatio
 
-    readonly property int totalTimeWidth: 120
+    readonly property int totalTimeWidth: 150
     readonly property int countWidth: 80
-    readonly property int mtpcWidth: 100
-    readonly property int threadsWidth: 60
+    readonly property int mtpcWidth: 130
+    readonly property int threadsWidth: 70
 
-    property int totalFixedWidth: totalTimeWidth + countWidth + mtpcWidth + threadsWidth
-    property int availableWidth: tableContainer.width - totalFixedWidth
+    readonly property int totalFixedWidth: totalTimeWidth + countWidth + mtpcWidth + threadsWidth
+    readonly property int rowSpacing: 1
+
+    property int availableWidth: Math.max(0, tableContainer.width - totalFixedWidth - 5 * rowSpacing)
+    property int nameColumnWidth: Math.max(100, Math.floor(availableWidth * (nameColumnRatio / flexibleColumnRadio)))
+    property int locationColumnWidth: Math.max(100, availableWidth - nameColumnWidth)
+
+    property int sortedColumn: 0
+    property int sortedOrder: Qt.AscendingOrder
+
+    property var model: statisticsModel
 
     function updateFlexibleColumns() {
-        if (availableWidth <= 0) return;
-
-        var currentFlexWidth = nameColumnWidth + locationColumnWidth;
-
-        if (currentFlexWidth < availableWidth) {
-             currentFlexWidth;
-        } else {
-            var ratio = availableWidth / currentFlexWidth;
-            nameColumnWidth = Math.max(100, Math.floor(nameColumnWidth * ratio));
-            locationColumnWidth = Math.max(100, availableWidth - nameColumnWidth);
-        }
+        nameColumnWidth = Math.max(100, Math.floor(availableWidth * (nameColumnRatio / flaexibleColumnsRatio)))
+        locationColumnWidth = Math.max(100, availableWidth - nameColumnWidth)
     }
-
 
     onAvailableWidthChanged: {
         updateFlexibleColumns();
     }
 
-
     Component.onCompleted: {
         Qt.callLater(updateFlexibleColumns);
+
+        totalTimeHeader.isSorted = true;
+        totalTimeHeader.sortAscending = false;
+
+        model.sort(columns.totalTime, Qt.DescendingOrder);
+        sortedColumn = columns.totalTime;
+        sortedOrder = Qt.DescendingOrder;
     }
 
     readonly property var columns: {
@@ -63,7 +69,6 @@ Window {
         ColumnLayout {
             anchors.fill: parent
             spacing: 0
-
 
             ///////*mode comboBox and limit*//////
             Rectangle {
@@ -88,7 +93,7 @@ Window {
                         }
                         onCheckedChanged: {
                             if (checked) {
-                                statisticsView.model.setStatisticsMode(0)
+                                model.setStatisticsMode(0)
                             }
                         }
                     }
@@ -104,7 +109,7 @@ Window {
                     }
                     Text {
                         id: totalZoneCount
-                        text: statisticsView.totalZoneCount
+                        text: model.totalZoneCount
                         color: "white"
                     }
 
@@ -114,7 +119,7 @@ Window {
                     }
                     Text {
                         id: visibleZones
-                        text: statisticsView.visibleZoneCount
+                        text: model.visibleZoneCount
                         color: "white"
                     }
 
@@ -147,7 +152,9 @@ Window {
                         }
 
                         onCurrentIndexChanged: {
-                            statisticsView.setAccumulationMode(currentIndex)
+                            if (model) {
+                                root.model.setAccumulationMode(currentIndex)
+                            }
                         }
                     }
 
@@ -159,28 +166,24 @@ Window {
                     }
 
                     Button {
-                        id: limitRangeBtn
-                        text: "Limit Range"
-                        checkable: true
-                        checked: statisticsView.limitRangeActive
+                        id: resetRangeBtn
+                        text: "Reset"
 
                         contentItem: Text {
-                            text: limitRangeBtn.text
+                            text: resetRangeBtn.text
                             color: "white"
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         background: Rectangle {
-                            color: limitRangeBtn.checked ? "#bd94ab"
-                                : (limitRangeBtn.hovered ? "#505050" : "#666666")
+                            color: (resetRangeBtn.hovered ? "#505050" : "#666666")
                             border.color: "#555555"
                             border.width: 1
                         }
 
-                        onCheckedChanged: {
-                            statisticsView.limitRangeActive = checked
-                            statisticsView.model.refreshData()
+                        onClicked: {
+                           model.rangeActive = false;
                         }
                     }
                 }
@@ -198,15 +201,15 @@ Window {
                     spacing: 8
 
                     Text {
-                        text: "Name"
+                        text: "Filter"
                         color: "white"
                     }
 
                     TextField {
                         id: filterEdit
                         Layout.fillWidth: true
-                        placeholderText: "Enter filter text..."
-                        text: statisticsView.filterText
+                        placeholderText: "Enter filter text (use -term to exclude, name:term or file:term for field search, /regex/ for regex)..."
+                        text: model.filterText
                         color: "white"
 
                         background: Rectangle {
@@ -216,12 +219,12 @@ Window {
                         }
 
                         onTextChanged: {
-                            statisticsView.filterText = text
+                            model.filterText = text
                         }
                     }
 
                     Button {
-                        text: "clear"
+                        text: "Clear"
                         contentItem: Text {
                             text: parent.text
                             color: "white"
@@ -234,126 +237,7 @@ Window {
                             border.width: 1
                         }
                         onClicked: {
-                            statisticsView.clearFilter()
-                        }
-                    }
-                }
-            }
-
-            /////*fps chart tabs view*/////
-            Rectangle {
-                id: fpsChartTabsContainer
-                Layout.fillWidth: true
-                Layout.preferredHeight: 200
-                color: "#2D2D2D"
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    spacing: 0
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 30
-                        color: "#343131"
-
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: 0
-
-                            Rectangle {
-                                id: lineChartTab
-                                Layout.preferredWidth: 120
-                                Layout.fillHeight: true
-                                color: chartTabBar.currentIndex == 0 ? "#4D4D4D" : "#343131"
-                                border.color: chartTabBar.currentIndex == 0 ? "#666666" : "#343131"
-                                border.width: 1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "FPS Line Chart"
-                                    font.pixelSize: 12
-                                    color: "white"
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: {
-                                        chartTabBar.currentIndex = 0
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                id: barChartTab
-                                Layout.preferredWidth: 120
-                                Layout.fillHeight: true
-                                color: chartTabBar.currentIndex == 1 ? "#4D4D4D" : "#343131"
-                                border.color: chartTabBar.currentIndex == 1 ? "#666666" : "#343131"
-                                border.width: 1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "FPS Bar Chart"
-                                    font.pixelSize: 12
-                                    color: "white"
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: {
-                                        chartTabBar.currentIndex = 1
-                                    }
-                                }
-                            }
-
-                            Item {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                            }
-                        }
-                    }
-
-                    Item {
-                        id: chartTabBar
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        property int currentIndex: 0
-
-                        Rectangle {
-                            id: lineChartView
-                            anchors.fill: parent
-                            visible: chartTabBar.currentIndex == 0
-                            color: "#343131"
-
-                            FpsChart {
-                                id: fpsChartItem
-                                anchors.fill: parent
-                                anchors.margins: 10
-
-                                fpsValues: statisticsView.getFpsValues()
-                                minFps: statisticsView.getMinFps()
-                                maxFps: statisticsView.getMaxFps()
-                                avgFps: statisticsView.getAvgFps()
-                            }
-                        }
-
-                        Rectangle {
-                            id: barChartView
-                            anchors.fill: parent
-                            visible: chartTabBar.currentIndex == 1
-                            color: "#343131"
-
-                            FpsBarChart {
-                                id: fpsBarChartItem
-                                anchors.fill: parent
-                                anchors.margins: 10
-
-                                fpsValues: statisticsView.getFpsValues()
-                                minFps: statisticsView.getMinFps()
-                                maxFps: statisticsView.getMaxFps()
-                                avgFps: statisticsView.getAvgFps()
-                            }
+                            model.clearFilter()
                         }
                     }
                 }
@@ -369,13 +253,15 @@ Window {
                     id: headerRow
                     width: parent.width
                     height: 30
-                    spacing: 0
+                    spacing: 1
 
                     Rectangle {
                         id: nameHeader
                         width: nameColumnWidth
                         height: 30
                         color: "#2D2D2D"
+                        border.color: "#555555"
+                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -416,7 +302,10 @@ Window {
                                     nameHeader.sortAscending = true;
                                 }
 
-                                statisticsView.sort(
+                                root.sortedColumn = columns.name
+                                root.sortedOrder = nameHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
+
+                                model.sort(
                                     columns.name,
                                     nameHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                                 );
@@ -448,9 +337,9 @@ Window {
                                         var delta = mouseX - startX;
 
                                         var newNameWidth = Math.max(60, startNameWidth + delta);
-                                        var newLocationWidth = Math.max(60, startLocationWidth - delta);
+                                        var newLocationWidth = Math.max(60, availableWidth - newNameWidth);
 
-                                        if (newNameWidth + newLocationWidth <= availableWidth) {
+                                        if (newNameWidth <= availableWidth - 60) {
                                             nameColumnWidth = newNameWidth;
                                             locationColumnWidth = newLocationWidth;
                                         }
@@ -465,6 +354,8 @@ Window {
                         width: locationColumnWidth
                         height: 30
                         color: "#2D2D2D"
+                        border.color: "#555555"
+                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -504,7 +395,10 @@ Window {
                                     locationHeader.sortAscending = true;
                                 }
 
-                                statisticsView.sort(
+                                root.sortedColumn = columns.location
+                                root.sortedOrder = locationHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
+
+                                model.sort(
                                     columns.location,
                                     locationHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                                 );
@@ -517,9 +411,11 @@ Window {
                         width: totalTimeWidth
                         height: 30
                         color: "#2D2D2D"
+                        border.color: "#555555"
+                        border.width: 1
 
                         property bool isSorted: false
-                        property bool sortAscending: true
+                        property bool sortAscending: false
 
                         Row {
                             anchors.centerIn: parent
@@ -553,10 +449,13 @@ Window {
                                     threadsHeader.isSorted = false;
 
                                     totalTimeHeader.isSorted = true;
-                                    totalTimeHeader.sortAscending = true;
+                                    totalTimeHeader.sortAscending = false;
                                 }
 
-                                statisticsView.sort(
+                                root.sortedColumn = columns.totalTime
+                                root.sortedOrder = totalTimeHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
+
+                                model.sort(
                                     columns.totalTime,
                                     totalTimeHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                                 );
@@ -569,6 +468,8 @@ Window {
                         width: countWidth
                         height: 30
                         color: "#2D2D2D"
+                        border.color: "#555555"
+                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -605,10 +506,13 @@ Window {
                                     threadsHeader.isSorted = false;
 
                                     countHeader.isSorted = true;
-                                    countHeader.sortAscending = true;
+                                    countHeader.sortAscending = false;
                                 }
 
-                                statisticsView.sort(
+                                root.sortedColumn = columns.count
+                                root.sortedOrder = countHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
+
+                                model.sort(
                                     columns.count,
                                     countHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                                 );
@@ -621,6 +525,8 @@ Window {
                         width: mtpcWidth
                         height: 30
                         color: "#2D2D2D"
+                        border.color: "#555555"
+                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -630,7 +536,7 @@ Window {
                             spacing: 4
 
                             Text {
-                                text: "Mtpc"
+                                text: "MTPC"
                                 color: "white"
                                 anchors.verticalCenter: parent.verticalCenter
                             }
@@ -657,10 +563,13 @@ Window {
                                     threadsHeader.isSorted = false;
 
                                     mtpcHeader.isSorted = true;
-                                    mtpcHeader.sortAscending = true;
+                                    mtpcHeader.sortAscending = false;
                                 }
 
-                                statisticsView.sort(
+                                root.sortedColumn = columns.mtpc
+                                root.sortedOrder = mtpcHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
+
+                                model.sort(
                                     columns.mtpc,
                                     mtpcHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                                 );
@@ -668,12 +577,13 @@ Window {
                         }
                     }
 
-
                     Rectangle {
                         id: threadsHeader
                         width: threadsWidth
                         height: 30
                         color: "#2D2D2D"
+                        border.color: "#555555"
+                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -710,10 +620,13 @@ Window {
                                     mtpcHeader.isSorted = false;
 
                                     threadsHeader.isSorted = true;
-                                    threadsHeader.sortAscending = true;
+                                    threadsHeader.sortAscending = false;
                                 }
 
-                                statisticsView.sort(
+                                root.sortedColumn = columns.threads
+                                root.sortedOrder = threadsHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
+
+                                model.sort(
                                     columns.threads,
                                     threadsHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                                 );
@@ -728,117 +641,186 @@ Window {
                     anchors.top: headerRow.bottom
                     width: parent.width
                     height: parent.height - headerRow.height
-                    model: statisticsView ? statisticsView.model : null
+                    model: root.model
                     spacing: 1
                     clip: true
 
-                    delegate: Row {
+                    delegate: Rectangle {
                         id: rowDelegate
-                        spacing: 0
+                        width: listView.width
+                        height: 36
+                        color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+
+                        Row {
+                            width: parent.width
+                            height: parent.height
+                            spacing: 1
 
                         Rectangle {
                             width: nameColumnWidth
                             height: 36
                             color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+                            border.color: "#555555"
+                            border.width: 1
                             clip: true
 
-                            Text {
-                                id: nameText
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                width: parent.width - 16
-                                clip: true
-                                text: model.Name
-                                color: "white"
-                                horizontalAlignment: Text.AlignLeft
-                            }
+                                Rectangle {
+                                    id: statusIcon
+                                    width: 16
+                                    height: 16
+                                    radius: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    color: model.color || "#808080"
+                                    border.color: "#c8c8c8c8"
+                                    border.width: 1
+                                }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                hoverEnabled: true
-
-                                onDoubleClicked: {
-                                    statisticsView.openSource(index)
+                                Text {
+                                    id: nameText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: statusIcon.right
+                                    anchors.leftMargin: 8
+                                    width: parent.width - statusIcon.width - 24
+                                    clip: true
+                                    text: model.Name
+                                    color: "white"
+                                    elide: Text.ElideRight
+                                    horizontalAlignment: Text.AlignLeft
                                 }
                             }
-                        }
 
                         Rectangle {
                             width: locationColumnWidth
                             height: 36
                             color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+                            border.color: "#555555"
+                            border.width: 1
                             clip: true
 
+                                Text {
+                                    id: locationText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    width: parent.width - 16
+                                    clip: true
+                                    text: model.Location
+                                    color: "white"
+                                    elide: Text.ElideMiddle
+                                    horizontalAlignment: Text.AlignLeft
+                                }
 
-                            Text {
-                                id: locationText
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                width: parent.width - 16
-                                clip: true
-                                text: Location
-                                color: "white"
-                                horizontalAlignment: Text.AlignLeft
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+
+                                    onDoubleClicked: {
+                                        root.model.openSource(index)
+                                    }
+                                }
                             }
-                        }
-
 
                         Rectangle {
                             width: totalTimeWidth
                             height: 36
                             color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+                            border.color: "#555555"
+                            border.width: 1
                             clip: true
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: Totaltime
-                                clip: true
-                                color: "white"
+                                Row {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    spacing: 4
+
+                                    Text {
+                                        text: model.Totaltime
+                                        color: "white"
+                                    }
+
+                                    Text {
+                                        text: {
+                                            if(model.percentage !== undefined) {
+                                                return "(" + model.percentage.toFixed(2) + "%)"
+                                            }
+                                            return ""
+                                        }
+                                        visible: model.percentage !== undefined
+                                        color: "#FFFFFF80"
+                                    }
+                                }
                             }
-                        }
 
                         Rectangle {
                             width: countWidth
                             height: 36
                             color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+                            border.color: "#555555"
+                            border.width: 1
                             clip: true
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: Count
-                                clip: true
-                                color: "white"
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    text: model.Count
+                                    color: "white"
+                                }
                             }
-                        }
 
                         Rectangle {
                             width: mtpcWidth
                             height: 36
                             color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+                            border.color: "#555555"
+                            border.width: 1
                             clip: true
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: Mtpc
-                                clip: true
-                                color: "white"
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    text: model.Mtpc
+                                    color: "white"
+                                }
                             }
-                        }
 
                         Rectangle {
                             width: threadsWidth
                             height: 36
                             color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+                            border.color: "#555555"
+                            border.width: 1
                             clip: true
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: Threadcount
-                                clip: true
-                                color: "white"
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    text: model.Threadcount
+                                    color: "white"
+                                }
                             }
+                        }
+                    }
+
+                    ScrollBar.vertical: ScrollBar {
+                        width: 12
+                        policy: ScrollBar.AsNeeded
+                        active: true
+
+                        background: Rectangle {
+                            color: "#2D2D2D"
+                        }
+
+                        contentItem: Rectangle {
+                            implicitWidth: 6
+                            implicitHeight: 100
+                            radius: width / 2
+                            color: parent.pressed ? "#BD94AB" : "#808080"
                         }
                     }
                 }
@@ -846,43 +828,37 @@ Window {
         }
     }
 
+
     Connections {
-        target: statisticsView
+        target: model
         function onZoneCountChanged() {
-            totalZoneCount.text = statisticsView.totalZoneCount
-            visibleZones.text = statisticsView.visibleZoneCount
+            totalZoneCount.text = model.totalZoneCount
+            visibleZones.text = model.visibleZoneCount
         }
-        function onLimitRangeActiveChanged() {
-            limitRangeBtn.checked = statisticsView.limitRangeActive
-        }
+
         function onFilterTextChanged() {
-            filterEdit.text = statisticsView.filterText
+            filterEdit.text = model.filterText
         }
 
-        function onFpsDataChanged() {
-            fpsChartItem.fpsValues = statisticsView.getFpsValues()
-            fpsChartItem.minFps = statisticsView.getMinFps()
-            fpsChartItem.maxFps = statisticsView.getMaxFps()
-            fpsChartItem.avgFps = statisticsView.getAvgFps()
-            fpsChartItem.update()
-
-            fpsBarChartItem.fpsValues = statisticsView.getFpsValues()
-            fpsBarChartItem.minFps = statisticsView.getMinFps()
-            fpsBarChartItem.maxFps = statisticsView.getMaxFps()
-            fpsBarChartItem.avgFps = statisticsView.getAvgFps()
-            fpsBarChartItem.update()
-        }
-
-
-    }
-
-    Connections {
-        target: statisticsView.model
         function onStatisticsUpdated() {
             listView.forceLayout()
+            if(root.sortedColumn !== -1) {
+                model.sort(root.sortedColumn, root.sortedOrder)
+            }
         }
 
+        function onAccumulationModeChanged() {
+            timingCombo.currentIndex = model.accumulationMode
+        }
     }
 
+    Connections {
+        target: framesView
 
+        function onStatRangeChanged(startTime, endTime, active) {
+            if(resetRangeBtn.checked) {
+                model.setStatRange(startTime, endTime, true)
+            }
+        }
+    }
 }
