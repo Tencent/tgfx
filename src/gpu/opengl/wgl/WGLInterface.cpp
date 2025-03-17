@@ -61,7 +61,7 @@ static void DestroyTempWindow(HWND nativeWindow) {
   UnregisterClass(TEMP_CLASS, instance);
 }
 
-void InitializeExtensions(HDC deviceContext, WGLInterface& wglInterface) {
+void InitializeWGLExtensions(HDC deviceContext, WGLInterface& wglInterface) {
   if (deviceContext == nullptr) {
     LOGE("InitializeWGLExtensions() deviceContext is nullptr");
     return;
@@ -122,7 +122,7 @@ WGLInterface InitializeWGL() {
     GET_PROC(ReleasePbufferDC, ARB);
     GET_PROC(DestroyPbuffer, ARB);
     GET_PROC(SwapInterval, EXT);
-    InitializeExtensions(deviceContext, wglInterface);
+    InitializeWGLExtensions(deviceContext, wglInterface);
     wglMakeCurrent(deviceContext, nullptr);
     wglDeleteContext(glContext);
     DestroyTempWindow(nativeWindow);
