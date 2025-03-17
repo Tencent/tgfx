@@ -41,6 +41,7 @@ using CreatePbufferProc = HPBUFFER(WINAPI*)(HDC, int, int, int, const int*);
 using GetPbufferDCProc = HDC(WINAPI*)(HPBUFFER);
 using ReleasePbufferDCProc = int(WINAPI*)(HPBUFFER, HDC);
 using DestroyPbufferProc = BOOL(WINAPI*)(HPBUFFER);
+using SwapIntervalProc = BOOL(WINAPI*)(int);
 
 class WGLInterface {
  public:
@@ -51,6 +52,7 @@ class WGLInterface {
 
   bool pixelFormatSupport = false;
   bool pBufferSupport = false;
+  bool swapIntervalSupport = false;
 
   GetExtensionsStringProc wglGetExtensionsString = nullptr;
   ChoosePixelFormatProc wglChoosePixelFormat = nullptr;
@@ -58,5 +60,6 @@ class WGLInterface {
   GetPbufferDCProc wglGetPbufferDC = nullptr;
   ReleasePbufferDCProc wglReleasePbufferDC = nullptr;
   DestroyPbufferProc wglDestroyPbuffer = nullptr;
+  SwapIntervalProc wglSwapInterval = nullptr;
 };
 }  // namespace tgfx
