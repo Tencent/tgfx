@@ -63,16 +63,16 @@ static void DestroyTempWindow(HWND nativeWindow) {
 
 void InitializeExtensions(HDC deviceContext, WGLInterface& wglInterface) {
   if (deviceContext == nullptr) {
-    LOGE("InitializeExtensions() deviceContext is nullptr");
+    LOGE("InitializeWGLExtensions() deviceContext is nullptr");
     return;
   }
   if (wglInterface.wglGetExtensionsString == nullptr) {
-    LOGE("InitializeExtensions() wglGetExtensionsString == nullptr");
+    LOGE("InitializeWGLExtensions() wglGetExtensionsString is nullptr");
     return;
   }
   const char* extensionString = wglInterface.wglGetExtensionsString(deviceContext);
   if (extensionString == nullptr) {
-    LOGE("InitializeExtensions() extentionString is nullptr");
+    LOGE("InitializeWGLExtensions() extensionString is nullptr");
     return;
   }
   std::stringstream extensionStream;
