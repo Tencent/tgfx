@@ -1527,6 +1527,8 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
+  Paint paint = {};
+  paint.setColor(Color::Black());
   auto path = Path();
   path.addRect(Rect::MakeXYWH(10, 10, 50, 50));
   auto shape = Shape::MakeFrom(path);
@@ -1534,10 +1536,28 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   shape = Shape::ApplyMatrix(shape, matrix);
   Stroke stroke(10);
   shape = Shape::ApplyStroke(shape, &stroke);
-  canvas->drawShape(shape, Paint());
+  canvas->drawShape(shape, paint);
   shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(0.2f, 0.6f));
   canvas->translate(150, 0);
-  canvas->drawShape(shape, Paint());
+  canvas->drawShape(shape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape"));
+
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  path.reset();
+  path.moveTo(70.0f, 190.0f);
+  path.lineTo(100.0f, 74.0f);
+  path.lineTo(130.0f, 190.0f);
+  stroke.width = 15;
+  stroke.miterLimit = 4.0f;
+  stroke.join = LineJoin::Miter;
+  shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyStroke(shape, &stroke);
+  auto bounds = shape->getBounds();
+  canvas->clipRect(bounds);
+  stroke.applyToPath(&path);
+  EXPECT_EQ(bounds.top, 44.0f);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape_miter"));
 }
 }  // namespace tgfx

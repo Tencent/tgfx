@@ -494,13 +494,13 @@ TGFX_TEST(LayerTest, shapeLayer) {
     auto shapeLayerRect = shapeLayer->getBounds();
     switch (i) {
       case 0:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(5, 5, 155, 95));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-10, -10, 170, 110));
         break;
       case 1:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(0, 100, 160, 200));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 70, 190, 230));
         break;
       case 2:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(0, 200, 160, 300));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 170, 190, 330));
         break;
       default:
         break;
