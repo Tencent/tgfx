@@ -39,7 +39,8 @@ static tracy_force_inline uint32_t getColorMuted(uint32_t color, bool active) {
   }
 }
 
-TimelineView::TimelineView(QQuickItem* parent) : QQuickItem(parent) {
+TimelineView::TimelineView(QQuickItem* parent)
+  :QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   setAcceptedMouseButtons(Qt::AllButtons);
   setAcceptHoverEvents(true);
@@ -205,7 +206,7 @@ void TimelineView::drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd
   int64_t prev = -1;
   int64_t prevEnd = -1;
   int64_t endPos = -1;
-  const auto activeFrameSet = frameData == &fd;
+  const auto activeFrameSet = frames == &fd;
   const int64_t frameTarget = (activeFrameSet && viewData->drawFrameTargets)
                                   ? 1000000000ll / viewData->frameTarget
                                   : std::numeric_limits<int64_t>::max();
@@ -556,6 +557,12 @@ void TimelineView::drawTimeline(tgfx::Canvas* canvas) {
   if (mouseLine.isVisible && hoverData.hover) {
     drawMouseLine(canvas);
   }
+}
+
+void TimelineView::zoomToRangeFrame(int startFrame, int endFrame, bool pause) {
+  auto start = worker->GetFrameTime(*frames, size_t(startFrame));
+  auto end = worker->GetFrameTime(*frames, size_t(endFrame));
+  zoomToRange(start, end, pause);
 }
 
 void TimelineView::zoomToRange(int64_t start, int64_t end, bool pause) {

@@ -86,6 +86,8 @@ class TimelineView : public QQuickItem {
 
   void createAppHost();
 
+
+  void zoomToRange(int64_t start, int64_t end, bool pause);
   void draw();
   void drawThread(const TimelineContext& context, const tracy::ThreadData& thread,
                   const std::vector<tracy::TimelineDraw>& draw, int& _offset, int depth,
@@ -95,8 +97,6 @@ class TimelineView : public QQuickItem {
   void drawMouseLine(tgfx::Canvas* canvas);
   void drawTimeline(tgfx::Canvas* canvas);
   void drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd, int& yMin);
-
-  void zoomToRange(int64_t start, int64_t end, bool pause);
 
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
@@ -130,10 +130,11 @@ class TimelineView : public QQuickItem {
   }
   void setWorker(unsigned long long _worker) {
     worker = (tracy::Worker*)(_worker);
-    frameData = worker->GetFramesBase();
+    frames = worker->GetFramesBase();
     timelineController = new TimelineController(*this, *worker, true);
   }
 
+  Q_SLOT void zoomToRangeFrame(int startFrame, int endFrame, bool pause);
   Q_SIGNAL void changeViewMode(ViewMode mode);
   Q_SIGNAL void showZoneToolTipSignal(const tracy::ZoneEvent& ev);
   Q_SIGNAL void showFlodedToolTipSignal(uint32_t num, int64_t time);
@@ -151,10 +152,6 @@ class TimelineView : public QQuickItem {
     viewMode = (ViewMode*)_viewMode;
   }
 
-  void setFramesView(FramesView* framesView) {
-    m_framesView = framesView;
-  }
-
  protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
   tracy_force_inline bool& vis(const void* ptr) {
@@ -170,8 +167,6 @@ class TimelineView : public QQuickItem {
   tracy::Vector<const tracy::ThreadData*> threadOrder;
   tracy::Vector<const tracy::ThreadData*> threadReinsert;
 
-  FramesView* m_framesView = nullptr;
-  const tracy::FrameData* frames = nullptr;
   tracy::Worker* worker;
   ViewData* viewData;
   ViewMode* viewMode;
@@ -181,7 +176,7 @@ class TimelineView : public QQuickItem {
   Region hightlightZoom;
   Animation zoomAnim;
   HoverData hoverData;
-  const tracy::FrameData* frameData;
+  const tracy::FrameData* frames = nullptr;
   MoveData moveData;
   MouseLine mouseLine;
   tgfx::Point mouseData;

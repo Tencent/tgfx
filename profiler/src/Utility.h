@@ -85,6 +85,7 @@ struct Config {
 tgfx::Color getTgfxColor(uint32_t color);
 
 tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize = 0);
+void drawPath(tgfx::Canvas* canvas, tgfx::Path& path, uint32_t color, float thickness = 0.f);
 void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color,
               float thickness = 0.f);
 void drawRect(tgfx::Canvas* canvas, tgfx::Point& p1, tgfx::Point& p2, uint32_t color,

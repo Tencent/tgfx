@@ -98,15 +98,21 @@ Window {
                         }
                     }
 
-                    Text {
-                        text: "|"
-                        color: "#666666"
+                    ToolSeparator {
+                        anchors.verticalCenter: Layout.verticalCenter
+                        orientation: Qt.Vertical
+                        contentItem: Rectangle {
+                            implicitHeight: Layout.vertical ? 1 : 24
+                            implicitWidth: Layout.vertical ? 24 : 1
+                            color: "#666666"
+                        }
                     }
 
                     Text {
                         text: "Total zone count:"
                         color: "white"
                     }
+
                     Text {
                         id: totalZoneCount
                         text: model.totalZoneCount
@@ -117,15 +123,21 @@ Window {
                         text: "Visible zones:"
                         color: "white"
                     }
+
                     Text {
                         id: visibleZones
                         text: model.visibleZoneCount
                         color: "white"
                     }
 
-                    Text {
-                        text: "|"
-                        color: "#666666"
+                    ToolSeparator {
+                        anchors.verticalCenter: Layout.verticalCenter
+                        orientation: Qt.Vertical
+                        contentItem: Rectangle {
+                            implicitHeight: Layout.vertical ? 1 : 24
+                            implicitWidth: Layout.vertical ? 24 : 1
+                            color: "#666666"
+                        }
                     }
 
                     Text {
@@ -160,30 +172,26 @@ Window {
 
                     Item { Layout.fillWidth: true }
 
-                    Text {
-                        text: "|"
-                        color: "#666666"
+                    ToolSeparator {
+                        anchors.verticalCenter: Layout.verticalCenter
+                        orientation: Qt.Vertical
+                        contentItem: Rectangle {
+                            implicitHeight: Layout.vertical ? 1 : 24
+                            implicitWidth: Layout.vertical ? 24 : 1
+                            color: "#666666"
+                        }
                     }
 
-                    Button {
-                        id: resetRangeBtn
-                        text: "Reset"
+                    Text {
+                        text: "Limit"
+                        color: "white"
+                    }
 
-                        contentItem: Text {
-                            text: resetRangeBtn.text
-                            color: "white"
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-
-                        background: Rectangle {
-                            color: (resetRangeBtn.hovered ? "#505050" : "#666666")
-                            border.color: "#555555"
-                            border.width: 1
-                        }
-
-                        onClicked: {
-                           model.rangeActive = false;
+                    Switch {
+                        id: limitRange
+                        onCheckedChanged: {
+                            model.rangeActive = limitRange.checked
+                            color = limitRange.checked ? "#666666" : "#333333"
                         }
                     }
                 }
@@ -243,6 +251,101 @@ Window {
                 }
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 0
+
+                ColumnLayout {
+                    Rectangle {
+                        id: fpsChartHeadTabBar
+                        Layout.preferredHeight: 100
+                        Layout.preferredWidth: 200
+                        color: "#2D2D2D"
+                    }
+                    Rectangle {
+                        id: drawCallChartHeadTabBar
+                        Layout.preferredHeight: 100
+                        Layout.preferredWidth: 200
+                        color: "#2D2D2D"
+                    }
+                    Rectangle {
+                        id: tranglesChartHeadTabBar
+                        Layout.preferredHeight: 100
+                        Layout.preferredWidth: 200
+                        color: "#2D2D2D"
+                    }
+                }
+
+                Rectangle {
+                    id: chartTabBar
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 300
+                    color: "#2D2D2D"
+
+                    ColumnLayout {
+                        anchors.margins: 0
+                        anchors.fill: parent
+                        spacing: 0
+
+                        FPSChart {
+                            id: fpsChart
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+
+                            dataName: "FPS"
+                            model: statisticsModel
+                        }
+
+                        DrawCallChart {
+                            id: drawCallChart
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+
+                            dataName: "DrawCall"
+                            model: statisticsModel
+                        }
+
+                        TriangleChart {
+                            id: triangleChart
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+
+                            dataName: "Triangles"
+                            model: statisticsModel
+                        }
+                    }
+
+                    MouseArea {
+                        id: mouseArea
+                        hoverEnabled: true
+                        anchors.fill: parent
+                        onPositionChanged: {
+                            console.log("mouse move")
+                            line.x = mouse.x
+                        }
+                        onExited: {
+                            console.log("onExited")
+                            line.visible = false
+                        }
+                        onEntered: {
+                            console.log("onEntered")
+                            line.visible = true
+                        }
+                    }
+
+                    Rectangle {
+                        id: line
+                        width: 1
+                        height: parent.height
+                        color: "#FFFFFF"
+                        x: mouseArea.width / 2
+                    }
+                }
+            }
+
+            // }
+            //     }
+            // }
             /////*table view header*/////
             Item {
                 id: tableContainer

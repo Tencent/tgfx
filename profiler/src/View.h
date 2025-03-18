@@ -85,14 +85,8 @@ class View : public QWidget {
     return validateSrcAge;
   }
 
-  Range m_statRange;
-
   const tracy::FrameData* GetFrames() const { return m_frames; }
   void showTimelineView();
-
-
-
-
  private:
   bool connected = false;
   int width;

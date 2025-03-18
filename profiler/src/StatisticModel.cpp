@@ -25,8 +25,9 @@
 
 StatisticsModel::StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObject* parent)
     : QAbstractTableModel(parent), view(v), viewData(vd), worker(w),
-      statAccumulationMode(AccumulationMode::SelfOnly), statisticsMode(StatMode::Instrumentation),
-      sortOrder(Qt::AscendingOrder), statMode(0), targetAddr(0), totalZoneCount(0) {
+      frames(worker->GetFramesBase()), statAccumulationMode(AccumulationMode::SelfOnly),
+      statisticsMode(StatMode::Instrumentation), sortOrder(Qt::AscendingOrder), statMode(0),
+      targetAddr(0), totalZoneCount(0) {
   refreshData();
 }
 
@@ -67,11 +68,6 @@ void StatisticsModel::openSource(int row) {
 
   viewSource(fileName, line);
 }
-
-// void StatisticsModel::setAccumulationMode(int mode) {
-//   setAccumulationMode(static_cast<StatisticsModel::AccumulationMode>(mode));
-//   updateZoneCountLabels();
-// }
 
 void StatisticsModel::updateZoneCountLabels() {
   Q_EMIT zoneCountChanged();
@@ -124,8 +120,8 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
 
     case percentageRole : {
       int64_t timeRange = 0;
-      if (view->m_statRange.active) {
-        timeRange = view->m_statRange.max - view->m_statRange.min;
+      if (stateRange.active) {
+        timeRange = stateRange.max - stateRange.min;
         if (timeRange == 0) {
           timeRange = 1;
         }
@@ -347,24 +343,19 @@ void StatisticsModel::setAccumulationMode(int mode) {
 }
 
 bool StatisticsModel::isRangeActive() const {
-  return view ? view->m_statRange.active : false;
+  return view ? stateRange.active : false;
 }
 
 void StatisticsModel::setRangeActive(bool active) {
-  if(!view) {
+  if (!view) {
     return;
   }
 
-  if(view->m_statRange.active == active) {
+  if (stateRange.active == active) {
     return;
   }
+  stateRange.active = active;
 
-  view->m_statRange.active = active;
-
-  if(!active) {
-    view->m_statRange.min = 0;
-    view->m_statRange.max = 0;
-  }
   refreshData();
   updateZoneCountLabels();
   Q_EMIT rangeActiveChanged();
@@ -509,27 +500,20 @@ void StatisticsModel::refreshData() {
       break;
 
     case Sampling:
-      refreshSamplingData();
-      break;
-
     case Gpu:
-      refreshGpuData();
       break;
   }
 }
 
-void StatisticsModel::setStatRange(int64_t startTime, int64_t endTime, bool active) {
-  view->m_statRange.active = active;
-  if(active) {
-    view->m_statRange.min = startTime;
-    view->m_statRange.max = endTime;
+void StatisticsModel::setStatRange(int startFrame, int endFrame, bool) {
+  frameRange.start = startFrame;
+  frameRange.end = endFrame;
+  stateRange.min = worker->GetFrameBegin(*frames, size_t(startFrame));
+  stateRange.max = worker->GetFrameBegin(*frames, size_t(endFrame));
+  if (stateRange.active) {
+    refreshInstrumentationData();
+    updateZoneCountLabels();
   }
-  else {
-    view->m_statRange.min = 0;
-    view->m_statRange.max = 0;
-  }
-  refreshInstrumentationData();
-  updateZoneCountLabels();
 }
 
 void StatisticsModel::refreshInstrumentationData() {
@@ -549,9 +533,9 @@ void StatisticsModel::refreshInstrumentationData() {
     srcloc.reserve(slz.size());
     uint32_t slzcnt = 0;
 
-    if (view->m_statRange.active) {
-      const auto min = view->m_statRange.min;
-      const auto max = view->m_statRange.max;
+    if (stateRange.active) {
+      const auto min = stateRange.min;
+      const auto max = stateRange.max;
       const auto st = max - min;
 
       for (auto it = slz.begin(); it != slz.end(); ++it) {
@@ -562,7 +546,7 @@ void StatisticsModel::refreshInstrumentationData() {
 
           if (!matchFilter(name, file)) {
             auto cit = statCache.find(it->first);
-            if (cit != statCache.end() && cit->second.range == view->m_statRange &&
+            if (cit != statCache.end() && cit->second.range == stateRange &&
                 cit->second.accumulationMode == statAccumulationMode &&
                 cit->second.srcCount == it->second.zones.size()) {
               if (cit->second.count != 0) {
@@ -599,7 +583,7 @@ void StatisticsModel::refreshInstrumentationData() {
                 srcloc.push_back_no_space_check(SrcLocZonesSlim{it->first, threadNum, cnt, total});
               }
               statCache[it->first] = StatCache{
-                  RangeSlim{view->m_statRange.min, view->m_statRange.max, view->m_statRange.active},
+                  RangeSlim{stateRange.min, stateRange.max, stateRange.active},
                   statAccumulationMode,
                   it->second.zones.size(),
                   cnt,
@@ -609,7 +593,7 @@ void StatisticsModel::refreshInstrumentationData() {
           } else {
             slzcnt++;
             auto cit = statCache.find(it->first);
-            if (cit != statCache.end() && cit->second.range == view->m_statRange &&
+            if (cit != statCache.end() && cit->second.range == stateRange &&
                 cit->second.accumulationMode == statAccumulationMode &&
                 cit->second.srcCount == it->second.zones.size()) {
               if (cit->second.count != 0) {
@@ -643,7 +627,7 @@ void StatisticsModel::refreshInstrumentationData() {
                 srcloc.push_back_no_space_check(SrcLocZonesSlim{it->first, threadNum, cnt, total});
               }
               statCache[it->first] = StatCache{
-                  RangeSlim{view->m_statRange.min, view->m_statRange.max, view->m_statRange.active},
+                  RangeSlim{stateRange.min, stateRange.max, stateRange.active},
                   statAccumulationMode,
                   it->second.zones.size(),
                   cnt,
@@ -693,14 +677,6 @@ void StatisticsModel::refreshInstrumentationData() {
   srcData = std::move(srcloc);
   endResetModel();
   Q_EMIT statisticsUpdated();
-}
-
-void StatisticsModel::refreshSamplingData() {
-  //todo
-}
-
-void StatisticsModel::refreshGpuData() {
-  //todo
 }
 
 void StatisticsModel::sort(int column, Qt::SortOrder order) {
@@ -809,9 +785,58 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
 void StatisticsModel::clearFilter() {
   setFilterText("");
 }
+
 void StatisticsModel::refreshTableData() {
   refreshData();
   updateZoneCountLabels();
+}
+
+void StatisticsModel::RefreshFrameData() {
+  auto total = static_cast<qsizetype>(worker->GetFrameCount(*frames));
+  if (fps.size() == total) {
+    return;
+  }
+  fps.clear();
+  fps.reserve(total);
+  drawCall.clear();
+  drawCall.reserve(total);
+  triangle.clear();
+  triangle.reserve(total);
+  for (size_t i = 0; i < static_cast<size_t>(total); ++i) {
+    auto frameTime = worker->GetFrameTime(*frames, i);
+    fps.push_back(1000000000.0f / frameTime);
+    drawCall.push_back(static_cast<float>(worker->GetFrameDrawCall(*frames, i)));
+    triangle.push_back(static_cast<float>(worker->GetFrameTrangles(*frames, i)));
+  }
+}
+
+QVector<float>& StatisticsModel::getFps() {
+  RefreshFrameData();
+  return fps;
+}
+
+QVector<float>& StatisticsModel::getDrawCall() {
+  RefreshFrameData();
+  return drawCall;
+}
+
+QVector<float>& StatisticsModel::getTriangles() {
+  RefreshFrameData();
+  return triangle;
+}
+
+uint32_t StatisticsModel::getFirstFrame() const {
+  if (stateRange.active) {
+    return static_cast<uint32_t>(frameRange.start);
+  }
+  return 1;
+}
+
+uint32_t StatisticsModel::getLastFrame() const {
+  if (stateRange.active) {
+    return static_cast<uint32_t>(frameRange.end);
+  }
+  return static_cast<uint32_t>(worker->GetFrameCount(*frames) - 1);
 }
 
 bool StatisticsModel::srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker,

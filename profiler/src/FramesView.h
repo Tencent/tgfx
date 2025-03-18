@@ -63,12 +63,6 @@ class FramesView : public QQuickItem {
     }
   }
 
-  //set timelineView
-  void setTimelineView(TimelineView* _timelineView) {
-    timelineView = _timelineView;
-  }
-
-
   unsigned long long getViewMode() const {
     return (unsigned long long)viewMode;
   }
@@ -78,7 +72,7 @@ class FramesView : public QQuickItem {
 
   //signals
   Q_SIGNAL void changeViewMode(ViewMode mode);
-  Q_SIGNAL void statRangeChanged(int64_t startTime, int64_t endTime, bool acive);
+  Q_SIGNAL void statRangeChanged(int startFrame, int endFrame, bool acive);
 
  protected:
   void draw();
@@ -91,7 +85,6 @@ class FramesView : public QQuickItem {
   ViewData* viewData = nullptr;
   ViewMode* viewMode = nullptr;
   const tracy::FrameData* frames = nullptr;
-  TimelineView* timelineView = nullptr;
 
   uint64_t frameTarget;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;

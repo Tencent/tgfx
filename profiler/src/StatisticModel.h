@@ -84,6 +84,11 @@ class StatisticsModel : public QAbstractTableModel {
     uint16_t threadNum = 0;
   };
 
+  struct FrameRange {
+    int start;
+    int end;
+  };
+
   explicit StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObject* parent = nullptr);
   ~StatisticsModel();
 
@@ -152,7 +157,7 @@ class StatisticsModel : public QAbstractTableModel {
 
   Q_SLOT void setFilterText(const QString& filter);
   Q_SLOT void refreshData();
-  Q_SLOT void setStatRange(int64_t startTime, int64_t endTime, bool active);
+  Q_SLOT void setStatRange(int startTime, int endTime, bool active);
   Q_SLOT void setStatisticsMode(StatMode mode);
 
 
@@ -162,6 +167,13 @@ class StatisticsModel : public QAbstractTableModel {
   Q_SIGNAL void rangeActiveChanged();
   Q_SIGNAL void filterTextChanged();
   Q_SIGNAL void accumulationModeChanged();
+
+  void RefreshFrameData();
+  QVector<float>& getFps();
+  QVector<float>& getDrawCall();
+  QVector<float>& getTriangles();
+  uint32_t getFirstFrame() const;
+  uint32_t getLastFrame() const;
 
   Q_INVOKABLE void openSource(int row);
   Q_INVOKABLE void setAccumulationMode(int mode);
@@ -181,6 +193,10 @@ class StatisticsModel : public QAbstractTableModel {
   ViewData* viewData = nullptr;
   tracy::Worker* worker = nullptr;
   FramesView* framesView = nullptr;
+  const tracy::FrameData* frames = nullptr;
+  QVector<float> fps;
+  QVector<float> drawCall;
+  QVector<float> triangle;
 
   tracy::Vector<SrcLocZonesSlim> srcData;
   tracy::unordered_flat_map<int16_t, StatCache> statCache;
@@ -193,6 +209,8 @@ class StatisticsModel : public QAbstractTableModel {
   QString filterText;
   Qt::SortOrder sortOrder;
 
+  Range stateRange;
+  FrameRange frameRange;
   int statMode;
   int targetLine = 0;
   int selectedLine = 0;

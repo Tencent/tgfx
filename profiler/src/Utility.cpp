@@ -104,6 +104,18 @@ tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize
   return rect;
 }
 
+void drawPath(tgfx::Canvas* canvas, tgfx::Path& path, uint32_t color, float thickness) {
+  tgfx::Paint paint;
+  paint.setColor(getTgfxColor(color));
+  if (thickness > 0.f) {
+    paint.setStyle(tgfx::PaintStyle::Stroke);
+    paint.setStrokeWidth(thickness);
+  } else {
+    paint.setStyle(tgfx::PaintStyle::Fill);
+  }
+  canvas->drawPath(path, paint);
+}
+
 void drawRect(tgfx::Canvas* canvas, float x0, float y0, float w, float h, uint32_t color,
               float thickness) {
   tgfx::Rect rect = tgfx::Rect::MakeXYWH(x0, y0, w, h);

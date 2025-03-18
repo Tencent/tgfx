@@ -26,6 +26,7 @@
 #include <QQmlContext>
 #include <QRadioButton>
 #include <QSpinBox>
+#include "DataChartItem.h"
 #include "FramesView.h"
 #include "MainView.h"
 #include "StatisticModel.h"
@@ -176,6 +177,9 @@ void View::changeViewModeButton(ViewMode mode) {
 void View::openStatisticsView() {
   if(tabWidget->count() < 2) {
     qmlRegisterType<StatisticsModel>("TGFX.Profiler", 1, 0, "StatisticsModel");
+    qmlRegisterType<FPSChartItem>("TGFX.Profiler", 1, 0, "FPSChart");
+    qmlRegisterType<DrawCallChartItem>("TGFX.Profiler", 1, 0, "DrawCallChart");
+    qmlRegisterType<TriangleChartItem>("TGFX.Profiler", 1, 0, "TriangleChart");
     StatisticsModel* statModel = new StatisticsModel(&worker, &viewData, this, nullptr);
     auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
     framesView = framesWindow->findChild<FramesView*>("framesView");
@@ -326,8 +330,7 @@ void View::ViewImpl() {
 
   framesView = framesWindow->findChild<FramesView*>("framesView");
   timelineView = timelineWindow->findChild<TimelineView*>("timelineView");
-  timelineView->setFramesView(framesView);
-  framesView->setTimelineView(timelineView);
+  connect(framesView, &FramesView::statRangeChanged, timelineView, &TimelineView::zoomToRangeFrame);
 
   //layout->addWidget(framesWidget);
   layout->addWidget(tabWidget);

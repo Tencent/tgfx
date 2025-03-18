@@ -285,10 +285,10 @@ void FramesView::mousePressEvent(QMouseEvent* event) {
         *viewMode = ViewMode::Paused;
         dragStartFrame = sel;
 
-        if (timelineView) {
-          viewData->zvStart = worker->GetFrameBegin(*frames, size_t(sel));
-          viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel));
-          if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
+        viewData->zvStart = worker->GetFrameBegin(*frames, size_t(sel));
+        viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel));
+        if (viewData->zvStart == viewData->zvEnd) {
+          viewData->zvStart--;
         }
         update();
       }
@@ -333,10 +333,7 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
         viewData->zvStart = t0;
         viewData->zvEnd = t1;
 
-        if (timelineView) {
-          timelineView->zoomToRange(t0, t1, false);
-        }
-        Q_EMIT statRangeChanged(t0, t1, true);
+        Q_EMIT statRangeChanged(selectedStartFrame, selectedEndFrame, false);
       }
     }
     event->accept();
@@ -385,10 +382,7 @@ void FramesView::mouseReleaseEvent(QMouseEvent* event) {
         viewData->zvStart = startTime;
         viewData->zvEnd = endTime;
         if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
-        if (timelineView) {
-          timelineView->zoomToRange(startTime, endTime, false);
-        }
-        Q_EMIT statRangeChanged(startTime, endTime, true);
+        Q_EMIT statRangeChanged(selectedStartFrame, selectedEndFrame, false);
       }
     }
     update();
