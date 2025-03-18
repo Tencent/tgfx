@@ -70,8 +70,8 @@ class ColorFilter {
 
   /**
     * Creates a new ColorFilter that makes translucent colors fully opaque or fully transparent
-    * based on a specified alpha threshold. Colors with alpha values at or below this threshold
-    * will become fully transparent, while colors with alpha values above this threshold will
+    * based on a specified alpha threshold. Colors with alpha values below this threshold will
+    * become fully transparent, while colors with alpha values at or above this threshold will
     * become fully opaque.
     */
   static std::shared_ptr<ColorFilter> AlphaThreshold(float threshold);
