@@ -338,8 +338,9 @@ TGFX_TEST(CanvasTest, drawPaint) {
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("TGFX", font);
-  auto shape = Shape::MakeFrom(std::move(textBlob));
-  auto path = shape->getPath();
+  Path path = {};
+  auto success = textBlob->getPath(&path);
+  EXPECT_TRUE(success);
   path.transform(Matrix::MakeTrans(10, 100));
   canvas->clear(Color::Red());
   canvas->save();
@@ -709,12 +710,11 @@ TGFX_TEST(CanvasTest, inversePath) {
   Font font(typeface, 70.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  auto shape = Shape::MakeFrom(std::move(textBlob));
-  shape = Shape::ApplyInverse(std::move(shape));
-  ASSERT_TRUE(shape != nullptr);
-  EXPECT_TRUE(shape->isInverseFillType());
-  Path textPath = shape->getPath();
+  Path textPath = {};
+  auto success = textBlob->getPath(&textPath);
+  EXPECT_TRUE(success);
   EXPECT_TRUE(!textPath.isEmpty());
+  textPath.toggleInverseFillType();
   EXPECT_TRUE(textPath.isInverseFillType());
   textPath.transform(Matrix::MakeTrans(10, 75));
   canvas->clipPath(textPath);
@@ -746,7 +746,7 @@ TGFX_TEST(CanvasTest, inversePath) {
   EXPECT_EQ(cachesBefore.size(), 1u);
   canvas->clear();
   canvas->clipPath(clipPath);
-  shape = Shape::MakeFrom(path);
+  auto shape = Shape::MakeFrom(path);
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(50, 50));
   canvas->translate(-50, -50);
   canvas->drawShape(shape, paint);
@@ -1456,7 +1456,7 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
     explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
     }
 
-    Path getPath(float /*resolutionScale*/) const override {
+    Path getPath() const override {
       if (points.size() < 2) {
         return {};
       }
@@ -1470,7 +1470,7 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
       return path;
     }
 
-    Rect getBounds(float /*resolutionScale*/) const override {
+    Rect getBounds() const override {
       if (points.size() < 2) {
         return Rect::MakeEmpty();
       }

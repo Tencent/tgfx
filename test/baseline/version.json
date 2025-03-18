@@ -36,7 +36,7 @@
         "drawImage": "d868e738",
         "drawPaint": "b7aefeb",
         "drawPaint_shadow": "1ae5042",
-        "drawShape": "fa6d7439",
+        "drawShape": "13657aa4",
         "filter_mode_linear": "2cb2474",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "0389826",
@@ -136,7 +136,7 @@
         "imageMask": "2cb2474",
         "innerShadow": "2cb2474",
         "shapeMask": "2cb2474",
-        "textMask": "d868e738"
+        "textMask": "13657aa4"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

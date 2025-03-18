@@ -27,8 +27,7 @@ std::shared_ptr<Shape> Shape::ApplyMatrix(std::shared_ptr<Shape> shape, const Ma
   if (matrix.isIdentity()) {
     return shape;
   }
-  auto maxScale = matrix.getMaxScale();
-  if (maxScale <= 0) {
+  if (!matrix.invertible()) {
     return nullptr;
   }
   if (shape->type() != Type::Matrix) {
@@ -42,16 +41,14 @@ std::shared_ptr<Shape> Shape::ApplyMatrix(std::shared_ptr<Shape> shape, const Ma
   return std::make_shared<MatrixShape>(matrixShape->shape, totalMatrix);
 }
 
-Rect MatrixShape::getBounds(float resolutionScale) const {
-  resolutionScale *= matrix.getMaxScale();
-  auto bounds = shape->getBounds(resolutionScale);
+Rect MatrixShape::getBounds() const {
+  auto bounds = shape->getBounds();
   matrix.mapRect(&bounds);
   return bounds;
 }
 
-Path MatrixShape::getPath(float resolutionScale) const {
-  resolutionScale *= matrix.getMaxScale();
-  auto path = shape->getPath(resolutionScale);
+Path MatrixShape::getPath() const {
+  auto path = shape->getPath();
   path.transform(matrix);
   return path;
 }

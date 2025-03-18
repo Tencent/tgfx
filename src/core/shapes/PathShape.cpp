@@ -54,11 +54,11 @@ bool PathShape::isInverseFillType() const {
   return path.isInverseFillType();
 }
 
-Rect PathShape::getBounds(float) const {
+Rect PathShape::getBounds() const {
   return path.getBounds();
 }
 
-Path PathShape::getPath(float) const {
+Path PathShape::getPath() const {
   return path;
 }
 

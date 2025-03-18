@@ -104,10 +104,6 @@ static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
 void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
-  auto maxScale = state.matrix.getMaxScale();
-  if (maxScale <= 0.0f) {
-    return;
-  }
   flushPendingOps();
   auto uvMatrix = Matrix::I();
   if (!state.matrix.invert(&uvMatrix)) {
@@ -122,7 +118,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
     if (shape->isInverseFillType()) {
       localBounds = ToLocalBounds(clipBounds, state.matrix);
     } else {
-      localBounds = shape->getBounds(maxScale);
+      localBounds = shape->getBounds();
       localBounds = ClipLocalBounds(localBounds, state.matrix, clipBounds);
     }
   }

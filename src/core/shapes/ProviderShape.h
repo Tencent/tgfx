@@ -30,9 +30,9 @@ class ProviderShape final : public Shape {
       : provider(std::move(pathProvider)) {
   }
 
-  Rect getBounds(float resolutionScale = 1.0f) const override;
+  Rect getBounds() const override;
 
-  Path getPath(float resolutionScale = 1.0f) const override;
+  Path getPath() const override;
 
  protected:
   Type type() const override {

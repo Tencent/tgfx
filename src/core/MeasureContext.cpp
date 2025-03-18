@@ -34,7 +34,7 @@ void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const F
 
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                const Fill& fill) {
-  auto localBounds = shape->getBounds(state.matrix.getMaxScale());
+  auto localBounds = shape->getBounds();
   addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
 
@@ -53,7 +53,7 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, con
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                       const MCState& state, const Fill& fill,
                                       const Stroke* stroke) {
-  auto localBounds = glyphRunList->getBounds(state.matrix.getMaxScale());
+  auto localBounds = glyphRunList->getBounds();
   if (stroke) {
     stroke->applyToBounds(&localBounds);
   }

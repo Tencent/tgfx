@@ -33,13 +33,13 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   return std::make_shared<GlyphShape>(std::move(glyphRunList));
 }
 
-Rect GlyphShape::getBounds(float resolutionScale) const {
-  return glyphRunList->getBounds(resolutionScale);
+Rect GlyphShape::getBounds() const {
+  return glyphRunList->getBounds();
 }
 
-Path GlyphShape::getPath(float resolutionScale) const {
+Path GlyphShape::getPath() const {
   Path path = {};
-  if (!glyphRunList->getPath(&path, resolutionScale)) {
+  if (!glyphRunList->getPath(&path)) {
     LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
     return {};
   }
