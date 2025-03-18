@@ -47,11 +47,11 @@ class InverseShape : public Shape {
     return !shape->isInverseFillType();
   }
 
-  Rect getBounds(float resolutionScale = 1.0f) const override {
-    return shape->getBounds(resolutionScale);
+  Rect getBounds() const override {
+    return shape->getBounds();
   }
 
-  Path getPath(float resolutionScale = 1.0f) const override;
+  Path getPath() const override;
 
  protected:
   Type type() const override {

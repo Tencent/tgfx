@@ -60,20 +60,20 @@ bool AppendShape::isInverseFillType() const {
   return shapes.front()->isInverseFillType();
 }
 
-Rect AppendShape::getBounds(float resolutionScale) const {
+Rect AppendShape::getBounds() const {
   auto bounds = Rect::MakeEmpty();
   for (const auto& shape : shapes) {
-    bounds.join(shape->getBounds(resolutionScale));
+    bounds.join(shape->getBounds());
   }
   return bounds;
 }
 
-Path AppendShape::getPath(float resolutionScale) const {
+Path AppendShape::getPath() const {
   auto firstShape = shapes.front();
   // the first path determines the fill type
-  auto path = firstShape->getPath(resolutionScale);
+  auto path = firstShape->getPath();
   for (size_t i = 1; i < shapes.size(); ++i) {
-    path.addPath(shapes[i]->getPath(resolutionScale));
+    path.addPath(shapes[i]->getPath());
   }
   return path;
 }

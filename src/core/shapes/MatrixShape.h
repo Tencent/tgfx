@@ -43,9 +43,9 @@ class MatrixShape : public Shape {
     return shape->isInverseFillType();
   }
 
-  Rect getBounds(float resolutionScale = 1.0f) const override;
+  Rect getBounds() const override;
 
-  Path getPath(float resolutionScale = 1.0f) const override;
+  Path getPath() const override;
 
   std::shared_ptr<Shape> shape = nullptr;
   Matrix matrix = {};

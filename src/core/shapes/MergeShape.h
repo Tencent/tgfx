@@ -35,9 +35,9 @@ class MergeShape : public Shape {
 
   bool isInverseFillType() const override;
 
-  Rect getBounds(float resolutionScale = 1.0f) const override;
+  Rect getBounds() const override;
 
-  Path getPath(float resolutionScale = 1.0f) const override;
+  Path getPath() const override;
 
  protected:
   Type type() const override {
