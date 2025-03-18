@@ -1,0 +1,434 @@
+namespace tgfx.fbs;
+
+enum LayerStyleType:byte{
+    BackgroundBlur = 0,
+    DropShadow,
+    InnerShadow,
+}
+
+enum BlendMode:byte{
+    Clear = 0,
+    Src,
+    Dst,
+    SrcOver,
+    DstOver,
+    SrcIn,
+    DstIn,
+    SrcOut,
+    DstOut,
+    SrcATop,
+    DstATop,
+    Xor,
+    PlusLighter,
+    Modulate,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    ColorDodge,
+    ColorBurn,
+    HardLight,
+    SoftLight,
+    Difference,
+    Exclusion,
+    Multiply,
+    Hue,
+    Saturation,
+    Color,
+    Luminosity,
+    PlusDarker
+}
+
+enum LayerStylePosition:byte{
+    Above = 0,
+    Below
+}
+
+enum LayerStyleExtraSourceType:byte{
+    None = 0,
+    Contour,
+    Background
+}
+
+struct LayerStyleCommonAttribute{
+    type : LayerStyleType;
+    blend_mode : BlendMode;
+    position : LayerStylePosition;
+    source_type : LayerStyleExtraSourceType;
+}
+
+enum TileMode:byte{
+    Clamp = 0,
+    Repeat,
+    Mirror,
+    Decal
+}
+
+table BackGroundBlurStyleAttribute{
+    common_attribute : LayerStyleCommonAttribute;
+    blurriness_x : float;
+    blurriness_y : float;
+    tile_mode : TileMode;
+}
+
+struct Color{
+    red : float;
+    green : float;
+    blue : float;
+    alpha : float;
+}
+
+table DropShadowStyleAttribute{
+    common_attribute : LayerStyleCommonAttribute;
+    offset_x : float;
+    offset_y : float;
+    blurriness_x : float;
+    blurriness_y : float;
+    color : Color;
+    show_behind_layer : bool;
+}
+
+table InnerShadowStyleAttribute {
+  common_attribute : LayerStyleCommonAttribute;
+  offset_x : float;
+  offset_y : float;
+  blurriness_x : float;
+  blurriness_y : float;
+  color : Color;
+}
+
+enum LayerFilterType:byte{
+    LayerFilter = 0,
+    BlendFilter,
+    BlurFilter,
+    ColorMatrixFliter,
+    DropShadowFilter,
+    InnerShadowFilter
+}
+
+struct LayerfilterCommonAttribute{
+    type : LayerFilterType;
+}
+
+table BlendFilterAttribute{
+    common_attribute : LayerfilterCommonAttribute;
+    color : Color;
+    blend_mode : BlendMode;
+}
+
+table BlurFilterAttribute{
+    common_attribute : LayerfilterCommonAttribute;
+    blurriness_x : float;
+    blurriness_y : float;
+    tile_mode : TileMode;
+}
+
+struct Matrix{
+    elements : [float : 20];
+}
+
+table ColorFilterAttribute{
+    common_attribute : LayerfilterCommonAttribute;
+    matrix : Matrix;
+}
+
+table DropShadowFilterAttribute{
+    common_attribute : LayerfilterCommonAttribute;
+    offset_x : float;
+    offset_y : float;
+    blurriness_x : float;
+    blurriness_y : float;
+    color : Color;
+    drop_shadow_only : bool;
+}
+
+table InnerShadowFilterAttribute{
+    common_attribute : LayerfilterCommonAttribute;
+    offset_x : float;
+    offset_y : float;
+    blurriness_x : float;
+    blurriness_y : float;
+    color : Color;
+    inner_shadow_only : bool;
+}
+
+enum LayerType:byte
+{
+    Layer = 0,
+    Image,
+    Shape,
+    Gradient,
+    Text,
+    Solid
+}
+
+struct Point{
+    x : float;
+    y : float;
+}
+
+union LayerStyleAttribute{
+    BackGroundBlurStyleAttribute,
+    DropShadowStyleAttribute,
+    InnerShadowStyleAttribute
+}
+
+table LayerStyle{
+    style_type : LayerStyleType;
+    style_body : LayerStyleAttribute;
+}
+
+union LayerFilterAttribute{
+    BlendFilterAttribute,
+    BlurFilterAttribute,
+    ColorFilterAttribute,
+    DropShadowFilterAttribute,
+    InnerShadowFilterAttribute
+}
+
+table LayerFilter{
+    filter_type : LayerFilterType;
+    filter_body : LayerFilterAttribute;
+}
+
+table LayerCommonAttribute{
+    type : LayerType;
+    name : string;
+    alpha : float;
+    blend_mode : BlendMode;
+    position : Point;
+    visible : bool;
+    rasterize : bool;
+    rasterize_scale : float;
+    edge_antialiasing : bool;
+    grounp_opacity : bool;
+    layer_styles : [LayerStyle];
+    layer_filters : [LayerFilter];
+}
+
+struct ImageAttribute{
+    image_type : int;
+    image_width : int;
+    image_height : int;
+    image_alpha_only : bool;
+    image_mipmap : bool;
+    image_fully_decode : bool;
+    image_texture_backed : bool;
+}
+
+enum FilterMode:byte{
+    Nearest = 0,
+    Linear
+}
+
+enum MipmapMode:byte{
+    None = 0,
+    Nearest,
+    Linear
+}
+
+table ImageLayerAttribute{
+    common_attribute : LayerCommonAttribute;
+    filter_mode : FilterMode;
+    mipmap_mode : MipmapMode;
+    image : ImageAttribute;
+}
+
+struct ShapeStyleCommonAttribute{
+    shape_style_alpha : float;
+    blend_mode : BlendMode;
+}
+
+table ImagePatternAttribute{
+    common_attribute : ShapeStyleCommonAttribute;
+    tilemode_x : TileMode;
+    tilemode_y : TileMode;
+    filtermode : FilterMode;
+    mipmapmode : MipmapMode;
+    image : ImageAttribute;
+}
+
+enum GradientType:byte{
+    None = 0,
+    Linear,
+    Radial,
+    Conic,
+    Diamond
+}
+
+table GradientAttribute{
+    common_attribute : ShapeStyleCommonAttribute;
+    type : GradientType;
+    colors : [Color];
+    positions : [float];
+}
+
+table LinearGradientAttribute{
+    gradient_attribute : GradientAttribute;
+    start_point : Point;
+    end_point : Point;
+}
+
+table RadialGradientAttribute{
+    gradient_attribute : GradientAttribute;
+    center : Point;
+    radius : float;
+}
+
+table ConicGradientAttribute{
+    gradient_attribute : GradientAttribute;
+    center : Point;
+    start_angle : float;
+    end_angle : float;
+}
+
+table DiamondGradientAttribute{
+    gradient_attribute : GradientAttribute;
+    center : Point;
+    half_diagonal : float;
+}
+
+enum ShapeStyleType:byte{
+    LinearGradient = 0,
+    RadiusGradient,
+    ConicGradient,
+    DiamondGradient,
+    ImagePattern
+}
+
+union ShapeStyleAttribute{
+    LinearGradientAttribute,
+    RadialGradientAttribute,
+    ConicGradientAttribute,
+    DiamondGradientAttribute,
+    ImagePatternAttribute
+}
+
+table ShapeStyle{
+    shapestyle_type : ShapeStyleType;
+    shapestyle_body : ShapeStyleAttribute;
+}
+
+enum PathFillType:byte{
+    Winding = 0,
+    EvenOdd,
+    InverseWinding,
+    InverseEvenOdd
+}
+
+struct Rect{
+    left : float;
+    top : float;
+    right : float;
+    bottom : float;
+}
+
+table ShapeLayerAttribute{
+    common_attribute : LayerCommonAttribute;
+    path_fill_type : PathFillType;
+    path_is_line : bool;
+    path_is_rect : bool;
+    path_is_oval : bool;
+    path_is_empty : bool;
+    path_bounds : Rect;
+    path_point_count : int;
+    path_verbs_count : int;
+    shape_styles_attribute : [ShapeStyle];
+}
+
+table SolidLayerAttribute{
+    common_attribute : LayerCommonAttribute;
+    width : float;
+    height : float;
+    solid_radius_x : float;
+    solid_radius_y : float;
+    solid_color : Color;
+}
+
+table TypeFace{
+    unique_id : uint32;
+    font_family : string;
+    font_style : string;
+    glyphs_count : uint32;
+    units_per_em : int;
+    has_color : bool;
+    has_outlines : bool;
+}
+
+struct FontMetrics{
+    top : float;
+    ascent : float;
+    descent : float;
+    bottom : float;
+    leading : float;
+    x_min : float;
+    x_max : float;
+    x_height : float;
+    cap_height : float;
+    underline_thickness : float;
+    underline_position : float;
+}
+
+table Font{
+    has_color : bool;
+    has_outlines : bool;
+    size : float;
+    is_faux_bold : bool;
+    is_faux_ttalic : bool;
+    type_face : TypeFace;
+}
+
+enum TextAlign:byte{
+    Left = 0,
+    Right,
+    Center,
+    Justify
+}
+
+table TextLayerAttribute{
+    common_attribute : LayerCommonAttribute;
+    text_string : string;
+    text_color : Color;
+    text_font : Font;
+    font_metrics : FontMetrics;
+    text_width : float;
+    text_height : float;
+    text_align : TextAlign;
+    text_auto_wrap : bool;
+}
+
+union LayerAttribute{
+    LayerCommonAttribute,
+    ImageLayerAttribute,
+    ShapeLayerAttribute,
+    SolidLayerAttribute,
+    TextLayerAttribute
+}
+
+table Layer{
+    layer_type : LayerType;
+    layer_body : LayerAttribute;
+}
+
+table TreeNode{
+    name : string;
+    children : [TreeNode];
+}
+
+enum Type:byte{
+    TreeData,
+    LayerData
+}
+
+union Data{
+    Layer,
+    TreeNode
+}
+
+table FinalData{
+    type : Type;
+    data : Data;
+}
+
+root_type FinalData;
+
