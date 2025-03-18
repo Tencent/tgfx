@@ -71,7 +71,7 @@
     },
     "FilterTest": {
         "AlphaThreshold": "5012d73",
-        "AlphaThreshold_empty": "5012d73",
+        "AlphaThreshold_empty": "500c87a",
         "ComposeColorFilter": "2cb2474",
         "ComposeImageFilter": "d868e738",
         "ComposeImageFilter2": "d868e738",
@@ -106,7 +106,7 @@
         "DropShadowStyle-stroke-blur": "fa6d7439",
         "DropShadowStyle-stroke-blur-behindLayer": "fa6d7439",
         "DropShadowStyle2": "0389826",
-        "InnerShadowStyle": "19dcc4d",
+        "InnerShadowStyle": "500c87a",
         "InvalidMask": "02f6b86",
         "LargeScale": "d868e738",
         "Layer_hitTestPoint": "9a7d2aa8",
