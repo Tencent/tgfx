@@ -51,6 +51,7 @@ TimelineView::TimelineView(QQuickItem* parent)
 TimelineView::~TimelineView() {
 }
 
+
 void TimelineView::initConnect() {
   connect(this, &TimelineView::showZoneToolTipSignal, this, &TimelineView::showZoneToolTip);
   connect(this, &TimelineView::showFlodedToolTipSignal, this, &TimelineView::showFlodedToolTip);
@@ -626,7 +627,7 @@ void TimelineView::draw() {
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
-  drawRect(canvas, 0, 0, 3008, 1578, 0xFF000000);
+  drawRect(canvas, 0, 0, 3008, 1578, 0xFF2E2E2E);
   drawTimeline(canvas);
   canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
   context->flushAndSubmit();
@@ -642,6 +643,7 @@ QSGNode* TimelineView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto pixelRatio = window()->devicePixelRatio();
   auto screenWidth = static_cast<int>(ceil(width() * pixelRatio));
   auto screenHeight = static_cast<int>(ceil(height() * pixelRatio));
+
   auto sizeChanged =
       appHost->updateScreen(screenWidth, screenHeight, static_cast<float>(pixelRatio));
   if (sizeChanged) {
@@ -655,7 +657,6 @@ QSGNode* TimelineView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     }
     node->setTexture(texture);
     node->markDirty(QSGNode::DirtyMaterial);
-    node->setRect(boundingRect());
     node->setRect(boundingRect());
   }
   return node;
@@ -827,7 +828,8 @@ void TimelineView::showZoneToolTip(const tracy::ZoneEvent& ev) {
 
 void TimelineView::showFlodedToolTip(uint32_t num, int64_t time) {
   QString tooltip = QString("Zone too small to display: %1\n").arg(num);
-  tooltip += QString("Excution time: %1").arg(QString::fromStdString(tracy::TimeToString(time)));
+  tooltip += QString("Excution time: %1")
+                 .arg(QString::fromStdString(tracy::TimeToString(time)));
   QToolTip::showText(QCursor::pos(), tooltip);
 }
 
