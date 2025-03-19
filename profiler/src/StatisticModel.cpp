@@ -18,6 +18,7 @@
 
 #include "StatisticModel.h"
 #include <QRegularExpression>
+#include <QTimer>
 #include <src/profiler/TracyColor.hpp>
 #include "TracyPrint.hpp"
 #include "View.h"
@@ -28,10 +29,20 @@ StatisticsModel::StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObjec
       frames(worker->GetFramesBase()), statAccumulationMode(AccumulationMode::SelfOnly),
       statisticsMode(StatMode::Instrumentation), sortOrder(Qt::AscendingOrder), statMode(0),
       targetAddr(0), totalZoneCount(0) {
+  dataRefreshTimer = new QTimer(this);
+  connect(dataRefreshTimer, &QTimer::timeout, this, &StatisticsModel::refreshData);
+  dataRefreshTimer->start(200);
   refreshData();
 }
 
-StatisticsModel::~StatisticsModel() = default;
+
+
+
+StatisticsModel::~StatisticsModel() {
+  if(dataRefreshTimer) {
+    dataRefreshTimer->stop();
+  }
+};
 
 int StatisticsModel::rowCount(const QModelIndex& parent) const {
   if (parent.isValid()) {
@@ -68,6 +79,7 @@ void StatisticsModel::openSource(int row) {
 
   viewSource(fileName, line);
 }
+
 
 void StatisticsModel::updateZoneCountLabels() {
   Q_EMIT zoneCountChanged();
