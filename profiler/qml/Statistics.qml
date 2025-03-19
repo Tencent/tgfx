@@ -3,6 +3,8 @@ import QtQuick.Controls 2.15
 import QtQuick.Window 2.15
 import QtQuick.Layouts 1.15
 import TGFX.Profiler 1.0
+import TGFX.Controls 1.0
+
 
 Window {
     id: root
@@ -88,8 +90,13 @@ Window {
                         contentItem: Text {
                             text: instrumentationBtn.text
                             color: "white"
+                            // width: instrumentationBtn.width - instrumentationBtn.indicator.width - 4
+                            // height: instrumentationBtn.height
+                            // alignment: Qt.AlignLeft | Qt.AlignVCenter
+                            // elideMode: Qt.ElideNone
                             leftPadding: instrumentationBtn.indicator.width + 4
                             verticalAlignment: Text.AlignVCenter
+                            x:instrumentationBtn.indicator.width + 4
                         }
                         onCheckedChanged: {
                             if (checked) {
@@ -319,18 +326,6 @@ Window {
                         id: mouseArea
                         hoverEnabled: true
                         anchors.fill: parent
-                        onPositionChanged: {
-                            console.log("mouse move")
-                            line.x = mouse.x
-                        }
-                        onExited: {
-                            console.log("onExited")
-                            line.visible = false
-                        }
-                        onEntered: {
-                            console.log("onEntered")
-                            line.visible = true
-                        }
                     }
 
                     Rectangle {
@@ -343,9 +338,6 @@ Window {
                 }
             }
 
-            // }
-            //     }
-            // }
             /////*table view header*/////
             Item {
                 id: tableContainer
@@ -550,7 +542,6 @@ Window {
                                     countHeader.isSorted = false;
                                     mtpcHeader.isSorted = false;
                                     threadsHeader.isSorted = false;
-
                                     totalTimeHeader.isSorted = true;
                                     totalTimeHeader.sortAscending = false;
                                 }
@@ -607,7 +598,6 @@ Window {
                                     totalTimeHeader.isSorted = false;
                                     mtpcHeader.isSorted = false;
                                     threadsHeader.isSorted = false;
-
                                     countHeader.isSorted = true;
                                     countHeader.sortAscending = false;
                                 }
@@ -664,7 +654,6 @@ Window {
                                     totalTimeHeader.isSorted = false;
                                     countHeader.isSorted = false;
                                     threadsHeader.isSorted = false;
-
                                     mtpcHeader.isSorted = true;
                                     mtpcHeader.sortAscending = false;
                                 }
@@ -780,17 +769,18 @@ Window {
                                     border.width: 1
                                 }
 
-                                Text {
+                                TGFXText {
                                     id: nameText
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.left: statusIcon.right
                                     anchors.leftMargin: 8
                                     width: parent.width - statusIcon.width - 24
+                                    height:parent.height
                                     clip: true
                                     text: model.Name
                                     color: "white"
-                                    elide: Text.ElideRight
-                                    horizontalAlignment: Text.AlignLeft
+                                    elideMode: Qt.ElideRight
+                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
                                 }
                             }
 
@@ -802,17 +792,18 @@ Window {
                             border.width: 1
                             clip: true
 
-                                Text {
+                                TGFXText {
                                     id: locationText
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.left: parent.left
                                     anchors.leftMargin: 8
                                     width: parent.width - 16
+                                    height: parent.height
                                     clip: true
                                     text: model.Location
                                     color: "white"
-                                    elide: Text.ElideMiddle
-                                    horizontalAlignment: Text.AlignLeft
+                                    elideMode: Qt.ElideMiddle
+                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
                                 }
 
                                 MouseArea {
@@ -833,29 +824,38 @@ Window {
                             border.width: 1
                             clip: true
 
-                                Row {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
-                                    spacing: 4
-
-                                    Text {
-                                        text: model.Totaltime
-                                        color: "white"
-                                    }
-
-                                    Text {
-                                        text: {
-                                            if(model.percentage !== undefined) {
-                                                return "(" + model.percentage.toFixed(2) + "%)"
-                                            }
-                                            return ""
-                                        }
-                                        visible: model.percentage !== undefined
-                                        color: "#FFFFFF80"
-                                    }
-                                }
+                            TGFXText {
+                                id: totalTimeText
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                text: model.Totaltime
+                                color: "white"
+                                height: parent.height
+                                width: model.percentage !== undefined ? 70 : parent.width - 16
+                                alignment: Qt.AlignLeft | Qt.AlignVCenter
+                                elideMode: Qt.ElideNone
                             }
+
+                            TGFXText {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: totalTimeText.right
+                                anchors.leftMargin: 4
+                                text: {
+                                    if(model.percentage !== undefined) {
+                                        return "(" + model.percentage.toFixed(2) + "%)"
+                                    }
+                                    return ""
+                                }
+                                visible: model.percentage !== undefined
+                                color: "#FFFFFF80"
+                                height: parent.height
+                                width: 70
+                                alignment: Qt.AlignLeft | Qt.AlignVCenter
+                                elideMode:Qt.ElideNone
+                            }
+
+                        }
 
                         Rectangle {
                             width: countWidth
@@ -865,12 +865,16 @@ Window {
                             border.width: 1
                             clip: true
 
-                                Text {
+                                TGFXText {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.left: parent.left
                                     anchors.leftMargin: 8
                                     text: model.Count
                                     color: "white"
+                                    height: parent.height
+                                    width: parent.width - 16
+                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
+                                    elideMode: Qt.ElideNone
                                 }
                             }
 
@@ -882,12 +886,16 @@ Window {
                             border.width: 1
                             clip: true
 
-                                Text {
+                                TGFXText {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.left: parent.left
                                     anchors.leftMargin: 8
                                     text: model.Mtpc
                                     color: "white"
+                                    height: parent.height
+                                    width: parent.width - 16
+                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
+                                    elideMode: Qt.ElideNone
                                 }
                             }
 
@@ -899,12 +907,16 @@ Window {
                             border.width: 1
                             clip: true
 
-                                Text {
+                                TGFXText {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.left: parent.left
                                     anchors.leftMargin: 8
                                     text: model.Threadcount
                                     color: "white"
+                                    height: parent.height
+                                    width: parent.width - 16
+                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
+                                    elideMode: Qt.ElideNone
                                 }
                             }
                         }

@@ -219,4 +219,5 @@ class StatisticsModel : public QAbstractTableModel {
 
   SourceView* srcView = nullptr;
   QString srcViewFile;
+  QTimer* dataRefreshTimer;
 };
