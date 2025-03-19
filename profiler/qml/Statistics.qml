@@ -256,96 +256,146 @@ Window {
                 spacing: 0
 
                 ColumnLayout {
+                    anchors.margins: 0
+                    anchors.fill: parent
+                    spacing: 0
+
                     Rectangle {
+                        anchors.margins: 0
                         id: fpsChartHeadTabBar
                         Layout.preferredHeight: 100
                         Layout.preferredWidth: 200
+                        border.width: 0.5
+                        border.color: "#4D4D4D"
                         color: "#2D2D2D"
+                        Text {
+                            id: fpsHeadText
+                            text: "FPS"
+
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.leftMargin: 10
+                            anchors.topMargin: 8
+
+                            color: "white"
+                            font.bold: true
+                        }
                     }
+
                     Rectangle {
+                        anchors.margins: 0
                         id: drawCallChartHeadTabBar
                         Layout.preferredHeight: 100
                         Layout.preferredWidth: 200
+                        border.width: 0.5
+                        border.color: "#4D4D4D"
                         color: "#2D2D2D"
+                        Text {
+                            id: drawCallHeadText
+                            text: "DrawCall"
+
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.leftMargin: 10
+                            anchors.topMargin: 8
+
+                            color: "white"
+                            font.bold: true
+                        }
                     }
+
                     Rectangle {
+                        anchors.margins: 0
                         id: tranglesChartHeadTabBar
                         Layout.preferredHeight: 100
                         Layout.preferredWidth: 200
+                        border.width: 0.5
+                        border.color: "#4D4D4D"
                         color: "#2D2D2D"
+                        Text {
+                            id: trianglesHeadText
+                            text: "Triangles"
+
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.leftMargin: 10
+                            anchors.topMargin: 8
+
+                            color: "white"
+                            font.bold: true
+                        }
                     }
+
                 }
 
                 Rectangle {
                     id: chartTabBar
                     Layout.fillWidth: true
                     Layout.preferredHeight: 300
+                    anchors.margins: 0
                     color: "#2D2D2D"
-
-                    ColumnLayout {
-                        anchors.margins: 0
-                        anchors.fill: parent
-                        spacing: 0
-
-                        FPSChart {
-                            id: fpsChart
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-
-                            dataName: "FPS"
-                            model: statisticsModel
-                        }
-
-                        DrawCallChart {
-                            id: drawCallChart
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-
-                            dataName: "DrawCall"
-                            model: statisticsModel
-                        }
-
-                        TriangleChart {
-                            id: triangleChart
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-
-                            dataName: "Triangles"
-                            model: statisticsModel
-                        }
-                    }
 
                     MouseArea {
                         id: mouseArea
+                        propagateComposedEvents: true
                         hoverEnabled: true
                         anchors.fill: parent
+
                         onPositionChanged: {
-                            console.log("mouse move")
                             line.x = mouse.x
                         }
                         onExited: {
-                            console.log("onExited")
                             line.visible = false
                         }
                         onEntered: {
-                            console.log("onEntered")
                             line.visible = true
                         }
+
+                        ColumnLayout {
+                            anchors.margins: 0
+                            anchors.fill: parent
+                            spacing: 0
+
+                            FPSChart {
+                                id: fpsChart
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+
+                                dataName: "FPS"
+                                model: statisticsModel
+                            }
+
+                            DrawCallChart {
+                                id: drawCallChart
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+
+                                dataName: "DrawCall"
+                                model: statisticsModel
+                            }
+
+                            TriangleChart {
+                                id: triangleChart
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+
+                                dataName: "Triangles"
+                                model: statisticsModel
+                            }
+                        }
+
                     }
 
                     Rectangle {
                         id: line
+                        x: mouseArea.width / 2
                         width: 1
                         height: parent.height
-                        color: "#FFFFFF"
-                        x: mouseArea.width / 2
+                        color: "#6D6D6D"
                     }
                 }
             }
 
-            // }
-            //     }
-            // }
             /////*table view header*/////
             Item {
                 id: tableContainer

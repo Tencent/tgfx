@@ -58,7 +58,7 @@ void DataChartItem::createAppHost() {
 }
 
 void DataChartItem::drawCoordinateAxes(tgfx::Canvas* canvas, float xStart, float yStart, float xLength, float yLength) {
-  uint32_t color = 0xFFAAAAAA;
+  uint32_t color = 0xFF4D4D4D;
   drawRect(canvas, xStart, yStart, xLength, yLength, color, 1.f);
 }
 
@@ -106,11 +106,18 @@ void DataChartItem::drawData(tgfx::Canvas* canvas) {
   auto& data = getData();
   auto minX = model->getFirstFrame();
   auto maxX = model->getLastFrame();
+  auto allData = maxX - minX + 1;
   auto maxY = getMaxData(data, minX, maxX);
   auto charWidth = static_cast<float>(width());
   auto charHeight = static_cast<float>(height());
+  auto minRunningWidth = 10.f;
+  auto maxShowData = static_cast<uint32_t>(charWidth / minRunningWidth);
+  auto dataWidth = std::min(minRunningWidth, charWidth / allData);
   auto total = static_cast<uint32_t>(data.size());
-  auto dataWidth = std::min(10.f, charWidth / (maxX - minX + 1));
+  if (model->isRunning() && maxX > maxShowData) {
+    minX = std::max(minX, maxX - maxShowData + 1);
+    dataWidth = minRunningWidth;
+  }
   float xStart = 0.f;
   float yStart = 0.f;
   float frameStart = 0.f;
@@ -201,7 +208,13 @@ void DataChartItem::hoverMoveEvent(QHoverEvent* event) {
   auto maxX = model->getLastFrame();
   auto maxY = getMaxData(data, minX, maxX);
   auto charWidth = static_cast<float>(width());
-  auto dataWidth = std::min(10.f, charWidth / (maxX - minX + 1));
+  auto minRunningWidth = 10.f;
+  auto maxShowData = static_cast<uint32_t>(charWidth / minRunningWidth);
+  auto dataWidth = std::min(minRunningWidth, charWidth / (maxX - minX + 1));
+  if (model->isRunning() && maxX > maxShowData) {
+    minX = std::max(minX, maxX - maxShowData + 1);
+    dataWidth = minRunningWidth;
+  }
   auto mouseX = static_cast<float>(event->position().x());
   auto sel = minX + static_cast<uint32_t>(mouseX / dataWidth);
   if (sel > maxX || sel < 0) {

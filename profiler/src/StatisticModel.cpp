@@ -791,7 +791,7 @@ void StatisticsModel::refreshTableData() {
   updateZoneCountLabels();
 }
 
-void StatisticsModel::RefreshFrameData() {
+void StatisticsModel::refreshFrameData() {
   auto total = static_cast<qsizetype>(worker->GetFrameCount(*frames));
   if (fps.size() == total) {
     return;
@@ -810,18 +810,22 @@ void StatisticsModel::RefreshFrameData() {
   }
 }
 
+bool StatisticsModel::isRunning() {
+  return worker->IsConnected();
+}
+
 QVector<float>& StatisticsModel::getFps() {
-  RefreshFrameData();
+  refreshFrameData();
   return fps;
 }
 
 QVector<float>& StatisticsModel::getDrawCall() {
-  RefreshFrameData();
+  refreshFrameData();
   return drawCall;
 }
 
 QVector<float>& StatisticsModel::getTriangles() {
-  RefreshFrameData();
+  refreshFrameData();
   return triangle;
 }
 
@@ -836,7 +840,7 @@ uint32_t StatisticsModel::getLastFrame() const {
   if (stateRange.active) {
     return static_cast<uint32_t>(frameRange.end);
   }
-  return static_cast<uint32_t>(worker->GetFrameCount(*frames) - 1);
+  return static_cast<uint32_t>(fps.size() - 1);
 }
 
 bool StatisticsModel::srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker,

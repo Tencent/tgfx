@@ -168,7 +168,8 @@ class StatisticsModel : public QAbstractTableModel {
   Q_SIGNAL void filterTextChanged();
   Q_SIGNAL void accumulationModeChanged();
 
-  void RefreshFrameData();
+  void refreshFrameData();
+  bool isRunning();
   QVector<float>& getFps();
   QVector<float>& getDrawCall();
   QVector<float>& getTriangles();
