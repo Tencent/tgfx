@@ -518,10 +518,8 @@ void StatisticsModel::refreshData() {
 }
 
 void StatisticsModel::setStatRange(int startFrame, int endFrame, bool) {
-  frameRange.start = startFrame;
-  frameRange.end = endFrame;
   stateRange.min = worker->GetFrameBegin(*frames, size_t(startFrame));
-  stateRange.max = worker->GetFrameBegin(*frames, size_t(endFrame));
+  stateRange.max = worker->GetFrameEnd(*frames, size_t(endFrame));
   if (stateRange.active) {
     refreshInstrumentationData();
     updateZoneCountLabels();
@@ -843,14 +841,16 @@ QVector<float>& StatisticsModel::getTriangles() {
 
 uint32_t StatisticsModel::getFirstFrame() const {
   if (stateRange.active) {
-    return static_cast<uint32_t>(frameRange.start);
+    auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+    return static_cast<uint32_t>(range.first);
   }
   return 1;
 }
 
 uint32_t StatisticsModel::getLastFrame() const {
   if (stateRange.active) {
-    return static_cast<uint32_t>(frameRange.end);
+    auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+    return static_cast<uint32_t>(range.second);
   }
   return static_cast<uint32_t>(fps.size() - 1);
 }

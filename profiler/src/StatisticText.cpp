@@ -21,9 +21,9 @@
 #include "StatisticText.h"
 #include "Utility.h"
 
-StatisticsText::StatisticsText(QQuickItem* parent) : QQuickItem(parent) {
+StatisticsText::StatisticsText(QQuickItem* parent)
+  : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
   setFlag(ItemHasContents, true);
-  createAppHost();
 }
 
 StatisticsText::~StatisticsText() = default;
@@ -41,6 +41,7 @@ tgfx::Rect StatisticsText::getTextBounds(const QString& text) const {
 void StatisticsText::setText(const QString& text) {
   if(sText != text) {
     sText = text;
+    dirty = true;
     Q_EMIT textChanged();
     update();
   }
@@ -78,19 +79,8 @@ void StatisticsText::setElideMode(int elideMode) {
   }
 }
 
-void StatisticsText::createAppHost() {
-  appHost = std::make_unique<AppHost>();
-#ifdef __APPLE__
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
-  auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
-#else
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
-#endif
-  appHost->addTypeface("default", defaultTypeface);
-}
-
 void StatisticsText::draw() {
-  if (!tgfxWindow || !appHost) {
+  if (!tgfxWindow || !appHost || !dirty) {
     return;
   }
 
@@ -118,6 +108,7 @@ void StatisticsText::draw() {
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+  dirty = false;
 }
 
 

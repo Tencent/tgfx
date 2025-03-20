@@ -24,8 +24,8 @@
 class DataChartItem : public QQuickItem
 {
   Q_OBJECT
-  Q_PROPERTY(QString dataName WRITE setDataName)
-  Q_PROPERTY(StatisticsModel* model WRITE setModel)
+  Q_PROPERTY(QString dataName WRITE setDataName READ getDataName)
+  Q_PROPERTY(StatisticsModel* model WRITE setModel READ getModel)
 public:
   enum ChartType {
     Polyline,
@@ -33,25 +33,25 @@ public:
     Column
   };
 
-  DataChartItem(QQuickItem* parent = nullptr, ChartType chartType = Line);
+  DataChartItem(QQuickItem* parent = nullptr, ChartType chartType = Line, float lineThickness = 1.f);
 
   virtual QVector<float>& getData();
+  virtual uint32_t getColor() = 0;
   virtual uint32_t getMaxData(QVector<float>& data, uint32_t min, uint32_t max);
 
-  void setModel(StatisticsModel* model) {
-    this->model = model;
-  }
+  void setModel(StatisticsModel* model) { this->model = model; }
+  StatisticsModel* getModel() const { return model; }
   void setDataName(QString value) { name = std::move(value); }
+  QString getDataName() const { return name; }
 
-  void createAppHost();
   void draw();
   void drawCoordinateAxes(tgfx::Canvas* canvas, float xStart, float yStart, float xLength, float yLength);
   void drawData(tgfx::Canvas* canvas);
 
   void drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float xStart, float yStart, float width, float height);
-  void drawPolylineChart(tgfx::Path& linePath, float xStart, float yStart, float width);
+  void drawPolylineChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height);
   void drawLineChart(tgfx::Path& linePath, float xStart, float yStart, float width);
-  void drawColumChart(tgfx::Canvas* canvas, float xStart, float yStart, float width, float height);
+  void drawColumChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height);
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
   void hoverMoveEvent(QHoverEvent* event) override;
@@ -59,6 +59,7 @@ public:
 private:
   QString name;
   ChartType chartType;
+  float thickness;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
 public:
@@ -68,24 +69,26 @@ public:
 class FPSChartItem: public DataChartItem
 {
 public:
-  FPSChartItem(QQuickItem* parent = nullptr);
+  FPSChartItem(QQuickItem* parent = nullptr): DataChartItem(parent, Polyline, 0.f) {}
 
-  QVector<float>& getData() override;
-  uint32_t getMaxData(QVector<float>& data, uint32_t min, uint32_t max) override;
+  QVector<float>& getData() override { return model->getFps(); }
+  uint32_t getColor() override { return 0xFFFEBA00; }
+  uint32_t getMaxData(QVector<float>&, uint32_t, uint32_t) override { return 240; }
 };
 
 class DrawCallChartItem: public DataChartItem
 {
 public:
-  DrawCallChartItem(QQuickItem* parent = nullptr);
+  DrawCallChartItem(QQuickItem* parent = nullptr): DataChartItem(parent, Column, 0.f) {}
 
-  QVector<float>& getData() override;
+  QVector<float>& getData() override { return model->getDrawCall(); }
+  uint32_t getColor() override { return 0xFF509E54; }
 };
 
-class TriangleChartItem: public DataChartItem
-{
+class TriangleChartItem: public DataChartItem {
 public:
-  TriangleChartItem(QQuickItem* parent = nullptr);
+  TriangleChartItem(QQuickItem* parent = nullptr): DataChartItem(parent, Line) {}
 
-  QVector<float>& getData() override;
+  QVector<float>& getData() override { return model->getTriangles(); }
+  uint32_t getColor() override { return 0xFF6EDAF4; }
 };

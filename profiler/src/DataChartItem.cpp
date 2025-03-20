@@ -19,15 +19,14 @@
 #include <QSGImageNode>
 #include <QToolTip>
 
-DataChartItem::DataChartItem(QQuickItem* parent, ChartType chartType)
-  : QQuickItem(parent), chartType(chartType){
+DataChartItem::DataChartItem(QQuickItem* parent, ChartType chartType, float lineThickness)
+  : QQuickItem(parent), chartType(chartType), thickness(lineThickness), appHost(AppHostInstance::GetAppHostInstance()) {
   setFlag(ItemHasContents, true);
   setFlag(ItemAcceptsInputMethod, true);
   setFlag(ItemIsFocusScope, true);
   setAcceptedMouseButtons(Qt::AllButtons);
   setAcceptHoverEvents(true);
   setAntialiasing(true);
-  createAppHost();
 }
 
 QVector<float>& DataChartItem::getData() {
@@ -47,25 +46,15 @@ uint32_t DataChartItem::getMaxData(QVector<float>& data, uint32_t min, uint32_t 
   return static_cast<uint32_t>(maxData * 3 / 2);
 }
 
-void DataChartItem::createAppHost() {
-  appHost = std::make_unique<AppHost>();
-#ifdef __APPLE__
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
-#else
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
-#endif
-  appHost->addTypeface("default", defaultTypeface);
-}
-
 void DataChartItem::drawCoordinateAxes(tgfx::Canvas* canvas, float xStart, float yStart, float xLength, float yLength) {
   uint32_t color = 0xFF4D4D4D;
   drawRect(canvas, xStart, yStart, xLength, yLength, color, 1.f);
 }
 
-void DataChartItem::drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
+void DataChartItem::drawChart(tgfx::Canvas*, tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
   switch (chartType) {
     case Polyline: {
-      drawPolylineChart(linePath, xStart, yStart, width);
+      drawPolylineChart(linePath, xStart, yStart, width, height);
       break;
     }
     case Line: {
@@ -73,16 +62,21 @@ void DataChartItem::drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float 
       break;
     }
     case Column: {
-      drawColumChart(canvas, xStart, yStart, width, height);
+      drawColumChart(linePath, xStart, yStart, width, height);
       break;
     }
   }
 }
 
-void DataChartItem::drawPolylineChart(tgfx::Path& linePath, float xStart, float yStart, float width) {
+void DataChartItem::drawPolylineChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
   if (xStart == 0) {
-    linePath.moveTo(xStart + width / 2, yStart);
-    return;
+    if (thickness == 0.f) {
+      linePath.moveTo(xStart + width / 2, height + yStart);
+    }
+    else {
+      linePath.moveTo(xStart + width / 2, yStart);
+      return;
+    }
   }
   linePath.lineTo(xStart + width / 2, yStart);
 }
@@ -97,9 +91,15 @@ void DataChartItem::drawLineChart(tgfx::Path& linePath, float xStart, float ySta
   linePath.lineTo(xStart + lineWidth * 2, yStart);
 }
 
-void DataChartItem::drawColumChart(tgfx::Canvas* canvas, float xStart, float yStart, float width, float height) {
-  uint32_t color = 0xFF509e54;
-  drawRect(canvas, xStart, yStart, width, height, color);
+void DataChartItem::drawColumChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
+  if (xStart == 0) {
+    linePath.moveTo(xStart, height + yStart);
+    linePath.lineTo(xStart, yStart);
+  }
+  else {
+    linePath.lineTo(xStart, yStart);
+  }
+  linePath.lineTo(xStart + width, yStart);
 }
 
 void DataChartItem::drawData(tgfx::Canvas* canvas) {
@@ -143,7 +143,11 @@ void DataChartItem::drawData(tgfx::Canvas* canvas) {
     idx += group;
   }
   if (!linePath.isEmpty()) {
-    drawPath(canvas, linePath, 0xFF6EDAF4, 1.f);
+    if (thickness == 0.f) {
+      linePath.lineTo(frameStart + i * dataWidth, charHeight);
+      linePath.close();
+    }
+    drawPath(canvas, linePath, getColor(), thickness);
   }
 }
 
@@ -164,8 +168,8 @@ void DataChartItem::draw() {
 
   auto canvas = surface->getCanvas();
   canvas->clear();
-  drawData(canvas);
   canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
+  drawData(canvas);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
@@ -252,36 +256,3 @@ void DataChartItem::hoverLeaveEvent(QHoverEvent* event) {
   QToolTip::hideText();
   return QQuickItem::hoverLeaveEvent(event);
 }
-
-FPSChartItem::FPSChartItem(QQuickItem* parent)
-  : DataChartItem(parent, Polyline) {
-
-}
-
-QVector<float>& FPSChartItem::getData() {
-  return model->getFps();
-}
-
-uint32_t FPSChartItem::getMaxData(QVector<float>&, uint32_t, uint32_t) {
-  return 240;
-}
-
-DrawCallChartItem::DrawCallChartItem(QQuickItem* parent)
-  : DataChartItem(parent, Column) {
-
-}
-
-QVector<float>& DrawCallChartItem::getData() {
-  return model->getDrawCall();
-}
-
-TriangleChartItem::TriangleChartItem(QQuickItem* parent)
-  : DataChartItem(parent, Line) {
-
-}
-
-QVector<float>& TriangleChartItem::getData() {
-  return model->getTriangles();
-}
-
-

@@ -35,7 +35,7 @@ public:
   explicit StatisticsText(QQuickItem* parent = nullptr);
   ~StatisticsText() override;
 
-  QString getText() const {return sText;}
+  QString getText() const { return sText; }
   QColor getColor() const {return sColor;}
   bool getContrast() const {return sContrast;}
   Qt::Alignment getAlignment() const {return sAlignment;}
@@ -49,8 +49,6 @@ public:
 
   void draw();
   void drawStext(tgfx::Canvas* canvas);
-  void createAppHost();
-
 
   Q_SIGNALS:
   void textChanged();

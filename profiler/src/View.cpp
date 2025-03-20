@@ -161,13 +161,15 @@ View::View(const char* addr, uint16_t port, int width, const Config& config, QWi
 View::View(tracy::FileRead& file, int width, const Config& config, QWidget* parent)
     : QWidget(parent), width(width), worker(file), viewMode(ViewMode::Paused),
       userData(worker.GetCaptureProgram().c_str(), worker.GetCaptureTime()), config(config) {
-  initView();
   userData.StateShouldBePreserved();
   userData.LoadState(viewData);
+  initView();
 }
 
 View::~View() {
-  userData.SaveState(viewData);
+  if (userData.Valid()) {
+    userData.SaveState(viewData);
+  }
 }
 
 void View::changeViewModeButton(ViewMode mode) {
@@ -276,19 +278,19 @@ bool View::save() {
 
 void View::ViewImpl() {
   auto layout = new QVBoxLayout(this);
+  layout->setSpacing(0);
   layout->setContentsMargins(0, 0, 0, 0);
 
   qmlRegisterType<ViewMode>("com.example", 1, 0, "ViewMode");
   qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
-  framesEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Frames.qml")));
-  framesEngine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
-  framesEngine->rootContext()->setContextProperty("_viewData", &viewData);
-  framesEngine->rootContext()->setContextProperty("_viewMode", (unsigned long long)&viewMode);
+  framesEngine = new QQmlApplicationEngine;
+  framesEngine->rootContext()->setContextProperty("workerPtr", (unsigned long long)&worker);
+  framesEngine->rootContext()->setContextProperty("viewDataPtr", &viewData);
+  framesEngine->rootContext()->setContextProperty("viewModePtr", (unsigned long long)&viewMode);
+  framesEngine->load(QUrl(QStringLiteral("qrc:/qml/Frames.qml")));
   auto quickWindow = static_cast<QQuickWindow*>(framesEngine->rootObjects().first());
   auto framesWidget = createWindowContainer(quickWindow);
   framesWidget->setFixedHeight(70);
-
-  layout->addWidget(framesWidget);
 
   tabWidget = new QTabWidget(this);
   tabWidget->setTabPosition(QTabWidget::South);
@@ -318,10 +320,11 @@ void View::ViewImpl() {
 
   qmlRegisterType<tracy::Worker>("tracy", 1, 0, "TracyWorker");
   qmlRegisterType<TimelineView>("Timeline", 1, 0, "TimelineView");
-  timelineEngine = new QQmlApplicationEngine(QUrl(QStringLiteral("qrc:/qml/Timeline.qml")));
-  timelineEngine->rootContext()->setContextProperty("_worker", (unsigned long long)&worker);
-  timelineEngine->rootContext()->setContextProperty("_viewData", &viewData);
-  timelineEngine->rootContext()->setContextProperty("_viewMode", (unsigned long long)&viewMode);
+  timelineEngine = new QQmlApplicationEngine;
+  timelineEngine->rootContext()->setContextProperty("workerPtr", (unsigned long long)&worker);
+  timelineEngine->rootContext()->setContextProperty("viewDataPtr", &viewData);
+  timelineEngine->rootContext()->setContextProperty("viewModePtr", (unsigned long long)&viewMode);
+  timelineEngine->load(QUrl(QStringLiteral("qrc:/qml/Timeline.qml")));
   quickWindow = static_cast<QQuickWindow*>(timelineEngine->rootObjects().first());
   auto timelineWidget = createWindowContainer(quickWindow);
   tabWidget->addTab(timelineWidget, "Timeline View");
@@ -334,7 +337,7 @@ void View::ViewImpl() {
   timelineView = timelineWindow->findChild<TimelineView*>("timelineView");
   connect(framesView, &FramesView::statRangeChanged, timelineView, &TimelineView::zoomToRangeFrame);
 
-  //layout->addWidget(framesWidget);
+  layout->addWidget(framesWidget);
   layout->addWidget(tabWidget);
 }
 

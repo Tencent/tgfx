@@ -24,13 +24,13 @@
 #include "TracyPrint.hpp"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
-FramesView::FramesView(QQuickItem* parent) : QQuickItem(parent) {
+FramesView::FramesView(QQuickItem* parent)
+  : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
   setFlag(ItemHasContents, true);
   setFlag(ItemAcceptsInputMethod, true);
   setFlag(ItemIsFocusScope, true);
   setAcceptedMouseButtons(Qt::AllButtons);
   setAcceptHoverEvents(true);
-  createAppHost();
 }
 
 FramesView::~FramesView() {
@@ -79,9 +79,9 @@ void FramesView::draw() {
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
+  canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
   drawRect(canvas, 0, 0, static_cast<float>(width()), static_cast<float>(height()), 0xFF000000);
   drawFrames(canvas);
-  canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
@@ -149,13 +149,11 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     selectedEndFrame = range.second;
   }
 
-  const auto zrange = std::make_pair(selectedStartFrame, selectedEndFrame);
-
-  if (zrange.second > viewData->frameStart &&
-      zrange.first < viewData->frameStart + onScreen * group) {
+  if (range.second > viewData->frameStart &&
+      range.first < viewData->frameStart + onScreen * group) {
     auto x1 = std::min(onScreen * frameWidth,
-                       (zrange.second - viewData->frameStart) * frameWidth / group);
-    auto x0 = std::max(0, (zrange.first - viewData->frameStart) * frameWidth / group);
+                       (range.second - viewData->frameStart) * frameWidth / group);
+    auto x0 = std::max(0, (range.first - viewData->frameStart) * frameWidth / group);
     if (x0 == x1) x1 = x0 + frameWidth;
     auto fx1 = static_cast<float>(x1);
     auto fx0 = static_cast<float>(x0);
@@ -174,17 +172,6 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     }
   }
   canvas->restore();
-}
-
-void FramesView::createAppHost() {
-  appHost = std::make_unique<AppHost>();
-#ifdef __APPLE__
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
-  auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
-#else
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
-#endif
-  appHost->addTypeface("default", defaultTypeface);
 }
 
 void FramesView::setViewToLastFrames() {

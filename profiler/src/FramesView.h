@@ -34,7 +34,6 @@ class FramesView : public QQuickItem {
  public:
   FramesView(QQuickItem* parent = nullptr);
   ~FramesView();
-  void createAppHost();
   void setViewToLastFrames();
 
   void wheelEvent(QWheelEvent* event) override;

@@ -84,11 +84,6 @@ class StatisticsModel : public QAbstractTableModel {
     uint16_t threadNum = 0;
   };
 
-  struct FrameRange {
-    int start;
-    int end;
-  };
-
   explicit StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObject* parent = nullptr);
   ~StatisticsModel();
 
@@ -211,7 +206,6 @@ class StatisticsModel : public QAbstractTableModel {
   Qt::SortOrder sortOrder;
 
   Range stateRange;
-  FrameRange frameRange;
   int statMode;
   int targetLine = 0;
   int selectedLine = 0;

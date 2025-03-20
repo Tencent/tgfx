@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Controls 2.15
+import QtQuick.Controls.Basic
 import QtQuick.Window 2.15
 import QtQuick.Layouts 1.15
 import TGFX.Profiler 1.0
@@ -259,8 +259,9 @@ Window {
                 spacing: 0
 
                 ColumnLayout {
-                    anchors.margins: 0
-                    anchors.fill: parent
+                    Layout.margins: 0
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
                     spacing: 0
 
                     Rectangle {
@@ -343,7 +344,7 @@ Window {
                         hoverEnabled: true
                         anchors.fill: parent
 
-                        onPositionChanged: {
+                        onPositionChanged: function(mouse) {
                             line.x = mouse.x
                         }
                         onExited: {
@@ -385,7 +386,6 @@ Window {
                                 model: statisticsModel
                             }
                         }
-
                     }
 
                     Rectangle {
@@ -1024,16 +1024,6 @@ Window {
 
         function onAccumulationModeChanged() {
             timingCombo.currentIndex = model.accumulationMode
-        }
-    }
-
-    Connections {
-        target: framesView
-
-        function onStatRangeChanged(startTime, endTime, active) {
-            if(resetRangeBtn.checked) {
-                model.setStatRange(startTime, endTime, true)
-            }
         }
     }
 }

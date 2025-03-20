@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <stdint.h>
 #include <QColor>
 #include <iostream>
+#include "AppHost.h"
 #include "TracyEvent.hpp"
 #include "src/profiler/TracyColor.hpp"
 #include "tgfx/core/Canvas.h"
@@ -40,31 +40,6 @@ enum class ShortenName : uint8_t {
   OnlyNormalize,
   NoSpace,
   NoSpaceAndNormalize,
-};
-
-class AppHost {
- public:
-  explicit AppHost(int width = 1280, int height = 720, float density = 1.0f);
-
-  int width() const {
-    return _width;
-  }
-  int height() const {
-    return _height;
-  }
-  float density() const {
-    return _density;
-  }
-
-  void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
-  std::shared_ptr<tgfx::Typeface> getTypeface(const std::string& name) const;
-  bool updateScreen(int width, int height, float density);
-
- private:
-  int _width = 1280;
-  int _height = 720;
-  float _density = 1.0f;
-  std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
 };
 
 struct Config {

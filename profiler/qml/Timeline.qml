@@ -13,9 +13,9 @@ Window {
 
     TimelineView {
         id: timelineView
-        worker: _worker
-        viewData: _viewData
-        viewMode: _viewMode
+        worker: workerPtr
+        viewData: viewDataPtr
+        viewMode: viewModePtr
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom

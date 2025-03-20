@@ -84,8 +84,6 @@ class TimelineView : public QQuickItem {
   ~TimelineView();
   void initConnect();
 
-  void createAppHost();
-
 
   void zoomToRange(int64_t start, int64_t end, bool pause);
   void draw();

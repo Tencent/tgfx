@@ -40,11 +40,10 @@ static tracy_force_inline uint32_t getColorMuted(uint32_t color, bool active) {
 }
 
 TimelineView::TimelineView(QQuickItem* parent)
-  :QQuickItem(parent) {
+  : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
   setFlag(ItemHasContents, true);
   setAcceptedMouseButtons(Qt::AllButtons);
   setAcceptHoverEvents(true);
-  createAppHost();
   initConnect();
 }
 
@@ -560,8 +559,8 @@ void TimelineView::drawTimeline(tgfx::Canvas* canvas) {
 }
 
 void TimelineView::zoomToRangeFrame(int startFrame, int endFrame, bool pause) {
-  auto start = worker->GetFrameTime(*frames, size_t(startFrame));
-  auto end = worker->GetFrameTime(*frames, size_t(endFrame));
+  auto start = worker->GetFrameBegin(*frames, size_t(startFrame));
+  auto end = worker->GetFrameEnd(*frames, size_t(endFrame));
   zoomToRange(start, end, pause);
 }
 
@@ -599,17 +598,6 @@ tgfx::Color TimelineView::getColor(uint32_t color) {
   return tgfx::Color::FromRGBA(r, g, b, a);
 }
 
-void TimelineView::createAppHost() {
-  appHost = std::make_unique<AppHost>();
-#ifdef __APPLE__
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
-  auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
-#else
-  auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
-#endif
-  appHost->addTypeface("default", defaultTypeface);
-}
-
 void TimelineView::draw() {
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
@@ -626,9 +614,9 @@ void TimelineView::draw() {
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
-  drawRect(canvas, 0, 0, 3008, 1578, 0xFF000000);
-  drawTimeline(canvas);
   canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
+  drawRect(canvas, 0.f, 0.f, static_cast<float>(width()), static_cast<float>(height()), 0xFF000000);
+  drawTimeline(canvas);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();

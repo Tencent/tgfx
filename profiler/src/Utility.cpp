@@ -29,47 +29,6 @@ constexpr const char* TypesList[] = {
     "int8_t ",   "int16_t ",  "int32_t ",  "int64_t ",   "intptr_t ", "uint8_t ",
     "uint16_t ", "uint32_t ", "uint64_t ", "ptrdiff_t ", nullptr};
 
-AppHost::AppHost(int width, int height, float density)
-    : _width(width), _height(height), _density(density) {
-}
-
-void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface) {
-  if (name.empty()) {
-    return;
-  }
-  if (typeface == nullptr) {
-    return;
-  }
-  if (typefaces.count(name) > 0) {
-    return;
-  }
-  typefaces[name] = std::move(typeface);
-}
-
-std::shared_ptr<tgfx::Typeface> AppHost::getTypeface(const std::string& name) const {
-  auto result = typefaces.find(name);
-  if (result != typefaces.end()) {
-    return result->second;
-  }
-  return nullptr;
-}
-
-bool AppHost::updateScreen(int width, int height, float density) {
-  if (width <= 0 || height <= 0) {
-    return false;
-  }
-  if (density < 1.0) {
-    return false;
-  }
-  if (width == _width && height == _height && density == _density) {
-    return false;
-  }
-  _width = width;
-  _height = height;
-  _density = density;
-  return true;
-}
-
 bool isEqual(float num1, float num2) {
   return abs(num1 - num2) < 0.00001;
 }
