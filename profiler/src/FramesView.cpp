@@ -49,10 +49,10 @@ uint64_t FramesView::getFrameNumber(const tracy::FrameData& frameData, uint64_t 
 }
 
 uint32_t GetFrameColor(uint64_t time, uint64_t target) {
-  return time > target * 2   ? 0xFF2222DD
-         : time > target     ? 0xFF22DDDD
-         : time > target / 2 ? 0xFF22DD22
-                             : 0xFFDD9900;
+  return time > target * 2   ? 0xFF8888FF
+         : time > target     ? 0xFF88FFFF
+         : time > target / 2 ? 0xFF88FF88
+                             : 0xFFFFCC88;
 }
 
 int GetFrameWidth(int frameScale) {
@@ -80,7 +80,7 @@ void FramesView::draw() {
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
-  drawRect(canvas, 0, 0, static_cast<float>(width()), static_cast<float>(height()), 0xFF000000);
+  drawRect(canvas, 0, 0, static_cast<float>(width()), static_cast<float>(height()), 0xFF2E2E2E);
   drawFrames(canvas);
   context->flushAndSubmit();
   tgfxWindow->present(context);
@@ -159,16 +159,16 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     auto fx0 = static_cast<float>(x0);
     auto h = static_cast<float>(height());
     if (x1 - x0 >= 3) {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x55DD22DD);
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
       auto p1 = tgfx::Point{2.f + fx0, -1.f};
       auto p2 = tgfx::Point{2.f + fx0, h - 1.f};
       auto p3 = tgfx::Point{fx1, -1.f};
       auto p4 = tgfx::Point{fx1, h - 1.f};
 
-      drawLine(canvas, p1, p2, 0x55FF55FF);
-      drawLine(canvas, p3, p4, 0x55FF55FF);
+      drawLine(canvas, p1, p2, 0xFF7259A3);
+      drawLine(canvas, p3, p4, 0xFF7259A3);
     } else {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x55FF55FF);
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
     }
   }
   canvas->restore();

@@ -644,7 +644,6 @@ QSGNode* TimelineView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     node->setTexture(texture);
     node->markDirty(QSGNode::DirtyMaterial);
     node->setRect(boundingRect());
-    node->setRect(boundingRect());
   }
   return node;
 }
@@ -815,7 +814,8 @@ void TimelineView::showZoneToolTip(const tracy::ZoneEvent& ev) {
 
 void TimelineView::showFlodedToolTip(uint32_t num, int64_t time) {
   QString tooltip = QString("Zone too small to display: %1\n").arg(num);
-  tooltip += QString("Excution time: %1").arg(QString::fromStdString(tracy::TimeToString(time)));
+  tooltip += QString("Excution time: %1")
+                 .arg(QString::fromStdString(tracy::TimeToString(time)));
   QToolTip::showText(QCursor::pos(), tooltip);
 }
 
