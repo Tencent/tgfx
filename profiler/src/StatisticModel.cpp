@@ -842,7 +842,7 @@ QVector<float>& StatisticsModel::getTriangles() {
 uint32_t StatisticsModel::getFirstFrame() const {
   if (stateRange.active) {
     auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
-    return static_cast<uint32_t>(range.first);
+    return static_cast<uint32_t>(std::max(range.first, 0));
   }
   return 1;
 }
@@ -850,7 +850,7 @@ uint32_t StatisticsModel::getFirstFrame() const {
 uint32_t StatisticsModel::getLastFrame() const {
   if (stateRange.active) {
     auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
-    return static_cast<uint32_t>(range.second);
+    return std::min(static_cast<uint32_t>(range.second - 1), static_cast<uint32_t>(fps.size() - 1));
   }
   return static_cast<uint32_t>(fps.size() - 1);
 }

@@ -273,7 +273,7 @@ void FramesView::mousePressEvent(QMouseEvent* event) {
         dragStartFrame = sel;
 
         viewData->zvStart = worker->GetFrameBegin(*frames, size_t(sel));
-        viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel));
+        viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel + group - 1));
         if (viewData->zvStart == viewData->zvEnd) {
           viewData->zvStart--;
         }
