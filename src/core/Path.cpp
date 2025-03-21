@@ -360,6 +360,9 @@ void Path::addRect(const Rect& rect, bool reversed, unsigned startIndex) {
 
 void Path::addRect(float left, float top, float right, float bottom, bool reversed,
                    unsigned startIndex) {
+  if (left >= right || top >= bottom) {
+    return;
+  }
   std::vector<Point> points = {};
   points.push_back({left, top});
   points.push_back({right, top});
