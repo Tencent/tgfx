@@ -37,7 +37,7 @@ class PointIterator {
   }
 
   const SkPoint& current() const {
-    return *reinterpret_cast<const SkPoint*>(&points.at(index));
+    return *reinterpret_cast<const SkPoint*>(&points[index]);
   }
 
   const SkPoint& next() {
