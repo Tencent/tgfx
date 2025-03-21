@@ -1560,4 +1560,19 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   canvas->drawShape(shape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape_miter"));
 }
+
+TGFX_TEST(CanvasTest, ClipAll) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 20, 20);
+  auto canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 0, 0));
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(5, 5, 10, 10));
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAll"));
+}
 }  // namespace tgfx

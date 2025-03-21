@@ -516,7 +516,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
 
 void OpsCompositor::addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const Fill& fill,
                               const Rect& localBounds, const Rect& deviceBounds) {
-  if (op == nullptr || fill.nothingToDraw()) {
+  if (op == nullptr || fill.nothingToDraw() || getClipBounds(clip).isEmpty()) {
     return;
   }
   DEBUG_ASSERT(renderTarget != nullptr);
