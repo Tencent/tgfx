@@ -31,22 +31,22 @@ static SkPathDirection ToSkDirection(bool reversed) {
 
 class PointIterator {
  public:
-  PointIterator(std::vector<Point>* points, bool reversed, unsigned startIndex)
-      : points(points), index(startIndex % points->size()),
-        advance(reversed ? points->size() - 1 : 1) {
+  PointIterator(const std::vector<Point>& points, bool reversed, unsigned startIndex)
+      : points(points), index(startIndex % points.size()),
+        advance(reversed ? points.size() - 1 : 1) {
   }
 
   const SkPoint& current() const {
-    return *reinterpret_cast<const SkPoint*>(&points->at(index));
+    return *reinterpret_cast<const SkPoint*>(&points.at(index));
   }
 
   const SkPoint& next() {
-    index = (index + advance) % points->size();
+    index = (index + advance) % points.size();
     return this->current();
   }
 
  protected:
-  std::vector<Point>* points = nullptr;
+  const std::vector<Point>& points = {};
 
  private:
   size_t index = 0;
@@ -368,7 +368,7 @@ void Path::addRect(float left, float top, float right, float bottom, bool revers
   points.push_back({right, top});
   points.push_back({right, bottom});
   points.push_back({left, bottom});
-  PointIterator iter(&points, reversed, startIndex);
+  PointIterator iter(points, reversed, startIndex);
   auto path = &(writableRef()->path);
   path->moveTo(iter.current());
   path->lineTo(iter.next());
@@ -448,7 +448,7 @@ void Path::addArc(const Rect& oval, float startAngle, float sweepAngle) {
   int numBeziers = 0;
   auto points =
       GetArcPoints(oval.centerX(), oval.centerY(), radiusX, radiusY, startRad, endRad, &numBeziers);
-  PointIterator iter(&points, false, 0);
+  PointIterator iter(points, false, 0);
   auto path = &(writableRef()->path);
   path->moveTo(iter.current());
   for (int i = 0; i < numBeziers; i++) {
