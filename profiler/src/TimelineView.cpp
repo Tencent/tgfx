@@ -163,7 +163,7 @@ const char* TimelineView::getFrameText(const tracy::FrameData& fd, int i, uint64
 }
 
 void TimelineView::drawMouseLine(tgfx::Canvas* canvas) {
-  if (!mouseLine.isVisible || !hoverData.hover) {
+  if (!mouseLine.isVisible || !hoverData.hover || (hightlight.active && hightlight.visiable)) {
     return;
   }
   const auto lineColor = 0x33FFFFFF;
@@ -177,7 +177,37 @@ void TimelineView::drawMouseLine(tgfx::Canvas* canvas) {
   drawLine(canvas, p1, p2, lineColor);
 }
 
-void TimelineView::drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd, float& yMin) {
+void TimelineView::drawTimelineFrames(tgfx::Canvas* canvas, float& yMin) {
+  if (hightlight.active) {
+    auto yMousePos = hightlight.startPos;
+    if (yMousePos > yMin && yMousePos < yMin + 15.f) {
+      hightlight.start = std::min(hightlight.start, hightlight.end);
+      hightlight.end = std::max(hightlight.start, hightlight.end);
+      hightlight.visiable = true;
+      std::pair<size_t, size_t> range = worker->GetFrameRange(*frames, hightlight.start, hightlight.end);
+      auto start = worker->GetFrameBegin(*frames, range.first);
+      auto end = worker->GetFrameBegin(*frames, range.second);
+      if (hightlight.start < start) {
+        start = worker->GetFrameBegin(*frames, range.first - 1);
+      }
+      if (hightlight.end > end) {
+        end = worker->GetFrameEnd(*frames, range.second);
+      }
+      hightlight.start = start;
+      hightlight.end = end;
+    }
+  }
+  if (worker->AreFramesUsed()) {
+    auto& frames = worker->GetFrames();
+    for (auto frameData : frames) {
+      if (vis(frameData)) {
+        drawTimelineFrameItem(canvas, *frameData, yMin);
+      }
+    }
+  }
+}
+
+void TimelineView::drawTimelineFrameItem(tgfx::Canvas* canvas, tracy::FrameData& fd, float& yMin) {
   const std::pair<size_t, size_t> zrange =
       worker->GetFrameRange(fd, viewData->zvStart, viewData->zvEnd);
 
@@ -343,11 +373,23 @@ void TimelineView::drawTimelineSelect(tgfx::Canvas* canvs) {
   if (hightlight.active && hightlight.visiable) {
     const auto s = std::min(hightlight.start, hightlight.end);
     const auto e = std::max(hightlight.start, hightlight.end);
+    auto text = tracy::TimeToString(e - s);
+
     auto p1 = tgfx::Point{(s - viewData->zvStart) * pxns, 0};
     auto p2 = tgfx::Point{(e - s) * pxns, h};
     drawRect(canvs, p1, p2, 0x22DD8888);
     drawLine(canvs, p1.x, p1.y, p1.x, p2.y, 0xAADD8888);
     drawLine(canvs, p2.x + p1.x, p1.y, p2.x + p1.x, p2.y, 0xAADD8888);
+
+    auto margins = 5.f;
+    auto textTopY = 10.f;
+    auto textBounds = getTextSize(appHost.get(), text);
+    auto textStartXPos = (p1.x * 2 + p2.x - textBounds.width()) / 2;
+    auto textStartYPos = textBounds.height() + textTopY;
+    p1 = tgfx::Point{textStartXPos - margins, textTopY - margins};
+    p2 = tgfx::Point{textBounds.width() + 2 * margins, textBounds.height() + 2 * margins};
+    drawRect(canvs, p1, p2, 0xFF000000);
+    drawText(canvs, appHost.get(), text, textStartXPos, textStartYPos, 0xFF73AB6A);
   }
 }
 
@@ -610,14 +652,7 @@ void TimelineView::drawTimeline(tgfx::Canvas* canvas) {
 
   timelineController->begin();
   drawTimelineFramesHeader(canvas, yMin);
-  if (worker->AreFramesUsed()) {
-    auto& frames = worker->GetFrames();
-    for (auto frameData : frames) {
-      if (vis(frameData)) {
-        drawTimelineFrames(canvas, *frameData, yMin);
-      }
-    }
-  }
+  drawTimelineFrames(canvas, yMin);
 
   if (viewData->drawZones) {
     const auto& threadData = worker->GetThreadData();
@@ -645,13 +680,6 @@ void TimelineView::drawTimeline(tgfx::Canvas* canvas) {
 
   drawMouseLine(canvas);
   drawTimelineSelect(canvas);
-}
-
-void TimelineView::setHightlight(int64_t start, int64_t end) {
-  hightlight.active = true;
-  hightlight.visiable = true;
-  hightlight.start = start;
-  hightlight.end = end;
 }
 
 void TimelineView::zoomToRangeFrame(int startFrame, int endFrame, bool pause) {
@@ -755,7 +783,6 @@ void TimelineView::mouseMoveEvent(QMouseEvent* event) {
 
   if (hightlight.active) {
     hightlight.end = viewData->zvStart + int64_t(event->position().x() * nspx);
-    update();
   } else if (moveData.isDragging) {
     *viewMode = ViewMode::Paused;
     Q_EMIT changeViewMode(*viewMode);
@@ -804,9 +831,12 @@ void TimelineView::mousePressEvent(QMouseEvent* event) {
       }
       showZoneInfo(*hoverData.selectedZone);
     } else {
-      hightlight.active = true;
-      hightlight.start = hightlight.end = viewData->zvStart + int64_t(event->position().x() * nspx);
-      hightlight.startPos = event->pos().y();
+      auto selStart = viewData->zvStart + int64_t(event->position().x() * nspx);
+      if (selStart > 0) {
+        hightlight.active = true;
+        hightlight.start = hightlight.end = selStart;
+        hightlight.startPos = event->pos().y();
+      }
       hoverData.isPressed = false;
       hoverData.selectedZone = nullptr;
 
@@ -831,7 +861,6 @@ void TimelineView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::RightButton) {
     moveData.isDragging = false;
   }
-
   if (event->button() == Qt::LeftButton) {
     hightlight.active = false;
     hightlight.visiable = false;

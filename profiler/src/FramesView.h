@@ -79,7 +79,7 @@ class FramesView : public QQuickItem {
   void drawFrames(tgfx::Canvas* canvas);
   void drawBackground(tgfx::Canvas* canvas);
   void drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group);
-  // void drawSelectHightlightFrame(tgfx::Canvas* canvas, const int onScreen, const int frameWidth, const int group);
+  void drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen, int frameWidth, int group, uint32_t color);
   QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
 
  private:
@@ -98,12 +98,9 @@ class FramesView : public QQuickItem {
   //Left button
   float viewOffset = 0.0f;
   bool isLeftDagging;
-  QPoint lastLeftDragPos;
   int selectedStartFrame;
   int selectedEndFrame;
   int dragStartFrame;
 
-  //RightButton
-  bool isRightDragging = false;
   QPoint lastRightDragPos;
 };

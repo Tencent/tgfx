@@ -96,7 +96,8 @@ class TimelineView : public QQuickItem {
   void drawMouseLine(tgfx::Canvas* canvas);
   void drawTimeline(tgfx::Canvas* canvas);
   void drawTimelineFramesHeader(tgfx::Canvas* canvas, float& yMin);
-  void drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd, float& yMin);
+  void drawTimelineFrames(tgfx::Canvas* canvas, float& yMin);
+  void drawTimelineFrameItem(tgfx::Canvas* canvas, tracy::FrameData& fd, float& yMin);
   void drawTimelineSelect(tgfx::Canvas* canvs);
 
   void wheelEvent(QWheelEvent* event) override;
@@ -135,7 +136,6 @@ class TimelineView : public QQuickItem {
     timelineController = new TimelineController(*this, *worker, true);
   }
 
-  Q_SLOT void setHightlight(int64_t start, int64_t end);
   Q_SLOT void zoomToRangeFrame(int startFrame, int endFrame, bool pause);
   Q_SIGNAL void changeViewMode(ViewMode mode);
   Q_SIGNAL void showZoneToolTipSignal(const tracy::ZoneEvent& ev);

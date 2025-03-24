@@ -87,16 +87,10 @@ void FramesView::draw() {
   device->unlock();
 }
 
-void FramesView::drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group) {
-  auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
-
-  if (range.first != -1) {
-    selectedStartFrame = range.first;
-    selectedEndFrame = range.second;
-  }
-
+void FramesView::drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen, int frameWidth, int group, uint32_t color) {
+  auto transparentColor = color & 0x55FFFFFF;
   if (range.second > viewData->frameStart &&
-      range.first < viewData->frameStart + onScreen * group) {
+        range.first < viewData->frameStart + onScreen * group) {
     auto x1 = std::min(onScreen * frameWidth,
                        (range.second - viewData->frameStart) * frameWidth / group);
     auto x0 = std::max(0, (range.first - viewData->frameStart) * frameWidth / group);
@@ -105,23 +99,28 @@ void FramesView::drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWi
     auto fx0 = static_cast<float>(x0);
     auto h = static_cast<float>(height());
     if (x1 - x0 >= 3) {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, transparentColor);
       auto p1 = tgfx::Point{2.f + fx0, -1.f};
       auto p2 = tgfx::Point{2.f + fx0, h - 1.f};
       auto p3 = tgfx::Point{fx1, -1.f};
       auto p4 = tgfx::Point{fx1, h - 1.f};
 
-      drawLine(canvas, p1, p2, 0xFF7259A3);
-      drawLine(canvas, p3, p4, 0xFF7259A3);
+      drawLine(canvas, p1, p2, color);
+      drawLine(canvas, p3, p4, color);
     } else {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, transparentColor);
     }
   }
 }
 
-// void FramesView::drawSelectHightlightFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group) {
-
-// }
+void FramesView::drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group) {
+  auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+  if (range.first != -1) {
+    selectedStartFrame = range.first;
+    selectedEndFrame = range.second;
+  }
+  drawSelect(canvas, range, onScreen, frameWidth, group, 0xFF7259A3);
+}
 
 void FramesView::drawFrames(tgfx::Canvas* canvas) {
   assert(worker->GetFrameCount(*frames) != 0);
@@ -273,10 +272,9 @@ void FramesView::mousePressEvent(QMouseEvent* event) {
       const int sel = viewData->frameStart + off;
 
       if (size_t(sel) < total) {
+        dragStartFrame = sel;
         isLeftDagging = true;
         *viewMode = ViewMode::Paused;
-        dragStartFrame = sel;
-
         viewData->zvStart = worker->GetFrameBegin(*frames, size_t(sel));
         viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel + group - 1));
         if (viewData->zvStart == viewData->zvEnd) {
@@ -290,11 +288,12 @@ void FramesView::mousePressEvent(QMouseEvent* event) {
   }
 
   if (event->button() == Qt::RightButton) {
-    isRightDragging = true;
     lastRightDragPos = event->pos();
     setCursor(Qt::ClosedHandCursor);
     event->accept();
+    return;
   }
+  QQuickItem::mousePressEvent(event);
 }
 
 void FramesView::mouseMoveEvent(QMouseEvent* event) {
@@ -303,7 +302,7 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
   const int group = GetFrameGroup(viewData->frameScale);
   const auto total = worker->GetFrameCount(*frames);
 
-  if (isLeftDagging && (event->buttons() & Qt::LeftButton)) {
+  if (event->buttons() & Qt::LeftButton) {
     const auto mx = pos.x();
     if (mx > 0 && mx < width() - 1) {
 
@@ -332,7 +331,7 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
     return;
   }
 
-  if (isRightDragging && (event->buttons() & Qt::RightButton)) {
+  if (event->buttons() & Qt::RightButton) {
     *viewMode = ViewMode::Paused;
     const auto delta = (event->pos().x() - lastRightDragPos.x());
     if (abs(delta) >= frameWidth) {
@@ -348,7 +347,6 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
 
 void FramesView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::RightButton) {
-    isRightDragging = false;
     setCursor(Qt::ArrowCursor);
     event->accept();
     return;
