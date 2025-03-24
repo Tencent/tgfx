@@ -19,7 +19,6 @@
 #pragma once
 
 #include <QGraphicsLineItem>
-#include "FramesView.h"
 #include "TimelineController.h"
 #include "TracyWorker.hpp"
 #include "ViewData.h"
@@ -34,6 +33,8 @@ class TimelineView : public QQuickItem {
  public:
   struct Region {
     bool active = false;
+    bool visiable = false;
+    float startPos;
     int64_t start;
     int64_t end;
   };
@@ -72,7 +73,7 @@ class TimelineView : public QQuickItem {
   struct MoveData {
     bool isDragging = false;
     QPointF pos;
-    double hwheelDelta = 0;
+    float hwheelDelta = 0;
   };
 
   // mouseLine
@@ -94,7 +95,9 @@ class TimelineView : public QQuickItem {
                     int offset, uint64_t tid, tgfx::Canvas* canvas);
   void drawMouseLine(tgfx::Canvas* canvas);
   void drawTimeline(tgfx::Canvas* canvas);
-  void drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd, int& yMin);
+  void drawTimelineFramesHeader(tgfx::Canvas* canvas, float& yMin);
+  void drawTimelineFrames(tgfx::Canvas* canvas, tracy::FrameData& fd, float& yMin);
+  void drawTimelineSelect(tgfx::Canvas* canvs);
 
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
@@ -132,6 +135,7 @@ class TimelineView : public QQuickItem {
     timelineController = new TimelineController(*this, *worker, true);
   }
 
+  Q_SLOT void setHightlight(int64_t start, int64_t end);
   Q_SLOT void zoomToRangeFrame(int startFrame, int endFrame, bool pause);
   Q_SIGNAL void changeViewMode(ViewMode mode);
   Q_SIGNAL void showZoneToolTipSignal(const tracy::ZoneEvent& ev);
@@ -171,7 +175,6 @@ class TimelineView : public QQuickItem {
   TimelineController* timelineController;
 
   Region hightlight;
-  Region hightlightZoom;
   Animation zoomAnim;
   HoverData hoverData;
   const tracy::FrameData* frames = nullptr;

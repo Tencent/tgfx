@@ -816,33 +816,33 @@ Window {
                             border.width: 1
                             clip: true
 
-                                Rectangle {
-                                    id: statusIcon
-                                    width: 16
-                                    height: 16
-                                    radius: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
-                                    color: model.color || "#808080"
-                                    border.color: "#c8c8c8c8"
-                                    border.width: 1
-                                }
-
-                                TGFXText {
-                                    id: nameText
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: statusIcon.right
-                                    anchors.leftMargin: 8
-                                    width: parent.width - statusIcon.width - 24
-                                    height:parent.height
-                                    clip: true
-                                    text: model.Name
-                                    color: "white"
-                                    elideMode: Qt.ElideRight
-                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                }
+                            Rectangle {
+                                id: statusIcon
+                                width: 16
+                                height: 16
+                                radius: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                color: model.color || "#808080"
+                                border.color: "#c8c8c8c8"
+                                border.width: 1
                             }
+
+                            TGFXText {
+                                id: nameText
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: statusIcon.right
+                                anchors.leftMargin: 8
+                                width: parent.width - statusIcon.width - 24
+                                height:parent.height
+                                clip: true
+                                text: model.Name
+                                color: "white"
+                                elideMode: Qt.ElideRight
+                                alignment: Qt.AlignLeft | Qt.AlignVCenter
+                            }
+                        }
 
                         Rectangle {
                             width: locationColumnWidth

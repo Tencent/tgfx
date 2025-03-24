@@ -807,10 +807,10 @@ void StatisticsModel::refreshFrameData() {
     return;
   }
   fps.clear();
-  fps.reserve(total);
   drawCall.clear();
-  drawCall.reserve(total);
   triangle.clear();
+  fps.reserve(total);
+  drawCall.reserve(total);
   triangle.reserve(total);
   for (size_t i = 0; i < static_cast<size_t>(total); ++i) {
     auto frameTime = worker->GetFrameTime(*frames, i);

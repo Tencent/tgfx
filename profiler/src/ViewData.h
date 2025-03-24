@@ -24,6 +24,8 @@
 struct ViewData : QObject {
   int64_t zvStart = 0;
   int64_t zvEnd = 0;
+  int64_t selStart = 0;
+  int64_t selEnd = 0;
   int32_t frameScale = 0;
   int32_t frameStart = 0;
 

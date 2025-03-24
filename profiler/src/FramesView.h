@@ -70,6 +70,7 @@ class FramesView : public QQuickItem {
   }
 
   //signals
+  Q_SIGNAL void selectFrameHightlight(int64_t start, int64_t end);
   Q_SIGNAL void changeViewMode(ViewMode mode);
   Q_SIGNAL void statRangeChanged(int startFrame, int endFrame, bool acive);
 
@@ -77,6 +78,8 @@ class FramesView : public QQuickItem {
   void draw();
   void drawFrames(tgfx::Canvas* canvas);
   void drawBackground(tgfx::Canvas* canvas);
+  void drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group);
+  // void drawSelectHightlightFrame(tgfx::Canvas* canvas, const int onScreen, const int frameWidth, const int group);
   QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
 
  private:

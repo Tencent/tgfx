@@ -51,7 +51,7 @@ void DataChartItem::drawCoordinateAxes(tgfx::Canvas* canvas, float xStart, float
   drawRect(canvas, xStart, yStart, xLength, yLength, color, 1.f);
 }
 
-void DataChartItem::drawChart(tgfx::Canvas*, tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
+void DataChartItem::drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
   switch (chartType) {
     case Polyline: {
       drawPolylineChart(linePath, xStart, yStart, width, height);
@@ -62,7 +62,11 @@ void DataChartItem::drawChart(tgfx::Canvas*, tgfx::Path& linePath, float xStart,
       break;
     }
     case Column: {
-      drawColumChart(linePath, xStart, yStart, width, height);
+      drawColumnChart(canvas, xStart, yStart, width, height);
+      break;
+    }
+    case Rectangle: {
+      drawRectangleChart(linePath, xStart, yStart, width, height);
       break;
     }
   }
@@ -91,7 +95,13 @@ void DataChartItem::drawLineChart(tgfx::Path& linePath, float xStart, float ySta
   linePath.lineTo(xStart + lineWidth * 2, yStart);
 }
 
-void DataChartItem::drawColumChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
+void DataChartItem::drawColumnChart(tgfx::Canvas* canvas, float xStart, float yStart, float width, float height) {
+  float columnWidth = width / 2;
+  float halfColumnWidth = columnWidth / 2;
+  drawRect(canvas, xStart + halfColumnWidth, yStart, columnWidth, height, getColor());
+}
+
+void DataChartItem::drawRectangleChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
   if (xStart == 0) {
     linePath.moveTo(xStart, height + yStart);
     linePath.lineTo(xStart, yStart);

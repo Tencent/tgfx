@@ -30,7 +30,8 @@ public:
   enum ChartType {
     Polyline,
     Line,
-    Column
+    Column,
+    Rectangle
   };
 
   DataChartItem(QQuickItem* parent = nullptr, ChartType chartType = Line, float lineThickness = 1.f);
@@ -51,7 +52,8 @@ public:
   void drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float xStart, float yStart, float width, float height);
   void drawPolylineChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height);
   void drawLineChart(tgfx::Path& linePath, float xStart, float yStart, float width);
-  void drawColumChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height);
+  void drawColumnChart(tgfx::Canvas* canvas, float xStart, float yStart, float width, float height);
+  void drawRectangleChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height);
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
   void hoverMoveEvent(QHoverEvent* event) override;
@@ -69,7 +71,7 @@ public:
 class FPSChartItem: public DataChartItem
 {
 public:
-  FPSChartItem(QQuickItem* parent = nullptr): DataChartItem(parent, Polyline, 0.f) {}
+  FPSChartItem(QQuickItem* parent = nullptr): DataChartItem(parent, Column, 0.f) {}
 
   QVector<float>& getData() override { return model->getFps(); }
   uint32_t getColor() override { return 0xFFFEBA00; }
@@ -79,7 +81,7 @@ public:
 class DrawCallChartItem: public DataChartItem
 {
 public:
-  DrawCallChartItem(QQuickItem* parent = nullptr): DataChartItem(parent, Column, 0.f) {}
+  DrawCallChartItem(QQuickItem* parent = nullptr): DataChartItem(parent, Rectangle, 0.f) {}
 
   QVector<float>& getData() override { return model->getDrawCall(); }
   uint32_t getColor() override { return 0xFF509E54; }

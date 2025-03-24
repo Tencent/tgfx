@@ -87,9 +87,44 @@ void FramesView::draw() {
   device->unlock();
 }
 
+void FramesView::drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group) {
+  auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+
+  if (range.first != -1) {
+    selectedStartFrame = range.first;
+    selectedEndFrame = range.second;
+  }
+
+  if (range.second > viewData->frameStart &&
+      range.first < viewData->frameStart + onScreen * group) {
+    auto x1 = std::min(onScreen * frameWidth,
+                       (range.second - viewData->frameStart) * frameWidth / group);
+    auto x0 = std::max(0, (range.first - viewData->frameStart) * frameWidth / group);
+    if (x0 == x1) x1 = x0 + frameWidth;
+    auto fx1 = static_cast<float>(x1);
+    auto fx0 = static_cast<float>(x0);
+    auto h = static_cast<float>(height());
+    if (x1 - x0 >= 3) {
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
+      auto p1 = tgfx::Point{2.f + fx0, -1.f};
+      auto p2 = tgfx::Point{2.f + fx0, h - 1.f};
+      auto p3 = tgfx::Point{fx1, -1.f};
+      auto p4 = tgfx::Point{fx1, h - 1.f};
+
+      drawLine(canvas, p1, p2, 0xFF7259A3);
+      drawLine(canvas, p3, p4, 0xFF7259A3);
+    } else {
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
+    }
+  }
+}
+
+// void FramesView::drawSelectHightlightFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group) {
+
+// }
+
 void FramesView::drawFrames(tgfx::Canvas* canvas) {
   assert(worker->GetFrameCount(*frames) != 0);
-  canvas->save();
   canvas->translate(viewOffset, 0);
 
   const int frameWidth = GetFrameWidth(viewData->frameScale);
@@ -141,37 +176,7 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     idx += group;
   }
 
-  //draw selection
-  auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
-
-  if (range.first != -1) {
-    selectedStartFrame = range.first;
-    selectedEndFrame = range.second;
-  }
-
-  if (range.second > viewData->frameStart &&
-      range.first < viewData->frameStart + onScreen * group) {
-    auto x1 = std::min(onScreen * frameWidth,
-                       (range.second - viewData->frameStart) * frameWidth / group);
-    auto x0 = std::max(0, (range.first - viewData->frameStart) * frameWidth / group);
-    if (x0 == x1) x1 = x0 + frameWidth;
-    auto fx1 = static_cast<float>(x1);
-    auto fx0 = static_cast<float>(x0);
-    auto h = static_cast<float>(height());
-    if (x1 - x0 >= 3) {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
-      auto p1 = tgfx::Point{2.f + fx0, -1.f};
-      auto p2 = tgfx::Point{2.f + fx0, h - 1.f};
-      auto p3 = tgfx::Point{fx1, -1.f};
-      auto p4 = tgfx::Point{fx1, h - 1.f};
-
-      drawLine(canvas, p1, p2, 0xFF7259A3);
-      drawLine(canvas, p3, p4, 0xFF7259A3);
-    } else {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x557259A3);
-    }
-  }
-  canvas->restore();
+  drawSelectFrame(canvas, onScreen, frameWidth, group);
 }
 
 void FramesView::setViewToLastFrames() {
@@ -363,9 +368,9 @@ void FramesView::mouseReleaseEvent(QMouseEvent* event) {
 
       if (sel == dragStartFrame) {
         selectedStartFrame = sel;
-        selectedEndFrame = sel;
+        selectedEndFrame = sel + group - 1;
         int64_t startTime = worker->GetFrameBegin(*frames, static_cast<size_t>(sel));
-        int64_t endTime = worker->GetFrameEnd(*frames, static_cast<size_t>(sel));
+        int64_t endTime = worker->GetFrameEnd(*frames, static_cast<size_t>(selectedEndFrame));
         viewData->zvStart = startTime;
         viewData->zvEnd = endTime;
         if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
