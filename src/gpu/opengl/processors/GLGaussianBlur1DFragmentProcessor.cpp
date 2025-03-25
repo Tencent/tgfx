@@ -52,7 +52,7 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
   fragBuilder->codeAppend("float total = 0.0;");
 
-  fragBuilder->codeAppend("for (int j = 0; j <= 2 * 6; ++j) {");
+  fragBuilder->codeAppend("for (int j = 0; j <= 2 * 200; ++j) {");
   fragBuilder->codeAppend("int i = j - radius;");
   fragBuilder->codeAppend("float weight = exp(-float(i*i) / (2.0*sigma*sigma));");
   fragBuilder->codeAppend("total += weight;");

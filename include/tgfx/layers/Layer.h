@@ -54,15 +54,15 @@ class Layer {
   static void SetDefaultAllowsEdgeAntialiasing(bool value);
 
   /**
-   * Returns the default value for the allowsGroupOpacity property for new Layer instances. The
+   * Returns the value for the allowsGroupOpacity property for new Layer instances. The
    * default value is false.
    */
-  static bool DefaultAllowsGroupOpacity();
+  static bool AllowsGroupOpacity();
 
   /**
-   * Sets the default value for the allowsGroupOpacity property for new Layer instances.
+   * Sets the value for the allowsGroupOpacity property for new Layer instances.
    */
-  static void SetDefaultAllowsGroupOpacity(bool value);
+  static void SetAllowsGroupOpacity(bool value);
 
   /**
    * Creates a new Layer instance.
@@ -202,22 +202,6 @@ class Layer {
    * Sets whether the layer is allowed to perform edge antialiasing.
    */
   void setAllowsEdgeAntialiasing(bool value);
-
-  /**
-   * Returns true if the layer is allowed to be composited as a separate group from their parent.
-   * When true and the layer’s alpha value is less than 1.0, the layer can composite itself
-   * separately from its parent. This ensures correct rendering for layers with multiple opaque
-   * components but may reduce performance. The default value is read from the
-   * Layer::DefaultAllowsGroupOpacity() method.
-   */
-  bool allowsGroupOpacity() const {
-    return bitFields.allowsGroupOpacity;
-  }
-
-  /**
-   * Sets whether the layer is allowed to be composited as a separate group from their parent.
-   */
-  void setAllowsGroupOpacity(bool value);
 
   /**
    * Returns the list of layer styles applied to the layer. Unlike layer filters, layer styles do
@@ -487,12 +471,6 @@ class Layer {
   Layer();
 
   /**
-   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
-   * the layer as dirty and does not update the layer content.
-   */
-  void invalidateTransform();
-
-  /**
    * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
    * be called to create the new layer content.
    */
@@ -581,17 +559,23 @@ class Layer {
 
   bool hasValidMask() const;
 
+  void invalidateBackground();
+
+  /**
+   *  Marks the layer as changed and needing to be redrawn.
+   */
+  void invalidateTransform();
+
   void invalidate();
 
   struct {
     bool dirtyContent : 1;      // need to update content
     bool dirtyDescendents : 1;  // need to redraw child layers
-    bool dirtyTransform : 1;    // need to redraw the layer, property such as alpha,
-                                // blendMode, matrix, etc.
+    bool dirtyBackground : 1;   // need to redraw background
+    bool dirtyTransform : 1;    // need to redraw layer
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
-    bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
   } bitFields = {};
   std::string _name;

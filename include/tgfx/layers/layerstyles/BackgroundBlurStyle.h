@@ -30,7 +30,7 @@ namespace tgfx {
 class BackgroundBlurStyle : public LayerStyle {
  public:
   static std::shared_ptr<BackgroundBlurStyle> Make(float blurrinessX, float blurrinessY,
-                                                   TileMode tileMode = TileMode::Clamp);
+                                                   TileMode tileMode = TileMode::Mirror);
   /**
    * The x blurriness of the background.
    */
