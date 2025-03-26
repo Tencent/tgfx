@@ -30,9 +30,9 @@ StatisticsModel::StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObjec
       statisticsMode(StatMode::Instrumentation), sortOrder(Qt::AscendingOrder), statMode(0),
       targetAddr(0), totalZoneCount(0) {
   dataRefreshTimer = new QTimer(this);
-  connect(dataRefreshTimer, &QTimer::timeout, this, &StatisticsModel::refreshData);
+  connect(dataRefreshTimer, &QTimer::timeout, this, &StatisticsModel::refreshInstrumentationData);
   dataRefreshTimer->start(200);
-  refreshData();
+  refreshInstrumentationData();
 }
 
 StatisticsModel::~StatisticsModel() {
@@ -52,7 +52,7 @@ int StatisticsModel::columnCount(const QModelIndex& parent) const {
   if (parent.isValid()) {
     return 0;
   }
-  return Column::ColumnCount;
+  return ColumnCount;
 }
 
 QHash<int, QByteArray> StatisticsModel::roleNames() const {
@@ -70,7 +70,7 @@ QHash<int, QByteArray> StatisticsModel::roleNames() const {
 }
 
 void StatisticsModel::openSource(int row) {
-  auto& srcloc = getSrcLocFromIndex(index(row, StatisticsModel::LocationColumn));
+  auto& srcloc = getSrcLocFromIndex(index(row, LocationColumn));
   const char* fileName = worker->GetString(srcloc.file);
   int line = static_cast<int>(srcloc.line);
 
@@ -347,7 +347,7 @@ void StatisticsModel::setAccumulationMode(int mode) {
     return;
   }
   statAccumulationMode = newMode;
-  refreshData();
+  refreshInstrumentationData();
   Q_EMIT accumulationModeChanged();
 }
 
@@ -365,7 +365,7 @@ void StatisticsModel::setRangeActive(bool active) {
   }
   stateRange.active = active;
 
-  refreshData();
+  refreshInstrumentationData();
   updateZoneCountLabels();
   Q_EMIT rangeActiveChanged();
 }
@@ -373,7 +373,7 @@ void StatisticsModel::setRangeActive(bool active) {
 void StatisticsModel::setStatisticsMode(StatMode mode) {
   if (statisticsMode != mode) {
     statisticsMode = mode;
-    refreshData();
+    refreshInstrumentationData();
     Q_EMIT statisticsModeChanged();
   }
 }
@@ -381,7 +381,7 @@ void StatisticsModel::setStatisticsMode(StatMode mode) {
 void StatisticsModel::setFilterText(const QString& filter) {
   if (filterText != filter) {
     filterText = filter;
-    refreshData();
+    refreshInstrumentationData();
     Q_EMIT filterTextChanged();
   }
 }
@@ -489,50 +489,23 @@ const tracy::SourceLocation& StatisticsModel::getSrcLocFromIndex(const QModelInd
   return worker->GetSourceLocation(entry.srcloc);
 }
 
-void StatisticsModel::refreshData() {
-  if (!worker->HasData()) {
-    beginResetModel();
-    srcData.clear();
-    endResetModel();
-    return;
-  }
-
-  switch (statisticsMode) {
-    case Instrumentation:
-      if (!worker->AreSourceLocationZonesReady()) {
-        beginResetModel();
-        srcData.clear();
-        endResetModel();
-        return;
-      }
-      refreshInstrumentationData();
-      break;
-
-    case Sampling:
-    case Gpu:
-      break;
-  }
-}
-
 void StatisticsModel::setStatRange(int startFrame, int endFrame, bool) {
   stateRange.min = worker->GetFrameBegin(*frames, size_t(startFrame));
   stateRange.max = worker->GetFrameEnd(*frames, size_t(endFrame));
   if (stateRange.active) {
     refreshInstrumentationData();
     updateZoneCountLabels();
+    Q_EMIT statisticsUpdated();
   }
 }
 
 void StatisticsModel::refreshInstrumentationData() {
   tracy::Vector<SrcLocZonesSlim> srcloc;
-  beginResetModel();
   srcData.clear();
 
   if (statMode == 0) {
     if (!worker->HasData() || !worker->AreSourceLocationZonesReady()) {
-      beginResetModel();
       srcData.clear();
-      endResetModel();
       return;
     }
 
@@ -631,6 +604,7 @@ void StatisticsModel::refreshInstrumentationData() {
               }
               const auto threadNum = (uint16_t)threads.size();
               if (cnt != 0) {
+                slzcnt++;
                 srcloc.push_back_no_space_check(SrcLocZonesSlim{it->first, threadNum, cnt, total});
               }
               statCache[it->first] =
@@ -682,20 +656,22 @@ void StatisticsModel::refreshInstrumentationData() {
   }
 
   srcData = std::move(srcloc);
-  endResetModel();
+  if(!srcData.empty()) {
+    sort(sortColumn, sortOrder);
+  }
   Q_EMIT statisticsUpdated();
 }
 
 void StatisticsModel::sort(int column, Qt::SortOrder order) {
   if (srcData.size() < 2) {
-    //endResetModel();
     return;
   }
-  beginResetModel();
+  sortOrder = order;
+  sortColumn = column;
 
   auto ascendingOrder = (order == Qt::AscendingOrder);
   switch (column) {
-    case Column::NameColumn:
+    case NameColumn:
       if (ascendingOrder) {
         tracy::pdqsort_branchless(
             srcData.begin(), srcData.end(), [this](const auto& lhs, const auto& rhs) {
@@ -711,7 +687,7 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
       }
       break;
 
-    case Column::LocationColumn: {
+    case LocationColumn: {
       if (ascendingOrder) {
         tracy::pdqsort_branchless(
             srcData.begin(), srcData.end(), [this](const auto& lhs, const auto& rhs) {
@@ -732,7 +708,7 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
       break;
     }
 
-    case Column::TotalTimeColumn:
+    case TotalTimeColumn:
       if (ascendingOrder) {
         tracy::pdqsort_branchless(
             srcData.begin(), srcData.end(),
@@ -755,8 +731,7 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
             [](const auto& lhs, const auto& rhs) { return lhs.numZones > rhs.numZones; });
       }
       break;
-    //MTPC: total / numZones
-    case Column::MtpcColumn:
+    case MtpcColumn:
       if (ascendingOrder) {
         tracy::pdqsort_branchless(srcData.begin(), srcData.end(),
                                   [](const auto& lhs, const auto& rhs) {
@@ -786,16 +761,10 @@ void StatisticsModel::sort(int column, Qt::SortOrder order) {
     default:
       assert(false);
   }
-  endResetModel();
 }
 
 void StatisticsModel::clearFilter() {
   setFilterText("");
-}
-
-void StatisticsModel::refreshTableData() {
-  refreshData();
-  updateZoneCountLabels();
 }
 
 void StatisticsModel::refreshFrameData() {
@@ -825,6 +794,106 @@ QVector<float>& StatisticsModel::getFps() {
   refreshFrameData();
   return fps;
 }
+float StatisticsModel::getMaxFps() const {
+   const_cast<StatisticsModel*>(this)->refreshFrameData();
+   if (fps.isEmpty()) {
+     return 0.0f;
+   }
+
+   auto maxCompare = [](float a, float b){ return a < b; };
+   float globalMax = *std::max_element(fps.begin(), fps.end());
+
+   return calculateStatInRange(fps, maxCompare, globalMax);
+ }
+
+ float StatisticsModel::getMinFps() const {
+   const_cast<StatisticsModel*>(this)->refreshFrameData();
+   if (fps.isEmpty()) {
+     return 0.0f;
+   }
+
+   auto minCompare = [](float a, float b){ return a > b; };
+   float globalMax = *std::min_element(fps.begin(), fps.end());
+
+   return calculateStatInRange(fps, minCompare, globalMax);
+ }
+
+ float StatisticsModel::getAvgFps() const {
+   const_cast<StatisticsModel*>(this)->refreshFrameData();
+   if (fps.isEmpty()) {
+     return 0.0f;
+   }
+
+   int start = 0;
+   int end = static_cast<int>(fps.size() - 1);
+   if (stateRange.active) {
+     auto  range =  worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+
+     start = static_cast<int>(range.first);
+     end = static_cast<int>(range.second);
+
+     start = qBound(0, start, static_cast<int>(fps.size() - 1));
+     end = qBound(0, end, static_cast<int>(fps.size() - 1));
+
+   }
+
+   if (start <= end) {
+     float sum = 0.0f;
+     for (int i = start; i <= end; ++i) {
+       sum += fps[i];
+     }
+     return sum / (end - start + 1);
+   }
+   return 0.0f;
+ }
+
+ float StatisticsModel::getMaxDrawCall() const {
+   const_cast<StatisticsModel*>(this)->refreshFrameData();
+   if (drawCall.isEmpty()) {
+     return 0.0f;
+   }
+
+   auto maxCompare = [](float a, float b) { return a < b; };
+   float globalMax = *std::max_element(drawCall.begin(), drawCall.end());
+
+   return calculateStatInRange(drawCall, maxCompare, globalMax);
+ }
+
+ float StatisticsModel::getMinDrawCall() const {
+   const_cast<StatisticsModel*>(this)->refreshFrameData();
+   if (drawCall.isEmpty()) {
+     return 0.0f;
+   }
+
+   auto minCompare = [](float a, float b) { return a > b; };
+   float globalMax = *std::min_element(drawCall.begin(), drawCall.end());
+
+   return calculateStatInRange(drawCall, minCompare, globalMax);
+ }
+
+ float StatisticsModel::getMaxTriangles() const {
+   const_cast<StatisticsModel*>(this)->refreshFrameData();
+   if (triangle.isEmpty()) {
+     return 0.0f;
+   }
+
+   auto maxCompare = [](float a, float b) { return a < b; };
+   float globalMax = *std::max_element(triangle.begin(), triangle.end());
+
+   return calculateStatInRange(triangle, maxCompare, globalMax);
+ }
+
+ float StatisticsModel::getMinTriangles() const {
+   const_cast<StatisticsModel*>(this)->refreshFrameData();
+   if (triangle.isEmpty()) {
+     return 0.0f;
+   }
+
+   auto minCompare = [](float a, float b) { return a > b; };
+   float globalMax = *std::min_element(triangle.begin(), triangle.end());
+
+   return calculateStatInRange(triangle, minCompare, globalMax);
+ }
 
 QVector<float>& StatisticsModel::getDrawCall() {
   refreshFrameData();
@@ -862,3 +931,38 @@ bool StatisticsModel::srcFileValid(const char* fn, uint64_t olderThan, const tra
   }
   return false;
 }
+
+template <typename Func>
+ float StatisticsModel::calculateStatInRange(const QVector<float>& data, Func comparefunc,
+                                            float initValue) const {
+  if(data.isEmpty()) {
+    return 0.0f;
+  }
+
+  if(stateRange.active) {
+    auto  range =  worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+
+    int start = static_cast<int>(range.first);
+    int end = static_cast<int>(range.second);
+
+    start = qBound(0, start, static_cast<int>(fps.size() - 1));
+    end = qBound(0, end, static_cast<int>(fps.size() - 1));
+
+    if(start <= end) {
+      float resultValue = data[start];
+      for(int i = start + 1; i <= end; ++i) {
+        if(comparefunc(resultValue, data[i])) {
+          resultValue = data[i];
+        }
+      }
+      return resultValue;
+    }
+  }
+  return initValue;
+}
+
+
+
+
+
+

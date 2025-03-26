@@ -152,8 +152,8 @@ class StatisticsModel : public QAbstractTableModel {
   void setRangeActive(bool active);
 
   Q_SLOT void setFilterText(const QString& filter);
-  Q_SLOT void refreshData();
   Q_SLOT void setStatRange(int startTime, int endTime, bool active);
+
   Q_SLOT void setStatisticsMode(StatMode mode);
 
   Q_SIGNAL void statisticsModeChanged();
@@ -165,23 +165,27 @@ class StatisticsModel : public QAbstractTableModel {
 
   void refreshFrameData();
   bool isRunning();
-  QVector<float>& getFps();
+
   QVector<float>& getDrawCall();
   QVector<float>& getTriangles();
-  uint32_t getFirstFrame() const;
-  uint32_t getLastFrame() const;
-
+  Q_INVOKABLE uint32_t getFirstFrame() const;
+  Q_INVOKABLE uint32_t getLastFrame() const;
+  Q_INVOKABLE QVector<float>& getFps();
+  Q_INVOKABLE float getMaxFps() const;
+  Q_INVOKABLE float getMinFps() const;
+  Q_INVOKABLE float getAvgFps() const;
+  Q_INVOKABLE float getMaxDrawCall() const;
+  Q_INVOKABLE float getMinDrawCall() const;
+  Q_INVOKABLE float getMaxTriangles() const;
+  Q_INVOKABLE float getMinTriangles() const;
   Q_INVOKABLE void openSource(int row);
   Q_INVOKABLE void setAccumulationMode(int mode);
   Q_INVOKABLE void updateZoneCountLabels();
   Q_INVOKABLE void sort(int column, Qt::SortOrder order) override;
   Q_INVOKABLE void clearFilter();
-  Q_INVOKABLE void refreshTableData();
 
  protected:
   void refreshInstrumentationData();
-  void refreshSamplingData();
-  void refreshGpuData();
   bool matchFilter(const QString& name, const QString& location) const;
 
  private:
@@ -204,6 +208,7 @@ class StatisticsModel : public QAbstractTableModel {
 
   QString filterText;
   Qt::SortOrder sortOrder;
+  int sortColumn = TotalTimeColumn;
 
   Range stateRange;
   int statMode;
@@ -215,4 +220,7 @@ class StatisticsModel : public QAbstractTableModel {
   SourceView* srcView = nullptr;
   QString srcViewFile;
   QTimer* dataRefreshTimer;
+
+  template <typename Func>
+  float calculateStatInRange(const QVector<float>& data, Func comparefunc, float initValue) const;
 };
