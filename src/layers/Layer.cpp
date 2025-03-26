@@ -30,7 +30,7 @@
 
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
-static std::atomic_bool AllowsGroupOpacity = false;
+static std::atomic_bool bAllowsGroupOpacity = false;
 
 struct LayerStyleSource {
   float contentScale = 1.0f;
@@ -78,12 +78,12 @@ void Layer::SetDefaultAllowsEdgeAntialiasing(bool value) {
   AllowsEdgeAntialiasing = value;
 }
 
-bool Layer::DefaultAllowsGroupOpacity() {
-  return AllowsGroupOpacity;
+bool Layer::AllowsGroupOpacity() {
+  return bAllowsGroupOpacity;
 }
 
-void Layer::SetDefaultAllowsGroupOpacity(bool value) {
-  AllowsGroupOpacity = value;
+void Layer::SetAllowsGroupOpacity(bool value) {
+  bAllowsGroupOpacity = value;
 }
 
 std::shared_ptr<Layer> Layer::Make() {
@@ -106,7 +106,6 @@ Layer::Layer() {
   memset(&bitFields, 0, sizeof(bitFields));
   bitFields.visible = true;
   bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
-  bitFields.allowsGroupOpacity = AllowsGroupOpacity;
 }
 
 void Layer::setAlpha(float value) {
@@ -174,14 +173,6 @@ void Layer::setAllowsEdgeAntialiasing(bool value) {
     return;
   }
   bitFields.allowsEdgeAntialiasing = value;
-  invalidateTransform();
-}
-
-void Layer::setAllowsGroupOpacity(bool value) {
-  if (bitFields.allowsGroupOpacity == value) {
-    return;
-  }
-  bitFields.allowsGroupOpacity = value;
   invalidateTransform();
 }
 
@@ -698,7 +689,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   DEBUG_ASSERT(canvas != nullptr);
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
-  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
+  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bAllowsGroupOpacity) ||
              (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
