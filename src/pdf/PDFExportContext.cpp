@@ -79,11 +79,11 @@ namespace tgfx {
 class ScopedContentEntry {
  public:
   ScopedContentEntry(PDFExportContext* device, const MCState* state, const Matrix& matrix,
-                     const Fill& style, float textScale = 0)
+                     const Fill& fill, float textScale = 0)
       : drawContext(device), state(state) {
-    blendMode = style.blendMode;
+    blendMode = fill.blendMode;
     contentStream =
-        drawContext->setUpContentEntry(state, matrix, style, textScale, &destFormXObject);
+        drawContext->setUpContentEntry(state, matrix, fill, textScale, &destFormXObject);
   }
 
   // ScopedContentEntry(PDFExportContext* dev, const Paint& paint, float textScale = 0)
@@ -207,9 +207,9 @@ std::shared_ptr<Record> ModifyRecord(const Record* record, std::shared_ptr<Shade
   switch (record->type()) {
     case RecordType::DrawFill: {
       const auto* drawFill = static_cast<const DrawFill*>(record);
-      auto newDrawStyle = std::make_shared<DrawFill>(drawFill->state, drawFill->fill);
-      newDrawStyle->fill.shader = std::move(imageShader);
-      return newDrawStyle;
+      auto newDrawFill = std::make_shared<DrawFill>(drawFill->state, drawFill->fill);
+      newDrawFill->fill.shader = std::move(imageShader);
+      return newDrawFill;
     }
     case RecordType::DrawRect: {
       const auto* drawRect = static_cast<const DrawRect*>(record);
@@ -878,7 +878,7 @@ bool treat_as_regular_pdf_blend_mode(BlendMode blendMode) {
 
 void populate_graphic_state_entry_from_paint(
     PDFDocument* document, const Matrix& matrix, const MCState* state, Rect deviceBounds,
-    const Fill& style, const Matrix& initialTransform, float textScale,
+    const Fill& fill, const Matrix& initialTransform, float textScale,
     PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {
 
@@ -888,13 +888,13 @@ void populate_graphic_state_entry_from_paint(
 
   entry->fMatrix = state->matrix * matrix;
   // entry->fClipStackGenID = clipStack ? clipStack->getTopmostGenID() : SkClipStack::kWideOpenGenID;
-  auto color = style.color;
+  auto color = fill.color;
   color.alpha = 1;
   entry->fColor = color;
   entry->fShaderIndex = -1;
 
   // PDF treats a shader as a color, so we only set one or the other.
-  if (auto shader = style.shader) {
+  if (auto shader = fill.shader) {
     // note: we always present the alpha as 1 for the shader, knowing that it will be
     //       accounted for when we create our newGraphicsState (below)
     if (const auto* colorShader = Caster::AsColorShader(shader.get())) {
@@ -930,10 +930,10 @@ void populate_graphic_state_entry_from_paint(
   }
 
   PDFIndirectReference newGraphicState;
-  if (color == style.color) {
-    newGraphicState = PDFGraphicState::GetGraphicStateForPaint(document, style);
+  if (color == fill.color) {
+    newGraphicState = PDFGraphicState::GetGraphicStateForPaint(document, fill);
   } else {
-    auto newPaint = style;
+    auto newPaint = fill;
     newPaint.color = color;
     newGraphicState = PDFGraphicState::GetGraphicStateForPaint(document, newPaint);
   }
@@ -1156,9 +1156,9 @@ void PDFExportContext::drawFormXObjectWithMask(PDFIndirectReference xObject,
                                                PDFIndirectReference sMask, BlendMode mode,
                                                bool invertClip) {
   DEBUG_ASSERT(sMask);
-  Fill style;
-  style.blendMode = mode;
-  ScopedContentEntry content(this, nullptr, Matrix::I(), style);
+  Fill fill;
+  fill.blendMode = mode;
+  ScopedContentEntry content(this, nullptr, Matrix::I(), fill);
   if (!content) {
     return;
   }
@@ -1246,10 +1246,12 @@ void PDFExportContext::drawPathWithFilter(const MCState& clipStack, const Matrix
     return;
   }
 
-  setGraphicState(PDFGraphicState::GetSMaskGraphicState(
-                      maskContext->makeFormXObjectFromDevice(maskBound, true), false,
-                      PDFGraphicState::SMaskMode::Luminosity, document),
-                  contentEntry.stream());
+  setGraphicState(
+      PDFGraphicState::GetSMaskGraphicState(
+          maskContext->makeFormXObjectFromDevice(maskBound, true), false,
+          picture ? PDFGraphicState::SMaskMode::Alpha : PDFGraphicState::SMaskMode::Luminosity,
+          document),
+      contentEntry.stream());
   PDFUtils::AppendRectangle(maskBound, contentEntry.stream());
   PDFUtils::PaintPath(path.getFillType(), contentEntry.stream());
   clearMaskOnGraphicState(contentEntry.stream());

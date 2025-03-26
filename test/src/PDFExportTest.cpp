@@ -30,6 +30,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "utils/ProjectPath.h"
@@ -81,12 +82,12 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
       paint.setImageFilter(blurFilter);
       canvas->drawPath(*path, paint);
 
-      // strokePaint.setStyle(PaintStyle::Stroke);
-      // auto gradientShader = tgfx::Shader::MakeLinearGradient(
-      //     tgfx::Point{0.f, 0.f}, tgfx::Point{0.f, 200.f},
-      //     {tgfx::Color::FromRGBA(157, 239, 132), tgfx::Color::FromRGBA(255, 156, 69)}, {});
-      // strokePaint.setShader(gradientShader);
-      // canvas->drawPath(*path, strokePaint);
+      strokePaint.setStyle(PaintStyle::Stroke);
+      auto gradientShader = tgfx::Shader::MakeLinearGradient(
+          tgfx::Point{0.f, 0.f}, tgfx::Point{0.f, 200.f},
+          {tgfx::Color::FromRGBA(157, 239, 132), tgfx::Color::FromRGBA(255, 156, 69)}, {});
+      strokePaint.setShader(gradientShader);
+      canvas->drawPath(*path, strokePaint);
     }
 
     // //G
@@ -210,7 +211,12 @@ TGFX_TEST(PDFExportTest, tryMask) {
 
   Recorder recorder;
   auto* pictureCanvas = recorder.beginRecording();
-  pictureCanvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), Paint());
+  Paint picturePaint;
+  auto gradientShader = tgfx::Shader::MakeLinearGradient(
+      tgfx::Point{0.f, 0.f}, tgfx::Point{0.f, 100.f},
+      {tgfx::Color::FromRGBA(255, 255, 255, 255), tgfx::Color::FromRGBA(0, 0, 0, 0)}, {0.0, 1.0});
+  picturePaint.setShader(gradientShader);
+  pictureCanvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), picturePaint);
   auto picture = recorder.finishRecordingAsPicture();
   auto image = Image::MakeFrom(picture, 200, 200);
 
@@ -222,6 +228,7 @@ TGFX_TEST(PDFExportTest, tryMask) {
   paint.setMaskFilter(std::move(maskFilter));
 
   canvas->drawRect(Rect::MakeWH(150, 150), paint);
+  // canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), picturePaint);
 
   document->endPage();
   document->close();
