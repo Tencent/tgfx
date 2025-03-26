@@ -38,11 +38,11 @@ uint8_t filter_pdf_blend_mode(BlendMode mode) {
 }  // namespace
 
 PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocument* document,
-                                                              const FillStyle& style) {
+                                                              const Fill& fill) {
   DEBUG_ASSERT(document);
-  auto mode = style.blendMode;
+  auto mode = fill.blendMode;
 
-  PDFFillGraphicState fillKey = {style.color.alpha, filter_pdf_blend_mode(mode)};
+  PDFFillGraphicState fillKey = {fill.color.alpha, filter_pdf_blend_mode(mode)};
   auto& fillMap = document->fFillGSMap;
   auto iter = fillMap.find(fillKey);
   if (iter != fillMap.end()) {

@@ -21,7 +21,6 @@
 #include <memory>
 #include <unordered_set>
 #include "core/DrawContext.h"
-#include "core/FillStyle.h"
 #include "core/MCState.h"
 #include "core/Records.h"
 #include "core/filters/BlurImageFilter.h"
@@ -31,6 +30,7 @@
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -48,29 +48,28 @@ class PDFExportContext : public DrawContext {
 
   ~PDFExportContext() override;
 
-  void drawStyle(const MCState& state, const FillStyle& style) override;
+  void drawFill(const MCState& state, const Fill& fill) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override;
+  void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                 const FillStyle& style) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const FillStyle& style) override;
+                 const MCState& state, const Fill& fill) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                      const SamplingOptions& sampling, const MCState& state,
-                     const FillStyle& style) override;
+                     const Fill& fill) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
-                        const MCState& state, const FillStyle& style) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                        const Fill& fill, const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const FillStyle& style) override;
+                 const MCState& state, const Fill& fill) override;
 
   std::unique_ptr<PDFDictionary> makeResourceDictionary();
 
@@ -89,15 +88,14 @@ class PDFExportContext : public DrawContext {
  private:
   void reset();
 
-  void onDrawPath(const MCState& state, const Matrix& ctm, const Path& path,
-                  const FillStyle& srcStyle, bool pathIsMutable);
+  void onDrawPath(const MCState& state, const Matrix& ctm, const Path& path, const Fill& fill,
+                  bool pathIsMutable);
 
   void onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                       const SamplingOptions& sampling, const MCState& state,
-                       const FillStyle& srcStyle);
+                       const SamplingOptions& sampling, const MCState& state, const Fill& fill);
 
   std::shared_ptr<MemoryWriteStream> setUpContentEntry(const MCState* state, const Matrix& matrix,
-                                                       const FillStyle& style, float scale,
+                                                       const Fill& fill, float scale,
                                                        PDFIndirectReference* destination);
 
   void finishContentEntry(const MCState* state, BlendMode blendMode,
@@ -126,12 +124,12 @@ class PDFExportContext : public DrawContext {
 
   void drawDropShadowBeforeLayer(const std::shared_ptr<Picture>& picture,
                                  const DropShadowImageFilter* dropShadowFilter,
-                                 const MCState& state, const FillStyle& style);
+                                 const MCState& state, const Fill& fill);
 
   static void DrawInnerShadowAfterLayer(const std::shared_ptr<Picture>& picture,
                                         const std::shared_ptr<ImageFilter>& imageFilter,
-                                        const MCState& state, const FillStyle& style,
-                                        Context* context, PDFExportContext* pdfExportContext);
+                                        const MCState& state, const Fill& fill, Context* context,
+                                        PDFExportContext* pdfExportContext);
 
   void drawInnerShadowAfterLayer(const Record* record,
                                  const InnerShadowImageFilter* innerShadowFilter,
@@ -139,10 +137,10 @@ class PDFExportContext : public DrawContext {
 
   void drawBlurLayer(const std::shared_ptr<Picture>& picture,
                      const std::shared_ptr<ImageFilter>& imageFilter, const MCState& state,
-                     const FillStyle& style);
+                     const Fill& fill);
 
   void drawPathWithFilter(const MCState& clipStack, const Matrix& matrix, const Path& originPath,
-                          const FillStyle& originPaint);
+                          const Fill& originPaint);
 
   ISize _pageSize = {};
   // uint32_t nodeId = 0;

@@ -25,7 +25,6 @@
 #include <utility>
 #include <vector>
 #include "core/DrawContext.h"
-#include "core/FillStyle.h"
 #include "core/MCState.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
@@ -80,7 +79,7 @@ namespace tgfx {
 class ScopedContentEntry {
  public:
   ScopedContentEntry(PDFExportContext* device, const MCState* state, const Matrix& matrix,
-                     const FillStyle& style, float textScale = 0)
+                     const Fill& style, float textScale = 0)
       : drawContext(device), state(state) {
     blendMode = style.blendMode;
     contentStream =
@@ -166,38 +165,37 @@ void PDFExportContext::reset() {
   // fActiveStackState = SkPDFGraphicStackState();
 }
 
-void PDFExportContext::drawStyle(const MCState&, const FillStyle&) {
-}
+void PDFExportContext::drawFill(const MCState&, const Fill&){};
 
-void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const FillStyle& style) {
+void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
   Path path;
   path.addRect(rect);
-  this->onDrawPath(state, Matrix::I(), path, style, true);
+  this->onDrawPath(state, Matrix::I(), path, fill, true);
 }
 
-void PDFExportContext::drawRRect(const RRect&, const MCState&, const FillStyle&) {
+void PDFExportContext::drawRRect(const RRect&, const MCState&, const Fill&) {
 }
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const FillStyle& style) {
+                                 const Fill& fill) {
   auto path = shape->getPath();
-  this->onDrawPath(state, Matrix::I(), path, style, false);
+  this->onDrawPath(state, Matrix::I(), path, fill, false);
 }
 
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const FillStyle& style) {
+                                 const MCState& state, const Fill& fill) {
   auto rect = Rect::MakeWH(image->width(), image->height());
-  onDrawImageRect(image, rect, sampling, state, style);
+  onDrawImageRect(image, rect, sampling, state, fill);
 }
 
 void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions& sampling, const MCState& state,
-                                     const FillStyle& style) {
-  onDrawImageRect(image, rect, sampling, state, style);
+                                     const Fill& fill) {
+  onDrawImageRect(image, rect, sampling, state, fill);
 }
 
-void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList>, const Stroke*,
-                                        const MCState&, const FillStyle&) {
+void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList>, const MCState&, const Fill&,
+                                        const Stroke*) {
 }
 
 void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -207,60 +205,60 @@ void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCSta
 namespace {
 std::shared_ptr<Record> ModifyRecord(const Record* record, std::shared_ptr<Shader> imageShader) {
   switch (record->type()) {
-    case RecordType::DrawStyle: {
-      const auto* drawStyle = static_cast<const DrawStyle*>(record);
-      auto newDrawStyle = std::make_shared<DrawStyle>(drawStyle->state, drawStyle->style);
-      newDrawStyle->style.shader = std::move(imageShader);
+    case RecordType::DrawFill: {
+      const auto* drawFill = static_cast<const DrawFill*>(record);
+      auto newDrawStyle = std::make_shared<DrawFill>(drawFill->state, drawFill->fill);
+      newDrawStyle->fill.shader = std::move(imageShader);
       return newDrawStyle;
     }
     case RecordType::DrawRect: {
       const auto* drawRect = static_cast<const DrawRect*>(record);
       auto newDrawRect =
-          std::make_shared<DrawRect>(drawRect->rect, drawRect->state, drawRect->style);
-      newDrawRect->style.shader = std::move(imageShader);
+          std::make_shared<DrawRect>(drawRect->rect, drawRect->state, drawRect->fill);
+      newDrawRect->fill.shader = std::move(imageShader);
       return newDrawRect;
     }
     case RecordType::DrawRRect: {
       const auto* drawRRect = static_cast<const DrawRRect*>(record);
       auto newDrawRRect =
-          std::make_shared<DrawRRect>(drawRRect->rRect, drawRRect->state, drawRRect->style);
-      newDrawRRect->style.shader = std::move(imageShader);
+          std::make_shared<DrawRRect>(drawRRect->rRect, drawRRect->state, drawRRect->fill);
+      newDrawRRect->fill.shader = std::move(imageShader);
       return newDrawRRect;
     }
     case RecordType::DrawShape: {
       const auto* drawShape = static_cast<const DrawShape*>(record);
       auto newDrawShape =
-          std::make_shared<DrawShape>(drawShape->shape, drawShape->state, drawShape->style);
-      newDrawShape->style.shader = std::move(imageShader);
+          std::make_shared<DrawShape>(drawShape->shape, drawShape->state, drawShape->fill);
+      newDrawShape->fill.shader = std::move(imageShader);
       return newDrawShape;
     }
     case RecordType::DrawImage: {
       const auto* drawImage = static_cast<const DrawImage*>(record);
       auto newDrawImage = std::make_shared<DrawImage>(drawImage->image, drawImage->sampling,
-                                                      drawImage->state, drawImage->style);
-      newDrawImage->style.shader = std::move(imageShader);
+                                                      drawImage->state, drawImage->fill);
+      newDrawImage->fill.shader = std::move(imageShader);
       return newDrawImage;
     }
     case RecordType::DrawImageRect: {
       const auto* drawImageRect = static_cast<const DrawImageRect*>(record);
       auto newDrawImageRect = std::make_shared<DrawImageRect>(
           drawImageRect->image, drawImageRect->rect, drawImageRect->sampling, drawImageRect->state,
-          drawImageRect->style);
-      newDrawImageRect->style.shader = std::move(imageShader);
+          drawImageRect->fill);
+      newDrawImageRect->fill.shader = std::move(imageShader);
       return newDrawImageRect;
     }
     case RecordType::DrawGlyphRunList: {
       const auto* drawGlyphRunList = static_cast<const DrawGlyphRunList*>(record);
       auto newDrawGlyphRunList = std::make_shared<DrawGlyphRunList>(
-          drawGlyphRunList->glyphRunList, drawGlyphRunList->state, drawGlyphRunList->style);
-      newDrawGlyphRunList->style.shader = std::move(imageShader);
+          drawGlyphRunList->glyphRunList, drawGlyphRunList->state, drawGlyphRunList->fill);
+      newDrawGlyphRunList->fill.shader = std::move(imageShader);
       return newDrawGlyphRunList;
     }
     case RecordType::DrawLayer: {
       const auto* drawLayer = static_cast<const DrawLayer*>(record);
       auto newDrawLayer = std::make_shared<DrawLayer>(drawLayer->picture, drawLayer->filter,
-                                                      drawLayer->state, drawLayer->style);
-      newDrawLayer->style.shader = std::move(imageShader);
+                                                      drawLayer->state, drawLayer->fill);
+      newDrawLayer->fill.shader = std::move(imageShader);
       return newDrawLayer;
     }
     default:
@@ -272,7 +270,7 @@ std::shared_ptr<Record> ModifyRecord(const Record* record, std::shared_ptr<Shade
 
 void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>& picture,
                                                  const DropShadowImageFilter* dropShadowFilter,
-                                                 const MCState& state, const FillStyle& style) {
+                                                 const MCState& state, const Fill& fill) {
 
   auto pictureBounds = picture->getBounds();
   auto blurBounds = dropShadowFilter->blurFilter->filterBounds(pictureBounds);
@@ -302,13 +300,13 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
     auto imageState = state;
     imageState.matrix.postTranslate(pictureBounds.x() - offset.x + dropShadowFilter->dx,
                                     pictureBounds.y() - offset.y + dropShadowFilter->dy);
-    drawImage(std::move(image), SamplingOptions(), imageState, style);
+    drawImage(std::move(image), SamplingOptions(), imageState, fill);
   }
 }
 
 void PDFExportContext::DrawInnerShadowAfterLayer(const std::shared_ptr<Picture>& picture,
                                                  const std::shared_ptr<ImageFilter>& imageFilter,
-                                                 const MCState& state, const FillStyle& style,
+                                                 const MCState& state, const Fill& fill,
                                                  Context* context,
                                                  PDFExportContext* pdfExportContext) {
   const auto* innerShadowFilter = Caster::AsInnerShadowImageFilter(imageFilter.get());
@@ -334,7 +332,7 @@ void PDFExportContext::DrawInnerShadowAfterLayer(const std::shared_ptr<Picture>&
     image = image->makeTextureImage(context);
     auto imageState = state;
     imageState.matrix.postTranslate(pictureBounds.x(), pictureBounds.y());
-    pdfExportContext->drawImage(std::move(image), SamplingOptions(), imageState, style);
+    pdfExportContext->drawImage(std::move(image), SamplingOptions(), imageState, fill);
   }
 }
 
@@ -396,7 +394,7 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
 
 void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
                                      const std::shared_ptr<ImageFilter>& imageFilter,
-                                     const MCState& state, const FillStyle& style) {
+                                     const MCState& state, const Fill& fill) {
   auto pictureBounds = picture->getBounds();
   auto blurBounds = imageFilter->filterBounds(pictureBounds);
   blurBounds = blurBounds.makeOutset(100, 100);
@@ -421,16 +419,16 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
     image = image->makeTextureImage(document->context());
     auto imageState = state;
     imageState.matrix.postTranslate(pictureBounds.x() - offset.x, pictureBounds.y() - offset.y);
-    drawImage(std::move(image), SamplingOptions(), imageState, style);
+    drawImage(std::move(image), SamplingOptions(), imageState, fill);
   }
 }
 
 void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                                 const FillStyle& style) {
+                                 const Fill& fill) {
 
   if (const auto* dropShadowFilter = Caster::AsDropShadowImageFilter(imageFilter.get())) {
-    drawDropShadowBeforeLayer(picture, dropShadowFilter, state, style);
+    drawDropShadowBeforeLayer(picture, dropShadowFilter, state, fill);
     if (!dropShadowFilter->shadowOnly) {
       picture->playback(this, state);
     }
@@ -444,7 +442,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
     }
   }
   if (const auto* blurShadowFilter = Caster::AsBlurImageFilter(imageFilter.get())) {
-    drawBlurLayer(picture, imageFilter, state, style);
+    drawBlurLayer(picture, imageFilter, state, fill);
     return;
   }
   picture->playback(this, state);
@@ -474,7 +472,7 @@ std::shared_ptr<Data> PDFExportContext::getContent() {
 }
 
 void PDFExportContext::onDrawPath(const MCState& state, const Matrix& ctm, const Path& path,
-                                  const FillStyle& srcStyle, bool /*pathIsMutable*/) {
+                                  const Fill& fill, bool /*pathIsMutable*/) {
   // if (state.clip.isEmpty()) {
   //   return;
   // }
@@ -482,8 +480,8 @@ void PDFExportContext::onDrawPath(const MCState& state, const Matrix& ctm, const
   Path modifiedPath;
   const Path* pathPointer = &path;
 
-  if (srcStyle.maskFilter) {
-    this->drawPathWithFilter(state, ctm, path, srcStyle);
+  if (fill.maskFilter) {
+    this->drawPathWithFilter(state, ctm, path, fill);
     return;
   }
 
@@ -524,7 +522,7 @@ void PDFExportContext::onDrawPath(const MCState& state, const Matrix& ctm, const
   //   matrix = SkMatrix::I();
   // }
 
-  ScopedContentEntry scopedContent(this, &state, matrix, srcStyle);
+  ScopedContentEntry scopedContent(this, &state, matrix, fill);
   if (!scopedContent) {
     return;
   }
@@ -586,7 +584,7 @@ namespace {
 
 void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                        const SamplingOptions& sampling, const MCState& state,
-                                       const FillStyle& srcStyle) {
+                                       const Fill& fill) {
   // if (this->hasEmptyClip()) {
   //   return;
   // }
@@ -611,20 +609,20 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
 
   // Alpha-only images need to get their color from the shader, before
   // applying the colorfilter.
-  auto style = srcStyle;
-  if (image->isAlphaOnly() && style.colorFilter) {
+  auto modifiedFill = fill;
+  if (image->isAlphaOnly() && modifiedFill.colorFilter) {
     // must blend alpha image and shader before applying colorfilter.
     auto surface = Surface::Make(document->context(), image->width(), image->height());
     Canvas* canvas = surface->getCanvas();
     Paint tmpPaint;
     // In the case of alpha images with shaders, the shader's coordinate
     // system is the image's coordiantes.
-    tmpPaint.setShader(style.shader);
-    tmpPaint.setColor(style.color);
+    tmpPaint.setShader(modifiedFill.shader);
+    tmpPaint.setColor(modifiedFill.color);
     canvas->clear();
     canvas->drawImage(image, &tmpPaint);
-    if (style.shader != nullptr) {
-      style.shader = nullptr;
+    if (modifiedFill.shader != nullptr) {
+      modifiedFill.shader = nullptr;
     }
     image = surface->makeImageSnapshot();
     DEBUG_ASSERT(!image->isAlphaOnly());
@@ -632,7 +630,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
 
   if (image->isAlphaOnly()) {
     // The ColorFilter applies to the paint color/shader, not the alpha layer.
-    DEBUG_ASSERT(style.colorFilter == nullptr);
+    DEBUG_ASSERT(modifiedFill.colorFilter == nullptr);
 
     // sk_sp<SkImage> mask = alpha_image_to_greyscale_image(imageSubset.image().get());
     // if (!mask) {
@@ -648,13 +646,13 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
       // entire device if unnecessary.
       canvas->clipRect(state.clip.getBounds());
       // canvas.concat(ctm);
-      if (style.maskFilter) {
+      if (modifiedFill.maskFilter) {
         Paint tmpPaint;
         auto imageShader =
             Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
         imageShader = imageShader->makeWithMatrix(transform);
         tmpPaint.setShader(imageShader);
-        tmpPaint.setMaskFilter(style.maskFilter);
+        tmpPaint.setMaskFilter(modifiedFill.maskFilter);
         canvas->drawRect(rect, tmpPaint);
       } else {
         // if (src && !is_integral(*src)) {
@@ -669,7 +667,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     // if (!ctm.isIdentity() && paint->getShader()) {
     //   transform_shader(paint.writable(), ctm);  // Since we are using identity matrix.
     // }
-    ScopedContentEntry content(this, &state, Matrix::I(), style);
+    ScopedContentEntry content(this, &state, Matrix::I(), modifiedFill);
     if (!content) {
       return;
     }
@@ -682,15 +680,15 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     this->clearMaskOnGraphicState(content.stream());
     return;
   }
-  if (style.maskFilter) {
+  if (modifiedFill.maskFilter) {
     auto imageShader =
         Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, SamplingOptions());
     imageShader = imageShader->makeWithMatrix(transform);
-    style.shader = imageShader;
+    modifiedFill.shader = imageShader;
 
     Path path;
     path.addRect(rect);
-    this->onDrawPath(state, Matrix::I(), path, style, true);
+    this->onDrawPath(state, Matrix::I(), path, modifiedFill, true);
     return;
   }
   // transform.postConcat(ctm);
@@ -772,7 +770,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   auto subset = Rect::MakeWH(image->width(), image->height());
   scaled.postScale(subset.width(), subset.height());
   scaled.postConcat(matrix);
-  ScopedContentEntry content(this, &state, scaled, style);
+  ScopedContentEntry content(this, &state, scaled, modifiedFill);
   if (!content) {
     return;
   }
@@ -786,7 +784,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     return;
   }
 
-  if (auto colorFilter = style.colorFilter) {
+  if (auto colorFilter = modifiedFill.colorFilter) {
     auto imageFilter = ImageFilter::ColorFilter(colorFilter);
     image = image->makeWithFilter(imageFilter);
     if (!image) {
@@ -880,7 +878,7 @@ bool treat_as_regular_pdf_blend_mode(BlendMode blendMode) {
 
 void populate_graphic_state_entry_from_paint(
     PDFDocument* document, const Matrix& matrix, const MCState* state, Rect deviceBounds,
-    const FillStyle& style, const Matrix& initialTransform, float textScale,
+    const Fill& style, const Matrix& initialTransform, float textScale,
     PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {
 
@@ -946,10 +944,10 @@ void populate_graphic_state_entry_from_paint(
 }  // namespace
 
 std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
-    const MCState* state, const Matrix& matrix, const FillStyle& style, float scale,
+    const MCState* state, const Matrix& matrix, const Fill& fill, float scale,
     PDFIndirectReference* destination) {
   DEBUG_ASSERT(!*destination);
-  BlendMode blendMode = style.blendMode;
+  BlendMode blendMode = fill.blendMode;
 
   if (blendMode == BlendMode::Dst) {
     return nullptr;
@@ -981,7 +979,7 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
 
   DEBUG_ASSERT(fActiveStackState.fContentStream);
   PDFGraphicStackState::Entry entry;
-  populate_graphic_state_entry_from_paint(document, matrix, state, Rect::MakeSize(_pageSize), style,
+  populate_graphic_state_entry_from_paint(document, matrix, state, Rect::MakeSize(_pageSize), fill,
                                           _initialTransform, scale, &entry, &fShaderResources,
                                           &fGraphicStateResources);
   fActiveStackState.updateClip(*state, Rect::MakeSize(_pageSize));
@@ -1036,7 +1034,7 @@ void PDFExportContext::finishContentEntry(const MCState* state, BlendMode blendM
   // if source has shape, we need to clip it too, so a copy of the clip is
   // saved.
 
-  FillStyle stockPaint;
+  Fill stockPaint;
 
   PDFIndirectReference srcFormXObject;
   if (this->isContentEmpty()) {
@@ -1064,7 +1062,7 @@ void PDFExportContext::finishContentEntry(const MCState* state, BlendMode blendM
   } else {
     if (path != nullptr) {
       // Draw shape into a form-xobject.
-      FillStyle filledPaint;
+      Fill filledPaint;
       filledPaint.color = Color::Black();
       MCState empty;
       PDFExportContext shapeContext(_pageSize, document, _initialTransform);
@@ -1158,7 +1156,7 @@ void PDFExportContext::drawFormXObjectWithMask(PDFIndirectReference xObject,
                                                PDFIndirectReference sMask, BlendMode mode,
                                                bool invertClip) {
   DEBUG_ASSERT(sMask);
-  FillStyle style;
+  Fill style;
   style.blendMode = mode;
   ScopedContentEntry content(this, nullptr, Matrix::I(), style);
   if (!content) {
@@ -1196,14 +1194,14 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
 }  // namespace
 
 void PDFExportContext::drawPathWithFilter(const MCState& clipStack, const Matrix& matrix,
-                                          const Path& originPath, const FillStyle& originPaint) {
+                                          const Path& originPath, const Fill& originPaint) {
   DEBUG_ASSERT(originPaint.maskFilter);
 
   Path path(originPath);
   path.transform(matrix);
   auto maskBound = path.getBounds();
 
-  FillStyle paint(originPaint);
+  Fill paint(originPaint);
 
   const auto* shaderMaskFilter = Caster::AsShaderMaskFilter(originPaint.maskFilter.get());
   auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);

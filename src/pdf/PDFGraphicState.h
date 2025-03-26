@@ -19,8 +19,8 @@
 #pragma once
 
 #include <cstring>
-#include "core/FillStyle.h"
 #include "pdf/PDFTypes.h"
+#include "tgfx/core/Fill.h"
 
 namespace tgfx {
 
@@ -58,8 +58,7 @@ class PDFGraphicState {
     Luminosity,
   };
 
-  static PDFIndirectReference GetGraphicStateForPaint(PDFDocument* document,
-                                                      const FillStyle& style);
+  static PDFIndirectReference GetGraphicStateForPaint(PDFDocument* document, const Fill& fill);
 
   static PDFIndirectReference GetSMaskGraphicState(PDFIndirectReference sMask, bool invert,
                                                    SMaskMode sMaskMode, PDFDocument* doc);

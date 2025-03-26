@@ -20,9 +20,9 @@
 
 #include <memory>
 #include <string>
-#include "core/FillStyle.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFTypes.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/MD5.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"

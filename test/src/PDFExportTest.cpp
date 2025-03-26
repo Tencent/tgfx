@@ -19,7 +19,6 @@
 #include <filesystem>
 #include <memory>
 #include "base/TGFXTest.h"
-#include "core/FillStyle.h"
 #include "core/Records.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUnion.h"
