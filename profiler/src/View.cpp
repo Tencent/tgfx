@@ -30,7 +30,7 @@
 #include "FramesView.h"
 #include "MainView.h"
 #include "StatisticModel.h"
-#include "StatisticText.h"
+#include "TableItem.h"
 #include "TimelineView.h"
 #include "TracySysUtil.hpp"
 #include "src/profiler/TracyFileselector.hpp"
@@ -179,7 +179,7 @@ void View::changeViewModeButton(ViewMode mode) {
 
 void View::openStatisticsView() {
   if(tabWidget->count() < 2) {
-    qmlRegisterType<StatisticsText>("TGFX.Controls", 1, 0, "TGFXText");
+    qmlRegisterType<TableItem>("TGFX.Controls", 1, 0, "TGFXTable");
     qmlRegisterType<StatisticsModel>("TGFX.Profiler", 1, 0, "StatisticsModel");
     qmlRegisterType<FPSChartItem>("TGFX.Profiler", 1, 0, "FPSChart");
     qmlRegisterType<DrawCallChartItem>("TGFX.Profiler", 1, 0, "DrawCallChart");

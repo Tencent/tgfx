@@ -17,20 +17,21 @@ Window {
     readonly property real locationColumnRatio: 0.35
     readonly property real flaexibleColumnsRatio: nameColumnRatio + locationColumnRatio
 
-    readonly property int totalTimeWidth: 150
+    readonly property int totalTimeWidth: 160
     readonly property int countWidth: 80
     readonly property int mtpcWidth: 130
     readonly property int threadsWidth: 70
 
     readonly property int totalFixedWidth: totalTimeWidth + countWidth + mtpcWidth + threadsWidth
-    readonly property int rowSpacing: 1
+    readonly property int rowSpacing: 0
 
     property int availableWidth: Math.max(0, tableContainer.width - totalFixedWidth - 5 * rowSpacing)
-    property int nameColumnWidth: Math.max(100, Math.floor(availableWidth * (nameColumnRatio / flexibleColumnRadio)))
+    property int nameColumnWidth: Math.max(100, Math.floor(availableWidth * (nameColumnRatio / flaexibleColumnsRatio)))
     property int locationColumnWidth: Math.max(100, availableWidth - nameColumnWidth)
 
     property int sortedColumn: 0
     property int sortedOrder: Qt.AscendingOrder
+
 
     property var model: statisticsModel
 
@@ -38,6 +39,8 @@ Window {
         nameColumnWidth = Math.max(100, Math.floor(availableWidth * (nameColumnRatio / flaexibleColumnsRatio)))
         locationColumnWidth = Math.max(100, availableWidth - nameColumnWidth)
     }
+
+
 
     onAvailableWidthChanged: {
         updateFlexibleColumns();
@@ -49,7 +52,9 @@ Window {
         totalTimeHeader.isSorted = true;
         totalTimeHeader.sortAscending = false;
 
-        model.sort(columns.totalTime, Qt.DescendingOrder);
+        canvasTable.sortColumn = columns.totalTime
+        canvasTable.sortOrder = Qt.DescendingOrder
+
         sortedColumn = columns.totalTime;
         sortedOrder = Qt.DescendingOrder;
     }
@@ -66,7 +71,7 @@ Window {
     /////*statistics main view*/////
     Rectangle {
         anchors.fill: parent
-        color: "#343131"
+        color: "#2D2D2D"
 
         ColumnLayout {
             anchors.fill: parent
@@ -90,6 +95,7 @@ Window {
                         contentItem: Text {
                             text: instrumentationBtn.text
                             color: "white"
+                            font.bold: true
                             leftPadding: instrumentationBtn.indicator.width + 4
                             verticalAlignment: Text.AlignVCenter
                             x:instrumentationBtn.indicator.width + 4
@@ -111,27 +117,45 @@ Window {
                         }
                     }
 
+                    Item { Layout.preferredWidth: 5 }
+
                     Text {
                         text: "Total zone count:"
                         color: "white"
+                        font.bold: true
                     }
+
+                    Item { Layout.preferredWidth: 2 }
 
                     Text {
                         id: totalZoneCount
                         text: model.totalZoneCount
                         color: "white"
+                        font.bold: true
+                        Layout.preferredWidth: 5
+                        horizontalAlignment: Text.AlignRight
                     }
+
+                    Item { Layout.preferredWidth: 5 }
 
                     Text {
                         text: "Visible zones:"
                         color: "white"
+                        font.bold: true
                     }
+
+                    Item { Layout.preferredWidth: 2 }
 
                     Text {
                         id: visibleZones
                         text: model.visibleZoneCount
                         color: "white"
+                        font.bold: true
+                        Layout.preferredWidth: 5
+                        horizontalAlignment: Text.AlignRight
                     }
+
+                    Item { Layout.preferredWidth: 5 }
 
                     ToolSeparator {
                         anchors.verticalCenter: Layout.verticalCenter
@@ -143,9 +167,45 @@ Window {
                         }
                     }
 
+                    Item { Layout.preferredWidth: 5 }
+
+                    Row {
+                        spacing: 3
+
+                        Text {
+                            text: "Frame :"
+                            color: "white"
+                            font.bold: true
+                            width: 60
+                        }
+
+                        Text {
+                            id: frameRangeText
+                            text: model.getFirstFrame() + " - " + model.getLastFrame()
+                            color: "white"
+                            font.bold: true
+                            width: 70
+                        }
+                    }
+
+                    //Item { Layout.preferredWidth: 5 }
+
+                    ToolSeparator {
+                        anchors.verticalCenter: Layout.verticalCenter
+                        orientation: Qt.Vertical
+                        contentItem: Rectangle {
+                            implicitHeight: Layout.vertical ? 1 : 24
+                            implicitWidth: Layout.vertical ? 24 : 1
+                            color: "#666666"
+                        }
+                    }
+
+                    Item { Layout.preferredWidth: 5 }
+
                     Text {
                         text: "Timing"
                         color: "white"
+                        font.bold: true
                     }
 
                     ComboBox {
@@ -173,7 +233,7 @@ Window {
                         }
                     }
 
-                    Item { Layout.fillWidth: true }
+                    Item { Layout.preferredWidth: 5 }
 
                     ToolSeparator {
                         anchors.verticalCenter: Layout.verticalCenter
@@ -185,9 +245,12 @@ Window {
                         }
                     }
 
+                    Item { Layout.preferredWidth: 5 }
+
                     Text {
                         text: "Limit"
                         color: "white"
+                        font.bold: true
                     }
 
                     Switch {
@@ -197,6 +260,8 @@ Window {
                             color = limitRange.checked ? "#666666" : "#333333"
                         }
                     }
+
+                    Item { Layout.fillWidth: true }
                 }
             }
 
@@ -272,6 +337,7 @@ Window {
                         border.width: 0.5
                         border.color: "#4D4D4D"
                         color: "#2D2D2D"
+
                         Text {
                             id: fpsHeadText
                             text: "FPS"
@@ -283,6 +349,35 @@ Window {
 
                             color: "white"
                             font.bold: true
+                        }
+
+                        Column {
+                            anchors.left: parent.left
+                            anchors.top: fpsHeadText.bottom
+                            anchors.leftMargin: 10
+                            anchors.topMargin: 8
+                            spacing: 5
+
+                            Text {
+                                id: maxFps
+                                text: "MaxFps : " + model.getMaxFps().toFixed(1)
+                                color: "white"
+                                font.pixelSize: 15
+                            }
+
+                            Text {
+                                id: minFps
+                                text: "MinFps : " + model.getMinFps().toFixed(1)
+                                color: "white"
+                                font.pixelSize: 15
+                            }
+
+                            Text {
+                                id: avgFps
+                                text: "AvgFps : " + model.getAvgFps().toFixed(1)
+                                color: "white"
+                                font.pixelSize: 15
+                            }
                         }
                     }
 
@@ -306,6 +401,28 @@ Window {
                             color: "white"
                             font.bold: true
                         }
+
+                        Column {
+                            anchors.left: parent.left
+                            anchors.top: drawCallHeadText.bottom
+                            anchors.leftMargin: 10
+                            anchors.topMargin: 8
+                            spacing: 5
+
+                            Text {
+                                id: maxDrawCall
+                                text: "MaxDrawCall : " + model.getMaxDrawCall().toFixed(1)
+                                color: "white"
+                                font.pixelSize: 15
+                            }
+
+                            Text {
+                                id: minDrawCall
+                                text: "MaxDrawCall : " + model.getMinDrawCall().toFixed(1)
+                                color: "white"
+                                font.pixelSize: 15
+                            }
+                        }
                     }
 
                     Rectangle {
@@ -327,6 +444,28 @@ Window {
 
                             color: "white"
                             font.bold: true
+                        }
+
+                        Column {
+                            anchors.left: parent.left
+                            anchors.top: trianglesHeadText.bottom
+                            anchors.leftMargin: 10
+                            anchors.topMargin: 8
+                            spacing: 5
+
+                            Text {
+                                id: maxTriangles
+                                text: "MaxTriangles : " + model.getMaxTriangles().toFixed(1)
+                                color: "white"
+                                font.pixelSize: 15
+                            }
+
+                            Text {
+                                id: minTriangles
+                                text: "MinTriangles : " + model.getMinTriangles().toFixed(1)
+                                color: "white"
+                                font.pixelSize: 15
+                            }
                         }
                     }
                 }
@@ -408,7 +547,8 @@ Window {
                     id: headerRow
                     width: parent.width
                     height: 30
-                    spacing: 1
+                    spacing: rowSpacing
+                    anchors.margins: 0
 
                     Rectangle {
                         id: nameHeader
@@ -416,7 +556,6 @@ Window {
                         height: 30
                         color: "#2D2D2D"
                         border.color: "#555555"
-                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -460,10 +599,8 @@ Window {
                                 root.sortedColumn = columns.name
                                 root.sortedOrder = nameHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
 
-                                model.sort(
-                                    columns.name,
-                                    nameHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
-                                );
+                                canvasTable.sortColumn = columns.name
+                                canvasTable.sortOrder = nameHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                             }
                         }
 
@@ -510,7 +647,6 @@ Window {
                         height: 30
                         color: "#2D2D2D"
                         border.color: "#555555"
-                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -553,10 +689,8 @@ Window {
                                 root.sortedColumn = columns.location
                                 root.sortedOrder = locationHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
 
-                                model.sort(
-                                    columns.location,
-                                    locationHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
-                                );
+                                canvasTable.sortColumn = columns.location
+                                canvasTable.sortOrder = locationHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                             }
                         }
                     }
@@ -567,7 +701,6 @@ Window {
                         height: 30
                         color: "#2D2D2D"
                         border.color: "#555555"
-                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: false
@@ -609,10 +742,8 @@ Window {
                                 root.sortedColumn = columns.totalTime
                                 root.sortedOrder = totalTimeHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
 
-                                model.sort(
-                                    columns.totalTime,
-                                    totalTimeHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
-                                );
+                                canvasTable.sortColumn = columns.totalTime
+                                canvasTable.sortOrder = totalTimeHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                             }
                         }
                     }
@@ -623,7 +754,6 @@ Window {
                         height: 30
                         color: "#2D2D2D"
                         border.color: "#555555"
-                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -665,10 +795,8 @@ Window {
                                 root.sortedColumn = columns.count
                                 root.sortedOrder = countHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
 
-                                model.sort(
-                                    columns.count,
-                                    countHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
-                                );
+                                canvasTable.sortColumn = columns.count
+                                canvasTable.sortOrder = countHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                             }
                         }
                     }
@@ -679,7 +807,6 @@ Window {
                         height: 30
                         color: "#2D2D2D"
                         border.color: "#555555"
-                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -721,10 +848,8 @@ Window {
                                 root.sortedColumn = columns.mtpc
                                 root.sortedOrder = mtpcHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
 
-                                model.sort(
-                                    columns.mtpc,
-                                    mtpcHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
-                                );
+                                canvasTable.sortColumn = columns.mtpc
+                                canvasTable.sortOrder = mtpcHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                             }
                         }
                     }
@@ -735,7 +860,6 @@ Window {
                         height: 30
                         color: "#2D2D2D"
                         border.color: "#555555"
-                        border.width: 1
 
                         property bool isSorted: false
                         property bool sortAscending: true
@@ -778,224 +902,34 @@ Window {
                                 root.sortedColumn = columns.threads
                                 root.sortedOrder = threadsHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
 
-                                model.sort(
-                                    columns.threads,
-                                    threadsHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
-                                );
+                                canvasTable.sortColumn = columns.threads
+                                canvasTable.sortOrder = threadsHeader.sortAscending ? Qt.AscendingOrder : Qt.DescendingOrder
                             }
                         }
                     }
                 }
 
-                /////*table view*/////
-                ListView {
-                    id: listView
-                    anchors.top: headerRow.bottom
+                //////*Table View*//////
+                TGFXTable {
+                    id: canvasTable
+                    anchors.top: headerRow .bottom
                     width: parent.width
                     height: parent.height - headerRow.height
-                    model: root.model
-                    spacing: 1
-                    clip: true
+                    model: statisticsModel
+                    rowHeight: 36
+                    nameColumnWidth: root.nameColumnWidth
+                    locationColumnWidth: root.locationColumnWidth
+                    totalTimeWidth: root.totalTimeWidth
+                    countWidth: root.countWidth
+                    mtpcWidth: root.mtpcWidth
+                    threadsWidth: root.threadsWidth
 
-                    delegate: Rectangle {
-                        id: rowDelegate
-                        width: listView.width
-                        height: 36
-                        color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
 
-                        Row {
-                            width: parent.width
-                            height: parent.height
-                            spacing: 1
-
-                        Rectangle {
-                            width: nameColumnWidth
-                            height: 36
-                            color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
-                            border.color: "#555555"
-                            border.width: 1
-                            clip: true
-
-                            Rectangle {
-                                id: statusIcon
-                                width: 16
-                                height: 16
-                                radius: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                color: model.color || "#808080"
-                                border.color: "#c8c8c8c8"
-                                border.width: 1
-                            }
-
-                            TGFXText {
-                                id: nameText
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: statusIcon.right
-                                anchors.leftMargin: 8
-                                width: parent.width - statusIcon.width - 24
-                                height:parent.height
-                                clip: true
-                                text: model.Name
-                                color: "white"
-                                elideMode: Qt.ElideRight
-                                alignment: Qt.AlignLeft | Qt.AlignVCenter
-                            }
-                        }
-
-                        Rectangle {
-                            width: locationColumnWidth
-                            height: 36
-                            color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
-                            border.color: "#555555"
-                            border.width: 1
-                            clip: true
-
-                                TGFXText {
-                                    id: locationText
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
-                                    width: parent.width - 16
-                                    height: parent.height
-                                    clip: true
-                                    text: model.Location
-                                    color: "white"
-                                    elideMode: Qt.ElideMiddle
-                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-
-                                    onDoubleClicked: {
-                                        root.model.openSource(index)
-                                    }
-                                }
-                            }
-
-                        Rectangle {
-                            width: totalTimeWidth
-                            height: 36
-                            color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
-                            border.color: "#555555"
-                            border.width: 1
-                            clip: true
-
-                            TGFXText {
-                                id: totalTimeText
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                text: model.Totaltime
-                                color: "white"
-                                height: parent.height
-                                width: model.percentage !== undefined ? 70 : parent.width - 16
-                                alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                elideMode: Qt.ElideNone
-                            }
-
-                            TGFXText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: totalTimeText.right
-                                anchors.leftMargin: 4
-                                text: {
-                                    if(model.percentage !== undefined) {
-                                        return "(" + model.percentage.toFixed(2) + "%)"
-                                    }
-                                    return ""
-                                }
-                                visible: model.percentage !== undefined
-                                color: "#FFFFFF80"
-                                height: parent.height
-                                width: 70
-                                alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                elideMode:Qt.ElideNone
-                            }
-
-                        }
-
-                        Rectangle {
-                            width: countWidth
-                            height: 36
-                            color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
-                            border.color: "#555555"
-                            border.width: 1
-                            clip: true
-
-                                TGFXText {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
-                                    text: model.Count
-                                    color: "white"
-                                    height: parent.height
-                                    width: parent.width - 16
-                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                    elideMode: Qt.ElideNone
-                                }
-                            }
-
-                        Rectangle {
-                            width: mtpcWidth
-                            height: 36
-                            color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
-                            border.color: "#555555"
-                            border.width: 1
-                            clip: true
-
-                                TGFXText {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
-                                    text: model.Mtpc
-                                    color: "white"
-                                    height: parent.height
-                                    width: parent.width - 16
-                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                    elideMode: Qt.ElideNone
-                                }
-                            }
-
-                        Rectangle {
-                            width: threadsWidth
-                            height: 36
-                            color: index % 2 === 0 ? "#2D2D2D" : "#3F3F3F"
-                            border.color: "#555555"
-                            border.width: 1
-                            clip: true
-
-                                TGFXText {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
-                                    text: model.Threadcount
-                                    color: "white"
-                                    height: parent.height
-                                    width: parent.width - 16
-                                    alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                    elideMode: Qt.ElideNone
-                                }
-                            }
-                        }
-                    }
-
-                    ScrollBar.vertical: ScrollBar {
-                        width: 12
-                        policy: ScrollBar.AsNeeded
-                        active: true
-
-                        background: Rectangle {
-                            color: "#2D2D2D"
-                        }
-
-                        contentItem: Rectangle {
-                            implicitWidth: 6
-                            implicitHeight: 100
-                            radius: width / 2
-                            color: parent.pressed ? "#BD94AB" : "#808080"
+                        onDoubleClicked: function(mouse) {
+                            canvasTable.handleMouseDoubleClick(mouse.x, mouse.y)
                         }
                     }
                 }
@@ -1009,21 +943,35 @@ Window {
         function onZoneCountChanged() {
             totalZoneCount.text = model.totalZoneCount
             visibleZones.text = model.visibleZoneCount
+            frameRangeText.text = model.getFirstFrame() + " - " + model.getLastFrame()
         }
-
         function onFilterTextChanged() {
             filterEdit.text = model.filterText
         }
-
         function onStatisticsUpdated() {
-            listView.forceLayout()
+            maxFps.text = "MaxFps: " + model.getMaxFps().toFixed(1)
+            minFps.text = "MinFps: " + model.getMinFps().toFixed(1)
+            avgFps.text = "AvgFps: " + model.getAvgFps().toFixed(1)
+            maxDrawCall.text = "MaxDrawCall: " + model.getMaxDrawCall().toFixed(1)
+            minDrawCall.text = "MinDrawCall: " + model.getMinDrawCall().toFixed(1)
+            maxTriangles.text = "MaxTriangles: " + model.getMaxTriangles().toFixed(1)
+            minTriangles.text = "MinTriangles: " + model.getMinTriangles().toFixed(1)
             if(root.sortedColumn !== -1) {
-                model.sort(root.sortedColumn, root.sortedOrder)
+                canvasTable.sortColumn = root.sortedColumn
+                canvasTable.sortOrder = root.sortedOrder
             }
         }
-
         function onAccumulationModeChanged() {
             timingCombo.currentIndex = model.accumulationMode
+        }
+        function onRangeActiveChanged() {
+            maxFps.text = "MaxFps: " + model.getMaxFps().toFixed(1)
+            minFps.text = "MinFps: " + model.getMinFps().toFixed(1)
+            avgFps.text = "AvgFps: " + model.getAvgFps().toFixed(1)
+            maxDrawCall.text = "MaxDrawCall: " + model.getMaxDrawCall().toFixed(1)
+            minDrawCall.text = "MinDrawCall: " + model.getMinDrawCall().toFixed(1)
+            maxTriangles.text = "MaxTriangles: " + model.getMaxTriangles().toFixed(1)
+            minTriangles.text = "MinTriangles: " + model.getMinTriangles().toFixed(1)
         }
     }
 }

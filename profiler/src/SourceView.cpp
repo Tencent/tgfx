@@ -67,36 +67,39 @@ void SourceTextColor::highlightBlock(const QString& text) {
 
     switch (token.color) {
       case Tokenizer::TokenColor::Keyword:
-        format.setForeground(QColor(86, 156, 214));
+        format.setForeground(QColor(215, 58, 73));
         break;
 
       case Tokenizer::TokenColor::Type:
-        format.setForeground(QColor(78, 201, 176));
+        format.setForeground(QColor(111, 66, 193));
         break;
 
       case Tokenizer::TokenColor::Special:
-        format.setForeground(QColor(212, 212, 212));
+        format.setForeground(QColor(97, 175, 239));
         break;
 
       case Tokenizer::TokenColor::Comment:
         format.setForeground(QColor(106, 153, 85));
         break;
 
-      case Tokenizer::TokenColor::CharacterLiteral:
       case Tokenizer::TokenColor::String:
-        format.setForeground(QColor(206, 145, 120));
+        format.setForeground(QColor(227, 98, 9));
         break;
 
       case Tokenizer::TokenColor::Number:
-        format.setForeground(QColor(181, 206, 168));
+        format.setForeground(QColor(111, 66, 193));
         break;
 
       case Tokenizer::TokenColor::Punctuation:
-        format.setForeground(QColor(255, 165, 0));
+        format.setForeground(QColor(169, 177, 214));
         break;
 
       case Tokenizer::TokenColor::Prprocessor:
-        format.setForeground(QColor(197, 134, 192));
+        format.setForeground(QColor(152, 26, 144));
+        break;
+
+      case Tokenizer::TokenColor::CharacterLiteral:
+        format.setForeground(QColor(227, 98, 9));
         break;
 
       default:
