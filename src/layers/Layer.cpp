@@ -661,11 +661,6 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   auto contextID = args.context->uniqueID();
   auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
   if (content && content->contextID() == contextID) {
-    if (args.cleanDirtyFlags) {
-      // DirtyLayerTree is true when the layer before current layer was removed.
-      // So we need to clean it here.
-      bitFields.dirtyDescendents = false;
-    }
     return content;
   }
   auto drawingMatrix = Matrix::I();
