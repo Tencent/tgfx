@@ -290,6 +290,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   _children.insert(_children.begin() + index, child);
   child->_parent = this;
   child->onAttachToRoot(_root);
+  child->invalidateTransform();
   invalidateDescendents();
   return true;
 }
@@ -333,6 +334,10 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   child->_parent = nullptr;
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
+  if (static_cast<size_t>(index) < _children.size()) {
+    // mark the children after the removed child as changed
+    _children[static_cast<size_t>(index)]->bitFields.dirtyDescendents = true;
+  }
   invalidateDescendents();
   return child;
 }
@@ -367,6 +372,11 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   }
   _children.erase(_children.begin() + oldIndex);
   _children.insert(_children.begin() + index, child);
+  if (oldIndex < index) {
+    // mark the children after the removed child as changed
+    _children[static_cast<size_t>(oldIndex)]->bitFields.dirtyDescendents = true;
+  }
+  child->invalidateTransform();
   invalidateDescendents();
   return true;
 }
@@ -651,6 +661,11 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   auto contextID = args.context->uniqueID();
   auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
   if (content && content->contextID() == contextID) {
+    if (args.cleanDirtyFlags) {
+      // DirtyDescendents is true when the layer before current layer was removed.
+      // So we need to clean it here.
+      bitFields.dirtyDescendents = false;
+    }
     return content;
   }
   auto drawingMatrix = Matrix::I();
