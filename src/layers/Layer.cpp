@@ -119,10 +119,11 @@ void Layer::setAlpha(float value) {
 }
 
 void Layer::setBlendMode(BlendMode value) {
-  if (blendMode() == value) {
+  uint8_t uValue = static_cast<uint8_t>(value);
+  if (bitFields.blendMode == uValue) {
     return;
   }
-  bitFields.blendMode = static_cast<uint8_t>(value);
+  bitFields.blendMode = uValue;
   invalidateTransform();
 }
 
@@ -336,7 +337,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
   if (static_cast<size_t>(index) < _children.size()) {
-    _children[static_cast<size_t>(index)]->bitFields.dirtyBackground = true;
+    _children[static_cast<size_t>(index)]->invalidateBackground();
   }
   invalidateDescendents();
   return child;
@@ -373,7 +374,7 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   _children.erase(_children.begin() + oldIndex);
   _children.insert(_children.begin() + index, child);
   if (oldIndex < index) {
-    _children[static_cast<size_t>(oldIndex)]->bitFields.dirtyBackground = true;
+    _children[static_cast<size_t>(oldIndex)]->invalidateBackground();
   }
   child->invalidateTransform();
   invalidateDescendents();
@@ -499,9 +500,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
   auto surface = canvas->getSurface();
   DrawArgs args = {};
-  if (surface) {
+  if (surface && !(surface->renderFlags() & RenderFlags::DisableCache)) {
     args.context = surface->getContext();
-    args.renderFlags = surface->renderFlags();
   }
   drawLayer(args, canvas, alpha, blendMode);
 }
@@ -519,7 +519,6 @@ void Layer::invalidateTransform() {
     return;
   }
   bitFields.dirtyTransform = true;
-  bitFields.dirtyBackground = true;
   invalidate();
 }
 
@@ -528,9 +527,10 @@ void Layer::invalidateContent() {
     return;
   }
   bitFields.dirtyContent = true;
-  bitFields.dirtyBackground = true;
-  rasterizedContent = nullptr;
-  invalidate();
+  if (!_children.empty()) {
+    _children.front()->invalidateBackground();
+  }
+  invalidateDescendents();
 }
 
 void Layer::invalidateDescendents() {
@@ -540,6 +540,10 @@ void Layer::invalidateDescendents() {
   bitFields.dirtyDescendents = true;
   rasterizedContent = nullptr;
   invalidate();
+}
+
+void Layer::invalidateBackground() {
+  bitFields.dirtyBackground = true;
 }
 
 std::unique_ptr<LayerContent> Layer::onUpdateContent() {
@@ -648,14 +652,11 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   if (!bitFields.shouldRasterize || args.context == nullptr) {
     return nullptr;
   }
-  if (args.renderFlags & RenderFlags::DisableCache) {
-    return nullptr;
-  }
   auto hasBackgroundStyle =
       std::find_if(_layerStyles.begin(), _layerStyles.end(), [](const auto& style) {
         return style->extraSourceType() == LayerStyleExtraSourceType::Background;
       }) != _layerStyles.end();
-  if (hasBackgroundStyle && bitFields.dirtyBackground) {
+  if (hasBackgroundStyle && args.backgroundChanged) {
     rasterizedContent = nullptr;
   }
   auto contextID = args.context->uniqueID();
@@ -811,7 +812,7 @@ void Layer::drawContents(LayerContent* content, Canvas* canvas, float alpha, boo
 }
 
 bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild) {
-  bool backgroundChanged = bitFields.dirtyBackground;
+  auto childArgs = args;
   for (const auto& child : _children) {
     if (child.get() == stopChild) {
       return false;
@@ -819,7 +820,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
     if (child->maskOwner) {
       continue;
     }
-    backgroundChanged = backgroundChanged || child->bitFields.dirtyBackground;
+    childArgs.backgroundChanged |=
+        child->bitFields.dirtyBackground || child->bitFields.dirtyTransform;
     if (!child->visible() || child->_alpha <= 0) {
       if (args.cleanDirtyFlags) {
         child->bitFields.dirtyTransform = false;
@@ -828,15 +830,15 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
       continue;
     }
 
-    child->bitFields.dirtyBackground = backgroundChanged;
-    backgroundChanged = backgroundChanged || child->bitFields.dirtyDescendents;
-
     AutoCanvasRestore autoRestore(canvas);
     canvas->concat(child->getMatrixWithScrollRect());
     if (child->_scrollRect) {
       canvas->clipRect(*child->_scrollRect);
     }
-    child->drawLayer(args, canvas, child->_alpha * alpha, child->blendMode());
+    auto childDirtyDescendents = child->bitFields.dirtyDescendents;
+    child->drawLayer(childArgs, canvas, child->_alpha * alpha,
+                     static_cast<BlendMode>(child->bitFields.blendMode));
+    childArgs.backgroundChanged |= childDirtyDescendents;
   }
   if (args.cleanDirtyFlags) {
     bitFields.dirtyDescendents = false;
@@ -886,8 +888,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
                  [&]() { return drawChildren(drawArgs, canvas, 1.0f); });
   };
 
-  DrawArgs drawArgs(args.context, args.renderFlags | RenderFlags::DisableCache, false,
-                    bitFields.excludeChildEffectsInLayerStyle);
+  DrawArgs drawArgs(args.context, false, bitFields.excludeChildEffectsInLayerStyle);
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
   auto contentOffset = Point::Zero();
   auto content = CreatePictureImage(contentPicture, &contentOffset);

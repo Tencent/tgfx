@@ -535,6 +535,11 @@ class Layer {
    */
   void invalidateDescendents();
 
+  /**
+   * Marks the layer's background as changed and needing to be redrawn.
+   */
+  void invalidateBackground();
+
   void onAttachToRoot(Layer* owner);
 
   void onDetachFromRoot();
@@ -587,7 +592,8 @@ class Layer {
     bool dirtyContent : 1;      // need to update content
     bool dirtyDescendents : 1;  // need to redraw the layer's descendents
     bool dirtyTransform : 1;    // need to redraw the layer
-    bool dirtyBackground : 1;   // need to redraw the layer's background
+    bool dirtyBackground : 1;   // need to redraw the layer's background, only mark while sibling is
+                                // changed.
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;

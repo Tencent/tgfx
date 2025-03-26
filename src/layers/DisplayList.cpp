@@ -39,7 +39,7 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   if (replaceAll) {
     canvas->clear();
   }
-  DrawArgs args(surface->getContext(), surface->renderFlags(), true);
+  DrawArgs args(surface->getContext(), true);
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   surfaceContentVersion = surface->contentVersion();
   surfaceID = surface->uniqueID();
