@@ -535,6 +535,8 @@ class Layer {
    */
   void invalidateDescendents();
 
+  void invalidateLayerTree();
+
   void onAttachToRoot(Layer* owner);
 
   void onDetachFromRoot();
@@ -585,7 +587,7 @@ class Layer {
 
   struct {
     bool dirtyContent : 1;      // need to update content
-    bool dirtyDescendents : 1;  // need to redraw child layers
+    bool dirtyLayerTree : 1;    // descendents or siblings changed
     bool dirtyTransform : 1;    // need to redraw the layer, property such as alpha,
                                 // blendMode, matrix, etc.
     bool visible : 1;

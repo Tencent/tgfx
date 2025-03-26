@@ -336,7 +336,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   _children.erase(_children.begin() + index);
   if (static_cast<size_t>(index) < _children.size()) {
     // mark the children after the removed child as changed
-    _children[static_cast<size_t>(index)]->bitFields.dirtyDescendents = true;
+    _children[static_cast<size_t>(index)]->invalidateLayerTree();
   }
   invalidateDescendents();
   return child;
@@ -374,7 +374,7 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   _children.insert(_children.begin() + index, child);
   if (oldIndex < index) {
     // mark the children after the removed child as changed
-    _children[static_cast<size_t>(oldIndex)]->bitFields.dirtyDescendents = true;
+    _children[static_cast<size_t>(oldIndex)]->invalidateLayerTree();
   }
   child->invalidateTransform();
   invalidateDescendents();
@@ -534,11 +534,15 @@ void Layer::invalidateContent() {
 }
 
 void Layer::invalidateDescendents() {
-  if (bitFields.dirtyDescendents) {
+  rasterizedContent = nullptr;
+  invalidateLayerTree();
+}
+
+void Layer::invalidateLayerTree() {
+  if (bitFields.dirtyLayerTree) {
     return;
   }
-  bitFields.dirtyDescendents = true;
-  rasterizedContent = nullptr;
+  bitFields.dirtyLayerTree = true;
   invalidate();
 }
 
@@ -655,16 +659,16 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
       std::find_if(_layerStyles.begin(), _layerStyles.end(), [](const auto& style) {
         return style->extraSourceType() == LayerStyleExtraSourceType::Background;
       }) != _layerStyles.end();
-  if (hasBackgroundStyle && (args.backgroundChanged || bitFields.dirtyDescendents)) {
+  if (hasBackgroundStyle && (args.backgroundChanged || bitFields.dirtyLayerTree)) {
     rasterizedContent = nullptr;
   }
   auto contextID = args.context->uniqueID();
   auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
   if (content && content->contextID() == contextID) {
     if (args.cleanDirtyFlags) {
-      // DirtyDescendents is true when the layer before current layer was removed.
+      // DirtyLayerTree is true when the layer before current layer was removed.
       // So we need to clean it here.
-      bitFields.dirtyDescendents = false;
+      bitFields.dirtyLayerTree = false;
     }
     return content;
   }
@@ -835,12 +839,12 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
       canvas->clipRect(*child->_scrollRect);
     }
     childArgs.backgroundChanged = childArgs.backgroundChanged || child->bitFields.dirtyTransform;
-    auto childDirtyDescendents = child->bitFields.dirtyDescendents;
+    auto childDirtyLayerTree = child->bitFields.dirtyLayerTree;
     child->drawLayer(childArgs, canvas, child->_alpha * alpha, child->_blendMode);
-    childArgs.backgroundChanged = childArgs.backgroundChanged || childDirtyDescendents;
+    childArgs.backgroundChanged = childArgs.backgroundChanged || childDirtyLayerTree;
   }
   if (args.cleanDirtyFlags) {
-    bitFields.dirtyDescendents = false;
+    bitFields.dirtyLayerTree = false;
   }
   return true;
 }

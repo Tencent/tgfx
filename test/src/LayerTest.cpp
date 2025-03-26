@@ -1799,24 +1799,24 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
-  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyLayerTree && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyLayerTree && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(!root->bitFields.dirtyLayerTree && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(child->bitFields.dirtyDescendents);
-  EXPECT_TRUE(root->bitFields.dirtyDescendents);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyLayerTree && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(child->bitFields.dirtyLayerTree);
+  EXPECT_TRUE(root->bitFields.dirtyLayerTree);
   displayList->render(surface.get());
 
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
-  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyLayerTree && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyLayerTree && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(!root->bitFields.dirtyLayerTree && !root->bitFields.dirtyContent);
 
   child->setVisible(false);
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
-  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
-  EXPECT_TRUE(root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyLayerTree && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyLayerTree && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(root->bitFields.dirtyLayerTree && !root->bitFields.dirtyContent);
 }
 
 TGFX_TEST(LayerTest, DropShadowStyle) {
@@ -1950,9 +1950,9 @@ TGFX_TEST(LayerTest, MaskOnwer) {
 
   EXPECT_FALSE(layer2->bitFields.dirtyContent);
   displayList->render(surface.get());
-  EXPECT_FALSE(layer->bitFields.dirtyDescendents);
+  EXPECT_FALSE(layer->bitFields.dirtyLayerTree);
   mask->setAlpha(0.5f);
-  EXPECT_TRUE(layer->bitFields.dirtyDescendents);
+  EXPECT_TRUE(layer->bitFields.dirtyLayerTree);
 
   layer2->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
