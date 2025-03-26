@@ -28,7 +28,7 @@
 
 namespace tgfx {
 
-#define MAX_BLUR_SIGMA 3.0f
+#define MAX_BLUR_SIGMA 50.0f
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
@@ -52,7 +52,7 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   auto context = renderTarget->getContext();
   auto drawingManager = context->drawingManager();
   auto processor = GaussianBlur1DFragmentProcessor::Make(
-      context->drawingBuffer(), std::move(source), sigma, direction, stepLength);
+      context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
   drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
 }
 

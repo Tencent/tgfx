@@ -20,21 +20,28 @@
 
 namespace tgfx {
 
-PlacementPtr<GaussianBlur1DFragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
+PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
     PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> processor, float sigma,
-    GaussianBlurDirection direction, float stepLength) {
+    GaussianBlurDirection direction, float stepLength, int maxSigma) {
   if (!processor) {
     return nullptr;
   }
+  if (maxSigma < 0) {
+    return nullptr;
+  }
+  if (sigma <= 0 || stepLength <= 0) {
+    return processor;
+  }
 
-  return buffer->make<GLGaussianBlur1DFragmentProcessor>(std::move(processor), sigma, direction,
-                                                         stepLength);
+  return buffer->make<GLGaussianBlur1DFragmentProcessor>(
+      std::move(processor), sigma, direction, stepLength, static_cast<int>(ceil(maxSigma)));
 }
 
 GLGaussianBlur1DFragmentProcessor::GLGaussianBlur1DFragmentProcessor(
     PlacementPtr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
-    float stepLength)
-    : GaussianBlur1DFragmentProcessor(std::move(processor), sigma, direction, stepLength) {
+    float stepLength, int maxSigma)
+    : GaussianBlur1DFragmentProcessor(std::move(processor), sigma, direction, stepLength,
+                                      maxSigma) {
 }
 
 void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -52,7 +59,7 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
   fragBuilder->codeAppend("float total = 0.0;");
 
-  fragBuilder->codeAppend("for (int j = 0; j <= 2 * 6; ++j) {");
+  fragBuilder->codeAppendf("for (int j = 0; j <= 2 * %d; ++j) {", maxSigma);
   fragBuilder->codeAppend("int i = j - radius;");
   fragBuilder->codeAppend("float weight = exp(-float(i*i) / (2.0*sigma*sigma));");
   fragBuilder->codeAppend("total += weight;");
