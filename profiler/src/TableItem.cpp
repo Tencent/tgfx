@@ -29,12 +29,12 @@ TableItem::TableItem(QQuickItem* parent) : QQuickItem(parent) {
 TableItem::~TableItem() = default;
 
 void TableItem::setModel(StatisticsModel* model) {
-  if(tModel != model) {
-    if(tModel) {
+  if (tModel != model) {
+    if (tModel) {
       disconnect(tModel, &StatisticsModel::statisticsUpdated, this, nullptr);
     }
     tModel = model;
-    if(tModel) {
+    if (tModel) {
       connect(tModel, &StatisticsModel::statisticsUpdated, this, [this]() {
         update();
         Q_EMIT rowHeightChanged();
@@ -46,7 +46,7 @@ void TableItem::setModel(StatisticsModel* model) {
 }
 
 void TableItem::setRowHeight(int height) {
-  if(rowHeight != height) {
+  if (rowHeight != height) {
     rowHeight = height;
     Q_EMIT rowHeightChanged();
     update();
@@ -54,14 +54,14 @@ void TableItem::setRowHeight(int height) {
 }
 
 void TableItem::setScrollPosition(int position) {
-  if(scrollPosition != position) {
+  if (scrollPosition != position) {
     scrollPosition = position;
     Q_EMIT scrollPositionChanged();
     update();
   }
 }
 void TableItem::setNameColumnWidth(int width) {
-  if(nameColumnWidth != width) {
+  if (nameColumnWidth != width) {
     nameColumnWidth = width;
     Q_EMIT nameColumnWidthChanged();
     update();
@@ -69,7 +69,7 @@ void TableItem::setNameColumnWidth(int width) {
 }
 
 void TableItem::setLocationColumnWidth(int width) {
-  if(locationColumnWidth != width) {
+  if (locationColumnWidth != width) {
     locationColumnWidth = width;
     Q_EMIT locationColumnWidthChanged();
     update();
@@ -77,7 +77,7 @@ void TableItem::setLocationColumnWidth(int width) {
 }
 
 void TableItem::setTotalTimeWidth(int width) {
-  if(totalTimeWidth != width) {
+  if (totalTimeWidth != width) {
     totalTimeWidth = width;
     Q_EMIT totalTimeWidthChanged();
     update();
@@ -85,7 +85,7 @@ void TableItem::setTotalTimeWidth(int width) {
 }
 
 void TableItem::setCountWidth(int width) {
-  if(countWidth != width) {
+  if (countWidth != width) {
     countWidth = width;
     Q_EMIT countWidthChanged();
     update();
@@ -93,7 +93,7 @@ void TableItem::setCountWidth(int width) {
 }
 
 void TableItem::setMtpcWidth(int width) {
-  if(mtpcWidth != width) {
+  if (mtpcWidth != width) {
     mtpcWidth = width;
     Q_EMIT mtpcWidthChanged();
     update();
@@ -120,10 +120,10 @@ void TableItem::setSortColumn(int column) {
 }
 
 void TableItem::setSortOrder(int order) {
-  if(sortOrder != order) {
+  if (sortOrder != order) {
     sortOrder = order;
     Q_EMIT sortOrderChanged();
-    if(tModel) {
+    if (tModel) {
       tModel->sort(sortColumn, static_cast<Qt::SortOrder>(sortOrder));
       update();
     }
@@ -160,10 +160,11 @@ QSGNode* TableItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     geometryChanged = false;
   }
 
-  if(tModel) {
+  if (tModel) {
     int totalRows = tModel->rowCount(QModelIndex());
     visibleRowCount = std::min(totalRows, static_cast<int>(ceil(height() / rowHeight)));
-    firstVisibleCount = std::min(scrollPosition / rowHeight, totalRows - visibleRowCount > 0 ? totalRows - visibleRowCount : 0);
+    firstVisibleCount = std::min(scrollPosition / rowHeight,
+                                 totalRows - visibleRowCount > 0 ? totalRows - visibleRowCount : 0);
     Q_EMIT visibleRowCountChanged(visibleRowCount);
   }
 
@@ -233,22 +234,22 @@ void TableItem::draw() {
 }
 
 void TableItem::drawTable(tgfx::Canvas* canvas) {
-  if(!tModel) {
+  if (!tModel) {
     return;
   }
 
   float y = 0;
   int rowCount = 0;
-  for(int i = 0; i < visibleRowCount; ++i) {
+  for (int i = 0; i < visibleRowCount; ++i) {
     int rowIndex = firstVisibleCount + i;
-    if(rowIndex < tModel->rowCount(QModelIndex())) {
+    if (rowIndex < tModel->rowCount(QModelIndex())) {
       drawRow(canvas, rowIndex, y);
       rowCount++;
     }
     y += rowHeight;
   }
 
-  if(rowCount == 0){
+  if (rowCount == 0) {
     return;
   }
 
@@ -261,14 +262,14 @@ void TableItem::drawTable(tgfx::Canvas* canvas) {
 
   float x = 0;
 
-  x +=nameColumnWidth;
+  x += nameColumnWidth;
   canvas->drawLine(x, 0, x, lineHeight, linePaint);
 
   x += locationColumnWidth;
-  canvas->drawLine(x, 0, x , lineHeight, linePaint);
+  canvas->drawLine(x, 0, x, lineHeight, linePaint);
 
   x += totalTimeWidth;
-  canvas->drawLine(x, 0, x , lineHeight, linePaint);
+  canvas->drawLine(x, 0, x, lineHeight, linePaint);
 
   x += countWidth;
   canvas->drawLine(x, 0, x, lineHeight, linePaint);
@@ -280,19 +281,21 @@ void TableItem::drawTable(tgfx::Canvas* canvas) {
 void TableItem::drawRow(tgfx::Canvas* canvas, int rowIndex, float y) {
   tgfx::Paint backgroundPaint;
   backgroundPaint.setColor(getTgfxColor(0xFF2D2D2D));
-  auto textRect = tgfx::Rect::MakeXYWH(0, (int)y, static_cast<int>(width()), static_cast<int>(y + rowHeight));
+  auto textRect =
+      tgfx::Rect::MakeXYWH(0, (int)y, static_cast<int>(width()), static_cast<int>(y + rowHeight));
   canvas->drawRect(textRect, backgroundPaint);
 
   tgfx::Paint linePaint;
   linePaint.setColor(getTgfxColor(0xFF606060));
-  canvas->drawLine(0, (float)(y + rowHeight - 1), static_cast<float>(width()), y + rowHeight - 1, linePaint);
+  canvas->drawLine(0, (float)(y + rowHeight - 1), static_cast<float>(width()), y + rowHeight - 1,
+                   linePaint);
 
-  if(!tModel) {
+  if (!tModel) {
     return;
   }
 
   QModelIndex index = tModel->index(rowIndex, 0);
-  if(!index.isValid()) {
+  if (!index.isValid()) {
     return;
   }
 
@@ -301,45 +304,43 @@ void TableItem::drawRow(tgfx::Canvas* canvas, int rowIndex, float y) {
   QColor statusColor = index.data(StatisticsModel::colorRole).value<QColor>();
   uint32_t color32 = ((uint32_t)(statusColor.alpha()) << 24) |
                      ((uint32_t)(statusColor.blue()) << 16) |
-                     ((uint32_t)(statusColor.green())<< 8) |
-                     (uint32_t)(statusColor.red());
+                     ((uint32_t)(statusColor.green()) << 8) | (uint32_t)(statusColor.red());
   tgfx::Paint statusPaint;
   statusPaint.setColor(getTgfxColor(color32));
-  canvas->drawCircle(x + 16, y + rowHeight/2, 8, statusPaint);
-
+  canvas->drawCircle(x + 16, y + rowHeight / 2, 8, statusPaint);
 
   QString nameText = index.data(StatisticsModel::nameRole).toString();
-  drawCell(canvas, nameText, x + 30, y - rowHeight/2 + 5, nameColumnWidth - 30, textColor, false, Qt::AlignLeft);
+  drawCell(canvas, nameText, x + 30, y - rowHeight / 2 + 5, nameColumnWidth - 30, textColor, false,
+           Qt::AlignLeft);
   x += nameColumnWidth;
 
-
   QString locationText = index.data(StatisticsModel::locationRole).toString();
-  drawCell(canvas, locationText, x, y - rowHeight/2 + 5, locationColumnWidth, textColor, false, Qt::AlignLeft);
+  drawCell(canvas, locationText, x, y - rowHeight / 2 + 5, locationColumnWidth, textColor, false,
+           Qt::AlignLeft);
   x += locationColumnWidth;
 
   QString totalTimeText = index.data(StatisticsModel::totalTimeRole).toString();
-  drawCell(canvas, totalTimeText, x, y - rowHeight/2 + 5, totalTimeWidth, textColor, false, Qt::AlignLeft);
+  drawCell(canvas, totalTimeText, x, y - rowHeight / 2 + 5, totalTimeWidth, textColor, false,
+           Qt::AlignLeft);
   x += totalTimeWidth;
 
-
   QString countText = index.data(StatisticsModel::countRole).toString();
-  drawCell(canvas, countText, x, y - rowHeight/2 + 5, countWidth, textColor, false, Qt::AlignLeft);
+  drawCell(canvas, countText, x, y - rowHeight / 2 + 5, countWidth, textColor, false,
+           Qt::AlignLeft);
   x += countWidth;
 
-
   QString mtpcText = index.data(StatisticsModel::mtpcRole).toString();
-  drawCell(canvas, mtpcText, x, y - rowHeight/2 + 5, mtpcWidth, textColor, false, Qt::AlignLeft);
+  drawCell(canvas, mtpcText, x, y - rowHeight / 2 + 5, mtpcWidth, textColor, false, Qt::AlignLeft);
   x += mtpcWidth;
 
-
   QString threadsText = index.data(StatisticsModel::threadCountRole).toString();
-  drawCell(canvas, threadsText, x, y - rowHeight/2 + 5, threadsWidth, textColor, false, Qt::AlignLeft);
-
+  drawCell(canvas, threadsText, x, y - rowHeight / 2 + 5, threadsWidth, textColor, false,
+           Qt::AlignLeft);
 }
 
 void TableItem::drawCell(tgfx::Canvas* canvas, const QString& text, float x, float y, float width,
                          const QColor& textColor, bool contrast, Qt::Alignment alignment) {
-  if(text.isEmpty()) {
+  if (text.isEmpty()) {
     return;
   }
 
@@ -349,28 +350,24 @@ void TableItem::drawCell(tgfx::Canvas* canvas, const QString& text, float x, flo
   float textX = x + 8;
   auto textBounds = getTextBounds(displayText);
 
-  if(alignment & Qt::AlignHCenter) {
+  if (alignment & Qt::AlignHCenter) {
     textX = x + (width - textBounds.width()) / 2;
-  }
-  else if(alignment & Qt::AlignRight) {
+  } else if (alignment & Qt::AlignRight) {
     textX = x + width - textBounds.width() - 8;
   }
 
   float textY = y + (rowHeight + textBounds.height()) / 2 - textBounds.top;
-  uint32_t color32 = ((uint32_t)(textColor.alpha()) << 24) |
-                      ((uint32_t)(textColor.blue()) << 16) |
-                        ((uint32_t)(textColor.green())<< 8) |
-                          (uint32_t)(textColor.red());
-  if(contrast) {
+  uint32_t color32 = ((uint32_t)(textColor.alpha()) << 24) | ((uint32_t)(textColor.blue()) << 16) |
+                     ((uint32_t)(textColor.green()) << 8) | (uint32_t)(textColor.red());
+  if (contrast) {
     drawTextContrast(canvas, appHost.get(), textX, textY, color32, utf8Text.c_str());
-  }
-  else {
+  } else {
     drawText(canvas, appHost.get(), utf8Text, textX, textY, color32);
   }
 }
 
 tgfx::Rect TableItem::getTextBounds(const QString& text) const {
-  if(text.isEmpty() || !appHost) {
+  if (text.isEmpty() || !appHost) {
     return tgfx::Rect::MakeEmpty();
   }
 
@@ -441,4 +438,3 @@ QString TableItem::elideText(const QString& text, float maxWidth,
   }
   return result;
 }
-

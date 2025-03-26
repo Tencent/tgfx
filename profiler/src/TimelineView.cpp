@@ -389,8 +389,7 @@ void TimelineView::drawTimelineSelect(tgfx::Canvas* canvs) {
     auto textStartYPos = textBounds.height() + textTopY;
     p1 = tgfx::Point{textStartXPos - margins, textTopY - margins};
     p2 = tgfx::Point{textBounds.width() + 2 * margins, textBounds.height() + 2 * margins};
-    drawRect(canvs, p1, p2, 0xFF000000);
-    drawText(canvs, appHost.get(), text, textStartXPos, textStartYPos, 0xFF73AB6A);
+    drawTextWithBlackRect(canvs, appHost.get(), text, textStartXPos, textStartYPos, 0xFF73AB6A);
   }
 }
 

@@ -178,7 +178,7 @@ void View::changeViewModeButton(ViewMode mode) {
 }
 
 void View::openStatisticsView() {
-  if(tabWidget->count() < 2) {
+  if (tabWidget->count() < 2) {
     qmlRegisterType<TableItem>("TGFX.Controls", 1, 0, "TGFXTable");
     qmlRegisterType<StatisticsModel>("TGFX.Profiler", 1, 0, "StatisticsModel");
     qmlRegisterType<FPSChartItem>("TGFX.Profiler", 1, 0, "FPSChart");

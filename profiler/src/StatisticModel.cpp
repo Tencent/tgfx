@@ -656,7 +656,7 @@ void StatisticsModel::refreshInstrumentationData() {
   }
 
   srcData = std::move(srcloc);
-  if(!srcData.empty()) {
+  if (!srcData.empty()) {
     sort(sortColumn, sortOrder);
   }
   Q_EMIT statisticsUpdated();
@@ -795,105 +795,104 @@ QVector<float>& StatisticsModel::getFps() {
   return fps;
 }
 float StatisticsModel::getMaxFps() const {
-   const_cast<StatisticsModel*>(this)->refreshFrameData();
-   if (fps.isEmpty()) {
-     return 0.0f;
-   }
+  const_cast<StatisticsModel*>(this)->refreshFrameData();
+  if (fps.isEmpty()) {
+    return 0.0f;
+  }
 
-   auto maxCompare = [](float a, float b){ return a < b; };
-   float globalMax = *std::max_element(fps.begin(), fps.end());
+  auto maxCompare = [](float a, float b) { return a < b; };
+  float globalMax = *std::max_element(fps.begin(), fps.end());
 
-   return calculateStatInRange(fps, maxCompare, globalMax);
- }
+  return calculateStatInRange(fps, maxCompare, globalMax);
+}
 
- float StatisticsModel::getMinFps() const {
-   const_cast<StatisticsModel*>(this)->refreshFrameData();
-   if (fps.isEmpty()) {
-     return 0.0f;
-   }
+float StatisticsModel::getMinFps() const {
+  const_cast<StatisticsModel*>(this)->refreshFrameData();
+  if (fps.isEmpty()) {
+    return 0.0f;
+  }
 
-   auto minCompare = [](float a, float b){ return a > b; };
-   float globalMax = *std::min_element(fps.begin(), fps.end());
+  auto minCompare = [](float a, float b) { return a > b; };
+  float globalMax = *std::min_element(fps.begin(), fps.end());
 
-   return calculateStatInRange(fps, minCompare, globalMax);
- }
+  return calculateStatInRange(fps, minCompare, globalMax);
+}
 
- float StatisticsModel::getAvgFps() const {
-   const_cast<StatisticsModel*>(this)->refreshFrameData();
-   if (fps.isEmpty()) {
-     return 0.0f;
-   }
+float StatisticsModel::getAvgFps() const {
+  const_cast<StatisticsModel*>(this)->refreshFrameData();
+  if (fps.isEmpty()) {
+    return 0.0f;
+  }
 
-   int start = 0;
-   int end = static_cast<int>(fps.size() - 1);
-   if (stateRange.active) {
-     auto  range =  worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+  int start = 0;
+  int end = static_cast<int>(fps.size() - 1);
+  if (stateRange.active) {
+    auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
 
-     start = static_cast<int>(range.first);
-     end = static_cast<int>(range.second);
+    start = static_cast<int>(range.first);
+    end = static_cast<int>(range.second);
 
-     start = qBound(0, start, static_cast<int>(fps.size() - 1));
-     end = qBound(0, end, static_cast<int>(fps.size() - 1));
+    start = qBound(0, start, static_cast<int>(fps.size() - 1));
+    end = qBound(0, end, static_cast<int>(fps.size() - 1));
+  }
 
-   }
+  if (start <= end) {
+    float sum = 0.0f;
+    for (int i = start; i <= end; ++i) {
+      sum += fps[i];
+    }
+    return sum / (end - start + 1);
+  }
+  return 0.0f;
+}
 
-   if (start <= end) {
-     float sum = 0.0f;
-     for (int i = start; i <= end; ++i) {
-       sum += fps[i];
-     }
-     return sum / (end - start + 1);
-   }
-   return 0.0f;
- }
+float StatisticsModel::getMaxDrawCall() const {
+  const_cast<StatisticsModel*>(this)->refreshFrameData();
+  if (drawCall.isEmpty()) {
+    return 0.0f;
+  }
 
- float StatisticsModel::getMaxDrawCall() const {
-   const_cast<StatisticsModel*>(this)->refreshFrameData();
-   if (drawCall.isEmpty()) {
-     return 0.0f;
-   }
+  auto maxCompare = [](float a, float b) { return a < b; };
+  float globalMax = *std::max_element(drawCall.begin(), drawCall.end());
 
-   auto maxCompare = [](float a, float b) { return a < b; };
-   float globalMax = *std::max_element(drawCall.begin(), drawCall.end());
+  return calculateStatInRange(drawCall, maxCompare, globalMax);
+}
 
-   return calculateStatInRange(drawCall, maxCompare, globalMax);
- }
+float StatisticsModel::getMinDrawCall() const {
+  const_cast<StatisticsModel*>(this)->refreshFrameData();
+  if (drawCall.isEmpty()) {
+    return 0.0f;
+  }
 
- float StatisticsModel::getMinDrawCall() const {
-   const_cast<StatisticsModel*>(this)->refreshFrameData();
-   if (drawCall.isEmpty()) {
-     return 0.0f;
-   }
+  auto minCompare = [](float a, float b) { return a > b; };
+  float globalMax = *std::min_element(drawCall.begin(), drawCall.end());
 
-   auto minCompare = [](float a, float b) { return a > b; };
-   float globalMax = *std::min_element(drawCall.begin(), drawCall.end());
+  return calculateStatInRange(drawCall, minCompare, globalMax);
+}
 
-   return calculateStatInRange(drawCall, minCompare, globalMax);
- }
+float StatisticsModel::getMaxTriangles() const {
+  const_cast<StatisticsModel*>(this)->refreshFrameData();
+  if (triangle.isEmpty()) {
+    return 0.0f;
+  }
 
- float StatisticsModel::getMaxTriangles() const {
-   const_cast<StatisticsModel*>(this)->refreshFrameData();
-   if (triangle.isEmpty()) {
-     return 0.0f;
-   }
+  auto maxCompare = [](float a, float b) { return a < b; };
+  float globalMax = *std::max_element(triangle.begin(), triangle.end());
 
-   auto maxCompare = [](float a, float b) { return a < b; };
-   float globalMax = *std::max_element(triangle.begin(), triangle.end());
+  return calculateStatInRange(triangle, maxCompare, globalMax);
+}
 
-   return calculateStatInRange(triangle, maxCompare, globalMax);
- }
+float StatisticsModel::getMinTriangles() const {
+  const_cast<StatisticsModel*>(this)->refreshFrameData();
+  if (triangle.isEmpty()) {
+    return 0.0f;
+  }
 
- float StatisticsModel::getMinTriangles() const {
-   const_cast<StatisticsModel*>(this)->refreshFrameData();
-   if (triangle.isEmpty()) {
-     return 0.0f;
-   }
+  auto minCompare = [](float a, float b) { return a > b; };
+  float globalMax = *std::min_element(triangle.begin(), triangle.end());
 
-   auto minCompare = [](float a, float b) { return a > b; };
-   float globalMax = *std::min_element(triangle.begin(), triangle.end());
-
-   return calculateStatInRange(triangle, minCompare, globalMax);
- }
+  return calculateStatInRange(triangle, minCompare, globalMax);
+}
 
 QVector<float>& StatisticsModel::getDrawCall() {
   refreshFrameData();
@@ -933,14 +932,14 @@ bool StatisticsModel::srcFileValid(const char* fn, uint64_t olderThan, const tra
 }
 
 template <typename Func>
- float StatisticsModel::calculateStatInRange(const QVector<float>& data, Func comparefunc,
+float StatisticsModel::calculateStatInRange(const QVector<float>& data, Func comparefunc,
                                             float initValue) const {
-  if(data.isEmpty()) {
+  if (data.isEmpty()) {
     return 0.0f;
   }
 
-  if(stateRange.active) {
-    auto  range =  worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+  if (stateRange.active) {
+    auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
 
     int start = static_cast<int>(range.first);
     int end = static_cast<int>(range.second);
@@ -948,10 +947,10 @@ template <typename Func>
     start = qBound(0, start, static_cast<int>(fps.size() - 1));
     end = qBound(0, end, static_cast<int>(fps.size() - 1));
 
-    if(start <= end) {
+    if (start <= end) {
       float resultValue = data[start];
-      for(int i = start + 1; i <= end; ++i) {
-        if(comparefunc(resultValue, data[i])) {
+      for (int i = start + 1; i <= end; ++i) {
+        if (comparefunc(resultValue, data[i])) {
           resultValue = data[i];
         }
       }
@@ -960,9 +959,3 @@ template <typename Func>
   }
   return initValue;
 }
-
-
-
-
-
-

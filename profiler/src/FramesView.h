@@ -77,7 +77,7 @@ class FramesView : public QQuickItem {
  protected:
   void draw();
   void drawFrames(tgfx::Canvas* canvas);
-  void drawBackground(tgfx::Canvas* canvas, float& xEnd);
+  void drawBackground(tgfx::Canvas* canvas);
   void drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group);
   void drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen, int frameWidth,
                   int group, uint32_t color);
@@ -98,6 +98,7 @@ class FramesView : public QQuickItem {
 
   //Left button
   float viewOffset = 0.0f;
+  float placeWidth = 50.f;
   bool isLeftDagging;
   int selectedStartFrame;
   int selectedEndFrame;

@@ -23,31 +23,57 @@ class TableItem : public QQuickItem {
   Q_OBJECT
   Q_PROPERTY(StatisticsModel* model READ getModel WRITE setModel NOTIFY modelChanged)
   Q_PROPERTY(int rowHeight READ getRowHeight WRITE setRowHeight NOTIFY rowHeightChanged)
-  Q_PROPERTY(int scrollPosition READ getScrollPosition WRITE setScrollPosition NOTIFY scrollPositionChanged)
-  Q_PROPERTY(int nameColumnWidth READ getNameColumnWidth WRITE setNameColumnWidth NOTIFY nameColumnWidthChanged)
-  Q_PROPERTY(int locationColumnWidth READ getLocationColumnWidth WRITE setLocationColumnWidth NOTIFY locationColumnWidthChanged)
-  Q_PROPERTY(int totalTimeWidth READ getTotalTimeWidth WRITE setTotalTimeWidth NOTIFY totalTimeWidthChanged)
+  Q_PROPERTY(int scrollPosition READ getScrollPosition WRITE setScrollPosition NOTIFY
+                 scrollPositionChanged)
+  Q_PROPERTY(int nameColumnWidth READ getNameColumnWidth WRITE setNameColumnWidth NOTIFY
+                 nameColumnWidthChanged)
+  Q_PROPERTY(int locationColumnWidth READ getLocationColumnWidth WRITE setLocationColumnWidth NOTIFY
+                 locationColumnWidthChanged)
+  Q_PROPERTY(int totalTimeWidth READ getTotalTimeWidth WRITE setTotalTimeWidth NOTIFY
+                 totalTimeWidthChanged)
   Q_PROPERTY(int countWidth READ getCountWidth WRITE setCountWidth NOTIFY countWidthChanged)
   Q_PROPERTY(int mtpcWidth READ getMtpcWidth WRITE setMtpcWidth NOTIFY mtpcWidthChanged)
   Q_PROPERTY(int threadsWidth READ getThreadsWidth WRITE setThreadsWidth NOTIFY threadsWidthChanged)
   Q_PROPERTY(int sortColumn READ getSortColumn WRITE setSortColumn NOTIFY sortColumnChanged)
   Q_PROPERTY(int sortOrder READ getSortOrder WRITE setSortOrder NOTIFY sortOrderChanged)
 
-public:
+ public:
   explicit TableItem(QQuickItem* parent = nullptr);
   ~TableItem() override;
 
-  StatisticsModel* getModel() const { return tModel; }
-  int getRowHeight() const { return rowHeight; }
-  int getScrollPosition() const { return scrollPosition; }
-  int getNameColumnWidth() const { return nameColumnWidth; }
-  int getLocationColumnWidth() const { return locationColumnWidth; }
-  int getTotalTimeWidth() const { return totalTimeWidth; }
-  int getCountWidth() const { return countWidth; }
-  int getMtpcWidth() const { return mtpcWidth; }
-  int getThreadsWidth() const { return threadsWidth; }
-  int getSortColumn() const { return sortColumn; }
-  int getSortOrder() const { return sortOrder; }
+  StatisticsModel* getModel() const {
+    return tModel;
+  }
+  int getRowHeight() const {
+    return rowHeight;
+  }
+  int getScrollPosition() const {
+    return scrollPosition;
+  }
+  int getNameColumnWidth() const {
+    return nameColumnWidth;
+  }
+  int getLocationColumnWidth() const {
+    return locationColumnWidth;
+  }
+  int getTotalTimeWidth() const {
+    return totalTimeWidth;
+  }
+  int getCountWidth() const {
+    return countWidth;
+  }
+  int getMtpcWidth() const {
+    return mtpcWidth;
+  }
+  int getThreadsWidth() const {
+    return threadsWidth;
+  }
+  int getSortColumn() const {
+    return sortColumn;
+  }
+  int getSortOrder() const {
+    return sortOrder;
+  }
 
   void setModel(StatisticsModel* model);
   void setRowHeight(int height);
@@ -63,8 +89,7 @@ public:
 
   Q_INVOKABLE void handleMouseDoubleClick(int x, int y);
 
-
-  Q_SIGNALS:
+ Q_SIGNALS:
   void modelChanged();
   void rowHeightChanged();
   void scrollPositionChanged();
@@ -79,7 +104,7 @@ public:
   void sortColumnChanged();
   void sortOrderChanged();
 
-protected:
+ protected:
   QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
   void createAppHost();
@@ -87,12 +112,12 @@ protected:
   void drawTable(tgfx::Canvas* canvas);
   void drawRow(tgfx::Canvas* canvas, int rowIndex, float y);
   void drawCell(tgfx::Canvas* canvas, const QString& text, float x, float y, float width,
-                  const QColor& textColor, bool contrast = false, Qt::Alignment alignment = Qt::AlignLeft);
+                const QColor& textColor, bool contrast = false,
+                Qt::Alignment alignment = Qt::AlignLeft);
   tgfx::Rect getTextBounds(const QString& text) const;
   QString elideText(const QString& text, float maxWidth, Qt::TextElideMode elideMode) const;
 
-
-private:
+ private:
   StatisticsModel* tModel = nullptr;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow;
   std::unique_ptr<AppHost> appHost;

@@ -78,7 +78,7 @@ void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, flo
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color,
                       const char* text, float fontSize = FontSize);
 void drawTextWithBlackRect(tgfx::Canvas* canvas, const AppHost* appHost, const char* text, float x,
-                           float y, uint32_t color, float fontSize);
+                           float y, uint32_t color, float fontSize = FontSize);
 
 uint32_t getThreadColor(uint64_t thread, int depth, bool dynamic);
 const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name,

@@ -127,9 +127,8 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
   assert(worker->GetFrameCount(*frames) != 0);
   canvas->translate(viewOffset, 0);
 
-  auto xEnd = 0.f;
-  drawBackground(canvas, xEnd);
-  const int w = static_cast<int>(width() - xEnd);
+  drawBackground(canvas);
+  const int w = static_cast<int>(width() - placeWidth);
   const int frameWidth = GetFrameWidth(viewData->frameScale);
   const int group = GetFrameGroup(viewData->frameScale);
   const int total = static_cast<int>(worker->GetFrameCount(*frames));
@@ -221,13 +220,11 @@ QSGNode* FramesView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   return node;
 }
 
-void FramesView::drawBackground(tgfx::Canvas* canvas, float& xEnd) {
+void FramesView::drawBackground(tgfx::Canvas* canvas) {
   const auto dpos = tgfx::Point{0.f, 0.f};
   const auto h = static_cast<float>(height());
   const auto w = static_cast<float>(width());
   auto fontSize = 12.f;
-  auto placeWidth = 50.f;
-  xEnd += placeWidth;
 
   auto p1 = tgfx::Point{w - placeWidth, 0};
   auto p2 = tgfx::Point{placeWidth, h};
@@ -404,10 +401,15 @@ void FramesView::hoverMoveEvent(QHoverEvent* event) {
     QQuickItem::hoverMoveEvent(event);
     return;
   }
+  const auto w = static_cast<float>(width());
+  const auto mouseX = int(event->position().x());
+  if (mouseX < 0 || mouseX > w - placeWidth) {
+    QToolTip::hideText();
+    return;
+  }
 
   const int frameWidth = GetFrameWidth(viewData->frameScale);
   const int group = GetFrameGroup(viewData->frameScale);
-  const auto mouseX = int(event->position().x());
   const auto adjustedX = mouseX - int(viewOffset);
   const auto offset = adjustedX * group / frameWidth;
   const auto total = int(worker->GetFrameCount(*frames));
