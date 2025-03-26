@@ -888,7 +888,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
                  [&]() { return drawChildren(drawArgs, canvas, 1.0f); });
   };
 
-  DrawArgs drawArgs(args.context, false, bitFields.excludeChildEffectsInLayerStyle);
+  // null context prohibits the use of rasterizedCache during the drawing process.
+  DrawArgs drawArgs(nullptr, false, bitFields.excludeChildEffectsInLayerStyle);
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
   auto contentOffset = Point::Zero();
   auto content = CreatePictureImage(contentPicture, &contentOffset);
