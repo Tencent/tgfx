@@ -28,9 +28,11 @@ namespace drawers {
 
 static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto progressBar = tgfx::Layer::Make();
+  progressBar->setName("progressBar");
   progressBar->setMatrix(tgfx::Matrix::MakeTrans(24, 670));
   progressBar->setBlendMode(tgfx::BlendMode::ColorDodge);
   auto backLineLayer = tgfx::ShapeLayer::Make();
+  backLineLayer->setName("backlineLayer");
   auto backLinePath = tgfx::Path();
   backLinePath.lineTo(327, 0);
   backLineLayer->setPath(backLinePath);
@@ -40,6 +42,7 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   progressBar->addChild(backLineLayer);
 
   auto frontLineLayer = tgfx::ShapeLayer::Make();
+  frontLineLayer->setName("frontLineLayer");
   auto frontLinePath = tgfx::Path();
   frontLinePath.lineTo(222, 0);
   frontLineLayer->setPath(frontLinePath);
@@ -48,6 +51,7 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   progressBar->addChild(frontLineLayer);
 
   auto circleLayer = tgfx::ShapeLayer::Make();
+  circleLayer->setName("circleLayer");
   auto circlePath = tgfx::Path();
   circlePath.addOval(tgfx::Rect::MakeWH(22, 22));
   circleLayer->setFillStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(192, 221, 241)));
@@ -60,6 +64,7 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
 
 static std::shared_ptr<tgfx::Layer> CreateBackground() {
   auto background = tgfx::ShapeLayer::Make();
+  background->setName("background");
   tgfx::Rect displayRect = tgfx::Rect::MakeWH(375, 812);
   auto backPath = tgfx::Path();
   backPath.addRoundRect(displayRect, 40, 40);
@@ -67,6 +72,7 @@ static std::shared_ptr<tgfx::Layer> CreateBackground() {
   background->setPath(backPath);
 
   auto backgroundGradient = tgfx::ShapeLayer::Make();
+  backgroundGradient->setName("backGroundGradient");
   auto gradient = tgfx::Gradient::MakeLinear(
       {0, 0}, {0, 430},
       {tgfx::Color::FromRGBA(233, 0, 100), tgfx::Color::FromRGBA(134, 93, 255, 0)});
@@ -86,11 +92,14 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
     return nullptr;
   }
   auto card = tgfx::Layer::Make();
+  card->setName("card");
   auto cardMatrix = tgfx::Matrix::MakeTrans(24, 150);
   auto imageLayer = tgfx::ImageLayer::Make();
+  imageLayer->setName("Image");
   imageLayer->setImage(image);
   auto imageScale = static_cast<float>(std::min(327.0 / image->width(), 344.0 / image->height()));
   auto maskLayer = tgfx::ShapeLayer::Make();
+  maskLayer->setName("mask");
   maskLayer->setFillStyle(tgfx::SolidColor::Make());
   auto maskPath = tgfx::Path();
   auto radius = 20.f / imageScale;
@@ -108,6 +117,7 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
 
 std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
+  root->setName("root");
   // background
   root->addChild(CreateBackground());
 
@@ -116,10 +126,12 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
 
   // text
   auto textLayer = tgfx::TextLayer::Make();
+  textLayer->setName("text");
   textLayer->setText("        TGFX  |  Image of bridge");
   textLayer->setMatrix(tgfx::Matrix::MakeTrans(48, 550));
   tgfx::Font font(host->getTypeface("default"), 18);
   textLayer->setFont(font);
+
   root->addChild(textLayer);
 
   // progress shape

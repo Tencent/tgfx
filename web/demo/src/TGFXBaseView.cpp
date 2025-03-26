@@ -45,36 +45,36 @@ void TGFXBaseView::setImagePath(const std::string& imagePath) {
 }
 
 void TGFXBaseView::draw(int drawIndex) {
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
-  }
-  if (window == nullptr) {
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-  }
-  if (window == nullptr) {
-    return;
-  }
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
-  }
-  auto surface = window->getSurface(context);
-  if (surface == nullptr) {
+    if (appHost->width() <= 0 || appHost->height() <= 0) {
+      return;
+    }
+    if (window == nullptr) {
+      window = tgfx::WebGLWindow::MakeFrom(canvasID);
+    }
+    if (window == nullptr) {
+      return;
+    }
+    auto device = window->getDevice();
+    auto context = device->lockContext();
+    if (context == nullptr) {
+      return;
+    }
+    auto surface = window->getSurface(context);
+    if (surface == nullptr) {
+      device->unlock();
+      return;
+    }
+    auto canvas = surface->getCanvas();
+    canvas->clear();
+    auto numDrawers = drawers::Drawer::Count() - 1;
+    auto index = (drawIndex % numDrawers) + 1;
+    auto drawer = drawers::Drawer::GetByName("GridBackground");
+    drawer->draw(canvas, appHost.get());
+    drawer = drawers::Drawer::GetByIndex(index);
+    drawer->draw(canvas, appHost.get());
+    context->flushAndSubmit();
+    window->present(context);
     device->unlock();
-    return;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  context->flushAndSubmit();
-  window->present(context);
-  device->unlock();
 }
 }  // namespace hello2d
 

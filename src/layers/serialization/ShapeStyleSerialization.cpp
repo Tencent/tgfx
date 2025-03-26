@@ -76,7 +76,7 @@ uint32_t ImagePatternStyleSerialization::Serialization(flatbuffers::FlatBufferBu
   ShapeStyleSerialization::Serialization(builder);
   std::shared_ptr<ImagePattern> ptr = std::static_pointer_cast<ImagePattern>(m_ShapeStyle);
   auto img = ptr->image;
-  auto image = fbs::ImageAttribute(static_cast<int>(img->type()), img->width(), img->height(),
+  auto image = fbs::ImageAttribute(static_cast<fbs::ImageType>(img->type()), img->width(), img->height(),
     img->isAlphaOnly(), img->hasMipmaps(), img->isFullyDecoded(), img->isTextureBacked());
   auto imagePattern = fbs::CreateImagePatternAttribute(builder,
     &m_ShapeStyleCommonAttribute, static_cast<fbs::TileMode>(ptr->tileModeX),

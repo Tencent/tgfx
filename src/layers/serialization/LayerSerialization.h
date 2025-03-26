@@ -19,89 +19,89 @@
 #pragma once
 
 #include "flatbuffers/flatbuffers.h"
+#include "SerializationUtils.h"
 
 namespace tgfx {
   class Layer;
-  class LayerSerialization
-  {
+
+  class LayerSerialization{
   public:
+    UNCOPIED_PACK(LayerSerialization);
+
     static std::vector<uint8_t> serializingLayerAttribute(std::shared_ptr<Layer> layer);
     static std::vector<uint8_t> serializingTreeNode(std::shared_ptr<Layer> layer);
 
-    LayerSerialization() = delete;
-    LayerSerialization(const LayerSerialization& ) = delete;
-    LayerSerialization(LayerSerialization&&) = delete;
-    LayerSerialization& operator=(const LayerSerialization&) = delete;
-    LayerSerialization& operator=(LayerSerialization&&) = delete;
-
     static std::shared_ptr<LayerSerialization> GetSerialization(std::shared_ptr<Layer> layer);
-    LayerSerialization(std::shared_ptr<tgfx::Layer> layer);
+
     virtual ~LayerSerialization() = default;
+
+    virtual std::string OriginClassName() = 0;
     virtual uint32_t SerializationLayerAttribute(flatbuffers::FlatBufferBuilder& builder);
-    uint32_t SerializationLayerTreeNode(flatbuffers::FlatBufferBuilder& builder);
+    uint32_t SerializationLayerTreeNode(flatbuffers::FlatBufferBuilder& builder, std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
   private:
-    uint32_t createTreeNode(flatbuffers::FlatBufferBuilder& builder, std::shared_ptr<Layer> layer);
+    uint32_t createTreeNode(flatbuffers::FlatBufferBuilder& builder, std::shared_ptr<Layer> layer, std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
   protected:
+    explicit LayerSerialization(std::shared_ptr<tgfx::Layer> layer);
     std::shared_ptr<Layer> m_Layer;
   };
 
   class BasicLayerSerialization : public LayerSerialization {
   public:
-    BasicLayerSerialization() = delete;
-    BasicLayerSerialization(const BasicLayerSerialization& ) = delete;
-    BasicLayerSerialization(BasicLayerSerialization&&) = delete;
-    BasicLayerSerialization& operator=(const BasicLayerSerialization&) = delete;
-    BasicLayerSerialization& operator=(BasicLayerSerialization&&) = delete;
-    BasicLayerSerialization(std::shared_ptr<Layer> layer);
-    virtual ~BasicLayerSerialization() = default;
+    UNCOPIED_PACK(BasicLayerSerialization);
+
+    explicit BasicLayerSerialization(std::shared_ptr<Layer> layer);
+    ~BasicLayerSerialization() override = default;
+    std::string OriginClassName() override {
+      return "Layer";
+    }
     uint32_t SerializationLayerAttribute(flatbuffers::FlatBufferBuilder& builder) override;
   };
 
   class ImageLayerSerialization : public LayerSerialization {
   public:
-    ImageLayerSerialization() = delete;
-    ImageLayerSerialization(const ImageLayerSerialization& ) = delete;
-    ImageLayerSerialization(ImageLayerSerialization&&) = delete;
-    ImageLayerSerialization& operator=(const ImageLayerSerialization&) = delete;
-    ImageLayerSerialization& operator=(ImageLayerSerialization&&) = delete;
-    ImageLayerSerialization(std::shared_ptr<Layer> layer);
-    virtual ~ImageLayerSerialization() = default;
+    UNCOPIED_PACK(ImageLayerSerialization);
+
+    explicit ImageLayerSerialization(std::shared_ptr<Layer> layer);
+    ~ImageLayerSerialization() override = default;
+    std::string OriginClassName() override {
+      return "ImageLayer";
+    }
     uint32_t SerializationLayerAttribute(flatbuffers::FlatBufferBuilder& builder) override;
   };
 
   class ShapeLayerSerialization : public LayerSerialization {
   public:
-    ShapeLayerSerialization() = delete;
-    ShapeLayerSerialization(const ShapeLayerSerialization& ) = delete;
-    ShapeLayerSerialization(ShapeLayerSerialization&&) = delete;
-    ShapeLayerSerialization& operator=(const ShapeLayerSerialization&) = delete;
-    ShapeLayerSerialization& operator=(ShapeLayerSerialization&&) = delete;
-    ShapeLayerSerialization(std::shared_ptr<Layer> layer);
-    virtual ~ShapeLayerSerialization() = default;
+    UNCOPIED_PACK(ShapeLayerSerialization);
+
+    explicit ShapeLayerSerialization(std::shared_ptr<Layer> layer);
+    ~ShapeLayerSerialization() override = default;
+    std::string OriginClassName() override {
+      return "ShapeLayer";
+    }
     uint32_t SerializationLayerAttribute(flatbuffers::FlatBufferBuilder& builder) override;
   };
 
   class SolidLayerSerialization : public LayerSerialization {
   public:
-    SolidLayerSerialization() = delete;
-    SolidLayerSerialization(const SolidLayerSerialization& ) = delete;
-    SolidLayerSerialization(SolidLayerSerialization&&) = delete;
-    SolidLayerSerialization& operator=(const SolidLayerSerialization&) = delete;
-    SolidLayerSerialization& operator=(SolidLayerSerialization&&) = delete;
-    SolidLayerSerialization(std::shared_ptr<Layer> layer);
-    virtual ~SolidLayerSerialization() = default;
+    UNCOPIED_PACK(SolidLayerSerialization);
+
+    explicit SolidLayerSerialization(std::shared_ptr<Layer> layer);
+    ~SolidLayerSerialization() override = default;
+    std::string OriginClassName() override {
+      return "SolidLayer";
+    }
     uint32_t SerializationLayerAttribute(flatbuffers::FlatBufferBuilder& builder) override;
   };
 
   class TextLayerSerialization : public LayerSerialization {
   public:
-    TextLayerSerialization() = delete;
-    TextLayerSerialization(const TextLayerSerialization& ) = delete;
-    TextLayerSerialization(TextLayerSerialization&&) = delete;
-    TextLayerSerialization& operator=(const TextLayerSerialization&) = delete;
-    TextLayerSerialization& operator=(TextLayerSerialization&&) = delete;
-    TextLayerSerialization(std::shared_ptr<Layer> layer);
-    virtual ~TextLayerSerialization() = default;
+    UNCOPIED_PACK(TextLayerSerialization);
+
+    explicit TextLayerSerialization(std::shared_ptr<Layer> layer);
+    ~TextLayerSerialization() override = default;
+    std::string OriginClassName() override {
+      return "TextLayer";
+    }
     uint32_t SerializationLayerAttribute(flatbuffers::FlatBufferBuilder& builder) override;
   };
 }

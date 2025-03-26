@@ -27,6 +27,7 @@ namespace tgfx {
  * image can be repeated in both the x and y directions, and you can specify the sampling options.
  */
 class ImagePattern : public ShapeStyle {
+ friend class ImagePatternStyleSerialization;
  public:
   /**
     * Creates a new ImagePattern with the given image, tile modes, and sampling options.
@@ -40,6 +41,10 @@ class ImagePattern : public ShapeStyle {
                                             TileMode tileModeX = TileMode::Clamp,
                                             TileMode tileModeY = TileMode::Clamp,
                                             const SamplingOptions& sampling = {});
+
+ ShapeStyleType getType() const override{
+  return ShapeStyleType::ImagePattern;
+ }
 
  protected:
   std::shared_ptr<Shader> onGetShader() const override;

@@ -18,7 +18,7 @@
 
 #pragma once
 
-//#include "SerializationStructure.h"
+#include "SerializationUtils.h"
 #include "flatbuffers/flatbuffer_builder.h"
 #include "layers/generate/SerializationStructure_generated.h"
 
@@ -27,11 +27,7 @@ namespace tgfx{
   class LayerStyleSerialization
   {
   public:
-    LayerStyleSerialization() = delete;
-    LayerStyleSerialization(const LayerStyleSerialization& ) = delete;
-    LayerStyleSerialization(LayerStyleSerialization&&) = delete;
-    LayerStyleSerialization& operator=(const LayerStyleSerialization&) = delete;
-    LayerStyleSerialization& operator=(LayerStyleSerialization&&) = delete;
+    UNCOPIED_PACK(LayerStyleSerialization)
 
     static std::shared_ptr<LayerStyleSerialization> GetSerialization(std::shared_ptr<LayerStyle> layerStyle);
     LayerStyleSerialization(std::shared_ptr<LayerStyle> layerStyle);
@@ -44,11 +40,7 @@ namespace tgfx{
 
   class BackGroundBlurStyleSerialization : public LayerStyleSerialization {
   public:
-    BackGroundBlurStyleSerialization() = delete;
-    BackGroundBlurStyleSerialization(const BackGroundBlurStyleSerialization& ) = delete;
-    BackGroundBlurStyleSerialization(BackGroundBlurStyleSerialization&&) = delete;
-    BackGroundBlurStyleSerialization& operator=(const BackGroundBlurStyleSerialization&) = delete;
-    BackGroundBlurStyleSerialization& operator=(BackGroundBlurStyleSerialization&&) = delete;
+    UNCOPIED_PACK(BackGroundBlurStyleSerialization)
 
     BackGroundBlurStyleSerialization(std::shared_ptr<LayerStyle> layerStyle);
     virtual ~BackGroundBlurStyleSerialization() = default;
@@ -57,11 +49,7 @@ namespace tgfx{
 
   class DropShadowStyleSerialization : public LayerStyleSerialization {
   public:
-    DropShadowStyleSerialization() = delete;
-    DropShadowStyleSerialization(const DropShadowStyleSerialization& ) = delete;
-    DropShadowStyleSerialization(DropShadowStyleSerialization&&) = delete;
-    DropShadowStyleSerialization& operator=(const DropShadowStyleSerialization&) = delete;
-    DropShadowStyleSerialization& operator=(DropShadowStyleSerialization&&) = delete;
+    UNCOPIED_PACK(DropShadowStyleSerialization)
 
     DropShadowStyleSerialization(std::shared_ptr<LayerStyle> layerStyle);
     virtual ~DropShadowStyleSerialization() = default;
@@ -70,11 +58,7 @@ namespace tgfx{
 
   class InnerShadowStyleSerialization : public LayerStyleSerialization {
   public:
-    InnerShadowStyleSerialization() = delete;
-    InnerShadowStyleSerialization(const InnerShadowStyleSerialization& ) = delete;
-    InnerShadowStyleSerialization(InnerShadowStyleSerialization&&) = delete;
-    InnerShadowStyleSerialization& operator=(const InnerShadowStyleSerialization&) = delete;
-    InnerShadowStyleSerialization& operator=(InnerShadowStyleSerialization&&) = delete;
+    UNCOPIED_PACK(InnerShadowStyleSerialization)
 
     InnerShadowStyleSerialization(std::shared_ptr<LayerStyle> layerStyle);
     virtual ~InnerShadowStyleSerialization() = default;

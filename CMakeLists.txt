@@ -19,9 +19,9 @@ option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 option(TGFX_USE_FASTER_BLUR "Use faster blur algorithm instead of gaussian blur" ON)
 option(TGFX_USE_ANGLE "Allow build with the ANGLE library" OFF)
 
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
-endif ()
+#if (CMAKE_BUILD_TYPE MATCHES "Debug")
+option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
+#endif ()
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
     option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)
@@ -112,7 +112,9 @@ file(GLOB_RECURSE SRC_FILES
         src/gpu/processors/*.*
         src/gpu/proxies/*.*
         src/gpu/tasks/*.*
-        src/layers/*.*)
+        src/layers/*.*
+        src/layers/serialization/*.*
+        src/layers/generate/*.*)
 list(APPEND TGFX_FILES ${SRC_FILES})
 file(GLOB PLATFORM_COMMON_FILES
         src/core/*.*
@@ -305,6 +307,7 @@ if (TGFX_BUILD_SVG)
     list(APPEND TGFX_STATIC_VENDORS expat)
     list(APPEND TGFX_INCLUDES third_party/expat)
 endif ()
+list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
 
 if (WEB)
     file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)

@@ -18,7 +18,7 @@
 
 #pragma once
 
-//#include "SerializationStructure.h"
+#include "SerializationUtils.h"
 #include "flatbuffers/flatbuffer_builder.h"
 #include "layers/generate/SerializationStructure_generated.h"
 
@@ -26,11 +26,7 @@ namespace tgfx {
  class ShapeStyle;
  class ShapeStyleSerialization {
  public:
-   ShapeStyleSerialization() = delete;
-   ShapeStyleSerialization(const ShapeStyleSerialization& ) = delete;
-   ShapeStyleSerialization(ShapeStyleSerialization&&) = delete;
-   ShapeStyleSerialization& operator=(const ShapeStyleSerialization&) = delete;
-   ShapeStyleSerialization& operator=(ShapeStyleSerialization&&) = delete;
+   UNCOPIED_PACK(ShapeStyleSerialization)
 
    static std::shared_ptr<ShapeStyleSerialization> GetSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
    ShapeStyleSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
@@ -43,11 +39,7 @@ namespace tgfx {
 
   class ImagePatternStyleSerialization : public ShapeStyleSerialization {
   public:
-    ImagePatternStyleSerialization() = delete;
-    ImagePatternStyleSerialization(const ImagePatternStyleSerialization& ) = delete;
-    ImagePatternStyleSerialization(ImagePatternStyleSerialization&&) = delete;
-    ImagePatternStyleSerialization& operator=(const ImagePatternStyleSerialization&) = delete;
-    ImagePatternStyleSerialization& operator=(ImagePatternStyleSerialization&&) = delete;
+    UNCOPIED_PACK(ImagePatternStyleSerialization)
 
     ImagePatternStyleSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
     virtual ~ImagePatternStyleSerialization() = default;
@@ -56,11 +48,7 @@ namespace tgfx {
 
  class GradientStyleSerialization : public ShapeStyleSerialization {
  public:
-   GradientStyleSerialization() = delete;
-   GradientStyleSerialization(const GradientStyleSerialization& ) = delete;
-   GradientStyleSerialization(GradientStyleSerialization&&) = delete;
-   GradientStyleSerialization& operator=(const GradientStyleSerialization&) = delete;
-   GradientStyleSerialization& operator=(GradientStyleSerialization&&) = delete;
+    UNCOPIED_PACK(GradientStyleSerialization)
 
    GradientStyleSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
    virtual ~GradientStyleSerialization() = default;
@@ -69,11 +57,7 @@ namespace tgfx {
 
  class LinearGradientSerialization : public GradientStyleSerialization {
  public:
-   LinearGradientSerialization() = delete;
-   LinearGradientSerialization(const LinearGradientSerialization& ) = delete;
-   LinearGradientSerialization(LinearGradientSerialization&&) = delete;
-   LinearGradientSerialization& operator=(const LinearGradientSerialization&) = delete;
-   LinearGradientSerialization& operator=(LinearGradientSerialization&&) = delete;
+   UNCOPIED_PACK(LinearGradientSerialization)
 
    LinearGradientSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
    virtual ~LinearGradientSerialization() = default;
@@ -82,11 +66,7 @@ namespace tgfx {
 
 class RadialGradientSerialization : public GradientStyleSerialization {
 public:
-  RadialGradientSerialization() = delete;
-  RadialGradientSerialization(const RadialGradientSerialization& ) = delete;
-  RadialGradientSerialization(RadialGradientSerialization&&) = delete;
-  RadialGradientSerialization& operator=(const RadialGradientSerialization&) = delete;
-  RadialGradientSerialization& operator=(RadialGradientSerialization&&) = delete;
+  UNCOPIED_PACK(RadialGradientSerialization)
 
   RadialGradientSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
   virtual ~RadialGradientSerialization() = default;
@@ -95,11 +75,7 @@ public:
 
 class ConicGradientSerialization : public GradientStyleSerialization {
 public:
-  ConicGradientSerialization() = delete;
-  ConicGradientSerialization(const ConicGradientSerialization& ) = delete;
-  ConicGradientSerialization(ConicGradientSerialization&&) = delete;
-  ConicGradientSerialization& operator=(const ConicGradientSerialization&) = delete;
-  ConicGradientSerialization& operator=(ConicGradientSerialization&&) = delete;
+  UNCOPIED_PACK(ConicGradientSerialization)
 
   ConicGradientSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
   virtual ~ConicGradientSerialization() = default;
@@ -108,11 +84,7 @@ public:
 
 class DiamondGradientSerialization : public GradientStyleSerialization {
 public:
-  DiamondGradientSerialization() = delete;
-  DiamondGradientSerialization(const DiamondGradientSerialization& ) = delete;
-  DiamondGradientSerialization(DiamondGradientSerialization&&) = delete;
-  DiamondGradientSerialization& operator=(const DiamondGradientSerialization&) = delete;
-  DiamondGradientSerialization& operator=(DiamondGradientSerialization&&) = delete;
+  UNCOPIED_PACK(DiamondGradientSerialization)
 
   DiamondGradientSerialization(std::shared_ptr<ShapeStyle> shapeStyle);
   virtual ~DiamondGradientSerialization() = default;

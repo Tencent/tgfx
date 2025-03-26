@@ -33,6 +33,10 @@ class DropShadowStyle : public LayerStyle {
                                                float blurrinessY, const Color& color,
                                                bool showBehindLayer = true);
 
+ LayerStyleType Type() const override {
+  return LayerStyleType::DropShadow;
+ }
+
   /**
    * The x offset of the shadow.
    */

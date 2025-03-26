@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-//#include "SerializationStructure.h"
+#include "SerializationUtils.h"
 #include "layers/generate/SerializationStructure_generated.h"
 #include <flatbuffers/flatbuffer_builder.h>
 namespace tgfx {
@@ -25,11 +25,7 @@ namespace tgfx {
   class LayerFilterSerialization
   {
   public:
-    LayerFilterSerialization() = delete;
-    LayerFilterSerialization(const LayerFilterSerialization& ) = delete;
-    LayerFilterSerialization(LayerFilterSerialization&&) = delete;
-    LayerFilterSerialization& operator=(const LayerFilterSerialization&) = delete;
-    LayerFilterSerialization& operator=(LayerFilterSerialization&&) = delete;
+    UNCOPIED_PACK(LayerFilterSerialization);
 
     static std::shared_ptr<LayerFilterSerialization> GetSerialization(std::shared_ptr<LayerFilter> layerFilter);
 
@@ -43,11 +39,7 @@ namespace tgfx {
 
   class BlendFilterSerialization : public LayerFilterSerialization {
   public:
-    BlendFilterSerialization() = delete;
-    BlendFilterSerialization(const BlendFilterSerialization& ) = delete;
-    BlendFilterSerialization(BlendFilterSerialization&&) = delete;
-    BlendFilterSerialization& operator=(const BlendFilterSerialization&) = delete;
-    BlendFilterSerialization& operator=(BlendFilterSerialization&&) = delete;
+    UNCOPIED_PACK(BlendFilterSerialization);
 
     BlendFilterSerialization(std::shared_ptr<LayerFilter> layerFilter);
     virtual ~BlendFilterSerialization() = default;
@@ -56,11 +48,7 @@ namespace tgfx {
 
   class BlurFilterSerialization : public LayerFilterSerialization {
   public:
-    BlurFilterSerialization() = delete;
-    BlurFilterSerialization(const BlurFilterSerialization& ) = delete;
-    BlurFilterSerialization(BlurFilterSerialization&&) = delete;
-    BlurFilterSerialization& operator=(const BlurFilterSerialization&) = delete;
-    BlurFilterSerialization& operator=(BlurFilterSerialization&&) = delete;
+    UNCOPIED_PACK(BlurFilterSerialization);
 
     BlurFilterSerialization(std::shared_ptr<LayerFilter> layerFilter);
     virtual ~BlurFilterSerialization() = default;
@@ -69,11 +57,7 @@ namespace tgfx {
 
   class ColorMatrixFilterSerialization : public LayerFilterSerialization {
   public:
-    ColorMatrixFilterSerialization() = delete;
-    ColorMatrixFilterSerialization(const ColorMatrixFilterSerialization& ) = delete;
-    ColorMatrixFilterSerialization(ColorMatrixFilterSerialization&&) = delete;
-    ColorMatrixFilterSerialization& operator=(const ColorMatrixFilterSerialization&) = delete;
-    ColorMatrixFilterSerialization& operator=(ColorMatrixFilterSerialization&&) = delete;
+    UNCOPIED_PACK(ColorMatrixFilterSerialization)
 
     ColorMatrixFilterSerialization(std::shared_ptr<LayerFilter> layerFilter);
     virtual ~ColorMatrixFilterSerialization() = default;
@@ -82,11 +66,7 @@ namespace tgfx {
 
   class DropShadowFilterSerialization : public LayerFilterSerialization {
   public:
-    DropShadowFilterSerialization() = delete;
-    DropShadowFilterSerialization(const DropShadowFilterSerialization& ) = delete;
-    DropShadowFilterSerialization(DropShadowFilterSerialization&&) = delete;
-    DropShadowFilterSerialization& operator=(const DropShadowFilterSerialization&) = delete;
-    DropShadowFilterSerialization& operator=(DropShadowFilterSerialization&&) = delete;
+    UNCOPIED_PACK(DropShadowFilterSerialization)
 
     DropShadowFilterSerialization(std::shared_ptr<LayerFilter> layerFilter);
     virtual ~DropShadowFilterSerialization() = default;
@@ -95,11 +75,7 @@ namespace tgfx {
 
   class InnerShadowFilterSerialization : public LayerFilterSerialization {
   public:
-    InnerShadowFilterSerialization() = delete;
-    InnerShadowFilterSerialization(const InnerShadowFilterSerialization& ) = delete;
-    InnerShadowFilterSerialization(InnerShadowFilterSerialization&&) = delete;
-    InnerShadowFilterSerialization& operator=(const InnerShadowFilterSerialization&) = delete;
-    InnerShadowFilterSerialization& operator=(InnerShadowFilterSerialization&&) = delete;
+    UNCOPIED_PACK(InnerShadowFilterSerialization)
 
     InnerShadowFilterSerialization(std::shared_ptr<LayerFilter> layerFilter);
     virtual ~InnerShadowFilterSerialization() = default;

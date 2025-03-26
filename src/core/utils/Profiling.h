@@ -45,6 +45,11 @@
 #define FRAME_MARK_END FrameMarkEnd(nullptr)
 
 #define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
+
+#define LAYER_DATA(data)  TracyLayerData(data)
+
+#define LAYER_CALLBACK(x) TracyFeedBackCallBack(x)
+
 #else
 #define TRACE_EVENT
 #define TRACE_EVENT_NAME(name)
@@ -59,4 +64,7 @@
 #define FRAME_MARK_END
 
 #define TRACE_THREAD_NAME(name)
+
+#define LAYER_DATA(data)
+#define LAYER_CALLBACK(x)
 #endif

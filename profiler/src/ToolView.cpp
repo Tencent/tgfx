@@ -111,11 +111,15 @@ void ToolView::initView() {
   connectButton = new QPushButton("connect");
   openFileButton = new QPushButton("open file");
   auto websocketLayout = new QHBoxLayout;
-  openWebsocketButton = new QPushButton("open websocket");
+  openWebsocketButton = new QPushButton("open profiler");
+  //auto layerprofilerLayout = new QHBoxLayout;
+  //openLayerProfiler = new QPushButton("open layer profiler");
+
 
   buttonLayout->addWidget(connectButton);
   buttonLayout->addWidget(openFileButton);
   websocketLayout->addWidget(openWebsocketButton);
+  //layerprofilerLayout->addWidget(openLayerProfiler);
 
   clientWidget = new QListWidget;
   clientWidget->setResizeMode(QListView::Adjust);
@@ -124,6 +128,7 @@ void ToolView::initView() {
   layout->addWidget(textCombobox);
   layout->addLayout(buttonLayout);
   layout->addLayout(websocketLayout);
+  //layout->addLayout(layerprofilerLayout);
   layout->addWidget(clientWidget);
 }
 
@@ -178,6 +183,11 @@ void ToolView::openWebsocketServer() {
   mainView->openWebsocketServer();
 }
 
+void ToolView::openLayerProfilerServer() {
+  auto mainView = static_cast<MainView*>(this->parent());
+  mainView->openLayerProfilerWebsocketServer();
+}
+
 void ToolView::handleClient(uint64_t clientId) {
   auto iter = clientItems.find(clientId);
   if (iter != clientItems.end()) {
@@ -201,6 +211,7 @@ void ToolView::initConnect() {
   connect(openWebsocketButton, &QPushButton::clicked, this, &ToolView::openWebsocketServer);
   connect(this, &ToolView::addClient, this, &ToolView::handleClient);
   connect(clientWidget, &QListWidget::itemClicked, this, &ToolView::connectClient);
+  //connect(openLayerProfiler, &QPushButton::clicked, this, &ToolView::openLayerProfilerServer);
 }
 
 void ToolView::updateBroadcastClients() {

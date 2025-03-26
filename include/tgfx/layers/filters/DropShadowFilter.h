@@ -33,6 +33,10 @@ class DropShadowFilter : public LayerFilter {
                                                 float blurrinessY, const Color& color,
                                                 bool dropsShadowOnly = false);
 
+ LayerFilterType Type() const override{
+  return LayerFilterType::DropShadowFilter;
+ }
+
   /**
    * The x offset of the shadow.
    */

@@ -77,6 +77,10 @@ void MainView::discardConnect() {
     delete centorView;
     centorView = nullptr;
   }
+  if(m_LayerProfilerView) {
+    delete m_LayerProfilerView;
+    m_LayerProfilerView = nullptr;
+  }
   reopenToolView();
 }
 
@@ -121,9 +125,20 @@ void MainView::openWebsocketServer() {
   if (!centorView->isConnected()) {
     discardConnect();
     return;
+
   }
   layout->addWidget(centorView);
   Q_EMIT statusChange(ProfilerStatus::Connect);
+}
+
+void MainView::openLayerProfilerWebsocketServer() {
+  toolView->setParent(nullptr);
+  m_LayerProfilerView = new LayerProfilerView(this);
+  if(!m_LayerProfilerView->hasConnection()) {
+    discardConnect();
+    return;
+  }
+  layout->addWidget(m_LayerProfilerView);
 }
 
 void MainView::openToolView() {

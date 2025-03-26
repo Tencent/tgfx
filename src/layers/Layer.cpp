@@ -27,6 +27,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "layers/serialization/LayerSerialization.h"
 
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
@@ -101,6 +102,14 @@ Layer::~Layer() {
   }
   removeChildren();
 }
+
+// void Layer::serialization() {
+//
+//   auto serialization = LayerSerialization::GetSerialization(std::shared_ptr<Layer>(this));
+//   void* data = serialization->Serialization();
+//
+//   LOGE("fdaf", data);
+// }
 
 Layer::Layer() {
   memset(&bitFields, 0, sizeof(bitFields));

@@ -3,7 +3,7 @@ cd $(dirname $0)
 # install all the tools required for the autotest.
 
 if [[ `uname` == 'Darwin' ]]; then
-  MAC_REQUIRED_TOOLS="node cmake ninja yasm git-lfs"
+  MAC_REQUIRED_TOOLS="node cmake ninja yasm git-lfs flatbuffers"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
     if [ ! $(which $TOOL) ]; then
       if [ ! $(which brew) ]; then

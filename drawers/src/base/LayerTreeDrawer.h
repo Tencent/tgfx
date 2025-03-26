@@ -18,6 +18,7 @@
 
 #include "drawers/Drawer.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/LayerInspector.h"
 
 #pragma once
 

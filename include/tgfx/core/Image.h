@@ -346,5 +346,7 @@ class Image {
   friend class RasterizedImage;
   friend class ImageShader;
   friend class Caster;
+  friend class ImageLayerSerialization;
+  friend class ImagePatternStyleSerialization;
 };
 }  // namespace tgfx

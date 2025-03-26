@@ -31,6 +31,9 @@ class BackgroundBlurStyle : public LayerStyle {
  public:
   static std::shared_ptr<BackgroundBlurStyle> Make(float blurrinessX, float blurrinessY,
                                                    TileMode tileMode = TileMode::Clamp);
+ LayerStyleType Type() const override {
+  return LayerStyleType::BackgroundBlur;
+ }
   /**
    * The x blurriness of the background.
    */

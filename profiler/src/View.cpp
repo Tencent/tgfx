@@ -135,7 +135,7 @@ void SaveFileDialog::zstdLevelChanged() {
 }
 
 View::View(int width, const Config& config, QWidget* parent)
-    : QWidget(parent), width(width),
+    : QWidget(parent), width(width), layerProfilerView(new LayerProfilerView(this)),
       worker(config.memoryLimit == 0
                  ? -1
                  : (config.memoryLimitPercent * tracy::GetPhysicalMemorySize() / 100)),
@@ -258,7 +258,8 @@ bool View::save() {
 }
 
 void View::ViewImpl() {
-  auto layout = new QVBoxLayout(this);
+  auto hlayout = new QHBoxLayout(this);
+  auto layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
 
   qmlRegisterType<ViewMode>("com.example", 1, 0, "ViewMode");
@@ -291,10 +292,14 @@ void View::ViewImpl() {
 
   layout->addWidget(framesWidget);
   layout->addWidget(timelineWidget);
+  hlayout->addLayout(layout, 3);
+  hlayout->addWidget(layerProfilerView, 1);
 }
 
 void View::timerEvent(QTimerEvent*) {
-  if (worker.HasData() && connectDialog) {
+  //qDebug() << "worker has data: " << worker.HasData();
+  //qDebug() << "layer profiler connection: " << layerProfilerView->hasConnection();
+  if (worker.HasData() && connectDialog && layerProfilerView->hasConnection()) {
     connectDialog->close();
     killTimer(timerId);
   }

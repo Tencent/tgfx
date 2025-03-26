@@ -26,6 +26,7 @@
 #include "TracyWorker.hpp"
 #include "Utility.h"
 #include "View.h"
+#include "layerInspector/LayerProfilerView.h"
 
 class View;
 class MainView : public QWidget {
@@ -40,6 +41,8 @@ class MainView : public QWidget {
   void openFile();
   void openToolView();
   void openWebsocketServer();
+
+  void openLayerProfilerWebsocketServer();
 
   void changeViewModeButton(bool pause);
   Q_SLOT void changeViewMode(bool pause);
@@ -57,5 +60,6 @@ class MainView : public QWidget {
   QWidget* toolView;
   QWidget* connectView;
   View* centorView;
+  LayerProfilerView* m_LayerProfilerView;
   QVBoxLayout* layout;
 };

@@ -34,6 +34,10 @@ class InnerShadowFilter : public LayerFilter {
                                                  float blurrinessY, const Color& color,
                                                  bool innerShadowOnly = false);
 
+ LayerFilterType Type() const override{
+  return LayerFilterType::InnerShadowFilter;
+ }
+
   /**
    * The x offset of the shadow.
    */

@@ -17,7 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+
+#include "core/utils/Log.h"
 #include "layers/DrawArgs.h"
+#include "layers/serialization/LayerSerialization.h"
+#include "layers/generate/SerializationStructure_generated.h"
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 
@@ -45,5 +50,35 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   surfaceID = surface->uniqueID();
   return true;
 }
+
+void DisplayList::serializingLayerTree() {
+  // auto blob = LayerSerialization::serializingTreeNode(_root);
+  // // websocket send
+  // printf("blob size %zu", blob.size());
+  // LAYER_DATA(blob);
+}
+
+void DisplayList::pickedLayerAttributeSerialization(float x, float y) {
+  std::shared_ptr<Layer> pickedLayer = _root->getLayersUnderPoint(x, y).front();
+  if(!pickedLayer) return;
+
+  auto blob = LayerSerialization::serializingLayerAttribute(pickedLayer);
+  // websocket send
+  LAYER_DATA(blob);
+}
+
+void DisplayList::pickLayer(std::shared_ptr<Layer> layer) {
+  if(!layer) return;
+
+  auto blob = LayerSerialization::serializingTreeNode(_root);
+  // websocket send
+  printf("blob size %zu", blob.size());
+  LAYER_DATA(blob);
+
+  auto blob1 = LayerSerialization::serializingLayerAttribute(layer);
+  // websocket send
+  LAYER_DATA(blob1);
+}
+
 
 }  // namespace tgfx

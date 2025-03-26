@@ -30,6 +30,8 @@
 #include "TracyWorker.hpp"
 #include "UserData.h"
 #include "ViewData.h"
+#include "websocket/WebSocketServer.h"
+#include "layerInspector/LayerProfilerView.h"
 
 class SaveFileDialog : public QDialog {
   Q_OBJECT
@@ -87,6 +89,7 @@ class View : public QWidget {
  private:
   bool connected = false;
   int width;
+  LayerProfilerView* layerProfilerView;
   tracy::Worker worker;
 
   ViewMode viewMode;
@@ -111,4 +114,5 @@ class View : public QWidget {
   std::vector<SourceRegex> srcSubstitutions;
   bool srcRegexValid = true;
   bool validateSrcAge = true;
+
 };

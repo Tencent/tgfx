@@ -2,6 +2,8 @@
     <qresource prefix="/">
         <file>qml/Timeline.qml</file>
         <file>qml/Frames.qml</file>
+        <file>qml/LayerTree.qml</file>
+        <file>qml/LayerAttribute.qml</file>
         <file>icons/power.png</file>
         <file>icons/save.png</file>
         <file>icons/pause.png</file>
@@ -9,5 +11,11 @@
         <file>icons/stop.png</file>
         <file>icons/discard.png</file>
         <file>icons/statistics.png</file>
+        <file>icons/vline.png</file>
+        <file>icons/branch-closed.png</file>
+        <file>icons/branch-end.png</file>
+        <file>icons/branch-more.png</file>
+        <file>icons/branch-open.png</file>
+        <file>icons/arrow_icon.png</file>
     </qresource>
 </RCC>

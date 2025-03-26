@@ -204,10 +204,26 @@ table LayerCommonAttribute{
     grounp_opacity : bool;
     layer_styles : [LayerStyle];
     layer_filters : [LayerFilter];
+    address : uint64;
+}
+
+enum ImageType:byte{
+    Buffer = 0,
+    Codec,
+    Decoded,
+    Filter,
+    Generator,
+    Mipmap,
+    Orient,
+    Picture,
+    Rasterized,
+    RGBAAA,
+    Texture,
+    Subset
 }
 
 struct ImageAttribute{
-    image_type : int;
+    image_type : ImageType;
     image_width : int;
     image_height : int;
     image_alpha_only : bool;
@@ -412,6 +428,7 @@ table Layer{
 
 table TreeNode{
     name : string;
+    address : uint64;
     children : [TreeNode];
 }
 

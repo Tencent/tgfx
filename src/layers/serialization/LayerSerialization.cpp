@@ -35,7 +35,7 @@ namespace tgfx {
 
 std::vector<uint8_t> LayerSerialization::serializingLayerAttribute(std::shared_ptr<Layer> layer) {
   flatbuffers::FlatBufferBuilder builder(1024);
-  auto serialization = LayerSerialization::GetSerialization(layer);
+  auto serialization = GetSerialization(layer);
   uint32_t data = serialization->SerializationLayerAttribute(builder);
   auto finalData = fbs::CreateFinalData(builder, fbs::Type::Type_LayerData,
     fbs::Data::Data_Layer, data);
@@ -45,11 +45,11 @@ std::vector<uint8_t> LayerSerialization::serializingLayerAttribute(std::shared_p
 
 std::vector<uint8_t> LayerSerialization::serializingTreeNode(std::shared_ptr<Layer> layer) {
   flatbuffers::FlatBufferBuilder builder(1024);
-  auto treeNodeSerialization = LayerSerialization::GetSerialization(layer);
-  uint32_t data = treeNodeSerialization->SerializationLayerTreeNode(builder);
-  auto finalData = fbs::CreateFinalData(builder, fbs::Type::Type_TreeData,
-    fbs::Data::Data_TreeNode, data);
-  builder.Finish(finalData);
+  auto treeNodeSerialization = GetSerialization(layer);
+  //uint32_t data = treeNodeSerialization->SerializationLayerTreeNode(builder);
+ //auto finalData = fbs::CreateFinalData(builder, fbs::Type::Type_TreeData,
+  //  fbs::Data::Data_TreeNode, data);
+  //builder.Finish(finalData);
   return std::vector<uint8_t>(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
 }
 
@@ -108,26 +108,28 @@ std::shared_ptr<LayerSerialization> LayerSerialization::GetSerialization(
       static_cast<tgfx::fbs::LayerType>(m_Layer->type()), layerName, m_Layer->alpha(),
       static_cast<tgfx::fbs::BlendMode>(m_Layer->blendMode()), &position, m_Layer->visible(),
       m_Layer->shouldRasterize(), m_Layer->rasterizationScale(),
-      m_Layer->allowsEdgeAntialiasing(), m_Layer->allowsGroupOpacity(), layer_styles, layer_filters);
+      m_Layer->allowsEdgeAntialiasing(), m_Layer->allowsGroupOpacity(), layer_styles, layer_filters,
+      reinterpret_cast<uint64_t>(m_Layer.get()));
 
     return layerCommonAttribute.o;
   }
 
-  uint32_t LayerSerialization::SerializationLayerTreeNode(flatbuffers::FlatBufferBuilder& builder) {
-    return createTreeNode(builder, m_Layer);
+  uint32_t LayerSerialization::SerializationLayerTreeNode(flatbuffers::FlatBufferBuilder& builder,  std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap) {
+    return createTreeNode(builder, m_Layer, layerMap);
   }
 
-  uint32_t LayerSerialization::createTreeNode(flatbuffers::FlatBufferBuilder& builder,
-      std::shared_ptr<Layer> layer) {
-    auto layerName = layer->name();
+  uint32_t LayerSerialization::createTreeNode(flatbuffers::FlatBufferBuilder& builder, std::shared_ptr<Layer> layer, std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap) {
+    auto layerName = OriginClassName();
     auto name = builder.CreateString(layerName);
-    std::vector<flatbuffers::Offset<fbs::TreeNode>> childrenList;
+    std::vector<flatbuffers::Offset<fbs::TreeNode>> childrenList = {};
     auto children = layer->children();
     for(auto child : children) {
-      childrenList.push_back(createTreeNode(builder, child));
+      auto serializator = GetSerialization(child);
+      childrenList.push_back(serializator->SerializationLayerTreeNode(builder, layerMap));
     }
-    auto treeNode = fbs::CreateTreeNode(builder, name,
+    auto treeNode = fbs::CreateTreeNode(builder, name, reinterpret_cast<uint64_t>(layer.get()),
       builder.CreateVector(childrenList));
+    layerMap[reinterpret_cast<uint64_t>(layer.get())] = layer;
     return treeNode.o;
   }
 
@@ -153,7 +155,7 @@ std::shared_ptr<LayerSerialization> LayerSerialization::GetSerialization(
     auto basicLayer = LayerSerialization::SerializationLayerAttribute(builder);
     std::shared_ptr<ImageLayer> ptr = std::static_pointer_cast<ImageLayer>(m_Layer);
     auto image = ptr->image();
-    auto img = fbs::ImageAttribute(static_cast<int>(image->type()), image->width(), image->height(),
+    auto img = fbs::ImageAttribute(static_cast<fbs::ImageType>(image->type()), image->width(), image->height(),
       image->isAlphaOnly(), image->hasMipmaps(), image->isFullyDecoded(),
       image->isTextureBacked());
     auto ImageLayer = fbs::CreateImageLayerAttribute(builder, basicLayer,

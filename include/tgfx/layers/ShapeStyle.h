@@ -21,6 +21,12 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/layers/LayerProperty.h"
 
+enum class ShapeStyleType {
+ Gradient,
+ ImagePattern,
+ SolidColor
+};
+
 namespace tgfx {
 /**
  * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
@@ -66,6 +72,8 @@ class ShapeStyle : public LayerProperty {
    * Sets the transformation matrix applied to the ShapeStyle.
    */
   void setMatrix(const Matrix& value);
+
+  virtual ShapeStyleType getType() const = 0;
 
  protected:
   std::shared_ptr<Shader> getShader() const;

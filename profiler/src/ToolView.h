@@ -57,6 +57,7 @@ class ToolView : public QWidget {
   void initConnect();
   void openFile();
   void openWebsocketServer();
+  void openLayerProfilerServer();
   void reset();
   Q_SLOT void connectAddress();
   Q_SLOT void connectClient(QListWidgetItem* currenItem);
@@ -68,6 +69,7 @@ class ToolView : public QWidget {
   QPushButton* connectButton;
   QPushButton* openFileButton;
   QPushButton* openWebsocketButton;
+  //QPushButton* openLayerProfiler;
 
   QListWidget* clientWidget;
 

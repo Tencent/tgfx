@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/layers/LayerProperty.h"
+#include "LayerStyleType.h"
 
 namespace tgfx {
 
@@ -60,6 +61,8 @@ enum class LayerStyleExtraSourceType {
  */
 class LayerStyle : public LayerProperty {
  public:
+
+ virtual LayerStyleType Type() const = 0;
   /**
    * The blend mode used to composite the layer style with the existing content on the canvas.
    */

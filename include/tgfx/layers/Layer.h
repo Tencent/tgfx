@@ -31,6 +31,7 @@ namespace tgfx {
 
 class DisplayList;
 class DrawArgs;
+class LayerSerialization;
 struct LayerStyleSource;
 
 /**
@@ -41,6 +42,7 @@ struct LayerStyleSource;
  * blendMode, position, matrix, visible, scrollRect, and mask.
  */
 class Layer {
+ friend class LayerSerialization;
  public:
   /**
    * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
@@ -77,6 +79,8 @@ class Layer {
   virtual LayerType type() const {
     return LayerType::Layer;
   }
+
+  // void serialization();
 
   /**
    * Returns the instance name of the layer. The layer can be identified in the child list of its
