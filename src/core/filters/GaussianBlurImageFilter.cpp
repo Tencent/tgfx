@@ -51,9 +51,8 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   }
   auto context = renderTarget->getContext();
   auto drawingManager = context->drawingManager();
-  auto processor =
-      GaussianBlur1DFragmentProcessor::Make(context->drawingBuffer(), std::move(source), sigma,
-                                            direction, stepLength);
+  auto processor = GaussianBlur1DFragmentProcessor::Make(
+      context->drawingBuffer(), std::move(source), sigma, direction, stepLength);
   drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
 }
 
