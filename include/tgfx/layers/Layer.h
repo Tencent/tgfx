@@ -487,7 +487,8 @@ class Layer {
   Layer();
 
   /**
-   * Marks the layer as needing to be redrawn.
+   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
+   * the layer as dirty and does not update the layer content.
    */
   void invalidateTransform();
 
