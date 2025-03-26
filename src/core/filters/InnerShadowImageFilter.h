@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
@@ -25,6 +26,10 @@ class InnerShadowImageFilter : public ImageFilter {
  public:
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                          const Color& color, bool shadowOnly);
+
+  std::shared_ptr<InnerShadowImageFilter> clone() const {
+    return std::make_shared<InnerShadowImageFilter>(*this);
+  };
 
   float dx = 0.0f;
   float dy = 0.0f;

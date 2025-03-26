@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/UTF.h"
+#include <cstddef>
+#include <string>
 
 namespace tgfx {
 static int utf8_byte_type(uint8_t c) {
@@ -131,5 +133,21 @@ std::string UTF::ToUTF8(int32_t unichar) {
   }
   *--to = (char)(~(0xFF >> count) | unichar);
   return {utf8, count};
+}
+
+std::wstring UTF::ToUTF16(int32_t uni) {
+  if (static_cast<uint32_t>(uni) > 0x10FFFF) {
+    return L"";
+  }
+  size_t extra = (uni > 0xFFFF);
+  wchar_t utf16[2];
+  if (extra) {
+    utf16[0] = static_cast<wchar_t>((0xD800 - 64) + (uni >> 10));
+    utf16[1] = static_cast<wchar_t>(0xDC00 | (uni & 0x3FF));
+  } else {
+    utf16[0] = static_cast<wchar_t>(uni);
+  }
+
+  return {utf16, 1 + extra};
 }
 }  // namespace tgfx

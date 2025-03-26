@@ -65,6 +65,10 @@ class ImageInfo {
     return _colorType == ColorType::ALPHA_8;
   }
 
+  bool isOpaque() const {
+    return _alphaType == AlphaType::Opaque;
+  }
+
   /**
    * Returns the width of the pixels.
    */

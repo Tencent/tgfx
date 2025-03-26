@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Path.h"
+#include <include/core/SkPathTypes.h>
+#include <include/core/SkRect.h>
+#include <memory>
 #include "core/PathRef.h"
 #include "core/utils/MathExtra.h"
 
@@ -128,15 +131,21 @@ bool Path::isLine(Point line[2]) const {
   return pathRef->path.isLine(reinterpret_cast<SkPoint*>(line));
 }
 
-bool Path::isRect(Rect* rect) const {
-  if (!rect) {
-    return pathRef->path.isRect(nullptr);
-  }
-  SkRect skRect = {};
-  if (!pathRef->path.isRect(&skRect)) {
+bool Path::isRect(Rect* rect, bool* isClosed, PathDirection* direction) const {
+  std::unique_ptr<SkRect> rectPointer = rect ? std::make_unique<SkRect>() : nullptr;
+  std::unique_ptr<SkPathDirection> directionPointer =
+      direction ? std::make_unique<SkPathDirection>() : nullptr;
+
+  if (!pathRef->path.isRect(rectPointer.get(), isClosed, directionPointer.get())) {
     return false;
   }
-  rect->setLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
+
+  if (rectPointer) {
+    rect->setLTRB(rectPointer->fLeft, rectPointer->fTop, rectPointer->fRight, rectPointer->fBottom);
+  }
+  if (directionPointer) {
+    *direction = *directionPointer == SkPathDirection::kCW ? PathDirection::CW : PathDirection::CCW;
+  }
   return true;
 }
 

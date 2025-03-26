@@ -81,5 +81,6 @@ class Picture {
   friend class Image;
   friend class PictureImage;
   friend class Canvas;
+  friend class PDFExportContext;
 };
 }  // namespace tgfx

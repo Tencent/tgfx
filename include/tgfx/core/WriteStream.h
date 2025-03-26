@@ -88,6 +88,11 @@ class MemoryWriteStream : public WriteStream {
    */
   bool write(const void* data, size_t size) override;
 
+  bool writeToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream);
+
+  void writeToStream(const std::shared_ptr<MemoryWriteStream>& destStream);
+
+  bool prependToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream);
   /**
    * Returns the current size of the written bytes.
    */
@@ -113,6 +118,8 @@ class MemoryWriteStream : public WriteStream {
    * Return the buffer as string.
    */
   std::string readString();
+
+  void reset();
 
  private:
   /**

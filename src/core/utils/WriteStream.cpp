@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/WriteStream.h"
+#include <_types/_uint8_t.h>
 #include <cstring>
+#include <vector>
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
@@ -91,6 +93,46 @@ bool MemoryWriteStream::write(const void* data, size_t size) {
   return true;
 }
 
+bool MemoryWriteStream::writeToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream) {
+  if (!destStream) {
+    return false;
+  }
+  if (bytesWritten() == 0) {
+    return true;
+  }
+  if (destStream->bytesWritten() == 0) {
+    destStream->buffer.swap(buffer);
+    return true;
+  }
+  destStream->buffer.insert(destStream->buffer.end(), buffer.begin(), buffer.end());
+  reset();
+  return true;
+}
+
+void MemoryWriteStream::writeToStream(const std::shared_ptr<MemoryWriteStream>& destStream) {
+  if (!destStream) {
+    return;
+  }
+  destStream->buffer.insert(destStream->buffer.end(), buffer.begin(), buffer.end());
+}
+
+bool MemoryWriteStream::prependToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream) {
+  if (!destStream) {
+    return false;
+  }
+  if (bytesWritten() == 0) {
+    return true;
+  }
+  if (destStream->bytesWritten() == 0) {
+    destStream->buffer.swap(buffer);
+    return true;
+  }
+  buffer.insert(buffer.end(), destStream->buffer.begin(), destStream->buffer.end());
+  destStream->buffer.swap(buffer);
+  reset();
+  return true;
+}
+
 size_t MemoryWriteStream::bytesWritten() const {
   return buffer.size();
 }
@@ -110,6 +152,11 @@ std::shared_ptr<Data> MemoryWriteStream::readData() {
 
 std::string MemoryWriteStream::readString() {
   return std::string(buffer.begin(), buffer.end());
+}
+
+void MemoryWriteStream::reset() {
+  buffer.clear();
+  buffer.shrink_to_fit();
 }
 
 }  // namespace tgfx

@@ -40,6 +40,9 @@ class MatrixShader final : public Shader {
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
+  std::shared_ptr<Shader> source = nullptr;
+  Matrix matrix = Matrix::I();
+
  protected:
   Type type() const override {
     return Type::Matrix;
@@ -51,9 +54,6 @@ class MatrixShader final : public Shader {
                                                          const Matrix* uvMatrix) const override;
 
  private:
-  std::shared_ptr<Shader> source = nullptr;
-  Matrix matrix = Matrix::I();
-
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
 };
 }  // namespace tgfx

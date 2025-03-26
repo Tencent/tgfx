@@ -732,6 +732,8 @@ class Matrix {
    */
   bool isFinite() const;
 
+  std::array<float, 6> asAffine() const;
+
  private:
   float values[6];
   /**

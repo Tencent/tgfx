@@ -155,6 +155,10 @@ class Bitmap {
     return _info.isAlphaOnly();
   }
 
+  bool isOpaque() const {
+    return _info.isOpaque();
+  }
+
   /**
    * Returns the rowBytes of the pixels.
    */

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pdf/PDFBitmap.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -108,5 +109,6 @@ class ImageCodec : public ImageGenerator {
 
   friend class Pixmap;
   friend class SVGExportContext;
+  friend class PDFBitmap;
 };
 }  // namespace tgfx

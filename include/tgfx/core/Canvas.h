@@ -439,6 +439,9 @@ class Canvas {
   friend class Picture;
   friend class Recorder;
   friend class SVGExporter;
+  friend class PDFDocument;
+  friend class PDFShader;
+  friend class PDFExportContext;
 };
 
 /**

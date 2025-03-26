@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/ImageFilter.h"
 

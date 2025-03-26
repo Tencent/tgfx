@@ -1,0 +1,77 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <cstring>
+#include "core/FillStyle.h"
+#include "pdf/PDFTypes.h"
+
+namespace tgfx {
+
+#pragma pack(push, 1)
+struct PDFFillGraphicState {
+  float fAlpha;
+  uint8_t fBlendMode;
+  uint8_t fPADDING[3] = {0, 0, 0};
+
+  bool operator==(const PDFFillGraphicState& other) const {
+    return fAlpha == other.fAlpha && fBlendMode == other.fBlendMode &&
+           fPADDING[0] == other.fPADDING[0] && fPADDING[1] == other.fPADDING[1] &&
+           fPADDING[2] == other.fPADDING[2];
+  }
+
+  bool operator!=(const PDFFillGraphicState& o) const {
+    return !(*this == o);
+  }
+
+  std::size_t hash() const {
+    std::size_t h1 = std::hash<float>{}(fAlpha);
+    std::size_t h2 = std::hash<uint8_t>{}(fBlendMode);
+    std::size_t h3 = std::hash<uint8_t>{}(fPADDING[0]);
+    std::size_t h4 = std::hash<uint8_t>{}(fPADDING[1]);
+    std::size_t h5 = std::hash<uint8_t>{}(fPADDING[2]);
+    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4);
+  }
+};
+#pragma pack(pop)
+
+class PDFGraphicState {
+ public:
+  enum class SMaskMode {
+    Alpha,
+    Luminosity,
+  };
+
+  static PDFIndirectReference GetGraphicStateForPaint(PDFDocument* document,
+                                                      const FillStyle& style);
+
+  static PDFIndirectReference GetSMaskGraphicState(PDFIndirectReference sMask, bool invert,
+                                                   SMaskMode sMaskMode, PDFDocument* doc);
+};
+
+}  // namespace tgfx
+
+namespace std {
+template <>
+struct std::hash<tgfx::PDFFillGraphicState> {
+  std::size_t operator()(const tgfx::PDFFillGraphicState& s) const {
+    return s.hash();
+  }
+};
+}  // namespace std

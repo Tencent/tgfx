@@ -56,7 +56,7 @@ if (MACOS AND CLION_IDE AND NOT HasParent)
     option(TGFX_BUILD_TESTS "Build tgfx tests" ON)
 endif ()
 
-if (TGFX_BUILD_SVG)
+if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF)
     set(TGFX_USE_PNG_ENCODE ON)
     set(TGFX_USE_JPEG_DECODE ON)
 endif ()
@@ -65,6 +65,7 @@ if (TGFX_BUILD_TESTS)
     set(TGFX_USE_FREETYPE ON)
     set(TGFX_BUILD_DRAWERS ON)
     set(TGFX_BUILD_SVG ON)
+    set(TGFX_BUILD_PDF ON)
 else ()
     set(TGFX_BUILD_TESTS OFF)
 endif ()
@@ -122,6 +123,12 @@ if (TGFX_BUILD_SVG)
     file(GLOB_RECURSE SVG_FILES
             src/svg/*.*)
     list(APPEND TGFX_FILES ${SVG_FILES})
+endif ()
+
+if(TGFX_BUILD_PDF)
+    file(GLOB_RECURSE PDF_FILES
+            src/pdf/*.*)
+    list(APPEND TGFX_FILES ${PDF_FILES})
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -209,7 +216,7 @@ if (TGFX_USE_ZLIB)
     list(APPEND TGFX_STATIC_VENDORS zlib)
 endif ()
 
-if (TGFX_BUILD_SVG)
+if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF)
     # SVG and PDF exports require glyphs to be convertible back to Unicode.
     list(APPEND TGFX_DEFINES TGFX_USE_GLYPH_TO_UNICODE)
 endif ()
