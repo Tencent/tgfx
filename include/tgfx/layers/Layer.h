@@ -487,8 +487,7 @@ class Layer {
   Layer();
 
   /**
-   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
-   * the layer as dirty and does not update the layer content.
+   * Marks the layer as needing to be redrawn.
    */
   void invalidateTransform();
 
@@ -586,10 +585,9 @@ class Layer {
   void invalidate();
 
   struct {
-    bool dirtyContent : 1;      // need to update content
-    bool dirtyLayerTree : 1;    // descendents or siblings changed
-    bool dirtyTransform : 1;    // need to redraw the layer, property such as alpha,
-                                // blendMode, matrix, etc.
+    bool dirtyContent : 1;    // need to update content
+    bool dirtyLayerTree : 1;  // descendents or siblings changed
+    bool dirtyTransform : 1;  // need to redraw the layer
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
