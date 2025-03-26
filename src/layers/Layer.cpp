@@ -509,6 +509,7 @@ void Layer::invalidateContent() {
     return;
   }
   bitFields.dirtyContent = true;
+  bitFields.dirtyTransform = true;
   rasterizedContent = nullptr;
   invalidate();
 }
@@ -635,7 +636,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
       std::find_if(_layerStyles.begin(), _layerStyles.end(), [](const auto& style) {
         return style->extraSourceType() == LayerStyleExtraSourceType::Background;
       }) != _layerStyles.end();
-  if (args.backgroundChanged && hasBackgroundStyle) {
+  if (hasBackgroundStyle && (args.backgroundChanged || bitFields.dirtyDescendents)) {
     rasterizedContent = nullptr;
   }
   auto contextID = args.context->uniqueID();
@@ -772,10 +773,8 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   if (layerStyleSource) {
     drawLayerStyles(canvas, alpha, layerStyleSource.get(), LayerStylePosition::Below);
   }
-  auto childArgs = args;
-  childArgs.backgroundChanged = childArgs.backgroundChanged || bitFields.dirtyContent;
   drawContents(getContent(), canvas, alpha, args.drawMode == DrawMode::Contour, [&]() {
-    drawChildren(childArgs, canvas, alpha);
+    drawChildren(args, canvas, alpha);
     if (layerStyleSource) {
       drawLayerStyles(canvas, alpha, layerStyleSource.get(), LayerStylePosition::Above);
     }
