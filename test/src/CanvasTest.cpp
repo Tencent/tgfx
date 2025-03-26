@@ -338,8 +338,9 @@ TGFX_TEST(CanvasTest, drawPaint) {
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("TGFX", font);
-  auto shape = Shape::MakeFrom(std::move(textBlob));
-  auto path = shape->getPath();
+  Path path = {};
+  auto success = textBlob->getPath(&path);
+  EXPECT_TRUE(success);
   path.transform(Matrix::MakeTrans(10, 100));
   canvas->clear(Color::Red());
   canvas->save();
@@ -709,12 +710,11 @@ TGFX_TEST(CanvasTest, inversePath) {
   Font font(typeface, 70.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  auto shape = Shape::MakeFrom(std::move(textBlob));
-  shape = Shape::ApplyInverse(std::move(shape));
-  ASSERT_TRUE(shape != nullptr);
-  EXPECT_TRUE(shape->isInverseFillType());
-  Path textPath = shape->getPath();
+  Path textPath = {};
+  auto success = textBlob->getPath(&textPath);
+  EXPECT_TRUE(success);
   EXPECT_TRUE(!textPath.isEmpty());
+  textPath.toggleInverseFillType();
   EXPECT_TRUE(textPath.isInverseFillType());
   textPath.transform(Matrix::MakeTrans(10, 75));
   canvas->clipPath(textPath);
@@ -746,7 +746,7 @@ TGFX_TEST(CanvasTest, inversePath) {
   EXPECT_EQ(cachesBefore.size(), 1u);
   canvas->clear();
   canvas->clipPath(clipPath);
-  shape = Shape::MakeFrom(path);
+  auto shape = Shape::MakeFrom(path);
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(50, 50));
   canvas->translate(-50, -50);
   canvas->drawShape(shape, paint);
@@ -1456,7 +1456,7 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
     explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
     }
 
-    Path getPath(float /*resolutionScale*/) const override {
+    Path getPath() const override {
       if (points.size() < 2) {
         return {};
       }
@@ -1470,7 +1470,7 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
       return path;
     }
 
-    Rect getBounds(float /*resolutionScale*/) const override {
+    Rect getBounds() const override {
       if (points.size() < 2) {
         return Rect::MakeEmpty();
       }
@@ -1527,6 +1527,8 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
+  Paint paint = {};
+  paint.setColor(Color::Black());
   auto path = Path();
   path.addRect(Rect::MakeXYWH(10, 10, 50, 50));
   auto shape = Shape::MakeFrom(path);
@@ -1534,10 +1536,43 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   shape = Shape::ApplyMatrix(shape, matrix);
   Stroke stroke(10);
   shape = Shape::ApplyStroke(shape, &stroke);
-  canvas->drawShape(shape, Paint());
+  canvas->drawShape(shape, paint);
   shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(0.2f, 0.6f));
   canvas->translate(150, 0);
-  canvas->drawShape(shape, Paint());
+  canvas->drawShape(shape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape"));
+
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  path.reset();
+  path.moveTo(70.0f, 190.0f);
+  path.lineTo(100.0f, 74.0f);
+  path.lineTo(130.0f, 190.0f);
+  stroke.width = 15;
+  stroke.miterLimit = 4.0f;
+  stroke.join = LineJoin::Miter;
+  shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyStroke(shape, &stroke);
+  auto bounds = shape->getBounds();
+  canvas->clipRect(bounds);
+  stroke.applyToPath(&path);
+  EXPECT_EQ(bounds.top, 44.0f);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape_miter"));
+}
+
+TGFX_TEST(CanvasTest, ClipAll) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 20, 20);
+  auto canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 0, 0));
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(5, 5, 10, 10));
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAll"));
 }
 }  // namespace tgfx

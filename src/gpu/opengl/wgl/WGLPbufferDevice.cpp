@@ -90,6 +90,7 @@ bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, HPBUFFER
   }
   return false;
 }
+
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   HWND window = nullptr;
   HDC parentDeviceContext = nullptr;
@@ -130,7 +131,6 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   device->sharedContext = static_cast<HGLRC>(sharedContext);
   device->pBuffer = pBuffer;
   device->weakThis = device;
-
   return device;
 }
 

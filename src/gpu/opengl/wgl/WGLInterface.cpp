@@ -61,14 +61,18 @@ static void DestroyTempWindow(HWND nativeWindow) {
   UnregisterClass(TEMP_CLASS, instance);
 }
 
-void InitialiseExtensions(HDC deviceContext, WGLInterface& wglInterface) {
-  if (deviceContext == nullptr || wglInterface.wglGetExtensionsString == nullptr) {
-    LOGE("InitialiseExtensions() context is invalid");
+void InitializeWGLExtensions(HDC deviceContext, WGLInterface& wglInterface) {
+  if (deviceContext == nullptr) {
+    LOGE("InitializeWGLExtensions() deviceContext is nullptr");
+    return;
+  }
+  if (wglInterface.wglGetExtensionsString == nullptr) {
+    LOGE("InitializeWGLExtensions() wglGetExtensionsString is nullptr");
     return;
   }
   const char* extensionString = wglInterface.wglGetExtensionsString(deviceContext);
   if (extensionString == nullptr) {
-    LOGE("InitialiseExtensions() extentionString is nullptr");
+    LOGE("InitializeWGLExtensions() extensionString is nullptr");
     return;
   }
   std::stringstream extensionStream;
@@ -81,9 +85,11 @@ void InitialiseExtensions(HDC deviceContext, WGLInterface& wglInterface) {
   wglInterface.pixelFormatSupport =
       extensionList.find("WGL_ARB_pixel_format") != extensionList.end();
   wglInterface.pBufferSupport = extensionList.find("WGL_ARB_pbuffer") != extensionList.end();
+  wglInterface.swapIntervalSupport =
+      extensionList.find("WGL_EXT_swap_control") != extensionList.end();
 }
 
-WGLInterface InitialiseWGL() {
+WGLInterface InitializeWGL() {
 #define GET_PROC(NAME, SUFFIX) \
   wglInterface.wgl##NAME = (NAME##Proc)wglGetProcAddress("wgl" #NAME #SUFFIX)
   WGLInterface wglInterface;
@@ -115,7 +121,8 @@ WGLInterface InitialiseWGL() {
     GET_PROC(GetPbufferDC, ARB);
     GET_PROC(ReleasePbufferDC, ARB);
     GET_PROC(DestroyPbuffer, ARB);
-    InitialiseExtensions(deviceContext, wglInterface);
+    GET_PROC(SwapInterval, EXT);
+    InitializeWGLExtensions(deviceContext, wglInterface);
     wglMakeCurrent(deviceContext, nullptr);
     wglDeleteContext(glContext);
     DestroyTempWindow(nativeWindow);
@@ -125,7 +132,7 @@ WGLInterface InitialiseWGL() {
 }
 
 const WGLInterface* WGLInterface::Get() {
-  static WGLInterface instance = InitialiseWGL();
+  static WGLInterface instance = InitializeWGL();
   return &instance;
 }
 }  // namespace tgfx

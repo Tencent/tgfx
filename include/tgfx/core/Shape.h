@@ -42,8 +42,9 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. Returns nullptr if the text blob is nullptr or
-   * contains a typeface that can't generate a path, such as bitmap typefaces.
+   * Creates a new Shape from the given text blob. The Shape uses a resolution scale of 1.0 to get
+   * the path from the text blob. Returns nullptr if the text blob is nullptr or contains a typeface
+   * that can't generate a path, such as bitmap typefaces.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
@@ -131,32 +132,15 @@ class Shape {
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
-   * the exact bounds can't be determined until the shape is computed. Note: Since the Shape may
-   * contain strokes or text glyphs whose outlines can change with different scale factors, it's
-   * best to pass the final drawing scale factor in the resolutionScale for computing the bounds to
-   * ensure accuracy. However, the resolutionScale is not applied to the returned bounds; it just
-   * affects the precision of the bounds.
-   * @param resolutionScale The intended resolution for the Shape. The default value is 1.0. Higher
-   * values (res > 1) mean the result should be more precise, as it will be zoomed up and small
-   * errors will be magnified. Lower values (0 < res < 1) mean the result can be less precise, as it
-   * will be zoomed down and small errors may be invisible.
-   * @return The bounding box of the Shape.
+   * the exact bounds can't be determined until the shape is computed.
    */
-  virtual Rect getBounds(float resolutionScale = 1.0f) const;
+  virtual Rect getBounds() const = 0;
 
   /**
-   * Returns the computed path of the Shape. Note: Since the Shape may contain strokes or text
-   * glyphs whose outlines can change with different scale factors, it's best to pass the final
-   * drawing scale factor in the resolutionScale for computing the path to ensure accuracy. However,
-   * the resolutionScale is not applied to the returned path; it just affects the precision of the
-   * path.
-   * @param resolutionScale The intended resolution for the Shape. The default value is 1.0. Higher
-   * values (res > 1) mean the result should be more precise, as it will be zoomed up and small
-   * errors will be magnified. Lower values (0 < res < 1) mean the result can be less precise, as it
-   * will be zoomed down and small errors may be invisible.
-   * @return The computed path of the Shape.
+   * Returns the Shape's computed path.  Note: The path is recalculated each time this method is
+   * called, as it is not cached.
    */
-  virtual Path getPath(float resolutionScale = 1.0f) const;
+  virtual Path getPath() const = 0;
 
  protected:
   enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke, Provider };

@@ -116,7 +116,9 @@ class AsyncDataSource : public DataSource<T> {
   }
 
   ~AsyncDataSource() override {
-    task->cancel();
+    // The data source might have objects created in shared memory (like PlacementBuffer), so we
+    // need to wait for the task to finish before destroying it.
+    task->cancelOrWait();
   }
 
   std::shared_ptr<T> getData() const override {

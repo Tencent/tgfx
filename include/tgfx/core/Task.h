@@ -78,7 +78,7 @@ class Task {
 
   /**
    * Requests the Task to skip executing its Runnable object. Cancellation does not affect the
-   * execution of a Task that has already begun.
+   * execution of a Task that has already begun. This method does not block the current thread.
    */
   void cancel();
 
@@ -88,6 +88,13 @@ class Task {
    * canceled and still in the queue.
    */
   void wait();
+
+  /**
+   * Cancels the Task if it is still in the queue, otherwise waits for the Task to finish its
+   * execution. Returns immediately if the Task is finished or canceled, otherwise blocks the
+   * current thread.
+   */
+  void cancelOrWait();
 
  protected:
   virtual void onExecute() = 0;

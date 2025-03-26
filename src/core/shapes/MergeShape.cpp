@@ -73,9 +73,9 @@ bool MergeShape::isInverseFillType() const {
   }
 }
 
-Rect MergeShape::getBounds(float resolutionScale) const {
-  auto firstBounds = first->getBounds(resolutionScale);
-  auto secondBounds = second->getBounds(resolutionScale);
+Rect MergeShape::getBounds() const {
+  auto firstBounds = first->getBounds();
+  auto secondBounds = second->getBounds();
   switch (pathOp) {
     case PathOp::Difference:
       return second->isInverseFillType() ? secondBounds : firstBounds;
@@ -90,9 +90,9 @@ Rect MergeShape::getBounds(float resolutionScale) const {
   }
 }
 
-Path MergeShape::getPath(float resolutionScale) const {
-  auto path = first->getPath(resolutionScale);
-  auto secondPath = second->getPath(resolutionScale);
+Path MergeShape::getPath() const {
+  auto path = first->getPath();
+  auto secondPath = second->getPath();
   path.addPath(secondPath, pathOp);
   return path;
 }

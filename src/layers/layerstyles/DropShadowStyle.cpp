@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include <utility>
+#include "OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -96,7 +97,7 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
                                             const Point& extraSourceOffset, float alpha,
                                             BlendMode blendMode) {
   // create opaque image
-  auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0));
+  auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
 
   auto offset = Point::Zero();
