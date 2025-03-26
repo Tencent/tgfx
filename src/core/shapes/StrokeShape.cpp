@@ -30,6 +30,9 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   if (stroke == nullptr) {
     return shape;
   }
+  if (stroke->width <= 0.0f) {
+    return nullptr;
+  }
   if (shape->type() != Type::Matrix) {
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
   }
@@ -47,15 +50,15 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   return std::make_shared<MatrixShape>(std::move(shape), matrixShape->matrix);
 }
 
-Rect StrokeShape::getBounds(float resolutionScale) const {
-  auto bounds = shape->getBounds(resolutionScale);
+Rect StrokeShape::getBounds() const {
+  auto bounds = shape->getBounds();
   stroke.applyToBounds(&bounds);
   return bounds;
 }
 
-Path StrokeShape::getPath(float resolutionScale) const {
-  auto path = shape->getPath(resolutionScale);
-  stroke.applyToPath(&path, resolutionScale);
+Path StrokeShape::getPath() const {
+  auto path = shape->getPath();
+  stroke.applyToPath(&path);
   return path;
 }
 

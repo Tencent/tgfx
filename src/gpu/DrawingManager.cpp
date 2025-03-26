@@ -17,46 +17,51 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "gpu/Gpu.h"
+#include "core/utils/Profiling.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
 
 namespace tgfx {
+DrawingManager::DrawingManager(Context* context)
+    : context(context), drawingBuffer(context->drawingBuffer()) {
+}
+
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                  std::unique_ptr<FragmentProcessor> processor,
-                                  uint32_t renderFlags) {
+                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags) {
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  RectPaint rectPaint = {bounds, Matrix::I()};
-  auto op = RectDrawOp::Make(renderTarget->getContext(), {rectPaint}, AAType::None, renderFlags);
+  auto rectPaint = drawingBuffer->makeNode<RectPaint>(bounds, Matrix::I());
+  auto op = RectDrawOp::Make(renderTarget->getContext(), {std::move(rectPaint)}, true, AAType::None,
+                             renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
-  std::vector<std::unique_ptr<Op>> ops = {};
-  ops.push_back(std::move(op));
-  auto opsTask = std::make_unique<OpsRenderTask>(renderTarget, std::move(ops));
-  renderTasks.push_back(std::move(opsTask));
+  PlacementList<Op> ops = {std::move(op)};
+  auto task = drawingBuffer->makeNode<OpsRenderTask>(renderTarget, std::move(ops));
+  renderTasks.append(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
   return true;
 }
 
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
     std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags) {
-  auto compositor = std::make_shared<OpsCompositor>(this, std::move(target), renderFlags);
+  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags);
   compositors.push_back(compositor);
+  compositor->cachedPosition = --compositors.end();
   return compositor;
 }
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      std::vector<std::unique_ptr<Op>> ops) {
+                                      PlacementList<Op> ops) {
   if (renderTarget == nullptr || ops.empty()) {
     return;
   }
-  auto renderTask = std::make_unique<OpsRenderTask>(renderTarget, std::move(ops));
-  renderTasks.push_back(std::move(renderTask));
+  auto task = drawingBuffer->makeNode<OpsRenderTask>(renderTarget, std::move(ops));
+  renderTasks.append(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -67,9 +72,9 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  auto task =
-      std::make_unique<RuntimeDrawTask>(renderTarget, std::move(inputs), std::move(effect), offset);
-  renderTasks.push_back(std::move(task));
+  auto task = drawingBuffer->makeNode<RuntimeDrawTask>(renderTarget, std::move(inputs),
+                                                       std::move(effect), offset);
+  renderTasks.append(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -78,61 +83,79 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> ta
   if (textureProxy == nullptr || (target->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
-  auto task = std::make_unique<TextureResolveTask>(std::move(target));
-  renderTasks.push_back(std::move(task));
+  auto task = drawingBuffer->makeNode<TextureResolveTask>(std::move(target));
+  renderTasks.append(std::move(task));
 }
 
-void DrawingManager::addTextureFlattenTask(std::unique_ptr<TextureFlattenTask> flattenTask) {
-  if (flattenTask == nullptr) {
+void DrawingManager::addTextureFlattenTask(UniqueKey uniqueKey,
+                                           std::shared_ptr<TextureProxy> textureProxy) {
+  if (textureProxy == nullptr) {
     return;
   }
-  flattenTasks.push_back(std::move(flattenTask));
+  auto task =
+      drawingBuffer->makeNode<TextureFlattenTask>(std::move(uniqueKey), std::move(textureProxy));
+  flattenTasks.append(std::move(task));
 }
 
-void DrawingManager::addResourceTask(std::unique_ptr<ResourceTask> resourceTask) {
+void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
+                                             std::shared_ptr<TextureProxy> dest) {
+  if (source == nullptr || dest == nullptr) {
+    return;
+  }
+  DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
+  auto task = drawingBuffer->makeNode<RenderTargetCopyTask>(std::move(source), std::move(dest));
+  renderTasks.append(std::move(task));
+}
+
+void DrawingManager::addResourceTask(PlacementNode<ResourceTask> resourceTask) {
   if (resourceTask == nullptr) {
     return;
   }
   auto result = resourceTaskMap.find(resourceTask->uniqueKey);
   if (result != resourceTaskMap.end()) {
-    // Replace the existing task with the new one.
-    resourceTasks[result->second] = std::move(resourceTask);
+    // Remove the unique key from the old task, so it will be skipped when the task is executed.
+    result->second->uniqueKey = {};
   } else {
-    resourceTaskMap[resourceTask->uniqueKey] = resourceTasks.size();
-    resourceTasks.push_back(std::move(resourceTask));
+    resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
+    resourceTasks.append(std::move(resourceTask));
   }
 }
 
 bool DrawingManager::flush() {
-  for (auto& compositor : compositors) {
+  while (!compositors.empty()) {
+    auto compositor = compositors.back();
+    // The makeClosed() method may add more compositors to the list.
     compositor->makeClosed();
   }
-  compositors = {};
 
   if (resourceTasks.empty() && renderTasks.empty()) {
     return false;
   }
   for (auto& task : resourceTasks) {
-    task->execute(context);
+    TRACE_EVENT_NAME("CreateResource");
+    task.execute(context);
   }
-  resourceTasks.resize(0);
+  resourceTasks.clear();
   resourceTaskMap = {};
 
+  if (renderPass == nullptr) {
+    renderPass = RenderPass::Make(context);
+  }
   std::vector<TextureFlattenTask*> validFlattenTasks = {};
   validFlattenTasks.reserve(flattenTasks.size());
   for (auto& task : flattenTasks) {
-    if (task->prepare(context)) {
-      validFlattenTasks.push_back(task.get());
+    if (task.prepare(context)) {
+      validFlattenTasks.push_back(&task);
     }
   }
   for (auto& task : validFlattenTasks) {
-    task->execute(context);
+    task->execute(renderPass.get());
   }
-  flattenTasks.resize(0);
+  flattenTasks.clear();
   for (auto& task : renderTasks) {
-    task->execute(context->gpu());
+    task.execute(renderPass.get());
   }
-  renderTasks.resize(0);
+  renderTasks.clear();
   return true;
 }
 }  // namespace tgfx

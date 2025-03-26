@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/DataProvider.h"
-#include "core/ImageDecoder.h"
+#include "core/ImageSource.h"
+#include "gpu/AAType.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -60,7 +60,7 @@ class ProxyProvider {
    * uploaded to the GPU.
    */
   std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
-                                                       std::unique_ptr<DataProvider> provider,
+                                                       std::unique_ptr<DataSource<Data>> source,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
 
@@ -68,7 +68,7 @@ class ProxyProvider {
    * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to
    * the GPU.
    */
-  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, bool antiAlias,
+  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 
@@ -90,10 +90,11 @@ class ProxyProvider {
                                                    uint32_t renderFlags = 0);
 
   /**
-   * Creates a TextureProxy for the given ImageDecoder.
+   * Creates a TextureProxy for the given image source.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
-                                                   std::shared_ptr<ImageDecoder> decoder,
+                                                   std::shared_ptr<DataSource<ImageBuffer>> source,
+                                                   int width, int height, bool alphaOnly,
                                                    bool mipmapped = false,
                                                    uint32_t renderFlags = 0);
 
@@ -120,12 +121,10 @@ class ProxyProvider {
                                                    bool adopted = false);
   /**
    * Creates an empty RenderTargetProxy with specified width, height, format, sample count,
-   * mipmap state and origin. If clearAll is true, the entire render target will be cleared
-   * to transparent black.
+   * mipmap state and origin.
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
-      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1,
-      bool clearAll = false);
+      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1);
 
   /**
    * Creates a render target proxy for the given BackendRenderTarget.
@@ -145,11 +144,6 @@ class ProxyProvider {
   static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
   std::shared_ptr<GpuBufferProxy> findOrWrapGpuBufferProxy(const UniqueKey& uniqueKey);
-
-  std::shared_ptr<TextureProxy> doCreateTextureProxy(const UniqueKey& uniqueKey,
-                                                     std::shared_ptr<ImageDecoder> decoder,
-                                                     bool mipmapped = false,
-                                                     uint32_t renderFlags = 0);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
 };

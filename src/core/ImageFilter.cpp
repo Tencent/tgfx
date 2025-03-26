@@ -68,9 +68,10 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   return true;
 }
 
-std::unique_ptr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(std::shared_ptr<Image> source,
+                                                                    const FPArgs& args,
+                                                                    const SamplingOptions& sampling,
+                                                                    const Matrix* uvMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (uvMatrix) {

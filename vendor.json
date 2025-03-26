@@ -36,6 +36,21 @@
       }
     },
     {
+      "name": "tracyServer",
+      "dir": "tracy/serverLib",
+      "cmake": {
+        "targets": [
+          "TracyServer",
+          "TracyNfd",
+          "TracyZstd",
+          "capstone"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ]
+      }
+    },
+    {
       "name": "zlib",
       "cmake": {
         "targets": [

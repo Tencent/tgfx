@@ -19,26 +19,21 @@
 #pragma once
 
 #include "ResourceTask.h"
-#include "core/DataProvider.h"
+#include "core/DataSource.h"
 #include "gpu/GpuBuffer.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 class GpuBufferUploadTask : public ResourceTask {
  public:
-  /**
-   * Create a new GpuBufferUploadTask to generate a GpuBuffer with the given data provider.
-   */
-  static std::unique_ptr<GpuBufferUploadTask> MakeFrom(UniqueKey uniqueKey, BufferType bufferType,
-                                                       std::unique_ptr<DataProvider> provider);
+  GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
+                      std::unique_ptr<DataSource<Data>> source);
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
   BufferType bufferType = BufferType::Vertex;
-  std::unique_ptr<DataProvider> provider = nullptr;
-
-  GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
-                      std::unique_ptr<DataProvider> provider);
+  std::unique_ptr<DataSource<Data>> source = nullptr;
 };
 }  // namespace tgfx

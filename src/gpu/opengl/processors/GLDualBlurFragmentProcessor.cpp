@@ -17,42 +17,40 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLDualBlurFragmentProcessor.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
-    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-    Size texelSize) {
+PlacementPtr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
+    PlacementBuffer* buffer, DualBlurPassMode passMode, PlacementPtr<FragmentProcessor> processor,
+    Point blurOffset) {
   if (processor == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<DualBlurFragmentProcessor>(
-      new GLDualBlurFragmentProcessor(passMode, std::move(processor), blurOffset, texelSize));
+  return buffer->make<GLDualBlurFragmentProcessor>(passMode, std::move(processor), blurOffset);
 }
 
-GLDualBlurFragmentProcessor::GLDualBlurFragmentProcessor(
-    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-    Size texelSize)
-    : DualBlurFragmentProcessor(passMode, std::move(processor), blurOffset, texelSize) {
+GLDualBlurFragmentProcessor::GLDualBlurFragmentProcessor(DualBlurPassMode passMode,
+                                                         PlacementPtr<FragmentProcessor> processor,
+                                                         Point blurOffset)
+    : DualBlurFragmentProcessor(passMode, std::move(processor), blurOffset) {
 }
 
 void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto blurOffsetName =
       args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Blur");
-  auto texelSizeName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "TexelSize");
+  auto stepName = args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Step");
   std::string tempColor = "tempColor";
   if (passMode == DualBlurPassMode::Down) {
     fragBuilder->codeAppend("const int size = 5;");
     fragBuilder->codeAppendf("vec2 coords[size];");
     fragBuilder->codeAppend("coords[0] = vec2(0.0, 0.0);");
-    fragBuilder->codeAppendf("coords[1] = -%s * %s;", texelSizeName.c_str(),
-                             blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[2] = %s * %s;", texelSizeName.c_str(), blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[3] = vec2(%s.x, -%s.y) * %s;", texelSizeName.c_str(),
-                             texelSizeName.c_str(), blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[4] = -vec2(%s.x, -%s.y) * %s;", texelSizeName.c_str(),
-                             texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[1] = -%s * %s;", stepName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[2] = %s * %s;", stepName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[3] = vec2(%s.x, -%s.y) * %s;", stepName.c_str(),
+                             stepName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[4] = -vec2(%s.x, -%s.y) * %s;", stepName.c_str(),
+                             stepName.c_str(), blurOffsetName.c_str());
     fragBuilder->codeAppendf("vec4 sum;");
     fragBuilder->codeAppend("for (int i = 0; i < size; i++) {");
     emitChild(0, &tempColor, args,
@@ -67,21 +65,21 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   } else {
     fragBuilder->codeAppend("const int size = 8;");
     fragBuilder->codeAppend("vec2 coords[size];");
-    fragBuilder->codeAppendf("coords[0] = vec2(-%s.x * 2.0, 0.0) * %s;", texelSizeName.c_str(),
+    fragBuilder->codeAppendf("coords[0] = vec2(-%s.x * 2.0, 0.0) * %s;", stepName.c_str(),
                              blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[1] = vec2(-%s.x, %s.y) * %s;", texelSizeName.c_str(),
-                             texelSizeName.c_str(), blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[2] = vec2(0.0, %s.y * 2.0) * %s;", texelSizeName.c_str(),
+    fragBuilder->codeAppendf("coords[1] = vec2(-%s.x, %s.y) * %s;", stepName.c_str(),
+                             stepName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[2] = vec2(0.0, %s.y * 2.0) * %s;", stepName.c_str(),
                              blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[3] = %s * %s;", texelSizeName.c_str(), blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[4] = vec2(%s.x * 2.0, 0.0) * %s;", texelSizeName.c_str(),
+    fragBuilder->codeAppendf("coords[3] = %s * %s;", stepName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[4] = vec2(%s.x * 2.0, 0.0) * %s;", stepName.c_str(),
                              blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[5] = vec2(%s.x, -%s.y) * %s;", texelSizeName.c_str(),
-                             texelSizeName.c_str(), blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[6] = vec2(0.0, -%s.y * 2.0) * %s;", texelSizeName.c_str(),
+    fragBuilder->codeAppendf("coords[5] = vec2(%s.x, -%s.y) * %s;", stepName.c_str(),
+                             stepName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[6] = vec2(0.0, -%s.y * 2.0) * %s;", stepName.c_str(),
                              blurOffsetName.c_str());
-    fragBuilder->codeAppendf("coords[7] = vec2(-%s.x, -%s.y) * %s;", texelSizeName.c_str(),
-                             texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[7] = vec2(-%s.x, -%s.y) * %s;", stepName.c_str(),
+                             stepName.c_str(), blurOffsetName.c_str());
     fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
     fragBuilder->codeAppend("for (int i = 0; i < size; i++) {");
     emitChild(0, &tempColor, args,
@@ -97,7 +95,14 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) const {
 }
 
 void GLDualBlurFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+  auto* processor = childProcessor(0);
+  Point stepVectors[] = {{0, 0}, {0.5, 0.5}};
+  if (auto transform = processor->coordTransform(0)) {
+    auto matrix = transform->getTotalMatrix();
+    matrix.mapPoints(stepVectors, 2);
+  }
+  Point step = stepVectors[1] - stepVectors[0];
   uniformBuffer->setData("Blur", blurOffset);
-  uniformBuffer->setData("TexelSize", texelSize);
+  uniformBuffer->setData("Step", step);
 }
 }  // namespace tgfx

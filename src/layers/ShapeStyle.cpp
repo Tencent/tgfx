@@ -20,12 +20,35 @@
 
 namespace tgfx {
 void ShapeStyle::setAlpha(float value) {
+  if (_alpha == value) {
+    return;
+  }
   _alpha = value;
   invalidate();
 }
 
 void ShapeStyle::setBlendMode(BlendMode value) {
+  if (_blendMode == value) {
+    return;
+  }
   _blendMode = value;
   invalidate();
 }
+
+void ShapeStyle::setMatrix(const Matrix& value) {
+  if (_matrix == value) {
+    return;
+  }
+  _matrix = value;
+  invalidate();
+}
+
+std::shared_ptr<Shader> ShapeStyle::getShader() const {
+  auto shader = onGetShader();
+  if (!shader) {
+    return nullptr;
+  }
+  return shader->makeWithMatrix(_matrix);
+}
+
 }  // namespace tgfx

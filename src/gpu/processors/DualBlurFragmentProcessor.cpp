@@ -20,10 +20,9 @@
 
 namespace tgfx {
 DualBlurFragmentProcessor::DualBlurFragmentProcessor(DualBlurPassMode passMode,
-                                                     std::unique_ptr<FragmentProcessor> processor,
-                                                     Point blurOffset, Size texelSize)
-    : FragmentProcessor(ClassID()), passMode(passMode), blurOffset(blurOffset),
-      texelSize(texelSize) {
+                                                     PlacementPtr<FragmentProcessor> processor,
+                                                     Point blurOffset)
+    : FragmentProcessor(ClassID()), passMode(passMode), blurOffset(blurOffset) {
   registerChildProcessor(std::move(processor));
 }
 

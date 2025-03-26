@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <optional>
 #include "gpu/processors/ConstColorProcessor.h"
 #include "tgfx/core/Color.h"
 

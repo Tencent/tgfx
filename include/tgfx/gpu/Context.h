@@ -19,7 +19,7 @@
 #pragma once
 
 #include <chrono>
-#include "tgfx/core/Color.h"
+#include <deque>
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/Device.h"
@@ -31,6 +31,7 @@ class DrawingManager;
 class Gpu;
 class ResourceProvider;
 class ProxyProvider;
+class PlacementBuffer;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -70,6 +71,10 @@ class Context {
 
   DrawingManager* drawingManager() const {
     return _drawingManager;
+  }
+
+  PlacementBuffer* drawingBuffer() const {
+    return _drawingBuffer;
   }
 
   ResourceProvider* resourceProvider() const {
@@ -194,11 +199,13 @@ class Context {
   DrawingManager* _drawingManager = nullptr;
   ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
+  PlacementBuffer* _drawingBuffer = nullptr;
+  std::deque<size_t> drawingBufferSizes = {};
 
   void releaseAll(bool releaseGPU);
+  void clearDrawingBuffer();
 
   friend class Device;
-
   friend class Resource;
 };
 

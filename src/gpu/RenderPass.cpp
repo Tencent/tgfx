@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderPass.h"
+#include "core/utils/Profiling.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
@@ -32,20 +34,14 @@ bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
 }
 
 void RenderPass::end() {
+  onUnbindRenderTarget();
   _renderTarget = nullptr;
   _renderTargetTexture = nullptr;
-  resetActiveBuffers();
-}
-
-void RenderPass::resetActiveBuffers() {
   _program = nullptr;
-  _indexBuffer = nullptr;
-  _vertexBuffer = nullptr;
 }
 
 void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
                                            const Rect& scissorRect) {
-  resetActiveBuffers();
   if (!onBindProgramAndScissorClip(programInfo, scissorRect)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
     return;
@@ -58,9 +54,9 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  _indexBuffer = std::move(indexBuffer);
-  _vertexBuffer = std::move(vertexBuffer);
-  _vertexData = nullptr;
+  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), nullptr)) {
+    drawPipelineStatus = DrawPipelineStatus::FailedToBind;
+  }
 }
 
 void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
@@ -68,24 +64,27 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  _indexBuffer = std::move(indexBuffer);
-  _vertexBuffer = nullptr;
-  _vertexData = std::move(vertexData);
-  ;
+  if (!onBindBuffers(std::move(indexBuffer), nullptr, std::move(vertexData))) {
+    drawPipelineStatus = DrawPipelineStatus::FailedToBind;
+  }
 }
 
 void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
+  TRACE_DRAW(primitiveType == PrimitiveType::TriangleStrip ? vertexCount - 2 : vertexCount / 3);
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  onDraw(primitiveType, baseVertex, vertexCount);
+  onDraw(primitiveType, baseVertex, vertexCount, false);
+  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 }
 
 void RenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
+  TRACE_DRAW(indexCount / 3);
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  onDrawIndexed(primitiveType, baseIndex, indexCount);
+  onDraw(primitiveType, baseIndex, indexCount, true);
+  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 }
 
 void RenderPass::clear(const Rect& scissor, Color color) {
@@ -93,9 +92,16 @@ void RenderPass::clear(const Rect& scissor, Color color) {
   onClear(scissor, color);
 }
 
-void RenderPass::copyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) {
+void RenderPass::resolve(const Rect& bounds) {
+  auto gpu = context->gpu();
+  gpu->resolveRenderTarget(_renderTarget.get(), bounds);
+  // Reset the render target after the resolve operation.
+  onBindRenderTarget();
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  onCopyTo(texture, srcRect, dstPoint);
 }
 
+void RenderPass::copyToTexture(Texture* texture, int srcX, int srcY) {
+  onCopyToTexture(texture, srcX, srcY);
+  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
+}
 }  // namespace tgfx

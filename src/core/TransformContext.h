@@ -43,37 +43,36 @@ class TransformContext : public DrawContext {
   explicit TransformContext(DrawContext* drawContext) : drawContext(drawContext) {
   }
 
-  void drawStyle(const MCState& state, const FillStyle& style) override {
-    drawContext->drawStyle(transform(state), style);
+  void drawFill(const MCState& state, const Fill& fill) override {
+    drawContext->drawFill(transform(state), fill);
   }
 
-  void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override {
-    drawContext->drawRect(rect, transform(state), style);
+  void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override {
+    drawContext->drawRect(rect, transform(state), fill);
   }
 
-  void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) override {
-    drawContext->drawRRect(rRect, transform(state), style);
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override {
+    drawContext->drawRRect(rRect, transform(state), fill);
   }
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                 const FillStyle& style) override {
-    drawContext->drawShape(std::move(shape), transform(state), style);
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override {
+    drawContext->drawShape(std::move(shape), transform(state), fill);
   }
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const FillStyle& style) override {
-    drawContext->drawImage(std::move(image), sampling, transform(state), style);
+                 const MCState& state, const Fill& fill) override {
+    drawContext->drawImage(std::move(image), sampling, transform(state), fill);
   }
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                      const SamplingOptions& sampling, const MCState& state,
-                     const FillStyle& style) override {
-    drawContext->drawImageRect(std::move(image), rect, sampling, transform(state), style);
+                     const Fill& fill) override {
+    drawContext->drawImageRect(std::move(image), rect, sampling, transform(state), fill);
   }
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
-                        const MCState& state, const FillStyle& style) override {
-    drawContext->drawGlyphRunList(std::move(glyphRunList), stroke, transform(state), style);
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                        const Fill& fill, const Stroke* stroke) override {
+    drawContext->drawGlyphRunList(std::move(glyphRunList), transform(state), fill, stroke);
   }
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override {
@@ -81,8 +80,8 @@ class TransformContext : public DrawContext {
   }
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const FillStyle& style) override {
-    drawContext->drawLayer(std::move(picture), std::move(filter), transform(state), style);
+                 const MCState& state, const Fill& fill) override {
+    drawContext->drawLayer(std::move(picture), std::move(filter), transform(state), fill);
   }
 
  protected:

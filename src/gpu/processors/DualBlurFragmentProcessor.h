@@ -25,9 +25,10 @@ enum class DualBlurPassMode { Up = 0, Down = 1 };
 
 class DualBlurFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<DualBlurFragmentProcessor> Make(
-      DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
-      Size texelSize);
+  static PlacementPtr<DualBlurFragmentProcessor> Make(PlacementBuffer* buffer,
+                                                      DualBlurPassMode passMode,
+                                                      PlacementPtr<FragmentProcessor> processor,
+                                                      Point blurOffset);
 
   std::string name() const override {
     return "DualBlurFragmentProcessor";
@@ -38,11 +39,10 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor,
-                            Point blurOffset, Size texelSize);
+  DualBlurFragmentProcessor(DualBlurPassMode passMode, PlacementPtr<FragmentProcessor> processor,
+                            Point blurOffset);
 
   DualBlurPassMode passMode;
   Point blurOffset;
-  Size texelSize;
 };
 }  // namespace tgfx

@@ -35,17 +35,22 @@ struct RRectPaint {
 class RRectDrawOp : public DrawOp {
  public:
   /**
+   * The maximum number of round rects that can be drawn in a single draw call.
+   */
+  static constexpr uint16_t MaxNumRRects = 512;
+
+  /**
    * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
    * the device space.
    */
-  static std::unique_ptr<RRectDrawOp> Make(Context* context, const std::vector<RRectPaint>& rects,
-                                           AAType aaType, uint32_t renderFlags);
+  static PlacementNode<RRectDrawOp> Make(Context* context, PlacementList<RRectPaint> rects,
+                                         AAType aaType, uint32_t renderFlags);
+
+  RRectDrawOp(AAType aaType, size_t rectCount);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  RRectDrawOp(AAType aaType, size_t rectCount);
-
   size_t rectCount = 0;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;

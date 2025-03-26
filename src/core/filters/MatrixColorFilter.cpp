@@ -41,7 +41,7 @@ bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return other && matrix == other->matrix;
 }
 
-std::unique_ptr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor() const {
-  return ColorMatrixFragmentProcessor::Make(matrix);
+PlacementPtr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor(Context* context) const {
+  return ColorMatrixFragmentProcessor::Make(context->drawingBuffer(), matrix);
 }
 }  // namespace tgfx

@@ -19,9 +19,9 @@
 #include "GLColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make(
-    const std::array<float, 20>& matrix) {
-  return std::unique_ptr<ColorMatrixFragmentProcessor>(new GLColorMatrixFragmentProcessor(matrix));
+PlacementPtr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make(
+    PlacementBuffer* buffer, const std::array<float, 20>& matrix) {
+  return buffer->make<GLColorMatrixFragmentProcessor>(matrix);
 }
 
 GLColorMatrixFragmentProcessor::GLColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)

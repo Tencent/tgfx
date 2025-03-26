@@ -46,6 +46,14 @@ class TextBlob {
                                             size_t glyphCount, const Font& font);
 
   /**
+   * Creates a new TextBlob from the given glyphIDs, positions, and glyphFace. Returns nullptr if
+   * the glyphCount is 0 or glyphFace is nullptr.
+   */
+  static std::shared_ptr<TextBlob> MakeFrom(const GlyphID glyphIDs[], const Point positions[],
+                                            size_t glyphCount,
+                                            std::shared_ptr<GlyphFace> glyphFace);
+
+  /**
    * Creates a new TextBlob from a single glyph run. Returns nullptr if the glyph run is empty or
    * has mismatched glyph and position counts.
    */
@@ -68,6 +76,15 @@ class TextBlob {
    * @return The bounding box of the TextBlob.
    */
   Rect getBounds(float resolutionScale = 1.0f) const;
+
+  /**
+   * Creates a Path for the glyphs in the text blob. Since text outlines can change with different
+   * scale factors, it's best to use the final drawing scale factor in the resolutionScale for
+   * accuracy. Note that the resolutionScale is not applied to the returned Path; it only affects
+   * the precision of the Path. Returns true if the path was successfully created. Otherwise,
+   * returns false and leaves the path unchanged.
+   */
+  bool getPath(Path* path, float resolutionScale = 1.0f) const;
 
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};

@@ -17,80 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
-#include "core/Rasterizer.h"
-#include "core/Records.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "gpu/TPArgs.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
-static bool CheckStyleAndClipForMask(const FillStyle& style, const Path& clip, int width,
-                                     int height, const Matrix* matrix) {
-  if (style.colorFilter || style.maskFilter || style.shader || style.color != Color::White()) {
-    return false;
-  }
-  if (!BlendModeIsOpaque(style.blendMode, OpacityType::Opaque)) {
-    return false;
-  }
-  if (clip.isInverseFillType()) {
-    return clip.isEmpty();
-  }
-  Rect clipRect = {};
-  if (!clip.isRect(&clipRect)) {
-    return false;
-  }
-  if (matrix) {
-    if (!matrix->rectStaysRect()) {
-      return false;
-    }
-    matrix->mapRect(&clipRect);
-  }
-  return clipRect.contains(Rect::MakeWH(width, height));
-}
-
-static Matrix GetMaskMatrix(const MCState& state, const Matrix* matrix) {
-  auto m = state.matrix;
-  if (matrix) {
-    m.postConcat(*matrix);
-  }
-  return m;
-}
-
-static std::shared_ptr<Rasterizer> GetEquivalentRasterizer(const Record* record, int width,
-                                                           int height, const Matrix* matrix) {
-  if (record->type() == RecordType::DrawShape) {
-    auto shapeRecord = static_cast<const DrawShape*>(record);
-    if (!CheckStyleAndClipForMask(shapeRecord->style, shapeRecord->state.clip, width, height,
-                                  matrix)) {
-      return nullptr;
-    }
-    auto shape = Shape::ApplyMatrix(shapeRecord->shape, GetMaskMatrix(shapeRecord->state, matrix));
-    return Rasterizer::MakeFrom(width, height, std::move(shape), shapeRecord->style.antiAlias);
-  }
-  if (record->type() == RecordType::DrawGlyphRunList) {
-    auto glyphRecord = static_cast<const DrawGlyphRunList*>(record);
-    if (!CheckStyleAndClipForMask(glyphRecord->style, glyphRecord->state.clip, width, height,
-                                  matrix)) {
-      return nullptr;
-    }
-    return Rasterizer::MakeFrom(width, height, glyphRecord->glyphRunList,
-                                glyphRecord->style.antiAlias,
-                                GetMaskMatrix(glyphRecord->state, matrix));
-  }
-  if (record->type() == RecordType::StrokeGlyphRunList) {
-    auto strokeGlyphRecord = static_cast<const StrokeGlyphRunList*>(record);
-    if (!CheckStyleAndClipForMask(strokeGlyphRecord->style, strokeGlyphRecord->state.clip, width,
-                                  height, matrix)) {
-      return nullptr;
-    }
-    return Rasterizer::MakeFrom(
-        width, height, strokeGlyphRecord->glyphRunList, strokeGlyphRecord->style.antiAlias,
-        GetMaskMatrix(strokeGlyphRecord->state, matrix), &strokeGlyphRecord->stroke);
-  }
-  return nullptr;
-}
-
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
                                        const Matrix* matrix) {
   if (picture == nullptr || width <= 0 || height <= 0) {
@@ -105,22 +39,15 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
     if (image) {
       return image;
     }
-    auto rasterizer = GetEquivalentRasterizer(picture->records[0], width, height, matrix);
-    image = Image::MakeFrom(std::move(rasterizer));
-    if (image) {
-      return image;
-    }
   }
-  auto image =
-      std::make_shared<PictureImage>(UniqueKey::Make(), std::move(picture), width, height, matrix);
+  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix);
   image->weakThis = image;
   return image;
 }
 
-PictureImage::PictureImage(UniqueKey uniqueKey, std::shared_ptr<Picture> picture, int width,
-                           int height, const Matrix* matrix)
-    : OffscreenImage(std::move(uniqueKey)), picture(std::move(picture)), _width(width),
-      _height(height) {
+PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
+                           const Matrix* matrix, bool mipmapped)
+    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -130,12 +57,77 @@ PictureImage::~PictureImage() {
   delete matrix;
 }
 
-bool PictureImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
-                          uint32_t renderFlags) const {
-  RenderContext renderContext(renderTarget, renderFlags);
-  MCState replayState(matrix ? *matrix : Matrix::I());
+std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
+  return std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
+}
+
+PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& args,
+                                                                  TileMode tileModeX,
+                                                                  TileMode tileModeY,
+                                                                  const SamplingOptions& sampling,
+                                                                  const Matrix* uvMatrix) const {
+
+  auto drawBounds = args.drawRect;
+  if (uvMatrix) {
+    drawBounds = uvMatrix->mapRect(drawBounds);
+  }
+  auto rect = Rect::MakeWH(_width, _height);
+  if (!rect.intersect(drawBounds)) {
+    return nullptr;
+  }
+  rect.roundOut();
+  auto mipmapped = sampling.mipmapMode != MipmapMode::None && hasMipmaps();
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
+      isAlphaOnly() && alphaRenderable, 1, mipmapped);
+
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  Point offset = Point::Make(-rect.left, -rect.top);
+  if (!drawPicture(renderTarget, args.renderFlags, &offset)) {
+    return nullptr;
+  }
+  auto finalUVMatrix = Matrix::MakeTrans(offset.x, offset.y);
+  if (uvMatrix) {
+    finalUVMatrix.preConcat(*uvMatrix);
+  }
+  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
+                                  &finalUVMatrix, isAlphaOnly());
+}
+
+std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto renderTarget = RenderTargetProxy::MakeFallback(args.context, width(), height(),
+                                                      isAlphaOnly() && alphaRenderable, 1,
+                                                      hasMipmaps() && args.mipmapped);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
+    return nullptr;
+  }
+  return renderTarget->getTextureProxy();
+}
+
+bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
+                               uint32_t renderFlags, const Point* offset) const {
+  if (renderTarget == nullptr) {
+    return false;
+  }
+  RenderContext renderContext(renderTarget, renderFlags, true);
+  auto totalMatrix = Matrix::I();
+  if (offset) {
+    totalMatrix.preTranslate(offset->x, offset->y);
+  }
+  if (matrix) {
+    totalMatrix.preConcat(*matrix);
+  }
+  MCState replayState(totalMatrix);
   picture->playback(&renderContext, replayState);
   renderContext.flush();
   return true;
 }
+
 }  // namespace tgfx

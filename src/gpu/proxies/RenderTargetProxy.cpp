@@ -71,42 +71,39 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int width, int height,
                                                            PixelFormat format, int sampleCount,
-                                                           bool mipmapped, ImageOrigin origin,
-                                                           bool clearAll) {
+                                                           bool mipmapped, ImageOrigin origin) {
   if (context == nullptr) {
     return nullptr;
   }
   if (!context->caps()->isFormatRenderable(format)) {
     return nullptr;
   }
-  return Create(context, width, height, format, sampleCount, mipmapped, origin, clearAll);
+  return Create(context, width, height, format, sampleCount, mipmapped, origin);
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,
                                                                    int height, bool isAlphaOnly,
                                                                    int sampleCount, bool mipmapped,
-                                                                   ImageOrigin origin,
-                                                                   bool clearAll) {
+                                                                   ImageOrigin origin) {
   if (context == nullptr) {
     return nullptr;
   }
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  return Create(context, width, height, format, sampleCount, mipmapped, origin, clearAll);
+  return Create(context, width, height, format, sampleCount, mipmapped, origin);
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Create(Context* context, int width,
                                                              int height, PixelFormat format,
                                                              int sampleCount, bool mipmapped,
-                                                             ImageOrigin origin, bool clearAll) {
+                                                             ImageOrigin origin) {
   auto proxyProvider = context->proxyProvider();
   auto textureProxy =
       proxyProvider->createTextureProxy({}, width, height, format, mipmapped, origin);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return proxyProvider->createRenderTargetProxy(std::move(textureProxy), format, sampleCount,
-                                                clearAll);
+  return proxyProvider->createRenderTargetProxy(std::move(textureProxy), format, sampleCount);
 }
 
 RenderTargetProxy::RenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format,
@@ -136,13 +133,13 @@ std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int
                                                       origin());
 }
 
-std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int width, int height,
-                                                                            bool clearAll) const {
+std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int width,
+                                                                            int height) const {
   auto textureProxy = makeTextureProxy(width, height);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   return context->proxyProvider()->createRenderTargetProxy(std::move(textureProxy), format(),
-                                                           sampleCount(), clearAll);
+                                                           sampleCount());
 }
 }  // namespace tgfx

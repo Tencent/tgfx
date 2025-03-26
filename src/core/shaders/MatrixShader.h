@@ -50,8 +50,8 @@ class MatrixShader final : public Shader {
 
   bool isEqual(const Shader* shader) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const Matrix* uvMatrix) const override;
 
  private:
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);

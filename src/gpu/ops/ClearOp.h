@@ -19,18 +19,19 @@
 #pragma once
 
 #include "Op.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 class ClearOp : public Op {
  public:
-  static std::unique_ptr<ClearOp> Make(Color color, const Rect& scissor);
+  static PlacementNode<ClearOp> Make(Context* context, Color color, const Rect& scissor);
+
+  ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
+  }
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
-  }
-
   Color color = Color::Transparent();
   Rect scissor = Rect::MakeEmpty();
 };

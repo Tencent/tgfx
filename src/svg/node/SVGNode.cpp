@@ -118,7 +118,7 @@ bool SVGNode::parseAndSetAttribute(const std::string& name, const std::string& v
                                                                                    value))
 
   return PARSE_AND_SET("clip-path", ClipPath) || PARSE_AND_SET("clip-rule", ClipRule) ||
-         PARSE_AND_SET("color", Color) ||
+         PARSE_AND_SET("color", Color) || PARSE_AND_SET("class", Class) ||
          PARSE_AND_SET("color-interpolation", ColorInterpolation) ||
          PARSE_AND_SET("color-interpolation-filters", ColorInterpolationFilters) ||
          PARSE_AND_SET("display", Display) || PARSE_AND_SET("fill", Fill) ||

@@ -42,12 +42,4 @@ bool Shape::isSimplePath(Path*) const {
 bool Shape::isInverseFillType() const {
   return false;
 }
-
-Rect Shape::getBounds(float) const {
-  return Rect::MakeEmpty();
-}
-
-Path Shape::getPath(float) const {
-  return {};
-}
 }  // namespace tgfx

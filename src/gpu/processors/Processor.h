@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/PlacementBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"

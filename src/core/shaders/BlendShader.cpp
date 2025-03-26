@@ -54,8 +54,8 @@ bool BlendShader::isEqual(const Shader* shader) const {
          Caster::Compare(src.get(), other->src.get());
 }
 
-std::unique_ptr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs& args,
-                                                                    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs& args,
+                                                                 const Matrix* uvMatrix) const {
   auto fpA = FragmentProcessor::Make(dst, args, uvMatrix);
   if (fpA == nullptr) {
     return nullptr;
@@ -64,6 +64,7 @@ std::unique_ptr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs
   if (fpB == nullptr) {
     return nullptr;
   }
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(std::move(fpB), std::move(fpA), mode);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingBuffer(),
+                                                          std::move(fpB), std::move(fpA), mode);
 }
 }  // namespace tgfx

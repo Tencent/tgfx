@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "core/FillStyle.h"
+#include "tgfx/core/Fill.h"
 
 namespace tgfx {
 
 struct Resources {
   Resources() = default;
-  explicit Resources(const FillStyle& fill);
+  explicit Resources(const Fill& fill);
   std::string paintColor;
   std::string filter;
   std::string mask;

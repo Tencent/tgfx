@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,21 +18,27 @@
 
 #pragma once
 
-#include "tgfx/gpu/PixelFormat.h"
+#include "gpu/Resource.h"
 
 namespace tgfx {
-/**
- * Types for interacting with GL frame buffers.
- */
-struct GLFrameBuffer {
-  /**
-   * The id of this frame buffer.
-   */
-  unsigned id = 0;
+class GLFrameBuffer : public Resource {
+ public:
+  static std::shared_ptr<GLFrameBuffer> Make(Context* context);
 
-  /**
-   * The pixel format of this frame buffer.
-   */
-  PixelFormat format = PixelFormat::RGBA_8888;
+  explicit GLFrameBuffer(unsigned id);
+
+  size_t memoryUsage() const override {
+    return 0;
+  }
+
+  unsigned id() const {
+    return _id;
+  }
+
+ protected:
+  void onReleaseGPU() override;
+
+ private:
+  unsigned _id = 0;
 };
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/RuntimeResource.h"
 
 namespace tgfx {
@@ -27,7 +28,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
       offset(offset) {
 }
 
-bool RuntimeDrawTask::execute(Gpu* gpu) {
+bool RuntimeDrawTask::execute(RenderPass* renderPass) {
   std::vector<BackendTexture> inputTextures;
   inputTextures.reserve(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {
@@ -47,10 +48,11 @@ bool RuntimeDrawTask::execute(Gpu* gpu) {
     LOGE("RuntimeDrawTask::execute() Failed to get the render target!");
     return false;
   }
-  auto context = gpu->getContext();
+  auto context = renderPass->getContext();
   UniqueKey uniqueKey(effect->type());
   auto program = Resource::Find<RuntimeResource>(context, uniqueKey);
   if (program == nullptr) {
+    TRACE_EVENT_NAME("CreateProgram");
     program = RuntimeResource::Wrap(uniqueKey, effect->onCreateProgram(context));
     if (program == nullptr) {
       LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");

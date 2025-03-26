@@ -25,11 +25,11 @@
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
-                                                 TileMode tileModeX, TileMode tileModeY,
-                                                 const SamplingOptions& sampling = {},
-                                                 const Matrix* uvMatrix = nullptr,
-                                                 bool forceAsMask = false);
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
+                                              TileMode tileModeX, TileMode tileModeY,
+                                              const SamplingOptions& sampling = {},
+                                              const Matrix* uvMatrix = nullptr,
+                                              bool forceAsMask = false);
 
   std::string name() const override {
     return "TiledTextureEffect";

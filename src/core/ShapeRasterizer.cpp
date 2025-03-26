@@ -20,14 +20,15 @@
 #include "core/PathTriangulator.h"
 #include "tgfx/core/Mask.h"
 #include "utils/Log.h"
+#include "utils/Profiling.h"
 
 namespace tgfx {
-ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape,
-                                 bool antiAlias)
-    : Rasterizer(width, height), shape(std::move(shape)), antiAlias(antiAlias) {
+ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, AAType aaType)
+    : Rasterizer(width, height), shape(std::move(shape)), aaType(aaType) {
 }
 
-std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) const {
+std::shared_ptr<ShapeBuffer> ShapeRasterizer::getData() const {
+  TRACE_EVENT_NAME("VectorRasterize");
   auto finalPath = shape->getPath();
   if (finalPath.isEmpty() && finalPath.isInverseFillType()) {
     finalPath.reset();
@@ -36,7 +37,7 @@ std::shared_ptr<ShapeBuffer> ShapeRasterizer::makeRasterized(bool tryHardware) c
   if (PathTriangulator::ShouldTriangulatePath(finalPath)) {
     return ShapeBuffer::MakeFrom(makeTriangles(finalPath));
   }
-  return ShapeBuffer::MakeFrom(makeImageBuffer(finalPath, tryHardware));
+  return ShapeBuffer::MakeFrom(makeImageBuffer(finalPath, true));
 }
 
 std::shared_ptr<ImageBuffer> ShapeRasterizer::onMakeBuffer(bool tryHardware) const {
@@ -48,9 +49,11 @@ std::shared_ptr<Data> ShapeRasterizer::makeTriangles(const Path& finalPath) cons
   std::vector<float> vertices = {};
   size_t count = 0;
   auto bounds = Rect::MakeWH(width(), height());
-  if (antiAlias) {
+  if (aaType == AAType::Coverage) {
     count = PathTriangulator::ToAATriangles(finalPath, bounds, &vertices);
   } else {
+    // If MSAA is enabled, we skip generating AA triangles since the shape will be drawn directly to
+    // the screen.
     count = PathTriangulator::ToTriangles(finalPath, bounds, &vertices);
   }
   if (count == 0) {
@@ -67,7 +70,7 @@ std::shared_ptr<ImageBuffer> ShapeRasterizer::makeImageBuffer(const Path& finalP
     LOGE("ShapeRasterizer::makeImageBuffer() Failed to create the mask!");
     return nullptr;
   }
-  mask->setAntiAlias(antiAlias);
+  mask->setAntiAlias(aaType != AAType::None);
   mask->fillPath(finalPath);
   return mask->makeBuffer();
 }

@@ -77,8 +77,8 @@ class LinearGradientShader : public GradientShader {
   GradientType asGradient(GradientInfo*) const override;
 
  protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const Matrix* uvMatrix) const override;
 };
 
 class RadialGradientShader : public GradientShader {
@@ -89,8 +89,8 @@ class RadialGradientShader : public GradientShader {
   GradientType asGradient(GradientInfo*) const override;
 
  protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const Matrix* uvMatrix) const override;
 };
 
 class ConicGradientShader : public GradientShader {
@@ -101,11 +101,23 @@ class ConicGradientShader : public GradientShader {
   GradientType asGradient(GradientInfo*) const override;
 
  protected:
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                         const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const Matrix* uvMatrix) const override;
 
  private:
   float bias;
   float scale;
+};
+
+class DiamondGradientShader : public GradientShader {
+ public:
+  DiamondGradientShader(const Point& center, float halfDiagonal, const std::vector<Color>& colors,
+                        const std::vector<float>& positions);
+
+  GradientType asGradient(GradientInfo* info) const override;
+
+ protected:
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

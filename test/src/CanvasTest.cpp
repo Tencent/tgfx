@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/FillStyle.h"
 #include "core/PathRef.h"
 #include "core/Records.h"
 #include "core/images/ResourceImage.h"
@@ -33,6 +32,7 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
@@ -109,6 +109,46 @@ TGFX_TEST(CanvasTest, TileMode) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tile_mode_rgbaaa"));
 }
 
+TGFX_TEST(CanvasTest, DiscardContent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  int width = 100;
+  int height = 100;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  surface->renderContext->flush();
+  auto* drawingManager = context->drawingManager();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
+  EXPECT_TRUE(task->ops.size() == 1);
+
+  Paint paint;
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 0.8f});
+  canvas->drawRect(Rect::MakeWH(50, 50), paint);
+  paint.setBlendMode(BlendMode::Src);
+  canvas->drawRect(Rect::MakeWH(width, height), paint);
+  surface->renderContext->flush();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
+  task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.back());
+  EXPECT_TRUE(task->ops.size() == 1);
+
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
+  canvas->drawRect(Rect::MakeWH(50, 50), paint);
+  paint.setBlendMode(BlendMode::SrcOver);
+  paint.setShader(Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{static_cast<float>(width), static_cast<float>(height)},
+      {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
+  canvas->drawPaint(paint);
+  surface->renderContext->flush();
+  ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
+  task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.back());
+  EXPECT_TRUE(task->ops.size() == 1);
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
+}
+
 TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -139,9 +179,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   surface->renderContext->flush();
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RectDrawOp*>(task->ops[1].get())->rectCount, drawCallCount);
+  EXPECT_EQ(static_cast<RectDrawOp*>(&task->ops.back())->rectCount, drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
 }
@@ -179,9 +219,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   surface->renderContext->flush();
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops[1].get())->rectCount, drawCallCount);
+  EXPECT_EQ(static_cast<RRectDrawOp*>(&task->ops.back())->rectCount, drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
 }
@@ -298,8 +338,9 @@ TGFX_TEST(CanvasTest, drawPaint) {
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("TGFX", font);
-  auto shape = Shape::MakeFrom(std::move(textBlob));
-  auto path = shape->getPath();
+  Path path = {};
+  auto success = textBlob->getPath(&path);
+  EXPECT_TRUE(success);
   path.transform(Matrix::MakeTrans(10, 100));
   canvas->clear(Color::Red());
   canvas->save();
@@ -626,8 +667,6 @@ TGFX_TEST(CanvasTest, simpleShape) {
   ASSERT_TRUE(image != nullptr);
   Paint paint;
   paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(0));
-  EXPECT_TRUE(paint.nothingToDraw());
   paint.setStrokeWidth(2);
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   auto point = Point::Make(width / 2, height / 2);
@@ -671,12 +710,11 @@ TGFX_TEST(CanvasTest, inversePath) {
   Font font(typeface, 70.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  auto shape = Shape::MakeFrom(std::move(textBlob));
-  shape = Shape::ApplyInverse(std::move(shape));
-  ASSERT_TRUE(shape != nullptr);
-  EXPECT_TRUE(shape->isInverseFillType());
-  Path textPath = shape->getPath();
+  Path textPath = {};
+  auto success = textBlob->getPath(&textPath);
+  EXPECT_TRUE(success);
   EXPECT_TRUE(!textPath.isEmpty());
+  textPath.toggleInverseFillType();
   EXPECT_TRUE(textPath.isInverseFillType());
   textPath.transform(Matrix::MakeTrans(10, 75));
   canvas->clipPath(textPath);
@@ -708,7 +746,7 @@ TGFX_TEST(CanvasTest, inversePath) {
   EXPECT_EQ(cachesBefore.size(), 1u);
   canvas->clear();
   canvas->clipPath(clipPath);
-  shape = Shape::MakeFrom(path);
+  auto shape = Shape::MakeFrom(path);
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(50, 50));
   canvas->translate(-50, -50);
   canvas->drawShape(shape, paint);
@@ -755,7 +793,9 @@ TGFX_TEST(CanvasTest, saveLayer) {
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   Font font(typeface, 30.f);
   font.setFauxBold(true);
+  paint.setAntiAlias(false);
   canvas->drawSimpleText("Hello TGFX", 50, 400, font, paint);
+  paint.setAntiAlias(true);
   auto atlas = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(atlas != nullptr);
   Matrix matrix[2] = {Matrix::I(), Matrix::MakeTrans(150, 0)};
@@ -1048,7 +1088,7 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   auto sampler = CreateRectangleTexture(context, 110, 110);
   ASSERT_TRUE(sampler.id > 0);
   auto backendTexture = BackendTexture(sampler, 110, 110);
-  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft);
+  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, 4);
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/apitest/imageReplacement.png");
@@ -1255,7 +1295,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   auto textImage = Image::MakeFrom(textRecord, width, height, &matrix);
-  EXPECT_EQ(textRecord.use_count(), 1);
+  EXPECT_EQ(textRecord.use_count(), 2);
   ASSERT_TRUE(textImage != nullptr);
 
   surface = Surface::Make(context, textImage->width(), textImage->height());
@@ -1276,7 +1316,7 @@ TGFX_TEST(CanvasTest, Picture) {
   width = static_cast<int>(bounds.width());
   height = static_cast<int>(bounds.height());
   auto pathImage = Image::MakeFrom(patRecord, width, height, &matrix);
-  EXPECT_EQ(patRecord.use_count(), 1);
+  EXPECT_EQ(patRecord.use_count(), 2);
   ASSERT_TRUE(pathImage != nullptr);
 
   surface = Surface::Make(context, pathImage->width(), pathImage->height());
@@ -1304,8 +1344,8 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
   auto surfaceHeight = (static_cast<float>(padding + image->height())) * scale *
                        ceil(sizeof(blendModes) / sizeof(BlendMode) / 4.0f) * 2;
 
-  auto surface =
-      Surface::Make(context, static_cast<int>(offset * 4), static_cast<int>(surfaceHeight));
+  auto surface = Surface::Make(context, static_cast<int>(offset * 4),
+                               static_cast<int>(surfaceHeight), false, 4);
   auto canvas = surface->getCanvas();
 
   Paint backPaint;
@@ -1416,7 +1456,7 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
     explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
     }
 
-    Path getPath(float /*resolutionScale*/) const override {
+    Path getPath() const override {
       if (points.size() < 2) {
         return {};
       }
@@ -1430,7 +1470,7 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
       return path;
     }
 
-    Rect getBounds(float /*resolutionScale*/) const override {
+    Rect getBounds() const override {
       if (points.size() < 2) {
         return Rect::MakeEmpty();
       }
@@ -1487,6 +1527,8 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
+  Paint paint = {};
+  paint.setColor(Color::Black());
   auto path = Path();
   path.addRect(Rect::MakeXYWH(10, 10, 50, 50));
   auto shape = Shape::MakeFrom(path);
@@ -1494,10 +1536,43 @@ TGFX_TEST(CanvasTest, StrokeShape) {
   shape = Shape::ApplyMatrix(shape, matrix);
   Stroke stroke(10);
   shape = Shape::ApplyStroke(shape, &stroke);
-  canvas->drawShape(shape, Paint());
+  canvas->drawShape(shape, paint);
   shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(0.2f, 0.6f));
   canvas->translate(150, 0);
-  canvas->drawShape(shape, Paint());
+  canvas->drawShape(shape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape"));
+
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  path.reset();
+  path.moveTo(70.0f, 190.0f);
+  path.lineTo(100.0f, 74.0f);
+  path.lineTo(130.0f, 190.0f);
+  stroke.width = 15;
+  stroke.miterLimit = 4.0f;
+  stroke.join = LineJoin::Miter;
+  shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyStroke(shape, &stroke);
+  auto bounds = shape->getBounds();
+  canvas->clipRect(bounds);
+  stroke.applyToPath(&path);
+  EXPECT_EQ(bounds.top, 44.0f);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape_miter"));
+}
+
+TGFX_TEST(CanvasTest, ClipAll) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 20, 20);
+  auto canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 0, 0));
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(5, 5, 10, 10));
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAll"));
 }
 }  // namespace tgfx

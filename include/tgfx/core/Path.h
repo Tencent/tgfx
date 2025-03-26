@@ -39,14 +39,23 @@ class Path {
   Path();
 
   /**
-   * Compares a and b; returns true if they are equivalent.
+   * Compares a and b; returns true if PathFillType, verb array, and Point array are equivalent.
    */
   friend bool operator==(const Path& a, const Path& b);
 
   /**
-   * Compares a and b; returns true if they are not equivalent.
+   * Compares a and b; returns true if PathFillType, verb array, and Point array are not equivalent.
    */
   friend bool operator!=(const Path& a, const Path& b);
+
+  /**
+   * Returns true if this Path is the same as the specified Path. This method is faster than
+   * operator== but may return false for paths that are equivalent but not identical, as it only
+   * compares the internal reference without a deep comparison.
+   */
+  bool isSame(const Path& other) const {
+    return pathRef == other.pathRef;
+  }
 
   /**
    * Returns PathFillType, the rule used to fill Path. PathFillType of a new Path is

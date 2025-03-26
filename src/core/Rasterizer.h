@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/GlyphRunList.h"
+#include "gpu/AAType.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/Shape.h"
 

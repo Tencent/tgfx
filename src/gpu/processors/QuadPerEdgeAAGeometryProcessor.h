@@ -26,8 +26,10 @@
 namespace tgfx {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  public:
-  static std::unique_ptr<QuadPerEdgeAAGeometryProcessor> Make(int width, int height, AAType aa,
-                                                              std::optional<Color> uniformColor);
+  static PlacementPtr<QuadPerEdgeAAGeometryProcessor> Make(PlacementBuffer* buffer, int width,
+                                                           int height, AAType aa,
+                                                           std::optional<Color> uniformColor,
+                                                           bool useUVCoord);
 
   std::string name() const override {
     return "QuadPerEdgeAAGeometryProcessor";
@@ -37,17 +39,18 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                 std::optional<Color> uniformColor);
+                                 std::optional<Color> uniformColor, bool useUVCoord);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position;  // May contain coverage as last channel
-  Attribute localCoord;
+  Attribute uvCoord;
   Attribute color;
 
   int width = 1;
   int height = 1;
   AAType aa = AAType::None;
   std::optional<Color> uniformColor = std::nullopt;
+  bool useUVCoord = false;
 };
 }  // namespace tgfx

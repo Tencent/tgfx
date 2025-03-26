@@ -21,11 +21,10 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                            TileMode tileModeX, TileMode tileModeY,
-                                                            const SamplingOptions& options,
-                                                            const Matrix* uvMatrix,
-                                                            bool forceAsMask) {
+PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
+                                                         TileMode tileModeX, TileMode tileModeY,
+                                                         const SamplingOptions& options,
+                                                         const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
@@ -35,10 +34,11 @@ std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Text
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   SamplerState samplerState(tileModeX, tileModeY, options);
   auto isAlphaOnly = proxy->isAlphaOnly();
-  std::unique_ptr<FragmentProcessor> processor =
-      std::make_unique<GLTiledTextureEffect>(std::move(proxy), samplerState, matrix);
+  auto drawingBuffer = proxy->getContext()->drawingBuffer();
+  PlacementPtr<FragmentProcessor> processor =
+      drawingBuffer->make<GLTiledTextureEffect>(std::move(proxy), samplerState, matrix);
   if (forceAsMask && !isAlphaOnly) {
-    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
+    processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
   }
   return processor;
 }

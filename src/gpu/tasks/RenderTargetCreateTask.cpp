@@ -22,19 +22,11 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-std::unique_ptr<RenderTargetCreateTask> RenderTargetCreateTask::MakeFrom(
-    UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy, PixelFormat pixelFormat,
-    int sampleCount, bool clearAll) {
-  return std::unique_ptr<RenderTargetCreateTask>(new RenderTargetCreateTask(
-      std::move(uniqueKey), std::move(textureProxy), pixelFormat, sampleCount, clearAll));
-}
-
 RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey,
                                                std::shared_ptr<TextureProxy> textureProxy,
-                                               PixelFormat pixelFormat, int sampleCount,
-                                               bool clearAll)
+                                               PixelFormat pixelFormat, int sampleCount)
     : ResourceTask(std::move(uniqueKey)), textureProxy(std::move(textureProxy)),
-      pixelFormat(pixelFormat), sampleCount(sampleCount), clearAll(clearAll) {
+      pixelFormat(pixelFormat), sampleCount(sampleCount) {
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
@@ -47,7 +39,7 @@ std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
     LOGE("RenderTargetCreateTask::onMakeResource() the texture format mismatch!");
     return nullptr;
   }
-  auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount, clearAll);
+  auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount);
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to create the render target!");
   }

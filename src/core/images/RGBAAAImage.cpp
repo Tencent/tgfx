@@ -49,11 +49,11 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
   return image;
 }
 
-std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
-                                                                    TileMode tileModeX,
-                                                                    TileMode tileModeY,
-                                                                    const SamplingOptions& sampling,
-                                                                    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
+                                                                 TileMode tileModeX,
+                                                                 TileMode tileModeY,
+                                                                 const SamplingOptions& sampling,
+                                                                 const Matrix* uvMatrix) const {
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;

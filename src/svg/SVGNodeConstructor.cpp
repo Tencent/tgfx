@@ -17,11 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGNodeConstructor.h"
+#include <cstddef>
+#include <memory>
+#include <regex>
+#include <string>
+#include <utility>
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGUtils.h"
+#include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/node/SVGCircle.h"
 #include "tgfx/svg/node/SVGClipPath.h"
+#include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGDefs.h"
 #include "tgfx/svg/node/SVGEllipse.h"
 #include "tgfx/svg/node/SVGFeBlend.h"
@@ -311,6 +318,92 @@ void SVGNodeConstructor::ParseNodeAttributes(const DOMNode* xmlNode,
   }
 }
 
+struct CSSRule {
+  std::string selector;
+  std::string declarations;
+};
+
+class CSSParser {
+ public:
+  explicit CSSParser(std::string cssString) : css(std::move(cssString)) {
+  }
+
+  void parse() {
+    size_t pos = 0;
+    while (pos < css.size()) {
+      // Find start of next rule
+      size_t ruleStart = css.find_first_not_of(" \t\n\r", pos);
+      if (ruleStart == std::string::npos) {
+        break;
+      }
+      // Find end of rule
+      size_t ruleEnd = css.find('}', ruleStart);
+      if (ruleEnd == std::string::npos) {
+        break;
+      }
+      // Parse the individual rule
+      std::string ruleString = css.substr(ruleStart, ruleEnd - ruleStart + 1);
+      CSSRule rule = parseRule(ruleString);
+      if (!rule.selector.empty()) {
+        rules.push_back(rule);
+      }
+      pos = ruleEnd + 1;
+    }
+  }
+
+  const std::vector<CSSRule>& getRules() const {
+    return rules;
+  }
+
+ private:
+  // Remove whitespace from the beginning and end of a string
+  std::string trim(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t\n\r");
+    size_t last = str.find_last_not_of(" \t\n\r");
+    if (first == std::string::npos) {
+      return "";
+    }
+    return str.substr(first, (last - first + 1));
+  }
+
+  CSSRule parseRule(const std::string& ruleStr) {
+    CSSRule rule;
+    // Find delimiter between selector and declarations
+    size_t openBrace = ruleStr.find('{');
+    if (openBrace == std::string::npos) {
+      return rule;
+    }
+    // Extract selector
+    rule.selector = trim(ruleStr.substr(0, openBrace)).substr(1);
+
+    // Extract declarations block
+    size_t closeBrace = ruleStr.find('}', openBrace);
+    if (closeBrace == std::string::npos) {
+      return rule;
+    }
+    rule.declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
+    return rule;
+  }
+
+  std::string css;
+  std::vector<CSSRule> rules = {};
+};
+
+void SVGNodeConstructor::ParseCSSStyle(const DOMNode* xmlNode, CSSMapper* mapper) {
+  std::shared_ptr<DOMNode> child = xmlNode->firstChild;
+  while (child) {
+    if (child->type == DOMNodeType::Text) {
+      auto css = child->name;
+      CSSParser parser(css);
+      parser.parse();
+      for (const auto& rule : parser.getRules()) {
+        mapper->insert({rule.selector, rule.declarations});
+      }
+    }
+    child = child->nextSibling;
+  }
+}
+
 std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const ConstructionContext& context,
                                                               const DOMNode* xmlNode) {
   std::string elementName = xmlNode->name;
@@ -318,14 +411,17 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
 
   if (elementType == DOMNodeType::Text) {
     // Text literals require special handling.
-    ASSERT(xmlNode->attributes.empty());
+    DEBUG_ASSERT(xmlNode->attributes.empty());
     auto text = SVGTextLiteral::Make();
     text->setText(xmlNode->name);
     context.parentNode->appendChild(std::move(text));
     return nullptr;
+  } else if (elementName == "style") {
+    ParseCSSStyle(xmlNode, context.cssMapper);
+    return nullptr;
   }
 
-  ASSERT(elementType == DOMNodeType::Element);
+  DEBUG_ASSERT(elementType == DOMNodeType::Element);
 
   auto makeNode = [](const ConstructionContext& context,
                      const std::string& elementName) -> std::shared_ptr<SVGNode> {
@@ -338,7 +434,8 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
       return iter->second();
     }
     //can't find the element factory
-    ASSERT(false);
+    DEBUG_ASSERT(false);
+    return nullptr;
   };
 
   auto node = makeNode(context, elementName);
@@ -358,6 +455,26 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
     child = child->nextSibling;
   }
   return node;
+}
+
+void SVGNodeConstructor::SetClassStyleAttributes(SVGNode& root, const CSSMapper& mapper) {
+  auto styleSetter = [&](auto setter, SVGNode* node) -> void {
+    auto classStr = node->getClass().get();
+    if (classStr.has_value() && !classStr->empty()) {
+      auto iter = mapper.find(*classStr);
+      if (iter != mapper.end()) {
+        std::string style = iter->second;
+        SetStyleAttributes(*node, SVGAttribute::Class, style);
+      }
+    }
+    if (node->hasChildren()) {
+      auto* container = static_cast<SVGContainer*>(node);
+      for (const auto& child : container->getChildren()) {
+        setter(setter, child.get());
+      }
+    }
+  };
+  styleSetter(styleSetter, &root);
 }
 
 }  // namespace tgfx

@@ -25,8 +25,8 @@
 namespace tgfx {
 class GLClampedGradientEffect : public ClampedGradientEffect {
  public:
-  GLClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
-                          std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
+  GLClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
+                          PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor,
                           Color rightBorderColor);
 
   void emitCode(EmitArgs& args) const override;

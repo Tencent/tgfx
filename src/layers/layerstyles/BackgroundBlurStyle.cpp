@@ -15,6 +15,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
+#include "OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -59,7 +60,7 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
 
   // draw background out of the mask
   Paint maskPaint = {};
-  maskPaint.setImageFilter(ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(0)));
+  maskPaint.setImageFilter(ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD)));
   maskPaint.setBlendMode(BlendMode::DstOut);
   canvas->drawImage(content, &maskPaint);
 
@@ -67,11 +68,12 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
   auto blur =
       ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
   Point backgroundOffset = Point::Zero();
-  auto blurBackground = extraSource->makeWithFilter(blur, &backgroundOffset);
+  auto clipRect = Rect::MakeWH(extraSource->width(), extraSource->height());
+  auto blurBackground = extraSource->makeWithFilter(blur, &backgroundOffset, &clipRect);
   backgroundOffset += extraSourceOffset;
 
   auto maskShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
-  maskShader = maskShader->makeWithColorFilter(ColorFilter::AlphaThreshold(0));
+  maskShader = maskShader->makeWithColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
   Matrix matrix = Matrix::MakeTrans(-backgroundOffset.x, -backgroundOffset.y);
   maskShader = maskShader->makeWithMatrix(matrix);
 

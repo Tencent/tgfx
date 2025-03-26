@@ -30,7 +30,7 @@ TGFX_TEST(DrawersTest, Compare) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, appHost.width(), appHost.height());
+  auto surface = Surface::Make(context, appHost.width(), appHost.height(), false, 4);
   auto canvas = surface->getCanvas();
   auto drawerNames = drawers::Drawer::Names();
   for (auto& name : drawerNames) {

@@ -44,11 +44,11 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   return SubsetImage::MakeFrom(source, newBounds);
 }
 
-std::unique_ptr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
-                                                                    TileMode tileModeX,
-                                                                    TileMode tileModeY,
-                                                                    const SamplingOptions& sampling,
-                                                                    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
+                                                                 TileMode tileModeX,
+                                                                 TileMode tileModeY,
+                                                                 const SamplingOptions& sampling,
+                                                                 const Matrix* uvMatrix) const {
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {

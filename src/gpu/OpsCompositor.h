@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "core/FillStyle.h"
 #include "core/MCState.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -42,35 +42,33 @@ class OpsCompositor {
   /**
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
-  OpsCompositor(DrawingManager* drawingManager, std::shared_ptr<RenderTargetProxy> proxy,
-                uint32_t renderFlags);
+  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags);
 
   /**
-   * Fill the given rect with the image, sampling options, state and style.
+   * Fills the given rect with the image, sampling options, state and fill.
    */
   void fillImage(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                 const MCState& state, const FillStyle& style);
+                 const MCState& state, const Fill& fill);
 
   /**
-   * Fill the given rect with the given state and style.
+   * Fills the given rect with the given state and fill.
    */
-  void fillRect(const Rect& rect, const MCState& state, const FillStyle& style);
+  void fillRect(const Rect& rect, const MCState& state, const Fill& fill);
 
   /**
-   * Fill the given rrect with the given state and style.
+   * Fills the given rrect with the given state and fill.
    */
-  void fillRRect(const RRect& rRect, const MCState& state, const FillStyle& style);
+  void fillRRect(const RRect& rRect, const MCState& state, const Fill& fill);
 
   /**
-   * Fill the given shape with the given state and style.
+   * Fills the given shape with the given state and fill.
    */
-  void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const FillStyle& style);
+  void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
   /**
-   * Copy the contents of the render target to the given texture.
+   * Discard all pending operations.
    */
-  void copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                     const Point& dstPoint);
+  void discardAll();
 
   /**
    * Close the compositor and submit the composed render task to the render queue. After closing,
@@ -82,37 +80,46 @@ class OpsCompositor {
    * Returns true if the compositor is closed.
    */
   bool isClosed() const {
-    return drawingManager == nullptr;
+    return renderTarget == nullptr;
   }
 
  private:
-  DrawingManager* drawingManager = nullptr;
+  Context* context = nullptr;
+  std::list<std::shared_ptr<OpsCompositor>>::iterator cachedPosition;
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
-  std::vector<std::unique_ptr<Op>> ops = {};
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   PendingOpType pendingType = PendingOpType::Unknown;
   Path pendingClip = {};
-  FillStyle pendingStyle = {};
+  Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
-  std::vector<RectPaint> pendingRects = {};
-  std::vector<RRectPaint> pendingRRects = {};
+  PlacementList<RectPaint> pendingRects = {};
+  PlacementList<RRectPaint> pendingRRects = {};
+  PlacementList<Op> ops = {};
 
-  bool drawAsClear(const Rect& rect, const MCState& state, const FillStyle& style);
-  bool canAppend(PendingOpType type, const Path& clip, const FillStyle& style) const;
-  void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {},
-                       FillStyle style = {});
-  AAType getAAType(const FillStyle& style) const;
-  std::pair<bool, bool> needComputeBounds(const FillStyle& style, bool hasImageFill = false);
+  PlacementBuffer* drawingBuffer() const {
+    return context->drawingBuffer();
+  }
+
+  ProxyProvider* proxyProvider() const {
+    return context->proxyProvider();
+  }
+
+  bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
+  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
+  void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {});
+  AAType getAAType(const Fill& fill) const;
+  std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasImageFill = false);
   Rect getClipBounds(const Path& clip);
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
-  std::unique_ptr<FragmentProcessor> getClipMaskFP(const Path& clip, AAType aaType,
-                                                   Rect* scissorRect);
-  DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, const FillStyle& style,
+  PlacementPtr<FragmentProcessor> getClipMaskFP(const Path& clip, AAType aaType, Rect* scissorRect);
+  DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
+  void addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const Fill& fill,
                  const Rect& localBounds, const Rect& deviceBounds);
+
+  friend class DrawingManager;
 };
 }  // namespace tgfx

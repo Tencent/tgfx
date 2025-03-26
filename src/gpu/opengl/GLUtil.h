@@ -46,6 +46,8 @@ unsigned CreateGLProgram(Context* context, const std::string& vertex, const std:
 
 unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source);
 
+void ClearGLError(Context* context);
+
 bool CheckGLErrorImpl(Context* context, std::string file, int line);
 
 #ifdef DEBUG

@@ -17,23 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "core/utils/Log.h"
-#include "gpu/Gpu.h"
 
 namespace tgfx {
-std::unique_ptr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
-                                                 std::unique_ptr<GeometryProcessor> gp) {
+PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
+                                              PlacementPtr<GeometryProcessor> gp) {
   auto numColorProcessors = colors.size();
-  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.resize(numColorProcessors + coverages.size());
-  std::move(colors.begin(), colors.end(), fragmentProcessors.begin());
-  std::move(coverages.begin(), coverages.end(),
-            fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
+  auto fragmentProcessors = std::move(colors);
+  fragmentProcessors.reserve(numColorProcessors + coverages.size());
+  for (auto& coverage : coverages) {
+    fragmentProcessors.emplace_back(std::move(coverage));
+  }
   auto format = renderPass->renderTarget()->format();
-  auto caps = renderPass->getContext()->caps();
-  const auto& swizzle = caps->getWriteSwizzle(format);
-  return std::make_unique<Pipeline>(std::move(gp), std::move(fragmentProcessors),
-                                    numColorProcessors, std::move(xferProcessor), blendMode,
-                                    &swizzle);
+  auto context = renderPass->getContext();
+  const auto& swizzle = context->caps()->getWriteSwizzle(format);
+  return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),
+                                                  numColorProcessors, std::move(xferProcessor),
+                                                  blendMode, &swizzle);
 }
 }  // namespace tgfx

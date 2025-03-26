@@ -19,6 +19,7 @@
 #include "FTMask.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
+#include "core/utils/USE.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
@@ -100,6 +101,9 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
   if (pixels == nullptr) {
     return;
   }
+  // We ignore the antiAlias parameter because FreeType always produces 1-bit masks when antiAlias
+  // is disabled, and we haven't implemented the conversion from 1-bit to 8-bit masks.
+  USE(antiAlias);
   const auto& info = pixelRef->info();
   auto finalPath = path;
   auto totalMatrix = matrix;
@@ -142,10 +146,7 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
   target.pitch = pitch;
   target.gammaTable = PixelRefMask::GammaTable().data();
   FT_Raster_Params params;
-  params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP;
-  if (antiAlias) {
-    params.flags |= FT_RASTER_FLAG_AA;
-  }
+  params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
   params.gray_spans = SpanFunc;
   params.user = &target;
   auto& clip = params.clip_box;

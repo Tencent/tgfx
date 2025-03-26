@@ -50,9 +50,9 @@ std::shared_ptr<Shape> Shape::ApplyInverse(std::shared_ptr<Shape> shape) {
   }
   return std::make_shared<InverseShape>(std::move(shape));
 }
-//Fix an issue where GpuBuffers with valid UniqueKeys are mistakenly purged from the cache.
-Path InverseShape::getPath(float resolutionScale) const {
-  auto path = shape->getPath(resolutionScale);
+
+Path InverseShape::getPath() const {
+  auto path = shape->getPath();
   path.toggleInverseFillType();
   return path;
 }

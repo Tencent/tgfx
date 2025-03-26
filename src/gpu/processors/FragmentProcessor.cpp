@@ -25,50 +25,52 @@
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
-                                                           const FPArgs& args,
-                                                           const SamplingOptions& sampling,
-                                                           const Matrix* uvMatrix) {
+PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
+                                                        const FPArgs& args,
+                                                        const SamplingOptions& sampling,
+                                                        const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
   return image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, uvMatrix);
 }
 
-std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
-                                                           const FPArgs& args, TileMode tileModeX,
-                                                           TileMode tileModeY,
-                                                           const SamplingOptions& sampling,
-                                                           const Matrix* uvMatrix) {
+PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
+                                                        const FPArgs& args, TileMode tileModeX,
+                                                        TileMode tileModeY,
+                                                        const SamplingOptions& sampling,
+                                                        const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
   return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
 }
 
-std::unique_ptr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
-                                                           const FPArgs& args,
-                                                           const Matrix* uvMatrix) {
+PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
+                                                        const FPArgs& args,
+                                                        const Matrix* uvMatrix) {
   DEBUG_ASSERT(shader != nullptr);
   return shader->asFragmentProcessor(args, uvMatrix);
 }
 
-std::unique_ptr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
-    std::unique_ptr<FragmentProcessor> child) {
+PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> child) {
   if (child == nullptr) {
     return nullptr;
   }
-  return XfermodeFragmentProcessor::MakeFromDstProcessor(std::move(child), BlendMode::DstIn);
+  return XfermodeFragmentProcessor::MakeFromDstProcessor(buffer, std::move(child),
+                                                         BlendMode::DstIn);
 }
 
-std::unique_ptr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
-    std::unique_ptr<FragmentProcessor> child, bool inverted) {
+PlacementPtr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> child, bool inverted) {
   if (child == nullptr) {
     return nullptr;
   }
   return XfermodeFragmentProcessor::MakeFromDstProcessor(
-      std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
+      buffer, std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
 }
 
-std::unique_ptr<FragmentProcessor> FragmentProcessor::Compose(
-    std::unique_ptr<FragmentProcessor> f, std::unique_ptr<FragmentProcessor> g) {
-  return ComposeFragmentProcessor::Make(std::move(f), std::move(g));
+PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(PlacementBuffer* buffer,
+                                                           PlacementPtr<FragmentProcessor> f,
+                                                           PlacementPtr<FragmentProcessor> g) {
+  return ComposeFragmentProcessor::Make(buffer, std::move(f), std::move(g));
 }
 
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
@@ -83,7 +85,7 @@ void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey
   }
 }
 
-size_t FragmentProcessor::registerChildProcessor(std::unique_ptr<FragmentProcessor> child) {
+size_t FragmentProcessor::registerChildProcessor(PlacementPtr<FragmentProcessor> child) {
   auto index = childProcessors.size();
   childProcessors.push_back(std::move(child));
   return index;

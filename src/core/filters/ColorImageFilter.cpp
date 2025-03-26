@@ -32,14 +32,16 @@ ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
     : filter(std::move(filter)) {
 }
 
-std::unique_ptr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   auto imageProcessor = FragmentProcessor::Make(std::move(source), args, sampling, uvMatrix);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  return FragmentProcessor::MulChildByInputAlpha(
-      ComposeFragmentProcessor::Make(std::move(imageProcessor), filter->asFragmentProcessor()));
+  auto drawingBuffer = args.context->drawingBuffer();
+  auto processor = ComposeFragmentProcessor::Make(drawingBuffer, std::move(imageProcessor),
+                                                  filter->asFragmentProcessor(args.context));
+  return FragmentProcessor::MulChildByInputAlpha(drawingBuffer, std::move(processor));
 }
 }  // namespace tgfx

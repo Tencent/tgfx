@@ -30,10 +30,15 @@ struct AttribLayout {
 };
 
 static constexpr std::pair<SLType, AttribLayout> attribLayoutPair[] = {
-    {SLType::Float, {false, 1, GL_FLOAT}},  {SLType::Float2, {false, 2, GL_FLOAT}},
-    {SLType::Float3, {false, 3, GL_FLOAT}}, {SLType::Float4, {false, 4, GL_FLOAT}},
-    {SLType::Int, {false, 1, GL_INT}},      {SLType::Int2, {false, 2, GL_INT}},
-    {SLType::Int3, {false, 3, GL_INT}},     {SLType::Int4, {false, 4, GL_INT}}};
+    {SLType::Float, {false, 1, GL_FLOAT}},
+    {SLType::Float2, {false, 2, GL_FLOAT}},
+    {SLType::Float3, {false, 3, GL_FLOAT}},
+    {SLType::Float4, {false, 4, GL_FLOAT}},
+    {SLType::Int, {false, 1, GL_INT}},
+    {SLType::Int2, {false, 2, GL_INT}},
+    {SLType::Int3, {false, 3, GL_INT}},
+    {SLType::Int4, {false, 4, GL_INT}},
+    {SLType::UByte4Color, {true, 4, GL_UNSIGNED_BYTE}}};
 
 static AttribLayout GetAttribLayout(SLType type) {
   for (const auto& pair : attribLayoutPair) {
@@ -42,6 +47,11 @@ static AttribLayout GetAttribLayout(SLType type) {
     }
   }
   return {false, 0, 0};
+}
+
+std::unique_ptr<RenderPass> RenderPass::Make(Context* context) {
+  DEBUG_ASSERT(context != nullptr);
+  return std::make_unique<GLRenderPass>(context);
 }
 
 GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
@@ -100,6 +110,17 @@ void GLRenderPass::onBindRenderTarget() {
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
+  if (vertexArray) {
+    gl->bindVertexArray(vertexArray->id());
+  }
+}
+
+void GLRenderPass::onUnbindRenderTarget() {
+  auto gl = GLFunctions::Get(context);
+  if (vertexArray) {
+    gl->bindVertexArray(0);
+  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
@@ -108,8 +129,8 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   if (_program == nullptr) {
     return false;
   }
+  ClearGLError(context);
   auto gl = GLFunctions::Get(context);
-  CheckGLError(context);
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   UpdateScissor(context, scissorRect);
@@ -121,40 +142,18 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   return true;
 }
 
-static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
-
-void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
-  auto func = [&]() {
-    auto gl = GLFunctions::Get(context);
-    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(baseVertex),
-                   static_cast<int>(vertexCount));
-  };
-  draw(func);
-}
-
-void GLRenderPass::onDrawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
-  auto func = [&]() {
-    auto gl = GLFunctions::Get(context);
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                   std::static_pointer_cast<GLBuffer>(_indexBuffer)->bufferID());
-    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
-                     GL_UNSIGNED_SHORT, reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  };
-  draw(func);
-}
-
-void GLRenderPass::draw(const std::function<void()>& func) {
+bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                                 std::shared_ptr<GpuBuffer> vertexBuffer,
+                                 std::shared_ptr<Data> vertexData) {
   auto gl = GLFunctions::Get(context);
-  if (vertexArray) {
-    gl->bindVertexArray(vertexArray->id());
-  }
-  if (_vertexBuffer) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(_vertexBuffer)->bufferID());
-  } else {
+  if (vertexBuffer) {
+    gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
+  } else if (vertexData) {
     gl->bindBuffer(GL_ARRAY_BUFFER, sharedVertexBuffer->bufferID());
-    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertexData->size()),
-                   _vertexData->data(), GL_STATIC_DRAW);
+    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertexData->size()), vertexData->data(),
+                   GL_STATIC_DRAW);
+  } else {
+    return false;
   }
   auto* program = static_cast<GLProgram*>(_program);
   for (const auto& attribute : program->vertexAttributes()) {
@@ -164,12 +163,25 @@ void GLRenderPass::draw(const std::function<void()>& func) {
                             reinterpret_cast<void*>(attribute.offset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
-  func();
-  if (vertexArray) {
-    gl->bindVertexArray(0);
+  if (indexBuffer) {
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                   std::static_pointer_cast<GLBuffer>(indexBuffer)->bufferID());
   }
-  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-  CheckGLError(context);
+  return true;
+}
+
+static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
+
+void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
+                          bool drawIndexed) {
+  auto gl = GLFunctions::Get(context);
+  if (drawIndexed) {
+    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(count),
+                     GL_UNSIGNED_SHORT, reinterpret_cast<void*>(offset * sizeof(uint16_t)));
+  } else {
+    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(offset),
+                   static_cast<int>(count));
+  }
 }
 
 void GLRenderPass::onClear(const Rect& scissor, Color color) {
@@ -179,25 +191,71 @@ void GLRenderPass::onClear(const Rect& scissor, Color color) {
   gl->clear(GL_COLOR_BUFFER_BIT);
 }
 
-void GLRenderPass::onCopyTo(Texture* texture, const Rect& srcRect, const Point& dstPoint) {
+void GLRenderPass::onCopyToTexture(Texture* texture, int srcX, int srcY) {
+  auto gpu = context->gpu();
+  if (_renderTarget->sampleCount() > 1) {
+    if (copyAsBlit(texture, srcX, srcY)) {
+      return;
+    }
+    auto bounds = Rect::MakeXYWH(srcX, srcY, texture->width(), texture->height());
+    gpu->resolveRenderTarget(_renderTarget.get(), bounds);
+  }
+  gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcX, srcY);
+  // Reset the render target after the copy operation.
   auto gl = GLFunctions::Get(context);
-  auto glRT = static_cast<const GLRenderTarget*>(_renderTarget.get());
-  auto hasMSAA = glRT->sampleCount() > 1;
-  if (hasMSAA) {
-    gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID(false));
+  gl->bindFramebuffer(GL_FRAMEBUFFER,
+                      static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID());
+}
+
+bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
+  auto caps = GLCaps::Get(context);
+  if (!caps->usesMSAARenderBuffers() || caps->msFBOType == MSFBOType::ES_Apple) {
+    return false;
+  }
+  if (caps->blitRectsMustMatchForMSAASrc && (srcX != 0 || srcY != 0)) {
+    return false;
   }
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  gl->bindTexture(glSampler->target, glSampler->id);
-  gl->copyTexSubImage2D(glSampler->target, 0, static_cast<int>(dstPoint.x),
-                        static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
-                        static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
-                        static_cast<int>(srcRect.height()));
+  if (glSampler->format != _renderTarget->format()) {
+    return false;
+  }
+  if (frameBuffer == nullptr) {
+    frameBuffer = GLFrameBuffer::Make(context);
+    if (frameBuffer == nullptr) {
+      return false;
+    }
+  }
+  ClearGLError(context);
+  auto gl = GLFunctions::Get(context);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, glSampler->id,
+                           0);
+  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID();
+#ifndef TGFX_BUILD_FOR_WEB
+  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
+    return false;
+  }
+#endif
+  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, sourceFrameBufferID);
+  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer->id());
+  gl->disable(GL_SCISSOR_TEST);
+  auto right = srcX + texture->width();
+  auto bottom = srcY + texture->height();
+  gl->blitFramebuffer(srcX, srcY, right, bottom, 0, 0, texture->width(), texture->height(),
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  if (!CheckGLError(context)) {
+    gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
+    return false;
+  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, 0, 0);
   if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
+    gl->bindTexture(glSampler->target, glSampler->id);
     gl->generateMipmap(glSampler->target);
   }
-  if (hasMSAA) {
-    gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID(true));
-  }
+  gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
+  return true;
 }
 
 }  // namespace tgfx

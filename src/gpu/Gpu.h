@@ -24,10 +24,7 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class RenderPass;
-
 class RenderTarget;
-
 class Texture;
 
 class Gpu {
@@ -38,8 +35,6 @@ class Gpu {
     return context;
   }
 
-  virtual std::shared_ptr<RenderPass> getRenderPass() = 0;
-
   virtual std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                         int mipLevelCount) = 0;
 
@@ -48,7 +43,10 @@ class Gpu {
   virtual void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
                            size_t rowBytes) = 0;
 
-  virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
+  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
+                                         int srcX, int srcY) = 0;
+
+  virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) = 0;
 
   virtual void regenerateMipmapLevels(const TextureSampler* sampler) = 0;
 

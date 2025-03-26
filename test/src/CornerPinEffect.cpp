@@ -73,7 +73,7 @@ Rect CornerPinEffect::filterBounds(const Rect&) const {
 std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* context) const {
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
-  CheckGLError(context);
+  ClearGLError(context);
   auto filterProgram =
       FilterProgram::Make(context, CORNER_PIN_VERTEX_SHADER, CORNER_PIN_FRAGMENT_SHADER);
   if (filterProgram == nullptr) {
@@ -110,7 +110,7 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
                              const BackendRenderTarget& target, const Point& offset) const {
   auto context = program->getContext();
   // Clear the previously generated GLError
-  CheckGLError(context);
+  ClearGLError(context);
   auto filterProgram = static_cast<const FilterProgram*>(program);
   auto uniforms = static_cast<const CornerPinUniforms*>(filterProgram->uniforms.get());
   auto gl = tgfx::GLFunctions::Get(context);

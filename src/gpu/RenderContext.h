@@ -26,42 +26,35 @@
 namespace tgfx {
 class RenderContext : public DrawContext {
  public:
-  RenderContext(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                Surface* surface = nullptr);
+  RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                bool clearAll = false, Surface* surface = nullptr);
 
   Context* getContext() const {
     return renderTarget->getContext();
   }
 
-  void drawStyle(const MCState& state, const FillStyle& style) override;
+  void drawFill(const MCState& state, const Fill& fill) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const FillStyle& style) override;
+  void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const FillStyle& style) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                 const FillStyle& style) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const FillStyle& style) override;
+                 const MCState& state, const Fill& fill) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                      const SamplingOptions& sampling, const MCState& state,
-                     const FillStyle& style) override;
+                     const Fill& fill) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke* stroke,
-                        const MCState& state, const FillStyle& style) override;
+  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                        const Fill& fill, const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const FillStyle& style) override;
-
-  /**
-   * Copies the contents of the render target to the given texture.
-   */
-  void copyToTexture(std::shared_ptr<TextureProxy> textureProxy, const Rect& srcRect,
-                     const Point& dstPoint);
+                 const MCState& state, const Fill& fill) override;
 
   /**
    * Flushes the render context, submitting all pending operations to the drawing manager. Returns
@@ -77,9 +70,10 @@ class RenderContext : public DrawContext {
 
   Rect getClipBounds(const Path& clip);
   void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                       const FillStyle& style);
-  AAType getAAType(const FillStyle& style) const;
-  OpsCompositor* getOpsCompositor(bool readOnly = false, bool discardContent = false);
+                       const Fill& fill);
+  OpsCompositor* getOpsCompositor(bool discardContent = false);
+  void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
+                           std::shared_ptr<Image> oldContent);
 
   friend class Surface;
 };

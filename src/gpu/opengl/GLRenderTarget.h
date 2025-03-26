@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/RenderTarget.h"
-#include "gpu/opengl/GLFrameBuffer.h"
 
 namespace tgfx {
 class GLInterface;
@@ -30,7 +29,7 @@ class GLInterface;
 class GLRenderTarget : public RenderTarget {
  public:
   PixelFormat format() const override {
-    return frameBufferForDraw.format;
+    return pixelFormat;
   }
 
   /**
@@ -47,14 +46,15 @@ class GLRenderTarget : public RenderTarget {
   void onReleaseGPU() override;
 
  private:
-  GLFrameBuffer frameBufferForRead = {};
-  GLFrameBuffer frameBufferForDraw = {};
-  unsigned msRenderBufferID = 0;
+  PixelFormat pixelFormat = PixelFormat::RGBA_8888;
+  unsigned frameBufferRead = 0;
+  unsigned frameBufferDraw = 0;
+  unsigned renderBufferID = 0;
   unsigned textureTarget = 0;
   bool externalResource = false;
 
-  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
-                 GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
+  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount, PixelFormat format,
+                 unsigned textureTarget = 0);
 
   friend class RenderTarget;
 };

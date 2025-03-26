@@ -19,7 +19,6 @@
 #include <memory>
 #include <vector>
 #include "CornerPinEffect.h"
-#include "core/filters/BlurImageFilter.h"
 #include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -399,8 +398,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   {
     auto imageFilter = ImageFilter::Blur(20, 30);
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
-    auto blurFilter = std::static_pointer_cast<BlurImageFilter>(imageFilter);
-    Size blurSize = blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    Size blurSize = imageFilter->filterBounds(Rect::MakeEmpty()).size();
     EXPECT_EQ(blurSize.width, 18.f);
     EXPECT_EQ(blurSize.height, 36.f);
   }
@@ -574,6 +572,25 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     EXPECT_EQ(info.points[0], center);
     EXPECT_EQ(info.radiuses[0], startAngle);
     EXPECT_EQ(info.radiuses[1], endAngle);
+  }
+
+  center = Point::Make(50, 50);
+  float halfDiagonal = 50;
+  {
+    auto shader = Shader::MakeDiamondGradient(center, halfDiagonal, colors, positions);
+    ASSERT_TRUE(shader != nullptr);
+    EXPECT_EQ(shader->type(), Shader::Type::Gradient);
+
+    auto gradientShader = std::static_pointer_cast<DiamondGradientShader>(shader);
+
+    GradientInfo info;
+    auto gradientType = gradientShader->asGradient(&info);
+    EXPECT_EQ(gradientType, GradientType::Diamond);
+    EXPECT_EQ(info.colors, colors);
+    EXPECT_EQ(info.positions, positions);
+    EXPECT_FLOAT_EQ(info.points[0].x, center.x);
+    EXPECT_FLOAT_EQ(info.points[0].y, center.y);
+    EXPECT_FLOAT_EQ(info.radiuses[0], halfDiagonal);
   }
 }
 
