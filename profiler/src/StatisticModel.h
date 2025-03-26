@@ -19,11 +19,11 @@
 #pragma once
 
 #include <qabstractitemmodel.h>
+#include "FramesView.h"
 #include "SourceContents.h"
+#include "SourceView.h"
 #include "TracyVector.hpp"
 #include "ViewData.h"
-#include "SourceView.h"
-#include "FramesView.h"
 
 class View;
 class SourceView;
@@ -34,8 +34,8 @@ class StatisticsModel : public QAbstractTableModel {
   Q_PROPERTY(QString visibleZoneCount READ getVisibleZoneCount NOTIFY zoneCountChanged)
   Q_PROPERTY(bool rangeActive READ isRangeActive WRITE setRangeActive NOTIFY rangeActiveChanged)
   Q_PROPERTY(QString filterText READ getFilterText WRITE setFilterText NOTIFY filterTextChanged)
-  Q_PROPERTY(int accumulationMode READ getAccumulationMode WRITE setAccumulationMode NOTIFY accumulationModeChanged)
-
+  Q_PROPERTY(int accumulationMode READ getAccumulationMode WRITE setAccumulationMode NOTIFY
+                 accumulationModeChanged)
 
  public:
   enum class AccumulationMode { SelfOnly, AllChildren, NonReentrantChildren };
@@ -115,11 +115,11 @@ class StatisticsModel : public QAbstractTableModel {
   }
 
   QColor getTextColor() const {
-    return QColor(255, 255,255, 230);
+    return QColor(255, 255, 255, 230);
   }
 
   int getAccumulationMode() const {
-    return static_cast<int>(statAccumulationMode) ;
+    return static_cast<int>(statAccumulationMode);
   }
 
   StatMode statisticMode() const {
@@ -144,7 +144,8 @@ class StatisticsModel : public QAbstractTableModel {
   void openSource(const char* fileName, int line, const tracy::Worker* worker, const View* view);
   void parseSource(const char* fileName, const tracy::Worker* worker, const View* view);
   void viewSource(const char* fileName, int line);
-  static bool srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker, View* view);
+  static bool srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker,
+                           View* view);
 
   /////*range selected*/////
   bool isRangeActive() const;
@@ -154,7 +155,6 @@ class StatisticsModel : public QAbstractTableModel {
   Q_SLOT void refreshData();
   Q_SLOT void setStatRange(int startTime, int endTime, bool active);
   Q_SLOT void setStatisticsMode(StatMode mode);
-
 
   Q_SIGNAL void statisticsModeChanged();
   Q_SIGNAL void statisticsUpdated();

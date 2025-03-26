@@ -30,46 +30,39 @@ SourceContents::~SourceContents() {
 }
 
 void SourceContents::Parse(const char* fileName, const tracy::Worker* worker, const View* view) {
-  if( files == fileName ) return;
+  if (files == fileName) return;
 
   files = fileName;
-  fileStringIdx = worker->FindStringIdx( fileName );
+  fileStringIdx = worker->FindStringIdx(fileName);
   lines.clear();
-  if( fileName )
-  {
+  if (fileName) {
     uint32_t sz;
-    const auto srcCache = worker->GetSourceFileFromCache( fileName );
-    if( srcCache.data != nullptr ) {
+    const auto srcCache = worker->GetSourceFileFromCache(fileName);
+    if (srcCache.data != nullptr) {
       mdata = srcCache.data;
       mdataSize = srcCache.len;
       sz = srcCache.len;
-    }
-    else
-    {
-      FILE* f = fopen( view->sourceSubstitution( fileName ), "rb" );
-      if( f )
-      {
-        fseek( f, 0, SEEK_END );
-        sz = static_cast<uint32_t>(ftell( f ));
-        fseek( f, 0, SEEK_SET );
-        if( sz > dataBufSize )
-        {
+    } else {
+      FILE* f = fopen(view->sourceSubstitution(fileName), "rb");
+      if (f) {
+        fseek(f, 0, SEEK_END);
+        sz = static_cast<uint32_t>(ftell(f));
+        fseek(f, 0, SEEK_SET);
+        if (sz > dataBufSize) {
           delete[] dataBuf;
           dataBuf = new char[sz];
           dataBufSize = sz;
         }
-        fread( dataBuf, 1, sz, f );
+        fread(dataBuf, 1, sz, f);
         mdata = dataBuf;
         mdataSize = sz;
-        fclose( f );
-      }
-      else
-      {
+        fclose(f);
+      } else {
         files = nullptr;
       }
     }
 
-    if( files ) Tokenize( mdata, sz );
+    if (files) Tokenize(mdata, sz);
   }
 }
 

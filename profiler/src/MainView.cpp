@@ -89,7 +89,7 @@ void MainView::statView() {
 void MainView::connectClient(const char* address, const uint16_t port) {
   toolView->setParent(nullptr);
   Config config;
-  centorView = new View(address, port, this->width(), config, this);
+  centorView = new View(address, port, width(), config, this);
   if (!centorView->isConnected()) {
     discardConnect();
     return;
@@ -105,7 +105,7 @@ void MainView::openFile() {
       toolView->setParent(nullptr);
 
       Config config;
-      centorView = new View(*file, this->width(), config, this);
+      centorView = new View(*file, width(), config, this);
       layout->addWidget(centorView);
       Q_EMIT statusChange(ProfilerStatus::ReadFile);
       delete toolView;
@@ -117,7 +117,7 @@ void MainView::openFile() {
 void MainView::openWebsocketServer() {
   toolView->setParent(nullptr);
   Config config;
-  centorView = new View(this->width(), config, this);
+  centorView = new View(width(), config, this);
   if (!centorView->isConnected()) {
     discardConnect();
     return;

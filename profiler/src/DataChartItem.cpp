@@ -20,7 +20,8 @@
 #include <QToolTip>
 
 DataChartItem::DataChartItem(QQuickItem* parent, ChartType chartType, float lineThickness)
-  : QQuickItem(parent), chartType(chartType), thickness(lineThickness), appHost(AppHostInstance::GetAppHostInstance()) {
+    : QQuickItem(parent), chartType(chartType), thickness(lineThickness),
+      appHost(AppHostInstance::GetAppHostInstance()) {
   setFlag(ItemHasContents, true);
   setFlag(ItemAcceptsInputMethod, true);
   setFlag(ItemIsFocusScope, true);
@@ -46,12 +47,14 @@ uint32_t DataChartItem::getMaxData(QVector<float>& data, uint32_t min, uint32_t 
   return static_cast<uint32_t>(maxData * 3 / 2);
 }
 
-void DataChartItem::drawCoordinateAxes(tgfx::Canvas* canvas, float xStart, float yStart, float xLength, float yLength) {
+void DataChartItem::drawCoordinateAxes(tgfx::Canvas* canvas, float xStart, float yStart,
+                                       float xLength, float yLength) {
   uint32_t color = 0xFF4D4D4D;
   drawRect(canvas, xStart, yStart, xLength, yLength, color, 1.f);
 }
 
-void DataChartItem::drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
+void DataChartItem::drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float xStart,
+                              float yStart, float width, float height) {
   switch (chartType) {
     case Polyline: {
       drawPolylineChart(linePath, xStart, yStart, width, height);
@@ -72,12 +75,12 @@ void DataChartItem::drawChart(tgfx::Canvas* canvas, tgfx::Path& linePath, float 
   }
 }
 
-void DataChartItem::drawPolylineChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
+void DataChartItem::drawPolylineChart(tgfx::Path& linePath, float xStart, float yStart, float width,
+                                      float height) {
   if (xStart == 0) {
     if (thickness == 0.f) {
       linePath.moveTo(xStart + width / 2, height + yStart);
-    }
-    else {
+    } else {
       linePath.moveTo(xStart + width / 2, yStart);
       return;
     }
@@ -95,18 +98,19 @@ void DataChartItem::drawLineChart(tgfx::Path& linePath, float xStart, float ySta
   linePath.lineTo(xStart + lineWidth * 2, yStart);
 }
 
-void DataChartItem::drawColumnChart(tgfx::Canvas* canvas, float xStart, float yStart, float width, float height) {
+void DataChartItem::drawColumnChart(tgfx::Canvas* canvas, float xStart, float yStart, float width,
+                                    float height) {
   float columnWidth = width / 2;
   float halfColumnWidth = columnWidth / 2;
   drawRect(canvas, xStart + halfColumnWidth, yStart, columnWidth, height, getColor());
 }
 
-void DataChartItem::drawRectangleChart(tgfx::Path& linePath, float xStart, float yStart, float width, float height) {
+void DataChartItem::drawRectangleChart(tgfx::Path& linePath, float xStart, float yStart,
+                                       float width, float height) {
   if (xStart == 0) {
     linePath.moveTo(xStart, height + yStart);
     linePath.lineTo(xStart, yStart);
-  }
-  else {
+  } else {
     linePath.lineTo(xStart, yStart);
   }
   linePath.lineTo(xStart + width, yStart);
@@ -143,12 +147,14 @@ void DataChartItem::drawData(tgfx::Canvas* canvas) {
     auto d = data[minX + idx];
     if (group > 1) {
       for (uint32_t j = 1; j < group; ++j) {
-        d = std::max(d, data[minX + idx + j]);
+        auto dataIdx = std::min(minX + idx + j, maxX);
+        d = std::max(d, data[dataIdx]);
       }
     }
     const auto currentHeight = std::min(static_cast<float>(maxY), d) / maxY * (charHeight - 2);
     const auto dataHeight = std::max(1.f, currentHeight);
-    drawChart(canvas, linePath, frameStart + i * dataWidth, charHeight - dataHeight, dataWidth, dataHeight);
+    drawChart(canvas, linePath, frameStart + i * dataWidth, charHeight - dataHeight, dataWidth,
+              dataHeight);
     ++i;
     idx += group;
   }
@@ -163,15 +169,15 @@ void DataChartItem::drawData(tgfx::Canvas* canvas) {
 
 void DataChartItem::draw() {
   auto device = tgfxWindow->getDevice();
-  if(device == nullptr) {
+  if (device == nullptr) {
     return;
   }
   auto context = device->lockContext();
-  if(context == nullptr) {
+  if (context == nullptr) {
     return;
   }
   auto surface = tgfxWindow->getSurface(context);
-  if(surface == nullptr) {
+  if (surface == nullptr) {
     device->unlock();
     return;
   }
@@ -245,17 +251,13 @@ void DataChartItem::hoverMoveEvent(QHoverEvent* event) {
       d = std::max(d, data[sel + j]);
     }
     text = QString("Frames: %1 - %2(%3)\nMax%4: %5\n")
-            .arg(sel)
-            .arg(sel + g -1)
-            .arg(g)
-            .arg(name)
-            .arg(d);
-  }
-  else {
-    text = QString("Frames: %1\n%2: %3")
-      .arg(sel)
-      .arg(name)
-      .arg(d);
+               .arg(sel)
+               .arg(sel + g - 1)
+               .arg(g)
+               .arg(name)
+               .arg(d);
+  } else {
+    text = QString("Frames: %1\n%2: %3").arg(sel).arg(name).arg(d);
   }
   QPoint globalPos = QCursor::pos();
   QToolTip::showText(globalPos, text, nullptr);

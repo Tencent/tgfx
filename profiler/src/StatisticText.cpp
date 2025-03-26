@@ -16,20 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "StatisticText.h"
 #include <QQuickWindow>
 #include <QSGImageNode>
-#include "StatisticText.h"
 #include "Utility.h"
 
 StatisticsText::StatisticsText(QQuickItem* parent)
-  : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
+    : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
   setFlag(ItemHasContents, true);
 }
 
 StatisticsText::~StatisticsText() = default;
 
 tgfx::Rect StatisticsText::getTextBounds(const QString& text) const {
-  if(text.isEmpty() || !appHost) {
+  if (text.isEmpty() || !appHost) {
     return tgfx::Rect::MakeEmpty();
   }
 
@@ -39,7 +39,7 @@ tgfx::Rect StatisticsText::getTextBounds(const QString& text) const {
 }
 
 void StatisticsText::setText(const QString& text) {
-  if(sText != text) {
+  if (sText != text) {
     sText = text;
     dirty = true;
     Q_EMIT textChanged();
@@ -48,7 +48,7 @@ void StatisticsText::setText(const QString& text) {
 }
 
 void StatisticsText::setColor(const QColor& color) {
-  if(sColor != color) {
+  if (sColor != color) {
     sColor = color;
     Q_EMIT scolorChanged();
     update();
@@ -56,7 +56,7 @@ void StatisticsText::setColor(const QColor& color) {
 }
 
 void StatisticsText::setContrast(bool contrast) {
-  if(sContrast != contrast) {
+  if (sContrast != contrast) {
     sContrast = contrast;
     Q_EMIT contrastChanged();
     update();
@@ -64,7 +64,7 @@ void StatisticsText::setContrast(bool contrast) {
 }
 
 void StatisticsText::setAlignment(Qt::Alignment alignment) {
-  if(sAlignment != alignment) {
+  if (sAlignment != alignment) {
     sAlignment = alignment;
     Q_EMIT alignmentChanged();
     update();
@@ -72,7 +72,7 @@ void StatisticsText::setAlignment(Qt::Alignment alignment) {
 }
 
 void StatisticsText::setElideMode(int elideMode) {
-  if(sElideMode != elideMode) {
+  if (sElideMode != elideMode) {
     sElideMode = elideMode;
     Q_EMIT elideModeChanged();
     update();
@@ -111,12 +111,11 @@ void StatisticsText::draw() {
   dirty = false;
 }
 
-
 void StatisticsText::drawStext(tgfx::Canvas* canvas) {
-  if(!sText.isEmpty()) {
+  if (!sText.isEmpty()) {
     QString displayText = sText;
-    if(sElideMode != Qt::ElideNone) {
-      displayText = elideText(sText, static_cast<float>( width()));
+    if (sElideMode != Qt::ElideNone) {
+      displayText = elideText(sText, static_cast<float>(width()));
     }
 
     float x = 0.0f;
@@ -124,36 +123,30 @@ void StatisticsText::drawStext(tgfx::Canvas* canvas) {
 
     auto textBounds = getTextBounds(displayText);
 
-    if(sAlignment & Qt::AlignHCenter) {
+    if (sAlignment & Qt::AlignHCenter) {
       float textWidth = textBounds.width();
       x = static_cast<float>((width() - textWidth)) / 2.0f - textBounds.left;
-    }
-    else if(sAlignment & Qt::AlignRight) {
+    } else if (sAlignment & Qt::AlignRight) {
       x = static_cast<float>(width() - textBounds.right - textBounds.right);
-    }
-    else {
+    } else {
       x = -textBounds.left;
     }
 
     if (sAlignment & Qt::AlignVCenter) {
       float textHeight = textBounds.height();
       y = static_cast<float>((height() - textHeight) / 2.0f - textBounds.top);
-    }
-    else if (sAlignment & Qt::AlignBottom) {
+    } else if (sAlignment & Qt::AlignBottom) {
       y = static_cast<float>(height() - textBounds.bottom - textBounds.top);
-    }
-    else {
+    } else {
       y = -textBounds.top;
     }
-
 
     std::string utf8Text = displayText.toStdString();
     uint32_t color32 = colorToUint32(sColor);
 
-    if(sContrast) {
+    if (sContrast) {
       drawTextContrast(canvas, appHost.get(), x, y, color32, utf8Text.c_str());
-    }
-    else {
+    } else {
       drawText(canvas, appHost.get(), utf8Text, x, y, color32);
     }
   }
@@ -184,12 +177,11 @@ QSGNode* StatisticsText::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
     node->setRect(boundingRect());
   }
   return node;
-
 }
 
 void StatisticsText::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
   QQuickItem::geometryChange(newGeometry, oldGeometry);
-  if(newGeometry.size() != oldGeometry.size()) {
+  if (newGeometry.size() != oldGeometry.size()) {
     sGeometryChanged = false;
     update();
   }
@@ -201,7 +193,7 @@ QString StatisticsText::elideText(const QString& text, float maxWidth) {
   }
 
   auto bounds = getTextBounds(text);
-  if(bounds.width() <= maxWidth) {
+  if (bounds.width() <= maxWidth) {
     return text;
   }
 
@@ -212,28 +204,28 @@ QString StatisticsText::elideText(const QString& text, float maxWidth) {
     case Qt::ElideRight: {
       int length = static_cast<int>(text.length());
       while (length > 1) {
-        length --;
+        length--;
         result = text.left(length) + ellipsis;
         bounds = getTextBounds(result);
-        if(bounds.width() <= maxWidth) {
+        if (bounds.width() <= maxWidth) {
           break;
         }
       }
       break;
     }
-    case Qt::ElideLeft : {
+    case Qt::ElideLeft: {
       int length = static_cast<int>(text.length());
       while (length > 1) {
-        length --;
+        length--;
         result = ellipsis + text.right(length);
         bounds = getTextBounds(result);
-        if(bounds.width() <= maxWidth) {
+        if (bounds.width() <= maxWidth) {
           break;
         }
       }
       break;
     }
-    case Qt::ElideMiddle : {
+    case Qt::ElideMiddle: {
       int halfLength = static_cast<int>(text.length()) / 2;
       int leftLength = halfLength;
       int rightLength = static_cast<int>(text.length()) - halfLength;
@@ -241,14 +233,13 @@ QString StatisticsText::elideText(const QString& text, float maxWidth) {
       while (leftLength > 0 && rightLength > 0) {
         result = text.left(leftLength) + ellipsis + text.right(rightLength);
         bounds = getTextBounds(result);
-        if(bounds.width() <= maxWidth) {
+        if (bounds.width() <= maxWidth) {
           break;
         }
-        if(leftLength > rightLength) {
-          leftLength --;
-        }
-        else {
-          rightLength --;
+        if (leftLength > rightLength) {
+          leftLength--;
+        } else {
+          rightLength--;
         }
       }
       break;
@@ -262,8 +253,6 @@ uint32_t StatisticsText::colorToUint32(const QColor& color) const {
   uint8_t r = static_cast<uint8_t>(color.red());
   uint8_t g = static_cast<uint8_t>(color.green());
   uint8_t b = static_cast<uint8_t>(color.blue());
-  return  static_cast<uint32_t>(a << 24) |
-          static_cast<uint32_t>(b << 16) |
-          static_cast<uint32_t>(g << 8) | static_cast<uint32_t>(r);
+  return static_cast<uint32_t>(a << 24) | static_cast<uint32_t>(b << 16) |
+         static_cast<uint32_t>(g << 8) | static_cast<uint32_t>(r);
 }
-

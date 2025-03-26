@@ -25,7 +25,7 @@
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 FramesView::FramesView(QQuickItem* parent)
-  : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
+    : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
   setFlag(ItemHasContents, true);
   setFlag(ItemAcceptsInputMethod, true);
   setFlag(ItemIsFocusScope, true);
@@ -87,12 +87,13 @@ void FramesView::draw() {
   device->unlock();
 }
 
-void FramesView::drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen, int frameWidth, int group, uint32_t color) {
+void FramesView::drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen,
+                            int frameWidth, int group, uint32_t color) {
   auto transparentColor = color & 0x55FFFFFF;
   if (range.second > viewData->frameStart &&
-        range.first < viewData->frameStart + onScreen * group) {
-    auto x1 = std::min(onScreen * frameWidth,
-                       (range.second - viewData->frameStart) * frameWidth / group);
+      range.first < viewData->frameStart + onScreen * group) {
+    auto x1 =
+        std::min(onScreen * frameWidth, (range.second - viewData->frameStart) * frameWidth / group);
     auto x0 = std::max(0, (range.first - viewData->frameStart) * frameWidth / group);
     if (x0 == x1) x1 = x0 + frameWidth;
     auto fx1 = static_cast<float>(x1);
@@ -126,10 +127,13 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
   assert(worker->GetFrameCount(*frames) != 0);
   canvas->translate(viewOffset, 0);
 
+  auto xEnd = 0.f;
+  drawBackground(canvas, xEnd);
+  const int w = static_cast<int>(width() - xEnd);
   const int frameWidth = GetFrameWidth(viewData->frameScale);
   const int group = GetFrameGroup(viewData->frameScale);
   const int total = static_cast<int>(worker->GetFrameCount(*frames));
-  const int onScreen = (static_cast<int>(width()) - 2) / frameWidth;
+  const int onScreen = (w - 2) / frameWidth;
 
   if (*viewMode != ViewMode::Paused) {
     viewData->frameStart = (total < onScreen * group) ? 0 : total - onScreen * group;
@@ -145,7 +149,6 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     }
   }
 
-  drawBackground(canvas);
   int i = 0, idx = 0;
   while (i < onScreen && viewData->frameStart + idx < total) {
     auto frameTime = worker->GetFrameTime(*frames, size_t(viewData->frameStart + idx));
@@ -218,29 +221,45 @@ QSGNode* FramesView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   return node;
 }
 
-void FramesView::drawBackground(tgfx::Canvas* canvas) {
+void FramesView::drawBackground(tgfx::Canvas* canvas, float& xEnd) {
   const auto dpos = tgfx::Point{0.f, 0.f};
+  const auto h = static_cast<float>(height());
+  const auto w = static_cast<float>(width());
+  auto fontSize = 12.f;
+  auto placeWidth = 50.f;
+  xEnd += placeWidth;
 
-  const uint64_t frameTarget = 1000 * 1000 * 1000 / viewData->frameTarget;
+  auto p1 = tgfx::Point{w - placeWidth, 0};
+  auto p2 = tgfx::Point{placeWidth, h};
+  auto textXStart = p1.x + p2.x / 2;
+  drawRect(canvas, p1, p2, 0x66BB7DC8);
 
-  auto p1 =
-      dpos +
-      tgfx::Point{0, round((float)height() - (float)height() * frameTarget * 2 / MaxFrameTime)};
-  auto p2 =
-      dpos + tgfx::Point{(float)width(),
-                         round((float)height() - (float)height() * frameTarget * 2 / MaxFrameTime)};
+  p1 = dpos + tgfx::Point{0, round(h - h * frameTarget * 2 / MaxFrameTime)};
+  p2 = dpos + tgfx::Point{w, round(h - h * frameTarget * 2 / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x442222DD);
+  auto textFps = "30FPS";
+  auto textBounds = getTextSize(appHost.get(), textFps, 0, fontSize);
+  auto textPoint = tgfx::Point{textXStart - textBounds.width() / 2, p2.y + textBounds.height() / 2};
+  drawTextWithBlackRect(canvas, appHost.get(), textFps, textPoint.x, textPoint.y, 0xFF2222DD,
+                        fontSize);
 
-  p1 = dpos + tgfx::Point{0, round((float)height() - float(height() * frameTarget / MaxFrameTime))};
-  p2 = dpos + tgfx::Point{(float)width(),
-                          round((float)height() - (float)height() * frameTarget / MaxFrameTime)};
+  p1 = dpos + tgfx::Point{0, round(h - h * frameTarget / MaxFrameTime)};
+  p2 = dpos + tgfx::Point{w, round(h - h * frameTarget / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x4422DDDD);
+  textFps = "60FPS";
+  textBounds = getTextSize(appHost.get(), textFps, 0, fontSize);
+  textPoint = tgfx::Point{textXStart - textBounds.width() / 2, p2.y + textBounds.height() / 2};
+  drawTextWithBlackRect(canvas, appHost.get(), textFps, textPoint.x, textPoint.y, 0xFF22DDDD,
+                        fontSize);
 
-  p1 = dpos +
-       tgfx::Point{0, round((float)height() - (float)height() * frameTarget / 2 / MaxFrameTime)};
-  p2 = dpos + tgfx::Point{(float)width(), round((float)height() -
-                                                (float)height() * frameTarget / 2 / MaxFrameTime)};
+  p1 = dpos + tgfx::Point{0, round(h - h * frameTarget / 2 / MaxFrameTime)};
+  p2 = dpos + tgfx::Point{w, round(h - h * frameTarget / 2 / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x4422DD22);
+  textFps = "120FPS";
+  textBounds = getTextSize(appHost.get(), textFps, 0, fontSize);
+  textPoint = tgfx::Point{textXStart - textBounds.width() / 2, p2.y + textBounds.height() / 2};
+  drawTextWithBlackRect(canvas, appHost.get(), textFps, textPoint.x, textPoint.y, 0xFF22DD22,
+                        fontSize);
 }
 
 void FramesView::wheelEvent(QWheelEvent* event) {

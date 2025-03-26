@@ -85,7 +85,6 @@ class TimelineView : public QQuickItem {
   ~TimelineView();
   void initConnect();
 
-
   void zoomToRange(int64_t start, int64_t end, bool pause);
   void draw();
   void drawThread(const TimelineContext& context, const tracy::ThreadData& thread,

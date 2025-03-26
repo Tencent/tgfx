@@ -20,7 +20,7 @@
 #include "tgfx/core/Canvas.h"
 
 class AppHost {
-public:
+ public:
   explicit AppHost(int width = 1280, int height = 720, float density = 1.0f);
 
   int width() const {
@@ -37,7 +37,7 @@ public:
   std::shared_ptr<tgfx::Typeface> getTypeface(const std::string& name) const;
   bool updateScreen(int width, int height, float density);
 
-private:
+ private:
   int _width = 1280;
   int _height = 720;
   float _density = 1.0f;
@@ -45,6 +45,6 @@ private:
 };
 
 class AppHostInstance {
-public:
+ public:
   static std::shared_ptr<AppHost> GetAppHostInstance();
 };

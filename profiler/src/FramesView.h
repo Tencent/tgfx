@@ -77,9 +77,10 @@ class FramesView : public QQuickItem {
  protected:
   void draw();
   void drawFrames(tgfx::Canvas* canvas);
-  void drawBackground(tgfx::Canvas* canvas);
+  void drawBackground(tgfx::Canvas* canvas, float& xEnd);
   void drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group);
-  void drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen, int frameWidth, int group, uint32_t color);
+  void drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen, int frameWidth,
+                  int group, uint32_t color);
   QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
 
  private:

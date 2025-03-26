@@ -18,10 +18,10 @@
 
 #pragma once
 
+#include "Utility.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
-#include "Utility.h"
 
 class StatisticsText : public QQuickItem {
   Q_OBJECT
@@ -31,15 +31,25 @@ class StatisticsText : public QQuickItem {
   Q_PROPERTY(Qt::Alignment alignment READ getAlignment WRITE setAlignment NOTIFY alignmentChanged)
   Q_PROPERTY(int elideMode READ getElideMode WRITE setElideMode NOTIFY elideModeChanged)
 
-public:
+ public:
   explicit StatisticsText(QQuickItem* parent = nullptr);
   ~StatisticsText() override;
 
-  QString getText() const { return sText; }
-  QColor getColor() const {return sColor;}
-  bool getContrast() const {return sContrast;}
-  Qt::Alignment getAlignment() const {return sAlignment;}
-  int getElideMode() const {return sElideMode;}
+  QString getText() const {
+    return sText;
+  }
+  QColor getColor() const {
+    return sColor;
+  }
+  bool getContrast() const {
+    return sContrast;
+  }
+  Qt::Alignment getAlignment() const {
+    return sAlignment;
+  }
+  int getElideMode() const {
+    return sElideMode;
+  }
 
   void setText(const QString& text);
   void setColor(const QColor& color);
@@ -50,22 +60,21 @@ public:
   void draw();
   void drawStext(tgfx::Canvas* canvas);
 
-  Q_SIGNALS:
+ Q_SIGNALS:
   void textChanged();
   void scolorChanged();
   void contrastChanged();
   void alignmentChanged();
   void elideModeChanged();
 
-protected:
+ protected:
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
   void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
-  QString elideText(const QString &text, float maxWidth);
-  uint32_t colorToUint32(const QColor &color) const;
+  QString elideText(const QString& text, float maxWidth);
+  uint32_t colorToUint32(const QColor& color) const;
   tgfx::Rect getTextBounds(const QString& text) const;
 
-
-private:
+ private:
   QString sText;
   QColor sColor = Qt::white;
   bool sContrast = false;

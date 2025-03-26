@@ -34,7 +34,7 @@ bool isEqual(float num1, float num2) {
 }
 
 tgfx::Color getTgfxColor(uint32_t color) {
-  uint8_t r = (color) & 0xFF;
+  uint8_t r = (color)&0xFF;
   uint8_t g = (color >> 8) & 0xFF;
   uint8_t b = (color >> 16) & 0xFF;
   uint8_t a = (color >> 24) & 0xFF;
@@ -46,7 +46,7 @@ uint32_t getThreadColor(uint64_t thread, int depth, bool dynamic) {
   return tracy::GetHsvColor(thread, depth);
 }
 
-tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize) {
+tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize, float fontSize) {
   std::string strText(text);
   auto iter = TextSizeMap.find(strText);
   if (iter != TextSizeMap.end()) {
@@ -56,7 +56,7 @@ tgfx::Rect getTextSize(const AppHost* appHost, const char* text, size_t textSize
     strText = std::string(text, textSize);
   }
   auto typeface = appHost->getTypeface("default");
-  tgfx::Font font(typeface, FontSize);
+  tgfx::Font font(typeface, fontSize);
   auto textBlob = tgfx::TextBlob::MakeFrom(strText, font);
   auto rect = textBlob->getBounds();
   TextSizeMap.emplace(strText, rect);
@@ -126,24 +126,31 @@ void drawLine(tgfx::Canvas* canvas, float x0, float y0, float x1, float y1, uint
 }
 
 void drawText(tgfx::Canvas* canvas, const AppHost* appHost, const std::string& text, float x,
-              float y, uint32_t color) {
+              float y, uint32_t color, float fontSize) {
   tgfx::Paint paint;
   paint.setColor(getTgfxColor(color));
   auto typeface = appHost->getTypeface("default");
-  tgfx::Font font(typeface, FontSize);
+  tgfx::Font font(typeface, fontSize);
   canvas->drawSimpleText(text, x, y, font, paint);
 }
 
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, tgfx::Point pos, uint32_t color,
-                      const char* text) {
-  drawTextContrast(canvas, appHost, pos.x, pos.y, color, text);
+                      const char* text, float fontSize) {
+  drawTextContrast(canvas, appHost, pos.x, pos.y, color, text, fontSize);
 }
 
 void drawTextContrast(tgfx::Canvas* canvas, const AppHost* appHost, float x, float y,
-                      uint32_t color, const char* text) {
+                      uint32_t color, const char* text, float fontSize) {
   auto height = abs(getTextSize(appHost, text).top) + 1;
-  drawText(canvas, appHost, text, x + 0.5f, y + height + 0.5f, 0xAA000000);
-  drawText(canvas, appHost, text, x, y + height, color);
+  drawText(canvas, appHost, text, x + 0.5f, y + height + 0.5f, 0xAA000000, fontSize);
+  drawText(canvas, appHost, text, x, y + height, color, fontSize);
+}
+
+void drawTextWithBlackRect(tgfx::Canvas* canvas, const AppHost* appHost, const char* text, float x,
+                           float y, uint32_t color, float fontSize) {
+  auto textBounds = getTextSize(appHost, text);
+  drawRect(canvas, x, y - textBounds.height(), textBounds.width(), textBounds.height(), 0xFF000000);
+  drawText(canvas, appHost, text, x + 1, y - 1.5f, color, fontSize);
 }
 
 const char* shortenZoneName(const AppHost* appHost, ShortenName type, const char* name,

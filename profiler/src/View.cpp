@@ -178,7 +178,7 @@ void View::changeViewModeButton(ViewMode mode) {
 }
 
 void View::openStatisticsView() {
-  if(tabWidget->count() < 2) {
+  if (tabWidget->count() < 2) {
     qmlRegisterType<StatisticsText>("TGFX.Controls", 1, 0, "TGFXText");
     qmlRegisterType<StatisticsModel>("TGFX.Profiler", 1, 0, "StatisticsModel");
     qmlRegisterType<FPSChartItem>("TGFX.Profiler", 1, 0, "FPSChart");
@@ -187,7 +187,7 @@ void View::openStatisticsView() {
     StatisticsModel* statModel = new StatisticsModel(&worker, &viewData, this, nullptr);
     auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
     framesView = framesWindow->findChild<FramesView*>("framesView");
-    if(framesView) {
+    if (framesView) {
       connect(framesView, &FramesView::statRangeChanged, statModel, &StatisticsModel::setStatRange);
     }
 
@@ -196,10 +196,9 @@ void View::openStatisticsView() {
     statEngine->rootContext()->setContextProperty("statisticsModel", statModel);
     statEngine->load(QUrl(QStringLiteral("qrc:/qml/Statistics.qml")));
 
-    QQuickWindow *statWindow = qobject_cast<QQuickWindow*>(statEngine->rootObjects().first());
+    QQuickWindow* statWindow = qobject_cast<QQuickWindow*>(statEngine->rootObjects().first());
     statisticsWidget = createWindowContainer(statWindow);
     tabWidget->addTab(statisticsWidget, "Statistic View");
-
   }
   tabWidget->setCurrentIndex(1);
 }
@@ -290,33 +289,32 @@ void View::ViewImpl() {
   framesEngine->load(QUrl(QStringLiteral("qrc:/qml/Frames.qml")));
   auto quickWindow = static_cast<QQuickWindow*>(framesEngine->rootObjects().first());
   auto framesWidget = createWindowContainer(quickWindow);
-  framesWidget->setFixedHeight(70);
+  framesWidget->setFixedHeight(100);
 
   tabWidget = new QTabWidget(this);
   tabWidget->setTabPosition(QTabWidget::South);
   tabWidget->setStyleSheet(
-    "QTabWidget::pane {"
-    "border: 1px solid #555555;"
-    "background-color: #343131;"
-    "}"
-    "QTabBar::tab{"
-    "background-color: #3F3F3F;"
-    "color: white;"
-    "padding: 8px 16px;"
-    "border: 1px solid #555555;"
-    "border-bottom-color: #3F3F3F;"
-    "border-top-left-radius: 4px;"
-    "border-top-right-radius: 4px;"
-    "min-width: 100px;"
-    "}"
-    "QTabBar::tab:selected{"
-    "background-color: #555555;"
-    "border-bottom-color: #555555;"
-    "}"
-    "QTabBar::tab:hover{"
-    "background-color: #4A4A4A;"
-    "}"
-    );
+      "QTabWidget::pane {"
+      "border: 1px solid #555555;"
+      "background-color: #343131;"
+      "}"
+      "QTabBar::tab{"
+      "background-color: #3F3F3F;"
+      "color: white;"
+      "padding: 8px 16px;"
+      "border: 1px solid #555555;"
+      "border-bottom-color: #3F3F3F;"
+      "border-top-left-radius: 4px;"
+      "border-top-right-radius: 4px;"
+      "min-width: 100px;"
+      "}"
+      "QTabBar::tab:selected{"
+      "background-color: #555555;"
+      "border-bottom-color: #555555;"
+      "}"
+      "QTabBar::tab:hover{"
+      "background-color: #4A4A4A;"
+      "}");
 
   qmlRegisterType<tracy::Worker>("tracy", 1, 0, "TracyWorker");
   qmlRegisterType<TimelineView>("Timeline", 1, 0, "TimelineView");

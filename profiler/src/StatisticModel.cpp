@@ -35,11 +35,8 @@ StatisticsModel::StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObjec
   refreshData();
 }
 
-
-
-
 StatisticsModel::~StatisticsModel() {
-  if(dataRefreshTimer) {
+  if (dataRefreshTimer) {
     dataRefreshTimer->stop();
   }
 };
@@ -80,7 +77,6 @@ void StatisticsModel::openSource(int row) {
   viewSource(fileName, line);
 }
 
-
 void StatisticsModel::updateZoneCountLabels() {
   Q_EMIT zoneCountChanged();
 }
@@ -94,43 +90,44 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
   const auto& entry = srcData[idx];
 
   switch (role) {
-    case nameRole : {
+    case nameRole: {
       auto& srcloc = worker->GetSourceLocation(entry.srcloc);
       auto name = worker->GetString(srcloc.name.active ? srcloc.name : srcloc.function);
       return QString::fromUtf8(name);
     }
 
-    case locationRole : {
+    case locationRole: {
       auto& srcloc = worker->GetSourceLocation(entry.srcloc);
-      QString location = worker->GetString(srcloc.file) + QStringLiteral(":") + QString::number(srcloc.line);
+      QString location =
+          worker->GetString(srcloc.file) + QStringLiteral(":") + QString::number(srcloc.line);
       return location;
     }
 
-    case totalTimeRole : {
+    case totalTimeRole: {
       double time = entry.total;
       return tracy::TimeToString(static_cast<int64_t>(time));
     }
 
-    case countRole : {
+    case countRole: {
       return QString::number(entry.numZones);
     }
 
-    case mtpcRole : {
+    case mtpcRole: {
       if (entry.numZones == 0) return QStringLiteral("0ms");
       double mtpc = static_cast<double>(entry.total) / entry.numZones;
       return QString::fromUtf8(tracy::TimeToString(static_cast<int64_t>(mtpc)));
     }
 
-    case threadCountRole :
+    case threadCountRole:
       return QString::number(entry.numThreads);
 
-    case colorRole : {
+    case colorRole: {
       auto& srcloc = worker->GetSourceLocation(entry.srcloc);
       QColor color = QColor::fromRgba(getStrLocColor(srcloc, 0));
       return color;
     }
 
-    case percentageRole : {
+    case percentageRole: {
       int64_t timeRange = 0;
       if (stateRange.active) {
         timeRange = stateRange.max - stateRange.min;
@@ -144,7 +141,7 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
       return percentage;
     }
 
-    case totalTimeRawRole : {
+    case totalTimeRawRole: {
       return QVariant::fromValue(entry.total);
     }
 
@@ -436,20 +433,20 @@ bool StatisticsModel::matchFilter(const QString& name, const QString& location) 
 }
 
 void StatisticsModel::viewSource(const char* fileName, int line) {
-  if(!fileName || !view) return;
+  if (!fileName || !view) return;
 
   srcViewFile = fileName;
   openSource(fileName, line, worker, view);
 
-  if(!srcView) {
+  if (!srcView) {
     srcView = new SourceView(nullptr);
     srcView->setAttribute(Qt::WA_DeleteOnClose);
     srcView->setStyleSheet("background-color: #2D2D2D;");
-    connect(srcView, &QObject::destroyed, this, [this](){srcView = nullptr;});
+    connect(srcView, &QObject::destroyed, this, [this]() { srcView = nullptr; });
   }
 
   const auto& source = getSource();
-  if(!source.empty()) {
+  if (!source.empty()) {
     QString content = QString::fromStdString(std::string(source.data(), source.dataSize()));
     srcView->setWindowTitle(QString("Source: %1").arg(fileName));
     srcView->loadSource(content, line);
@@ -592,13 +589,13 @@ void StatisticsModel::refreshInstrumentationData() {
                 slzcnt++;
                 srcloc.push_back_no_space_check(SrcLocZonesSlim{it->first, threadNum, cnt, total});
               }
-              statCache[it->first] = StatCache{
-                  RangeSlim{stateRange.min, stateRange.max, stateRange.active},
-                  statAccumulationMode,
-                  it->second.zones.size(),
-                  cnt,
-                  total,
-                  threadNum};
+              statCache[it->first] =
+                  StatCache{RangeSlim{stateRange.min, stateRange.max, stateRange.active},
+                            statAccumulationMode,
+                            it->second.zones.size(),
+                            cnt,
+                            total,
+                            threadNum};
             }
           } else {
             slzcnt++;
@@ -636,13 +633,13 @@ void StatisticsModel::refreshInstrumentationData() {
               if (cnt != 0) {
                 srcloc.push_back_no_space_check(SrcLocZonesSlim{it->first, threadNum, cnt, total});
               }
-              statCache[it->first] = StatCache{
-                  RangeSlim{stateRange.min, stateRange.max, stateRange.active},
-                  statAccumulationMode,
-                  it->second.zones.size(),
-                  cnt,
-                  total,
-                  threadNum};
+              statCache[it->first] =
+                  StatCache{RangeSlim{stateRange.min, stateRange.max, stateRange.active},
+                            statAccumulationMode,
+                            it->second.zones.size(),
+                            cnt,
+                            total,
+                            threadNum};
             }
           }
         }
@@ -865,7 +862,3 @@ bool StatisticsModel::srcFileValid(const char* fn, uint64_t olderThan, const tra
   }
   return false;
 }
-
-
-
-

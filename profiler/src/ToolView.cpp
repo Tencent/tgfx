@@ -137,7 +137,7 @@ void ToolView::connectClient(QListWidgetItem* currenItem) {
     return;
   }
   auto data = clientDataIter->second;
-  auto mainView = static_cast<MainView*>(this->parent());
+  auto mainView = static_cast<MainView*>(parent());
   mainView->connectClient(data.address.c_str(), data.port);
   reset();
 }
@@ -152,7 +152,7 @@ void ToolView::connectAddress() {
 
   if (aptr != aend) {
 
-    auto mainView = static_cast<MainView*>(this->parent());
+    auto mainView = static_cast<MainView*>(parent());
     std::string address(aptr, aend);
 
     auto adata = address.data();
@@ -169,12 +169,12 @@ void ToolView::connectAddress() {
 }
 
 void ToolView::openFile() {
-  auto mainView = static_cast<MainView*>(this->parent());
+  auto mainView = static_cast<MainView*>(parent());
   mainView->openFile();
 }
 
 void ToolView::openWebsocketServer() {
-  auto mainView = static_cast<MainView*>(this->parent());
+  auto mainView = static_cast<MainView*>(parent());
   mainView->openWebsocketServer();
 }
 
