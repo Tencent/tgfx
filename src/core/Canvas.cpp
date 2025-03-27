@@ -151,9 +151,13 @@ void Canvas::clipRect(const tgfx::Rect& rect) {
 }
 
 void Canvas::clipPath(const Path& path) {
-  auto clipPath = path;
-  clipPath.transform(mcState->matrix);
-  mcState->clip.addPath(clipPath, PathOp::Intersect);
+  if (path.isLine()) {
+    mcState->clip = {};
+  } else {
+    auto clipPath = path;
+    clipPath.transform(mcState->matrix);
+    mcState->clip.addPath(clipPath, PathOp::Intersect);
+  }
 }
 
 void Canvas::resetStateStack() {
