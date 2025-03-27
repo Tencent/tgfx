@@ -1575,4 +1575,17 @@ TGFX_TEST(CanvasTest, ClipAll) {
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAll"));
 }
+
+TGFX_TEST(CanvasTest, RevertRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 10, 10);
+  auto canvas = surface->getCanvas();
+  Path path = {};
+  path.addRect(5, 5, 2, 3);
+  Paint paint = {};
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RevertRect"));
+}
 }  // namespace tgfx
