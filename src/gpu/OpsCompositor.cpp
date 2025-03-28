@@ -438,10 +438,11 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   return clipTexture;
 }
 
-PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, AAType aaType,
-                                                             Rect* scissorRect) {
+std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(const Path& clip,
+                                                                              AAType aaType,
+                                                                              Rect* scissorRect) {
   if (clip.isEmpty() && clip.isInverseFillType()) {
-    return nullptr;
+    return {nullptr, false};
   }
   auto buffer = context->drawingBuffer();
   auto [rect, useScissor] = getClipRect(clip);
@@ -450,10 +451,10 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, A
       *scissorRect = *rect;
       if (!useScissor) {
         scissorRect->roundOut();
-        return AARectEffect::Make(buffer, *rect);
+        return {AARectEffect::Make(buffer, *rect), true};
       }
     }
-    return nullptr;
+    return {nullptr, false};
   }
   auto clipBounds = getClipBounds(clip);
   *scissorRect = clipBounds;
@@ -467,7 +468,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, A
     uvMatrix.preConcat(flipYMatrix);
   }
   auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
-  return FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor));
+  return {FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor)), true};
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
@@ -545,8 +546,11 @@ void OpsCompositor::addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const 
   }
   Rect scissorRect = Rect::MakeEmpty();
   auto aaType = getAAType(fill);
-  auto clipMask = getClipMaskFP(clip, aaType, &scissorRect);
-  if (clipMask) {
+  auto [clipMask, hasMask] = getClipMaskFP(clip, aaType, &scissorRect);
+  if (hasMask) {
+    if (!clipMask) {
+      return;
+    }
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
