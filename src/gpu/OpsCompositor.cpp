@@ -438,11 +438,11 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   return clipTexture;
 }
 
-std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(const Path& clip,
-                                                                              AAType aaType,
-                                                                              Rect* scissorRect) {
+PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, AAType aaType,
+                                                             Rect* scissorRect, bool* emptyMask) {
+  *emptyMask = false;
   if (clip.isEmpty() && clip.isInverseFillType()) {
-    return {nullptr, false};
+    return nullptr;
   }
   auto buffer = context->drawingBuffer();
   auto [rect, useScissor] = getClipRect(clip);
@@ -451,10 +451,12 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
       *scissorRect = *rect;
       if (!useScissor) {
         scissorRect->roundOut();
-        return {AARectEffect::Make(buffer, *rect), true};
+        auto processor = AARectEffect::Make(buffer, *rect);
+        *emptyMask = processor == nullptr;
+        return processor;
       }
     }
-    return {nullptr, false};
+    return nullptr;
   }
   auto clipBounds = getClipBounds(clip);
   *scissorRect = clipBounds;
@@ -468,7 +470,9 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
     uvMatrix.preConcat(flipYMatrix);
   }
   auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
-  return {FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor)), true};
+  processor = FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor));
+  *emptyMask = processor == nullptr;
+  return processor;
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
@@ -546,11 +550,12 @@ void OpsCompositor::addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const 
   }
   Rect scissorRect = Rect::MakeEmpty();
   auto aaType = getAAType(fill);
-  auto [clipMask, hasMask] = getClipMaskFP(clip, aaType, &scissorRect);
-  if (hasMask) {
-    if (!clipMask) {
-      return;
-    }
+  bool emptyMask = false;
+  auto clipMask = getClipMaskFP(clip, aaType, &scissorRect, &emptyMask);
+  if (emptyMask) {
+    return;
+  }
+  if (clipMask) {
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
