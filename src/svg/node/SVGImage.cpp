@@ -79,8 +79,7 @@ std::shared_ptr<Image> LoadImage(const SVGIRI& href) {
   }
 }
 
-SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort,
-                                        SVGPreserveAspectRatio /*ratio*/) {
+SVGImage::ImageInfo SVGImage::LoadImage(const SVGIRI& iri, const Rect& viewPort) {
   std::shared_ptr<Image> image = ::tgfx::LoadImage(iri);
   if (!image) {
     return {};
@@ -101,7 +100,7 @@ void SVGImage::onRender(const SVGRenderContext& context) const {
   const Rect viewPort = lengthContext.resolveRect(X, Y, Width, Height);
 
   ImageInfo image;
-  const auto imgInfo = LoadImage(Href, viewPort, PreserveAspectRatio);
+  const auto imgInfo = LoadImage(Href, viewPort);
   if (!imgInfo.image) {
     LOGE("can't render image: load image failed\n");
     return;

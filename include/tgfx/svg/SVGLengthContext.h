@@ -49,22 +49,22 @@ class SVGLengthContext {
   std::tuple<float, float> resolveOptionalRadii(const std::optional<SVGLength>& optionalRx,
                                                 const std::optional<SVGLength>& optionalRy) const;
 
-  void setPatternUnits(SVGObjectBoundingBoxUnits unit) {
-    patternUnit = unit;
+  void setBoundingBoxUnits(SVGObjectBoundingBoxUnits inputUnit) {
+    unit = inputUnit;
   }
 
-  void clearPatternUnits() {
-    patternUnit.reset();
+  void clearBoundingBoxUnits() {
+    unit.reset();
   }
 
-  std::optional<SVGObjectBoundingBoxUnits> getPatternUnits() const {
-    return patternUnit;
+  std::optional<SVGObjectBoundingBoxUnits> getBoundingBoxUnits() const {
+    return unit;
   }
 
  private:
   Size _viewPort;
   float dpi;
-  std::optional<SVGObjectBoundingBoxUnits> patternUnit;
+  std::optional<SVGObjectBoundingBoxUnits> unit;
 };
 
 }  // namespace tgfx

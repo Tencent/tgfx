@@ -35,6 +35,10 @@ class SVGTransformableNode : public SVGNode {
     transform = t;
   }
 
+  const SVGTransformType& getTransform() const {
+    return transform;
+  }
+
  protected:
   SVGTransformableNode(SVGTag tag);
 

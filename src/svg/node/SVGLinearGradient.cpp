@@ -43,7 +43,7 @@ std::shared_ptr<Shader> SVGLinearGradient::onMakeShader(const SVGRenderContext& 
                                                         TileMode /*tileMode*/,
                                                         const Matrix& /*localMatrix*/) const {
   SVGLengthContext lengthContext = context.lengthContext();
-  lengthContext.setPatternUnits(getGradientUnits());
+  lengthContext.setBoundingBoxUnits(getGradientUnits());
 
   auto startPoint = Point::Make(lengthContext.resolve(X1, SVGLengthContext::LengthType::Horizontal),
                                 lengthContext.resolve(Y1, SVGLengthContext::LengthType::Vertical));

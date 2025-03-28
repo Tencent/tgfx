@@ -82,6 +82,13 @@ class SVGDOM {
    */
   const Size& getContainerSize() const;
 
+  /**
+   * Returns the ID mapper for the SVG nodes.
+   */
+  const SVGIDMapper& nodeIDMapper() const {
+    return _nodeIDMapper;
+  }
+
  private:
   /**
    * Construct a new SVGDOM object
@@ -90,7 +97,7 @@ class SVGDOM {
          SVGIDMapper&& mapper);
 
   const std::shared_ptr<SVGRoot> root = nullptr;
-  const SVGIDMapper nodeIDMapper = {};
+  const SVGIDMapper _nodeIDMapper = {};
   const std::shared_ptr<TextShaper> textShaper = nullptr;
   Size containerSize = {};
 };

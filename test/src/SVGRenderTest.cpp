@@ -21,11 +21,17 @@
 #include <unordered_map>
 #include <vector>
 #include "gtest/gtest.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/svg/SVGDOM.h"
+#include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/node/SVGRadialGradient.h"
+#include "tgfx/svg/node/SVGRect.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "utils/TestUtils.h"
 
@@ -85,6 +91,70 @@ TGFX_TEST(SVGRenderTest, XMLParse) {
   EXPECT_TRUE(copyDOM != nullptr);
   EXPECT_TRUE(copyDOM.get() != xmlDOM.get());
   EXPECT_EQ(copyDOM->getRootNode()->name, xmlDOM->getRootNode()->name);
+}
+
+TGFX_TEST(SVGRenderTest, SVGParse) {
+  /*
+  <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="url(#paint0_radial_88_7)"/>
+    <defs>
+      <radialGradient id="paint0_radial_88_7" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(50 50) rotate(90) scale(50)">
+        <stop stop-color="#0800FF"/>
+        <stop offset="0.49" stop-color="#D2E350"/>
+        <stop offset="1" stop-color="#74D477"/>
+      </radialGradient>
+    </defs>
+  </svg>
+  */
+
+  auto stream =
+      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/radialGradient.svg"));
+  EXPECT_TRUE(stream != nullptr);
+  auto svgDOM = SVGDOM::Make(*stream);
+  auto root = svgDOM->getRoot();
+  auto nodeIDMap = svgDOM->nodeIDMapper();
+
+  auto children = root->getChildren();
+  // EXPECT_EQ(children.size(), 1U);
+  auto childNode0 = children[0];
+  if (childNode0->tag() == SVGTag::Rect) {
+    auto rectNode = std::static_pointer_cast<SVGRect>(childNode0);
+    rectNode->getWidth();
+    rectNode->getHeight();
+    // SVGProperty<SVGPaint, true> svgPaint =rectNode->getFill();
+    auto svgPaint = rectNode->getFill();
+    if (svgPaint.isValue()) {
+      if (svgPaint->type() == SVGPaint::Type::Color) {
+        //normal color
+        auto color = svgPaint->color();
+      } else if (svgPaint->type() == SVGPaint::Type::IRI) {
+        auto iri = svgPaint->iri();
+        const auto& nodeID = iri.iri();
+        auto iter = nodeIDMap.find(nodeID);
+        if (iter != nodeIDMap.end() && iter->second) {
+          if (iter->second->tag() == SVGTag::RadialGradient) {
+            auto radialGradient = std::static_pointer_cast<SVGRadialGradient>(iter->second);
+            radialGradient->getGradientTransform();
+            radialGradient->getGradientUnits();
+            auto center =
+                Point::Make(radialGradient->getCx().value(), radialGradient->getCy().value());
+            auto radius = radialGradient->getR();
+
+            std::vector<Color> colors;
+            std::vector<float> offsets;
+            for (const auto& node : radialGradient->getChildren()) {
+              auto stop = std::static_pointer_cast<SVGStop>(node);
+              auto offset = stop->getOffset();
+              offsets.push_back(offset.value());
+              auto stopColor = stop->getStopColor();
+              colors.push_back(stopColor->color());
+            }
+            Shader::MakeRadialGradient(center, radius.value(), colors, offsets);
+          }
+        }
+      }
+    }
+  }
 }
 
 TGFX_TEST(SVGRenderTest, PathSVG) {
