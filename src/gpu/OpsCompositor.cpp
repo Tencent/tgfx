@@ -469,8 +469,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(const Path& clip, A
     flipYMatrix.postTranslate(0, -static_cast<float>(renderTarget->height()));
     uvMatrix.preConcat(flipYMatrix);
   }
-  PlacementPtr<FragmentProcessor> processor =
-      DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
+  auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
   processor = FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor));
   *emptyMask = processor == nullptr;
   return processor;
