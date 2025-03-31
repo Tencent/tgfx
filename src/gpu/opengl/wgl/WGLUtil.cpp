@@ -63,7 +63,7 @@ HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
         WGL_CONTEXT_MINOR_VERSION,
         wglInterface->glMinorMax,
         WGL_CONTEXT_PROFILE_MASK,
-        WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT,
+        WGL_CONTEXT_CORE_PROFILE_BIT,
         0,
     };
     glContext =
