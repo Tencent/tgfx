@@ -61,19 +61,6 @@ static void DestroyTempWindow(HWND nativeWindow) {
   UnregisterClass(TEMP_CLASS, instance);
 }
 
-static bool GetGLVersion(int& glMajorMax, int& glMinorMax) {
-  const char* versionString = (const char*)glGetString(GL_VERSION);
-  if (versionString == nullptr) {
-    return false;
-  }
-  int n = sscanf_s(versionString, "%d.%d", &glMajorMax, &glMinorMax);
-  if (2 == n) {
-    return true;
-  }
-  n = sscanf_s(versionString, "OpenGL ES GLSL ES %d.%d", &glMajorMax, &glMinorMax);
-  return 2 == n;
-}
-
 void InitializeWGLExtensions(HDC deviceContext, WGLInterface& wglInterface) {
   if (deviceContext == nullptr) {
     LOGE("InitializeWGLExtensions() deviceContext is nullptr");
@@ -139,7 +126,6 @@ WGLInterface InitializeWGL() {
     GET_PROC(SwapInterval, EXT);
     GET_PROC(CreateContextAttribs, ARB);
     InitializeWGLExtensions(deviceContext, wglInterface);
-    GetGLVersion(wglInterface.glMajorMax, wglInterface.glMinorMax);
     wglMakeCurrent(deviceContext, nullptr);
     wglDeleteContext(glContext);
     DestroyTempWindow(nativeWindow);

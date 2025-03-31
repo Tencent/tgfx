@@ -21,6 +21,12 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
+
+static bool renderDocAttached() {
+  auto hmodule = GetModuleHandleA("renderdoc.dll");
+  return hmodule != nullptr;
+}
+
 void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
   auto wglInterface = WGLInterface::Get();
   if (!wglInterface->pixelFormatSupport) {
@@ -56,18 +62,24 @@ HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
 
   HGLRC glContext = nullptr;
   auto wglInterface = WGLInterface::Get();
-  if (wglInterface->createContextAttribsSupport) {
-    const int coreProfileAttribs[] = {
-        WGL_CONTEXT_MAJOR_VERSION,
-        wglInterface->glMajorMax,
-        WGL_CONTEXT_MINOR_VERSION,
-        wglInterface->glMinorMax,
-        WGL_CONTEXT_PROFILE_MASK,
-        WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT,
-        0,
+  if (renderDocAttached() && wglInterface->createContextAttribsSupport) {
+    static constexpr int kCoreGLVersions[] = {
+        4, 6, 4, 3, 4, 2, 4, 1, 4, 0, 3, 3, 3, 2,
     };
-    glContext =
-        wglInterface->wglCreateContextAttribs(deviceContext, sharedContext, coreProfileAttribs);
+    int attributeList[] = {
+        WGL_CONTEXT_MAJOR_VERSION,    -1, WGL_CONTEXT_MINOR_VERSION, -1, WGL_CONTEXT_PROFILE_MASK,
+        WGL_CONTEXT_CORE_PROFILE_BIT, 0,
+    };
+
+    for (size_t v = 0; v < std::size(kCoreGLVersions) / 2; ++v) {
+      attributeList[1] = kCoreGLVersions[2 * v];
+      attributeList[3] = kCoreGLVersions[2 * v + 1];
+      glContext =
+          wglInterface->wglCreateContextAttribs(deviceContext, sharedContext, attributeList);
+      if (glContext != nullptr) {
+        break;
+      }
+    }
   }
 
   if (glContext == nullptr) {
