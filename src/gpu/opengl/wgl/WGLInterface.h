@@ -62,7 +62,7 @@ class WGLInterface {
   bool createContextAttribsSupport = false;
 
   int glMajorMax = 1;
-  int glMinorMax = 1;
+  int glMinorMax = 0;
 
   GetExtensionsStringProc wglGetExtensionsString = nullptr;
   ChoosePixelFormatProc wglChoosePixelFormat = nullptr;
