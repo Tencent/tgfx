@@ -50,11 +50,11 @@ void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
 }
 
 void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                             std::shared_ptr<GpuBuffer> vertexBuffer) {
+                             std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), nullptr)) {
+  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), vertexOffset, nullptr)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
   }
 }
@@ -64,7 +64,7 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  if (!onBindBuffers(std::move(indexBuffer), nullptr, std::move(vertexData))) {
+  if (!onBindBuffers(std::move(indexBuffer), nullptr, 0, std::move(vertexData))) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
   }
 }
