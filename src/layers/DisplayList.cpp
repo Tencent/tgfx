@@ -39,14 +39,14 @@ Layer* DisplayList::root() const {
 bool DisplayList::render(Surface* surface, bool replaceAll) {
   if (!surface ||
       (replaceAll && surface->uniqueID() == surfaceID &&
-       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.childrenDirty)) {
+       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirtyDescendents)) {
     return false;
   }
   auto canvas = surface->getCanvas();
   if (replaceAll) {
     canvas->clear();
   }
-  DrawArgs args(surface->getContext(), surface->renderFlags(), true);
+  DrawArgs args(surface->getContext(), true);
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   surfaceContentVersion = surface->contentVersion();
   surfaceID = surface->uniqueID();

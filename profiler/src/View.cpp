@@ -197,11 +197,9 @@ void View::initView() {
     layout->addWidget(textLable);
     connectDialog->exec();
   }
-
   if (!worker.HasData()) {
     return;
   }
-
   connected = true;
   ViewImpl();
 }

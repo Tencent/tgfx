@@ -19,8 +19,9 @@
 #include "GLConstColorProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color color, InputMode mode) {
-  return std::unique_ptr<ConstColorProcessor>(new GLConstColorProcessor(color, mode));
+PlacementPtr<ConstColorProcessor> ConstColorProcessor::Make(PlacementBuffer* buffer, Color color,
+                                                            InputMode mode) {
+  return buffer->make<GLConstColorProcessor>(color, mode);
 }
 
 GLConstColorProcessor::GLConstColorProcessor(Color color, InputMode mode)

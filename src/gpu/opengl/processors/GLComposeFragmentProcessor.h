@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLComposeFragmentProcessor : public ComposeFragmentProcessor {
  public:
-  explicit GLComposeFragmentProcessor(std::vector<std::unique_ptr<FragmentProcessor>> processors);
+  explicit GLComposeFragmentProcessor(std::vector<PlacementPtr<FragmentProcessor>> processors);
 
   void emitCode(EmitArgs& args) const override;
 };

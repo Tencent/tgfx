@@ -19,9 +19,9 @@
 #include "GLConicGradientLayout.h"
 
 namespace tgfx {
-std::unique_ptr<ConicGradientLayout> ConicGradientLayout::Make(Matrix matrix, float bias,
-                                                               float scale) {
-  return std::unique_ptr<ConicGradientLayout>(new GLConicGradientLayout(matrix, bias, scale));
+PlacementPtr<ConicGradientLayout> ConicGradientLayout::Make(PlacementBuffer* buffer, Matrix matrix,
+                                                            float bias, float scale) {
+  return buffer->make<GLConicGradientLayout>(matrix, bias, scale);
 }
 
 GLConicGradientLayout::GLConicGradientLayout(Matrix matrix, float bias, float scale)

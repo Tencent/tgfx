@@ -114,5 +114,4 @@ class View : public QWidget {
   std::vector<SourceRegex> srcSubstitutions;
   bool srcRegexValid = true;
   bool validateSrcAge = true;
-
 };

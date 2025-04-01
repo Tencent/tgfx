@@ -15,17 +15,23 @@ StatisticsModel::StatisticsModel(tracy::Worker& w, ViewData& vd, View* v, QObjec
 StatisticsModel::~StatisticsModel() = default;
 
 int StatisticsModel::rowCount(const QModelIndex& parent) const {
-  if (parent.isValid()) return 0;
+  if (parent.isValid()) {
+    return 0;
+  }
   return static_cast<int>(srcData.size());
 }
 
 int StatisticsModel::columnCount(const QModelIndex& parent) const {
-  if (parent.isValid()) return 0;
+  if (parent.isValid()) {
+    return 0;
+  }
   return Column::ColumnCount;
 }
 
 QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid() || static_cast<size_t>(index.row()) >= srcData.size()) return QVariant();
+  if (!index.isValid() || static_cast<size_t>(index.row()) >= srcData.size()) {
+    return QVariant();
+  }
 
   const auto idx = static_cast<size_t>(index.row());
   const auto& entry = srcData[idx];
@@ -49,17 +55,21 @@ QVariant StatisticsModel::data(const QModelIndex& index, int role) const {
         return tracy::TimeToString(static_cast<int64_t>(time));
       }
 
-      case CountColumn:
+      case CountColumn: {
         return QString::number(entry.numZones);
+      }
 
       case MtpcColumn: {
-        if (entry.numZones == 0) return "0ms";
+        if (entry.numZones == 0) {
+          return "0ms";
+        }
         double mtpc = static_cast<double>(entry.total) / entry.numZones;
         return tracy::TimeToString(static_cast<int64_t>(mtpc));
       }
 
-      case ThreadCountColumn:
+      case ThreadCountColumn: {
         return QString::number(entry.numThreads);
+      }
     }
   }
   return QVariant();
@@ -134,21 +144,39 @@ bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone) const {
         auto vec = (tracy::Vector<tracy::ZoneEvent>*)timeline;
         auto it = std::upper_bound(vec->begin(), vec->end(), zone.Start(),
                                    [](const auto& l, const auto& r) { return l < r.Start(); });
-        if (it != vec->begin()) --it;
-        if (zone.IsEndValid() && it->Start() > zone.End()) break;
-        if (it == &zone) return false;
+        if (it != vec->begin()) {
+          --it;
+        }
+        if (zone.IsEndValid() && it->Start() > zone.End()) {
+          break;
+        }
+        if (it == &zone) {
+          return false;
+        }
         parent = it;
-        if (parent->SrcLoc() == zone.SrcLoc()) return true;
+        if (parent->SrcLoc() == zone.SrcLoc()) {
+          return true;
+        }
         timeline = &worker.GetZoneChildren(parent->Child());
       } else {
         auto it = std::upper_bound(timeline->begin(), timeline->end(), zone.Start(),
                                    [](const auto& l, const auto& r) { return l < r->Start(); });
-        if (it != timeline->begin()) --it;
-        if (zone.IsEndValid() && (*it)->Start() > zone.End()) break;
-        if (*it == &zone) return false;
-        if (!(*it)->HasChildren()) break;
+        if (it != timeline->begin()) {
+          --it;
+        }
+        if (zone.IsEndValid() && (*it)->Start() > zone.End()) {
+          break;
+        }
+        if (*it == &zone) {
+          return false;
+        }
+        if (!(*it)->HasChildren()) {
+          break;
+        }
         parent = *it;
-        if (parent->SrcLoc() == zone.SrcLoc()) return true;
+        if (parent->SrcLoc() == zone.SrcLoc()) {
+          return true;
+        }
         timeline = &worker.GetZoneChildren(parent->Child());
       }
     }
@@ -166,12 +194,22 @@ bool StatisticsModel::isZoneReentry(const tracy::ZoneEvent& zone, uint64_t tid) 
       auto vec = (tracy::Vector<tracy::ZoneEvent>*)timeline;
       auto it = std::upper_bound(vec->begin(), vec->end(), zone.Start(),
                                  [](const auto& l, const auto& r) { return l < r.Start(); });
-      if (it != vec->begin()) --it;
-      if (zone.IsEndValid() && it->Start() > zone.End()) break;
-      if (it == &zone) return false;
-      if (!it->HasChildren()) break;
+      if (it != vec->begin()) {
+        --it;
+      }
+      if (zone.IsEndValid() && it->Start() > zone.End()) {
+        break;
+      }
+      if (it == &zone) {
+        return false;
+      }
+      if (!it->HasChildren()) {
+        break;
+      }
       parent = it;
-      if (parent->SrcLoc() == zone.SrcLoc()) return true;
+      if (parent->SrcLoc() == zone.SrcLoc()) {
+        return true;
+      }
       timeline = &worker.GetZoneChildren(parent->Child());
     }
   }
@@ -224,7 +262,9 @@ bool StatisticsModel::matchFilter(const QString& name, const QString& location) 
   if (!filterText.isEmpty()) {
     QStringList terms = filterText.split(' ', Qt::SkipEmptyParts);
     for (const QString& term : terms) {
-      if (term.isEmpty()) continue;
+      if (term.isEmpty()) {
+        continue;
+      }
 
       bool termMatch = false;
       bool isNegative = term.startsWith('-');
@@ -256,8 +296,12 @@ bool StatisticsModel::matchFilter(const QString& name, const QString& location) 
                       location.contains(searchTerm, Qt::CaseInsensitive);
         }
       }
-      if (isNegative && termMatch) return false;
-      if (!isNegative && !termMatch) return false;
+      if (isNegative && termMatch) {
+        return false;
+      }
+      if (!isNegative && !termMatch) {
+        return false;
+      }
     }
   }
   return true;
@@ -268,7 +312,9 @@ uint32_t StatisticsModel::getRawSrcLocColor(const tracy::SourceLocation& srcloc,
   if (namehash == 0 && srcloc.function.active) {
     const auto f = worker.GetString(srcloc.function);
     namehash = static_cast<uint32_t>(tracy::charutil::hash(f));
-    if (namehash == 0) namehash++;
+    if (namehash == 0) {
+      namehash++;
+    }
     srcloc.namehash = namehash;
   }
   if (namehash == 0) {
@@ -280,13 +326,16 @@ uint32_t StatisticsModel::getRawSrcLocColor(const tracy::SourceLocation& srcloc,
 
 uint32_t StatisticsModel::getStrLocColor(const tracy::SourceLocation& srcloc, int depth) {
   const auto color = srcloc.color;
-  if (color != 0 && !viewData.forceColors) return color | 0xFF000000;
-  if (viewData.dynamicColors == 0) return 0xFFCC5555;
+  if (color != 0 && !viewData.forceColors) {
+    return color | 0xFF000000;
+  }
+  if (viewData.dynamicColors == 0) {
+    return 0xFFCC5555;
+  }
   return getRawSrcLocColor(srcloc, depth);
 }
 
 const tracy::SourceLocation& StatisticsModel::getSrcLocFromIndex(const QModelIndex& index) const {
-
   const auto& entry = srcData[static_cast<size_t>(index.row())];
   return worker.GetSourceLocation(entry.srcloc);
 }

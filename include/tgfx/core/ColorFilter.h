@@ -24,7 +24,10 @@
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
+template <typename T>
+class PlacementPtr;
 class FragmentProcessor;
+class Context;
 
 /**
  * ColorFilter is the base class for filters that perform color transformations in the drawing
@@ -67,8 +70,8 @@ class ColorFilter {
 
   /**
     * Creates a new ColorFilter that makes translucent colors fully opaque or fully transparent
-    * based on a specified alpha threshold. Colors with alpha values at or below this threshold
-    * will become fully transparent, while colors with alpha values above this threshold will
+    * based on a specified alpha threshold. Colors with alpha values below this threshold will
+    * become fully transparent, while colors with alpha values at or above this threshold will
     * become fully opaque.
     */
   static std::shared_ptr<ColorFilter> AlphaThreshold(float threshold);
@@ -105,7 +108,7 @@ class ColorFilter {
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
 
  private:
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;

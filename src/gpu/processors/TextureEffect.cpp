@@ -21,16 +21,17 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                       const SamplingOptions& sampling,
-                                                       const Matrix* uvMatrix, bool forceAsMask) {
+PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
+                                                    const SamplingOptions& sampling,
+                                                    const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto isAlphaOnly = proxy->isAlphaOnly();
   auto processor = MakeRGBAAA(std::move(proxy), Point::Zero(), sampling, uvMatrix);
   if (forceAsMask && !isAlphaOnly) {
-    processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
+    auto drawingBuffer = proxy->getContext()->drawingBuffer();
+    processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
   }
   return processor;
 }

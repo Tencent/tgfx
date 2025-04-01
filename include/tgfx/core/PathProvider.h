@@ -30,32 +30,15 @@ class PathProvider {
   virtual ~PathProvider() = default;
 
   /**
-   * Returns the computed path of the PathProvider. Note: Since the path may contain stroking
-   * operations whose outlines can change with different scale factors, it's best to pass the final
-   * drawing scale factor in the resolutionScale for computing the path to ensure accuracy. However,
-   * the resolutionScale is not applied to the returned path; it just affects the stroking precision
-   * of the path.
-   * @param resolutionScale The intended resolution for the path. The default value is 1.0. Higher
-   * values (res > 1) mean the result should be more precise, as it will be zoomed up and small
-   * errors will be magnified. Lower values (0 < res < 1) mean the result can be less precise, as it
-   * will be zoomed down and small errors may be invisible.
-   * @return The computed path of the PathProvider.
+   * Returns the computed path of the PathProvider. Note: The path is recalculated each time this
+   * method is called, as it is not cached.
    */
-  virtual Path getPath(float resolutionScale = 1.0f) const = 0;
+  virtual Path getPath() const = 0;
 
   /**
    * Returns the bounding box of the path. The bounds might be larger than the actual path because
-   * the exact bounds can't be determined until the path is computed. Note: Since the path may
-   * contain stroking operations whose outlines can change with different scale factors, it's best
-   * to pass the final drawing scale factor in the resolutionScale for computing the path to ensure
-   * accuracy. However, the resolutionScale is not applied to the returned path; it just affects the
-   * stroking precision of the path.
-   * @param resolutionScale The intended resolution for the path. The default value is 1.0. Higher
-   * values (res > 1) mean the result should be more precise, as it will be zoomed up and small
-   * errors will be magnified. Lower values (0 < res < 1) mean the result can be less precise, as it
-   * will be zoomed down and small errors may be invisible.
-   * @return The bounding box of the path.
+   * the exact bounds can't be determined until the path is computed.
    */
-  virtual Rect getBounds(float resolutionScale = 1.0f) const = 0;
+  virtual Rect getBounds() const = 0;
 };
 }  // namespace tgfx

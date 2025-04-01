@@ -23,11 +23,12 @@
 namespace tgfx {
 class ComposeFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(std::unique_ptr<FragmentProcessor> first,
-                                                 std::unique_ptr<FragmentProcessor> second);
+  static PlacementPtr<FragmentProcessor> Make(PlacementBuffer* buffer,
+                                              PlacementPtr<FragmentProcessor> first,
+                                              PlacementPtr<FragmentProcessor> second);
 
-  static std::unique_ptr<FragmentProcessor> Make(
-      std::vector<std::unique_ptr<FragmentProcessor>> processors);
+  static PlacementPtr<FragmentProcessor> Make(
+      PlacementBuffer* buffer, std::vector<PlacementPtr<FragmentProcessor>> processors);
 
   std::string name() const override {
     return "ComposeFragmentProcessor";
@@ -36,6 +37,6 @@ class ComposeFragmentProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit ComposeFragmentProcessor(std::vector<std::unique_ptr<FragmentProcessor>> processors);
+  explicit ComposeFragmentProcessor(std::vector<PlacementPtr<FragmentProcessor>> processors);
 };
 }  // namespace tgfx

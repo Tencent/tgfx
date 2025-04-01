@@ -63,20 +63,10 @@ void StatisticsView::setupUI() {
   insBtn->setStyleSheet("QRadioButton {color:white;}");
   insBtn->setChecked(true);
 
-  // auto samBtn = new QRadioButton(tr("Sampling"), this);
-  // samBtn->setStyleSheet("QRadioButton {color:white;}");
-  //
-  // auto gpuBtn = new QRadioButton(tr("GPU"), this);
-  // gpuBtn->setStyleSheet("QRadioButton {color:white;}");
-
   insBtn->setChecked(true);
   modeGroup->addButton(insBtn, 0);
-  // modeGroup->addButton(samBtn, 1);
-  // modeGroup->addButton(gpuBtn, 1);
 
   toolBarLayout->addWidget(insBtn);
-  // toolBarLayout->addWidget(samBtn);
-  // toolBarLayout->addWidget(gpuBtn);
 
   //seperator
   auto sep1 = new QLabel("|", this);
@@ -259,10 +249,14 @@ void StatisticsView::viewSource(const char* fileName, int line) {
 
 bool StatisticsView::srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker,
                                   View* view) {
-  if (worker.GetSourceFileFromCache(fn).data != nullptr) return true;
+  if (worker.GetSourceFileFromCache(fn).data != nullptr) {
+    return true;
+  }
   struct stat buf;
   if (stat(view->sourceSubstitution(fn), &buf) == 0 && (buf.st_mode & S_IFREG) != 0) {
-    if (!view->validateSourceAge()) return true;
+    if (!view->validateSourceAge()) {
+      return true;
+    }
     return (uint64_t)buf.st_mtime < olderThan;
   }
   return false;
@@ -289,7 +283,9 @@ void StatisticsView::showContentMenu(const QPoint& pos) {
 }
 
 void StatisticsView::updateColumnSizes() {
-  if (!model) return;
+  if (!model) {
+    return;
+  }
 
   tableView->setColumnWidth(StatisticsModel::Column::NameColumn, 500);
   tableView->setColumnWidth(StatisticsModel::Column::LocationColumn, 400);

@@ -20,21 +20,28 @@
 
 namespace tgfx {
 
-std::unique_ptr<GaussianBlur1DFragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
-    std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
-    float stepLength) {
+PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> processor, float sigma,
+    GaussianBlurDirection direction, float stepLength, int maxSigma) {
   if (!processor) {
     return nullptr;
   }
+  if (maxSigma < 0) {
+    return nullptr;
+  }
+  if (sigma <= 0 || stepLength <= 0) {
+    return processor;
+  }
 
-  return std::unique_ptr<GaussianBlur1DFragmentProcessor>(
-      new GLGaussianBlur1DFragmentProcessor(std::move(processor), sigma, direction, stepLength));
+  return buffer->make<GLGaussianBlur1DFragmentProcessor>(
+      std::move(processor), sigma, direction, stepLength, static_cast<int>(ceil(maxSigma)));
 }
 
 GLGaussianBlur1DFragmentProcessor::GLGaussianBlur1DFragmentProcessor(
-    std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
-    float stepLength)
-    : GaussianBlur1DFragmentProcessor(std::move(processor), sigma, direction, stepLength) {
+    PlacementPtr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
+    float stepLength, int maxSigma)
+    : GaussianBlur1DFragmentProcessor(std::move(processor), sigma, direction, stepLength,
+                                      maxSigma) {
 }
 
 void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -52,7 +59,7 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
   fragBuilder->codeAppend("float total = 0.0;");
 
-  fragBuilder->codeAppend("for (int j = 0; j <= 2 * 6; ++j) {");
+  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", 4 * maxSigma);
   fragBuilder->codeAppend("int i = j - radius;");
   fragBuilder->codeAppend("float weight = exp(-float(i*i) / (2.0*sigma*sigma));");
   fragBuilder->codeAppend("total += weight;");

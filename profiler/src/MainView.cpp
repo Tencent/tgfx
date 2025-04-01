@@ -125,7 +125,6 @@ void MainView::openWebsocketServer() {
   if (!centorView->isConnected()) {
     discardConnect();
     return;
-
   }
   layout->addWidget(centorView);
   Q_EMIT statusChange(ProfilerStatus::Connect);

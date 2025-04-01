@@ -20,17 +20,18 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
-    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset) {
+PlacementPtr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
+    PlacementBuffer* buffer, DualBlurPassMode passMode, PlacementPtr<FragmentProcessor> processor,
+    Point blurOffset) {
   if (processor == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<DualBlurFragmentProcessor>(
-      new GLDualBlurFragmentProcessor(passMode, std::move(processor), blurOffset));
+  return buffer->make<GLDualBlurFragmentProcessor>(passMode, std::move(processor), blurOffset);
 }
 
-GLDualBlurFragmentProcessor::GLDualBlurFragmentProcessor(
-    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset)
+GLDualBlurFragmentProcessor::GLDualBlurFragmentProcessor(DualBlurPassMode passMode,
+                                                         PlacementPtr<FragmentProcessor> processor,
+                                                         Point blurOffset)
     : DualBlurFragmentProcessor(passMode, std::move(processor), blurOffset) {
 }
 

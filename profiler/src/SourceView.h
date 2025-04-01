@@ -65,7 +65,7 @@ class CodeEditor : public QPlainTextEdit {
   Q_SLOT void updateLineNumberArea(const QRect& rect, int dy);
   Q_SLOT void highlightCurrentLine();
 
-  QWidget* lineNumberArea;
+  QWidget* lineNumberArea = nullptr;
 };
 
 class LineNumberArea : public QWidget {
@@ -83,5 +83,5 @@ class LineNumberArea : public QWidget {
   }
 
  private:
-  CodeEditor* codeEditor;
+  CodeEditor* codeEditor = nullptr;
 };

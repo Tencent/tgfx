@@ -23,7 +23,6 @@ ResourceTask::ResourceTask(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)
 }
 
 bool ResourceTask::execute(Context* context) {
-
   if (uniqueKey.strongCount() <= 0) {
     // Skip the resource creation if there is no proxy is referencing it.
     return false;

@@ -19,16 +19,16 @@
 #include "GLComposeFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> ComposeFragmentProcessor::Make(
-    std::vector<std::unique_ptr<FragmentProcessor>> processors) {
+PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(
+    PlacementBuffer* buffer, std::vector<PlacementPtr<FragmentProcessor>> processors) {
   if (processors.empty()) {
     return nullptr;
   }
-  return std::unique_ptr<FragmentProcessor>(new GLComposeFragmentProcessor(std::move(processors)));
+  return buffer->make<GLComposeFragmentProcessor>(std::move(processors));
 }
 
 GLComposeFragmentProcessor::GLComposeFragmentProcessor(
-    std::vector<std::unique_ptr<FragmentProcessor>> processors)
+    std::vector<PlacementPtr<FragmentProcessor>> processors)
     : ComposeFragmentProcessor(std::move(processors)) {
 }
 

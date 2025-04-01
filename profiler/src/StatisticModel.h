@@ -126,7 +126,7 @@ class StatisticsModel : public QAbstractTableModel {
   bool matchFilter(const QString& name, const QString& location) const;
 
  private:
-  View* view;
+  View* view = nullptr;
   ViewData& viewData;
   tracy::Worker& worker;
 

@@ -34,6 +34,10 @@ DECLARE_HANDLE(HPBUFFER);
 #define WGL_ALPHA_BITS 0x201B
 #define WGL_STENCIL_BITS 0x2023
 #define WGL_FULL_ACCELERATION 0x2027
+#define WGL_CONTEXT_MAJOR_VERSION 0x2091
+#define WGL_CONTEXT_MINOR_VERSION 0x2092
+#define WGL_CONTEXT_PROFILE_MASK 0x9126
+#define WGL_CONTEXT_CORE_PROFILE_BIT 0x00000001
 
 using GetExtensionsStringProc = const char*(WINAPI*)(HDC);
 using ChoosePixelFormatProc = BOOL(WINAPI*)(HDC, const int*, const FLOAT*, UINT, int*, UINT*);
@@ -41,6 +45,8 @@ using CreatePbufferProc = HPBUFFER(WINAPI*)(HDC, int, int, int, const int*);
 using GetPbufferDCProc = HDC(WINAPI*)(HPBUFFER);
 using ReleasePbufferDCProc = int(WINAPI*)(HPBUFFER, HDC);
 using DestroyPbufferProc = BOOL(WINAPI*)(HPBUFFER);
+using SwapIntervalProc = BOOL(WINAPI*)(int);
+using CreateContextAttribsProc = HGLRC(WINAPI*)(HDC, HGLRC, const int*);
 
 class WGLInterface {
  public:
@@ -51,6 +57,11 @@ class WGLInterface {
 
   bool pixelFormatSupport = false;
   bool pBufferSupport = false;
+  bool swapIntervalSupport = false;
+  bool createContextAttribsSupport = false;
+
+  int glMajorMax = 1;
+  int glMinorMax = 0;
 
   GetExtensionsStringProc wglGetExtensionsString = nullptr;
   ChoosePixelFormatProc wglChoosePixelFormat = nullptr;
@@ -58,5 +69,7 @@ class WGLInterface {
   GetPbufferDCProc wglGetPbufferDC = nullptr;
   ReleasePbufferDCProc wglReleasePbufferDC = nullptr;
   DestroyPbufferProc wglDestroyPbuffer = nullptr;
+  SwapIntervalProc wglSwapInterval = nullptr;
+  CreateContextAttribsProc wglCreateContextAttribs = nullptr;
 };
 }  // namespace tgfx

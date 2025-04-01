@@ -45,9 +45,11 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
 }
 
-std::unique_ptr<FragmentProcessor> ResourceImage::asFragmentProcessor(
-    const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
+                                                                   TileMode tileModeX,
+                                                                   TileMode tileModeY,
+                                                                   const SamplingOptions& sampling,
+                                                                   const Matrix* uvMatrix) const {
   TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,

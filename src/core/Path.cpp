@@ -46,7 +46,7 @@ class PointIterator {
   }
 
  protected:
-  std::vector<Point> points = {};
+  const std::vector<Point>& points = {};
 
  private:
   size_t index = 0;

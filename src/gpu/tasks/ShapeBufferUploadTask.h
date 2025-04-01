@@ -25,9 +25,8 @@
 namespace tgfx {
 class ShapeBufferUploadTask : public ResourceTask {
  public:
-  static std::unique_ptr<ShapeBufferUploadTask> MakeFrom(
-      UniqueKey trianglesKey, UniqueKey textureKey,
-      std::unique_ptr<DataSource<ShapeBuffer>> source);
+  ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
+                        std::unique_ptr<DataSource<ShapeBuffer>> source);
 
   bool execute(Context* context) override;
 
@@ -40,8 +39,5 @@ class ShapeBufferUploadTask : public ResourceTask {
  private:
   UniqueKey textureKey = {};
   std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
-
-  ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
-                        std::unique_ptr<DataSource<ShapeBuffer>> source);
 };
 }  // namespace tgfx

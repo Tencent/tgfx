@@ -20,6 +20,7 @@
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
+#include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -494,13 +495,13 @@ TGFX_TEST(LayerTest, shapeLayer) {
     auto shapeLayerRect = shapeLayer->getBounds();
     switch (i) {
       case 0:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(5, 5, 155, 95));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-10, -10, 170, 110));
         break;
       case 1:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(0, 100, 160, 200));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 70, 190, 230));
         break;
       case 2:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(0, 200, 160, 300));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 170, 190, 330));
         break;
       default:
         break;
@@ -1798,24 +1799,24 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
-  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(child->bitFields.childrenDirty);
-  EXPECT_TRUE(root->bitFields.childrenDirty);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(child->bitFields.dirtyDescendents);
+  EXPECT_TRUE(root->bitFields.dirtyDescendents);
   displayList->render(surface.get());
 
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
-  EXPECT_TRUE(!root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   child->setVisible(false);
-  EXPECT_TRUE(!grandChild->bitFields.childrenDirty && !grandChild->bitFields.contentDirty);
-  EXPECT_TRUE(!child->bitFields.childrenDirty && !child->bitFields.contentDirty);
-  EXPECT_TRUE(root->bitFields.childrenDirty && !root->bitFields.contentDirty);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
+  EXPECT_TRUE(root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 }
 
 TGFX_TEST(LayerTest, DropShadowStyle) {
@@ -1947,11 +1948,11 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwner, layer2.get());
 
-  EXPECT_FALSE(layer2->bitFields.contentDirty);
+  EXPECT_FALSE(layer2->bitFields.dirtyContent);
   displayList->render(surface.get());
-  EXPECT_FALSE(layer->bitFields.childrenDirty);
+  EXPECT_FALSE(layer->bitFields.dirtyDescendents);
   mask->setAlpha(0.5f);
-  EXPECT_TRUE(layer->bitFields.childrenDirty);
+  EXPECT_TRUE(layer->bitFields.dirtyDescendents);
 
   layer2->setMask(nullptr);
   EXPECT_EQ(layer->mask(), nullptr);
@@ -2195,5 +2196,138 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   auto surface = Surface::Make(context, 300, 100);
   list.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
+}
+
+TGFX_TEST(LayerTest, RasterizedBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 150, 150);
+  auto displayList = std::make_unique<DisplayList>();
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::Blue());
+  solidLayer->setWidth(150);
+  solidLayer->setHeight(150);
+  displayList->root()->addChild(solidLayer);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  displayList->root()->addChild(background);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(30, 30));
+  parent->addChild(background);
+
+  auto layerBeforeChild = ShapeLayer::Make();
+  auto path = Path();
+  path.addRect(Rect::MakeWH(50, 50));
+  layerBeforeChild->setPath(path);
+  layerBeforeChild->setFillStyle(SolidColor::Make(Color::Red()));
+
+  auto backgroundNephew = ShapeLayer::Make();
+  backgroundNephew->setPath(path);
+  backgroundNephew->setMatrix(Matrix::MakeTrans(10, 10));
+  backgroundNephew->setFillStyle(SolidColor::Make(Color::Green()));
+
+  auto child = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeWH(100, 100));
+  child->setPath(childPath);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  child->setFillStyle(fillStyle);
+  child->setShouldRasterize(true);
+  child->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  parent->addChild(child);
+  displayList->root()->addChild(parent);
+
+  displayList->render(surface.get());
+  background->setMatrix(Matrix::MakeTrans(50, 50));
+  auto rasterizedContent =
+      static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  child->setMatrix(Matrix::MakeTrans(20, 20));
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  auto layerNextChild = ShapeLayer::Make();
+  layerNextChild->setPath(path);
+  layerNextChild->setMatrix(Matrix::MakeTrans(10, 10));
+  layerNextChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
+  parent->addChild(layerNextChild);
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent ==
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  auto grandChild = ShapeLayer::Make();
+  grandChild->setPath(path);
+  grandChild->setMatrix(Matrix::MakeTrans(10, 10));
+  grandChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 128)));
+  child->addChild(grandChild);
+  EXPECT_TRUE(child->rasterizedContent == nullptr);
+  displayList->render(surface.get());
+
+  auto nephew = ShapeLayer::Make();
+  nephew->setPath(path);
+  nephew->setMatrix(Matrix::MakeTrans(10, 10));
+  nephew->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
+  layerNextChild->addChild(nephew);
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent ==
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  parent->addChildAt(layerBeforeChild, parent->getChildIndex(child));
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  layerBeforeChild->addChildAt(backgroundNephew, 0);
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  layerBeforeChild->removeChildren();
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  layerBeforeChild->removeFromParent();
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  parent->setChildIndex(background, static_cast<int>(parent->children().size() - 1u));
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  parent->setChildIndex(background, 0);
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  parent->replaceChild(background, layerBeforeChild);
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent !=
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+
+  parent->replaceChild(layerNextChild, background);
+  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  displayList->render(surface.get());
+  EXPECT_TRUE(rasterizedContent ==
+              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
 }
 }  // namespace tgfx

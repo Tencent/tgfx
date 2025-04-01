@@ -66,8 +66,12 @@ void Stroke::applyToBounds(Rect* bounds) const {
   if (bounds == nullptr) {
     return;
   }
-  auto strokeWidth = ceilf(width * 0.5f);
-  bounds->outset(strokeWidth, strokeWidth);
+  auto expand = width * 0.5f;
+  if (join == LineJoin::Miter) {
+    expand *= miterLimit;
+  }
+  expand = ceilf(expand);
+  bounds->outset(expand, expand);
 }
 
 }  // namespace tgfx

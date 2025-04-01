@@ -23,7 +23,8 @@
 namespace tgfx {
 class AlphaThresholdFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<AlphaThresholdFragmentProcessor> Make(float threshold);
+  static PlacementPtr<AlphaThresholdFragmentProcessor> Make(PlacementBuffer* buffer,
+                                                            float threshold);
 
   std::string name() const override {
     return "AlphaStepFragmentProcessor";

@@ -29,9 +29,6 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   if (!root) {
     root = buildLayerTree(host);
     displayList.root()->addChild(root);
-    tgfx::LayerInspector& Inspector = tgfx::LayerInspector::GetLayerInspector();
-    Inspector.serializingDisplayLists({displayList});
-    Inspector.serializingLayerAttribute(root->getChildByName("progressBar")->getChildByName("backlineLayer"));
   }
 
   updateRootMatrix(host);

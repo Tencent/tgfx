@@ -21,15 +21,6 @@
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-std::unique_ptr<GpuBufferUploadTask> GpuBufferUploadTask::MakeFrom(
-    UniqueKey uniqueKey, BufferType bufferType, std::unique_ptr<DataSource<Data>> source) {
-  if (source == nullptr) {
-    return nullptr;
-  }
-  return std::unique_ptr<GpuBufferUploadTask>(
-      new GpuBufferUploadTask(std::move(uniqueKey), bufferType, std::move(source)));
-}
-
 GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
                                          std::unique_ptr<DataSource<Data>> source)
     : ResourceTask(std::move(uniqueKey)), bufferType(bufferType), source(std::move(source)) {
