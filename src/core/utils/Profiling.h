@@ -44,12 +44,27 @@
 #define FRAME_MARK_START FrameMarkStart(nullptr)
 #define FRAME_MARK_END FrameMarkEnd(nullptr)
 
-#define TRACE_THREAD_NAME(name) tracy::SetThreadName(name)
-
 #define LAYER_DATA(data)  TracyLayerData(data)
 
 #define LAYER_CALLBACK(x) TracyFeedBackCallBack(x)
 
+static constexpr uint32_t INVALID_THREAD_NUMBER = 0;
+inline uint32_t GetThreadNumber() {
+  static std::atomic<uint32_t> nextID{1};
+  uint32_t number;
+  do {
+    number = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (number == INVALID_THREAD_NUMBER);
+  return number;
+}
+
+inline std::string GetThreadName() {
+  char threadName[10] = {'\0'};
+  snprintf(threadName, 10, "Thread_%d", GetThreadNumber());
+  return threadName;
+}
+
+#define TRACE_THREAD tracy::SetThreadName(GetThreadName().c_str())
 #else
 #define TRACE_EVENT
 #define TRACE_EVENT_NAME(name)
@@ -63,7 +78,7 @@
 #define FRAME_MARK_START
 #define FRAME_MARK_END
 
-#define TRACE_THREAD_NAME(name)
+#define TRACE_THREAD
 
 #define LAYER_DATA(data)
 #define LAYER_CALLBACK(x)

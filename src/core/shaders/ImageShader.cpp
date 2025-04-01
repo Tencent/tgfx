@@ -41,8 +41,8 @@ bool ImageShader::isEqual(const Shader* shader) const {
          tileModeY == other->tileModeY && sampling == other->sampling;
 }
 
-std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
-                                                                    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
+                                                                 const Matrix* uvMatrix) const {
   return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
 }
 }  // namespace tgfx

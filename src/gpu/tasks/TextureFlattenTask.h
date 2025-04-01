@@ -24,6 +24,7 @@
 namespace tgfx {
 class TextureFlattenTask {
  public:
+  TextureFlattenTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy);
   /**
    * Prepares the task for execution. Returns false if the task can be skipped.
    */
@@ -39,9 +40,5 @@ class TextureFlattenTask {
   std::shared_ptr<TextureProxy> sourceTextureProxy = nullptr;
   std::shared_ptr<Texture> flatTexture = nullptr;
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
-
-  TextureFlattenTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy);
-
-  friend class ProxyProvider;
 };
 }  // namespace tgfx

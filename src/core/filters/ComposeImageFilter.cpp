@@ -70,7 +70,7 @@ Rect ComposeImageFilter::onFilterBounds(const Rect& srcRect) const {
   return bounds;
 }
 
-std::unique_ptr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   auto lastSource = source;

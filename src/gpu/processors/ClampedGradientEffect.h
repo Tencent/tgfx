@@ -25,9 +25,10 @@
 namespace tgfx {
 class ClampedGradientEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<ClampedGradientEffect> Make(std::unique_ptr<FragmentProcessor> colorizer,
-                                                     std::unique_ptr<FragmentProcessor> gradLayout,
-                                                     Color leftBorderColor, Color rightBorderColor);
+  static PlacementPtr<ClampedGradientEffect> Make(PlacementBuffer* buffer,
+                                                  PlacementPtr<FragmentProcessor> colorizer,
+                                                  PlacementPtr<FragmentProcessor> gradLayout,
+                                                  Color leftBorderColor, Color rightBorderColor);
 
   std::string name() const override {
     return "ClampedGradientEffect";
@@ -36,8 +37,8 @@ class ClampedGradientEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
-                        std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
+  ClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
+                        PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor,
                         Color rightBorderColor);
 
   size_t colorizerIndex = ULONG_MAX;

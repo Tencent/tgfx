@@ -23,9 +23,9 @@
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
-Pipeline::Pipeline(std::unique_ptr<GeometryProcessor> geometryProcessor,
-                   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
-                   size_t numColorProcessors, std::unique_ptr<XferProcessor> xferProcessor,
+Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
+                   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
+                   size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
                    BlendMode blendMode, const Swizzle* outputSwizzle)
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),

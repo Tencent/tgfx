@@ -75,12 +75,16 @@ void SourceContents::Parse(const char* fileName, const tracy::Worker& worker, co
         files = nullptr;
       }
     }
-    if (files) Tokenize(mdata, sz);
+    if (files) {
+      Tokenize(mdata, sz);
+    }
   }
 }
 
 void SourceContents::Parse(const char* source) {
-  if (source == mdata) return;
+  if (source == mdata) {
+    return;
+  }
   const size_t len = strlen(source);
 
   files = nullptr;
@@ -101,7 +105,9 @@ void SourceContents::Tokenize(const char* txt, size_t sz) {
     }
 
     lines.emplace_back(Tokenizer::Line{txt, end, tokenizer.tokenize(txt, end)});
-    if (offset == sz) break;
+    if (offset == sz) {
+      break;
+    }
     if (*end == '\n') {
       end++;
       offset = static_cast<size_t>(end - mdata);
@@ -117,7 +123,9 @@ void SourceContents::Tokenize(const char* txt, size_t sz) {
         offset = static_cast<size_t>(end - mdata);
       }
     }
-    if (offset == sz) break;
+    if (offset == sz) {
+      break;
+    }
     txt = end;
   }
 }

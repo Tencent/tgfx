@@ -19,15 +19,15 @@
 #include "GLClampedGradientEffect.h"
 
 namespace tgfx {
-std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(
-    std::unique_ptr<FragmentProcessor> colorizer, std::unique_ptr<FragmentProcessor> gradLayout,
-    Color leftBorderColor, Color rightBorderColor) {
-  return std::unique_ptr<ClampedGradientEffect>(new GLClampedGradientEffect(
-      std::move(colorizer), std::move(gradLayout), leftBorderColor, rightBorderColor));
+PlacementPtr<ClampedGradientEffect> ClampedGradientEffect::Make(
+    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> colorizer,
+    PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor, Color rightBorderColor) {
+  return buffer->make<GLClampedGradientEffect>(std::move(colorizer), std::move(gradLayout),
+                                               leftBorderColor, rightBorderColor);
 }
 
-GLClampedGradientEffect::GLClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
-                                                 std::unique_ptr<FragmentProcessor> gradLayout,
+GLClampedGradientEffect::GLClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
+                                                 PlacementPtr<FragmentProcessor> gradLayout,
                                                  Color leftBorderColor, Color rightBorderColor)
     : ClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
                             rightBorderColor) {

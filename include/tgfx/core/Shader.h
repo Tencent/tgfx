@@ -172,8 +172,8 @@ class Shader {
 
   std::weak_ptr<Shader> weakThis;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                                 const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                              const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class Caster;

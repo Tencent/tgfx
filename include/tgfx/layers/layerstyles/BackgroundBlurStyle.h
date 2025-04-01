@@ -30,11 +30,11 @@ namespace tgfx {
 class BackgroundBlurStyle : public LayerStyle {
  public:
   static std::shared_ptr<BackgroundBlurStyle> Make(float blurrinessX, float blurrinessY,
-                                                   TileMode tileMode = TileMode::Clamp);
- LayerStyleType Type() const override {
-  return LayerStyleType::BackgroundBlur;
- }
-  /**
+                                                   TileMode tileMode = TileMode::Mirror);
+    LayerStyleType Type() const override {
+        return LayerStyleType::BackgroundBlur;
+    }
+ /**
    * The x blurriness of the background.
    */
   float blurrinessX() const {
@@ -97,7 +97,7 @@ class BackgroundBlurStyle : public LayerStyle {
   float _blurrinessX = 0;
   float _blurrinessY = 0;
 
-  TileMode _tileMode = TileMode::Clamp;
+  TileMode _tileMode = TileMode::Mirror;
 };
 
 }  // namespace tgfx

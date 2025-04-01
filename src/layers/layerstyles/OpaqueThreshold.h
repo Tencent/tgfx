@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,12 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AlphaThresholdFragmentProcessor.h"
-#include "gpu/opengl/processors/GLAlphaThresholdFragmentProcessor.h"
+#pragma once
 
 namespace tgfx {
-std::unique_ptr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
-    float threshold) {
-  return std::make_unique<GLAlphaThresholdFragmentProcessor>(threshold);
-}
+static constexpr float OPAQUE_THRESHOLD = 1.0f / 256.0f;
 }  // namespace tgfx

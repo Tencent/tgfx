@@ -24,9 +24,10 @@
 namespace tgfx {
 class DefaultGeometryProcessor : public GeometryProcessor {
  public:
-  static std::unique_ptr<DefaultGeometryProcessor> Make(Color color, int width, int height,
-                                                        AAType aa, const Matrix& viewMatrix,
-                                                        const Matrix& uvMatrix);
+  static PlacementPtr<DefaultGeometryProcessor> Make(PlacementBuffer* buffer, Color color,
+                                                     int width, int height, AAType aa,
+                                                     const Matrix& viewMatrix,
+                                                     const Matrix& uvMatrix);
 
   std::string name() const override {
     return "DefaultGeometryProcessor";

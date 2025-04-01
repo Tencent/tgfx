@@ -49,9 +49,10 @@ bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return other && inner->isEqual(other->inner.get()) && outer->isEqual(other->outer.get());
 }
 
-std::unique_ptr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor() const {
-  auto innerProcessor = inner->asFragmentProcessor();
-  auto outerProcessor = outer->asFragmentProcessor();
-  return FragmentProcessor::Compose(std::move(innerProcessor), std::move(outerProcessor));
+PlacementPtr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor(Context* context) const {
+  auto innerProcessor = inner->asFragmentProcessor(context);
+  auto outerProcessor = outer->asFragmentProcessor(context);
+  return FragmentProcessor::Compose(context->drawingBuffer(), std::move(innerProcessor),
+                                    std::move(outerProcessor));
 }
 }  // namespace tgfx

@@ -28,7 +28,10 @@
 
 namespace tgfx {
 
-#define MAX_BLUR_SIGMA 3.0f
+// When a 1px wide line segment is scaled down to 0.25 in both width and height, it can still provide acceptable image
+// information. However, when the sigma exceeds 40, the line segment becomes so blurred that it is almost invisible.
+// Therefore, 10 is chosen as the MAX_BLUR_SIGMA.
+#define MAX_BLUR_SIGMA 10.f
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
@@ -43,15 +46,16 @@ GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurri
     : BlurImageFilter(blurrinessX, blurrinessY, tileMode) {
 }
 
-static void Blur1D(std::unique_ptr<FragmentProcessor> source,
+static void Blur1D(PlacementPtr<FragmentProcessor> source,
                    std::shared_ptr<RenderTargetProxy> renderTarget, float sigma,
                    GaussianBlurDirection direction, float stepLength, uint32_t renderFlags) {
   if (!renderTarget) {
     return;
   }
-  auto drawingManager = renderTarget->getContext()->drawingManager();
-  auto processor =
-      GaussianBlur1DFragmentProcessor::Make(std::move(source), sigma, direction, stepLength);
+  auto context = renderTarget->getContext();
+  auto drawingManager = context->drawingManager();
+  auto processor = GaussianBlur1DFragmentProcessor::Make(
+      context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
   drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
 }
 
@@ -159,7 +163,7 @@ Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(2.f * blurrinessX, 2.f * blurrinessY);
 }
 
-std::unique_ptr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, uvMatrix);

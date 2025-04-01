@@ -115,7 +115,7 @@ class Layer {
    * is BlendMode::SrcOver.
    */
   BlendMode blendMode() const {
-    return _blendMode;
+    return static_cast<BlendMode>(bitFields.blendMode);
   }
 
   /**
@@ -494,7 +494,7 @@ class Layer {
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
    * the layer as dirty and does not update the layer content.
    */
-  void invalidate();
+  void invalidateTransform();
 
   /**
    * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
@@ -535,9 +535,14 @@ class Layer {
 
  private:
   /**
-   * Marks the layer's children as changed and needing to be redrawn.
+   * Marks the layer's descendents as changed and needing to be redrawn.
    */
-  void invalidateChildren();
+  void invalidateDescendents();
+
+  /**
+   * Marks the layer's background as changed and needing to be redrawn.
+   */
+  void invalidateBackground();
 
   void onAttachToRoot(Layer* owner);
 
@@ -585,18 +590,23 @@ class Layer {
 
   bool hasValidMask() const;
 
+  void invalidate();
+
   struct {
-    bool contentDirty : 1;   // need to update content
-    bool childrenDirty : 1;  // need to redraw child layers
+    bool dirtyContent : 1;      // need to update content
+    bool dirtyDescendents : 1;  // need to redraw the layer's descendents
+    bool dirtyTransform : 1;    // need to redraw the layer
+    bool dirtyBackground : 1;   // need to redraw the layer's background, only mark while sibling is
+                                // changed.
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
+    uint8_t blendMode : 5;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = Matrix::I();
   float _rasterizationScale = 1.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};

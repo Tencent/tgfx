@@ -23,8 +23,8 @@
 namespace tgfx {
 class GLXfermodeFragmentProcessor : public XfermodeFragmentProcessor {
  public:
-  GLXfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
-                              std::unique_ptr<FragmentProcessor> dst, BlendMode mode);
+  GLXfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
+                              PlacementPtr<FragmentProcessor> dst, BlendMode mode);
 
   void emitCode(EmitArgs& args) const override;
 };

@@ -41,6 +41,6 @@ class MatrixColorFilter : public ColorFilter {
  private:
   bool alphaIsUnchanged;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 };
 }  // namespace tgfx

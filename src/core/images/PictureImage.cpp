@@ -61,9 +61,11 @@ std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
   return std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
 }
 
-std::unique_ptr<FragmentProcessor> PictureImage::asFragmentProcessor(
-    const FPArgs& args, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& args,
+                                                                  TileMode tileModeX,
+                                                                  TileMode tileModeY,
+                                                                  const SamplingOptions& sampling,
+                                                                  const Matrix* uvMatrix) const {
 
   auto drawBounds = args.drawRect;
   if (uvMatrix) {

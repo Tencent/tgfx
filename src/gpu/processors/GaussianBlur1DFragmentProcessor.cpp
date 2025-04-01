@@ -21,10 +21,15 @@
 namespace tgfx {
 
 GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
-    std::unique_ptr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
-    float stepLength)
-    : FragmentProcessor(ClassID()), sigma(sigma), direction(direction), stepLength(stepLength) {
+    PlacementPtr<FragmentProcessor> processor, float sigma, GaussianBlurDirection direction,
+    float stepLength, int maxSigma)
+    : FragmentProcessor(ClassID()), sigma(sigma), direction(direction), stepLength(stepLength),
+      maxSigma(maxSigma) {
   registerChildProcessor(std::move(processor));
+}
+
+void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
+  key->write(maxSigma);
 }
 
 }  // namespace tgfx

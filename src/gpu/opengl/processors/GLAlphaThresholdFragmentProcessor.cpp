@@ -19,23 +19,21 @@
 #include "GLAlphaThresholdFragmentProcessor.h"
 
 namespace tgfx {
+PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
+    PlacementBuffer* buffer, float threshold) {
+  return buffer->make<GLAlphaThresholdFragmentProcessor>(threshold);
+}
+
 void GLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
   auto thresholdUniformName =
       uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Threshold");
 
   auto* fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), args.inputColor.c_str());
-  fragBuilder->codeAppendf("if (%s.a > %s)", args.outputColor.c_str(),
-                           thresholdUniformName.c_str());
-  fragBuilder->codeAppend("{");
-  fragBuilder->codeAppendf("%s.rgb /= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
-  fragBuilder->codeAppendf("%s.a = 1.0;", args.outputColor.c_str());
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppend("else");
-  fragBuilder->codeAppend("{");
-  fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-  fragBuilder->codeAppend("}");
+  fragBuilder->codeAppendf("%s.rgb = %s.rgb / %s.a;", args.outputColor.c_str(),
+                           args.inputColor.c_str(), args.inputColor.c_str());
+  fragBuilder->codeAppendf("%s.a = step(%s, %s.a);", args.outputColor.c_str(),
+                           thresholdUniformName.c_str(), args.inputColor.c_str());
   fragBuilder->codeAppendf("%s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
                            args.outputColor.c_str());
 }

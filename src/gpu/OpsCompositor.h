@@ -42,8 +42,7 @@ class OpsCompositor {
   /**
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
-  OpsCompositor(DrawingManager* drawingManager, std::shared_ptr<RenderTargetProxy> proxy,
-                uint32_t renderFlags);
+  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags);
 
   /**
    * Fills the given rect with the image, sampling options, state and fill.
@@ -81,14 +80,14 @@ class OpsCompositor {
    * Returns true if the compositor is closed.
    */
   bool isClosed() const {
-    return drawingManager == nullptr;
+    return renderTarget == nullptr;
   }
 
  private:
-  DrawingManager* drawingManager = nullptr;
+  Context* context = nullptr;
+  std::list<std::shared_ptr<OpsCompositor>>::iterator cachedPosition;
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
-  std::vector<std::unique_ptr<Op>> ops = {};
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   PendingOpType pendingType = PendingOpType::Unknown;
@@ -96,8 +95,17 @@ class OpsCompositor {
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
-  std::vector<RectPaint> pendingRects = {};
-  std::vector<RRectPaint> pendingRRects = {};
+  PlacementList<RectPaint> pendingRects = {};
+  PlacementList<RRectPaint> pendingRRects = {};
+  PlacementList<Op> ops = {};
+
+  PlacementBuffer* drawingBuffer() const {
+    return context->drawingBuffer();
+  }
+
+  ProxyProvider* proxyProvider() const {
+    return context->proxyProvider();
+  }
 
   bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
   bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
@@ -107,10 +115,12 @@ class OpsCompositor {
   Rect getClipBounds(const Path& clip);
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
-  std::unique_ptr<FragmentProcessor> getClipMaskFP(const Path& clip, AAType aaType,
-                                                   Rect* scissorRect);
+  std::pair<PlacementPtr<FragmentProcessor>, bool> getClipMaskFP(const Path& clip, AAType aaType,
+                                                                 Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
-  void addDrawOp(std::unique_ptr<DrawOp> op, const Path& clip, const Fill& fill,
+  void addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const Fill& fill,
                  const Rect& localBounds, const Rect& deviceBounds);
+
+  friend class DrawingManager;
 };
 }  // namespace tgfx

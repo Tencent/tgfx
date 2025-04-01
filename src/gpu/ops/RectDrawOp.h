@@ -48,14 +48,14 @@ class RectDrawOp : public DrawOp {
    * Create a new RectDrawOp for a list of RectPaints. The returned RectDrawOp is in the local space
    * of each rect.
    */
-  static std::unique_ptr<RectDrawOp> Make(Context* context, const std::vector<RectPaint>& rects,
-                                          bool useUVCoord, AAType aaType, uint32_t renderFlags);
+  static PlacementNode<RectDrawOp> Make(Context* context, PlacementList<RectPaint> rects,
+                                        bool useUVCoord, AAType aaType, uint32_t renderFlags);
+
+  RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord);
-
   size_t rectCount = 0;
   std::optional<Color> uniformColor = std::nullopt;
   bool useUVCoord = false;

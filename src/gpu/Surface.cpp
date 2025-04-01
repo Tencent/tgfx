@@ -100,7 +100,6 @@ ImageOrigin Surface::origin() const {
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
-  forceResolveRenderTarget();
   getContext()->flush();
   auto renderTarget = renderContext->renderTarget->getRenderTarget();
   if (renderTarget == nullptr) {
@@ -114,7 +113,6 @@ BackendTexture Surface::getBackendTexture() {
   if (!renderTarget->isTextureBacked()) {
     return {};
   }
-  forceResolveRenderTarget();
   getContext()->flush();
   auto texture = renderTarget->getTexture();
   if (texture == nullptr) {
@@ -128,7 +126,6 @@ HardwareBufferRef Surface::getHardwareBuffer() {
   if (!renderTarget->isTextureBacked()) {
     return nullptr;
   }
-  forceResolveRenderTarget();
   getContext()->flushAndSubmit(true);
   auto texture = renderTarget->getTexture();
   if (texture == nullptr) {
@@ -150,10 +147,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   }
   auto renderTarget = renderContext->renderTarget;
   auto drawingManager = getContext()->drawingManager();
-  if (!renderContext->flush()) {
-    // TODO(domchen): Remove the unnecessary resolve task.
-    drawingManager->addTextureResolveTask(renderContext->renderTarget);
-  }
+  renderContext->flush();
   auto textureProxy = renderTarget->getTextureProxy();
   if (textureProxy == nullptr || textureProxy->externallyOwned()) {
     textureProxy = renderTarget->makeTextureProxy();
@@ -176,7 +170,6 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  forceResolveRenderTarget();
   auto renderTargetProxy = renderContext->renderTarget;
   auto context = renderTargetProxy->getContext();
   context->flush();
@@ -228,12 +221,4 @@ void Surface::contentChanged() {
     _contentVersion++;
   } while (InvalidContentVersion == _contentVersion);
 }
-
-void Surface::forceResolveRenderTarget() {
-  // TODO(domchen): Remove the unnecessary resolve task.
-  if (!renderContext->flush()) {
-    getContext()->drawingManager()->addTextureResolveTask(renderContext->renderTarget);
-  }
-}
-
 }  // namespace tgfx

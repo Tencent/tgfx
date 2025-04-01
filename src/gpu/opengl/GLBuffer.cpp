@@ -53,10 +53,6 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
 void GLBuffer::onReleaseGPU() {
   if (_bufferID > 0) {
     auto gl = GLFunctions::Get(context);
-    // Resize the buffer to zero before deleting it can save significant time on some platforms.
-    auto target = GetTarget(_bufferType);
-    gl->bindBuffer(target, _bufferID);
-    gl->bufferData(target, 0, nullptr, GL_STATIC_DRAW);
     gl->deleteBuffers(1, &_bufferID);
     _bufferID = 0;
   }
