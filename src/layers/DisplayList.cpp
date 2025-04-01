@@ -18,16 +18,18 @@
 
 #include "tgfx/layers/DisplayList.h"
 
-#include "core/utils/Log.h"
 #include "layers/DrawArgs.h"
-#include "layers/serialization/LayerSerialization.h"
-#include "layers/generate/SerializationStructure_generated.h"
-#include "core/utils/Profiling.h"
+#include "tgfx/layers/LayerInspector.h"
 
 namespace tgfx {
 
 DisplayList::DisplayList() : _root(Layer::Make()) {
   _root->_root = _root.get();
+
+#ifdef TGFX_ENABLE_PROFILING
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDisplayList(this);
+#endif
 }
 
 Layer* DisplayList::root() const {
@@ -48,36 +50,13 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   surfaceContentVersion = surface->contentVersion();
   surfaceID = surface->uniqueID();
+
+#ifdef TGFX_ENABLE_PROFILING
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.serializingDisplayList();
+  layerInspector.setCallBack();
+#endif
   return true;
-}
-
-void DisplayList::serializingLayerTree() {
-  // auto blob = LayerSerialization::serializingTreeNode(_root);
-  // // websocket send
-  // printf("blob size %zu", blob.size());
-  // LAYER_DATA(blob);
-}
-
-void DisplayList::pickedLayerAttributeSerialization(float x, float y) {
-  std::shared_ptr<Layer> pickedLayer = _root->getLayersUnderPoint(x, y).front();
-  if(!pickedLayer) return;
-
-  auto blob = LayerSerialization::serializingLayerAttribute(pickedLayer);
-  // websocket send
-  LAYER_DATA(blob);
-}
-
-void DisplayList::pickLayer(std::shared_ptr<Layer> layer) {
-  if(!layer) return;
-
-  auto blob = LayerSerialization::serializingTreeNode(_root);
-  // websocket send
-  printf("blob size %zu", blob.size());
-  LAYER_DATA(blob);
-
-  auto blob1 = LayerSerialization::serializingLayerAttribute(layer);
-  // websocket send
-  LAYER_DATA(blob1);
 }
 
 

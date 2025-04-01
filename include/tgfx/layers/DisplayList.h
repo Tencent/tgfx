@@ -48,12 +48,6 @@ class DisplayList {
    */
   bool render(Surface* surface, bool replaceAll = true);
 
-  void serializingLayerTree();
-
-  void pickedLayerAttributeSerialization(float x, float y);
-
-  void pickLayer(std::shared_ptr<Layer> layer);
-
  private:
   std::shared_ptr<Layer> _root = nullptr;
   uint32_t surfaceContentVersion = 0u;

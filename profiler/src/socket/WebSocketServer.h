@@ -15,34 +15,33 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include <QAbstractItemModel>
-#include <qqmlintegration.h>
-#include <QVariant>
-#include <QList>
-#include <memory>
-#include <QModelIndex>
-#include "generate/SerializationStructure_generated.h"
-#include "LayerItem.h"
-
-
-class LayerModel : public QAbstractItemModel{
+#include <QtWebSockets/QWebSocketServer>
+#include <QtWebSockets/QWebSocket>
+class WebSocketServer : public QObject{
   Q_OBJECT
-  QML_NAMED_ELEMENT(LayerModel)
 public:
-  Q_DISABLE_COPY_MOVE(LayerModel)
-  explicit LayerModel(QObject* parent = nullptr);
-  ~LayerModel() override;
-
-  QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
-  QModelIndex parent(const QModelIndex &child) const override;
-  int rowCount(const QModelIndex &parent = QModelIndex()) const override;
-  int columnCount(const QModelIndex &parent = QModelIndex()) const override;
-  Qt::ItemFlags flags(const QModelIndex &index) const override;
-  QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
-protected:
-  std::unique_ptr<LayerItem> rootItem;
+  WebSocketServer(quint16 port, QObject *parent = nullptr);
+  bool hasClientConnect() const {
+    return m_HasClientConnect;
+  }
+  void close();
+  void listen();
+  void SendData(const QByteArray& data);
+  Q_SIGNALS:
+    void ClientConnected();
+  void ClientBinaryData(const QByteArray &message);
+  void ClientTextData(const QString& message);
+  void ClientDisconnected();
+  private slots:
+    void onNewConnection();
+  void onTextMessageReceived(const QString &message);
+  void onBinaryMessageReceived(const QByteArray &message);
+  void onClientDisconnected();
+private:
+  QWebSocketServer *m_server;
+  QWebSocket* m_ClientSocket;
+  quint16 m_port;
+  bool m_HasClientConnect = false;
 };
-

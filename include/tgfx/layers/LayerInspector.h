@@ -30,16 +30,23 @@ public:
         static LayerInspector instance;
         return instance;
     }
+
     LayerInspector(const LayerInspector&) = delete;
     LayerInspector(LayerInspector&&) = delete;
     LayerInspector& operator==(const LayerInspector&) = delete;
     LayerInspector& operator==(LayerInspector&&) = delete;
     ~LayerInspector() = default;
-    void serializingDisplayLists(const std::vector<tgfx::DisplayList>& displayLists);
+
+    void setDisplayList(tgfx::DisplayList* displayList);
+    void setDirty(Layer* root, std::shared_ptr<Layer> child);
+    void serializingDisplayList();
     void serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer);
     void FeedBackDataProcess(const std::vector<uint8_t>& data);
-    void setUpdateCallBack(std::function<void()> func) {
-        m_update = func;
+    void setCallBack();
+    void pickedLayer(float x, float y);
+    void getSurfaceSize(float width, float height) {
+        m_Width = width;
+        m_Height = height;
     }
 private:
     void AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer);
@@ -50,8 +57,12 @@ private:
     uint64_t m_SelectedAddress;
     std::shared_ptr<tgfx::Layer> m_HoverdLayer;
     int m_HighLightLayerIndex = 0;
+    bool m_HoverdSwitch = false;
+    tgfx::DisplayList* m_DisplayList;
+    bool m_IsDirty = false;
 
-    std::function<void()> m_update;
+    float m_Width;
+    float m_Height;
 };
 
 }

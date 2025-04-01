@@ -20,6 +20,8 @@
 #include <cstdint>
 
 namespace profiler {
+
+#pragma pack(push,1)
 enum Type : uint8_t {
   None = 0,
   EnalbeLayerInspect,
@@ -31,5 +33,7 @@ struct FeedbackData {
   Type type;
   uint64_t address;
 };
+
+#pragma pack(pop)
 }
 

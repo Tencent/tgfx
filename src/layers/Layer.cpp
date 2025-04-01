@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/LayerInspector.h"
 #include <atomic>
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
@@ -300,6 +301,10 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   child->_parent = this;
   child->onAttachToRoot(_root);
   invalidateChildren();
+#ifdef TGFX_ENABLE_PROFILING
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDirty(_root, child);
+#endif
   return true;
 }
 
@@ -343,6 +348,10 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
   invalidateChildren();
+#ifdef TGFX_ENABLE_PROFILING
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDirty(_root, child);
+#endif
   return child;
 }
 

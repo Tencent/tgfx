@@ -15,33 +15,33 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
 
-#include <QtWebSockets/QWebSocketServer>
-#include <QtWebSockets/QWebSocket>
-class WebSocketServer : public QObject{
+#include <QTcpSocket>
+#include <QByteArray>
+
+class TcpSocketClient : public QObject{
   Q_OBJECT
 public:
-  WebSocketServer(quint16 port, QObject *parent = nullptr);
+  TcpSocketClient(QObject* parent, QString ip, quint16 port);
+  ~TcpSocketClient() override;
+  void connection(QString ip, quint16 port);
+  void sendData(const QByteArray& data);
   bool hasClientConnect() const {
-    return m_HasClientConnect;
+    return m_IsConnection;
   }
-  void close();
-  void listen();
-  void SendData(const QByteArray& data);
-Q_SIGNALS:
-  void ClientConnected();
-  void ClientBinaryData(const QByteArray &message);
-  void ClientTextData(const QString& message);
-  void ClientDisconnected();
+  Q_SIGNALS:
+  void ServerBinaryData(const QByteArray &message);
 private slots:
-  void onNewConnection();
-  void onTextMessageReceived(const QString &message);
-  void onBinaryMessageReceived(const QByteArray &message);
-  void onClientDisconnected();
+  void onSocketConnected();
+  void onSocketDisconnected();
+  void onSocketReadyRead();
+  void onSocketErrorOccurred(QAbstractSocket::SocketError error);
 private:
-  QWebSocketServer *m_server;
-  QWebSocket* m_ClientSocket;
-  quint16 m_port;
-  bool m_HasClientConnect = false;
+  bool m_IsConnection;
+  QTcpSocket* m_TcpSocket;
 };
+
+
+

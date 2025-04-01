@@ -144,7 +144,7 @@ View::View(int width, const Config& config, QWidget* parent)
 }
 
 View::View(const char* addr, uint16_t port, int width, const Config& config, QWidget* parent)
-    : QWidget(parent), width(width),
+    : QWidget(parent), width(width), layerProfilerView(new LayerProfilerView(addr, 8084, this)),
       worker(addr, port,
              config.memoryLimit == 0
                  ? -1
@@ -197,9 +197,11 @@ void View::initView() {
     layout->addWidget(textLable);
     connectDialog->exec();
   }
+
   if (!worker.HasData()) {
     return;
   }
+
   connected = true;
   ViewImpl();
 }
@@ -297,9 +299,7 @@ void View::ViewImpl() {
 }
 
 void View::timerEvent(QTimerEvent*) {
-  //qDebug() << "worker has data: " << worker.HasData();
-  //qDebug() << "layer profiler connection: " << layerProfilerView->hasConnection();
-  if (worker.HasData() && connectDialog && layerProfilerView->hasConnection()) {
+  if (worker.HasData() && connectDialog && (layerProfilerView->hasWebSocketConnection() || layerProfilerView->hasSocketConnection())) {
     connectDialog->close();
     killTimer(timerId);
   }

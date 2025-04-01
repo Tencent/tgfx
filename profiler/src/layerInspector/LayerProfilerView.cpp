@@ -28,32 +28,42 @@
 
 using namespace tgfx::fbs;
 
+LayerProfilerView::LayerProfilerView(QString ip, quint16 port, QWidget* parent)
+  :QWidget(parent),
+  m_WebSocketServer(nullptr),
+  m_TcpSocketClient(new TcpSocketClient(this, ip, port)),
+  m_LayerTreeModel(new LayerTreeModel(this)),
+  m_LayerAttributeModel(new LayerAttributeModel(this))
+{
+  LayerProlfilerImplQML();
+  connect(m_TcpSocketClient, &TcpSocketClient::ServerBinaryData, this,
+    &LayerProfilerView::ProcessMessage);
+
+  connect(m_LayerTreeModel, &LayerTreeModel::selectAddress, [this](uint64_t address) {
+    profiler::FeedbackData data = {};
+    data.type = profiler::SelectedLayerAddress;
+    data.address = address;
+    m_TcpSocketClient->sendData(QByteArray((char*)&data, sizeof(data)));
+  });
+
+  connect(m_LayerTreeModel, &LayerTreeModel::hoveredAddress, [this](uint64_t address) {
+    profiler::FeedbackData data = {};
+    data.type = profiler::HoverLayerAddress;
+    data.address = address;
+    m_TcpSocketClient->sendData(QByteArray((char*)&data, sizeof(data)));
+  });
+
+}
+
 LayerProfilerView::LayerProfilerView(QWidget* parent)
   :QWidget(parent),
   m_WebSocketServer(new WebSocketServer(8085)),
   m_LayerTreeModel(new LayerTreeModel(this)),
   m_LayerAttributeModel(new LayerAttributeModel(this))
 {
-  //createMessage();
-  // if(!m_WebSocketServer->hasClientConnect()) {
-  //   return;
-  // }
-  //LayerProfilerImpl();
   LayerProlfilerImplQML();
   connect(m_WebSocketServer, &WebSocketServer::ClientBinaryData, this,
     &LayerProfilerView::ProcessMessage);
-  // connect(m_LayerTreeView, &LayerTreeView::hoverIndexChanged, [this](uint64_t address) {
-  //   profiler::FeedbackData data = {};
-  //   data.type = profiler::HoverLayerAddress;
-  //   data.address = address;
-  //   m_WebSocketServer->SendData(QByteArray((char*)&data, sizeof(data)));
-  // });
-  // connect(m_LayerTreeView, &LayerTreeView::clickedIndexChanged, [this](uint64_t address) {
-  //   profiler::FeedbackData data = {};
-  //   data.type = profiler::SelectedLayerAddress;
-  //   data.address = address;
-  //   m_WebSocketServer->SendData(QByteArray((char*)&data, sizeof(data)));
-  // });
   connect(m_LayerTreeModel, &LayerTreeModel::selectAddress, [this](uint64_t address) {
     profiler::FeedbackData data = {};
     data.type = profiler::SelectedLayerAddress;
@@ -70,7 +80,18 @@ LayerProfilerView::LayerProfilerView(QWidget* parent)
 }
 
 LayerProfilerView::~LayerProfilerView() {
- m_WebSocketServer->close();
+  if(m_WebSocketServer)
+    m_WebSocketServer->close();
+}
+
+void LayerProfilerView::SetHoveredSwitchState(bool state) {
+  profiler::FeedbackData data = {};
+  data.type = profiler::EnalbeLayerInspect;
+  data.address = state ? 1 : 0;
+  if(m_WebSocketServer)
+    m_WebSocketServer->SendData(QByteArray((char*)&data, sizeof(data)));
+  if(m_TcpSocketClient)
+    m_TcpSocketClient->sendData(QByteArray((char*)&data, sizeof(data)));
 }
 
 void LayerProfilerView::createMessage() {
@@ -86,23 +107,13 @@ void LayerProfilerView::createMessage() {
   m_ConnectBox->exec();
 }
 
-void LayerProfilerView::LayerProfilerImpl() {
-  auto layout = new QHBoxLayout(this);
-  layout->setContentsMargins(0, 0, 0, 0);
-  m_LayerTreeView = new LayerTreeView(this);
-  layout->addWidget(m_LayerTreeView);
-  m_LayerAttributeView = new LayerAttributeView(this);
-  layout->addWidget(m_LayerAttributeView);
-  layout->setSpacing(0);
-}
-
 void LayerProfilerView::LayerProlfilerImplQML() {
   auto layout = new QVBoxLayout(this);
   layout->setContentsMargins(0, 0, 0, 0);
 
-
   m_LayerTreeEngine = new QQmlApplicationEngine();
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerTreeModel", m_LayerTreeModel);
+  m_LayerTreeEngine->rootContext()->setContextProperty("_layerProfileView", this);
   m_LayerTreeEngine->load(QUrl(QStringLiteral("qrc:/qml/LayerTree.qml")));
   auto quickWindow = static_cast<QQuickWindow*>(m_LayerTreeEngine->rootObjects().first());
   auto layerTreeWidget = createWindowContainer(quickWindow);
@@ -117,7 +128,7 @@ void LayerProfilerView::LayerProlfilerImplQML() {
 
   layout->addWidget(layerTreeWidget);
   layout->addWidget(layerAttributeWidget);
-  layout->setSpacing(1);
+  layout->setSpacing(0);
 }
 
 void LayerProfilerView::ProcessMessage(const QByteArray& message) {

@@ -124,8 +124,10 @@ std::shared_ptr<LayerSerialization> LayerSerialization::GetSerialization(
     std::vector<flatbuffers::Offset<fbs::TreeNode>> childrenList = {};
     auto children = layer->children();
     for(auto child : children) {
-      auto serializator = GetSerialization(child);
-      childrenList.push_back(serializator->SerializationLayerTreeNode(builder, layerMap));
+      if(child->name()!="HighLightLayer") {
+        auto serializator = GetSerialization(child);
+        childrenList.push_back(serializator->SerializationLayerTreeNode(builder, layerMap));
+      }
     }
     auto treeNode = fbs::CreateTreeNode(builder, name, reinterpret_cast<uint64_t>(layer.get()),
       builder.CreateVector(childrenList));

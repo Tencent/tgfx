@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <functional>
+#include <chrono>
 #include "tgfx/layers/LayerInspector.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
@@ -24,6 +25,7 @@
 #include "layers/generate/SerializationStructure_generated.h"
 #include "core/utils/Profiling.h"
 
+#pragma pack(push,1)
 enum Type : uint8_t {
   None = 0,
   EnalbeLayerInspect,
@@ -35,42 +37,67 @@ struct FeedbackData {
   Type type;
   uint64_t address;
 };
+#pragma pack(pop)
 
 
 namespace tgfx {
-LayerInspector::LayerInspector() {
+void LayerInspector::setCallBack() {
   [[maybe_unused]] std::function<void(const std::vector<uint8_t>&)> func =
-    std::bind(&LayerInspector::FeedBackDataProcess, this, std::placeholders::_1);
+      std::bind(&LayerInspector::FeedBackDataProcess, this, std::placeholders::_1);
   LAYER_CALLBACK(func);
+}
+
+void LayerInspector::pickedLayer(float x, float y) {
+  if(m_HoverdSwitch) {
+    auto layers = m_DisplayList->root()->getLayersUnderPoint(x, y);
+    for(auto layer : layers) {
+      if(layer->name() != "HighLightLayer") {
+        AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), layer);
+        serializingLayerAttribute(layer);
+        break;
+      }
+    }
+  }
+}
+
+LayerInspector::LayerInspector() {
   m_HoverdLayer = nullptr;
 }
 
-  void LayerInspector::serializingDisplayLists(const std::vector<tgfx::DisplayList>& displayLists) {
-    m_LayerMap.clear();
+void LayerInspector::setDisplayList(tgfx::DisplayList* displayList) {
+  m_DisplayList = displayList;
+}
 
-    flatbuffers::FlatBufferBuilder builder(1024);
-    auto displayListsName =  builder.CreateString("DisplayLists");
-    std::vector<flatbuffers::Offset<fbs::TreeNode>> displayVector = {};
-    for(auto displaylist : displayLists) {
-      auto serializtor =  tgfx::LayerSerialization::GetSerialization(displaylist._root);
-      auto displaydata =  serializtor->SerializationLayerTreeNode(builder, m_LayerMap);
-      displayVector.push_back(displaydata);
-    }
-    auto displayListsData =  fbs::CreateTreeNode(builder, displayListsName, 0,
-      builder.CreateVector(displayVector));
-    auto finalData = fbs::CreateFinalData(builder, fbs::Type::Type_TreeData,
-      fbs::Data::Data_TreeNode, displayListsData.Union());
-    builder.Finish(finalData);
-    std::vector<uint8_t> blob(builder.GetBufferPointer(),
-      builder.GetBufferPointer() + builder.GetSize());
-
-    LAYER_DATA(blob);
+void LayerInspector::setDirty(Layer* root, std::shared_ptr<Layer> child) {
+  if(root == m_DisplayList->root() && child->name() != "HighLightLayer") {
+    m_IsDirty = true;
   }
+}
+
+void LayerInspector::serializingDisplayList() {
+    if(m_IsDirty) {
+      m_LayerMap.clear();
+      flatbuffers::FlatBufferBuilder builder(1024);
+      auto serializtor =  tgfx::LayerSerialization::GetSerialization(m_DisplayList->_root);
+      auto displaydata =  serializtor->SerializationLayerTreeNode(builder, m_LayerMap);
+      auto finalData = fbs::CreateFinalData(builder, fbs::Type::Type_TreeData,
+        fbs::Data::Data_TreeNode, displaydata);
+      builder.Finish(finalData);
+      std::vector<uint8_t> blob(builder.GetBufferPointer(),
+        builder.GetBufferPointer() + builder.GetSize());
+
+      LAYER_DATA(blob);
+
+      m_IsDirty = false;
+    }
+}
 
   void LayerInspector::serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer) {
     if(!layer) return;
+    auto start = std::chrono::high_resolution_clock::now();
     auto blob1 = LayerSerialization::serializingLayerAttribute(layer);
-    // websocket send
+    auto finshSer = std::chrono::high_resolution_clock::now();
+    printf("ser Layer attribute time: %lld mics", std::chrono::duration_cast<std::chrono::microseconds>(finshSer - start).count());
     LAYER_DATA(blob1);
   }
 
@@ -83,15 +110,20 @@ LayerInspector::LayerInspector() {
       }
       case EnalbeLayerInspect: {
         printf("Enable Layer inspect! \n");
+        m_HoverdSwitch = feedbackData->address;
+        if(!m_HoverdSwitch && m_HoverdLayer) {
+          m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
+          m_HoverdLayer = nullptr;
+        }
         break;
       }
       case HoverLayerAddress: {
-        printf("Hover Layer Address: \n");
-        printf("Address: %llu \n", feedbackData->address);
-        m_HoveredAddress = feedbackData->address;
-        AddHighLightOverlay(tgfx::Color::FromRGBA(255, 0, 0), m_LayerMap[m_HoveredAddress]);
-        if(m_update)
-          m_update();
+        if(m_HoverdSwitch) {
+          printf("Hover Layer Address: \n");
+          printf("Address: %llu \n", feedbackData->address);
+          m_HoveredAddress = feedbackData->address;
+          AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), m_LayerMap[m_HoveredAddress]);
+        }
         break;
       }
 
@@ -106,16 +138,27 @@ LayerInspector::LayerInspector() {
   }
 
   void LayerInspector::AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer) {
+    if(!hovedLayer) {
+      return;
+    }
+
+    if(hovedLayer == m_HoverdLayer) {
+      return;
+    }
+
     if(m_HoverdLayer) {
       m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
     }
+
     m_HoverdLayer = hovedLayer;
     auto highlightLayer = tgfx::ShapeLayer::Make();
-    highlightLayer->setBlendMode(tgfx::BlendMode::Lighten);
+    highlightLayer->setName("HighLightLayer");
+    highlightLayer->setBlendMode(tgfx::BlendMode::SrcOver);
     auto rectPath = tgfx::Path();
     rectPath.addRect(m_HoverdLayer->getBounds());
     highlightLayer->setFillStyle(tgfx::SolidColor::Make(color));
     highlightLayer->setPath(rectPath);
+    highlightLayer->setAlpha(0.66f);
     m_HoverdLayer->addChild(highlightLayer);
     m_HighLightLayerIndex = m_HoverdLayer->getChildIndex(highlightLayer);
   }

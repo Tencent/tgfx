@@ -134,7 +134,7 @@ void MainView::openWebsocketServer() {
 void MainView::openLayerProfilerWebsocketServer() {
   toolView->setParent(nullptr);
   m_LayerProfilerView = new LayerProfilerView(this);
-  if(!m_LayerProfilerView->hasConnection()) {
+  if(!m_LayerProfilerView->hasWebSocketConnection()) {
     discardConnect();
     return;
   }

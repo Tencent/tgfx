@@ -50,10 +50,10 @@ if (${QT_VERSION_MAJOR} LESS 6)
     SET(CMAKE_OSX_ARCHITECTURES x86_64)
 endif ()
 
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick WebSockets)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick WebSockets Network)
 list(APPEND TGFX_PROFILER_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
-        Qt${QT_VERSION_MAJOR}::WebSockets)
+        Qt${QT_VERSION_MAJOR}::WebSockets Qt${QT_VERSION_MAJOR}::Network)
 if (${QT_VERSION} VERSION_LESS "5.15")
     function(qt_add_resources outfiles)
         qt5_add_resources("${outfiles}" ${ARGN})
@@ -97,7 +97,7 @@ elseif (WIN32)
 endif ()
 
 list(APPEND TGFX_PROFILER_SRC src)
-file(GLOB TGFX_PROFILER_FILES src/*.* src/websocket/*.* src/generate/*.* src/layerInspector/*.*)
+file(GLOB TGFX_PROFILER_FILES src/*.* src/socket/*.* src/generate/*.* src/layerInspector/*.*)
 
 find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES)
 list(APPEND TGFX_PROFILER_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})

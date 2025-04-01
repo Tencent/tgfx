@@ -69,7 +69,6 @@ class ToolView : public QWidget {
   QPushButton* connectButton;
   QPushButton* openFileButton;
   QPushButton* openWebsocketButton;
-  //QPushButton* openLayerProfiler;
 
   QListWidget* clientWidget;
 

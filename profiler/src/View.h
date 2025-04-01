@@ -30,7 +30,7 @@
 #include "TracyWorker.hpp"
 #include "UserData.h"
 #include "ViewData.h"
-#include "websocket/WebSocketServer.h"
+#include "socket/WebSocketServer.h"
 #include "layerInspector/LayerProfilerView.h"
 
 class SaveFileDialog : public QDialog {
