@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "core/DataSource.h"
 #include "tgfx/core/Data.h"
 
