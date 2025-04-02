@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/Context.h"
 #include "core/utils/Log.h"
+#include "core/utils/MaxValueTracker.h"
 #include "core/utils/PlacementBuffer.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
@@ -27,8 +28,6 @@
 #include "tgfx/core/Clock.h"
 
 namespace tgfx {
-static constexpr size_t DRAWING_BUFFER_TRACKED_FRAMES = 10;
-
 Context::Context(Device* device) : _device(device) {
   _drawingBuffer = new PlacementBuffer(1 << 14);  // 16kb
   _programCache = new ProgramCache(this);
@@ -36,6 +35,7 @@ Context::Context(Device* device) : _device(device) {
   _drawingManager = new DrawingManager(this);
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
+  _maxValueTracker = new MaxValueTracker(10);
 }
 
 Context::~Context() {
@@ -50,6 +50,7 @@ Context::~Context() {
   delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
+  delete _maxValueTracker;
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
@@ -73,7 +74,8 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
     // Clean up all unreferenced resources after flushing to reduce memory usage.
     _proxyProvider->purgeExpiredProxies();
     _resourceCache->purgeToCacheLimit(timePoint);
-    clearDrawingBuffer();
+    _maxValueTracker->addValue(_drawingBuffer->size());
+    _drawingBuffer->clear(_maxValueTracker->getMaxValue());
   }
   return semaphoreInserted;
 }
@@ -125,19 +127,4 @@ void Context::releaseAll(bool releaseGPU) {
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
 }
-
-void Context::clearDrawingBuffer() {
-  drawingBufferSizes.push_back(_drawingBuffer->size());
-  if (drawingBufferSizes.size() > DRAWING_BUFFER_TRACKED_FRAMES) {
-    drawingBufferSizes.pop_front();
-  }
-  size_t maxReuseSize = 0;
-  for (auto size : drawingBufferSizes) {
-    if (size > maxReuseSize) {
-      maxReuseSize = size;
-    }
-  }
-  _drawingBuffer->clear(maxReuseSize);
-}
-
 }  // namespace tgfx

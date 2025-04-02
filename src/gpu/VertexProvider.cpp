@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,34 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/DisplayList.h"
-#include "layers/DrawArgs.h"
+#include "VertexProvider.h"
 
 namespace tgfx {
-
-DisplayList::DisplayList() : _root(Layer::Make()) {
-  _root->_root = _root.get();
-}
-
-Layer* DisplayList::root() const {
-  return _root.get();
-}
-
-bool DisplayList::render(Surface* surface, bool replaceAll) {
-  if (!surface ||
-      (replaceAll && surface->uniqueID() == surfaceID &&
-       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirtyDescendents)) {
-    return false;
+AsyncVertexSource::~AsyncVertexSource() {
+  // The vertex source might have objects created in shared memory (like PlacementBuffer), so we
+  // need to wait for the task to finish before destroying it.
+  for (auto& task : tasks) {
+    task->cancelOrWait();
   }
-  auto canvas = surface->getCanvas();
-  if (replaceAll) {
-    canvas->clear();
-  }
-  DrawArgs args(surface->getContext(), true);
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-  surfaceContentVersion = surface->contentVersion();
-  surfaceID = surface->uniqueID();
-  return true;
 }
 
+std::shared_ptr<Data> AsyncVertexSource::getData() const {
+  for (auto& task : tasks) {
+    task->wait();
+  }
+  return data;
+}
 }  // namespace tgfx

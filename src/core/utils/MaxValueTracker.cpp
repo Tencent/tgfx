@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,34 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/DisplayList.h"
-#include "layers/DrawArgs.h"
+#include "MaxValueTracker.h"
 
 namespace tgfx {
 
-DisplayList::DisplayList() : _root(Layer::Make()) {
-  _root->_root = _root.get();
+MaxValueTracker::MaxValueTracker(size_t maxSize) : _maxSize(maxSize) {
 }
 
-Layer* DisplayList::root() const {
-  return _root.get();
+void MaxValueTracker::addValue(size_t value) {
+  _values.push_back(value);
+  if (_values.size() > _maxSize) {
+    _values.pop_front();
+  }
 }
 
-bool DisplayList::render(Surface* surface, bool replaceAll) {
-  if (!surface ||
-      (replaceAll && surface->uniqueID() == surfaceID &&
-       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirtyDescendents)) {
-    return false;
+size_t MaxValueTracker::getMaxValue() const {
+  size_t maxValue = 0;
+  for (size_t value : _values) {
+    if (value > maxValue) {
+      maxValue = value;
+    }
   }
-  auto canvas = surface->getCanvas();
-  if (replaceAll) {
-    canvas->clear();
-  }
-  DrawArgs args(surface->getContext(), true);
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-  surfaceContentVersion = surface->contentVersion();
-  surfaceID = surface->uniqueID();
-  return true;
+  return maxValue;
 }
 
 }  // namespace tgfx

@@ -61,6 +61,6 @@ class RectDrawOp : public DrawOp {
   bool useUVCoord = false;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  std::shared_ptr<Data> vertexData = nullptr;
+  size_t vertexBufferOffset = 0;
 };
 }  // namespace tgfx
