@@ -27,7 +27,6 @@ std::unique_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
   if (asyncDecoding && !generator->asyncSupport()) {
     // The generator may have built-in async decoding support which will not block the main thread.
     // Therefore, we should trigger the decoding ASAP.
-    TRACE_EVENT_NAME("ImageDecode");
     auto buffer = generator->makeBuffer(tryHardware);
     return Wrap(std::move(buffer));
   }

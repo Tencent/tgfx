@@ -18,7 +18,6 @@
 
 #include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
-#include "core/utils/Profiling.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/gpu/Context.h"
 
@@ -39,7 +38,6 @@ Context* Device::lockContext() {
     locker.unlock();
     return nullptr;
   }
-  FRAME_MARK_START;
   return context;
 }
 
@@ -49,7 +47,6 @@ void Device::unlock() {
     onUnlockContext();
   }
   locker.unlock();
-  FRAME_MARK_END;
 }
 
 void Device::releaseAll() {

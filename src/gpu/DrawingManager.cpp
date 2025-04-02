@@ -18,7 +18,6 @@
 
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
-#include "core/utils/Profiling.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
@@ -137,7 +136,6 @@ bool DrawingManager::flush() {
     return false;
   }
   for (auto& task : resourceTasks) {
-    TRACE_EVENT_NAME("CreateResource");
     task.execute(context);
   }
   resourceTasks.clear();

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-#include "core/utils/Profiling.h"
 #include "gpu/RuntimeResource.h"
 
 namespace tgfx {
@@ -52,7 +51,6 @@ bool RuntimeDrawTask::execute(RenderPass* renderPass) {
   UniqueKey uniqueKey(effect->type());
   auto program = Resource::Find<RuntimeResource>(context, uniqueKey);
   if (program == nullptr) {
-    TRACE_EVENT_NAME("CreateProgram");
     program = RuntimeResource::Wrap(uniqueKey, effect->onCreateProgram(context));
     if (program == nullptr) {
       LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
