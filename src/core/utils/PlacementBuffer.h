@@ -18,9 +18,7 @@
 
 #pragma once
 
-#include <cstdint>
-#include <limits>
-#include <vector>
+#include "BlockBuffer.h"
 #include "core/utils/PlacementList.h"
 #include "core/utils/PlacementPtr.h"
 
@@ -32,9 +30,14 @@ namespace tgfx {
  */
 class PlacementBuffer {
  public:
-  explicit PlacementBuffer(size_t initBlockSize = 1024);
+  /**
+   * Constructs a PlacementBuffer with the given initial block size.
+   */
+  PlacementBuffer(size_t initBlockSize = 1024) : blockBuffer(initBlockSize) {
+  }
 
-  ~PlacementBuffer();
+  PlacementBuffer(const PlacementBuffer&) = delete;
+  PlacementBuffer& operator=(const PlacementBuffer&) = delete;
 
   /**
    * Creates an object of the given type in the PlacementBuffer. Returns a PlacementPtr to wrap the
@@ -42,7 +45,7 @@ class PlacementBuffer {
    */
   template <typename T, typename... Args>
   PlacementPtr<T> make(Args&&... args) {
-    void* memory = allocate(sizeof(T));
+    void* memory = blockBuffer.allocate(sizeof(T));
     if (!memory) {
       return nullptr;
     }
@@ -56,7 +59,7 @@ class PlacementBuffer {
   template <typename T, typename... Args>
   PlacementNode<T> makeNode(Args&&... args) {
     using Storage = typename PlacementNode<T>::Storage;
-    void* memory = alignedAllocate(PlacementNode<T>::ALIGNMENT, sizeof(Storage));
+    void* memory = blockBuffer.allocate(sizeof(Storage), PlacementNode<T>::ALIGNMENT);
     if (!memory) {
       return nullptr;
     }
@@ -67,49 +70,22 @@ class PlacementBuffer {
   }
 
   /**
-   * Allocates memory for an object of the given size. Returns nullptr if the allocation fails.
-   */
-  void* allocate(size_t size);
-
-  /**
-   * Allocates memory for an object of the given size with the given alignment. Returns nullptr if
-   * the allocation fails.
-   */
-  void* alignedAllocate(size_t alignment, size_t size);
-
-  /**
    * Returns the total size of all created objects in bytes.
    */
   size_t size() const {
-    return usedSize;
+    return blockBuffer.size();
   }
 
   /**
-   * Resets the size to zero and clears all allocated blocks, but keeps the last block for reuse if
-   * it is not larger than maxReuseSize.
+   * Resets the size to zero to reuse the memory blocks. If maxReuseSize is specified, blocks at the
+   * end of the list that exceed this size will be freed.
    */
-  void clear(size_t maxReuseSize = std::numeric_limits<size_t>::max());
+  void clear(size_t maxReuseSize = std::numeric_limits<size_t>::max()) {
+    blockBuffer.clear(maxReuseSize);
+  }
 
  private:
-  size_t initBlockSize = 0;
-  size_t currentBlockIndex = 0;
-  size_t usedSize = 0;
-
-  struct Block {
-    Block() = default;
-
-    Block(uint8_t* data, size_t size) : data(data), size(size) {
-    }
-
-    uint8_t* data = nullptr;
-    size_t size = 0;
-    size_t offset = 0;
-  };
-
-  std::vector<Block> blocks = {};
-
-  Block* findOrAllocateBlock(size_t requestedSize);
-  bool allocateNewBlock(size_t requestSize);
+  BlockBuffer blockBuffer = {};
 };
 
 }  // namespace tgfx

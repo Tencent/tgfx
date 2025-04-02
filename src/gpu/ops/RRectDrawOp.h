@@ -54,6 +54,6 @@ class RRectDrawOp : public DrawOp {
   size_t rectCount = 0;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  std::shared_ptr<Data> vertexData = nullptr;
+  size_t vertexBufferOffset = 0;
 };
 }  // namespace tgfx

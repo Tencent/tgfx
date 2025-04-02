@@ -18,8 +18,10 @@
 
 #pragma once
 
-#include "core/ImageSource.h"
+#include "core/utils/BlockBuffer.h"
+#include "core/utils/MaxValueTracker.h"
 #include "gpu/AAType.h"
+#include "gpu/VertexProvider.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -63,6 +65,14 @@ class ProxyProvider {
                                                        std::unique_ptr<DataSource<Data>> source,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
+
+  /**
+   * Creates a shared vertex buffer from the given VertexProvider. The source will be released after
+   * being uploaded to the GPU. Returns the shared buffer and the byte offset within the shared
+   * buffer where the vertices are stored.
+   */
+  std::pair<std::shared_ptr<GpuBufferProxy>, size_t> createSharedVertexBuffer(
+      std::unique_ptr<VertexProvider> provider, uint32_t renderFlags = 0);
 
   /**
    * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to
@@ -137,14 +147,31 @@ class ProxyProvider {
    */
   void purgeExpiredProxies();
 
+  /**
+   * Flushes the pending shared vertex buffer to upload the vertices to the GPU.
+   */
+  void flushSharedVertexBuffer();
+
+  /**
+   * Clears the block buffer used for shared vertex buffer.
+   */
+  void clearSharedVertexBuffer();
+
  private:
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
+  bool sharedVertexBufferFlushed = false;
+  std::shared_ptr<GpuBufferProxy> sharedVertexBuffer = nullptr;
+  std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
+  BlockBuffer blockBuffer = {};
+  MaxValueTracker maxValueTracker = {10};
 
   static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
   std::shared_ptr<GpuBufferProxy> findOrWrapGpuBufferProxy(const UniqueKey& uniqueKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
+
+  void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
 };
 }  // namespace tgfx

@@ -20,10 +20,10 @@
 #include "core/DataSource.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/GpuBuffer.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
+#include "gpu/VertexProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
-#include "tgfx/core/Buffer.h"
-#include "tgfx/core/Data.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -66,19 +66,21 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
   bytes[3] = static_cast<uint8_t>(color.alpha * 255);
 }
 
-class RRectVerticesProvider : public DataSource<Data> {
+class RRectVertexProvider : public VertexProvider {
  public:
-  RRectVerticesProvider(PlacementList<RRectPaint> rRectPaints, AAType aaType, bool useScale)
+  RRectVertexProvider(PlacementList<RRectPaint> rRectPaints, AAType aaType, bool useScale)
       : rRectPaints(std::move(rRectPaints)), aaType(aaType), useScale(useScale) {
   }
 
-  std::shared_ptr<Data> getData() const override {
+  size_t vertexCount() const override {
     auto floatCount = rRectPaints.size() * 4 * 36;
     if (useScale) {
       floatCount += rRectPaints.size() * 4 * 4;
     }
-    Buffer buffer(floatCount * sizeof(float));
-    auto vertices = reinterpret_cast<float*>(buffer.data());
+    return floatCount;
+  }
+
+  void getVertices(float* vertices) const override {
     auto index = 0;
     for (auto& rRectPaint : rRectPaints) {
       auto viewMatrix = rRectPaint.viewMatrix;
@@ -179,7 +181,6 @@ class RRectVerticesProvider : public DataSource<Data> {
         vertices[index++] = reciprocalRadii[3];
       }
     }
-    return buffer.release();
   }
 
  private:
@@ -201,14 +202,15 @@ PlacementNode<RRectDrawOp> RRectDrawOp::Make(Context* context, PlacementList<RRe
   auto drawOp = context->drawingBuffer()->makeNode<RRectDrawOp>(aaType, rectSize);
   drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer();
   auto useScale = UseScale(context);
-  auto vertexProvider = std::make_unique<RRectVerticesProvider>(std::move(rects), aaType, useScale);
-  if (rectSize > 1) {
-    drawOp->vertexBufferProxy = GpuBufferProxy::MakeFrom(context, std::move(vertexProvider),
-                                                         BufferType::Vertex, renderFlags);
-  } else {
+  auto vertexProvider = std::make_unique<RRectVertexProvider>(std::move(rects), aaType, useScale);
+  if (rectSize <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
-    drawOp->vertexData = vertexProvider->getData();
+    renderFlags |= RenderFlags::DisableAsyncTask;
   }
+  auto sharedVertexBuffer =
+      context->proxyProvider()->createSharedVertexBuffer(std::move(vertexProvider), renderFlags);
+  drawOp->vertexBufferProxy = sharedVertexBuffer.first;
+  drawOp->vertexBufferOffset = sharedVertexBuffer.second;
   return drawOp;
 }
 
@@ -223,13 +225,9 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   if (indexBuffer == nullptr) {
     return;
   }
-  std::shared_ptr<GpuBuffer> vertexBuffer = nullptr;
-  if (vertexBufferProxy) {
-    vertexBuffer = vertexBufferProxy->getBuffer();
-    if (vertexBuffer == nullptr) {
-      return;
-    }
-  } else if (vertexData == nullptr) {
+  std::shared_ptr<GpuBuffer> vertexBuffer =
+      vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
+  if (vertexBuffer == nullptr) {
     return;
   }
   auto renderTarget = renderPass->renderTarget();
@@ -239,11 +237,7 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
                                      false, UseScale(renderPass->getContext()));
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  if (vertexBuffer) {
-    renderPass->bindBuffers(indexBuffer, vertexBuffer);
-  } else {
-    renderPass->bindBuffers(indexBuffer, vertexData);
-  }
+  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
   auto numIndicesPerRRect = ResourceProvider::NumIndicesPerRRect();
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }

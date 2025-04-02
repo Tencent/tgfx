@@ -143,7 +143,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
 }
 
 bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                 std::shared_ptr<GpuBuffer> vertexBuffer,
+                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
                                  std::shared_ptr<Data> vertexData) {
   auto gl = GLFunctions::Get(context);
   if (vertexBuffer) {
@@ -158,9 +158,10 @@ bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   auto* program = static_cast<GLProgram*>(_program);
   for (const auto& attribute : program->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
+    auto offset = vertexOffset + attribute.offset;
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
                             layout.normalized, program->vertexStride(),
-                            reinterpret_cast<void*>(attribute.offset));
+                            reinterpret_cast<void*>(offset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   if (indexBuffer) {
