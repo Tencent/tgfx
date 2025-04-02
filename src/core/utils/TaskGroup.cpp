@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
-#include "Profiling.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -53,7 +52,6 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACE_THREAD;
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {

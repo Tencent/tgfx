@@ -20,10 +20,6 @@ option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
 option(TGFX_USE_FASTER_BLUR "Use faster blur algorithm instead of gaussian blur" ON)
 
 
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    option(TGFX_ENABLE_PROFILING "Enable Profiling" ON)
-endif ()
-
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
     option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)
 else ()
@@ -84,7 +80,6 @@ message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
-message("TGFX_ENABLE_PROFILING: ${TGFX_ENABLE_PROFILING}")
 message("EMSCRIPTEN_PTHREADS: ${EMSCRIPTEN_PTHREADS}")
 message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
 
@@ -295,11 +290,6 @@ else ()
     set(TGFX_USE_NATIVE_GL ON)
 endif ()
 
-if (TGFX_ENABLE_PROFILING)
-    list(APPEND TGFX_STATIC_VENDORS tracy)
-    list(APPEND TGFX_INCLUDES third_party/tracy)
-    list(APPEND TGFX_DEFINES TGFX_ENABLE_PROFILING)
-endif ()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)
