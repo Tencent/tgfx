@@ -225,26 +225,26 @@ class ShapeLayer : public Layer {
    */
   void setLineDashPhase(float phase);
 
- /**
-  * Returns whether the dash is adaptive to fit the length of the path.
-  * When adaptive is true:
-  * - Automatically scales dash intervals to fit path length
-  * - Maintains pattern integrity by rounding to whole pattern repetitions
-  * - Pattern count calculation:
-  *   - Total pattern length = sum of all intervals
-  *   - Number of full patterns = round(pathLength / totalPatternLength)
-  *   - Scale factor = pathLength / (numberOfPatterns * totalPatternLength)
-  *
-  * When adaptive is false:
-  * - Uses exact interval lengths without scaling
-  * - May truncate last pattern if path length isn't multiple of pattern length
-  * - Pattern count calculation:
-  *   - Number of full patterns = floor(pathLength / totalPatternLength)
-  *   - Remainder length = pathLength % totalPatternLength
-  * - Example (intervals [10,5], path length 22):
-  *   - adaptive=true: scales to [14.667,7.333] to fit 1 full pattern (22 total)
-  *   - adaptive=false: draws [10,5,10] (2 full patterns) then partial [2] at end
-  */
+  /**
+   * Returns whether the dash is adaptive to fit the length of the path.
+   * When adaptive is true:
+   * - Automatically scales dash intervals to fit path length
+   * - Maintains pattern integrity by rounding to whole pattern repetitions
+   * - Pattern count calculation:
+   *   - Total pattern length = sum of all intervals
+   *   - Number of full patterns = round(pathLength / totalPatternLength)
+   *   - Scale factor = pathLength / (numberOfPatterns * totalPatternLength)
+   *
+   * When adaptive is false:
+   * - Uses exact interval lengths without scaling
+   * - May truncate last pattern if path length isn't multiple of pattern length
+   * - Pattern count calculation:
+   *   - Number of full patterns = floor(pathLength / totalPatternLength)
+   *   - Remainder length = pathLength % totalPatternLength
+   * - Example (intervals [10,5], path length 22):
+   *   - adaptive=true: scales to [14.667,7.333] to fit 1 full pattern (22 total)
+   *   - adaptive=false: draws [10,5,10] (2 full patterns) then partial [2] at end
+   */
   bool lineDashAdaptive() const {
     return shapeBitFields.lineDashAdaptive;
   }
