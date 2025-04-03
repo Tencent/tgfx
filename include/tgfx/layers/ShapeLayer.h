@@ -226,7 +226,8 @@ class ShapeLayer : public Layer {
   void setLineDashPhase(float phase);
 
   /**
-   * Indicates whether the dash segments are the same length. The default value is false.
+   * Indicates whether to scale the dash intervals so that the dash segments have the same length.
+   * The default value is false.
    */
   bool lineDashAdaptive() const {
     return shapeBitFields.lineDashAdaptive;

@@ -34,7 +34,8 @@ class PathEffect {
    * intervals.
    * @param count number of elements in the interval array
    * @param phase offset into the interval array (mod the sum of all intervals).
-   * @param adaptive decides whether the dash segments are the same length.
+   * @param adaptive decides whether to scale the dash intervals so that the dash segments have
+   * the same length.
    */
   static std::shared_ptr<PathEffect> MakeDash(const float intervals[], int count, float phase,
                                               bool adaptive = false);
