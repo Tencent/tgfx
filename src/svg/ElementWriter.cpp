@@ -571,7 +571,9 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
     {
       ElementWriter useTag("use", writer);
       useTag.addAttribute("xlink:href", "#" + imageID);
-      useTag.addAttribute("transform", ToSVGTransform(matrix));
+      if (!matrix.isIdentity()) {
+        useTag.addAttribute("transform", ToSVGTransform(matrix));
+      }
     }
   }
   {
