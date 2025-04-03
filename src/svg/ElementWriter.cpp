@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include "SVGExportContext.h"
@@ -31,8 +32,10 @@
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/GradientType.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
@@ -388,12 +391,25 @@ Resources ElementWriter::addResources(const Fill& fill, Context* context,
 
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                                        Resources* resources) {
-  if (const auto* colorShader = Caster::AsColorShader(shader.get())) {
+  auto shaderDecomposer =
+      [](const std::shared_ptr<Shader>& decomposedShader) -> std::pair<const Shader*, Matrix> {
+    auto matrix = Matrix::I();
+    const Shader* tempShader = decomposedShader.get();
+
+    while (const auto* matrixShader = Caster::AsMatrixShader(tempShader)) {
+      matrix = matrix * matrixShader->matrix;
+      tempShader = matrixShader->source.get();
+    };
+    return {tempShader, matrix};
+  };
+  auto [decomposedShader, matrix] = shaderDecomposer(shader);
+
+  if (const auto* colorShader = Caster::AsColorShader(decomposedShader)) {
     addColorShaderResources(colorShader, resources);
-  } else if (const auto* gradientShader = Caster::AsGradientShader(shader.get())) {
-    addGradientShaderResources(gradientShader, resources);
-  } else if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
-    addImageShaderResources(imageShader, context, resources);
+  } else if (const auto* gradientShader = Caster::AsGradientShader(decomposedShader)) {
+    addGradientShaderResources(gradientShader, matrix, resources);
+  } else if (const auto* imageShader = Caster::AsImageShader(decomposedShader)) {
+    addImageShaderResources(imageShader, matrix, context, resources);
   } else {
     // TODO(YGaurora):
     // Export color filter shaders as color filters.
@@ -411,17 +427,18 @@ void ElementWriter::addColorShaderResources(const ColorShader* shader, Resources
   }
 }
 
-void ElementWriter::addGradientShaderResources(const GradientShader* shader, Resources* resources) {
+void ElementWriter::addGradientShaderResources(const GradientShader* shader, const Matrix& matrix,
+                                               Resources* resources) {
   GradientInfo info;
   GradientType type = shader->asGradient(&info);
 
   DEBUG_ASSERT(info.colors.size() == info.positions.size());
   if (type == GradientType::Linear) {
-    resources->paintColor = "url(#" + addLinearGradientDef(info) + ")";
+    resources->paintColor = "url(#" + addLinearGradientDef(info, matrix) + ")";
   } else if (type == GradientType::Radial) {
-    resources->paintColor = "url(#" + addRadialGradientDef(info) + ")";
+    resources->paintColor = "url(#" + addRadialGradientDef(info, matrix) + ")";
   } else {
-    resources->paintColor = "url(#" + addUnsupportedGradientDef(info) + ")";
+    resources->paintColor = "url(#" + addUnsupportedGradientDef(info, matrix) + ")";
     reportUnsupportedElement("Unsupported gradient type");
   }
 }
@@ -442,7 +459,7 @@ void ElementWriter::addGradientColors(const GradientInfo& info) {
   }
 }
 
-std::string ElementWriter::addLinearGradientDef(const GradientInfo& info) {
+std::string ElementWriter::addLinearGradientDef(const GradientInfo& info, const Matrix& matrix) {
   DEBUG_ASSERT(resourceStore);
   auto id = resourceStore->addGradient();
 
@@ -450,6 +467,9 @@ std::string ElementWriter::addLinearGradientDef(const GradientInfo& info) {
     ElementWriter gradient("linearGradient", writer);
 
     gradient.addAttribute("id", id);
+    if (!matrix.isIdentity()) {
+      gradient.addAttribute("gradientTransform", ToSVGTransform(matrix));
+    }
     gradient.addAttribute("gradientUnits", "userSpaceOnUse");
     gradient.addAttribute("x1", info.points[0].x);
     gradient.addAttribute("y1", info.points[0].y);
@@ -460,7 +480,7 @@ std::string ElementWriter::addLinearGradientDef(const GradientInfo& info) {
   return id;
 }
 
-std::string ElementWriter::addRadialGradientDef(const GradientInfo& info) {
+std::string ElementWriter::addRadialGradientDef(const GradientInfo& info, const Matrix& matrix) {
   DEBUG_ASSERT(resourceStore);
   auto id = resourceStore->addGradient();
 
@@ -468,6 +488,9 @@ std::string ElementWriter::addRadialGradientDef(const GradientInfo& info) {
     ElementWriter gradient("radialGradient", writer);
 
     gradient.addAttribute("id", id);
+    if (!matrix.isIdentity()) {
+      gradient.addAttribute("gradientTransform", ToSVGTransform(matrix));
+    }
     gradient.addAttribute("gradientUnits", "userSpaceOnUse");
     gradient.addAttribute("r", info.radiuses[0]);
     gradient.addAttribute("cx", info.points[0].x);
@@ -477,7 +500,8 @@ std::string ElementWriter::addRadialGradientDef(const GradientInfo& info) {
   return id;
 }
 
-std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info) {
+std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info,
+                                                     const Matrix& matrix) {
   DEBUG_ASSERT(resourceStore);
   auto id = resourceStore->addGradient();
 
@@ -485,6 +509,9 @@ std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info) {
     ElementWriter gradient("linearGradient", writer);
 
     gradient.addAttribute("id", id);
+    if (!matrix.isIdentity()) {
+      gradient.addAttribute("gradientTransform", ToSVGTransform(matrix));
+    }
     gradient.addAttribute("gradientUnits", "objectBoundingBox");
     gradient.addAttribute("x1", 0);
     gradient.addAttribute("y1", 0);
@@ -495,8 +522,8 @@ std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info) {
   return id;
 };
 
-void ElementWriter::addImageShaderResources(const ImageShader* shader, Context* context,
-                                            Resources* resources) {
+void ElementWriter::addImageShaderResources(const ImageShader* shader, const Matrix& matrix,
+                                            Context* context, Resources* resources) {
   auto image = shader->image;
   DEBUG_ASSERT(image);
 
@@ -530,6 +557,7 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, Context* 
   std::string heightValue = transDimension(shader->tileModeY, imageHeight);
 
   std::string patternID = resourceStore->addPattern();
+  std::string imageID = resourceStore->addImage();
   {
     ElementWriter pattern("pattern", writer);
     pattern.addAttribute("id", patternID);
@@ -541,15 +569,19 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, Context* 
     pattern.addAttribute("y", 0);
 
     {
-      std::string imageID = resourceStore->addImage();
-      ElementWriter imageTag("image", writer);
-      imageTag.addAttribute("id", imageID);
-      imageTag.addAttribute("x", 0);
-      imageTag.addAttribute("y", 0);
-      imageTag.addAttribute("width", image->width());
-      imageTag.addAttribute("height", image->height());
-      imageTag.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
+      ElementWriter useTag("use", writer);
+      useTag.addAttribute("xlink:href", "#" + imageID);
+      useTag.addAttribute("transform", ToSVGTransform(matrix));
     }
+  }
+  {
+    ElementWriter imageTag("image", writer);
+    imageTag.addAttribute("id", imageID);
+    imageTag.addAttribute("x", 0);
+    imageTag.addAttribute("y", 0);
+    imageTag.addAttribute("width", image->width());
+    imageTag.addAttribute("height", image->height());
+    imageTag.addAttribute("xlink:href", static_cast<const char*>(dataUri->data()));
   }
   resources->paintColor = "url(#" + patternID + ")";
 }
@@ -736,7 +768,7 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
 void ElementWriter::addRenderImageMaskResources(const ImageShader* imageShader,
                                                 const std::string& filterID, Context* context) {
   Resources resources;
-  addImageShaderResources(imageShader, context, &resources);
+  addImageShaderResources(imageShader, Matrix::I(), context, &resources);
 
   writer->startElement("rect");
   addAttribute("fill", resources.paintColor);
