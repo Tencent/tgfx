@@ -1,5 +1,6 @@
 {
     "CanvasTest": {
+        "AdaptiveDashEffect": "330279d",
         "Clip": "d010fb8",
         "ClipAll": "d0e35c3",
         "DiscardContent": "4c590832",
@@ -101,6 +102,7 @@
         "update_mask": "d010fb8"
     },
     "LayerTest": {
+        "AdaptiveDashEffect": "330279d",
         "ChildMask": "d868e738",
         "DropShadowStyle": "19dcc4d",
         "DropShadowStyle-stroke": "3244cc7",

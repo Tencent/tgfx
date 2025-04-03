@@ -150,6 +150,7 @@ void PkPathPointMeasure::build() {
     auto fisrtPt = SkPoint::Make(0, 0);
     do {
       if (hasMoveTo && verb == SkPath::kMove_Verb) {
+        // another contour
         break;
       }
       Segment segment = {};
@@ -191,9 +192,10 @@ void PkPathPointMeasure::build() {
           hasMoveTo = true;
           break;
 
-        case SkPath::kClose_Verb: {
+        case SkPath::kClose_Verb:
           isClosed = true;
-        } break;
+          break;
+
         default:
           continue;
       }

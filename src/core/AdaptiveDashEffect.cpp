@@ -79,7 +79,7 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
       auto ratio = length / intervalLength;
       ratio = std::max(std::roundf(ratio), 1.0f);
 
-      dashCount += ratio * (count >> 1);
+      dashCount += ratio * static_cast<float>(count >> 1);
       if (dashCount > kMaxDashCount) {
         return false;
       }
