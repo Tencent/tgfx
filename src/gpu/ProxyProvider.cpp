@@ -34,7 +34,7 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-ProxyProvider::ProxyProvider(Context* context) : context(context) {
+ProxyProvider::ProxyProvider(Context* context) : context(context), blockBuffer(1 << 14) {  // 16KB
 }
 
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const UniqueKey& uniqueKey,
@@ -69,6 +69,68 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(proxyKey, bufferType));
   addResourceProxy(proxy, uniqueKey);
   return proxy;
+}
+
+std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVertexBuffer(
+    std::unique_ptr<VertexProvider> provider, uint32_t renderFlags) {
+  if (provider == nullptr) {
+    return {nullptr, 0};
+  }
+  DEBUG_ASSERT(!sharedVertexBufferFlushed);
+  auto byteSize = provider->vertexCount() * sizeof(float);
+  auto lastBlock = blockBuffer.currentBlock();
+  auto vertices = reinterpret_cast<float*>(blockBuffer.allocate(byteSize));
+  if (vertices == nullptr) {
+    LOGE("ProxyProvider::createSharedVertexBuffer() Failed to allocate memory!");
+    return {nullptr, 0};
+  }
+  auto offset = lastBlock.second;
+  auto currentBlock = blockBuffer.currentBlock();
+  if (lastBlock.first != nullptr && lastBlock.first != currentBlock.first) {
+    DEBUG_ASSERT(sharedVertexBuffer != nullptr);
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedVertexBuffer(std::move(data));
+    offset = 0;
+  }
+  if (renderFlags & RenderFlags::DisableAsyncTask) {
+    provider->getVertices(vertices);
+  } else {
+    auto task = std::make_shared<VertexProviderTask>(std::move(provider), vertices);
+    Task::Run(task);
+    sharedVertexBufferTasks.push_back(std::move(task));
+  }
+  if (sharedVertexBuffer == nullptr) {
+    auto uniqueKey = UniqueKey::Make();
+    sharedVertexBuffer =
+        std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(uniqueKey, BufferType::Vertex));
+    addResourceProxy(sharedVertexBuffer, uniqueKey);
+  }
+  return {sharedVertexBuffer, offset};
+}
+
+void ProxyProvider::flushSharedVertexBuffer() {
+  if (sharedVertexBuffer != nullptr) {
+    auto lastBlock = blockBuffer.currentBlock();
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedVertexBuffer(std::move(data));
+  }
+  sharedVertexBufferFlushed = true;
+}
+
+void ProxyProvider::clearSharedVertexBuffer() {
+  maxValueTracker.addValue(blockBuffer.size());
+  blockBuffer.clear(maxValueTracker.getMaxValue());
+  sharedVertexBufferFlushed = false;
+}
+
+void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
+  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
+  auto dataSource =
+      std::make_unique<AsyncVertexSource>(std::move(data), std::move(sharedVertexBufferTasks));
+  auto task = context->drawingBuffer()->makeNode<GpuBufferUploadTask>(
+      sharedVertexBuffer->getUniqueKey(), BufferType::Vertex, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  sharedVertexBuffer = nullptr;
 }
 
 static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& clipBounds) {

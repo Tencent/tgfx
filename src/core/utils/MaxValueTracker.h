@@ -17,44 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <stdint.h>
-#include <vector>
 
-class Tokenizer {
+#include <deque>
+
+namespace tgfx {
+/**
+ * A tracker that keeps track of the maximum value of the last N values added.
+ */
+class MaxValueTracker {
  public:
-  enum class TokenColor : uint8_t {
-    Default,
-    Comment,
-    Prprocessor,
-    String,
-    CharacterLiteral,
-    Keyword,
-    Number,
-    Punctuation,
-    Type,
-    Special,
-  };
+  MaxValueTracker(size_t maxSize);
 
-  struct Token {
-    const char* begin;
-    const char* end;
-    TokenColor color;
-  };
+  void addValue(size_t value);
 
-  struct Line {
-    const char* begin;
-    const char* end;
-    std::vector<Token> tokens;
-  };
-
-  Tokenizer();
-  ~Tokenizer();
-
-  std::vector<Token> tokenize(const char* begin, const char* end);
+  size_t getMaxValue() const;
 
  private:
-  TokenColor identifyToken(const char*& begin, const char* end);
-
-  bool isInComment;
-  bool isInPreprocessor;
+  size_t _maxSize;
+  std::deque<size_t> _values;
 };
+
+}  // namespace tgfx

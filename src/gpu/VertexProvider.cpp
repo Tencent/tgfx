@@ -16,15 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <QApplication>
-#include "ProfilerWindow.h"
+#include "VertexProvider.h"
 
-class ProfilerApplication : public QApplication {
- public:
-  const QString ProfilerVersion = "1.0.0";
+namespace tgfx {
+AsyncVertexSource::~AsyncVertexSource() {
+  // The vertex source might have objects created in shared memory (like PlacementBuffer), so we
+  // need to wait for the task to finish before destroying it.
+  for (auto& task : tasks) {
+    task->cancelOrWait();
+  }
+}
 
-  ProfilerApplication(int& argc, char** argv);
-
-  bool event(QEvent* event);
-};
+std::shared_ptr<Data> AsyncVertexSource::getData() const {
+  for (auto& task : tasks) {
+    task->wait();
+  }
+  return data;
+}
+}  // namespace tgfx

@@ -16,46 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "MaxValueTracker.h"
 
-#include <QGraphicsView>
-#include <QMainWindow>
-#include <QVBoxLayout>
-#include <QWidget>
-#include <thread>
-#include "TracyWorker.hpp"
-#include "Utility.h"
-#include "View.h"
+namespace tgfx {
 
-class View;
-class MainView : public QWidget {
-  Q_OBJECT
- public:
-  static std::thread loadThread;
+MaxValueTracker::MaxValueTracker(size_t maxSize) : _maxSize(maxSize) {
+}
 
-  MainView(QWidget* parent = nullptr);
-  ~MainView();
+void MaxValueTracker::addValue(size_t value) {
+  _values.push_back(value);
+  if (_values.size() > _maxSize) {
+    _values.pop_front();
+  }
+}
 
-  void connectClient(const char* address, uint16_t port);
-  void openFile();
-  void openToolView();
-  void openWebsocketServer();
+size_t MaxValueTracker::getMaxValue() const {
+  size_t maxValue = 0;
+  for (size_t value : _values) {
+    if (value > maxValue) {
+      maxValue = value;
+    }
+  }
+  return maxValue;
+}
 
-  void changeViewModeButton(bool pause);
-  Q_SLOT void changeViewMode(bool pause);
-  Q_SLOT void quitReadFile();
-  Q_SLOT void saveFile();
-  Q_SLOT void discardConnect();
-  Q_SLOT void statView();
-  Q_SIGNAL void statusChange(ProfilerStatus status);
-
- protected:
-  void initToolView();
-  void reopenToolView();
-
- private:
-  QWidget* toolView;
-  QWidget* connectView;
-  View* centorView;
-  QVBoxLayout* layout;
-};
+}  // namespace tgfx

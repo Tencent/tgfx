@@ -36,7 +36,7 @@ class GLRenderPass : public RenderPass {
   bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                    const Rect& scissorRect) override;
   bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                     std::shared_ptr<GpuBuffer> vertexBuffer,
+                     std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
                      std::shared_ptr<Data> vertexData) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
               bool drawIndexed) override;

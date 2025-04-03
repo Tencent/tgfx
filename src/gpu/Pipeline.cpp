@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Pipeline.h"
-#include "core/utils/Profiling.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
@@ -107,7 +106,6 @@ void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
 }
 
 std::unique_ptr<Program> Pipeline::createProgram(Context* context) const {
-  TRACE_EVENT_NAME("CreateProgram");
   return ProgramBuilder::CreateProgram(context, this);
 }
 

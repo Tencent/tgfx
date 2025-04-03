@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "core/utils/Profiling.h"
+#include "ProxyProvider.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
@@ -127,16 +127,20 @@ bool DrawingManager::flush() {
     // The makeClosed() method may add more compositors to the list.
     compositor->makeClosed();
   }
+  auto proxyProvider = context->proxyProvider();
+  // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
+  proxyProvider->flushSharedVertexBuffer();
 
   if (resourceTasks.empty() && renderTasks.empty()) {
+    proxyProvider->clearSharedVertexBuffer();
     return false;
   }
   for (auto& task : resourceTasks) {
-    TRACE_EVENT_NAME("CreateResource");
     task.execute(context);
   }
   resourceTasks.clear();
   resourceTaskMap = {};
+  proxyProvider->clearSharedVertexBuffer();
 
   if (renderPass == nullptr) {
     renderPass = RenderPass::Make(context);

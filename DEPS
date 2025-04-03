@@ -64,11 +64,6 @@
         "url": "https://github.com/libexpat/libexpat.git",
         "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
         "dir": "third_party/expat"
-      },
-      {
-        "url": "https://github.com/libpag/tracy.git",
-        "commit": "ef23cd6ed597767200fe320721a99d824e3193f6",
-        "dir": "third_party/tracy"
       }
     ]
   },
