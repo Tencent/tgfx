@@ -1588,4 +1588,30 @@ TGFX_TEST(CanvasTest, RevertRect) {
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RevertRect"));
 }
+
+TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawColor(Color::White());
+  Paint paint = {};
+  Stroke stroke(2);
+  paint.setStroke(stroke);
+  paint.setColor(Color::Black());
+  paint.setStyle(PaintStyle::Stroke);
+  Path path = {};
+  path.addRect(50, 50, 250, 150);
+  path.addOval(Rect::MakeXYWH(50, 200, 200, 50));
+  path.moveTo(50, 300);
+  path.cubicTo(100, 300, 100, 350, 150, 350);
+  path.quadTo(200, 350, 200, 300);
+  float dashList[] = {40.f, 50.f};
+  auto effect = PathEffect::MakeDash(dashList, 2, 20, true);
+  effect->filterPath(&path);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
+}
 }  // namespace tgfx
