@@ -91,7 +91,10 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
     svg->addRectAttributes(rect);
   }
 
-  applyClipPath(state.clip);
+  if (!state.clip.contains(rect)) {
+    applyClipPath(state.clip);
+  }
+
   ElementWriter rectElement("rect", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
 
@@ -106,7 +109,9 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
 }
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill) {
-  applyClipPath(state.clip);
+  if (!state.clip.contains(roundRect.rect)) {
+    applyClipPath(state.clip);
+  }
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
       ElementWriter circleElement("circle", context, this, writer.get(), resourceBucket.get(),
@@ -127,7 +132,9 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
 
 void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill) {
-  applyClipPath(state.clip);
+  if (!state.clip.contains(shape->getBounds())) {
+    applyClipPath(state.clip);
+  }
   auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
@@ -183,7 +190,6 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state, 
     }
   }
   {
-    applyClipPath(state.clip);
     ElementWriter imageUse("use", context, this, writer.get(), resourceBucket.get(),
                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
     imageUse.addAttribute("xlink:href", "#" + imageID);
@@ -198,7 +204,9 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
 
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
-  applyClipPath(state.clip);
+  if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
+    applyClipPath(state.clip);
+  }
   if (hasFont) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
         exportFlags & SVGExportFlags::ConvertTextToPaths) {
@@ -299,7 +307,9 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     resources = defs.addImageFilterResource(imageFilter, bound);
   }
   {
-    applyClipPath(state.clip);
+    if (!state.clip.contains(picture->getBounds())) {
+      applyClipPath(state.clip);
+    }
     auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);
