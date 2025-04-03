@@ -38,6 +38,18 @@ class PathEffect {
   static std::shared_ptr<PathEffect> MakeDash(const float intervals[], int count, float phase);
 
   /**
+   * Creates an adaptive dash path effect. The dash intervals are automatically adjusted to
+   * fit the path length.
+   * @param intervals array containing an even number of entries (>=2), with the even indices
+   * specifying the length of "on" intervals, and the odd indices specifying the length of "off"
+   * intervals.
+   * @param count number of elements in the interval array
+   * @param phase  offset into the interval array (mod the sum of all of the intervals).
+   */
+  static std::shared_ptr<PathEffect> MakeAdaptiveDash(const float intervals[], int count,
+                                                      float phase);
+
+  /**
    * Create a corner path effect.
    * @param radius  must be > 0 to have an effect. It specifies the distance from each corner that
    * should be "rounded".

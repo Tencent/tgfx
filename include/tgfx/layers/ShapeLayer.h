@@ -226,6 +226,19 @@ class ShapeLayer : public Layer {
   void setLineDashPhase(float phase);
 
   /**
+   * Returns true if the dash is adaptive to fit the length of the path. The default value is
+   * false.
+   */
+  bool adaptiveDash() const {
+    return shapeBitFields.adaptiveDash;
+  }
+
+  /**
+   * Sets whether the dash is adaptive to fit the length of the path.
+   */
+  void setAdaptiveDash(bool adaptive);
+
+  /**
    * Returns the relative location at which to begin stroking the path. The value of this property
    * must be in the range 0.0 to 1.0. The default value of this property is 0.0. Combined with the
    * strokeEnd property, this property defines the subregion of the path to stroke. The value in
@@ -265,7 +278,7 @@ class ShapeLayer : public Layer {
    * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
    */
   StrokeAlign strokeAlign() const {
-    return _strokeAlign;
+    return static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
   }
 
   /**
@@ -279,13 +292,13 @@ class ShapeLayer : public Layer {
    * and layer styles. The default value is false.
    */
   bool strokeOnTop() const {
-    return _strokeOnTop;
+    return shapeBitFields.strokeOnTop;
   }
 
   void setStrokeOnTop(bool value);
 
  protected:
-  ShapeLayer() = default;
+  ShapeLayer();
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
@@ -301,8 +314,11 @@ class ShapeLayer : public Layer {
   float _lineDashPhase = 0.0f;
   float _strokeStart = 0.0f;
   float _strokeEnd = 1.0f;
-  StrokeAlign _strokeAlign = StrokeAlign::Center;
-  bool _strokeOnTop = false;
+  struct {
+    bool strokeOnTop : 1;
+    bool adaptiveDash : 1;
+    uint8_t strokeAlign : 2;
+  } shapeBitFields = {};
 
   Paint getPaint(float alpha) const;
   std::shared_ptr<Shape> createStrokeShape() const;

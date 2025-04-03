@@ -2330,4 +2330,34 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   EXPECT_TRUE(rasterizedContent ==
               static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
 }
+
+TGFX_TEST(LayerTest, AdaptiveDashEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawColor(Color::White());
+  Path path = {};
+  path.addRect(50, 50, 250, 150);
+  path.addOval(Rect::MakeXYWH(50, 200, 200, 50));
+  path.moveTo(50, 300);
+  path.cubicTo(100, 300, 100, 350, 150, 350);
+  path.quadTo(200, 350, 200, 300);
+  std::vector<float> dashList = {40.f, 50.f};
+  auto shapeLayer = ShapeLayer::Make();
+  shapeLayer->setPath(path);
+  auto strokeStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0));
+  shapeLayer->setLineWidth(1);
+  shapeLayer->setStrokeStyle(strokeStyle);
+  shapeLayer->setAdaptiveDash(true);
+  shapeLayer->setLineDashPattern(dashList);
+  shapeLayer->setLineDashPhase(20);
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/AdaptiveDashEffect"));
+}
+
 }  // namespace tgfx
