@@ -1609,7 +1609,7 @@ TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
   path.cubicTo(100, 300, 100, 350, 150, 350);
   path.quadTo(200, 350, 200, 300);
   float dashList[] = {40.f, 50.f};
-  auto effect = PathEffect::MakeAdaptiveDash(dashList, 2, 20);
+  auto effect = PathEffect::MakeDash(dashList, 2, 20, true);
   effect->filterPath(&path);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));

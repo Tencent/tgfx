@@ -2345,15 +2345,15 @@ TGFX_TEST(LayerTest, AdaptiveDashEffect) {
   path.moveTo(50, 300);
   path.cubicTo(100, 300, 100, 350, 150, 350);
   path.quadTo(200, 350, 200, 300);
-  std::vector<float> dashList = {40.f, 50.f};
+  std::vector<float> dashList = {10.f, 10.f};
   auto shapeLayer = ShapeLayer::Make();
   shapeLayer->setPath(path);
   auto strokeStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0));
   shapeLayer->setLineWidth(1);
   shapeLayer->setStrokeStyle(strokeStyle);
-  shapeLayer->setAdaptiveDash(true);
+  shapeLayer->setLineDashAdaptive(true);
   shapeLayer->setLineDashPattern(dashList);
-  shapeLayer->setLineDashPhase(20);
+  shapeLayer->setLineDashPhase(5);
   DisplayList displayList;
   displayList.root()->addChild(shapeLayer);
   displayList.render(surface.get());

@@ -18,7 +18,8 @@
 
 #include "AdaptiveDashEffect.h"
 #include "PathRef.h"
-#include "PathSegmentMeasure.h"
+
+using namespace pk;
 
 namespace tgfx {
 
@@ -26,25 +27,111 @@ inline bool IsEven(int x) {
   return !(x & 1);
 }
 
-std::shared_ptr<PathEffect> PathEffect::MakeAdaptiveDash(const float intervals[], int count,
-                                                         float phase) {
-  return std::make_shared<AdaptiveDashEffect>(intervals, count, phase);
+// Structure to hold path segment information
+struct Contour {
+  std::vector<std::unique_ptr<SkPathMeasure>> segments;
+  bool isClosed = false;
+};
+
+// Build contours from path
+std::vector<Contour> BuildContours(const Path& path) {
+  std::vector<Contour> contours;
+  bool hasMoveTo = false;
+  auto skPath = PathRef::ReadAccess(path);
+  SkPoint pts[4];
+  SkPath::Verb verb;
+  SkPath::Iter iter(skPath, false);
+
+  while ((verb = iter.next(pts)) != SkPath::kDone_Verb) {
+    Contour contour;
+    bool isClosed = false;
+    SkPoint lastPoint = {0, 0};
+    SkPoint firstPoint = {0, 0};
+
+    do {
+      if (hasMoveTo && verb == SkPath::kMove_Verb) {
+        break;  // New contour
+      }
+
+      if (contour.segments.empty()) {
+        firstPoint = pts[0];
+      }
+
+      SkPath segmentPath;
+      switch (verb) {
+        case SkPath::kLine_Verb:
+          segmentPath.moveTo(pts[0]);
+          segmentPath.lineTo(pts[1]);
+          lastPoint = pts[1];
+          break;
+
+        case SkPath::kQuad_Verb:
+          segmentPath.moveTo(pts[0]);
+          segmentPath.quadTo(pts[1], pts[2]);
+          lastPoint = pts[2];
+          break;
+
+        case SkPath::kConic_Verb:
+          segmentPath.moveTo(pts[0]);
+          segmentPath.conicTo(pts[1], pts[2], iter.conicWeight());
+          lastPoint = pts[2];
+          break;
+
+        case SkPath::kCubic_Verb:
+          segmentPath.moveTo(pts[0]);
+          segmentPath.cubicTo(pts[1], pts[2], pts[3]);
+          lastPoint = pts[3];
+          break;
+
+        case SkPath::kMove_Verb:
+          hasMoveTo = true;
+          break;
+
+        case SkPath::kClose_Verb:
+          isClosed = true;
+          break;
+
+        default:
+          continue;
+      }
+      auto measure = std::make_unique<SkPathMeasure>(segmentPath, false);
+      if (measure->getLength() > 0) {
+        contour.segments.push_back(std::move(measure));
+      }
+    } while ((verb = iter.next(pts)) != SkPath::kDone_Verb);
+
+    // Handle closed path
+    if (isClosed) {
+      contour.isClosed = true;
+      if (auto distance = SkPoint::Distance(lastPoint, firstPoint); distance > 0) {
+        SkPath closingSegment;
+        closingSegment.moveTo(lastPoint);
+        closingSegment.lineTo(firstPoint);
+        auto measure = std::make_unique<SkPathMeasure>(closingSegment, false);
+        if (measure->getLength() > 0) {
+          contour.segments.push_back(std::move(measure));
+        }
+      }
+    }
+
+    if (!contour.segments.empty()) {
+      contours.push_back(std::move(contour));
+    }
+  }
+  return contours;
 }
 
-static float AdjusetPhase(float intervalLength, float phase) {
+// Normalize phase to [0, intervalLength)
+float NormalizePhase(float phase, float intervalLength) {
   if (phase < 0) {
     phase = -phase;
     if (phase > intervalLength) {
-      phase = PkScalarMod(phase, intervalLength);
+      phase = std::fmod(phase, intervalLength);
     }
     phase = intervalLength - phase;
-    if (phase == intervalLength) {
-      phase = 0;
-    }
-  } else if (phase >= intervalLength) {
-    phase = PkScalarMod(phase, intervalLength);
+    return (phase == intervalLength) ? 0 : phase;
   }
-  return phase;
+  return (phase >= intervalLength) ? std::fmod(phase, intervalLength) : phase;
 }
 
 AdaptiveDashEffect::AdaptiveDashEffect(const float intervals[], int count, float phase)
@@ -53,70 +140,76 @@ AdaptiveDashEffect::AdaptiveDashEffect(const float intervals[], int count, float
   for (float interval : _intervals) {
     intervalLength += interval;
   }
-  _phase = AdjusetPhase(intervalLength, phase);
+  _phase = NormalizePhase(phase, intervalLength);
 }
 
 bool AdaptiveDashEffect::filterPath(Path* path) const {
-  if (path == nullptr) {
+  if (!path || path->isEmpty()) {
     return false;
   }
+
   if (intervalLength == 0) {
     path->reset();
     return true;
   }
 
-  auto meas = PathSegmentMeasure::MakeFrom(*path);
-  Path dst = {};
-  auto count = static_cast<int>(_intervals.size());
-  float dashCount = 0;
-  do {
-    auto skipFirstSegment = meas->isClosed();
-    bool needGetFirstSegment = false;
-    float initialDashLength = 0;
-    bool needMoveTo = true;
-    do {
-      auto length = meas->getSegmentLength();
-      auto ratio = length / intervalLength;
-      ratio = std::max(std::roundf(ratio), 1.0f);
+  const auto contours = BuildContours(*path);
+  if (contours.empty()) {
+    path->reset();
+    return true;
+  }
 
-      dashCount += ratio * static_cast<float>(count >> 1);
-      if (dashCount > kMaxDashCount) {
+  SkPath resultPath;
+  const int patternCount = static_cast<int>(_intervals.size());
+  float totalDashCount = 0;
+
+  for (const auto& contour : contours) {
+    bool skipFirstSegment = contour.isClosed;
+    bool deferFirstSegment = false;
+    float deferredLength = 0;
+    bool needMoveTo = true;
+
+    for (const auto& segment : contour.segments) {
+      const float segmentLength = segment->getLength();
+      const float patternRatio = std::max(std::roundf(segmentLength / intervalLength), 1.0f);
+
+      // Check dash count limit
+      totalDashCount += patternRatio * static_cast<float>(patternCount >> 1);
+      if (totalDashCount > kMaxDashCount) {
         return false;
       }
 
-      auto scale = length / (ratio * intervalLength);
-      auto currentPos = -_phase * scale;
-      int dashIndex = 0;
+      const float scale = segmentLength / (patternRatio * intervalLength);
+      float currentPos = -_phase * scale;
+      int patternIndex = 0;
 
-      while (currentPos < length) {
-        float dashLen = _intervals[static_cast<size_t>(dashIndex)] * scale;
-        if (IsEven(dashIndex) && currentPos + dashLen > 0) {
+      while (currentPos < segmentLength) {
+        const float dashLength = _intervals[static_cast<size_t>(patternIndex)] * scale;
+
+        if (IsEven(patternIndex) && currentPos + dashLength > 0) {
           if (currentPos < 0 && skipFirstSegment) {
-            // skip first segment and we need to apply at the end
-            needGetFirstSegment = true;
-            initialDashLength = dashLen + currentPos;
+            deferFirstSegment = true;
+            deferredLength = dashLength + currentPos;
           } else {
-            meas->getSegment(currentPos, currentPos + dashLen, needMoveTo, &dst);
+            segment->getSegment(currentPos, currentPos + dashLength, &resultPath, needMoveTo);
           }
         }
-        currentPos += dashLen;
-        if (dashIndex == count - 1) {
-          dashIndex = 0;
-        } else {
-          dashIndex++;
-        }
+
+        currentPos += dashLength;
+        patternIndex = (patternIndex + 1) % patternCount;
         needMoveTo = true;
       }
-      needMoveTo = IsEven(dashIndex);
-      skipFirstSegment = false;
-    } while (meas->nextSegment());
-    if (needGetFirstSegment) {
-      meas->resetSegement();
-      meas->getSegment(0, initialDashLength, false, &dst);
-    }
-  } while (meas->nextContour());
 
-  *path = std::move(dst);
+      needMoveTo = IsEven(patternIndex);
+      skipFirstSegment = false;
+    }
+
+    if (deferFirstSegment) {
+      contour.segments.front()->getSegment(0, deferredLength, &resultPath, false);
+    }
+  }
+
+  PathRef::WriteAccess(*path) = resultPath;
   return true;
 }
 

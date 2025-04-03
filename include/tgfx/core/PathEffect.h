@@ -29,25 +29,33 @@ class PathEffect {
  public:
   /**
    * Creates a dash path effect.
+   * When adaptive is true:
+   * - Automatically scales dash intervals to fit path length
+   * - Maintains pattern integrity by rounding to whole pattern repetitions
+   * - Pattern count calculation:
+   *   - Total pattern length = sum of all intervals
+   *   - Number of full patterns = round(pathLength / totalPatternLength)
+   *   - Scale factor = pathLength / (numberOfPatterns * totalPatternLength)
+   *
+   * When adaptive is false:
+   * - Uses exact interval lengths without scaling
+   * - May truncate last pattern if path length isn't multiple of pattern length
+   * - Pattern count calculation:
+   *   - Number of full patterns = floor(pathLength / totalPatternLength)
+   *   - Remainder length = pathLength % totalPatternLength
+   * - Example (intervals [10,5], path length 22):
+   *   - adaptive=true: scales to [14.667,7.333] to fit 1 full pattern (22 total)
+   *   - adaptive=false: draws [10,5,10] (2 full patterns) then partial [2] at end
+   *
    * @param intervals array containing an even number of entries (>=2), with the even indices
    * specifying the length of "on" intervals, and the odd indices specifying the length of "off"
    * intervals.
    * @param count number of elements in the interval array
-   * @param phase  offset into the interval array (mod the sum of all of the intervals).
+   * @param phase offset into the interval array (mod the sum of all intervals).
+   * @param adaptive decides whether to scale the intervals to fit the path length or not.
    */
-  static std::shared_ptr<PathEffect> MakeDash(const float intervals[], int count, float phase);
-
-  /**
-   * Creates an adaptive dash path effect. The dash intervals are automatically adjusted to
-   * fit the path length.
-   * @param intervals array containing an even number of entries (>=2), with the even indices
-   * specifying the length of "on" intervals, and the odd indices specifying the length of "off"
-   * intervals.
-   * @param count number of elements in the interval array
-   * @param phase  offset into the interval array (mod the sum of all of the intervals).
-   */
-  static std::shared_ptr<PathEffect> MakeAdaptiveDash(const float intervals[], int count,
-                                                      float phase);
+  static std::shared_ptr<PathEffect> MakeDash(const float intervals[], int count, float phase,
+                                              bool adaptive = false);
 
   /**
    * Create a corner path effect.
