@@ -55,6 +55,9 @@ class RenderContext : public DrawContext {
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
                  const MCState& state, const Fill& fill) override;
+  void drawAtlas(const MCState& mcState, std::shared_ptr<Image> atlas, const Matrix matrix[],
+                 const Rect tex[], const Color colors[], size_t count,
+                 const SamplingOptions& sampling, const Fill& fill);
 
   /**
    * Flushes the render context, submitting all pending operations to the drawing manager. Returns

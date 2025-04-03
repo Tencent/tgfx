@@ -1,0 +1,111 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+#include "AtlasTypes.h"
+#include <MacTypes.h>
+
+namespace tgfx {
+Plot::Plot(int pageIndex, int plotIndex, AtlasGenerationCounter* generationCounter, int offsetX,
+           int offsetY, int width, int height, int bytesPerPixel)
+    : generationCounter(generationCounter), _pageIndex(pageIndex), _plotIndex(plotIndex),
+      _genID(generationCounter->next()), width(width), height(height),
+      pixelOffset(Point::Make(offsetX * width, offsetY * height)), bytesPerPixel(bytesPerPixel),
+      rectPack(width, height),
+      plotLocator(static_cast<uint32_t>(pageIndex), static_cast<uint32_t>(plotIndex), _genID) {
+  dirtyRect.setEmpty();
+  cachedRect.setEmpty();
+}
+
+Plot::~Plot() {
+  delete[] data;
+}
+
+bool Plot::addSubImage(int width, int height, const void* image, AtlasLocator& atlasLocator) const {
+  if (data == nullptr) {
+    return false;
+  }
+
+  DEBUG_ASSERT(width < this->width && height < this->height);
+  Point location = {atlasLocator.getLocation().left, atlasLocator.getLocation().top};
+  auto rect = Rect::MakeXYWH(location.x, location.y, (float)width, (float)height);
+
+  auto left = static_cast<int>(rect.left);
+  auto top = static_cast<int>(rect.top);
+  auto rowBytes = static_cast<size_t>(width * bytesPerPixel);
+  auto imagePtr = static_cast<const uint8_t*>(image);
+  auto dataPtr = data;
+  dataPtr += bytesPerPixel * width * top;
+  dataPtr += bytesPerPixel * left;
+
+  for (auto i = 0; i < height; ++i) {
+    memcpy(dataPtr, imagePtr, rowBytes);
+    dataPtr += bytesPerPixel * width;
+    imagePtr += rowBytes;
+  }
+
+  return true;
+}
+
+bool Plot::addRect(int width, int height, AtlasLocator& atlasLocator) {
+  DEBUG_ASSERT(width < this->width && height < this->height);
+  Point location;
+  if (!rectPack.addRect(width, height, location)) {
+    return false;
+  }
+  auto rect = Rect::MakeXYWH(location.x, location.y, (float)width, (float)height);
+  if (data == nullptr) {
+    auto size = static_cast<size_t>(this->width * this->height * bytesPerPixel);
+    data = new (std::nothrow) uint8_t[size];
+    if (data == nullptr) {
+      return false;
+    }
+    memset(data, 0, size);
+  }
+  rect.offset(pixelOffset.x, pixelOffset.y);
+  atlasLocator.updateRect(rect);
+  dirtyRect.join(rect);
+  return true;
+}
+
+void Plot::resetRects() {
+  rectPack.reset();
+  _genID = generationCounter->next();
+  plotLocator =
+      PlotLocator(static_cast<uint32_t>(_pageIndex), static_cast<uint32_t>(_plotIndex), _genID);
+  if (data) {
+    memset(data, 0, static_cast<size_t>(bytesPerPixel * width * height));
+  }
+  dirtyRect.setEmpty();
+  cachedRect.setEmpty();
+}
+
+std::tuple<const void*, Rect, size_t> Plot::prepareForUpload() {
+  if (data == nullptr || dirtyRect.isEmpty()) {
+    return {nullptr, Rect::MakeEmpty(), 0};
+  }
+  auto rect = dirtyRect;
+  dirtyRect.setEmpty();
+  auto rowBytes = static_cast<size_t>(width * bytesPerPixel);
+  auto dataPtr = data;
+  auto top = static_cast<int>(rect.top);
+  auto left = static_cast<int>(rect.left);
+  dataPtr += bytesPerPixel * top;
+  dataPtr += bytesPerPixel * left;
+  return {dataPtr, rect, rowBytes};
+}
+
+}  // namespace tgfx

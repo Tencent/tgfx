@@ -103,6 +103,7 @@ endif ()
 
 # collects tgfx common files.
 file(GLOB_RECURSE SRC_FILES
+        src/core/atlas/*.*
         src/core/filters/*.*
         src/core/images/*.*
         src/core/shaders/*.*

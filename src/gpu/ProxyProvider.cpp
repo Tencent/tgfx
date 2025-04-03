@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
+#include "core/AtlasSource.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/UniqueID.h"
@@ -31,6 +32,7 @@
 #include "gpu/tasks/TextureCreateTask.h"
 #include "gpu/tasks/TextureFlattenTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
+#include "tasks/AtlasBufferUploadTask.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -151,6 +153,37 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
       new DefaultTextureProxy(textureProxyKey, width, height, false, true));
   addResourceProxy(textureProxy, textureKey);
   return std::make_shared<GpuShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
+}
+
+std::shared_ptr<AtlasProxy> ProxyProvider::createAtlasProxy(
+    const UniqueKey& uniqueKey, std::shared_ptr<GlyphRunList> glyphRunList, float scale,
+    uint32_t renderFlags /* = 0*/) {
+  if (glyphRunList == nullptr) {
+    return nullptr;
+  }
+
+  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
+
+  std::unique_ptr<DataSource<AtlasBuffer>> dataSource = nullptr;
+
+  auto atlasSource = std::make_unique<AtlasSource>(context->atlasManager(), std::move(glyphRunList),
+                                                   scale, nullptr);
+  if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
+    dataSource = DataSource<AtlasBuffer>::Async(std::move(atlasSource));
+  } else {
+    dataSource = std::move(atlasSource);
+  }
+
+  static const auto TriangleShapeType = UniqueID::Next();
+  auto task =
+      context->drawingBuffer()->makeNode<AtlasBufferUploadTask>(uniqueKey, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+
+  auto triangleProxyKey = UniqueKey::Append(uniqueKey, &TriangleShapeType, 1);
+  auto triangleProxy =
+      std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(triangleProxyKey, BufferType::Vertex));
+  addResourceProxy(triangleProxy, triangleProxyKey);
+  return std::make_shared<AtlasProxy>(triangleProxy);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(

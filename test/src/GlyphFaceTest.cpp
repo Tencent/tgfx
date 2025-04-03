@@ -79,6 +79,10 @@ class CustomPathGlyphFace : public GlyphFace {
     return nullptr;
   }
 
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID /*glyphID*/) const override {
+    return nullptr;
+  }
+
   Rect getBounds(GlyphID glyphID) const override {
     if (glyphID == 100) {
       return Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
@@ -139,6 +143,10 @@ class CustomImageGlyphFace : public GlyphFace {
 
     matrix->setScale(0.25f * _scale, 0.25f * _scale);
     return Image::MakeFromFile(ProjectPath::Absolute(imagePath));
+  }
+
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID /*glyphID*/) const override {
+    return nullptr;
   }
 
   Rect getBounds(GlyphID glyphID) const override {
@@ -221,6 +229,10 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return nullptr;
   }
 
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID /*glyphID*/) const override {
+    return nullptr;
+  }
+
   Rect getBounds(GlyphID glyphID) const override {
     if (glyphID == 8699 || glyphID == 16266) {
       return font40.getBounds(glyphID);
@@ -265,6 +277,10 @@ class CustomImageGlyphFace2 : public GlyphFace,
 
   std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override {
     return fontEmoji.getImage(glyphID, matrix);
+  }
+
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const override {
+    return fontEmoji.generateImage(glyphID);
   }
 
   Rect getBounds(GlyphID glyphID) const override {

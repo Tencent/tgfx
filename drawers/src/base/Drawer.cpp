@@ -25,7 +25,7 @@
 
 namespace drawers {
 static std::vector<Drawer*> drawers = {
-    new GridBackground(), new ConicGradient(),   new ImageWithMipmap(), new ImageWithShadow(),
+    new GridBackground(), new CustomLayerTree(), new ImageWithMipmap(), new ImageWithShadow(),
     new SimpleText(),     new SimpleLayerTree(), new CustomLayerTree()};
 
 static std::vector<std::string> GetDrawerNames() {

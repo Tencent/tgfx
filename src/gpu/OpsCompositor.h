@@ -65,6 +65,9 @@ class OpsCompositor {
    */
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
+  void fillGlyphRuns(std::shared_ptr<GlyphRunList> glyphRunList, float scale, const MCState& state,
+                     const Fill& fill);
+
   /**
    * Discard all pending operations.
    */

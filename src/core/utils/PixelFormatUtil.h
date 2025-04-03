@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdio>
+#include "core/atlas/AtlasTypes.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/PixelFormat.h"
 
@@ -28,4 +29,7 @@ PixelFormat ColorTypeToPixelFormat(ColorType type);
 ColorType PixelFormatToColorType(PixelFormat format);
 
 size_t PixelFormatBytesPerPixel(PixelFormat format);
+
+PixelFormat MaskFormatToPixelFormat(MaskFormat format);
+
 }  // namespace tgfx

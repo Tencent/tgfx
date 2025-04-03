@@ -63,4 +63,16 @@ size_t PixelFormatBytesPerPixel(PixelFormat format) {
       return 0;
   }
 }
+
+PixelFormat MaskFormatToPixelFormat(MaskFormat format) {
+  switch (format) {
+    case MaskFormat::A8:
+      return PixelFormat::ALPHA_8;
+    case MaskFormat::RGBA:
+      return PixelFormat::RGBA_8888;
+    default:
+      return PixelFormat::Unknown;
+  }
+}
+
 }  // namespace tgfx

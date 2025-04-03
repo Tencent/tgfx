@@ -68,6 +68,8 @@ class GlyphFace {
    */
   virtual std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const = 0;
 
+  virtual std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const = 0;
+
   /**
    * Returns the bounding box of the specified glyph.
    */

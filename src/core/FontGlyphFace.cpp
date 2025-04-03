@@ -50,6 +50,10 @@ std::shared_ptr<Image> FontGlyphFace::getImage(GlyphID glyphID, Matrix* matrix) 
   return _font.getImage(glyphID, matrix);
 }
 
+std::shared_ptr<ImageBuffer> FontGlyphFace::generateImage(GlyphID glyphID) const {
+  return _font.generateImage(glyphID);
+}
+
 Rect FontGlyphFace::getBounds(GlyphID glyphID) const {
   return _font.getBounds(glyphID);
 }

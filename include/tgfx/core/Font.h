@@ -153,6 +153,8 @@ class Font {
    */
   std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const;
 
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const;
+
   /**
    * Compares two fonts for equality.
    */

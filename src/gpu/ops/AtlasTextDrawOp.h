@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,33 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/GlyphFace.h"
+
+#include "DrawOp.h"
+#include "gpu/AAType.h"
+#include "gpu/proxies/AtlasProxy.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class FontGlyphFace final : public GlyphFace {
+class AtlasTextDrawOp : public DrawOp {
  public:
-  bool hasColor() const override;
+  static PlacementNode<AtlasTextDrawOp> Make(std::shared_ptr<GpuBufferProxy>,
+                                             const Matrix& uvMatrix, AAType aaType);
 
-  bool hasOutlines() const override;
-
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
-
-  bool getPath(GlyphID glyphID, Path* path) const override;
-
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
-
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const override;
-
-  Rect getBounds(GlyphID glyphID) const override;
-
-  bool asFont(Font* font) const override;
+  AtlasTextDrawOp(std::shared_ptr<GpuBufferProxy>, const Matrix& uvMatrix, AAType aaType);
+  void execute(RenderPass* renderPass) override;
 
  private:
-  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
-  }
-
-  Font _font = {};
-
-  friend class GlyphFace;
+  std::shared_ptr<GpuBufferProxy> atlasProxy = nullptr;
+  Matrix uvMatrix = Matrix::I();
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,34 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include "tgfx/core/GlyphFace.h"
+#include "Glyph.h"
 
 namespace tgfx {
-class FontGlyphFace final : public GlyphFace {
- public:
-  bool hasColor() const override;
+Glyph::~Glyph() {
+  delete[](unsigned char*) _image;
+}
 
-  bool hasOutlines() const override;
-
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
-
-  bool getPath(GlyphID glyphID, Path* path) const override;
-
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
-
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const override;
-
-  Rect getBounds(GlyphID glyphID) const override;
-
-  bool asFont(Font* font) const override;
-
- private:
-  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
-  }
-
-  Font _font = {};
-
-  friend class GlyphFace;
-};
 }  // namespace tgfx

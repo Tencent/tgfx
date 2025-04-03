@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/atlas/AtlasManager.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementBuffer.h"
 #include "gpu/DrawingManager.h"
@@ -36,6 +37,7 @@ Context::Context(Device* device) : _device(device) {
   _drawingManager = new DrawingManager(this);
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
+  _atlasManager = new AtlasManager(this);
 }
 
 Context::~Context() {
@@ -50,6 +52,7 @@ Context::~Context() {
   delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
+  delete _atlasManager;
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
@@ -124,6 +127,7 @@ void Context::releaseAll(bool releaseGPU) {
   _resourceProvider->releaseAll();
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
+  _atlasManager->releaseAll();
 }
 
 void Context::clearDrawingBuffer() {

@@ -32,6 +32,7 @@ class Gpu;
 class ResourceProvider;
 class ProxyProvider;
 class PlacementBuffer;
+class AtlasManager;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -83,6 +84,10 @@ class Context {
 
   ProxyProvider* proxyProvider() const {
     return _proxyProvider;
+  }
+
+  AtlasManager* atlasManager() const {
+    return _atlasManager;
   }
 
   /**
@@ -201,6 +206,7 @@ class Context {
   ProxyProvider* _proxyProvider = nullptr;
   PlacementBuffer* _drawingBuffer = nullptr;
   std::deque<size_t> drawingBufferSizes = {};
+  AtlasManager* _atlasManager = nullptr;
 
   void releaseAll(bool releaseGPU);
   void clearDrawingBuffer();

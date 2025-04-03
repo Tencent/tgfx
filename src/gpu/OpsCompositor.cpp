@@ -23,6 +23,7 @@
 #include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ops/AtlasTextDrawOp.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/DstTextureCopyOp.h"
 #include "gpu/ops/ResolveOp.h"
@@ -131,6 +132,35 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
+}
+
+void OpsCompositor::fillGlyphRuns(std::shared_ptr<GlyphRunList> glyphRunList, float scale,
+                                  const MCState& state, const Fill& fill) {
+  if (glyphRunList == nullptr || glyphRunList->glyphRuns().empty()) {
+    return;
+  }
+  flushPendingOps();
+  auto uvMatrix = Matrix::I();
+  if (!state.matrix.invert(&uvMatrix)) {
+    return;
+  }
+
+  auto localBounds = Rect::MakeEmpty();
+  auto deviceBounds = Rect::MakeEmpty();
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill);
+  auto& clip = state.clip;
+  auto clipBounds = getClipBounds(clip);
+  if (needLocalBounds) {
+    localBounds = glyphRunList->getBounds();
+    localBounds = ClipLocalBounds(localBounds, state.matrix, clipBounds);
+  }
+
+  auto aaType = getAAType(fill);
+  auto key = UniqueKey::Make();
+  auto atlasProxy =
+      proxyProvider()->createAtlasProxy(key, std::move(glyphRunList), scale, renderFlags);
+  auto drawOp = AtlasTextDrawOp::Make(atlasProxy->getTriangles(), uvMatrix, aaType);
+  addDrawOp(std::move(drawOp), state.clip, fill, localBounds, deviceBounds);
 }
 
 void OpsCompositor::discardAll() {

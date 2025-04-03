@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,33 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/GlyphFace.h"
+#include "AtlasBuffer.h"
+#include "DataSource.h"
+#include "core/GlyphRunList.h"
+#include "core/atlas/AtlasManager.h"
 
 namespace tgfx {
-class FontGlyphFace final : public GlyphFace {
+class AtlasSource : public DataSource<AtlasBuffer> {
  public:
-  bool hasColor() const override;
+  AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunList> glyphRunList, float scale,
+              const Stroke* stroke);
 
-  bool hasOutlines() const override;
+  std::shared_ptr<AtlasBuffer> getData() const override;
 
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
-
-  bool getPath(GlyphID glyphID, Path* path) const override;
-
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
-
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const override;
-
-  Rect getBounds(GlyphID glyphID) const override;
-
-  bool asFont(Font* font) const override;
-
- private:
-  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
+  float getScale() const {
+    return scale;
   }
 
-  Font _font = {};
+  const Stroke* getStroke() const {
+    return stroke;
+  }
 
-  friend class GlyphFace;
+ private:
+  AtlasManager* atlasManager;
+  float scale;
+  const Stroke* stroke;
+  std::shared_ptr<GlyphRunList> glyphRunList;
+
+  std::vector<PlacementPtr<DrawGlyph>> drawGlyphs;
+
+  void computeAtlasLocator();
 };
 }  // namespace tgfx
