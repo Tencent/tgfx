@@ -64,7 +64,7 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
-  PlacementBuffer* drawingBuffer = nullptr;
+  BlockBuffer* drawingBuffer = nullptr;
   std::unique_ptr<RenderPass> renderPass = nullptr;
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<TextureFlattenTask>> flattenTasks = {};

@@ -31,7 +31,7 @@ class DrawingManager;
 class Gpu;
 class ResourceProvider;
 class ProxyProvider;
-class PlacementBuffer;
+class BlockBuffer;
 class MaxValueTracker;
 
 /**
@@ -74,7 +74,7 @@ class Context {
     return _drawingManager;
   }
 
-  PlacementBuffer* drawingBuffer() const {
+  BlockBuffer* drawingBuffer() const {
     return _drawingBuffer;
   }
 
@@ -200,7 +200,7 @@ class Context {
   DrawingManager* _drawingManager = nullptr;
   ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
-  PlacementBuffer* _drawingBuffer = nullptr;
+  BlockBuffer* _drawingBuffer = nullptr;
   MaxValueTracker* _maxValueTracker = nullptr;
 
   void releaseAll(bool releaseGPU);

@@ -99,7 +99,7 @@ class OpsCompositor {
   std::vector<PlacementPtr<RRectPaint>> pendingRRects = {};
   std::vector<PlacementPtr<Op>> ops = {};
 
-  PlacementBuffer* drawingBuffer() const {
+  BlockBuffer* drawingBuffer() const {
     return context->drawingBuffer();
   }
 

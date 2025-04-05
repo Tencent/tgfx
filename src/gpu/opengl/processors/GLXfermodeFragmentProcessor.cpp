@@ -22,8 +22,8 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> src,
-    PlacementPtr<FragmentProcessor> dst, BlendMode mode) {
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> src, PlacementPtr<FragmentProcessor> dst,
+    BlendMode mode) {
   if (src == nullptr && dst == nullptr) {
     return nullptr;
   }

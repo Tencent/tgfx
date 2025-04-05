@@ -21,12 +21,13 @@
 #include <cstdint>
 #include <limits>
 #include <vector>
+#include "core/utils/PlacementPtr.h"
 
 namespace tgfx {
 /**
- * A buffer that allocates memory in blocks. This can be used to allocate many small objects in a
- * shared memory blocks to reduce the overhead of memory allocation. The memory is not freed until
- * the BlockBuffer is destroyed or cleared.
+ * A buffer that allocates memory in blocks. This can be used to allocate many small objects in
+ * shared memory blocks to reduce the overhead of memory allocation. All objects created in the
+ * BlockBuffer must be destroyed before the BlockBuffer itself is cleared or destroyed.
  */
 class BlockBuffer {
  public:
@@ -42,6 +43,19 @@ class BlockBuffer {
    * Destroys the BlockBuffer and frees all allocated memory blocks.
    */
   virtual ~BlockBuffer();
+
+  /**
+   * Creates an object of the given type in the BlockBuffer. Returns a PlacementPtr to wrap the
+   * created object. Returns nullptr if the allocation fails.
+   */
+  template <typename T, typename... Args>
+  PlacementPtr<T> make(Args&&... args) {
+    void* memory = allocate(sizeof(T));
+    if (!memory) {
+      return nullptr;
+    }
+    return PlacementPtr<T>(new (memory) T(std::forward<Args>(args)...));
+  }
 
   /**
  * Allocates memory for an object of the given size. Returns nullptr if the allocation fails.

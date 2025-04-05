@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "core/utils/MaxValueTracker.h"
-#include "core/utils/PlacementBuffer.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/ProxyProvider.h"
@@ -29,7 +29,7 @@
 
 namespace tgfx {
 Context::Context(Device* device) : _device(device) {
-  _drawingBuffer = new PlacementBuffer(1 << 14);  // 16kb
+  _drawingBuffer = new BlockBuffer(1 << 14);  // 16kb
   _programCache = new ProgramCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
