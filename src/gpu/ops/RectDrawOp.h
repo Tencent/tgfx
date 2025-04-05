@@ -48,8 +48,8 @@ class RectDrawOp : public DrawOp {
    * Create a new RectDrawOp for a list of RectPaints. The returned RectDrawOp is in the local space
    * of each rect.
    */
-  static PlacementNode<RectDrawOp> Make(Context* context, PlacementList<RectPaint> rects,
-                                        bool useUVCoord, AAType aaType, uint32_t renderFlags);
+  static PlacementPtr<RectDrawOp> Make(Context* context, std::vector<PlacementPtr<RectPaint>> rects,
+                                       bool useUVCoord, AAType aaType, uint32_t renderFlags);
 
   RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord);
 

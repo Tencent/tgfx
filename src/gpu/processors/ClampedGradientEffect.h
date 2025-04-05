@@ -25,7 +25,7 @@
 namespace tgfx {
 class ClampedGradientEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<ClampedGradientEffect> Make(PlacementBuffer* buffer,
+  static PlacementPtr<ClampedGradientEffect> Make(BlockBuffer* buffer,
                                                   PlacementPtr<FragmentProcessor> colorizer,
                                                   PlacementPtr<FragmentProcessor> gradLayout,
                                                   Color leftBorderColor, Color rightBorderColor);

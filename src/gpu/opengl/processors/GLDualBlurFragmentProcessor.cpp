@@ -21,7 +21,7 @@
 
 namespace tgfx {
 PlacementPtr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
-    PlacementBuffer* buffer, DualBlurPassMode passMode, PlacementPtr<FragmentProcessor> processor,
+    BlockBuffer* buffer, DualBlurPassMode passMode, PlacementPtr<FragmentProcessor> processor,
     Point blurOffset) {
   if (processor == nullptr) {
     return nullptr;

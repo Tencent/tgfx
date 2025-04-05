@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
-    PlacementBuffer* buffer, int width, int height, AAType aa, std::optional<Color> uniformColor,
+    BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> uniformColor,
     bool useUVCoord) {
   return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, uniformColor,
                                                         useUVCoord);

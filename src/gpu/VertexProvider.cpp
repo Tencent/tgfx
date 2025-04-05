@@ -20,7 +20,7 @@
 
 namespace tgfx {
 AsyncVertexSource::~AsyncVertexSource() {
-  // The vertex source might have objects created in shared memory (like PlacementBuffer), so we
+  // The vertex source might have objects created in shared memory (like BlockBuffer), so we
   // need to wait for the task to finish before destroying it.
   for (auto& task : tasks) {
     task->cancelOrWait();

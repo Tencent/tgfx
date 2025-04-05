@@ -44,7 +44,7 @@ struct UnrolledBinaryUniformName {
 static constexpr int kMaxIntervals = 8;
 
 PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::Make(
-    PlacementBuffer* buffer, const Color* colors, const float* positions, int count) {
+    BlockBuffer* buffer, const Color* colors, const float* positions, int count) {
   // Depending on how the positions resolve into hard stops or regular stops, the number of
   // intervals specified by the number of colors/positions can change. For instance, a plain
   // 3 color gradient is two intervals, but a 4 color gradient with a hard stop is also

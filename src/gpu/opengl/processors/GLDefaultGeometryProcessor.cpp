@@ -19,7 +19,7 @@
 #include "GLDefaultGeometryProcessor.h"
 
 namespace tgfx {
-PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(PlacementBuffer* buffer,
+PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(BlockBuffer* buffer,
                                                                       Color color, int width,
                                                                       int height, AAType aa,
                                                                       const Matrix& viewMatrix,

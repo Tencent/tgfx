@@ -21,7 +21,7 @@
 namespace tgfx {
 
 PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> processor, float sigma,
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> processor, float sigma,
     GaussianBlurDirection direction, float stepLength, int maxSigma) {
   if (!processor) {
     return nullptr;

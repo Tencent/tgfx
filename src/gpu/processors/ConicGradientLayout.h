@@ -23,7 +23,7 @@
 namespace tgfx {
 class ConicGradientLayout : public FragmentProcessor {
  public:
-  static PlacementPtr<ConicGradientLayout> Make(PlacementBuffer* buffer, Matrix matrix, float bias,
+  static PlacementPtr<ConicGradientLayout> Make(BlockBuffer* buffer, Matrix matrix, float bias,
                                                 float scale);
 
   std::string name() const override {

@@ -24,9 +24,8 @@
 namespace tgfx {
 class DualIntervalGradientColorizer : public FragmentProcessor {
  public:
-  static PlacementPtr<DualIntervalGradientColorizer> Make(PlacementBuffer* buffer, Color c0,
-                                                          Color c1, Color c2, Color c3,
-                                                          float threshold);
+  static PlacementPtr<DualIntervalGradientColorizer> Make(BlockBuffer* buffer, Color c0, Color c1,
+                                                          Color c2, Color c3, float threshold);
 
   std::string name() const override {
     return "DualIntervalGradientColorizer";

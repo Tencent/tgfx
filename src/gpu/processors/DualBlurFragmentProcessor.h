@@ -25,7 +25,7 @@ enum class DualBlurPassMode { Up = 0, Down = 1 };
 
 class DualBlurFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<DualBlurFragmentProcessor> Make(PlacementBuffer* buffer,
+  static PlacementPtr<DualBlurFragmentProcessor> Make(BlockBuffer* buffer,
                                                       DualBlurPassMode passMode,
                                                       PlacementPtr<FragmentProcessor> processor,
                                                       Point blurOffset);

@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> first,
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> first,
     PlacementPtr<FragmentProcessor> second) {
   if (first == nullptr && second == nullptr) {
     return nullptr;

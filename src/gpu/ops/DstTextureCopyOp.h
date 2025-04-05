@@ -27,8 +27,8 @@ namespace tgfx {
  */
 class DstTextureCopyOp : public Op {
  public:
-  static PlacementNode<DstTextureCopyOp> Make(std::shared_ptr<TextureProxy> textureProxy, int srcX,
-                                              int srcY);
+  static PlacementPtr<DstTextureCopyOp> Make(std::shared_ptr<TextureProxy> textureProxy, int srcX,
+                                             int srcY);
 
   DstTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, int srcX, int srcY);
 

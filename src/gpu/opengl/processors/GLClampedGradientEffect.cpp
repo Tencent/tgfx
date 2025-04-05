@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<ClampedGradientEffect> ClampedGradientEffect::Make(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> colorizer,
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> colorizer,
     PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor, Color rightBorderColor) {
   return buffer->make<GLClampedGradientEffect>(std::move(colorizer), std::move(gradLayout),
                                                leftBorderColor, rightBorderColor);

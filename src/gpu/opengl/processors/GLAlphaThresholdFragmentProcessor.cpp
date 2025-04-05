@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
-    PlacementBuffer* buffer, float threshold) {
+    BlockBuffer* buffer, float threshold) {
   return buffer->make<GLAlphaThresholdFragmentProcessor>(threshold);
 }
 

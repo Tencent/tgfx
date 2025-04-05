@@ -25,8 +25,8 @@
 namespace tgfx {
 class ShapeDrawOp : public DrawOp {
  public:
-  static PlacementNode<ShapeDrawOp> Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
-                                         const Matrix& uvMatrix, AAType aaType);
+  static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
+                                        const Matrix& uvMatrix, AAType aaType);
 
   ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,
               AAType aaType);
