@@ -43,8 +43,9 @@ class RRectDrawOp : public DrawOp {
    * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
    * the device space.
    */
-  static PlacementNode<RRectDrawOp> Make(Context* context, PlacementList<RRectPaint> rects,
-                                         AAType aaType, uint32_t renderFlags);
+  static PlacementPtr<RRectDrawOp> Make(Context* context,
+                                        std::vector<PlacementPtr<RRectPaint>> rects, AAType aaType,
+                                        uint32_t renderFlags);
 
   RRectDrawOp(AAType aaType, size_t rectCount);
 

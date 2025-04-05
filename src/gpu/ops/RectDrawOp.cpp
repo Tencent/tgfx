@@ -36,7 +36,8 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class RectCoverageVertexProvider : public VertexProvider {
  public:
-  RectCoverageVertexProvider(PlacementList<RectPaint> rectPaints, bool hasColor, bool useUVCoord)
+  RectCoverageVertexProvider(std::vector<PlacementPtr<RectPaint>> rectPaints, bool hasColor,
+                             bool useUVCoord)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor), useUVCoord(useUVCoord) {
   }
 
@@ -51,8 +52,8 @@ class RectCoverageVertexProvider : public VertexProvider {
   void getVertices(float* vertices) const override {
     auto index = 0;
     for (auto& rectPaint : rectPaints) {
-      auto& viewMatrix = rectPaint.viewMatrix;
-      auto& rect = rectPaint.rect;
+      auto& viewMatrix = rectPaint->viewMatrix;
+      auto& rect = rectPaint->rect;
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
       // we want the new edge to be .5px away from the old line.
@@ -65,8 +66,8 @@ class RectCoverageVertexProvider : public VertexProvider {
       auto uvOutsetQuad = Quad::MakeFrom(outsetBounds);
 
       for (int j = 0; j < 2; ++j) {
-        const auto& quad = j == 0 ? insetQuad : outsetQuad;
-        const auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
+        auto& quad = j == 0 ? insetQuad : outsetQuad;
+        auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
         auto coverage = j == 0 ? 1.0f : 0.0f;
         for (size_t k = 0; k < 4; ++k) {
           vertices[index++] = quad.point(k).x;
@@ -77,7 +78,7 @@ class RectCoverageVertexProvider : public VertexProvider {
             vertices[index++] = uvQuad.point(k).y;
           }
           if (hasColor) {
-            WriteUByte4Color(vertices, index, rectPaint.color);
+            WriteUByte4Color(vertices, index, rectPaint->color);
           }
         }
       }
@@ -85,14 +86,15 @@ class RectCoverageVertexProvider : public VertexProvider {
   }
 
  private:
-  PlacementList<RectPaint> rectPaints = {};
+  std::vector<PlacementPtr<RectPaint>> rectPaints = {};
   bool hasColor = false;
   bool useUVCoord = false;
 };
 
 class RectNonCoverageVertexProvider : public VertexProvider {
  public:
-  RectNonCoverageVertexProvider(PlacementList<RectPaint> rectPaints, bool hasColor, bool useUVCoord)
+  RectNonCoverageVertexProvider(std::vector<PlacementPtr<RectPaint>> rectPaints, bool hasColor,
+                                bool useUVCoord)
       : rectPaints(std::move(rectPaints)), hasColor(hasColor), useUVCoord(useUVCoord) {
   }
 
@@ -107,8 +109,8 @@ class RectNonCoverageVertexProvider : public VertexProvider {
   void getVertices(float* vertices) const override {
     auto index = 0;
     for (auto& rectPaint : rectPaints) {
-      auto& viewMatrix = rectPaint.viewMatrix;
-      auto& rect = rectPaint.rect;
+      auto& viewMatrix = rectPaint->viewMatrix;
+      auto& rect = rectPaint->rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto uvQuad = Quad::MakeFrom(rect);
       for (size_t j = 4; j >= 1; --j) {
@@ -119,30 +121,31 @@ class RectNonCoverageVertexProvider : public VertexProvider {
           vertices[index++] = uvQuad.point(j - 1).y;
         }
         if (hasColor) {
-          WriteUByte4Color(vertices, index, rectPaint.color);
+          WriteUByte4Color(vertices, index, rectPaint->color);
         }
       }
     }
   }
 
  private:
-  PlacementList<RectPaint> rectPaints = {};
+  std::vector<PlacementPtr<RectPaint>> rectPaints = {};
   bool hasColor = false;
   bool useUVCoord = false;
 };
 
-PlacementNode<RectDrawOp> RectDrawOp::Make(Context* context, PlacementList<RectPaint> rects,
-                                           bool useUVCoord, AAType aaType, uint32_t renderFlags) {
+PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
+                                          std::vector<PlacementPtr<RectPaint>> rects,
+                                          bool useUVCoord, AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
   auto rectSize = rects.size();
   auto drawingBuffer = context->drawingBuffer();
-  auto drawOp = drawingBuffer->makeNode<RectDrawOp>(aaType, rectSize, useUVCoord);
-  auto& firstColor = rects.front().color;
+  auto drawOp = drawingBuffer->make<RectDrawOp>(aaType, rectSize, useUVCoord);
+  auto& firstColor = rects.front()->color;
   std::optional<Color> uniformColor = firstColor;
   for (auto& rectPaint : rects) {
-    if (rectPaint.color != firstColor) {
+    if (rectPaint->color != firstColor) {
       uniformColor = std::nullopt;
       break;
     }

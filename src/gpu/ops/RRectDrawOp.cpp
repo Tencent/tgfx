@@ -68,7 +68,8 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class RRectVertexProvider : public VertexProvider {
  public:
-  RRectVertexProvider(PlacementList<RRectPaint> rRectPaints, AAType aaType, bool useScale)
+  RRectVertexProvider(std::vector<PlacementPtr<RRectPaint>> rRectPaints, AAType aaType,
+                      bool useScale)
       : rRectPaints(std::move(rRectPaints)), aaType(aaType), useScale(useScale) {
   }
 
@@ -83,9 +84,9 @@ class RRectVertexProvider : public VertexProvider {
   void getVertices(float* vertices) const override {
     auto index = 0;
     for (auto& rRectPaint : rRectPaints) {
-      auto viewMatrix = rRectPaint.viewMatrix;
-      auto rRect = rRectPaint.rRect;
-      auto& color = rRectPaint.color;
+      auto viewMatrix = rRectPaint->viewMatrix;
+      auto rRect = rRectPaint->rRect;
+      auto& color = rRectPaint->color;
       auto scales = viewMatrix.getAxisScales();
       rRect.scale(scales.x, scales.y);
       viewMatrix.preScale(1 / scales.x, 1 / scales.y);
@@ -184,7 +185,7 @@ class RRectVertexProvider : public VertexProvider {
   }
 
  private:
-  PlacementList<RRectPaint> rRectPaints = {};
+  std::vector<PlacementPtr<RRectPaint>> rRectPaints = {};
   AAType aaType = AAType::None;
   bool useScale = false;
 };
@@ -193,13 +194,14 @@ static bool UseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
 
-PlacementNode<RRectDrawOp> RRectDrawOp::Make(Context* context, PlacementList<RRectPaint> rects,
-                                             AAType aaType, uint32_t renderFlags) {
+PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
+                                            std::vector<PlacementPtr<RRectPaint>> rects,
+                                            AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
   auto rectSize = rects.size();
-  auto drawOp = context->drawingBuffer()->makeNode<RRectDrawOp>(aaType, rectSize);
+  auto drawOp = context->drawingBuffer()->make<RRectDrawOp>(aaType, rectSize);
   drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer();
   auto useScale = UseScale(context);
   auto vertexProvider = std::make_unique<RRectVertexProvider>(std::move(rects), aaType, useScale);
