@@ -25,8 +25,8 @@
 namespace tgfx {
 /**
  * A buffer that allocates memory in blocks. This can be used to allocate many small objects in a
- * single memory block to reduce the overhead of memory allocation. The memory is not freed until
- * the BlockBuffer is destroyed.
+ * shared memory blocks to reduce the overhead of memory allocation. The memory is not freed until
+ * the BlockBuffer is destroyed or cleared.
  */
 class BlockBuffer {
  public:
