@@ -22,13 +22,13 @@
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-PlacementNode<DstTextureCopyOp> DstTextureCopyOp::Make(std::shared_ptr<TextureProxy> textureProxy,
-                                                       int srcX, int srcY) {
+PlacementPtr<DstTextureCopyOp> DstTextureCopyOp::Make(std::shared_ptr<TextureProxy> textureProxy,
+                                                      int srcX, int srcY) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto drawingBuffer = textureProxy->getContext()->drawingBuffer();
-  return drawingBuffer->makeNode<DstTextureCopyOp>(std::move(textureProxy), srcX, srcY);
+  return drawingBuffer->make<DstTextureCopyOp>(std::move(textureProxy), srcX, srcY);
 }
 
 DstTextureCopyOp::DstTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, int srcX, int srcY)

@@ -95,11 +95,11 @@ class OpsCompositor {
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
-  PlacementList<RectPaint> pendingRects = {};
-  PlacementList<RRectPaint> pendingRRects = {};
-  PlacementList<Op> ops = {};
+  std::vector<PlacementPtr<RectPaint>> pendingRects = {};
+  std::vector<PlacementPtr<RRectPaint>> pendingRRects = {};
+  std::vector<PlacementPtr<Op>> ops = {};
 
-  PlacementBuffer* drawingBuffer() const {
+  BlockBuffer* drawingBuffer() const {
     return context->drawingBuffer();
   }
 
@@ -118,7 +118,7 @@ class OpsCompositor {
   std::pair<PlacementPtr<FragmentProcessor>, bool> getClipMaskFP(const Path& clip, AAType aaType,
                                                                  Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
-  void addDrawOp(PlacementNode<DrawOp> op, const Path& clip, const Fill& fill,
+  void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                  const Rect& localBounds, const Rect& deviceBounds);
 
   friend class DrawingManager;

@@ -19,7 +19,7 @@
 #include "GLDiamondGradientLayout.h"
 
 namespace tgfx {
-PlacementPtr<DiamondGradientLayout> DiamondGradientLayout::Make(PlacementBuffer* buffer,
+PlacementPtr<DiamondGradientLayout> DiamondGradientLayout::Make(BlockBuffer* buffer,
                                                                 Matrix matrix) {
   return buffer->make<GLDiamondGradientLayout>(matrix);
 }

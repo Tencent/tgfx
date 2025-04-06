@@ -19,8 +19,10 @@
 #include "GLDualIntervalGradientColorizer.h"
 
 namespace tgfx {
-PlacementPtr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Make(
-    PlacementBuffer* buffer, Color c0, Color c1, Color c2, Color c3, float threshold) {
+PlacementPtr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Make(BlockBuffer* buffer,
+                                                                                Color c0, Color c1,
+                                                                                Color c2, Color c3,
+                                                                                float threshold) {
   Color scale01;
   // Derive scale and biases from the 4 colors and threshold
   for (int i = 0; i < 4; ++i) {
