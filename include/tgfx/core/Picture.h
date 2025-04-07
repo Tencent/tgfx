@@ -19,15 +19,17 @@
 #pragma once
 
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
 
 namespace tgfx {
 class Record;
 class Canvas;
 class DrawContext;
-class SVGExportContext;
 class MCState;
 class Image;
+class Fill;
+class BlockData;
+template <typename T>
+class PlacementPtr;
 
 /**
  * The Picture class captures the drawing commands made on a Canvas, which can be replayed later.
@@ -39,15 +41,6 @@ class Picture {
   ~Picture();
 
   /**
-   * Returns the bounding box of the Picture when drawn with the given Matrix. Since the Picture
-   * may contain shape or glyph drawing commands whose outlines can change with different scale
-   * factors, it's best to use the final drawing matrix to calculate the bounds for accuracy.
-   * Note that the bounds only include the combined geometry of each drawing command, but some
-   * commands may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
-   */
-  Rect getBounds(const Matrix* matrix = nullptr) const;
-
-  /**
    * Returns true if the Picture contains any drawing commands that fill an unbounded (infinite)
    * area. For example, drawing a Path with an inverse fill type or drawing a Paint to cover the
    * entire canvas.
@@ -57,22 +50,36 @@ class Picture {
   }
 
   /**
+   * Returns the bounding box of the Picture when drawn with the given Matrix. Since the Picture
+   * may contain shape or glyph drawing commands whose outlines can change with different scale
+   * factors, it's best to use the final drawing matrix to calculate the bounds for accuracy.
+   * Note that the bounds only include the combined geometry of each drawing command, but some
+   * commands may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
+   */
+  Rect getBounds(const Matrix* matrix = nullptr) const;
+
+  /**
    * Replays the drawing commands on the specified canvas. In the case that the commands are
    * recorded, each command in the Picture is sent separately to canvas. To add a single command to
-   * draw Picture to recording canvas, call Canvas::drawPicture() instead.
+   * draw the Picture to a canvas, call Canvas::drawPicture() instead.
    */
   void playback(Canvas* canvas) const;
 
  private:
-  std::vector<Record*> records = {};
+  std::shared_ptr<BlockData> blockData = nullptr;
+  std::vector<PlacementPtr<Record>> records = {};
+  size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
-  Picture(std::vector<Record*> records, bool hasUnboundedFill);
+  Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
+          size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
+
+  const Record* firstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr) const;
 
   friend class MeasureContext;
   friend class RenderContext;

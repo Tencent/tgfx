@@ -745,7 +745,7 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
     return nullptr;
   }
   auto maskImageOffset = Point::Zero();
-  auto maskContentImage = CreatePictureImage(maskPicture, &maskImageOffset);
+  auto maskContentImage = CreatePictureImage(std::move(maskPicture), &maskImageOffset);
   if (maskContentImage == nullptr) {
     return nullptr;
   }
@@ -892,7 +892,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   DrawArgs drawArgs(nullptr, false, bitFields.excludeChildEffectsInLayerStyle);
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
   auto contentOffset = Point::Zero();
-  auto content = CreatePictureImage(contentPicture, &contentOffset);
+  auto content = CreatePictureImage(std::move(contentPicture), &contentOffset);
   if (content == nullptr) {
     return nullptr;
   }
@@ -910,7 +910,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     drawArgs.excludeEffects = true;
     drawArgs.drawMode = DrawMode::Contour;
     auto contourPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
-    source->contour = CreatePictureImage(contourPicture, &source->contourOffset);
+    source->contour = CreatePictureImage(std::move(contourPicture), &source->contourOffset);
   }
 
   auto needBackground =
@@ -934,7 +934,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       drawBackground(args, canvas);
     };
     auto backgroundPicture = CreatePicture(drawArgs, contentScale, backgroundDrawer);
-    source->background = CreatePictureImage(backgroundPicture, &source->backgroundOffset);
+    source->background =
+        CreatePictureImage(std::move(backgroundPicture), &source->backgroundOffset);
   }
   return source;
 }

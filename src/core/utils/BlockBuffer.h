@@ -25,6 +25,20 @@
 
 namespace tgfx {
 /**
+ * BlockData is a helper class that manages the memory blocks released from a BlockBuffer. It is
+ * responsible for freeing the memory blocks when they are no longer needed.
+ */
+class BlockData {
+ public:
+  explicit BlockData(std::vector<uint8_t*> blocks);
+
+  ~BlockData();
+
+ private:
+  std::vector<uint8_t*> blocks = {};
+};
+
+/**
  * A buffer that allocates memory in blocks. This can be used to allocate many small objects in
  * shared memory blocks to reduce the overhead of memory allocation. All objects created in the
  * BlockBuffer must be destroyed before the BlockBuffer itself is cleared or destroyed.
@@ -34,7 +48,7 @@ class BlockBuffer {
   /**
    * Constructs a BlockBuffer with the given initial block size.
    */
-  BlockBuffer(size_t initBlockSize = 1024);
+  BlockBuffer(size_t initBlockSize = 256);
 
   BlockBuffer(const BlockBuffer&) = delete;
   BlockBuffer& operator=(const BlockBuffer&) = delete;
@@ -42,7 +56,7 @@ class BlockBuffer {
   /**
    * Destroys the BlockBuffer and frees all allocated memory blocks.
    */
-  virtual ~BlockBuffer();
+  ~BlockBuffer();
 
   /**
    * Creates an object of the given type in the BlockBuffer. Returns a PlacementPtr to wrap the
@@ -63,12 +77,6 @@ class BlockBuffer {
   void* allocate(size_t size);
 
   /**
-   * Allocates memory for an object of the given size with the given alignment. Returns nullptr if
-   * the allocation fails.
-   */
-  void* allocate(size_t size, size_t alignment);
-
-  /**
    * Returns the total size of all allocated memory.
    */
   size_t size() const {
@@ -86,11 +94,14 @@ class BlockBuffer {
    */
   void clear(size_t maxReuseSize = std::numeric_limits<size_t>::max());
 
- private:
-  size_t initBlockSize = 0;
-  size_t currentBlockIndex = 0;
-  size_t usedSize = 0;
+  /**
+   * Transfers ownership of the memory blocks to the returned BlockData object and resets this
+   * BlockBuffer to its initial state. Returns nullptr if the BlockBuffer size is zero and leaves
+   * it unchanged.
+   */
+  std::shared_ptr<BlockData> release();
 
+ private:
   struct Block {
     Block() = default;
 
@@ -103,6 +114,10 @@ class BlockBuffer {
   };
 
   std::vector<Block> blocks = {};
+  size_t initBlockSize = 0;
+  size_t currentBlockIndex = 0;
+  size_t usedSize = 0;
+
   Block* findOrAllocateBlock(size_t requestedSize);
   bool allocateNewBlock(size_t requestSize);
 };

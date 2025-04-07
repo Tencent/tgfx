@@ -22,6 +22,10 @@
 
 namespace tgfx {
 enum class RecordType {
+  SetMatrix,
+  SetClip,
+  SetColor,
+  SetFill,
   DrawFill,
   DrawRect,
   DrawRRect,
@@ -34,123 +38,191 @@ enum class RecordType {
   DrawLayer
 };
 
+class PlaybackContext {
+ public:
+  MCState state = {};
+  Fill fill = {};
+};
+
 class Record {
  public:
-  explicit Record(MCState state) : state(std::move(state)) {
-  }
-
   virtual ~Record() = default;
 
   virtual RecordType type() const = 0;
 
-  virtual void playback(DrawContext* context) const = 0;
+  virtual bool hasUnboundedFill(bool& /*hasInverseClip*/) const {
+    return false;
+  }
 
-  MCState state;
+  virtual void playback(DrawContext* context, PlaybackContext* playback) const = 0;
+};
+
+class SetMatrix : public Record {
+ public:
+  explicit SetMatrix(const Matrix& matrix) : matrix(matrix) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetMatrix;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->state.matrix = matrix;
+  }
+
+  Matrix matrix = {};
+};
+
+class SetClip : public Record {
+ public:
+  explicit SetClip(Path clip) : clip(std::move(clip)) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetClip;
+  }
+
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    hasInverseClip = clip.isInverseFillType();
+    return false;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->state.clip = clip;
+  }
+
+  Path clip = {};
+};
+
+class SetColor : public Record {
+ public:
+  explicit SetColor(Color color) : color(color) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetColor;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->fill.color = color;
+  }
+
+  Color color = {};
+};
+
+class SetFill : public Record {
+ public:
+  explicit SetFill(Fill fill) : fill(std::move(fill)) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetFill;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->fill = fill;
+  }
+
+  Fill fill = {};
 };
 
 class DrawFill : public Record {
  public:
-  DrawFill(MCState state, Fill fill) : Record(std::move(state)), fill(std::move(fill)) {
-  }
-
   RecordType type() const override {
     return RecordType::DrawFill;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawFill(state, fill);
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    return hasInverseClip;
   }
 
-  Fill fill;
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawFill(playback->state, playback->fill);
+  }
 };
 
 class DrawRect : public Record {
  public:
-  DrawRect(const Rect& rect, MCState state, Fill fill)
-      : Record(std::move(state)), fill(std::move(fill)), rect(rect) {
+  explicit DrawRect(const Rect& rect) : rect(rect) {
   }
 
   RecordType type() const override {
     return RecordType::DrawRect;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawRect(rect, state, fill);
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawRect(rect, playback->state, playback->fill);
   }
 
-  Fill fill;
   Rect rect;
 };
 
 class DrawRRect : public Record {
  public:
-  DrawRRect(const RRect& rRect, MCState state, Fill fill)
-      : Record(std::move(state)), fill(std::move(fill)), rRect(rRect) {
+  explicit DrawRRect(const RRect& rRect) : rRect(rRect) {
   }
 
   RecordType type() const override {
     return RecordType::DrawRRect;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawRRect(rRect, state, fill);
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawRRect(rRect, playback->state, playback->fill);
   }
 
-  Fill fill;
   RRect rRect;
 };
 
 class DrawShape : public Record {
  public:
-  DrawShape(std::shared_ptr<Shape> shape, MCState state, Fill fill)
-      : Record(std::move(state)), fill(std::move(fill)), shape(std::move(shape)) {
+  explicit DrawShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
   }
 
   RecordType type() const override {
     return RecordType::DrawShape;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawShape(shape, state, fill);
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    return hasInverseClip && shape->isInverseFillType();
   }
 
-  Fill fill;
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawShape(shape, playback->state, playback->fill);
+  }
+
   std::shared_ptr<Shape> shape;
 };
 
 class DrawImage : public Record {
  public:
-  DrawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, MCState state, Fill fill)
-      : Record(std::move(state)), fill(std::move(fill)), image(std::move(image)),
-        sampling(sampling) {
+  DrawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling)
+      : image(std::move(image)), sampling(sampling) {
   }
 
   RecordType type() const override {
     return RecordType::DrawImage;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawImage(image, sampling, state, fill);
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawImage(image, sampling, playback->state, playback->fill);
   }
 
-  Fill fill;
   std::shared_ptr<Image> image;
   SamplingOptions sampling;
 };
 
 class DrawImageRect : public DrawImage {
  public:
-  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                MCState state, Fill fill)
-      : DrawImage(std::move(image), sampling, std::move(state), std::move(fill)), rect(rect) {
+  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling)
+      : DrawImage(std::move(image), sampling), rect(rect) {
   }
 
   RecordType type() const override {
     return RecordType::DrawImageRect;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawImageRect(image, rect, sampling, state, fill);
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawImageRect(image, rect, sampling, playback->state, playback->fill);
   }
 
   Rect rect;
@@ -158,36 +230,33 @@ class DrawImageRect : public DrawImage {
 
 class DrawGlyphRunList : public Record {
  public:
-  DrawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, MCState state, Fill fill)
-      : Record(std::move(state)), fill(std::move(fill)), glyphRunList(std::move(glyphRunList)) {
+  explicit DrawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList)
+      : glyphRunList(std::move(glyphRunList)) {
   }
 
   RecordType type() const override {
     return RecordType::DrawGlyphRunList;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawGlyphRunList(glyphRunList, state, fill, nullptr);
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawGlyphRunList(glyphRunList, playback->state, playback->fill, nullptr);
   }
 
-  Fill fill;
   std::shared_ptr<GlyphRunList> glyphRunList;
 };
 
 class StrokeGlyphRunList : public DrawGlyphRunList {
  public:
-  StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, MCState state, Fill fill,
-                     const Stroke& stroke)
-      : DrawGlyphRunList(std::move(glyphRunList), std::move(state), std::move(fill)),
-        stroke(stroke) {
+  StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke& stroke)
+      : DrawGlyphRunList(std::move(glyphRunList)), stroke(stroke) {
   }
 
   RecordType type() const override {
     return RecordType::StrokeGlyphRunList;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawGlyphRunList(glyphRunList, state, fill, &stroke);
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawGlyphRunList(glyphRunList, playback->state, playback->fill, &stroke);
   }
 
   Stroke stroke;
@@ -195,16 +264,19 @@ class StrokeGlyphRunList : public DrawGlyphRunList {
 
 class DrawPicture : public Record {
  public:
-  DrawPicture(std::shared_ptr<Picture> picture, MCState state)
-      : Record(std::move(state)), picture(std::move(picture)) {
+  explicit DrawPicture(std::shared_ptr<Picture> picture) : picture(std::move(picture)) {
   }
 
   RecordType type() const override {
     return RecordType::DrawPicture;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawPicture(picture, state);
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    return hasInverseClip && picture->hasUnboundedFill();
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawPicture(picture, playback->state);
   }
 
   std::shared_ptr<Picture> picture;
@@ -212,21 +284,22 @@ class DrawPicture : public Record {
 
 class DrawLayer : public Record {
  public:
-  DrawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter, MCState state,
-            Fill fill)
-      : Record(std::move(state)), fill(std::move(fill)), picture(std::move(picture)),
-        filter(std::move(filter)) {
+  DrawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter)
+      : picture(std::move(picture)), filter(std::move(filter)) {
   }
 
   RecordType type() const override {
     return RecordType::DrawLayer;
   }
 
-  void playback(DrawContext* context) const override {
-    context->drawLayer(picture, filter, state, fill);
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    return hasInverseClip && picture->hasUnboundedFill();
   }
 
-  Fill fill;
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawLayer(picture, filter, playback->state, playback->fill);
+  }
+
   std::shared_ptr<Picture> picture;
   std::shared_ptr<ImageFilter> filter;
 };
