@@ -85,9 +85,9 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
 
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(fill)) {
-    svg = std::make_unique<ElementWriter>("svg", context, this, writer.get(), resourceBucket.get(),
-                                          exportFlags & SVGExportFlags::ConvertTextToPaths, state,
-                                          fill);
+    svg =
+        std::make_unique<ElementWriter>("svg", context, this, writer.get(), resourceBucket.get(),
+                                        exportFlags & SVGExportFlags::DisableWarnings, state, fill);
     svg->addRectAttributes(rect);
   }
 
@@ -96,7 +96,7 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
   }
 
   ElementWriter rectElement("rect", context, this, writer.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                            exportFlags & SVGExportFlags::DisableWarnings, state, fill);
 
   if (svg) {
     rectElement.addAttribute("x", 0);
@@ -115,17 +115,17 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
       ElementWriter circleElement("circle", context, this, writer.get(), resourceBucket.get(),
-                                  exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                                  exportFlags & SVGExportFlags::DisableWarnings, state, fill);
       circleElement.addCircleAttributes(roundRect.rect);
       return;
     } else {
       ElementWriter ovalElement("ellipse", context, this, writer.get(), resourceBucket.get(),
-                                exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                                exportFlags & SVGExportFlags::DisableWarnings, state, fill);
       ovalElement.addEllipseAttributes(roundRect.rect);
     }
   } else {
     ElementWriter rrectElement("rect", context, this, writer.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                               exportFlags & SVGExportFlags::DisableWarnings, state, fill);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
@@ -137,7 +137,7 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   }
   auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                            exportFlags & SVGExportFlags::DisableWarnings, state, fill);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -191,7 +191,7 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state, 
   }
   {
     ElementWriter imageUse("use", context, this, writer.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                           exportFlags & SVGExportFlags::DisableWarnings, state, fill);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
@@ -229,8 +229,7 @@ void SVGExportContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& g
   Path path;
   if (glyphRunList->getPath(&path)) {
     ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill,
-                              stroke);
+                              exportFlags & SVGExportFlags::DisableWarnings, state, fill, stroke);
     pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
     if (path.getFillType() == PathFillType::EvenOdd) {
       pathElement.addAttribute("fill-rule", "evenodd");
@@ -243,8 +242,7 @@ void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& g
                                           const Stroke* stroke) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     ElementWriter textElement("text", context, this, writer.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill,
-                              stroke);
+                              exportFlags & SVGExportFlags::DisableWarnings, state, fill, stroke);
 
     Font font;
     if (glyphRun.glyphFace->asFont(&font)) {
