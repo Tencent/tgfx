@@ -414,8 +414,6 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
     // TODO(YGaurora):
     // Export color filter shaders as color filters.
     // Export blend shaders as a combination of a shader and blend mode.
-    // Export matrix shaders as a combination of a shader and matrix. The SVG standard allows
-    // writing the matrix into <pattern> using patternTransform.
     reportUnsupportedElement("Unsupported shader");
   }
 }
@@ -506,17 +504,16 @@ std::string ElementWriter::addUnsupportedGradientDef(const GradientInfo& info,
   auto id = resourceStore->addGradient();
 
   {
-    ElementWriter gradient("linearGradient", writer);
+    ElementWriter gradient("radialGradient", writer);
 
     gradient.addAttribute("id", id);
     if (!matrix.isIdentity()) {
       gradient.addAttribute("gradientTransform", ToSVGTransform(matrix));
     }
-    gradient.addAttribute("gradientUnits", "objectBoundingBox");
-    gradient.addAttribute("x1", 0);
-    gradient.addAttribute("y1", 0);
-    gradient.addAttribute("x2", 1);
-    gradient.addAttribute("y2", 0);
+    gradient.addAttribute("gradientUnits", "userSpaceOnUse");
+    gradient.addAttribute("r", info.radiuses[0]);
+    gradient.addAttribute("cx", info.points[0].x);
+    gradient.addAttribute("cy", info.points[0].y);
     addGradientColors(info);
   }
   return id;

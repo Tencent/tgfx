@@ -334,7 +334,7 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
   size_t base64Size = ((encodedData->size() + 2) / 3) * 4 + 1;  // +1 for char* terminator
   auto bufferSize = prefixLength + base64Size;
   auto* dest = static_cast<char*>(malloc(bufferSize));
-  memcpy(dest, pngPrefix, prefixLength);
+  memcpy(dest, prefix, prefixLength);
   Base64Encode(encodedData->bytes(), encodedData->size(), dest + prefixLength);
   dest[bufferSize - 1] = '\0';
 
