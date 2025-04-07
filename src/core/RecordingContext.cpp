@@ -28,49 +28,29 @@ namespace tgfx {
  */
 constexpr int MaxPictureDrawsToUnrollInsteadOfReference = 1;
 
+RecordingContext::~RecordingContext() {
+  // make sure the records are cleared before the blockBuffer is destroyed.
+  records.clear();
+}
+
+void RecordingContext::clear() {
+  records.clear();
+  blockBuffer.clear();
+  lastState = {};
+  lastFill = {};
+  drawCount = 0;
+}
+
 std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
   if (records.empty()) {
     return nullptr;
   }
-  bool hasUnboundedFill = false;
-  for (auto& record : records) {
-    if (!record->state.clip.isInverseFillType()) {
-      continue;
-    }
-    switch (record->type()) {
-      case RecordType::DrawFill:
-        hasUnboundedFill = true;
-        break;
-      case RecordType::DrawShape:
-        if (static_cast<DrawShape*>(record)->shape->isInverseFillType()) {
-          hasUnboundedFill = true;
-        }
-        break;
-      case RecordType::DrawPicture:
-        if (static_cast<DrawPicture*>(record)->picture->hasUnboundedFill()) {
-          hasUnboundedFill = true;
-        }
-        break;
-      case RecordType::DrawLayer:
-        if (static_cast<DrawLayer*>(record)->picture->hasUnboundedFill()) {
-          hasUnboundedFill = true;
-        }
-        break;
-      default:
-        break;
-    }
-    if (hasUnboundedFill) {
-      break;
-    }
-  }
-  return std::shared_ptr<Picture>(new Picture(std::move(records), hasUnboundedFill));
-}
-
-void RecordingContext::clear() {
-  for (auto& record : records) {
-    delete record;
-  }
-  records.clear();
+  auto picture =
+      std::shared_ptr<Picture>(new Picture(blockBuffer.release(), std::move(records), drawCount));
+  lastState = {};
+  lastFill = {};
+  drawCount = 0;
+  return picture;
 }
 
 void RecordingContext::drawFill(const MCState& state, const Fill& fill) {
@@ -80,60 +60,120 @@ void RecordingContext::drawFill(const MCState& state, const Fill& fill) {
     clear();
   }
   if (fill.color.alpha > 0.0f) {
-    records.push_back(new DrawFill(state, fill));
+    recordStateAndFill(state, fill);
+    auto record = blockBuffer.make<DrawFill>();
+    records.emplace_back(std::move(record));
+    drawCount++;
   }
 }
 
 void RecordingContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  records.push_back(new DrawRect(rect, state, fill));
+  recordStateAndFill(state, fill);
+  auto record = blockBuffer.make<DrawRect>(rect);
+  records.emplace_back(std::move(record));
+  drawCount++;
 }
 
 void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
-  records.push_back(new DrawRRect(rRect, state, fill));
+  recordStateAndFill(state, fill);
+  auto record = blockBuffer.make<DrawRRect>(rRect);
+  records.emplace_back(std::move(record));
+  drawCount++;
 }
 
 void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
-  records.push_back(new DrawShape(std::move(shape), state, fill));
+  recordStateAndFill(state, fill);
+  auto record = blockBuffer.make<DrawShape>(std::move(shape));
+  records.emplace_back(std::move(record));
+  drawCount++;
 }
 
 void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  records.push_back(new DrawImage(std::move(image), sampling, state, fill));
+  recordStateAndFill(state, fill);
+  auto record = blockBuffer.make<DrawImage>(std::move(image), sampling);
+  records.emplace_back(std::move(record));
+  drawCount++;
 }
 
 void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions& sampling, const MCState& state,
                                      const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  records.push_back(new DrawImageRect(std::move(image), rect, sampling, state, fill));
+  recordStateAndFill(state, fill);
+  auto record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling);
+  records.emplace_back(std::move(record));
+  drawCount++;
 }
 
 void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                         const MCState& state, const Fill& fill,
                                         const Stroke* stroke) {
+  recordStateAndFill(state, fill);
+  PlacementPtr<Record> record = nullptr;
   if (stroke) {
-    records.push_back(new StrokeGlyphRunList(std::move(glyphRunList), state, fill, *stroke));
+    record = blockBuffer.make<StrokeGlyphRunList>(std::move(glyphRunList), *stroke);
   } else {
-    records.push_back(new DrawGlyphRunList(std::move(glyphRunList), state, fill));
+    record = blockBuffer.make<DrawGlyphRunList>(std::move(glyphRunList));
   }
+  records.emplace_back(std::move(record));
+  drawCount++;
 }
 
 void RecordingContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> filter, const MCState& state,
                                  const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
-  records.push_back(new DrawLayer(std::move(picture), std::move(filter), state, fill));
+  recordStateAndFill(state, fill);
+  auto record = blockBuffer.make<DrawLayer>(std::move(picture), std::move(filter));
+  records.emplace_back(std::move(record));
+  drawCount++;
 }
 
 void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   DEBUG_ASSERT(picture != nullptr);
-  if (picture->records.size() > MaxPictureDrawsToUnrollInsteadOfReference) {
-    records.push_back(new DrawPicture(picture, state));
+  if (picture->drawCount > MaxPictureDrawsToUnrollInsteadOfReference) {
+    recordState(state);
+    auto record = blockBuffer.make<DrawPicture>(std::move(picture));
+    records.emplace_back(std::move(record));
+    drawCount++;
   } else {
     picture->playback(this, state);
+  }
+}
+
+void RecordingContext::recordState(const tgfx::MCState& state) {
+  if (lastState.matrix != state.matrix) {
+    auto record = blockBuffer.make<SetMatrix>(state.matrix);
+    records.emplace_back(std::move(record));
+    lastState.matrix = state.matrix;
+  }
+  if (!lastState.clip.isSame(state.clip)) {
+    auto record = blockBuffer.make<SetClip>(state.clip);
+    records.emplace_back(std::move(record));
+    lastState.clip = state.clip;
+  }
+}
+
+static bool CompareFill(const Fill& a, const Fill& b) {
+  // Ignore the color differences.
+  return a.antiAlias == b.antiAlias && a.blendMode == b.blendMode && a.shader == b.shader &&
+         a.maskFilter == b.maskFilter && a.colorFilter == b.colorFilter;
+}
+
+void RecordingContext::recordStateAndFill(const MCState& state, const Fill& fill) {
+  recordState(state);
+  if (!CompareFill(lastFill, fill)) {
+    auto record = blockBuffer.make<SetFill>(fill);
+    records.emplace_back(std::move(record));
+    lastFill = fill;
+  } else if (lastFill.color != fill.color) {
+    auto record = blockBuffer.make<SetColor>(fill.color);
+    records.emplace_back(std::move(record));
+    lastFill.color = fill.color;
   }
 }
 }  // namespace tgfx

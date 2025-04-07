@@ -33,6 +33,16 @@ static size_t NextBlockSize(size_t currentSize) {
   return std::min(currentSize * 2, MAX_BLOCK_SIZE);
 }
 
+BlockData::BlockData(std::vector<uint8_t*> blocks) : blocks(std::move(blocks)) {
+  DEBUG_ASSERT(!this->blocks.empty());
+}
+
+BlockData::~BlockData() {
+  for (auto& block : blocks) {
+    free(block);
+  }
+}
+
 BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);
 }
@@ -52,19 +62,6 @@ void* BlockBuffer::allocate(size_t size) {
   block->offset += size;
   usedSize += size;
   return data;
-}
-
-void* BlockBuffer::allocate(size_t size, size_t alignment) {
-  auto block = findOrAllocateBlock(size + alignment - 1);
-  if (block == nullptr) {
-    return nullptr;
-  }
-  auto baseAddress = reinterpret_cast<uintptr_t>(block->data + block->offset);
-  uintptr_t alignedAddress = (baseAddress + alignment - 1) & ~(alignment - 1);
-  size_t alignOffset = alignedAddress - reinterpret_cast<uintptr_t>(block->data);
-  block->offset = alignOffset + size;
-  usedSize += size;
-  return reinterpret_cast<void*>(alignedAddress);
 }
 
 BlockBuffer::Block* BlockBuffer::findOrAllocateBlock(size_t requestedSize) {
@@ -92,6 +89,9 @@ std::pair<const void*, size_t> BlockBuffer::currentBlock() const {
 }
 
 void BlockBuffer::clear(size_t maxReuseSize) {
+  if (blocks.empty()) {
+    return;
+  }
   currentBlockIndex = 0;
   usedSize = 0;
   size_t totalBlockSize = 0;
@@ -106,6 +106,25 @@ void BlockBuffer::clear(size_t maxReuseSize) {
     }
   }
   blocks.resize(reusedBlockCount);
+}
+
+std::shared_ptr<BlockData> BlockBuffer::release() {
+  if (usedSize == 0) {
+    return nullptr;
+  }
+  std::vector<uint8_t*> usedBlocks = {};
+  usedBlocks.reserve(currentBlockIndex + 1);
+  for (auto& block : blocks) {
+    if (block.offset > 0) {
+      usedBlocks.push_back(block.data);
+    } else {
+      free(block.data);
+    }
+  }
+  blocks.clear();
+  currentBlockIndex = 0;
+  usedSize = 0;
+  return std::make_shared<BlockData>(std::move(usedBlocks));
 }
 
 bool BlockBuffer::allocateNewBlock(size_t requestSize) {
