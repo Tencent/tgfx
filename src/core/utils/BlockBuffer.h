@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <vector>
 #include "core/utils/PlacementPtr.h"
 
