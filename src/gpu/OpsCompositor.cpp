@@ -175,10 +175,7 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
   }
   switch (pendingType) {
     case PendingOpType::Rect:
-      if (fill.antiAlias) {
-        return pendingRects.size() < RectDrawOp::MaxNumAARects;
-      }
-      return pendingRects.size() < RectDrawOp::MaxNumNonAARects;
+      return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
     default:

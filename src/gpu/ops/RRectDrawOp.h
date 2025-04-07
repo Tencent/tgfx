@@ -37,7 +37,7 @@ class RRectDrawOp : public DrawOp {
   /**
    * The maximum number of round rects that can be drawn in a single draw call.
    */
-  static constexpr uint16_t MaxNumRRects = 512;
+  static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
    * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
