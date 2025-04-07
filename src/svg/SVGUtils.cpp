@@ -331,7 +331,7 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
     return nullptr;
   }
   size_t prefixLength = strlen(prefix);
-  size_t base64Size = ((encodedData->size() + 2) / 3) * 4;
+  size_t base64Size = ((encodedData->size() + 2) / 3) * 4 + 1;  // +1 for char* terminator
   auto bufferSize = prefixLength + base64Size;
   auto* dest = static_cast<char*>(malloc(bufferSize));
   memcpy(dest, pngPrefix, prefixLength);
