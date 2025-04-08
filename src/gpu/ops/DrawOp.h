@@ -58,7 +58,7 @@ class DrawOp : public Op {
   explicit DrawOp(AAType aaType) : aaType(aaType) {
   }
 
- private:
+ protected:
   Rect _scissorRect = Rect::MakeEmpty();
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};

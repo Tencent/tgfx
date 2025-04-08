@@ -19,23 +19,36 @@
 #pragma once
 
 #include <memory>
+#include "core/atlas/AtlasTypes.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 
 namespace tgfx {
+
+struct AtlasGeometryProxy {
+  MaskFormat maskFormat;
+  uint32_t pageIndex;
+  std::shared_ptr<GpuBufferProxy> vertexProxy;
+  std::shared_ptr<GpuBufferProxy> indexProxy;
+};
+
 class AtlasProxy {
  public:
-  explicit AtlasProxy(std::shared_ptr<GpuBufferProxy> triangles) : triangles(std::move(triangles)) {
+  explicit AtlasProxy(std::vector<AtlasGeometryProxy> geometryProxies)
+      : geometryProxies(std::move(geometryProxies)) {
   }
 
   Context* getContext() const {
-    return triangles->getContext();
+    if (geometryProxies.empty()) {
+      return nullptr;
+    }
+    return geometryProxies[0].vertexProxy->getContext();
   }
 
-  std::shared_ptr<GpuBufferProxy> getTriangles() const {
-    return triangles;
+  const std::vector<AtlasGeometryProxy>& getGeometryProxies() const {
+    return geometryProxies;
   }
 
  private:
-  std::shared_ptr<GpuBufferProxy> triangles = nullptr;
+  std::vector<AtlasGeometryProxy> geometryProxies;
 };
 }  // namespace tgfx

@@ -22,18 +22,27 @@
 #include "core/atlas/Glyph.h"
 
 namespace tgfx {
+
+struct AtlasGeometryData {
+  MaskFormat maskFormat;
+  uint32_t pageIndex;
+  std::shared_ptr<Data> vertices;
+  std::shared_ptr<Data> indices;
+};
+
 class AtlasBuffer {
  public:
-  static std::shared_ptr<AtlasBuffer> MakeFrom(std::vector<Glyph*> glyphs);
+  static std::shared_ptr<AtlasBuffer> MakeFrom(std::vector<AtlasGeometryData>);
 
-  const std::vector<Glyph*>& glyphs() const {
-    return _glyphs;
+  const std::vector<AtlasGeometryData>& geometryData() const {
+    return _geometryData;
   }
 
  private:
-  explicit AtlasBuffer(std::vector<Glyph*> glyphs) : _glyphs(std::move(glyphs)) {
+  explicit AtlasBuffer(std::vector<AtlasGeometryData> geometryData)
+      : _geometryData(std::move(geometryData)) {
   }
-  std::vector<Glyph*> _glyphs;
+  std::vector<AtlasGeometryData> _geometryData;
 };
 
 }  // namespace tgfx

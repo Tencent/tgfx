@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <map>
 #include <memory>
+#include <vector>
 #include "ResourceTask.h"
 #include "core/AtlasBuffer.h"
 #include "core/DataSource.h"
@@ -27,7 +29,8 @@
 namespace tgfx {
 class AtlasBufferUploadTask : public ResourceTask {
  public:
-  AtlasBufferUploadTask(UniqueKey atlasKey, std::unique_ptr<DataSource<AtlasBuffer>> source);
+  AtlasBufferUploadTask(UniqueKey, std::vector<std::pair<UniqueKey, UniqueKey>>,
+                        std::unique_ptr<DataSource<AtlasBuffer>> source);
 
   bool execute(Context* context) override;
 
@@ -38,5 +41,6 @@ class AtlasBufferUploadTask : public ResourceTask {
 
  private:
   std::unique_ptr<DataSource<AtlasBuffer>> source = nullptr;
+  std::vector<std::pair<UniqueKey, UniqueKey>> atlasProxyKeys;
 };
 }  // namespace tgfx

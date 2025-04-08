@@ -17,12 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AtlasTextDrawOp.h"
-
 #include "core/atlas/AtlasManager.h"
 #include "core/utils/PlacementNode.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
-PlacementNode<AtlasTextDrawOp> AtlasTextDrawOp::Make(std::shared_ptr<GpuBufferProxy> atlasProxy,
+PlacementPtr<Pipeline> AtlasTextDrawOp::createPipeline(RenderPass* renderPass,
+                                                       std::shared_ptr<TextureProxy> textureProxy,
+                                                       PlacementPtr<GeometryProcessor> gp) {
+  auto numColorProcessors = colors.size();
+  auto fragmentProcessors = std::move(colors);
+  fragmentProcessors.reserve(numColorProcessors + coverages.size() + 1);
+
+  auto atlasProcessor = TiledTextureEffect::Make(std::move(textureProxy), TileMode::Clamp,
+                                                 TileMode::Clamp, {}, nullptr, true);
+
+  fragmentProcessors.emplace_back(std::move(atlasProcessor));
+  for (auto& coverage : coverages) {
+    fragmentProcessors.emplace_back(std::move(coverage));
+  }
+  auto format = renderPass->renderTarget()->format();
+  auto context = renderPass->getContext();
+  const auto& swizzle = context->caps()->getWriteSwizzle(format);
+  return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),
+                                                  numColorProcessors, std::move(xferProcessor),
+                                                  blendMode, &swizzle);
+}
+
+PlacementNode<AtlasTextDrawOp> AtlasTextDrawOp::Make(std::shared_ptr<AtlasProxy> atlasProxy,
                                                      const Matrix& uvMatrix, AAType aaType) {
   if (atlasProxy == nullptr) {
     return nullptr;
@@ -31,14 +55,14 @@ PlacementNode<AtlasTextDrawOp> AtlasTextDrawOp::Make(std::shared_ptr<GpuBufferPr
   return drawingBuffer->makeNode<AtlasTextDrawOp>(std::move(atlasProxy), uvMatrix, aaType);
 }
 
-AtlasTextDrawOp::AtlasTextDrawOp(std::shared_ptr<GpuBufferProxy> proxy, const Matrix& uvMatrix,
+AtlasTextDrawOp::AtlasTextDrawOp(std::shared_ptr<AtlasProxy> proxy, const Matrix& uvMatrix,
                                  AAType aaType)
     : DrawOp(aaType), atlasProxy(proxy), uvMatrix(uvMatrix) {
   // Initialize other members if needed
 }
 
 void AtlasTextDrawOp::execute(RenderPass* renderPass) {
-  if (atlasProxy == nullptr || renderPass == nullptr) {
+  if (atlasProxy == nullptr || atlasProxy->getContext() == nullptr || renderPass == nullptr) {
     return;
   }
   auto atlasManger = atlasProxy->getContext()->atlasManager();
@@ -46,6 +70,32 @@ void AtlasTextDrawOp::execute(RenderPass* renderPass) {
     return;
   }
   atlasManger->uploadToTexture();
+
+  const auto& geometryProxies = atlasProxy->getGeometryProxies();
+  for (const auto& [maskFormat, pageIndex, vertexproxy, indexProxy] : geometryProxies) {
+    if (vertexproxy == nullptr || vertexproxy->getBuffer() == nullptr || indexProxy == nullptr ||
+        indexProxy->getBuffer() == nullptr) {
+      continue;
+    }
+
+    auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+    auto renderTarget = renderPass->renderTarget();
+    auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+                                                   renderTarget->height(), AAType::None,
+                                                   std::nullopt, true);
+
+    unsigned numActiveProxies = 0;
+    auto textureProxy = atlasManger->getTextureProxy(maskFormat, &numActiveProxies);
+    if (pageIndex >= numActiveProxies) {
+      continue;
+    }
+
+    auto pipeLine = createPipeline(renderPass, textureProxy[pageIndex], std::move(gp));
+    renderPass->bindProgramAndScissorClip(pipeLine.get(), scissorRect());
+    renderPass->bindBuffers(indexProxy->getBuffer(), vertexproxy->getBuffer());
+    renderPass->drawIndexed(PrimitiveType::Triangles, 0,
+                            indexProxy->getBuffer()->size() / sizeof(uint16_t));
+  }
 
   // Implement the execution logic for the AtlasTextDrawOp
   // This will involve using the atlasProxy and uvMatrix to draw the text

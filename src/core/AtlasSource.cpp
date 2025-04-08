@@ -20,6 +20,8 @@
 #include "core/PixelBuffer.h"
 #include "core/atlas/AtlasManager.h"
 #include "core/utils/MathExtra.h"
+#include "gpu/Quad.h"
+#include "tgfx/core/Buffer.h"
 #include "utils/PlacementBuffer.h"
 
 namespace tgfx {
@@ -57,17 +59,25 @@ AtlasSource::AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunLis
 
 std::shared_ptr<AtlasBuffer> AtlasSource::getData() const {
   //auto aaType = AAType::Coverage;
-  for (auto& drawGlyph : drawGlyphs) {
-    auto imageBuffer = drawGlyph->glyphFace->generateImage(drawGlyph->glyphId);
-    if (imageBuffer == nullptr) {
-      continue;
+  for (auto& [_, pageGlyphMap] : drawGlyphs) {
+    for (auto& [_, drawGlyphArray] : pageGlyphMap) {
+      for (auto& drawGlyph : drawGlyphArray) {
+        auto imageBuffer = drawGlyph->glyphFace->generateImage(drawGlyph->glyphId);
+        if (imageBuffer == nullptr) {
+          continue;
+        }
+        auto pixelBuffer = std::static_pointer_cast<PixelBuffer>(imageBuffer);
+        if (pixelBuffer == nullptr) {
+          continue;
+        }
+        atlasManager->fillGlyphImage(drawGlyph->maskFormat, drawGlyph->locator,
+                                     pixelBuffer->lockPixels());
+        pixelBuffer->unlockPixels();
+      }
     }
-    auto pixelBuffer = std::static_pointer_cast<PixelBuffer>(imageBuffer);
-    atlasManager->fillGlyphImage(drawGlyph->maskFormat, drawGlyph->locator,
-                                 pixelBuffer->lockPixels());
   }
-  std::vector<Glyph*> glyphs;
-  return AtlasBuffer::MakeFrom(std::move(glyphs));
+
+  return AtlasBuffer::MakeFrom(makeGeometries());
 }
 
 void AtlasSource::computeAtlasLocator() {
@@ -111,7 +121,11 @@ void AtlasSource::computeAtlasLocator() {
         glyph->_height = static_cast<int>(bounds.height());
         if (std::max(glyph->width(), glyph->height()) < 256) {
           atlasManager->addGlyphToAtlasWithoutFillImage(std::move(glyph));
-          drawGlyphs.push_back(std::move(drawGlyph));
+          AtlasLocator locator;
+          if (atlasManager->getGlyphLocator(maskFormat, glyphKey, locator)) {
+            drawGlyph->locator = locator;
+          }
+          drawGlyphs[maskFormat][locator.pageIndex()].push_back(std::move(drawGlyph));
         } else {
           LOGE("glyph too large ");
         }
@@ -119,12 +133,56 @@ void AtlasSource::computeAtlasLocator() {
         AtlasLocator locator;
         if (atlasManager->getGlyphLocator(maskFormat, glyphKey, locator)) {
           drawGlyph->locator = locator;
-          drawGlyphs.push_back(std::move(drawGlyph));
+          drawGlyphs[maskFormat][locator.pageIndex()].push_back(std::move(drawGlyph));
         }
       }
       ++index;
     }
   }
+}
+
+std::vector<AtlasGeometryData> AtlasSource::makeGeometries() const {
+  std::vector<AtlasGeometryData> geometries;
+  for (auto& [maskFormat, maskDrawGlyphs] : drawGlyphs) {
+    for (auto& [pageIndex, glyphArray] : maskDrawGlyphs) {
+      size_t perVertexCount = 4;
+      auto floatCount = glyphArray.size() * perVertexCount * 4;
+      Buffer buffer(floatCount * sizeof(float));
+      auto vertices = reinterpret_cast<float*>(buffer.data());
+      auto index = 0;
+      for (auto& drawGlyph : glyphArray) {
+        auto rect = drawGlyph->locator.getLocation();
+        auto viewMatrix = Matrix::MakeScale(scale, scale);
+        viewMatrix.postTranslate(drawGlyph->position.x, drawGlyph->position.y);
+        auto quad = Quad::MakeFrom(rect, &viewMatrix);
+        auto uvQuad = Quad::MakeFrom(rect);
+        for (size_t j = 4; j >= 1; --j) {
+          vertices[index++] = quad.point(j - 1).x;
+          vertices[index++] = quad.point(j - 1).y;
+          vertices[index++] = uvQuad.point(j - 1).x;
+          vertices[index++] = uvQuad.point(j - 1).y;
+        }
+      }
+
+      size_t patternSize = 6;
+      auto reps = glyphArray.size();
+      auto size = static_cast<size_t>(reps * patternSize * sizeof(uint16_t));
+      static uint16_t pattern[] = {0, 1, 2, 2, 1, 3};
+      Buffer indexBuffer(size);
+      uint16_t vertCount = 4;
+      auto* data = reinterpret_cast<uint16_t*>(indexBuffer.data());
+      for (uint16_t i = 0; i < reps; ++i) {
+        uint16_t baseIndex = static_cast<uint16_t>(i * patternSize);
+        auto baseVert = static_cast<uint16_t>(i * vertCount);
+        for (uint16_t j = 0; j < patternSize; ++j) {
+          data[baseIndex + j] = baseVert + pattern[j];
+        }
+      }
+
+      geometries.push_back({maskFormat, pageIndex, buffer.release(), indexBuffer.release()});
+    }
+  }
+  return geometries;
 }
 
 }  // namespace tgfx

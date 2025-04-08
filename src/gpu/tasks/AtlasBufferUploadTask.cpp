@@ -17,16 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AtlasBufferUploadTask.h"
+#include "core/utils/UniqueID.h"
+#include "gpu/GpuBuffer.h"
 
 namespace tgfx {
 AtlasBufferUploadTask::AtlasBufferUploadTask(UniqueKey atlasKey,
+                                             std::vector<std::pair<UniqueKey, UniqueKey>> proxyKeys,
                                              std::unique_ptr<DataSource<AtlasBuffer>> source)
-    : ResourceTask(std::move(atlasKey)), source(std::move(source)) {
+    : ResourceTask(std::move(atlasKey)), source(std::move(source)),
+      atlasProxyKeys(std::move(proxyKeys)) {
 }
 
-bool AtlasBufferUploadTask::execute(Context*) {
+bool AtlasBufferUploadTask::execute(Context* context) {
   if (uniqueKey.strongCount() <= 0) {
-    // Skip the resource creation if there is no proxy is referencing it.
     return false;
   }
 
@@ -39,7 +42,29 @@ bool AtlasBufferUploadTask::execute(Context*) {
     return false;
   }
 
-  //TODO upload atlas
+  const auto& geometryData = atlasBuffer->geometryData();
+  if (atlasProxyKeys.size() != geometryData.size()) {
+    return false;
+  }
+
+  size_t index = 0;
+  for (const auto& geometry : geometryData) {
+    auto vertexBuffer = GpuBuffer::Make(context, BufferType::Vertex, geometry.vertices->data(),
+                                        geometry.vertices->size());
+    if (!vertexBuffer) {
+      return false;
+    }
+    auto indexBuffer = GpuBuffer::Make(context, BufferType::Index, geometry.indices->data(),
+                                       geometry.indices->size());
+    if (!indexBuffer) {
+      return false;
+    }
+
+    vertexBuffer->assignUniqueKey(atlasProxyKeys[index].first);
+    indexBuffer->assignUniqueKey(atlasProxyKeys[index].second);
+    index++;
+  }
+
   source = nullptr;
   return true;
 }

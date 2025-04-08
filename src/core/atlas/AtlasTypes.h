@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
 #include <list>
 #include "RectPackSkyline.h"
 #include "core/utils/Log.h"
@@ -160,6 +161,10 @@ class AtlasLocator {
     location = rect;
   }
 
+  void setPlotLocator(const PlotLocator& plotLocator) {
+    this->plotLocator = plotLocator;
+  }
+
  private:
   PlotLocator plotLocator;
   Rect location = Rect::MakeEmpty();
@@ -184,7 +189,8 @@ class Plot {
     return _genID;
   }
 
-  bool addSubImage(int width, int height, const void* image, AtlasLocator& atlasLocator) const;
+  bool addSubImage(int imageWidth, int imageHeight, const void* image,
+                   AtlasLocator& atlasLocator) const;
 
   bool addRect(int with, int height, AtlasLocator& atlasLocator);
 
@@ -204,6 +210,7 @@ class Plot {
   const int bytesPerPixel;
   RectPackSkyline rectPack;
   PlotLocator plotLocator;
+  const int padding = 1;
 
   Rect dirtyRect = Rect::MakeEmpty();
   Rect cachedRect = Rect::MakeEmpty();

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <memory>
 #include <map>
+#include <memory>
 #include <set>
 #include "core/atlas/AtlasTypes.h"
 #include "core/atlas/Glyph.h"
@@ -104,7 +104,7 @@ class Atlas {
   int plotHeight;
   const std::string label;
 
-  std::map<uint32_t,std::set<Plot*>> dirtyPlots;
+  std::map<uint32_t, std::set<Plot*>> dirtyPlots;
 
   BytesKeyMap<PlacementPtr<Glyph>> glyphs;
 };

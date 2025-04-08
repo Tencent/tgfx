@@ -172,7 +172,7 @@ void Atlas::uploadToTexture(Context* context) {
     return;
   }
 
-  for(auto& [pageIndex, plots] : dirtyPlots) {
+  for (auto& [pageIndex, plots] : dirtyPlots) {
     DEBUG_ASSERT(pageIndex < _maxPages);
     auto textureProxy = textureProxies[pageIndex];
     if (textureProxy == nullptr) {
@@ -189,12 +189,11 @@ void Atlas::uploadToTexture(Context* context) {
         continue;
       }
       auto [pixels, rect, rowBytes] = plot->prepareForUpload();
-      gpu->writePixels(texture->getSampler(),rect, pixels, rowBytes);
+      gpu->writePixels(texture->getSampler(), rect, pixels, rowBytes);
     }
   }
 
   dirtyPlots.clear();
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

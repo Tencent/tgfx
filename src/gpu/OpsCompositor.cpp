@@ -159,7 +159,7 @@ void OpsCompositor::fillGlyphRuns(std::shared_ptr<GlyphRunList> glyphRunList, fl
   auto key = UniqueKey::Make();
   auto atlasProxy =
       proxyProvider()->createAtlasProxy(key, std::move(glyphRunList), scale, renderFlags);
-  auto drawOp = AtlasTextDrawOp::Make(atlasProxy->getTriangles(), uvMatrix, aaType);
+  auto drawOp = AtlasTextDrawOp::Make(atlasProxy, uvMatrix, aaType);
   addDrawOp(std::move(drawOp), state.clip, fill, localBounds, deviceBounds);
 }
 

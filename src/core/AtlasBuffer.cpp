@@ -18,7 +18,7 @@
 #include "AtlasBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<AtlasBuffer> AtlasBuffer::MakeFrom(std::vector<Glyph*> glyphs) {
-  return std::shared_ptr<AtlasBuffer>(new AtlasBuffer(std::move(glyphs)));
+std::shared_ptr<AtlasBuffer> AtlasBuffer::MakeFrom(std::vector<AtlasGeometryData> geometryDatas) {
+  return std::shared_ptr<AtlasBuffer>(new AtlasBuffer(std::move(geometryDatas)));
 }
 }  // namespace tgfx

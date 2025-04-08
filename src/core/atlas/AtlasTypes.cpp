@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "AtlasTypes.h"
-#include <MacTypes.h>
 
 namespace tgfx {
 Plot::Plot(int pageIndex, int plotIndex, AtlasGenerationCounter* generationCounter, int offsetX,
@@ -34,24 +33,24 @@ Plot::~Plot() {
   delete[] data;
 }
 
-bool Plot::addSubImage(int width, int height, const void* image, AtlasLocator& atlasLocator) const {
+bool Plot::addSubImage(int imageWidth, int imageHeight, const void* image,
+                       AtlasLocator& atlasLocator) const {
   if (data == nullptr) {
     return false;
   }
-
-  DEBUG_ASSERT(width < this->width && height < this->height);
+  DEBUG_ASSERT(imageWidth < width && imageHeight < height);
   Point location = {atlasLocator.getLocation().left, atlasLocator.getLocation().top};
-  auto rect = Rect::MakeXYWH(location.x, location.y, (float)width, (float)height);
+  auto rect = Rect::MakeXYWH(location.x, location.y, (float)imageWidth, (float)imageHeight);
 
   auto left = static_cast<int>(rect.left);
   auto top = static_cast<int>(rect.top);
-  auto rowBytes = static_cast<size_t>(width * bytesPerPixel);
+  auto rowBytes = static_cast<size_t>(imageWidth * bytesPerPixel);
   auto imagePtr = static_cast<const uint8_t*>(image);
   auto dataPtr = data;
   dataPtr += bytesPerPixel * width * top;
   dataPtr += bytesPerPixel * left;
 
-  for (auto i = 0; i < height; ++i) {
+  for (auto i = 0; i < imageHeight; ++i) {
     memcpy(dataPtr, imagePtr, rowBytes);
     dataPtr += bytesPerPixel * width;
     imagePtr += rowBytes;
@@ -60,13 +59,15 @@ bool Plot::addSubImage(int width, int height, const void* image, AtlasLocator& a
   return true;
 }
 
-bool Plot::addRect(int width, int height, AtlasLocator& atlasLocator) {
-  DEBUG_ASSERT(width < this->width && height < this->height);
+bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) {
+  DEBUG_ASSERT(imageWidth + 2 * padding < width && imageHeight + 2 * padding < height);
+  auto widthWithPadding = imageWidth + 2 * padding;
+  auto heightWithPadding = imageHeight + 2 * padding;
   Point location;
-  if (!rectPack.addRect(width, height, location)) {
+  if (!rectPack.addRect(widthWithPadding, heightWithPadding, location)) {
     return false;
   }
-  auto rect = Rect::MakeXYWH(location.x, location.y, (float)width, (float)height);
+
   if (data == nullptr) {
     auto size = static_cast<size_t>(this->width * this->height * bytesPerPixel);
     data = new (std::nothrow) uint8_t[size];
@@ -75,8 +76,12 @@ bool Plot::addRect(int width, int height, AtlasLocator& atlasLocator) {
     }
     memset(data, 0, size);
   }
+  auto rectX = static_cast<int>(location.x) + padding;
+  auto rectY = static_cast<int>(location.y) + padding;
+  auto rect = Rect::MakeXYWH(rectX, rectY, imageWidth, imageHeight);
   rect.offset(pixelOffset.x, pixelOffset.y);
   atlasLocator.updateRect(rect);
+  atlasLocator.setPlotLocator(plotLocator);
   dirtyRect.join(rect);
   return true;
 }
@@ -99,11 +104,11 @@ std::tuple<const void*, Rect, size_t> Plot::prepareForUpload() {
   }
   auto rect = dirtyRect;
   dirtyRect.setEmpty();
-  auto rowBytes = static_cast<size_t>(width * bytesPerPixel);
+  auto rowBytes = static_cast<int>(width * bytesPerPixel);
   auto dataPtr = data;
   auto top = static_cast<int>(rect.top);
   auto left = static_cast<int>(rect.left);
-  dataPtr += bytesPerPixel * top;
+  dataPtr += rowBytes * top;
   dataPtr += bytesPerPixel * left;
   return {dataPtr, rect, rowBytes};
 }

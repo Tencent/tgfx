@@ -23,10 +23,21 @@
 #include "core/atlas/AtlasManager.h"
 
 namespace tgfx {
+
 class AtlasSource : public DataSource<AtlasBuffer> {
  public:
+  using PageGlyphMap = std::map<uint32_t, std::vector<PlacementPtr<DrawGlyph>>>;
+
   AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunList> glyphRunList, float scale,
               const Stroke* stroke);
+
+  size_t getBufferCount() const {
+    return drawGlyphs.size();
+  }
+
+  const std::map<MaskFormat, PageGlyphMap>& getDrawGlyphs() const {
+    return drawGlyphs;
+  }
 
   std::shared_ptr<AtlasBuffer> getData() const override;
 
@@ -38,13 +49,15 @@ class AtlasSource : public DataSource<AtlasBuffer> {
     return stroke;
   }
 
+  std::vector<AtlasGeometryData> makeGeometries() const;
+
  private:
   AtlasManager* atlasManager;
   float scale;
   const Stroke* stroke;
   std::shared_ptr<GlyphRunList> glyphRunList;
 
-  std::vector<PlacementPtr<DrawGlyph>> drawGlyphs;
+  std::map<MaskFormat, PageGlyphMap> drawGlyphs;
 
   void computeAtlasLocator();
 };

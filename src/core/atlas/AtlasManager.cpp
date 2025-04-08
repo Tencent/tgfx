@@ -100,13 +100,12 @@ bool AtlasManager::fillGlyphImage(MaskFormat maskFormat, AtlasLocator& locator, 
   return this->getAtlas(maskFormat)->fillGlyphImage(locator, image);
 }
 
-void AtlasManager::uploadToTexture(){
+void AtlasManager::uploadToTexture() {
   for (int i = 0; i < kMaskFormatCount; i++) {
     if (atlases[i] != nullptr) {
       atlases[i]->uploadToTexture(context);
     }
   }
 }
-
 
 }  // namespace tgfx
