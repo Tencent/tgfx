@@ -10,30 +10,30 @@ cmake_policy(SET CMP0063 NEW)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building tgfx
-option(TGFX_USE_OPENGL "Allow the use of OpenGL as GPU backend" ON)
-option(TGFX_USE_QT "Allow build with QT frameworks." OFF)
-option(TGFX_USE_SWIFTSHADER "Allow build with the SwiftShader library" OFF)
-option(TGFX_USE_ANGLE "Allow build with the ANGLE library" OFF)
-option(TGFX_BUILD_SVG "Allow build the svg module" OFF)
-option(TGFX_BUILD_DRAWERS "Build the tgfx-drawers library" OFF)
-option(EMSCRIPTEN_PTHREADS "Allow the use of threads on the web platform" OFF)
-option(TGFX_USE_FASTER_BLUR "Use faster blur algorithm instead of gaussian blur" ON)
-
+option(TGFX_BUILD_SVG "Enable building the SVG module" OFF)
+option(TGFX_BUILD_DRAWERS "Enable building the tgfx-drawers library for testing" OFF)
+option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
+option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
+option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
+option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
+option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
+# When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
+# Instead, they will use promise-awaiting calls before generating textures, allowing multiple
+# images to be decoded simultaneously. Avoid enabling this if your rendering process requires
+# multiple flush() calls in a single frame, as it may cause screen tearing, where parts of the
+# screen update while others do not.
+option(TGFX_USE_ASYNC_PROMISE "Enable async promises for loading images on the web" OFF)
+# This option is universal and can be set by vendor tools for building the wasm-mt architecture.
+option(EMSCRIPTEN_PTHREADS "Enable threading support on the web platform" OFF)
 
 if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
-    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" OFF)
+    option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" OFF)
 else ()
-    option(TGFX_USE_FREETYPE "Allow the use of embedded freetype library" ON)
+    option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" ON)
 endif ()
 
-if (IOS)
+if (IOS OR WEB)
     option(TGFX_USE_WEBP_DECODE "Enable embedded WEBP decoding support" ON)
-elseif (WEB)
-    option(TGFX_USE_WEBP_DECODE "Enable embedded WEBP decoding support" ON)
-    if (EMSCRIPTEN_PTHREADS)
-        option(TGFX_USE_PNG_DECODE "Enable embedded PNG decoding support" ON)
-        option(TGFX_USE_JPEG_DECODE "Enable embedded JPEG decoding support" ON)
-    ENDIF ()
 elseif (NOT ANDROID AND NOT OHOS)
     option(TGFX_USE_PNG_DECODE "Enable embedded PNG decoding support" ON)
     option(TGFX_USE_PNG_ENCODE "Enable embedded PNG encoding support" ON)
@@ -52,7 +52,7 @@ endif ()
 get_directory_property(HasParent PARENT_DIRECTORY)
 if (MACOS AND CLION_IDE AND NOT HasParent)
     # CLion project needs test targets.
-    option(TGFX_BUILD_TESTS "Build tgfx tests" ON)
+    option(TGFX_BUILD_TESTS "Enable building tgfx test targets" ON)
 endif ()
 
 if (TGFX_BUILD_SVG)
@@ -66,6 +66,11 @@ if (TGFX_BUILD_TESTS)
     set(TGFX_BUILD_SVG ON)
 else ()
     set(TGFX_BUILD_TESTS OFF)
+endif ()
+
+if (TGFX_USE_FREETYPE)
+    # Freetype needs libpng
+    set(TGFX_USE_PNG_DECODE ON)
 endif ()
 
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
@@ -82,6 +87,7 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("EMSCRIPTEN_PTHREADS: ${EMSCRIPTEN_PTHREADS}")
 message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
+message("TGFX_USE_ASYNC_PROMISE: ${TGFX_USE_ASYNC_PROMISE}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -152,11 +158,6 @@ if (TGFX_USE_QT OR TGFX_USE_SWIFTSHADER OR TGFX_USE_ANGLE)
     set(TGFX_USE_OPENGL ON)
 endif ()
 
-if (TGFX_USE_FREETYPE)
-    # Freetype needs libpng
-    set(TGFX_USE_PNG_DECODE ON)
-endif ()
-
 if (TGFX_USE_PNG_DECODE)
     list(APPEND TGFX_DEFINES TGFX_USE_PNG_DECODE)
     set(TGFX_USE_PNG ON)
@@ -222,6 +223,10 @@ if (TGFX_USE_FASTER_BLUR)
     list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*GaussianBlur.*")
 else ()
     list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*DualBlur.*")
+endif ()
+
+if (TGFX_USE_ASYNC_PROMISE)
+    list(APPEND TGFX_DEFINES TGFX_USE_ASYNC_PROMISE)
 endif ()
 
 if (TGFX_USE_FREETYPE)
