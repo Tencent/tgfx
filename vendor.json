@@ -25,32 +25,6 @@
       }
     },
     {
-      "name": "tracy",
-      "cmake": {
-        "targets": [
-          "TracyClient"
-        ],
-        "arguments": [
-          "-DCMAKE_CXX_FLAGS=\"-w\""
-        ]
-      }
-    },
-    {
-      "name": "tracyServer",
-      "dir": "tracy/serverLib",
-      "cmake": {
-        "targets": [
-          "TracyServer",
-          "TracyNfd",
-          "TracyZstd",
-          "capstone"
-        ],
-        "arguments": [
-          "-DCMAKE_CXX_FLAGS=\"-w\""
-        ]
-      }
-    },
-    {
       "name": "zlib",
       "cmake": {
         "targets": [
@@ -141,9 +115,6 @@
         "targets": [
           "png_static"
         ],
-        "arguments": [
-          "-DPNG_BUILD_ZLIB=ON"
-        ],
         "includes": [
           "${SOURCE_DIR}/png.h",
           "${SOURCE_DIR}/pngconf.h",
@@ -167,7 +138,6 @@
           "png_static"
         ],
         "arguments": [
-          "-DPNG_BUILD_ZLIB=ON",
           "-DPNG_ARM_NEON=on"
         ],
         "includes": [
@@ -192,7 +162,6 @@
         ],
         "arguments": [
           "-DANDROID=TRUE",
-          "-DPNG_BUILD_ZLIB=ON",
           "-DPNG_ARM_NEON=on"
         ],
         "includes": [
