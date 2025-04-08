@@ -48,6 +48,9 @@ class DataSource {
 	 * immediately.
    */
   static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source) {
+#ifndef TGFX_USE_THREADS
+    return source;
+#endif
     if (source == nullptr) {
       return nullptr;
     }

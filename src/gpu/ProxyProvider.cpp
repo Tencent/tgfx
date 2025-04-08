@@ -19,6 +19,7 @@
 #include "ProxyProvider.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
@@ -59,9 +60,11 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   if (proxy != nullptr) {
     return proxy;
   }
+#ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
     source = DataSource<Data>::Async(std::move(source));
   }
+#endif
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
   auto task =
       context->drawingBuffer()->make<GpuBufferUploadTask>(proxyKey, bufferType, std::move(source));
@@ -92,6 +95,7 @@ std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVe
     uploadSharedVertexBuffer(std::move(data));
     offset = 0;
   }
+#ifdef TGFX_USE_THREADS
   if (renderFlags & RenderFlags::DisableAsyncTask) {
     provider->getVertices(vertices);
   } else {
@@ -99,6 +103,10 @@ std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVe
     Task::Run(task);
     sharedVertexBufferTasks.push_back(std::move(task));
   }
+#else
+  USE(renderFlags);
+  provider->getVertices(vertices);
+#endif
   if (sharedVertexBuffer == nullptr) {
     auto uniqueKey = UniqueKey::Make();
     sharedVertexBuffer =
@@ -196,11 +204,15 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
+#ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     dataSource = DataSource<ShapeBuffer>::Async(std::move(rasterizer));
   } else {
     dataSource = std::move(rasterizer);
   }
+#else
+  dataSource = std::move(rasterizer);
+#endif
   auto triangleProxyKey = GetProxyKey(triangleKey, renderFlags);
   auto textureProxyKey = GetProxyKey(textureKey, renderFlags);
   auto task = context->drawingBuffer()->make<ShapeBufferUploadTask>(
@@ -238,7 +250,11 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
+#ifdef TGFX_USE_THREADS
   auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
+#else
+  auto asyncDecoding = false;
+#endif
   auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
   return createTextureProxy(uniqueKey, std::move(source), width, height, alphaOnly, mipmapped,
                             renderFlags);

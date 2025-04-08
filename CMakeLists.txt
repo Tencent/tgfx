@@ -17,16 +17,20 @@ option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
+
 # When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
 # Instead, they will use promise-awaiting calls before generating textures, allowing multiple
 # images to be decoded simultaneously. Avoid enabling this if your rendering process requires
 # multiple flush() calls in a single frame, as it may cause screen tearing, where parts of the
 # screen update while others do not.
 option(TGFX_USE_ASYNC_PROMISE "Enable async promises for loading images on the web" OFF)
-# This option is universal and can be set by vendor tools for building the wasm-mt architecture.
-option(EMSCRIPTEN_PTHREADS "Enable threading support on the web platform" OFF)
 
-if (APPLE OR (WEB AND NOT EMSCRIPTEN_PTHREADS))
+# EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
+if (NOT WEB OR EMSCRIPTEN_PTHREADS)
+    option(TGFX_USE_THREADS "Enable support for multithreaded rendering" ON)
+endif ()
+
+if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
     option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" OFF)
 else ()
     option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" ON)
@@ -85,9 +89,9 @@ message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
-message("EMSCRIPTEN_PTHREADS: ${EMSCRIPTEN_PTHREADS}")
 message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
 message("TGFX_USE_ASYNC_PROMISE: ${TGFX_USE_ASYNC_PROMISE}")
+message("TGFX_USE_THREADS: ${TGFX_USE_THREADS}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -227,6 +231,10 @@ endif ()
 
 if (TGFX_USE_ASYNC_PROMISE)
     list(APPEND TGFX_DEFINES TGFX_USE_ASYNC_PROMISE)
+endif ()
+
+if (TGFX_USE_THREADS)
+    list(APPEND TGFX_DEFINES TGFX_USE_THREADS)
 endif ()
 
 if (TGFX_USE_FREETYPE)
