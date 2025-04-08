@@ -87,9 +87,6 @@
         "targets": [
           "png_static"
         ],
-        "arguments": [
-          "-DPNG_BUILD_ZLIB=ON"
-        ],
         "includes": [
           "${SOURCE_DIR}/png.h",
           "${SOURCE_DIR}/pngconf.h",
@@ -98,7 +95,8 @@
         "platforms": [
           "android",
           "win",
-          "linux"
+          "linux",
+          "web"
         ]
       }
     },
@@ -112,7 +110,6 @@
           "png_static"
         ],
         "arguments": [
-          "-DPNG_BUILD_ZLIB=ON",
           "-DPNG_ARM_NEON=on"
         ],
         "includes": [
@@ -137,7 +134,6 @@
         ],
         "arguments": [
           "-DANDROID=TRUE",
-          "-DPNG_BUILD_ZLIB=ON",
           "-DPNG_ARM_NEON=on"
         ],
         "includes": [
