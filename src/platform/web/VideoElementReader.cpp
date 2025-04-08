@@ -21,7 +21,6 @@
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLSampler.h"
 #include "platform/web/VideoElement.h"
-#include "tgfx/platform/web/WebCodec.h"
 
 namespace tgfx {
 using namespace emscripten;

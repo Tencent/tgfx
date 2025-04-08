@@ -18,7 +18,6 @@
 
 #include "platform/web/VideoElement.h"
 #include "GLVideoTexture.h"
-#include "tgfx/platform/web/WebCodec.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -37,9 +36,11 @@ VideoElement::VideoElement(emscripten::val video, int width, int height)
 void VideoElement::markFrameChanged(emscripten::val promise) {
   currentPromise = promise;
   markContentDirty(Rect::MakeWH(width(), height()));
-  if (currentPromise != val::null() && !WebCodec::AsyncSupport()) {
+#ifndef TGFX_USE_ASYNC_PROMISE
+  if (currentPromise != val::null()) {
     currentPromise.await();
   }
+#endif
 }
 
 std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
@@ -51,9 +52,11 @@ std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipm
 }
 
 bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
-  if (currentPromise != val::null() && WebCodec::AsyncSupport()) {
+#ifdef TGFX_USE_ASYNC_PROMISE
+  if (currentPromise != val::null()) {
     currentPromise.await();
   }
+#endif
   return WebImageStream::onUpdateTexture(texture, bounds);
 }
 

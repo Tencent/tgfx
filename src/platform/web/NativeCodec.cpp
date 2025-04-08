@@ -22,7 +22,6 @@
 #include "WebImageInfo.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/platform/web/WebCodec.h"
 
 using namespace emscripten;
 
@@ -134,10 +133,9 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
     auto bytes =
         val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
     image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
-    usePromise = WebCodec::AsyncSupport();
-    if (!usePromise) {
-      image = image.await();
-    }
+#ifndef TGFX_USE_ASYNC_PROMISE
+    image = image.await();
+#endif
   }
   return std::shared_ptr<WebImageBuffer>(
       new WebImageBuffer(width(), height(), std::move(image), usePromise));
