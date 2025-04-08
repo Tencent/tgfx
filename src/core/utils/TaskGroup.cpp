@@ -29,7 +29,7 @@
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t THREAD_POOL_SIZE = 32;
-static constexpr uint32_t TASK_QUEUE_SIZE = 1024;
+static constexpr uint32_t TASK_QUEUE_SIZE = 4096;
 
 int GetCPUCores() {
   int cpuCores = 0;
