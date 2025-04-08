@@ -96,7 +96,7 @@ bool TaskGroup::checkThreads() {
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
+#ifndef TGFX_USE_THREADS
   return false;
 #endif
   if (exited || !checkThreads()) {
