@@ -51,8 +51,8 @@ static void computeAtlasKey(GlyphFace* glyphFace, GlyphID glyphID, const Stroke*
 }
 
 AtlasSource::AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunList> glyphRunList,
-                         float scale, const Stroke* stroke)
-    : atlasManager(atlasManager), scale(scale), stroke(stroke),
+                         const Matrix& viewMatrix, const Stroke* stroke)
+    : atlasManager(atlasManager), viewMatrix(viewMatrix), stroke(stroke),
       glyphRunList(std::move(glyphRunList)) {
   computeAtlasLocator();
 }
@@ -76,11 +76,11 @@ std::shared_ptr<AtlasBuffer> AtlasSource::getData() const {
       }
     }
   }
-
   return AtlasBuffer::MakeFrom(makeGeometries());
 }
 
 void AtlasSource::computeAtlasLocator() {
+  auto scale = viewMatrix.getMaxScale();
   auto hasScale = !FloatNearlyEqual(scale, 1.0f);
   for (auto& run : glyphRunList->glyphRuns()) {
     auto glyphFace = run.glyphFace;
@@ -142,6 +142,7 @@ void AtlasSource::computeAtlasLocator() {
 }
 
 std::vector<AtlasGeometryData> AtlasSource::makeGeometries() const {
+  auto scale = viewMatrix.getMaxScale();
   std::vector<AtlasGeometryData> geometries;
   for (auto& [maskFormat, maskDrawGlyphs] : drawGlyphs) {
     for (auto& [pageIndex, glyphArray] : maskDrawGlyphs) {
@@ -151,10 +152,14 @@ std::vector<AtlasGeometryData> AtlasSource::makeGeometries() const {
       auto vertices = reinterpret_cast<float*>(buffer.data());
       auto index = 0;
       for (auto& drawGlyph : glyphArray) {
+        auto glyphBounds = drawGlyph->glyphFace->getBounds(drawGlyph->glyphId);
         auto rect = drawGlyph->locator.getLocation();
-        auto viewMatrix = Matrix::MakeScale(scale, scale);
-        viewMatrix.postTranslate(drawGlyph->position.x, drawGlyph->position.y);
-        auto quad = Quad::MakeFrom(rect, &viewMatrix);
+        auto matrix = Matrix::MakeTrans(glyphBounds.x(), glyphBounds.y());
+        matrix.postScale(1.f/scale,1.f/scale);
+        matrix.postTranslate(drawGlyph->position.x, drawGlyph->position.y);
+        matrix.postConcat(viewMatrix);
+        matrix.preTranslate(-rect.x(),-rect.y());
+        auto quad = Quad::MakeFrom(rect, &matrix);
         auto uvQuad = Quad::MakeFrom(rect);
         for (size_t j = 4; j >= 1; --j) {
           vertices[index++] = quad.point(j - 1).x;

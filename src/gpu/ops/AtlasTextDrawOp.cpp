@@ -46,18 +46,18 @@ PlacementPtr<Pipeline> AtlasTextDrawOp::createPipeline(RenderPass* renderPass,
                                                   blendMode, &swizzle);
 }
 
-PlacementNode<AtlasTextDrawOp> AtlasTextDrawOp::Make(std::shared_ptr<AtlasProxy> atlasProxy,
+PlacementNode<AtlasTextDrawOp> AtlasTextDrawOp::Make(std::shared_ptr<AtlasProxy> atlasProxy,Color color,
                                                      const Matrix& uvMatrix, AAType aaType) {
   if (atlasProxy == nullptr) {
     return nullptr;
   }
   auto drawingBuffer = atlasProxy->getContext()->drawingBuffer();
-  return drawingBuffer->makeNode<AtlasTextDrawOp>(std::move(atlasProxy), uvMatrix, aaType);
+  return drawingBuffer->makeNode<AtlasTextDrawOp>(std::move(atlasProxy), color, uvMatrix, aaType);
 }
 
-AtlasTextDrawOp::AtlasTextDrawOp(std::shared_ptr<AtlasProxy> proxy, const Matrix& uvMatrix,
+AtlasTextDrawOp::AtlasTextDrawOp(std::shared_ptr<AtlasProxy> proxy, Color color,const Matrix& uvMatrix,
                                  AAType aaType)
-    : DrawOp(aaType), atlasProxy(proxy), uvMatrix(uvMatrix) {
+    : DrawOp(aaType), atlasProxy(proxy), color(color), uvMatrix(uvMatrix) {
   // Initialize other members if needed
 }
 
@@ -82,7 +82,7 @@ void AtlasTextDrawOp::execute(RenderPass* renderPass) {
     auto renderTarget = renderPass->renderTarget();
     auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                    renderTarget->height(), AAType::None,
-                                                   std::nullopt, true);
+                                                   color, true);
 
     unsigned numActiveProxies = 0;
     auto textureProxy = atlasManger->getTextureProxy(maskFormat, &numActiveProxies);

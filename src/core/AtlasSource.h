@@ -28,9 +28,8 @@ class AtlasSource : public DataSource<AtlasBuffer> {
  public:
   using PageGlyphMap = std::map<uint32_t, std::vector<PlacementPtr<DrawGlyph>>>;
 
-  AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunList> glyphRunList, float scale,
+  AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunList> glyphRunList, const Matrix& viewMatrix,
               const Stroke* stroke);
-
   size_t getBufferCount() const {
     return drawGlyphs.size();
   }
@@ -41,9 +40,6 @@ class AtlasSource : public DataSource<AtlasBuffer> {
 
   std::shared_ptr<AtlasBuffer> getData() const override;
 
-  float getScale() const {
-    return scale;
-  }
 
   const Stroke* getStroke() const {
     return stroke;
@@ -53,7 +49,7 @@ class AtlasSource : public DataSource<AtlasBuffer> {
 
  private:
   AtlasManager* atlasManager;
-  float scale;
+  Matrix viewMatrix = Matrix::I();
   const Stroke* stroke;
   std::shared_ptr<GlyphRunList> glyphRunList;
 

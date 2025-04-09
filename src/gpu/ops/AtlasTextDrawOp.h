@@ -26,18 +26,19 @@
 namespace tgfx {
 class AtlasTextDrawOp : public DrawOp {
  public:
-  static PlacementNode<AtlasTextDrawOp> Make(std::shared_ptr<AtlasProxy>, const Matrix& uvMatrix,
+  static PlacementNode<AtlasTextDrawOp> Make(std::shared_ptr<AtlasProxy>, Color color, const Matrix& uvMatrix,
                                              AAType aaType);
 
   PlacementPtr<Pipeline> createPipeline(RenderPass* renderPass,
                                         std::shared_ptr<TextureProxy> textProxy,
                                         PlacementPtr<GeometryProcessor> gp);
 
-  AtlasTextDrawOp(std::shared_ptr<AtlasProxy>, const Matrix& uvMatrix, AAType aaType);
+  AtlasTextDrawOp(std::shared_ptr<AtlasProxy>,Color color, const Matrix& uvMatrix, AAType aaType);
   void execute(RenderPass* renderPass) override;
 
  private:
   std::shared_ptr<AtlasProxy> atlasProxy = nullptr;
+  Color color = Color::Transparent();
   Matrix uvMatrix = Matrix::I();
 };
 }  // namespace tgfx

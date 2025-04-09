@@ -156,7 +156,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
 }
 
 std::shared_ptr<AtlasProxy> ProxyProvider::createAtlasProxy(
-    const UniqueKey& uniqueKey, std::shared_ptr<GlyphRunList> glyphRunList, float scale,
+    const UniqueKey& uniqueKey, std::shared_ptr<GlyphRunList> glyphRunList, const Matrix& viewMatrix,
     uint32_t renderFlags /* = 0*/) {
   if (glyphRunList == nullptr) {
     return nullptr;
@@ -167,7 +167,7 @@ std::shared_ptr<AtlasProxy> ProxyProvider::createAtlasProxy(
   std::unique_ptr<DataSource<AtlasBuffer>> dataSource = nullptr;
 
   auto atlasSource = std::make_unique<AtlasSource>(context->atlasManager(), std::move(glyphRunList),
-                                                   scale, nullptr);
+                                                   viewMatrix, nullptr);
   const auto& drawGlyphs = atlasSource->getDrawGlyphs();
   if (drawGlyphs.size() == 0) {
     return nullptr;

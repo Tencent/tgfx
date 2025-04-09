@@ -53,20 +53,38 @@ void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
 HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
   auto oldDeviceContext = wglGetCurrentDC();
   auto oldGLContext = wglGetCurrentContext();
-  auto glContext = wglCreateContext(deviceContext);
-  if (glContext == nullptr) {
-    LOGE("CreateGLContext() wglCreateContext failed.");
-    return nullptr;
-  }
-  if (sharedContext != nullptr && !wglShareLists(sharedContext, glContext)) {
-    wglDeleteContext(glContext);
-    return nullptr;
+
+  HGLRC glContext = nullptr;
+  auto wglInterface = WGLInterface::Get();
+  if (wglInterface->createContextAttribsSupport) {
+    const int coreProfileAttribs[] = {
+      WGL_CONTEXT_MAJOR_VERSION,
+      wglInterface->glMajorMax,
+      WGL_CONTEXT_MINOR_VERSION,
+      wglInterface->glMinorMax,
+      WGL_CONTEXT_PROFILE_MASK,
+      WGL_CONTEXT_CORE_PROFILE_BIT,
+      0,
+  };
+    glContext =
+        wglInterface->wglCreateContextAttribs(deviceContext, sharedContext, coreProfileAttribs);
   }
 
-  if (wglMakeCurrent(deviceContext, glContext)) {
-    if (auto wglInterface = WGLInterface::Get(); wglInterface->swapIntervalSupport) {
-      wglInterface->wglSwapInterval(1);
+  if (glContext == nullptr) {
+    glContext = wglCreateContext(deviceContext);
+    if (glContext == nullptr) {
+      LOGE("CreateGLContext() wglCreateContext failed.");
+      return nullptr;
     }
+
+    if (sharedContext != nullptr && !wglShareLists(sharedContext, glContext)) {
+      wglDeleteContext(glContext);
+      return nullptr;
+    }
+  }
+
+  if (wglMakeCurrent(deviceContext, glContext) && wglInterface->swapIntervalSupport) {
+    wglInterface->wglSwapInterval(1);
   }
 
   wglMakeCurrent(oldDeviceContext, oldGLContext);

@@ -161,8 +161,8 @@ class AtlasLocator {
     location = rect;
   }
 
-  void setPlotLocator(const PlotLocator& plotLocator) {
-    this->plotLocator = plotLocator;
+  void setPlotLocator(const PlotLocator& locator) {
+    this->plotLocator = locator;
   }
 
  private:
