@@ -25,13 +25,14 @@
 namespace tgfx {
 class OpsRenderTask : public RenderTask {
  public:
-  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy, PlacementList<Op> ops)
+  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                std::vector<PlacementPtr<Op>> ops)
       : RenderTask(std::move(renderTargetProxy)), ops(std::move(ops)) {
   }
 
   bool execute(RenderPass* renderPass) override;
 
  private:
-  PlacementList<Op> ops = {};
+  std::vector<PlacementPtr<Op>> ops = {};
 };
 }  // namespace tgfx

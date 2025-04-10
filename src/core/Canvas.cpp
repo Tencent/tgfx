@@ -83,7 +83,8 @@ void Canvas::restore() {
     auto layerContext = reinterpret_cast<RecordingContext*>(layer->layerContext.get());
     auto picture = layerContext->finishRecordingAsPicture();
     if (picture != nullptr) {
-      drawLayer(picture, {}, layer->layerPaint.getFill(), layer->layerPaint.getImageFilter());
+      drawLayer(std::move(picture), {}, layer->layerPaint.getFill(),
+                layer->layerPaint.getImageFilter());
     }
   }
 }
@@ -426,6 +427,7 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                        std::shared_ptr<ImageFilter> imageFilter) {
   DEBUG_ASSERT(fill.shader == nullptr);
+  DEBUG_ASSERT(picture != nullptr);
   if (imageFilter != nullptr) {
     Point offset = {};
     if (auto image = picture->asImage(&offset)) {
@@ -440,7 +442,7 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       drawContext->drawImage(std::move(image), {}, drawState, fill);
       return;
     }
-  } else if (picture->records.size() == 1 && fill.maskFilter == nullptr) {
+  } else if (picture->drawCount == 1 && fill.maskFilter == nullptr) {
     LayerUnrollContext layerContext(drawContext, fill);
     picture->playback(&layerContext, state);
     if (layerContext.hasUnrolled()) {

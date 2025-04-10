@@ -37,14 +37,15 @@ class RRectDrawOp : public DrawOp {
   /**
    * The maximum number of round rects that can be drawn in a single draw call.
    */
-  static constexpr uint16_t MaxNumRRects = 512;
+  static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
    * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
    * the device space.
    */
-  static PlacementNode<RRectDrawOp> Make(Context* context, PlacementList<RRectPaint> rects,
-                                         AAType aaType, uint32_t renderFlags);
+  static PlacementPtr<RRectDrawOp> Make(Context* context,
+                                        std::vector<PlacementPtr<RRectPaint>> rects, AAType aaType,
+                                        uint32_t renderFlags);
 
   RRectDrawOp(AAType aaType, size_t rectCount);
 
@@ -54,6 +55,6 @@ class RRectDrawOp : public DrawOp {
   size_t rectCount = 0;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  std::shared_ptr<Data> vertexData = nullptr;
+  size_t vertexBufferOffset = 0;
 };
 }  // namespace tgfx

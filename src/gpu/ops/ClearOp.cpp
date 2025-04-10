@@ -20,11 +20,11 @@
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-PlacementNode<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& scissor) {
+PlacementPtr<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& scissor) {
   if (scissor.isEmpty()) {
     return nullptr;
   }
-  return context->drawingBuffer()->makeNode<ClearOp>(color, scissor);
+  return context->drawingBuffer()->make<ClearOp>(color, scissor);
 }
 
 void ClearOp::execute(RenderPass* renderPass) {

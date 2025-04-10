@@ -19,7 +19,7 @@
 #include "GLEllipseGeometryProcessor.h"
 
 namespace tgfx {
-PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(PlacementBuffer* buffer,
+PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(BlockBuffer* buffer,
                                                                       int width, int height,
                                                                       bool stroke, bool useScale) {
   return buffer->make<GLEllipseGeometryProcessor>(width, height, stroke, useScale);

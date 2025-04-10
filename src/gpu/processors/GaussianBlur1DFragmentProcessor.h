@@ -26,9 +26,10 @@ enum class GaussianBlurDirection { Horizontal, Vertical };
 
 class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<GaussianBlur1DFragmentProcessor> Make(
-      PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> processor, float sigma,
-      GaussianBlurDirection direction, float stepLength);
+  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer,
+                                              PlacementPtr<FragmentProcessor> processor,
+                                              float sigma, GaussianBlurDirection direction,
+                                              float stepLength, int maxSigma);
 
   std::string name() const override {
     return "GaussianBlur1DFragmentProcessor";
@@ -38,10 +39,13 @@ class GaussianBlur1DFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
-                                  GaussianBlurDirection direction, float stepLength);
+                                  GaussianBlurDirection direction, float stepLength, int maxSigma);
+
+  void onComputeProcessorKey(BytesKey*) const override;
 
   float sigma = 0.f;
   GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
   float stepLength = 1.f;
+  int maxSigma = 10;
 };
 }  // namespace tgfx

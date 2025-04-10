@@ -19,6 +19,7 @@
 #include "ProxyProvider.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
@@ -34,7 +35,7 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-ProxyProvider::ProxyProvider(Context* context) : context(context) {
+ProxyProvider::ProxyProvider(Context* context) : context(context), blockBuffer(1 << 14) {  // 16KB
 }
 
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const UniqueKey& uniqueKey,
@@ -59,16 +60,85 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   if (proxy != nullptr) {
     return proxy;
   }
+#ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
     source = DataSource<Data>::Async(std::move(source));
   }
+#endif
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task = context->drawingBuffer()->makeNode<GpuBufferUploadTask>(proxyKey, bufferType,
-                                                                      std::move(source));
+  auto task =
+      context->drawingBuffer()->make<GpuBufferUploadTask>(proxyKey, bufferType, std::move(source));
   context->drawingManager()->addResourceTask(std::move(task));
   proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(proxyKey, bufferType));
   addResourceProxy(proxy, uniqueKey);
   return proxy;
+}
+
+std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVertexBuffer(
+    std::unique_ptr<VertexProvider> provider, uint32_t renderFlags) {
+  if (provider == nullptr) {
+    return {nullptr, 0};
+  }
+  DEBUG_ASSERT(!sharedVertexBufferFlushed);
+  auto byteSize = provider->vertexCount() * sizeof(float);
+  auto lastBlock = blockBuffer.currentBlock();
+  auto vertices = reinterpret_cast<float*>(blockBuffer.allocate(byteSize));
+  if (vertices == nullptr) {
+    LOGE("ProxyProvider::createSharedVertexBuffer() Failed to allocate memory!");
+    return {nullptr, 0};
+  }
+  auto offset = lastBlock.second;
+  auto currentBlock = blockBuffer.currentBlock();
+  if (lastBlock.first != nullptr && lastBlock.first != currentBlock.first) {
+    DEBUG_ASSERT(sharedVertexBuffer != nullptr);
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedVertexBuffer(std::move(data));
+    offset = 0;
+  }
+#ifdef TGFX_USE_THREADS
+  if (renderFlags & RenderFlags::DisableAsyncTask) {
+    provider->getVertices(vertices);
+  } else {
+    auto task = std::make_shared<VertexProviderTask>(std::move(provider), vertices);
+    Task::Run(task);
+    sharedVertexBufferTasks.push_back(std::move(task));
+  }
+#else
+  USE(renderFlags);
+  provider->getVertices(vertices);
+#endif
+  if (sharedVertexBuffer == nullptr) {
+    auto uniqueKey = UniqueKey::Make();
+    sharedVertexBuffer =
+        std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(uniqueKey, BufferType::Vertex));
+    addResourceProxy(sharedVertexBuffer, uniqueKey);
+  }
+  return {sharedVertexBuffer, offset};
+}
+
+void ProxyProvider::flushSharedVertexBuffer() {
+  if (sharedVertexBuffer != nullptr) {
+    auto lastBlock = blockBuffer.currentBlock();
+    auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
+    uploadSharedVertexBuffer(std::move(data));
+  }
+  sharedVertexBufferFlushed = true;
+}
+
+void ProxyProvider::clearSharedVertexBuffer() {
+  maxValueTracker.addValue(blockBuffer.size());
+  blockBuffer.clear(maxValueTracker.getMaxValue());
+  sharedVertexBufferFlushed = false;
+}
+
+void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
+  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
+  auto dataSource =
+      std::make_unique<AsyncVertexSource>(std::move(data), std::move(sharedVertexBufferTasks));
+  auto task = context->drawingBuffer()->make<GpuBufferUploadTask>(
+      sharedVertexBuffer->getUniqueKey(), BufferType::Vertex, std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  sharedVertexBuffer = nullptr;
 }
 
 static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& clipBounds) {
@@ -134,14 +204,18 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
+#ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     dataSource = DataSource<ShapeBuffer>::Async(std::move(rasterizer));
   } else {
     dataSource = std::move(rasterizer);
   }
+#else
+  dataSource = std::move(rasterizer);
+#endif
   auto triangleProxyKey = GetProxyKey(triangleKey, renderFlags);
   auto textureProxyKey = GetProxyKey(textureKey, renderFlags);
-  auto task = context->drawingBuffer()->makeNode<ShapeBufferUploadTask>(
+  auto task = context->drawingBuffer()->make<ShapeBufferUploadTask>(
       triangleProxyKey, textureProxyKey, std::move(dataSource));
   context->drawingManager()->addResourceTask(std::move(task));
   triangleProxy =
@@ -176,7 +250,11 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
+#ifdef TGFX_USE_THREADS
   auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
+#else
+  auto asyncDecoding = false;
+#endif
   auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
   return createTextureProxy(uniqueKey, std::move(source), width, height, alphaOnly, mipmapped,
                             renderFlags);
@@ -191,7 +269,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   }
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
   auto task =
-      context->drawingBuffer()->makeNode<TextureUploadTask>(proxyKey, std::move(source), mipmapped);
+      context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source), mipmapped);
   context->drawingManager()->addResourceTask(std::move(task));
   proxy = std::shared_ptr<TextureProxy>(
       new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly));
@@ -212,8 +290,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey&
     return nullptr;
   }
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task = context->drawingBuffer()->makeNode<TextureCreateTask>(proxyKey, width, height, format,
-                                                                    mipmapped, origin);
+  auto task = context->drawingBuffer()->make<TextureCreateTask>(proxyKey, width, height, format,
+                                                                mipmapped, origin);
   context->drawingManager()->addResourceTask(std::move(task));
   auto isAlphaOnly = format == PixelFormat::ALPHA_8;
   proxy = std::shared_ptr<TextureProxy>(
@@ -265,8 +343,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto uniqueKey = UniqueKey::Make();
-  auto task = context->drawingBuffer()->makeNode<RenderTargetCreateTask>(uniqueKey, textureProxy,
-                                                                         format, sampleCount);
+  auto task = context->drawingBuffer()->make<RenderTargetCreateTask>(uniqueKey, textureProxy,
+                                                                     format, sampleCount);
   auto drawingManager = context->drawingManager();
   drawingManager->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<RenderTargetProxy>(

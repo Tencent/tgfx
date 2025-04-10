@@ -19,7 +19,7 @@
 #include "GLAARectEffect.h"
 
 namespace tgfx {
-PlacementPtr<AARectEffect> AARectEffect::Make(PlacementBuffer* buffer, const Rect& rect) {
+PlacementPtr<AARectEffect> AARectEffect::Make(BlockBuffer* buffer, const Rect& rect) {
   return buffer->make<GLAARectEffect>(rect);
 }
 

@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(
-    PlacementBuffer* buffer, Color start, Color end) {
+    BlockBuffer* buffer, Color start, Color end) {
   return buffer->make<GLSingleIntervalGradientColorizer>(start, end);
 }
 

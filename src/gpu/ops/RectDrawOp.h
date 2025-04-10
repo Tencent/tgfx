@@ -35,21 +35,16 @@ struct RectPaint {
 class RectDrawOp : public DrawOp {
  public:
   /**
-   * The maximum number of non-AA rects that can be drawn in a single draw call.
+   * The maximum number of rects that can be drawn in a single draw call.
    */
-  static constexpr uint16_t MaxNumNonAARects = 2048;  // max possible: (1 << 14) - 1;
-
-  /**
-   * The maximum number of AA rects that can be drawn in a single draw call.
-   */
-  static constexpr uint16_t MaxNumAARects = 512;  // max possible: (1 << 13) - 1;
+  static constexpr uint16_t MaxNumRects = 2048;
 
   /**
    * Create a new RectDrawOp for a list of RectPaints. The returned RectDrawOp is in the local space
    * of each rect.
    */
-  static PlacementNode<RectDrawOp> Make(Context* context, PlacementList<RectPaint> rects,
-                                        bool useUVCoord, AAType aaType, uint32_t renderFlags);
+  static PlacementPtr<RectDrawOp> Make(Context* context, std::vector<PlacementPtr<RectPaint>> rects,
+                                       bool useUVCoord, AAType aaType, uint32_t renderFlags);
 
   RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord);
 
@@ -61,6 +56,6 @@ class RectDrawOp : public DrawOp {
   bool useUVCoord = false;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  std::shared_ptr<Data> vertexData = nullptr;
+  size_t vertexBufferOffset = 0;
 };
 }  // namespace tgfx

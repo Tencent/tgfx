@@ -121,7 +121,7 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   surface->renderContext->flush();
   auto* drawingManager = context->drawingManager();
   ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
+  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   EXPECT_TRUE(task->ops.size() == 1);
 
   Paint paint;
@@ -131,7 +131,7 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   surface->renderContext->flush();
   ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
-  task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.back());
+  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
   EXPECT_TRUE(task->ops.size() == 1);
 
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
@@ -143,7 +143,7 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   canvas->drawPaint(paint);
   surface->renderContext->flush();
   ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
-  task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.back());
+  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
   EXPECT_TRUE(task->ops.size() == 1);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
@@ -179,9 +179,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   surface->renderContext->flush();
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
+  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RectDrawOp*>(&task->ops.back())->rectCount, drawCallCount);
+  EXPECT_EQ(static_cast<RectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
 }
@@ -219,9 +219,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   surface->renderContext->flush();
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(&drawingManager->renderTasks.front());
+  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<RRectDrawOp*>(&task->ops.back())->rectCount, drawCallCount);
+  EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
 }
@@ -1252,8 +1252,8 @@ TGFX_TEST(CanvasTest, Picture) {
   paint.setImageFilter(nullptr);
   auto imagePicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(imagePicture != nullptr);
-  ASSERT_TRUE(imagePicture->records.size() == 1);
-  EXPECT_EQ(imagePicture->records[0]->type(), RecordType::DrawImage);
+  ASSERT_TRUE(imagePicture->drawCount == 1);
+  EXPECT_EQ(imagePicture->firstDrawRecord()->type(), RecordType::DrawImage);
 
   surface = Surface::Make(context, image->width() - 200, image->height() - 200);
   canvas = surface->getCanvas();
@@ -1574,5 +1574,44 @@ TGFX_TEST(CanvasTest, ClipAll) {
   path.addRect(Rect::MakeXYWH(5, 5, 10, 10));
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAll"));
+}
+
+TGFX_TEST(CanvasTest, RevertRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 10, 10);
+  auto canvas = surface->getCanvas();
+  Path path = {};
+  path.addRect(5, 5, 2, 3);
+  Paint paint = {};
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RevertRect"));
+}
+
+TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawColor(Color::White());
+  Paint paint = {};
+  Stroke stroke(2);
+  paint.setStroke(stroke);
+  paint.setColor(Color::Black());
+  paint.setStyle(PaintStyle::Stroke);
+  Path path = {};
+  path.addRect(50, 50, 250, 150);
+  path.addOval(Rect::MakeXYWH(50, 200, 200, 50));
+  path.moveTo(50, 300);
+  path.cubicTo(100, 300, 100, 350, 150, 350);
+  path.quadTo(200, 350, 200, 300);
+  float dashList[] = {40.f, 50.f};
+  auto effect = PathEffect::MakeDash(dashList, 2, 20, true);
+  effect->filterPath(&path);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
 }
 }  // namespace tgfx

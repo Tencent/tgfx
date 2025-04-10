@@ -21,13 +21,16 @@
 #include <functional>
 #include "core/DrawContext.h"
 #include "core/Records.h"
+#include "core/utils/BlockBuffer.h"
 
 namespace tgfx {
 class RecordingContext : public DrawContext {
  public:
-  std::shared_ptr<Picture> finishRecordingAsPicture();
+  ~RecordingContext() override;
 
   void clear();
+
+  std::shared_ptr<Picture> finishRecordingAsPicture();
 
   void drawFill(const MCState& state, const Fill& fill) override;
 
@@ -53,6 +56,13 @@ class RecordingContext : public DrawContext {
                  const MCState& state, const Fill& fill) override;
 
  private:
-  std::vector<Record*> records = {};
+  BlockBuffer blockBuffer = {};
+  std::vector<PlacementPtr<Record>> records = {};
+  size_t drawCount = 0;
+  MCState lastState = {};
+  Fill lastFill = {};
+
+  void recordState(const MCState& state);
+  void recordStateAndFill(const MCState& state, const Fill& fill);
 };
 }  // namespace tgfx
