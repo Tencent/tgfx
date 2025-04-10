@@ -34,6 +34,7 @@ class AtlasSource : public DataSource<AtlasBuffer> {
     return drawGlyphs.size();
   }
 
+
   const std::map<MaskFormat, PageGlyphMap>& getDrawGlyphs() const {
     return drawGlyphs;
   }
@@ -41,16 +42,12 @@ class AtlasSource : public DataSource<AtlasBuffer> {
   std::shared_ptr<AtlasBuffer> getData() const override;
 
 
-  const Stroke* getStroke() const {
-    return stroke;
-  }
-
   std::vector<AtlasGeometryData> makeGeometries() const;
 
  private:
   AtlasManager* atlasManager;
   Matrix viewMatrix = Matrix::I();
-  const Stroke* stroke;
+  std::shared_ptr<Stroke> stroke = nullptr;
   std::shared_ptr<GlyphRunList> glyphRunList;
 
   std::map<MaskFormat, PageGlyphMap> drawGlyphs;

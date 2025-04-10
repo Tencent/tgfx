@@ -154,7 +154,7 @@ void RenderContext::drawAtlas(const MCState& mcState, std::shared_ptr<Image> atl
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const MCState& state, const Fill& fill, const Stroke*) {
+                                     const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   if (glyphRunList->hasColor()) {
     drawColorGlyphs(std::move(glyphRunList), state, fill);
@@ -166,7 +166,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
 
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillGlyphRuns(glyphRunList, maxScale, state, fill);
+    compositor->fillGlyphRuns(glyphRunList, state, fill, stroke);
   }
 
   // auto textAtlas = TextAtlas::Make(renderTarget->getContext(), glyphRunList, maxScale, stroke);

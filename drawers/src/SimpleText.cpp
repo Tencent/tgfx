@@ -29,7 +29,7 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   std::string text = "HelloTGFX";
   auto typeface = host->getTypeface("default");
   tgfx::Font font(typeface, 40 * scale);
-  font.setFauxBold(true);
+  //font.setFauxBold(true);
   auto textBlob = tgfx::TextBlob::MakeFrom(text, font);
   auto bounds = textBlob->getBounds();
   auto textScale = screenWidth / bounds.width();

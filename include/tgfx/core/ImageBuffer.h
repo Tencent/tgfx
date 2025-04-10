@@ -109,6 +109,8 @@ class ImageBuffer {
    */
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const = 0;
 
+  //virtual  onUploadTexture(Texture texture ,Point offset,mipmap);
+
   friend class Texture;
 };
 }  // namespace tgfx

@@ -134,8 +134,8 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
 }
 
-void OpsCompositor::fillGlyphRuns(std::shared_ptr<GlyphRunList> glyphRunList, float scale,
-                                  const MCState& state, const Fill& fill) {
+void OpsCompositor::fillGlyphRuns(std::shared_ptr<GlyphRunList> glyphRunList,
+                                  const MCState& state, const Fill& fill,const Stroke* stroke) {
   if (glyphRunList == nullptr || glyphRunList->glyphRuns().empty()) {
     return;
   }
@@ -158,7 +158,7 @@ void OpsCompositor::fillGlyphRuns(std::shared_ptr<GlyphRunList> glyphRunList, fl
   auto aaType = getAAType(fill);
   auto key = UniqueKey::Make();
   auto atlasProxy =
-      proxyProvider()->createAtlasProxy(key, std::move(glyphRunList), state.matrix, renderFlags);
+      proxyProvider()->createAtlasProxy(key, std::move(glyphRunList), state.matrix, stroke, renderFlags);
   auto drawOp = AtlasTextDrawOp::Make(atlasProxy,fill.color, uvMatrix, aaType);
   addDrawOp(std::move(drawOp), state.clip, fill, localBounds, deviceBounds);
 }

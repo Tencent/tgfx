@@ -26,7 +26,7 @@ namespace tgfx {
 
 struct AtlasGeometryProxy {
   MaskFormat maskFormat;
-  uint32_t pageIndex;
+  uint32_t pageIndex;//atlasTextProxy
   std::shared_ptr<GpuBufferProxy> vertexProxy;
   std::shared_ptr<GpuBufferProxy> indexProxy;
 };

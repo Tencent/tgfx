@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AtlasSource.h"
+
 #include "core/PixelBuffer.h"
 #include "core/atlas/AtlasManager.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/Quad.h"
 #include "tgfx/core/Buffer.h"
 #include "utils/PlacementBuffer.h"
+#include "vectors/freetype/FTMask.h"
 
 namespace tgfx {
 static void computeAtlasKey(GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
@@ -46,14 +48,17 @@ static void computeAtlasKey(GlyphFace* glyphFace, GlyphID glyphID, const Stroke*
   key.write(typeFaceID);
   key.write(strokeWidth);
   key.write(fauxBold);
-  key.write(fauxItalic);
+  key.write(fauxItalic);//matrix
   key.write(glyphID);
 }
 
 AtlasSource::AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunList> glyphRunList,
-                         const Matrix& viewMatrix, const Stroke* stroke)
-    : atlasManager(atlasManager), viewMatrix(viewMatrix), stroke(stroke),
+                         const Matrix& viewMatrix, const Stroke* _stroke)
+    : atlasManager(atlasManager), viewMatrix(viewMatrix),
       glyphRunList(std::move(glyphRunList)) {
+  if (_stroke) {
+    stroke = std::make_shared<Stroke>(*_stroke);
+  }
   computeAtlasLocator();
 }
 
@@ -62,7 +67,39 @@ std::shared_ptr<AtlasBuffer> AtlasSource::getData() const {
   for (auto& [_, pageGlyphMap] : drawGlyphs) {
     for (auto& [_, drawGlyphArray] : pageGlyphMap) {
       for (auto& drawGlyph : drawGlyphArray) {
-        auto imageBuffer = drawGlyph->glyphFace->generateImage(drawGlyph->glyphId);
+        std::shared_ptr<ImageBuffer> imageBuffer;
+        if (stroke == nullptr) {
+          imageBuffer = drawGlyph->glyphFace->generateImage(drawGlyph->glyphId);
+        }else {
+          auto width = static_cast<int>(drawGlyph->locator.getLocation().width());
+          auto height = static_cast<int>(drawGlyph->locator.getLocation().height());
+          auto mask = Mask::Make(width, height,true);
+          if (!mask) {
+            continue;;
+          }
+          mask->setAntiAlias(true);
+          Path path;
+          if (!drawGlyph->glyphFace->getPath(drawGlyph->glyphId, &path)) {
+            continue;
+          }
+          auto scale = viewMatrix.getMaxScale();
+          auto scaleMatrix = Matrix::MakeScale(1.0f/ scale,1.0f/ scale);
+          path.transform(scaleMatrix);
+          auto glyphBounds = drawGlyph->glyphFace->getBounds(drawGlyph->glyphId);
+          glyphBounds.scale(1.f / scale, 1.f / scale);
+          stroke->applyToBounds(&glyphBounds);
+          glyphBounds.scale(scale, scale);
+          auto offsetX = -glyphBounds.x();
+          auto offsetY = -glyphBounds.y();
+
+          auto rasterizerMatrix = Matrix::MakeScale(scale,scale);
+          rasterizerMatrix.postTranslate(offsetX,offsetY);
+
+          mask->setMatrix(rasterizerMatrix);
+          mask->fillPath(path, stroke.get());
+          imageBuffer =  mask->makeBuffer();
+        }
+
         if (imageBuffer == nullptr) {
           continue;
         }
@@ -92,20 +129,27 @@ void AtlasSource::computeAtlasLocator() {
     size_t index = 0;
     for (auto& glyphID : run.glyphs) {
       auto bounds = glyphFace->getBounds(glyphID);
+      auto originBounds = bounds;
+      auto positionOffsetX = 0.f;
+      auto positionOffsetY = 0.f;
       if (stroke != nullptr) {
         bounds.scale(1.f / scale, 1.f / scale);
         stroke->applyToBounds(&bounds);
         bounds.scale(scale, scale);
+        positionOffsetX = (bounds.x() - originBounds.x()) / scale;
+        positionOffsetY = (bounds.y() - originBounds.y()) / scale;
       }
+
       bounds.roundOut();
 
       auto drawGlyph = atlasManager->getContext()->drawingBuffer()->make<DrawGlyph>();
       drawGlyph->position = run.positions[index];
+      drawGlyph->position.offset(positionOffsetX, positionOffsetY);
       drawGlyph->glyphFace = glyphFace;
       drawGlyph->glyphId = glyphID;
 
       BytesKey glyphKey;
-      computeAtlasKey(glyphFace.get(), glyphID, stroke, glyphKey);
+      computeAtlasKey(glyphFace.get(), glyphID, stroke.get(), glyphKey);
       auto maskFormat = glyphFace->hasColor() ? MaskFormat::RGBA : MaskFormat::A8;
       drawGlyph->maskFormat = maskFormat;
       unsigned numPage = 0;

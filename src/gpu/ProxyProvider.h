@@ -75,7 +75,7 @@ class ProxyProvider {
 
   std::shared_ptr<AtlasProxy> createAtlasProxy(const UniqueKey& uniqueKey,
                                                std::shared_ptr<GlyphRunList> glyphRunList,
-                                               const Matrix& viewMatrix, uint32_t renderFlags = 0);
+                                               const Matrix& viewMatrix,const Stroke* stroke, uint32_t renderFlags = 0);
 
   /*
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being
