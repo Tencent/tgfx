@@ -19,6 +19,7 @@
 #pragma once
 
 #include <mutex>
+#include "core/TypefaceMetrics.h"
 #include "ft2build.h"
 #include FT_FREETYPE_H
 #include "FTFontData.h"
@@ -58,6 +59,9 @@ class FTTypeface : public Typeface {
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
+  std::shared_ptr<Data> openData() const override;
+
+  std::unique_ptr<TypefaceMetrics> onGetMetrics() const override;
 
  private:
   uint32_t _uniqueID = 0;
@@ -68,6 +72,8 @@ class FTTypeface : public Typeface {
   FTTypeface(FTFontData data, FT_Face face);
 
   int unitsPerEmInternal() const;
+
+  bool isOpentypeFontDataStandardFormat() const;
 
   friend class FTScalerContext;
 };

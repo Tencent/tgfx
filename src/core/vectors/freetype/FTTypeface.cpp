@@ -17,9 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTTypeface.h"
+#include <sys/_types/_int16_t.h>
+#include <array>
 #include <cstddef>
+#include <cstring>
 #include "FTLibrary.h"
+#include "core/TypefaceMetrics.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/core/Stream.h"
+#include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
+#include FT_FONT_FORMATS_H
+#include FT_TYPE1_TABLES_H
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
@@ -188,5 +197,127 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
   return returnMap;
 }
 #endif
+
+namespace {
+bool canEmbed(FT_Face face) {
+  FT_UShort fsType = FT_Get_FSType_Flags(face);
+  return (fsType & (FT_FSTYPE_RESTRICTED_LICENSE_EMBEDDING | FT_FSTYPE_BITMAP_EMBEDDING_ONLY)) == 0;
+}
+
+bool canSubset(FT_Face face) {
+  FT_UShort fsType = FT_Get_FSType_Flags(face);
+  return (fsType & FT_FSTYPE_NO_SUBSETTING) == 0;
+}
+
+TypefaceMetrics::FontType get_font_type(FT_Face face) {
+  const char* fontType = FT_Get_X11_Font_Format(face);
+  static struct {
+    const char* s;
+    TypefaceMetrics::FontType t;
+  } values[] = {
+      {"Type 1", TypefaceMetrics::FontType::Type1},
+      {"CID Type 1", TypefaceMetrics::FontType::Type1CID},
+      {"CFF", TypefaceMetrics::FontType::CFF},
+      {"TrueType", TypefaceMetrics::FontType::TrueType},
+  };
+  for (const auto& v : values) {
+    if (strcmp(fontType, v.s) == 0) {
+      return v.t;
+    }
+  }
+  return TypefaceMetrics::FontType::Other;
+}
+}  // namespace
+
+bool FTTypeface::isOpentypeFontDataStandardFormat() const {
+  // FreeType reports TrueType for any data that can be decoded to TrueType or OpenType.
+  // However, there are alternate data formats for OpenType, like wOFF and wOF2.
+  auto stream = Stream::MakeFromData(data.data);
+  std::array<char, 4> buffer;
+  if (stream->read(buffer.data(), 4) < 4) {
+    return false;
+  }
+  auto fontTag = SetFourByteTag(buffer[0], buffer[1], buffer[2], buffer[3]);
+
+  constexpr auto windowsTrueTypeTag = SetFourByteTag(0, 1, 0, 0);
+  constexpr auto macTrueTypeTag = SetFourByteTag('t', 'r', 'u', 'e');
+  constexpr auto postScriptTag = SetFourByteTag('t', 'y', 'p', '1');
+  constexpr auto opentypeCFFTag = SetFourByteTag('O', 'T', 'T', 'O');
+  constexpr auto ttcTag = SetFourByteTag('t', 't', 'c', 'f');
+
+  return fontTag == windowsTrueTypeTag || fontTag == macTrueTypeTag || fontTag == postScriptTag ||
+         fontTag == opentypeCFFTag || fontTag == ttcTag;
+}
+
+std::unique_ptr<TypefaceMetrics> FTTypeface::onGetMetrics() const {
+  std::unique_ptr<TypefaceMetrics> info(new TypefaceMetrics);
+  info->postScriptName = FT_Get_Postscript_Name(face);
+
+  if (FT_HAS_MULTIPLE_MASTERS(face)) {
+    info->flags =
+        static_cast<TypefaceMetrics::FontFlags>(info->flags | TypefaceMetrics::FontFlags::Variable);
+  }
+  if (!canEmbed(face)) {
+    info->flags = static_cast<TypefaceMetrics::FontFlags>(
+        info->flags | TypefaceMetrics::FontFlags::NotEmbeddable);
+  }
+  if (!canSubset(face)) {
+    info->flags = static_cast<TypefaceMetrics::FontFlags>(
+        info->flags | TypefaceMetrics::FontFlags::NotSubsettable);
+  }
+
+  info->type = get_font_type(face);
+  if ((info->type == TypefaceMetrics::FontType::TrueType ||
+       info->type == TypefaceMetrics::FontType::CFF) &&
+      !isOpentypeFontDataStandardFormat()) {
+    info->flags = static_cast<TypefaceMetrics::FontFlags>(
+        info->flags | TypefaceMetrics::FontFlags::AltDataFormat);
+  }
+
+  info->style = static_cast<TypefaceMetrics::StyleFlags>(0);
+  if (FT_IS_FIXED_WIDTH(face)) {
+    info->style = static_cast<TypefaceMetrics::StyleFlags>(info->style |
+                                                           TypefaceMetrics::StyleFlags::FixedPitch);
+  }
+  if (face->style_flags & FT_STYLE_FLAG_ITALIC) {
+    info->style =
+        static_cast<TypefaceMetrics::StyleFlags>(info->style | TypefaceMetrics::StyleFlags::Italic);
+    ;
+  }
+
+  PS_FontInfoRec psFontInfo;
+  if (FT_Get_PS_Font_Info(face, &psFontInfo) == 0) {
+    info->fItalicAngle = static_cast<int16_t>(psFontInfo.italic_angle);
+  } else if (auto* postTable = static_cast<TT_Postscript*>(FT_Get_Sfnt_Table(face, ft_sfnt_post))) {
+    info->fItalicAngle = static_cast<int16_t>(postTable->italicAngle);
+  } else {
+    info->fItalicAngle = 0;
+  }
+
+  info->fAscent = face->ascender;
+  info->fDescent = face->descender;
+
+  if (auto* pcltTable = static_cast<TT_PCLT*>(FT_Get_Sfnt_Table(face, ft_sfnt_pclt))) {
+    info->fCapHeight = static_cast<int16_t>(pcltTable->CapHeight);
+    uint8_t serif_style = pcltTable->SerifStyle & 0x3F;
+    if (2 <= serif_style && serif_style <= 6) {
+      info->style = static_cast<TypefaceMetrics::StyleFlags>(info->style |
+                                                             TypefaceMetrics::StyleFlags::Serif);
+    } else if (9 <= serif_style && serif_style <= 12) {
+      info->style = static_cast<TypefaceMetrics::StyleFlags>(info->style |
+                                                             TypefaceMetrics::StyleFlags::Script);
+    }
+  } else if (auto* os2Table = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, ft_sfnt_os2))) {
+    if (os2Table->version != 0xFFFF && os2Table->version >= 2) {
+      info->fCapHeight = os2Table->sCapHeight;
+    }
+  }
+  info->fBBox = Rect::MakeLTRB(face->bbox.xMin, face->bbox.yMax, face->bbox.xMax, face->bbox.yMin);
+  return info;
+}
+
+std::shared_ptr<Data> FTTypeface::openData() const {
+  return data.data;
+}
 
 }  // namespace tgfx

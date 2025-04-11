@@ -19,22 +19,13 @@
 #pragma once
 
 #include <memory>
-#include "pdf/PDFTypes.h"
+#include "pdf/PDFGlyphUse.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Stream.h"
-#include "tgfx/core/WriteStream.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 
-/** A form XObject is a self contained description of a graphics
-    object.  A form XObject is a page object with slightly different
-    syntax, that can be drawn into a page content stream, just like a
-    bitmap XObject can be drawn into a page content stream.
-*/
-PDFIndirectReference MakePDFFormXObject(PDFDocument* document, std::shared_ptr<Data> contentData,
-                                        std::unique_ptr<PDFArray> mediaBox,
-                                        std::unique_ptr<PDFDictionary> resourceDictionary,
-                                        const Matrix& inverseTransform, const char* colorSpace);
+std::shared_ptr<Data> PDFSubsetFont(const std::shared_ptr<Typeface>& typeface,
+                                    const PDFGlyphUse& glyphUsage);
 
 }  // namespace tgfx

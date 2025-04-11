@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -36,8 +38,13 @@ typedef uint16_t GlyphID;
 typedef int32_t Unichar;
 
 typedef uint32_t FontTableTag;
+static inline constexpr FontTableTag SetFourByteTag(char a, char b, char c, char d) {
+  return ((static_cast<uint32_t>(a) << 24) | (static_cast<uint32_t>(b) << 16) |
+          (static_cast<uint32_t>(c) << 8) | static_cast<uint32_t>(d));
+}
 
 class ScalerContext;
+struct TypefaceMetrics;
 
 /**
  * A set of character glyphs and layout information for drawing text.
@@ -138,6 +145,8 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
+  size_t getTableSize(FontTableTag tag) const;
+
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -146,6 +155,12 @@ class Typeface {
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
+  std::unique_ptr<TypefaceMetrics> getMetrics() const;
+
+  virtual std::shared_ptr<Data> openData() const = 0;
+
+  virtual std::unique_ptr<TypefaceMetrics> onGetMetrics() const = 0;
+
   mutable std::mutex locker = {};
 
  private:
@@ -153,5 +168,6 @@ class Typeface {
 
   friend class ScalerContext;
   friend class GlyphConverter;
+  friend class PDFFont;
 };
 }  // namespace tgfx

@@ -65,6 +65,10 @@ class CGTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+  std::shared_ptr<Data> openData() const override;
+
+  std::unique_ptr<TypefaceMetrics> onGetMetrics() const override;
+
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
 

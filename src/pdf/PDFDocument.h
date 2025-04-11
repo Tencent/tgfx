@@ -18,12 +18,16 @@
 
 #pragma once
 
+#include <_types/_uint32_t.h>
 #include <cstddef>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include "core/TypefaceMetrics.h"
+#include "core/utils/UniqueID.h"
 #include "pdf/PDFExportContext.h"
+#include "pdf/PDFFont.h"
 #include "pdf/PDFGraphicState.h"
 #include "pdf/PDFTag.h"
 #include "pdf/PDFTypes.h"
@@ -33,6 +37,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/pdf/PDFMetadata.h"
@@ -173,12 +178,12 @@ class PDFDocument : public Document {
   //   skia_private::THashMap<SkBitmapKey, SkPDFIndirectReference> fPDFBitmapMap;
   //   skia_private::THashMap<SkPDFIccProfileKey, SkPDFIndirectReference, SkPDFIccProfileKey::Hash>
   //       fICCProfileMap;
-  //   skia_private::THashMap<uint32_t, std::unique_ptr<SkAdvancedTypefaceMetrics>> fTypefaceMetrics;
-  //   skia_private::THashMap<uint32_t, std::vector<SkString>> fType1GlyphNames;
-  //   skia_private::THashMap<uint32_t, std::vector<SkUnichar>> fToUnicodeMap;
-  //   skia_private::THashMap<uint32_t, SkPDFIndirectReference> fFontDescriptors;
-  //   skia_private::THashMap<uint32_t, SkPDFIndirectReference> fType3FontDescriptors;
-  //   skia_private::THashTable<sk_sp<SkPDFStrike>, const SkDescriptor&, SkPDFStrike::Traits> fStrikes;
+  std::unordered_map<uint32_t, std::unique_ptr<TypefaceMetrics>> fTypefaceMetrics;
+  std::unordered_map<uint32_t, std::vector<std::string>> fType1GlyphNames;
+  std::unordered_map<uint32_t, std::vector<Unichar>> fToUnicodeMap;
+  std::unordered_map<uint32_t, PDFIndirectReference> fFontDescriptors;
+  std::unordered_map<uint32_t, PDFIndirectReference> fType3FontDescriptors;
+  std::unordered_map<uint32_t, std::shared_ptr<PDFStrike>> fStrikes;
   //   skia_private::THashMap<SkPDFStrokeGraphicState, SkPDFIndirectReference,
   //                          SkPDFStrokeGraphicState::Hash>
   //       fStrokeGSMap;

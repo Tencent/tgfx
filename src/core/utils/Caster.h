@@ -25,6 +25,7 @@
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/images/BufferImage.h"
 #include "core/images/CodecImage.h"
 #include "core/images/GeneratorImage.h"
 #include "core/images/PictureImage.h"
@@ -82,6 +83,8 @@ class Caster {
   static const CodecImage* AsCodecImage(const Image* image);
 
   static const SubsetImage* AsSubsetImage(const Image* image);
+
+  static const BufferImage* AsBufferImage(const Image* image);
 
   static bool Compare(const MaskFilter* maskFilter, const MaskFilter* other);
 

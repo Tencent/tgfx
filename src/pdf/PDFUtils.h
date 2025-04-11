@@ -71,6 +71,11 @@ class PDFUtils {
     stream->write(buffer, len);
   }
 
+  static inline void WriteUInt8(const std::shared_ptr<WriteStream>& stream, uint8_t value) {
+    char result[2] = {HexadecimalDigits::upper[value >> 4], HexadecimalDigits::upper[value & 0xF]};
+    stream->write(result, 2);
+  }
+
   static inline void WriteUInt16BE(const std::shared_ptr<WriteStream>& stream, uint16_t value) {
     char result[4] = {
         HexadecimalDigits::upper[value >> 12], HexadecimalDigits::upper[0xF & (value >> 8)],

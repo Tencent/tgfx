@@ -31,6 +31,7 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Fill.h"
+#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -88,11 +89,16 @@ class PDFExportContext : public DrawContext {
  private:
   void reset();
 
-  void onDrawPath(const MCState& state, const Matrix& ctm, const Path& path, const Fill& fill,
-                  bool pathIsMutable);
+  void onDrawPath(const MCState& state, const Path& path, const Fill& fill, bool pathIsMutable);
 
   void onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                        const SamplingOptions& sampling, const MCState& state, const Fill& fill);
+
+  void onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
+                      const Stroke* stroke);
+
+  void onDrawGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
+                            const Stroke* stroke);
 
   std::shared_ptr<MemoryWriteStream> setUpContentEntry(const MCState* state, const Matrix& matrix,
                                                        const Fill& fill, float scale,
@@ -139,7 +145,7 @@ class PDFExportContext : public DrawContext {
                      const std::shared_ptr<ImageFilter>& imageFilter, const MCState& state,
                      const Fill& fill);
 
-  void drawPathWithFilter(const MCState& clipStack, const Matrix& matrix, const Path& originPath,
+  void drawPathWithFilter(const MCState& state, const Path& originPath, const Matrix& matrix,
                           const Fill& originPaint);
 
   ISize _pageSize = {};

@@ -18,6 +18,7 @@
 
 #include "Caster.h"
 #include "Log.h"
+#include "core/images/BufferImage.h"
 #include "core/images/CodecImage.h"
 #include "core/shaders/ColorShader.h"
 
@@ -158,6 +159,14 @@ const SubsetImage* Caster::AsSubsetImage(const Image* image) {
   DEBUG_ASSERT(image != nullptr);
   if (image->type() == Image::Type::Subset) {
     return static_cast<const SubsetImage*>(image);
+  }
+  return nullptr;
+}
+
+const BufferImage* Caster::AsBufferImage(const Image* image) {
+  DEBUG_ASSERT(image != nullptr);
+  if (image->type() == Image::Type::Buffer) {
+    return static_cast<const BufferImage*>(image);
   }
   return nullptr;
 }

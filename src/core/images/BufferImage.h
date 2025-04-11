@@ -40,6 +40,8 @@ class BufferImage : public ResourceImage {
     return imageBuffer->isAlphaOnly();
   }
 
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+
  protected:
   Type type() const override {
     return Type::Buffer;
@@ -47,8 +49,5 @@ class BufferImage : public ResourceImage {
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const override;
-
- private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 };
 }  // namespace tgfx

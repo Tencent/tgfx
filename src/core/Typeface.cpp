@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
+#include "core/TypefaceMetrics.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/UTF.h"
 
@@ -69,6 +70,14 @@ class EmptyTypeface : public Typeface {
     return {};
   }
 
+  std::shared_ptr<Data> openData() const override {
+    return nullptr;
+  }
+
+  std::unique_ptr<TypefaceMetrics> onGetMetrics() const override {
+    return nullptr;
+  };
+
  private:
   uint32_t _uniqueID = UniqueID::Next();
 };
@@ -94,5 +103,35 @@ GlyphID Typeface::getGlyphID(const std::string& name) const {
 std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
+
+size_t Typeface::getTableSize(FontTableTag tag) const {
+  auto data = copyTableData(tag);
+  if (data) {
+    return data->size();
+  }
+  return 0;
+}
+
+std::unique_ptr<TypefaceMetrics> Typeface::getMetrics() const {
+  std::unique_ptr<TypefaceMetrics> result = onGetMetrics();
+  if (result && result->postScriptName.empty()) {
+    result->postScriptName = this->fontFamily();
+  }
+  if (result && (result->type == TypefaceMetrics::FontType::TrueType ||
+                 result->type == TypefaceMetrics::FontType::CFF)) {
+    // SkOTTableOS2::Version::V2::Type::Field fsType;
+    // constexpr SkFontTableTag os2Tag = SkTEndian_SwapBE32(SkOTTableOS2::TAG);
+    // constexpr size_t fsTypeOffset = offsetof(SkOTTableOS2::Version::V2, fsType);
+    // if (this->getTableData(os2Tag, fsTypeOffset, sizeof(fsType), &fsType) == sizeof(fsType)) {
+    //   if (fsType.Bitmap || (fsType.Restricted && !(fsType.PreviewPrint || fsType.Editable))) {
+    //     result->fFlags |= SkAdvancedTypefaceMetrics::kNotEmbeddable_FontFlag;
+    //   }
+    //   if (fsType.NoSubsetting) {
+    //     result->fFlags |= SkAdvancedTypefaceMetrics::kNotSubsettable_FontFlag;
+    //   }
+    // }
+  }
+  return result;
+}
 
 }  // namespace tgfx

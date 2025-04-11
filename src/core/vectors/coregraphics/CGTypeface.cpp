@@ -19,12 +19,27 @@
 #include "CGTypeface.h"
 #include <CoreFoundation/CoreFoundation.h>
 #include "CGScalerContext.h"
+#include "core/TypefaceMetrics.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
+
+template <typename CFRef>
+struct CFReleaseDeleter {
+  void operator()(CFTypeRef ref) const {
+    if (ref) {
+      CFRelease(ref);
+    }
+  }
+};
+
+template <typename CFRef>
+using UniqueCFRef = std::unique_ptr<std::remove_pointer_t<CFRef>, CFReleaseDeleter<CFRef>>;
+
 std::string StringFromCFString(CFStringRef src) {
   static const CFIndex kCStringSize = 128;
   char temporaryCString[kCStringSize];
@@ -385,5 +400,104 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
   return returnMap;
 }
 #endif
+
+std::unique_ptr<TypefaceMetrics> CGTypeface::onGetMetrics() const {
+
+  // UniqueCFRef<CTFontRef> ctFont =
+  //     SkCTFontCreateExactCopy(fFontRef, CTFontGetUnitsPerEm(fFontRef), fOpszVariation);
+
+  std::unique_ptr<TypefaceMetrics> info(new TypefaceMetrics);
+
+  {
+    const auto* fontName = CTFontCopyPostScriptName(ctFont);
+    if (fontName) {
+      info->postScriptName = StringFromCFString(fontName);
+    }
+    CFRelease(fontName);
+  }
+
+  //TODO (YGaurora): Add support for variable fonts.
+  // CFArrayRef ctAxes = this->getVariationAxes();
+  // if (ctAxes && CFArrayGetCount(ctAxes) > 0) {
+  //   info->flags =
+  //       static_cast<TypefaceMetrics::FontFlags>(info->flags | TypefaceMetrics::FontFlags::Variable);
+  // }
+
+  // SkOTTableOS2_V4::Type fsType;
+  // if (sizeof(fsType) == this->getTableData(SkTEndian_SwapBE32(SkOTTableOS2::TAG),
+  //                                          offsetof(SkOTTableOS2_V4, fsType), sizeof(fsType),
+  //                                          &fsType)) {
+  //   SkOTUtils::SetAdvancedTypefaceFlags(fsType, info.get());
+  // }
+
+  // If it's not an OpenType font, mark it as 'other'. Assume that OpenType
+  // fonts always have both glyf and loca tables or a CFF table.
+  // At the least, this is what is needed to subset the font.
+  // CTFontCopyAttribute() does not always succeed in determining this directly.
+  constexpr auto glyf = SetFourByteTag('g', 'l', 'y', 'f');
+  constexpr auto loca = SetFourByteTag('l', 'o', 'c', 'a');
+  constexpr auto CFF = SetFourByteTag('C', 'F', 'F', ' ');
+  if (this->getTableSize(glyf) && this->getTableSize(loca)) {
+    info->type = TypefaceMetrics::FontType::TrueType;
+  } else if (this->getTableSize(CFF)) {
+    info->type = TypefaceMetrics::FontType::CFF;
+  } else {
+    return info;
+  }
+
+  CTFontSymbolicTraits symbolicTraits = CTFontGetSymbolicTraits(ctFont);
+  if (symbolicTraits & kCTFontMonoSpaceTrait) {
+    info->style = static_cast<TypefaceMetrics::StyleFlags>(info->style |
+                                                           TypefaceMetrics::StyleFlags::FixedPitch);
+  }
+  if (symbolicTraits & kCTFontItalicTrait) {
+    info->style =
+        static_cast<TypefaceMetrics::StyleFlags>(info->style | TypefaceMetrics::StyleFlags::Italic);
+  }
+  CTFontStylisticClass stylisticClass = symbolicTraits & kCTFontClassMaskTrait;
+  if (stylisticClass >= kCTFontOldStyleSerifsClass && stylisticClass <= kCTFontSlabSerifsClass) {
+    info->style =
+        static_cast<TypefaceMetrics::StyleFlags>(info->style | TypefaceMetrics::StyleFlags::Serif);
+  } else if (stylisticClass & kCTFontScriptsClass) {
+    info->style =
+        static_cast<TypefaceMetrics::StyleFlags>(info->style | TypefaceMetrics::StyleFlags::Script);
+  }
+  info->fItalicAngle = static_cast<int16_t>(CTFontGetSlantAngle(ctFont));
+  info->fAscent = static_cast<int16_t>(CTFontGetAscent(ctFont));
+  info->fDescent = static_cast<int16_t>(CTFontGetDescent(ctFont));
+  info->fCapHeight = static_cast<int16_t>(CTFontGetCapHeight(ctFont));
+  CGRect bbox = CTFontGetBoundingBox(ctFont);
+
+  auto rect =
+      Rect::MakeXYWH(static_cast<float>(bbox.origin.x), static_cast<float>(bbox.origin.y),
+                     static_cast<float>(bbox.size.width), static_cast<float>(bbox.size.height));
+  rect.roundOut();
+  info->fBBox = rect;
+
+  // Figure out a good guess for StemV - Min width of i, I, !, 1.
+  // This probably isn't very good with an italic font.
+  int16_t min_width = SHRT_MAX;
+  info->fStemV = 0;
+  static const UniChar stem_chars[] = {'i', 'I', '!', '1'};
+  const size_t count = sizeof(stem_chars) / sizeof(stem_chars[0]);
+  CGGlyph glyphs[count];
+  CGRect boundingRects[count];
+  if (CTFontGetGlyphsForCharacters(ctFont, stem_chars, glyphs, count)) {
+    CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, glyphs, boundingRects,
+                                    count);
+    for (auto& boundingRect : boundingRects) {
+      auto width = static_cast<int16_t>(boundingRect.size.width);
+      if (width > 0 && width < min_width) {
+        min_width = width;
+        info->fStemV = min_width;
+      }
+    }
+  }
+  return info;
+};
+
+std::shared_ptr<Data> CGTypeface::openData() const {
+  return data;
+};
 
 }  // namespace tgfx

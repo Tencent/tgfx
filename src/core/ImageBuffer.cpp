@@ -42,6 +42,9 @@ class PixelData : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
+  ImageInfo info = {};
+  std::shared_ptr<Data> pixels = nullptr;
+
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override {
     switch (info.colorType()) {
@@ -58,10 +61,6 @@ class PixelData : public ImageBuffer {
         return nullptr;
     }
   }
-
- private:
-  ImageInfo info = {};
-  std::shared_ptr<Data> pixels = nullptr;
 };
 
 /**

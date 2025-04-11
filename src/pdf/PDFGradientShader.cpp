@@ -661,7 +661,7 @@ PDFIndirectReference create_smask_graphic_state(PDFDocument* doc,
   auto bbox = state.fBBox;
   auto contentStream = create_pattern_fill_content(-1, luminosityShader.fValue, bbox);
   auto contentData = contentStream->readData();
-  auto alphaMask = MakePDDFormXObject(doc, contentData, PDFUtils::RectToArray(bbox),
+  auto alphaMask = MakePDFFormXObject(doc, contentData, PDFUtils::RectToArray(bbox),
                                       std::move(resources), Matrix::I(), "DeviceRGB");
   return PDFGraphicState::GetSMaskGraphicState(alphaMask, false,
                                                PDFGraphicState::SMaskMode::Luminosity, doc);

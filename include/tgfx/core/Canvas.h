@@ -445,6 +445,7 @@ class Canvas {
   friend class PDFDocument;
   friend class PDFShader;
   friend class PDFExportContext;
+  friend class PDFFont;
 };
 
 /**

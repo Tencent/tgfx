@@ -18,6 +18,7 @@
 
 #include "PDFExportContext.h"
 #include <cmath>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <tuple>
@@ -29,6 +30,7 @@
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/TransformContext.h"
+#include "core/TypefaceMetrics.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
@@ -50,6 +52,8 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Fill.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageFilter.h"
@@ -170,7 +174,7 @@ void PDFExportContext::drawFill(const MCState&, const Fill&){};
 void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
   Path path;
   path.addRect(rect);
-  this->onDrawPath(state, Matrix::I(), path, fill, true);
+  this->onDrawPath(state, path, fill, true);
 }
 
 void PDFExportContext::drawRRect(const RRect&, const MCState&, const Fill&) {
@@ -179,7 +183,7 @@ void PDFExportContext::drawRRect(const RRect&, const MCState&, const Fill&) {
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill) {
   auto path = shape->getPath();
-  this->onDrawPath(state, Matrix::I(), path, fill, false);
+  this->onDrawPath(state, path, fill, false);
 }
 
 void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -194,8 +198,204 @@ void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
   onDrawImageRect(image, rect, sampling, state, fill);
 }
 
-void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList>, const MCState&, const Fill&,
-                                        const Stroke*) {
+void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                        const MCState& state, const Fill& fill,
+                                        const Stroke* stroke) {
+  for (const auto& glyphRun : glyphRunList->glyphRuns()) {
+    // onDrawGlyphRun(glyphRun, state, fill, stroke);
+    onDrawGlyphRunAsPath(glyphRun, state, fill, stroke);
+  }
+}
+
+void PDFExportContext::onDrawGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state,
+                                            const Fill& fill, const Stroke* stroke) {
+  auto glyphFace = glyphRun.glyphFace;
+  Path path;
+
+  for (size_t i = 0; i < glyphRun.glyphs.size(); ++i) {
+    auto glyphID = glyphRun.glyphs[i];
+    auto glyphPosition = glyphRun.positions[i];
+    Path glyphPath;
+    if (!glyphFace->getPath(glyphID, &glyphPath)) {
+      continue;
+    }
+    glyphPath.transform(Matrix::MakeTrans(glyphPosition.x, glyphPosition.y));
+    path.addPath(glyphPath);
+  }
+
+  if (path.isEmpty()) {
+    return;
+  }
+  auto shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
+  drawShape(shape, state, fill);
+
+  //TODO (YGaurora): maybe hasPerspective()
+  Fill transparentFill = fill;
+  transparentFill.color = Color::Transparent();
+  onDrawGlyphRun(glyphRun, state, transparentFill, stroke);
+}
+
+void PDFExportContext::onDrawGlyphRun(const GlyphRun& /*glyphRun*/, const MCState& /*state*/,
+                                      const Fill& /*fill*/, const Stroke* /*stroke*/) {
+  // const auto& glyphIDs = glyphRun.glyphs;
+  // auto glyphFace = glyphRun.glyphFace;
+
+  // if (glyphIDs.empty() || !glyphFace) {
+  //   return;
+  // }
+
+  // if (fill.maskFilter) {  //this->localToDevice().hasPerspective()
+  //   this->onDrawGlyphRunAsPath(glyphRun, state, fill, stroke);
+  //   return;
+  // }
+
+  // Font glyphRunFont;
+  // if (!glyphFace->asFont(&glyphRunFont)) {
+  //   return;
+  // }
+  // auto pdfStrike = PDFStrike::Make(document, glyphRunFont);
+  // if (!pdfStrike) {
+  //   return;
+  // }
+
+  // auto typeface = pdfStrike->strikeSpec.font.getTypeface();
+
+  // const auto* metrics = PDFFont::GetMetrics(typeface, document);
+  // if (!metrics) {
+  //   return;
+  // }
+
+  // const auto& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
+
+  // // TODO: FontType should probably be on SkPDFStrike?
+  // TypefaceMetrics::FontType initialFontType = PDFFont::FontType(*pdfStrike, *metrics);
+
+  // SkClusterator clusterator(glyphRun);
+
+  // // The size, skewX, and scaleX are applied here.
+  // float textSize = glyphRunFont.getSize();
+  // float advanceScale = textSize * 1.f / pdfStrike->strikeSpec.unitsPerEM;
+
+  // // textScaleX and textScaleY are used to get a conservative bounding box for glyphs.
+  // float textScaleY = textSize / pdfStrike->strikeSpec.unitsPerEM;
+  // float textScaleX = advanceScale;
+
+  // auto clipStackBounds = state.clip.getBounds();
+
+  // // Clear everything from the runPaint that will be applied by the strike.
+  // SkPaint fillPaint(runPaint);
+  // if (fillPaint.getStrokeWidth() > 0) {
+  //   fillPaint.setStroke(false);
+  // }
+  // fillPaint.setPathEffect(nullptr);
+  // fillPaint.setMaskFilter(nullptr);
+  // SkTCopyOnFirstWrite<SkPaint> paint(clean_paint(fillPaint));
+  // ScopedContentEntry content(this, *paint, glyphRunFont.getScaleX());
+  // if (!content) {
+  //   return;
+  // }
+  // SkDynamicMemoryWStream* out = content.stream();
+
+  // out->writeText("BT\n");
+  // SK_AT_SCOPE_EXIT(out->writeText("ET\n"));
+
+  // // Destinations are in absolute coordinates.
+  // // The glyphs bounds go through the localToDevice separately for clipping.
+  // SkMatrix pageXform = this->deviceToGlobal().asM33();
+  // pageXform.postConcat(fDocument->currentPageTransform());
+
+  // ScopedOutputMarkedContentTags mark(fNodeId, {SK_ScalarNaN, SK_ScalarNaN}, fDocument, out);
+  // if (!glyphRun.text().empty()) {
+  //   fDocument->addNodeTitle(fNodeId, glyphRun.text());
+  // }
+
+  // const int numGlyphs = typeface.countGlyphs();
+
+  // if (clusterator.reversedChars()) {
+  //   out->writeText("/ReversedChars BMC\n");
+  // }
+  // SK_AT_SCOPE_EXIT(if (clusterator.reversedChars()) { out->writeText("EMC\n"); });
+  // GlyphPositioner glyphPositioner(out, glyphRunFont.getSkewX(), offset);
+  // PDFFont* font = nullptr;
+
+  // SkBulkGlyphMetricsAndPaths paths{pdfStrike->fPath.fStrikeSpec};
+  // auto glyphs = paths.glyphs(glyphRun.glyphsIDs());
+
+  // while (SkClusterator::Cluster c = clusterator.next()) {
+  //   int index = c.fGlyphIndex;
+  //   int glyphLimit = index + c.fGlyphCount;
+
+  //   bool actualText = false;
+  //   SK_AT_SCOPE_EXIT(if (actualText) {
+  //     glyphPositioner.flush();
+  //     out->writeText("EMC\n");
+  //   });
+  //   if (c.fUtf8Text) {  // real cluster
+  //     // Check if `/ActualText` needed.
+  //     const char* textPtr = c.fUtf8Text;
+  //     const char* textEnd = c.fUtf8Text + c.fTextByteLength;
+  //     SkUnichar unichar = SkUTF::NextUTF8(&textPtr, textEnd);
+  //     if (unichar < 0) {
+  //       return;
+  //     }
+  //     if (textPtr < textEnd ||                                    // >1 code points in cluster
+  //         c.fGlyphCount > 1 ||                                    // >1 glyphs in cluster
+  //         unichar != map_glyph(glyphToUnicode, glyphIDs[index]))  // 1:1 but wrong mapping
+  //     {
+  //       glyphPositioner.flush();
+  //       out->writeText("/Span<</ActualText ");
+  //       SkPDFWriteTextString(out, c.fUtf8Text, c.fTextByteLength);
+  //       out->writeText(" >> BDC\n");  // begin marked-content sequence
+  //                                     // with an associated property list.
+  //       actualText = true;
+  //     }
+  //   }
+  //   for (; index < glyphLimit; ++index) {
+  //     SkGlyphID gid = glyphIDs[index];
+  //     if (numGlyphs <= gid) {
+  //       continue;
+  //     }
+  //     SkPoint xy = glyphRun.positions()[index];
+  //     // Do a glyph-by-glyph bounds-reject if positions are absolute.
+  //     SkRect glyphBounds = get_glyph_bounds_device_space(glyphs[index], textScaleX, textScaleY,
+  //                                                        xy + offset, this->localToDevice());
+  //     if (glyphBounds.isEmpty()) {
+  //       if (!contains(clipStackBounds, {glyphBounds.x(), glyphBounds.y()})) {
+  //         continue;
+  //       }
+  //     } else {
+  //       if (!clipStackBounds.intersects(glyphBounds)) {
+  //         continue;  // reject glyphs as out of bounds
+  //       }
+  //     }
+  //     if (needs_new_font(font, glyphs[index], initialFontType)) {
+  //       // Not yet specified font or need to switch font.
+  //       font = pdfStrike->getFontResource(glyphs[index]);
+  //       SkASSERT(font);  // All preconditions for SkPDFFont::GetFontResource are met.
+  //       glyphPositioner.setFont(font);
+  //       SkPDFWriteResourceName(out, SkPDFResourceType::kFont,
+  //                              add_resource(fFontResources, font->indirectReference()));
+  //       out->writeText(" ");
+  //       SkPDFUtils::AppendScalar(textSize, out);
+  //       out->writeText(" Tf\n");
+  //     }
+  //     font->noteGlyphUsage(gid);
+  //     SkGlyphID encodedGlyph = font->glyphToPDFFontEncoding(gid);
+  //     SkScalar advance = advanceScale * glyphs[index]->advanceX();
+  //     if (mark) {
+  //       SkRect absoluteGlyphBounds = pageXform.mapRect(glyphBounds);
+  //       SkPoint& markPoint = mark.point();
+  //       if (markPoint.isFinite()) {
+  //         markPoint.fX = std::min(absoluteGlyphBounds.fLeft, markPoint.fX);
+  //         markPoint.fY = std::max(absoluteGlyphBounds.fBottom, markPoint.fY);  // PDF top
+  //       } else {
+  //         markPoint = SkPoint{absoluteGlyphBounds.fLeft, absoluteGlyphBounds.fBottom};
+  //       }
+  //     }
+  //     glyphPositioner.writeGlyph(encodedGlyph, advance, xy);
+  //   }
+  // }
 }
 
 void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -385,10 +585,10 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
   }
 
   // if (image) {
-  //   image = image->makeTextureImage(context);
+  //   image = image->makeTextureImage(document->context());
   //   auto imageState = state;
   //   imageState.matrix.postTranslate(pictureBounds.x(), pictureBounds.y());
-  //   pdfExportContext->drawImage(std::move(image), SamplingOptions(), imageState, style);
+  //   drawImage(std::move(image), SamplingOptions(), imageState, Fill());
   // }
 }
 
@@ -440,6 +640,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       record->playback(this);
       drawInnerShadowAfterLayer(record, innerShadowFilter, state);
     }
+    return;
   }
   if (const auto* blurShadowFilter = Caster::AsBlurImageFilter(imageFilter.get())) {
     drawBlurLayer(picture, imageFilter, state, fill);
@@ -471,8 +672,8 @@ std::shared_ptr<Data> PDFExportContext::getContent() {
   return buffer->readData();
 }
 
-void PDFExportContext::onDrawPath(const MCState& state, const Matrix& ctm, const Path& path,
-                                  const Fill& fill, bool /*pathIsMutable*/) {
+void PDFExportContext::onDrawPath(const MCState& state, const Path& path, const Fill& fill,
+                                  bool /*pathIsMutable*/) {
   // if (state.clip.isEmpty()) {
   //   return;
   // }
@@ -481,11 +682,11 @@ void PDFExportContext::onDrawPath(const MCState& state, const Matrix& ctm, const
   const Path* pathPointer = &path;
 
   if (fill.maskFilter) {
-    this->drawPathWithFilter(state, ctm, path, fill);
+    this->drawPathWithFilter(state, path, Matrix::I(), fill);
     return;
   }
 
-  Matrix matrix = ctm;
+  Matrix matrix = Matrix::I();
   // if (paint->getPathEffect()) {
   //   if (clipStack.isEmpty(this->bounds())) {
   //     return;
@@ -688,7 +889,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
 
     Path path;
     path.addRect(rect);
-    this->onDrawPath(state, Matrix::I(), path, modifiedFill, true);
+    this->onDrawPath(state, path, modifiedFill, true);
     return;
   }
   // transform.postConcat(ctm);
@@ -853,7 +1054,7 @@ PDFIndirectReference PDFExportContext::makeFormXObjectFromDevice(Rect bounds, bo
   auto mediaBox = MakePDFArray(static_cast<int>(bounds.left), static_cast<int>(bounds.top),
                                static_cast<int>(bounds.right), static_cast<int>(bounds.bottom));
   PDFIndirectReference xObject =
-      MakePDDFormXObject(document, getContent(), std::move(mediaBox), makeResourceDictionary(),
+      MakePDFFormXObject(document, getContent(), std::move(mediaBox), makeResourceDictionary(),
                          inverseTransform, colorSpace);
 
   reset();
@@ -1066,7 +1267,7 @@ void PDFExportContext::finishContentEntry(const MCState* state, BlendMode blendM
       filledPaint.color = Color::Black();
       MCState empty;
       PDFExportContext shapeContext(_pageSize, document, _initialTransform);
-      shapeContext.onDrawPath(state ? *state : empty, Matrix::I(), *path, filledPaint, true);
+      shapeContext.onDrawPath(state ? *state : empty, *path, filledPaint, true);
       xObject = destination;
       sMask = shapeContext.makeFormXObjectFromDevice();
     } else {
@@ -1193,8 +1394,8 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
 
 }  // namespace
 
-void PDFExportContext::drawPathWithFilter(const MCState& clipStack, const Matrix& matrix,
-                                          const Path& originPath, const Fill& originPaint) {
+void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& originPath,
+                                          const Matrix& matrix, const Fill& originPaint) {
   DEBUG_ASSERT(originPaint.maskFilter);
 
   Path path(originPath);
@@ -1215,8 +1416,7 @@ void PDFExportContext::drawPathWithFilter(const MCState& clipStack, const Matrix
     maskPaint.setShader(shaderMaskFilter->getShader());
     maskCanvas->drawPaint(maskPaint);
 
-    auto grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::Gray_8,
-                                         AlphaType::Unpremultiplied);
+    auto grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::ALPHA_8);
     auto byteSize = grayscaleInfo.byteSize();
     void* pixels = malloc(byteSize);
     if (!surface->readPixels(grayscaleInfo, pixels)) {
@@ -1224,6 +1424,8 @@ void PDFExportContext::drawPathWithFilter(const MCState& clipStack, const Matrix
       return;
     }
     auto pixelData = Data::MakeAdopted(pixels, byteSize, Data::FreeProc);
+    // Convert alpha-8 to a grayscale image
+    grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::Gray_8);
     auto maskImage = Image::MakeFrom(grayscaleInfo, pixelData);
 
     // PDF doesn't seem to allow masking vector graphics with an Image XObject.
@@ -1238,10 +1440,10 @@ void PDFExportContext::drawPathWithFilter(const MCState& clipStack, const Matrix
     canvas.drawPicture(picture);
   }
 
-  if (!matrix.isIdentity() && paint.shader) {
+  if (!state.matrix.isIdentity() && paint.shader) {
     paint.shader = paint.shader->makeWithMatrix(matrix);
   }
-  ScopedContentEntry contentEntry(this, &clipStack, Matrix::I(), paint);
+  ScopedContentEntry contentEntry(this, &state, Matrix::I(), paint);
   if (!contentEntry) {
     return;
   }
@@ -1252,7 +1454,15 @@ void PDFExportContext::drawPathWithFilter(const MCState& clipStack, const Matrix
           picture ? PDFGraphicState::SMaskMode::Alpha : PDFGraphicState::SMaskMode::Luminosity,
           document),
       contentEntry.stream());
-  PDFUtils::AppendRectangle(maskBound, contentEntry.stream());
+  // PDFUtils::AppendRectangle(maskBound, contentEntry.stream());
+  {
+    constexpr float ToleranceScale = 0.0625f;  // smaller = better conics (circles).
+    Point scalePoint{0, 0};
+    matrix.mapXY(1.0f, 1.0f, &scalePoint);
+    float matrixScale = scalePoint.length();
+    float tolerance = matrixScale > 0.0f ? ToleranceScale / matrixScale : ToleranceScale;
+    PDFUtils::EmitPath(path, false, contentEntry.stream(), tolerance);
+  }
   PDFUtils::PaintPath(path.getFillType(), contentEntry.stream());
   clearMaskOnGraphicState(contentEntry.stream());
 }
