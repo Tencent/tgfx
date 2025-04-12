@@ -44,18 +44,20 @@ class RectDrawOp : public DrawOp {
    * of each rect.
    */
   static PlacementPtr<RectDrawOp> Make(Context* context, std::vector<PlacementPtr<RectPaint>> rects,
-                                       bool useUVCoord, AAType aaType, uint32_t renderFlags);
-
-  RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord);
+                                       bool needUVCoord, AAType aaType, uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;
 
  private:
   size_t rectCount = 0;
-  std::optional<Color> uniformColor = std::nullopt;
-  bool useUVCoord = false;
+  std::optional<Color> commonColor = std::nullopt;
+  std::optional<Matrix> uvMatrix = std::nullopt;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
+
+  RectDrawOp(AAType aaType, size_t rectCount);
+
+  friend class BlockBuffer;
 };
 }  // namespace tgfx

@@ -135,13 +135,13 @@ class RectNonCoverageVertexProvider : public VertexProvider {
 
 PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
                                           std::vector<PlacementPtr<RectPaint>> rects,
-                                          bool useUVCoord, AAType aaType, uint32_t renderFlags) {
+                                          bool needUVCoord, AAType aaType, uint32_t renderFlags) {
   if (rects.empty()) {
     return nullptr;
   }
   auto rectSize = rects.size();
   auto drawingBuffer = context->drawingBuffer();
-  auto drawOp = drawingBuffer->make<RectDrawOp>(aaType, rectSize, useUVCoord);
+  auto drawOp = drawingBuffer->make<RectDrawOp>(aaType, rectSize);
   auto& firstColor = rects.front()->color;
   std::optional<Color> uniformColor = firstColor;
   for (auto& rectPaint : rects) {
@@ -150,7 +150,10 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
       break;
     }
   }
-  drawOp->uniformColor = uniformColor;
+  drawOp->commonColor = uniformColor;
+  if (!needUVCoord) {
+    drawOp->uvMatrix = Matrix::I();
+  }
   if (aaType == AAType::Coverage) {
     drawOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else if (rectSize > 1) {
@@ -159,10 +162,10 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   std::unique_ptr<VertexProvider> provider = nullptr;
   if (aaType == AAType::Coverage) {
     provider = std::make_unique<RectCoverageVertexProvider>(std::move(rects),
-                                                            !uniformColor.has_value(), useUVCoord);
+                                                            !uniformColor.has_value(), needUVCoord);
   } else {
     provider = std::make_unique<RectNonCoverageVertexProvider>(
-        std::move(rects), !uniformColor.has_value(), useUVCoord);
+        std::move(rects), !uniformColor.has_value(), needUVCoord);
   }
   if (rectSize <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -175,8 +178,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   return drawOp;
 }
 
-RectDrawOp::RectDrawOp(AAType aaType, size_t rectCount, bool useUVCoord)
-    : DrawOp(aaType), rectCount(rectCount), useUVCoord(useUVCoord) {
+RectDrawOp::RectDrawOp(AAType aaType, size_t rectCount) : DrawOp(aaType), rectCount(rectCount) {
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
@@ -194,9 +196,8 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   }
   auto renderTarget = renderPass->renderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                                 renderTarget->height(), aaType, uniformColor,
-                                                 useUVCoord);
+  auto gp = QuadPerEdgeAAGeometryProcessor::Make(
+      drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);

@@ -21,30 +21,27 @@
 
 namespace tgfx {
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                                               std::optional<Color> uniformColor,
-                                                               bool useUVCoord)
-    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa),
-      uniformColor(uniformColor), useUVCoord(useUVCoord) {
+                                                               std::optional<Color> commonColor,
+                                                               std::optional<Matrix> uvMatrix)
+    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
+      uvMatrix(uvMatrix) {
+  position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
-    position = {"aPositionWithCoverage", SLType::Float3};
-  } else {
-    position = {"aPosition", SLType::Float2};
+    coverage = {"inCoverage", SLType::Float};
   }
-  if (useUVCoord) {
+  if (!uvMatrix.has_value()) {
     uvCoord = {"uvCoord", SLType::Float2};
   }
-  int attributeCount = 2;
-  if (!uniformColor.has_value()) {
-    attributeCount++;
+  if (!commonColor.has_value()) {
     color = {"inColor", SLType::UByte4Color};
   }
-  setVertexAttributes(&position, attributeCount);
+  setVertexAttributes(&position, 4);
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
-  flags |= uniformColor.has_value() ? 2 : 0;
-  flags |= useUVCoord ? 4 : 0;
+  flags |= commonColor.has_value() ? 2 : 0;
+  flags |= uvMatrix.has_value() ? 4 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

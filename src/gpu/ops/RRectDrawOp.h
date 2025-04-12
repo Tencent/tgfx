@@ -47,8 +47,6 @@ class RRectDrawOp : public DrawOp {
                                         std::vector<PlacementPtr<RRectPaint>> rects, AAType aaType,
                                         uint32_t renderFlags);
 
-  RRectDrawOp(AAType aaType, size_t rectCount);
-
   void execute(RenderPass* renderPass) override;
 
  private:
@@ -56,5 +54,9 @@ class RRectDrawOp : public DrawOp {
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
+
+  RRectDrawOp(AAType aaType, size_t rectCount);
+
+  friend class BlockBuffer;
 };
 }  // namespace tgfx
