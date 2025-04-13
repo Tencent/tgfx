@@ -31,7 +31,7 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class AARectsVertexProvider : public RectsVertexProvider {
  public:
-  AARectsVertexProvider(std::vector<PlacementPtr<RectPaint>> rects, AAType aaType, bool hasUVCoord,
+  AARectsVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType, bool hasUVCoord,
                         bool hasColor)
       : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor) {
   }
@@ -83,8 +83,8 @@ class AARectsVertexProvider : public RectsVertexProvider {
 
 class NonAARectVertexProvider : public RectsVertexProvider {
  public:
-  NonAARectVertexProvider(std::vector<PlacementPtr<RectPaint>> rects, AAType aaType,
-                          bool hasUVCoord, bool hasColor)
+  NonAARectVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType, bool hasUVCoord,
+                          bool hasColor)
       : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor) {
   }
 
@@ -118,18 +118,22 @@ class NonAARectVertexProvider : public RectsVertexProvider {
   }
 };
 
-std::unique_ptr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
-    PlacementPtr<tgfx::RectPaint> rect, AAType aaType) {
-  if (rect == nullptr) {
+PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buffer,
+                                                                const Rect& rect, AAType aaType) {
+  if (rect.isEmpty()) {
     return nullptr;
   }
-  auto rects = std::vector<PlacementPtr<RectPaint>>{};
-  rects.push_back(std::move(rect));
-  return MakeFrom(std::move(rects), aaType, false);
+  auto rectPaint = buffer->make<RectPaint>(rect, Matrix::I());
+  auto array = buffer->makeArray(&rectPaint, 1);
+  if (aaType == AAType::Coverage) {
+    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, false, false);
+  }
+  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, false, false);
 }
 
-std::unique_ptr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
-    std::vector<PlacementPtr<RectPaint>> rects, AAType aaType, bool needUVCoord) {
+PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
+    BlockBuffer* buffer, std::vector<PlacementPtr<RectPaint>>&& rects, AAType aaType,
+    bool needUVCoord) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -141,13 +145,14 @@ std::unique_ptr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
       break;
     }
   }
+  auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
-    return std::make_unique<AARectsVertexProvider>(std::move(rects), aaType, needUVCoord, hasColor);
+    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, needUVCoord, hasColor);
   }
-  return std::make_unique<NonAARectVertexProvider>(std::move(rects), aaType, needUVCoord, hasColor);
+  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, needUVCoord, hasColor);
 }
 
-RectsVertexProvider::RectsVertexProvider(std::vector<PlacementPtr<RectPaint>> rects, AAType aaType,
+RectsVertexProvider::RectsVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType,
                                          bool hasUVCoord, bool hasColor)
     : rects(std::move(rects)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);

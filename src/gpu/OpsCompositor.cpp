@@ -253,10 +253,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           deviceBounds.join(rect);
         }
       }
-      auto capacity = pendingRects.size();
-      auto provider =
-          RectsVertexProvider::MakeFrom(std::move(pendingRects), aaType, needLocalBounds);
-      pendingRects.reserve(capacity);
+      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
+                                                    aaType, needLocalBounds);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -270,10 +268,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           localBounds = Rect::MakeEmpty();
         }
       }
-      auto capacity = pendingRRects.size();
-      auto provider =
-          RRectsVertexProvider::MakeFrom(std::move(pendingRRects), aaType, RRectUseScale(context));
-      pendingRRects.reserve(capacity);
+      auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects),
+                                                     aaType, RRectUseScale(context));
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     default:

@@ -33,8 +33,7 @@ class RectDrawOp : public DrawOp {
   /**
    * Create a new RectDrawOp for the specified vertex provider.
    */
-  static PlacementPtr<RectDrawOp> Make(Context* context,
-                                       std::unique_ptr<RectsVertexProvider> provider,
+  static PlacementPtr<RectDrawOp> Make(Context* context, PlacementPtr<RectsVertexProvider> provider,
                                        uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;

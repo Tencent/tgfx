@@ -20,6 +20,7 @@
 
 #include <vector>
 #include "core/DataSource.h"
+#include "core/utils/PlacementPtr.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
@@ -43,7 +44,7 @@ class VertexProvider {
 
 class VertexProviderTask : public Task {
  public:
-  VertexProviderTask(std::unique_ptr<VertexProvider> provider, float* vertices)
+  VertexProviderTask(PlacementPtr<VertexProvider> provider, float* vertices)
       : provider(std::move(provider)), vertices(vertices) {
   }
 
@@ -53,7 +54,7 @@ class VertexProviderTask : public Task {
   }
 
  private:
-  std::unique_ptr<VertexProvider> provider = nullptr;
+  PlacementPtr<VertexProvider> provider = nullptr;
   float* vertices = nullptr;
 };
 

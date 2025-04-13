@@ -34,7 +34,7 @@ class RRectDrawOp : public DrawOp {
    * the device space.
    */
   static PlacementPtr<RRectDrawOp> Make(Context* context,
-                                        std::unique_ptr<RRectsVertexProvider> provider,
+                                        PlacementPtr<RRectsVertexProvider> provider,
                                         uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/PlacementPtr.h"
+#include "core/utils/BlockBuffer.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
@@ -43,8 +43,9 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRectPaint records.
    */
-  static std::unique_ptr<RRectsVertexProvider> MakeFrom(std::vector<PlacementPtr<RRectPaint>> rects,
-                                                        AAType aaType, bool useScale);
+  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
+                                                     std::vector<PlacementPtr<RRectPaint>>&& rects,
+                                                     AAType aaType, bool useScale);
 
   /**
    * Returns the number of round rects in the provider.
@@ -69,12 +70,14 @@ class RRectsVertexProvider : public VertexProvider {
   void getVertices(float* vertices) const override;
 
  private:
-  std::vector<PlacementPtr<RRectPaint>> rects = {};
+  PlacementArray<RRectPaint> rects = {};
   struct {
     uint8_t aaType : 2;
     bool useScale : 1;
   } bitFields = {};
 
-  RRectsVertexProvider(std::vector<PlacementPtr<RRectPaint>> rects, AAType aaType, bool useScale);
+  RRectsVertexProvider(PlacementArray<RRectPaint>&& rects, AAType aaType, bool useScale);
+
+  friend class BlockBuffer;
 };
 }  // namespace tgfx

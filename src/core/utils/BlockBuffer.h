@@ -23,6 +23,7 @@
 #include <limits>
 #include <memory>
 #include <vector>
+#include "core/utils/PlacementArray.h"
 #include "core/utils/PlacementPtr.h"
 
 namespace tgfx {
@@ -74,8 +75,45 @@ class BlockBuffer {
   }
 
   /**
- * Allocates memory for an object of the given size. Returns nullptr if the allocation fails.
- */
+   * Moves the elements from the given PlacementPtr vector into a new PlacementArray. The original
+   * pointers are released, and the new array takes ownership of the elements. Returns a
+   * PlacementArray containing the moved elements.
+   */
+  template <typename T>
+  PlacementArray<T> makeArray(std::vector<PlacementPtr<T>>&& vector) {
+    if (vector.empty()) {
+      return {};
+    }
+    auto count = vector.size();
+    auto byteSize = sizeof(T*) * count;
+    void* memory = allocate(byteSize);
+    memcpy(memory, vector.data(), byteSize);
+    memset(vector.data(), 0, byteSize);
+    vector.clear();
+    return PlacementArray<T>(reinterpret_cast<T**>(memory), count);
+  }
+
+  /**
+   * Moves the elements from the given PlacementPtr array into a new PlacementArray. The original
+   * pointers are released, and the new array takes ownership of the elements. Returns a
+   * PlacementArray containing the moved elements.
+   */
+  template <typename T>
+  PlacementArray<T> makeArray(PlacementPtr<T>* elements, size_t count) {
+    if (count == 0) {
+      return {};
+    }
+    void* memory = allocate(sizeof(T*) * count);
+    auto data = reinterpret_cast<T**>(memory);
+    for (size_t i = 0; i < count; ++i) {
+      data[i] = elements[i].release();
+    }
+    return PlacementArray<T>(data, count);
+  }
+
+  /**
+   * Allocates memory for an object of the given size. Returns nullptr if the allocation fails.
+   */
   void* allocate(size_t size);
 
   /**

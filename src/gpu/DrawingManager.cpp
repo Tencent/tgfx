@@ -35,8 +35,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return false;
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  auto rect = drawingBuffer->make<RectPaint>(bounds, Matrix::I());
-  auto provider = RectsVertexProvider::MakeFrom(std::move(rect), AAType::None);
+  auto provider = RectsVertexProvider::MakeFrom(context->drawingBuffer(), bounds, AAType::None);
   auto op = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);

@@ -155,6 +155,15 @@ class PlacementPtr {
     pointer = ptr;
   }
 
+  /**
+   * Releases the ownership of the pointer and returns the raw pointer.
+   */
+  T* release() {
+    T* temp = pointer;
+    pointer = nullptr;
+    return temp;
+  }
+
   T& operator*() const {
     return *pointer;
   }

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/PlacementPtr.h"
+#include "core/utils/BlockBuffer.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
@@ -41,15 +41,17 @@ struct RectPaint {
 class RectsVertexProvider : public VertexProvider {
  public:
   /**
-   * Creates a new RectsVertexProvider from a single rect record.
+   * Creates a new RectsVertexProvider from a single rect.
    */
-  static std::unique_ptr<RectsVertexProvider> MakeFrom(PlacementPtr<RectPaint> rect, AAType aaType);
+  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer, const Rect& rect,
+                                                    AAType aaType);
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.
    */
-  static std::unique_ptr<RectsVertexProvider> MakeFrom(std::vector<PlacementPtr<RectPaint>> rects,
-                                                       AAType aaType, bool needUVCoord);
+  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
+                                                    std::vector<PlacementPtr<RectPaint>>&& rects,
+                                                    AAType aaType, bool needUVCoord);
 
   /**
    * Returns the number of rects in the provider.
@@ -102,14 +104,14 @@ class RectsVertexProvider : public VertexProvider {
   }
 
  protected:
-  std::vector<PlacementPtr<RectPaint>> rects = {};
+  PlacementArray<RectPaint> rects = {};
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
   } bitFields = {};
 
-  RectsVertexProvider(std::vector<PlacementPtr<RectPaint>> rects, AAType aaType, bool hasUVCoord,
+  RectsVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType, bool hasUVCoord,
                       bool hasColor);
 };
 }  // namespace tgfx

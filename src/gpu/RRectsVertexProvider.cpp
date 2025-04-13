@@ -51,13 +51,14 @@ namespace tgfx {
 // geometry but make the inner rect degenerate (either a point or a horizontal or
 // vertical line).
 
-std::unique_ptr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
-    std::vector<PlacementPtr<RRectPaint>> rects, AAType aaType, bool useScale) {
+PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
+    BlockBuffer* buffer, std::vector<PlacementPtr<RRectPaint>>&& rects, AAType aaType,
+    bool useScale) {
   if (rects.empty()) {
     return nullptr;
   }
-  return std::unique_ptr<RRectsVertexProvider>(
-      new RRectsVertexProvider(std::move(rects), aaType, useScale));
+  auto array = buffer->makeArray(std::move(rects));
+  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale);
 }
 
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
@@ -68,8 +69,8 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
   bytes[3] = static_cast<uint8_t>(color.alpha * 255);
 }
 
-RRectsVertexProvider::RRectsVertexProvider(std::vector<PlacementPtr<RRectPaint>> rects,
-                                           AAType aaType, bool useScale)
+RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectPaint>&& rects, AAType aaType,
+                                           bool useScale)
     : rects(std::move(rects)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.useScale = useScale;
