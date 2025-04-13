@@ -51,7 +51,8 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-void TaskGroup::RunLoop(TaskGroup* taskGroup) {
+void TaskGroup::RunLoop(void* arg) {
+  auto taskGroup = static_cast<TaskGroup*>(arg);
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
@@ -61,13 +62,6 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
   }
 }
 
-static void ReleaseThread(std::thread* thread) {
-  if (thread->joinable()) {
-    thread->join();
-  }
-  delete thread;
-}
-
 void OnAppExit() {
   // Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
   // pointers.
@@ -75,7 +69,7 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  threads = new LockFreeQueue<std::thread*>(THREAD_POOL_SIZE);
+  threads = new LockFreeQueue<Thread*>(THREAD_POOL_SIZE);
   tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
   std::atexit(OnAppExit);
 }
@@ -84,7 +78,7 @@ bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
-    auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
+    auto thread = Thread::Create([this]() { RunLoop(this); }, Thread::Priority::Highest);
     if (thread) {
       threads->enqueue(thread);
       totalThreads++;
@@ -131,9 +125,10 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 void TaskGroup::exit() {
   exited = true;
   condition.notify_all();
-  std::thread* thread = nullptr;
+  Thread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
-    ReleaseThread(thread);
+    thread->join();
+    delete thread;
   }
   delete threads;
   delete tasks;

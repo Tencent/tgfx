@@ -318,7 +318,7 @@ if (WEB)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
     list(APPEND TGFX_DEFINES TGFX_BUILD_FOR_WEB)
     if (TGFX_USE_NATIVE_GL)
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/webgl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/webgl/*.* src/platform/unix/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
     list(APPEND TGFX_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
@@ -335,7 +335,7 @@ elseif (OHOS)
     list(APPEND TGFX_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
             ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
             ${NATIVE_WINDOW_LIB})
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.* src/platform/unix/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
     if (TGFX_USE_NATIVE_GL)
         find_library(EGL_LIB EGL)
@@ -365,7 +365,7 @@ elseif (IOS)
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND TGFX_SHARED_LIBS ${ICONV_LIBRARIES})
 
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/apple/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/apple/*.* src/platform/unix/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)
@@ -390,7 +390,7 @@ elseif (MACOS)
     find_library(CORE_MEDIA CoreMedia)
     list(APPEND TGFX_SHARED_LIBS ${CORE_MEDIA})
 
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/apple/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/apple/*.* src/platform/unix/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)
@@ -410,7 +410,7 @@ elseif (ANDROID)
     find_library(JNIGRAPHICS_LIB jnigraphics)
     list(APPEND TGFX_SHARED_LIBS ${JNIGRAPHICS_LIB})
 
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/android/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/android/*.* src/platform/unix/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)
@@ -433,7 +433,7 @@ elseif (WIN32)
     find_library(DWrite_LIB DWrite)
     list(APPEND TGFX_STATIC_LIBS ${DWrite_LIB})
 
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.* src/platform/win/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)
@@ -448,7 +448,7 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     list(APPEND TGFX_SHARED_LIBS dl)
     list(APPEND TGFX_COMPILE_OPTIONS -fPIC -pthread)
 
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.* src/platform/unix/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)

@@ -18,35 +18,48 @@
 
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <list>
 #include <mutex>
 #include <thread>
-#include <vector>
-#include "LockFreeQueue.h"
-#include "Thread.h"
-#include "tgfx/core/Task.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-class TaskGroup {
- private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  std::atomic_int totalThreads = 0;
-  std::atomic_bool exited = false;
-  std::atomic_int waitingThreads = 0;
-  LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
-  LockFreeQueue<Thread*>* threads = nullptr;
-  static TaskGroup* GetInstance();
-  static void RunLoop(void* taskGroup);
 
-  TaskGroup();
-  bool checkThreads();
-  bool pushTask(std::shared_ptr<Task> task);
-  std::shared_ptr<Task> popTask();
-  void exit();
+class Thread {
+ public:
+  enum class Priority { Lowest, Low, Normal, High, Highest };
+  static Thread* Create(std::function<void()> task, Priority priority = Priority::Normal);
+  virtual ~Thread() = default;
 
-  friend class Task;
-  friend void OnAppExit();
+  void start() {
+    if (joinable()) {
+      return;
+    }
+    onStart();
+  }
+
+  void join() {
+    if (joinable()) {
+      onJoin();
+    }
+  }
+
+ protected:
+  Thread(std::function<void()> task, Priority priority)
+      : task(std::move(task)), priority(priority) {
+  }
+
+  virtual void onStart() = 0;
+
+  virtual bool joinable() const = 0;
+
+  virtual void onJoin() = 0;
+
+  std::function<void()> task;
+  Priority priority = Priority::Normal;
 };
+
 }  // namespace tgfx

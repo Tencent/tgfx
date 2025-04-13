@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,37 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
 
-#include <condition_variable>
-#include <list>
-#include <mutex>
-#include <thread>
-#include <vector>
-#include "LockFreeQueue.h"
-#include "Thread.h"
-#include "tgfx/core/Task.h"
+#pragma once
+#include <windows.h>
+#include "core/utils/Thread.h"
 
 namespace tgfx {
-class TaskGroup {
+
+class WinThread : public Thread {
+ public:
+  explicit WinThread(std::function<void()> task, Priority priority)
+      : Thread(std::move(task), priority) {}
+
+  ~WinThread() override {
+    if (joinable()) {
+      CloseHandle(threadHandle);
+    }
+  }
+
+  void onStart() override;
+  void onJoin() override;
+  bool joinable() const override;
+
  private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  std::atomic_int totalThreads = 0;
-  std::atomic_bool exited = false;
-  std::atomic_int waitingThreads = 0;
-  LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
-  LockFreeQueue<Thread*>* threads = nullptr;
-  static TaskGroup* GetInstance();
-  static void RunLoop(void* taskGroup);
-
-  TaskGroup();
-  bool checkThreads();
-  bool pushTask(std::shared_ptr<Task> task);
-  std::shared_ptr<Task> popTask();
-  void exit();
-
-  friend class Task;
-  friend void OnAppExit();
+  static DWORD WINAPI ThreadProc(LPVOID lpParameter);
+  void setThreadPriority();
+  HANDLE threadHandle = INVALID_HANDLE_VALUE;
+  DWORD threadID = 0;
 };
-}  // namespace tgfx
+
+} // namespace tgfx
+#endif //WINTHREAD_H
