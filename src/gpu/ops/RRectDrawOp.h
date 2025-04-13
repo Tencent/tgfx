@@ -19,19 +19,9 @@
 #pragma once
 
 #include "DrawOp.h"
-#include "tgfx/core/Path.h"
+#include "gpu/RRectsVertexProvider.h"
 
 namespace tgfx {
-struct RRectPaint {
-  RRectPaint(const RRect& rRect, const Matrix& viewMatrix, Color color = Color::White())
-      : rRect(rRect), viewMatrix(viewMatrix), color(color) {
-  }
-
-  RRect rRect;
-  Matrix viewMatrix;
-  Color color;
-};
-
 class RRectDrawOp : public DrawOp {
  public:
   /**
@@ -44,18 +34,19 @@ class RRectDrawOp : public DrawOp {
    * the device space.
    */
   static PlacementPtr<RRectDrawOp> Make(Context* context,
-                                        std::vector<PlacementPtr<RRectPaint>> rects, AAType aaType,
+                                        std::unique_ptr<RRectsVertexProvider> provider,
                                         uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;
 
  private:
   size_t rectCount = 0;
+  bool useScale = false;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
 
-  RRectDrawOp(AAType aaType, size_t rectCount);
+  explicit RRectDrawOp(RRectsVertexProvider* provider);
 
   friend class BlockBuffer;
 };

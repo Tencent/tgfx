@@ -19,19 +19,10 @@
 #pragma once
 
 #include <optional>
+#include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-struct RectPaint {
-  RectPaint(const Rect& rect, const Matrix& viewMatrix, const Color& color = Color::White())
-      : rect(rect), viewMatrix(viewMatrix), color(color) {
-  }
-
-  Rect rect;
-  Matrix viewMatrix;
-  Color color;
-};
-
 class RectDrawOp : public DrawOp {
  public:
   /**
@@ -40,11 +31,11 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRects = 2048;
 
   /**
-   * Create a new RectDrawOp for a list of RectPaints. The returned RectDrawOp is in the local space
-   * of each rect.
+   * Create a new RectDrawOp for the specified vertex provider.
    */
-  static PlacementPtr<RectDrawOp> Make(Context* context, std::vector<PlacementPtr<RectPaint>> rects,
-                                       bool needUVCoord, AAType aaType, uint32_t renderFlags);
+  static PlacementPtr<RectDrawOp> Make(Context* context,
+                                       std::unique_ptr<RectsVertexProvider> provider,
+                                       uint32_t renderFlags);
 
   void execute(RenderPass* renderPass) override;
 
@@ -56,7 +47,7 @@ class RectDrawOp : public DrawOp {
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
 
-  RectDrawOp(AAType aaType, size_t rectCount);
+  explicit RectDrawOp(RectsVertexProvider* provider);
 
   friend class BlockBuffer;
 };

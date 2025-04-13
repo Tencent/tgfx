@@ -194,6 +194,10 @@ static bool IsPixelAligned(const Rect& rect) {
          fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
 }
 
+static bool RRectUseScale(Context* context) {
+  return !context->caps()->floatIs32Bits;
+}
+
 void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
@@ -250,9 +254,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
       auto capacity = pendingRects.size();
-      drawOp =
-          RectDrawOp::Make(context, std::move(pendingRects), needLocalBounds, aaType, renderFlags);
+      auto provider =
+          RectsVertexProvider::MakeFrom(std::move(pendingRects), aaType, needLocalBounds);
       pendingRects.reserve(capacity);
+      drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
       if (needLocalBounds || needDeviceBounds) {
@@ -266,8 +271,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
       auto capacity = pendingRRects.size();
-      drawOp = RRectDrawOp::Make(context, std::move(pendingRRects), aaType, renderFlags);
+      auto provider =
+          RRectsVertexProvider::MakeFrom(std::move(pendingRRects), aaType, RRectUseScale(context));
       pendingRRects.reserve(capacity);
+      drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     default:
       break;
