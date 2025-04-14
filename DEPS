@@ -12,17 +12,17 @@
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "3a2d34b8e1465f264067f4e8c535c0fecfb98f9c",
+        "commit": "ad22a7e8c5708f1f12c1653b98ea7a554218af65",
         "dir": "third_party/pathkit"
       },
       {
         "url": "${PAG_GROUP}/skcms.git",
-        "commit": "0084176aa5808a668666846c356ae6503a3b2447",
+        "commit": "2d0ea94be31ed31438c3c7a57752a601ba83ff2c",
         "dir": "third_party/skcms"
       },
       {
         "url": "https://github.com/madler/zlib.git",
-        "commit": "cacf7f1d4e3d44d871b605da3b647f07d718623f",
+        "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
         "dir": "third_party/zlib"
       },
       {
@@ -47,12 +47,12 @@
       },
       {
         "url": "https://github.com/harfbuzz/harfbuzz.git",
-        "commit": "f1f2be776bcd994fa9262622e1a7098a066e5cf7",
+        "commit": "20ade4dea9589515a69793e447a6c6220b464535",
         "dir": "third_party/harfbuzz"
       },
       {
         "url": "https://github.com/google/googletest.git",
-        "commit": "e2239ee6043f73722e7aa812a459f54a28552929",
+        "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
         "dir": "third_party/googletest"
       },
       {
