@@ -27,7 +27,7 @@
 
 namespace tgfx {
 
-SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag), transform(Matrix::I()) {
+SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag) {
 }
 
 bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
