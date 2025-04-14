@@ -12,12 +12,12 @@
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "3a2d34b8e1465f264067f4e8c535c0fecfb98f9c",
+        "commit": "ad22a7e8c5708f1f12c1653b98ea7a554218af65",
         "dir": "third_party/pathkit"
       },
       {
         "url": "${PAG_GROUP}/skcms.git",
-        "commit": "0084176aa5808a668666846c356ae6503a3b2447",
+        "commit": "2d0ea94be31ed31438c3c7a57752a601ba83ff2c",
         "dir": "third_party/skcms"
       },
       {
@@ -52,7 +52,7 @@
       },
       {
         "url": "https://github.com/google/googletest.git",
-        "commit": "e2239ee6043f73722e7aa812a459f54a28552929",
+        "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
         "dir": "third_party/googletest"
       },
       {
