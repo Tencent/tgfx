@@ -75,6 +75,38 @@
           "${SOURCE_DIR}/jpeglib.h",
           "${SOURCE_DIR}/jerror.h",
           "${BUILD_DIR}/jconfig.h"
+        ],
+        "platforms": [
+          "win",
+          "linux",
+          "mac",
+          "android",
+          "ios",
+          "ohos"
+        ],
+        "arguments": [
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+        ]
+      }
+    },
+    {
+      "name": "libjpeg-turbo",
+      "cmake": {
+        "targets": [
+          "turbojpeg-static"
+        ],
+        "includes": [
+          "${SOURCE_DIR}/jmorecfg.h",
+          "${SOURCE_DIR}/jpeglib.h",
+          "${SOURCE_DIR}/jerror.h",
+          "${BUILD_DIR}/jconfig.h"
+        ],
+        "arguments": [
+          "-DWITH_SIMD=FALSE",
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+        ],
+        "platforms": [
+          "web"
         ]
       }
     },
@@ -174,7 +206,8 @@
           "-DHB_HAVE_FREETYPE=OFF",
           "-DHB_HAVE_CORETEXT=OFF",
           "-Wno-dev",
-          "-DCMAKE_CXX_FLAGS=\"-w -DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\""
+          "-DCMAKE_CXX_FLAGS=\"-w -DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\"",
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         ]
       }
     },
