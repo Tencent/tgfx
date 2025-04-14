@@ -25,12 +25,14 @@ class ResolveOp : public Op {
  public:
   static PlacementPtr<ResolveOp> Make(Context* context, const Rect& bounds);
 
-  explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
-  }
-
   void execute(RenderPass* renderPass) override;
 
  private:
   Rect bounds = Rect::MakeEmpty();
+
+  explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
+  }
+
+  friend BlockBuffer;
 };
 }  // namespace tgfx

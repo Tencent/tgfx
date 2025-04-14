@@ -20,10 +20,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <vector>
-#include "core/utils/PlacementPtr.h"
+#include "core/utils/PlacementArray.h"
 
 namespace tgfx {
 /**
@@ -74,8 +75,53 @@ class BlockBuffer {
   }
 
   /**
- * Allocates memory for an object of the given size. Returns nullptr if the allocation fails.
- */
+   * Creates a new PlacementArray with the specified count, initializing all elements to nullptr.
+   * If the count is zero, an empty PlacementArray is returned.
+   */
+  template <typename T>
+  PlacementArray<T> makeArray(size_t count) {
+    if (count == 0) {
+      return {};
+    }
+    auto byteSize = sizeof(PlacementPtr<T>) * count;
+    void* memory = allocate(byteSize);
+    memset(memory, 0, byteSize);
+    return PlacementArray<T>(reinterpret_cast<PlacementPtr<T>*>(memory), count);
+  }
+
+  /**
+   * Moves a list of PlacementPtr pointers into a new PlacementArray. The original pointers are
+   * released, and the new array takes ownership of the elements. Returns a PlacementArray with the
+   * moved elements.
+   */
+  template <typename T, typename U>
+  PlacementArray<T> makeArray(PlacementPtr<U>* elements, size_t count) {
+    static_assert(std::is_base_of_v<T, U>, "U must be a subclass of T!");
+    if (count == 0) {
+      return {};
+    }
+    auto byteSize = sizeof(PlacementPtr<T>) * count;
+    void* memory = allocate(byteSize);
+    memcpy(memory, elements, byteSize);
+    memset(static_cast<void*>(elements), 0, byteSize);
+    return PlacementArray<T>(reinterpret_cast<PlacementPtr<T>*>(memory), count);
+  }
+
+  /**
+   * Moves the elements from the given PlacementPtr vector into a new PlacementArray. The original
+   * pointers are released, and the new array takes ownership of the elements. Returns a
+   * PlacementArray containing the moved elements.
+   */
+  template <typename T>
+  PlacementArray<T> makeArray(std::vector<PlacementPtr<T>>&& vector) {
+    auto array = makeArray<T>(vector.data(), vector.size());
+    vector.clear();
+    return array;
+  }
+
+  /**
+   * Allocates memory for an object of the given size. Returns nullptr if the allocation fails.
+   */
   void* allocate(size_t size);
 
   /**

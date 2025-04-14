@@ -28,9 +28,6 @@ class ShapeDrawOp : public DrawOp {
   static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
                                         const Matrix& uvMatrix, AAType aaType);
 
-  ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,
-              AAType aaType);
-
   void execute(RenderPass* renderPass) override;
 
  private:
@@ -38,5 +35,10 @@ class ShapeDrawOp : public DrawOp {
   Color color = Color::Transparent();
   Matrix uvMatrix = Matrix::I();
   std::vector<float> maskVertices = {};
+
+  ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,
+              AAType aaType);
+
+  friend class BlockBuffer;
 };
 }  // namespace tgfx

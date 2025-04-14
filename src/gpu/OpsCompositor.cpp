@@ -194,6 +194,10 @@ static bool IsPixelAligned(const Rect& rect) {
          fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
 }
 
+static bool RRectUseScale(Context* context) {
+  return !context->caps()->floatIs32Bits;
+}
+
 void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
@@ -249,10 +253,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           deviceBounds.join(rect);
         }
       }
-      auto capacity = pendingRects.size();
-      drawOp =
-          RectDrawOp::Make(context, std::move(pendingRects), needLocalBounds, aaType, renderFlags);
-      pendingRects.reserve(capacity);
+      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
+                                                    aaType, needLocalBounds);
+      drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
       if (needLocalBounds || needDeviceBounds) {
@@ -265,9 +268,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           localBounds = Rect::MakeEmpty();
         }
       }
-      auto capacity = pendingRRects.size();
-      drawOp = RRectDrawOp::Make(context, std::move(pendingRRects), aaType, renderFlags);
-      pendingRRects.reserve(capacity);
+      auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects),
+                                                     aaType, RRectUseScale(context));
+      drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     default:
       break;
@@ -340,7 +343,8 @@ void OpsCompositor::makeClosed() {
   }
   flushPendingOps();
   auto drawingManager = context->drawingManager();
-  drawingManager->addOpsRenderTask(std::move(renderTarget), std::move(ops));
+  auto opArray = drawingBuffer()->makeArray(std::move(ops));
+  drawingManager->addOpsRenderTask(std::move(renderTarget), std::move(opArray));
   // Remove the compositor from the list, so it won't be flushed again.
   drawingManager->compositors.erase(cachedPosition);
 }
@@ -425,9 +429,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     }
     clipTexture = clipRenderTarget->getTextureProxy();
     auto clearOp = ClearOp::Make(context, Color::Transparent(), clipRenderTarget->bounds());
-    std::vector<PlacementPtr<Op>> opList = {};
-    opList.emplace_back(std::move(clearOp));
-    opList.emplace_back(std::move(drawOp));
+    auto opList = drawingBuffer()->makeArray<Op>(2);
+    opList[0] = std::move(clearOp);
+    opList[1] = std::move(drawOp);
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList));
   } else {
     auto rasterizer =
