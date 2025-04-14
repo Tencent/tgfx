@@ -48,7 +48,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   int width = 1;
   int height = 1;
   AAType aa = AAType::None;
-  Matrix viewMatrix = Matrix::I();
-  Matrix uvMatrix = Matrix::I();
+  Matrix viewMatrix = {};
+  Matrix uvMatrix = {};
 };
 }  // namespace tgfx

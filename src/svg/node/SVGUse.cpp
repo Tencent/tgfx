@@ -76,17 +76,14 @@ Path SVGUse::onAsPath(const SVGRenderContext& context) const {
 Rect SVGUse::onObjectBoundingBox(const SVGRenderContext& context) const {
   const auto ref = context.findNodeById(Href);
   if (!ref) {
-    return Rect::MakeEmpty();
+    return {};
   }
-
   auto lengthContext = context.lengthContext();
   lengthContext.clearPatternUnits();
   float x = lengthContext.resolve(X, SVGLengthContext::LengthType::Horizontal);
   float y = lengthContext.resolve(Y, SVGLengthContext::LengthType::Vertical);
-
   Rect bounds = ref->objectBoundingBox(context);
   bounds.offset(x, y);
-
   return bounds;
 }
 

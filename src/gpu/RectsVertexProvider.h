@@ -26,7 +26,7 @@
 
 namespace tgfx {
 struct RectPaint {
-  RectPaint(const Rect& rect, const Matrix& viewMatrix, const Color& color = Color::White())
+  RectPaint(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
       : rect(rect), viewMatrix(viewMatrix), color(color) {
   }
 

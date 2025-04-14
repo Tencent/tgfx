@@ -28,7 +28,7 @@ class ResolveOp : public Op {
   void execute(RenderPass* renderPass) override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
 
   explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
   }

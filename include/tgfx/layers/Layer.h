@@ -603,7 +603,7 @@ class Layer {
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  Matrix _matrix = Matrix::I();
+  Matrix _matrix = {};
   float _rasterizationScale = 1.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
