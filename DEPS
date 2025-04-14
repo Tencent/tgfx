@@ -37,7 +37,7 @@
       },
       {
         "url": "https://github.com/libjpeg-turbo/libjpeg-turbo.git",
-        "commit": "20ade4dea9589515a69793e447a6c6220b464535",
+        "commit": "0a9b9721782d3a60a5c16c8c9a7abf3d4b1ecd42",
         "dir": "third_party/libjpeg-turbo"
       },
       {

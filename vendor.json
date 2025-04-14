@@ -83,6 +83,9 @@
           "android",
           "ios",
           "ohos"
+        ],
+        "arguments": [
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         ]
       }
     },
@@ -99,7 +102,8 @@
           "${BUILD_DIR}/jconfig.h"
         ],
         "arguments": [
-          "-DWITH_SIMD=FALSE"
+          "-DWITH_SIMD=FALSE",
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         ],
         "platforms": [
           "web"
