@@ -37,7 +37,7 @@
       },
       {
         "url": "https://github.com/libjpeg-turbo/libjpeg-turbo.git",
-        "commit": "0a9b9721782d3a60a5c16c8c9a7abf3d4b1ecd42",
+        "commit": "20ade4dea9589515a69793e447a6c6220b464535",
         "dir": "third_party/libjpeg-turbo"
       },
       {
@@ -47,7 +47,7 @@
       },
       {
         "url": "https://github.com/harfbuzz/harfbuzz.git",
-        "commit": "43a778492219032b9d747112e412dec2201d2667",
+        "commit": "f1f2be776bcd994fa9262622e1a7098a066e5cf7",
         "dir": "third_party/harfbuzz"
       },
       {
