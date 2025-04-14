@@ -85,15 +85,18 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
 
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(fill)) {
-    svg = std::make_unique<ElementWriter>("svg", context, this, writer.get(), resourceBucket.get(),
-                                          exportFlags & SVGExportFlags::ConvertTextToPaths, state,
-                                          fill);
+    svg =
+        std::make_unique<ElementWriter>("svg", context, this, writer.get(), resourceBucket.get(),
+                                        exportFlags & SVGExportFlags::DisableWarnings, state, fill);
     svg->addRectAttributes(rect);
   }
 
-  applyClipPath(state.clip);
+  if (!state.clip.contains(rect)) {
+    applyClipPath(state.clip);
+  }
+
   ElementWriter rectElement("rect", context, this, writer.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                            exportFlags & SVGExportFlags::DisableWarnings, state, fill);
 
   if (svg) {
     rectElement.addAttribute("x", 0);
@@ -106,31 +109,35 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
 }
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill) {
-  applyClipPath(state.clip);
+  if (!state.clip.contains(roundRect.rect)) {
+    applyClipPath(state.clip);
+  }
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
       ElementWriter circleElement("circle", context, this, writer.get(), resourceBucket.get(),
-                                  exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                                  exportFlags & SVGExportFlags::DisableWarnings, state, fill);
       circleElement.addCircleAttributes(roundRect.rect);
       return;
     } else {
       ElementWriter ovalElement("ellipse", context, this, writer.get(), resourceBucket.get(),
-                                exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                                exportFlags & SVGExportFlags::DisableWarnings, state, fill);
       ovalElement.addEllipseAttributes(roundRect.rect);
     }
   } else {
     ElementWriter rrectElement("rect", context, this, writer.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                               exportFlags & SVGExportFlags::DisableWarnings, state, fill);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
 
 void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill) {
-  applyClipPath(state.clip);
+  if (!state.clip.contains(shape->getBounds())) {
+    applyClipPath(state.clip);
+  }
   auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                            exportFlags & SVGExportFlags::DisableWarnings, state, fill);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -183,9 +190,8 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state, 
     }
   }
   {
-    applyClipPath(state.clip);
     ElementWriter imageUse("use", context, this, writer.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill);
+                           exportFlags & SVGExportFlags::DisableWarnings, state, fill);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
@@ -198,7 +204,9 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
 
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
-  applyClipPath(state.clip);
+  if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
+    applyClipPath(state.clip);
+  }
   if (hasFont) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
         exportFlags & SVGExportFlags::ConvertTextToPaths) {
@@ -221,8 +229,7 @@ void SVGExportContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& g
   Path path;
   if (glyphRunList->getPath(&path)) {
     ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill,
-                              stroke);
+                              exportFlags & SVGExportFlags::DisableWarnings, state, fill, stroke);
     pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
     if (path.getFillType() == PathFillType::EvenOdd) {
       pathElement.addAttribute("fill-rule", "evenodd");
@@ -235,8 +242,7 @@ void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& g
                                           const Stroke* stroke) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     ElementWriter textElement("text", context, this, writer.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::ConvertTextToPaths, state, fill,
-                              stroke);
+                              exportFlags & SVGExportFlags::DisableWarnings, state, fill, stroke);
 
     Font font;
     if (glyphRun.glyphFace->asFont(&font)) {
@@ -299,7 +305,9 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     resources = defs.addImageFilterResource(imageFilter, bound);
   }
   {
-    applyClipPath(state.clip);
+    if (!state.clip.contains(picture->getBounds())) {
+      applyClipPath(state.clip);
+    }
     auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
     if (imageFilter) {
       groupElement->addAttribute("filter", resources.filter);

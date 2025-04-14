@@ -41,7 +41,7 @@ class MatrixShader final : public Shader {
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
   std::shared_ptr<Shader> source = nullptr;
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
 
  protected:
   Type type() const override {
@@ -53,7 +53,6 @@ class MatrixShader final : public Shader {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
 
- private:
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
 };
 }  // namespace tgfx

@@ -337,7 +337,7 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, flo
       SVGPresentationContext presentContext;
       presentContext._namedColors = _presentationContext->_namedColors;
       SVGRenderContext localContext(_canvas, _textShaper, nodeIDMapper, *_lengthContext,
-                                    presentContext, scope, Matrix::I());
+                                    presentContext, scope, {});
 
       const auto node = this->findNodeById(svgPaint.iri());
       if (!node || !node->asPaint(localContext, &(paint.value()))) {

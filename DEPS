@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "ef445edee3335b3ee30bd79afea76c0419947401",
+        "commit": "cd6d0b0ceeac7d06d56f9a1b7bd85c76fd3bf708",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -27,7 +27,7 @@
       },
       {
         "url": "https://github.com/glennrp/libpng.git",
-        "commit": "f135775ad4e5d4408d2e12ffcc71bb36e6b48551",
+        "commit": "872555f4ba910252783af1507f9e7fe1653be252",
         "dir": "third_party/libpng"
       },
       {
@@ -64,11 +64,6 @@
         "url": "https://github.com/libexpat/libexpat.git",
         "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
         "dir": "third_party/expat"
-      },
-      {
-        "url": "https://github.com/libpag/tracy.git",
-        "commit": "ef23cd6ed597767200fe320721a99d824e3193f6",
-        "dir": "third_party/tracy"
       }
     ]
   },

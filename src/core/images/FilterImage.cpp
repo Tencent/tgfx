@@ -127,7 +127,7 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   if (!clipBounds.intersect(drawBounds)) {
     return nullptr;
   }
-  Rect dstBounds = Rect::MakeEmpty();
+  Rect dstBounds = {};
   if (!filter->applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }

@@ -24,15 +24,17 @@
 namespace tgfx {
 class ClearOp : public Op {
  public:
-  static PlacementNode<ClearOp> Make(Context* context, Color color, const Rect& scissor);
-
-  ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
-  }
+  static PlacementPtr<ClearOp> Make(Context* context, Color color, const Rect& scissor);
 
   void execute(RenderPass* renderPass) override;
 
  private:
   Color color = Color::Transparent();
-  Rect scissor = Rect::MakeEmpty();
+  Rect scissor = {};
+
+  ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
+  }
+
+  friend class BlockBuffer;
 };
 }  // namespace tgfx

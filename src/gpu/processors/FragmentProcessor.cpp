@@ -50,7 +50,7 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> 
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> child) {
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child) {
   if (child == nullptr) {
     return nullptr;
   }
@@ -59,7 +59,7 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> child, bool inverted) {
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child, bool inverted) {
   if (child == nullptr) {
     return nullptr;
   }
@@ -67,7 +67,7 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
       buffer, std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
 }
 
-PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(PlacementBuffer* buffer,
+PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockBuffer* buffer,
                                                            PlacementPtr<FragmentProcessor> f,
                                                            PlacementPtr<FragmentProcessor> g) {
   return ComposeFragmentProcessor::Make(buffer, std::move(f), std::move(g));

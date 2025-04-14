@@ -190,6 +190,14 @@ void ShapeLayer::setLineDashPhase(float phase) {
   invalidateContent();
 }
 
+void ShapeLayer::setLineDashAdaptive(bool adaptive) {
+  if (shapeBitFields.lineDashAdaptive == adaptive) {
+    return;
+  }
+  shapeBitFields.lineDashAdaptive = adaptive;
+  invalidateContent();
+}
+
 void ShapeLayer::setStrokeStart(float start) {
   if (start < 0) {
     start = 0;
@@ -219,19 +227,24 @@ void ShapeLayer::setStrokeEnd(float end) {
 }
 
 void ShapeLayer::setStrokeAlign(StrokeAlign align) {
-  if (_strokeAlign == align) {
+  auto alignment = static_cast<uint8_t>(align);
+  if (shapeBitFields.strokeAlign == alignment) {
     return;
   }
-  _strokeAlign = align;
+  shapeBitFields.strokeAlign = alignment;
   invalidateContent();
 }
 
 void ShapeLayer::setStrokeOnTop(bool value) {
-  if (_strokeOnTop == value) {
+  if (shapeBitFields.strokeOnTop == value) {
     return;
   }
-  _strokeOnTop = value;
+  shapeBitFields.strokeOnTop = value;
   invalidateContent();
+}
+
+ShapeLayer::ShapeLayer() {
+  memset(&shapeBitFields, 0, sizeof(shapeBitFields));
 }
 
 ShapeLayer::~ShapeLayer() {
@@ -283,7 +296,7 @@ void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha
       canvas->drawShape(_shape, getPaint(alpha));
     }
   }
-  if (_strokeOnTop) {
+  if (shapeBitFields.strokeOnTop) {
     if (!drawChildren()) {
       return;
     }
@@ -291,7 +304,7 @@ void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha
   if (shapeContent) {
     shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
   }
-  if (!_strokeOnTop) {
+  if (!shapeBitFields.strokeOnTop) {
     drawChildren();
   }
 }
@@ -314,15 +327,17 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
     if (_lineDashPattern.size() % 2 != 0) {
       dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
     }
-    auto pathEffect =
-        PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase);
-    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
+    auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase,
+                                     shapeBitFields.lineDashAdaptive);
+
+    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
   }
-  if (_strokeAlign != StrokeAlign::Center) {
+  auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+  if (strokeAlign != StrokeAlign::Center) {
     auto tempStroke = stroke;
     tempStroke.width *= 2;
     strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-    if (_strokeAlign == StrokeAlign::Inside) {
+    if (strokeAlign == StrokeAlign::Inside) {
       strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
     } else {
       strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);

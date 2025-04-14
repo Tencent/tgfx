@@ -86,7 +86,7 @@ static constexpr uint16_t kNonAAQuadIndexPattern[] = {
 std::shared_ptr<GpuBufferProxy> ResourceProvider::nonAAQuadIndexBuffer() {
   if (_nonAAQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
-        kNonAAQuadIndexPattern, kIndicesPerNonAAQuad, RectDrawOp::MaxNumNonAARects,
+        kNonAAQuadIndexPattern, kIndicesPerNonAAQuad, RectDrawOp::MaxNumRects,
         kVerticesPerNonAAQuad);
     _nonAAQuadIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
@@ -114,7 +114,7 @@ static constexpr uint16_t kAAQuadIndexPattern[] = {
 std::shared_ptr<GpuBufferProxy> ResourceProvider::aaQuadIndexBuffer() {
   if (_aaQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
-        kAAQuadIndexPattern, kIndicesPerAAQuad, RectDrawOp::MaxNumAARects, kVerticesPerAAQuad);
+        kAAQuadIndexPattern, kIndicesPerAAQuad, RectDrawOp::MaxNumRects, kVerticesPerAAQuad);
     _aaQuadIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }

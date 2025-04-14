@@ -19,8 +19,7 @@
 #include "GLLinearGradientLayout.h"
 
 namespace tgfx {
-PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(PlacementBuffer* buffer,
-                                                              Matrix matrix) {
+PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(BlockBuffer* buffer, Matrix matrix) {
   return buffer->make<GLLinearGradientLayout>(matrix);
 }
 

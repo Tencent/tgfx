@@ -17,90 +17,39 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-class MatrixDrawContext : public TransformContext {
- public:
-  MatrixDrawContext(DrawContext* drawContext, const Matrix& matrix)
-      : TransformContext(drawContext), initMatrix(matrix) {
+TransformContext::TransformContext(DrawContext* drawContext, const MCState& state)
+    : drawContext(drawContext), initState(state) {
+  DEBUG_ASSERT(drawContext != nullptr);
+  auto hasClip = !state.clip.isEmpty() || !state.clip.isInverseFillType();
+  auto hasMatrix = !state.matrix.isIdentity();
+  if (hasClip && hasMatrix) {
+    _type = Type::Both;
+  } else if (hasClip) {
+    _type = Type::Clip;
+  } else if (hasMatrix) {
+    _type = Type::Matrix;
+  } else {
+    _type = Type::None;
   }
-
- protected:
-  MCState transform(const MCState& state) override {
-    auto newState = state;
-    newState.matrix.postConcat(initMatrix);
-    newState.clip.transform(initMatrix);
-    return newState;
-  }
-
- private:
-  Matrix initMatrix = {};
-};
-
-class ClipDrawContext : public TransformContext {
- public:
-  ClipDrawContext(DrawContext* drawContext, Path clip)
-      : TransformContext(drawContext), initClip(std::move(clip)) {
-  }
-
- protected:
-  MCState transform(const MCState& state) override {
-    MCState newState(state.matrix, lastIntersectedClip);
-    if (state.clip != lastClip) {
-      lastClip = state.clip;
-      lastIntersectedClip = initClip;
-      lastIntersectedClip.addPath(state.clip, PathOp::Intersect);
-      newState.clip = lastIntersectedClip;
-    }
-    return newState;
-  }
-
- private:
-  Path initClip = {};
-  Path lastClip = {};
-  Path lastIntersectedClip = {};
-};
-
-class MCStateDrawContext : public ClipDrawContext {
- public:
-  MCStateDrawContext(DrawContext* drawContext, const Matrix& matrix, Path clip)
-      : ClipDrawContext(drawContext, std::move(clip)), initMatrix(matrix) {
-  }
-
- protected:
-  MCState transform(const MCState& state) override {
-    auto newState = state;
-    newState.matrix.postConcat(initMatrix);
-    newState.clip.transform(initMatrix);
-    return ClipDrawContext::transform(newState);
-  }
-
- private:
-  Matrix initMatrix = {};
-};
-
-std::unique_ptr<TransformContext> TransformContext::Make(DrawContext* drawContext,
-                                                         const Matrix& matrix) {
-  if (drawContext == nullptr || matrix.isIdentity()) {
-    return nullptr;
-  }
-  return std::make_unique<MatrixDrawContext>(drawContext, matrix);
 }
 
-std::unique_ptr<TransformContext> TransformContext::Make(DrawContext* drawContext,
-                                                         const Matrix& matrix, const Path& clip) {
-  if (clip.isEmpty()) {
-    if (clip.isInverseFillType()) {
-      return Make(drawContext, matrix);
+MCState TransformContext::transform(const MCState& state) {
+  auto newState = state;
+  if (_type == Type::Matrix || _type == Type::Both) {
+    newState.matrix.postConcat(initState.matrix);
+    newState.clip.transform(initState.matrix);
+  }
+  if (_type == Type::Clip || _type == Type::Both) {
+    if (newState.clip != lastClip) {
+      lastClip = newState.clip;
+      lastIntersectedClip = initState.clip;
+      lastIntersectedClip.addPath(newState.clip, PathOp::Intersect);
     }
-    return nullptr;
+    newState.clip = lastIntersectedClip;
   }
-  if (drawContext == nullptr) {
-    return nullptr;
-  }
-  if (matrix.isIdentity()) {
-    return std::make_unique<ClipDrawContext>(drawContext, clip);
-  }
-  return std::make_unique<MCStateDrawContext>(drawContext, matrix, clip);
+  return newState;
 }
 }  // namespace tgfx

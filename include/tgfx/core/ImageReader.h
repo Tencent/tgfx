@@ -93,7 +93,7 @@ class ImageReader {
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
   bool hasPendingChanges = true;
-  Rect dirtyBounds = Rect::MakeEmpty();
+  Rect dirtyBounds = {};
 
   static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);
 

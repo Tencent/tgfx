@@ -16,15 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <QApplication>
-#include "ProfilerWindow.h"
+#include "tgfx/core/PathEffect.h"
 
-class ProfilerApplication : public QApplication {
+namespace tgfx {
+class AdaptiveDashEffect : public PathEffect {
  public:
-  const QString ProfilerVersion = "1.0.0";
+  // Maximum number of dashes allowed in the intervals array.
+  // Reference Skia's implementation to prevent excessive memory usage when dashing very long paths.
+  const float kMaxDashCount = 1000000;
 
-  ProfilerApplication(int& argc, char** argv);
+  AdaptiveDashEffect(const float intervals[], int count, float phase);
 
-  bool event(QEvent* event);
+  bool filterPath(Path* path) const override;
+
+ private:
+  std::vector<float> _intervals;
+  float _phase = 0;
+  float intervalLength = 0;
 };
+}  // namespace tgfx

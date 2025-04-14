@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PlacementBuffer.h"
+#include "BlockBuffer.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -33,17 +33,27 @@ static size_t NextBlockSize(size_t currentSize) {
   return std::min(currentSize * 2, MAX_BLOCK_SIZE);
 }
 
-PlacementBuffer::PlacementBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
+BlockData::BlockData(std::vector<uint8_t*> blocks) : blocks(std::move(blocks)) {
+  DEBUG_ASSERT(!this->blocks.empty());
+}
+
+BlockData::~BlockData() {
+  for (auto& block : blocks) {
+    free(block);
+  }
+}
+
+BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);
 }
 
-PlacementBuffer::~PlacementBuffer() {
+BlockBuffer::~BlockBuffer() {
   for (auto& block : blocks) {
     free(block.data);
   }
 }
 
-void* PlacementBuffer::allocate(size_t size) {
+void* BlockBuffer::allocate(size_t size) {
   auto block = findOrAllocateBlock(size);
   if (block == nullptr) {
     return nullptr;
@@ -54,20 +64,7 @@ void* PlacementBuffer::allocate(size_t size) {
   return data;
 }
 
-void* PlacementBuffer::alignedAllocate(size_t alignment, size_t size) {
-  auto block = findOrAllocateBlock(size + alignment - 1);
-  if (block == nullptr) {
-    return nullptr;
-  }
-  auto baseAddress = reinterpret_cast<uintptr_t>(block->data + block->offset);
-  uintptr_t alignedAddress = (baseAddress + alignment - 1) & ~(alignment - 1);
-  size_t alignOffset = alignedAddress - reinterpret_cast<uintptr_t>(block->data);
-  block->offset = alignOffset + size;
-  usedSize += size;
-  return reinterpret_cast<void*>(alignedAddress);
-}
-
-PlacementBuffer::Block* PlacementBuffer::findOrAllocateBlock(size_t requestedSize) {
+BlockBuffer::Block* BlockBuffer::findOrAllocateBlock(size_t requestedSize) {
   // Try to use an existing block
   while (currentBlockIndex < blocks.size()) {
     auto& block = blocks[currentBlockIndex];
@@ -83,7 +80,18 @@ PlacementBuffer::Block* PlacementBuffer::findOrAllocateBlock(size_t requestedSiz
   return &blocks[currentBlockIndex];
 }
 
-void PlacementBuffer::clear(size_t maxReuseSize) {
+std::pair<const void*, size_t> BlockBuffer::currentBlock() const {
+  if (usedSize == 0) {
+    return {nullptr, 0};
+  }
+  auto& block = blocks[currentBlockIndex];
+  return {block.data, block.offset};
+}
+
+void BlockBuffer::clear(size_t maxReuseSize) {
+  if (blocks.empty()) {
+    return;
+  }
   currentBlockIndex = 0;
   usedSize = 0;
   size_t totalBlockSize = 0;
@@ -100,21 +108,40 @@ void PlacementBuffer::clear(size_t maxReuseSize) {
   blocks.resize(reusedBlockCount);
 }
 
-bool PlacementBuffer::allocateNewBlock(size_t requestSize) {
-  if (requestSize > MAX_BLOCK_SIZE) {
-    LOGE("PlacementBuffer::allocateNewBlock() Request size exceeds the maximum block size: %zu ",
-         requestSize);
-    return false;
+std::shared_ptr<BlockData> BlockBuffer::release() {
+  if (usedSize == 0) {
+    return nullptr;
   }
-  auto blockSize = blocks.empty() ? initBlockSize : NextBlockSize(blocks.back().size);
-  while (blockSize < requestSize) {
-    blockSize = NextBlockSize(blockSize);
+  std::vector<uint8_t*> usedBlocks = {};
+  usedBlocks.reserve(currentBlockIndex + 1);
+  for (auto& block : blocks) {
+    if (block.offset > 0) {
+      usedBlocks.push_back(block.data);
+    } else {
+      free(block.data);
+    }
+  }
+  blocks.clear();
+  currentBlockIndex = 0;
+  usedSize = 0;
+  return std::make_shared<BlockData>(std::move(usedBlocks));
+}
+
+bool BlockBuffer::allocateNewBlock(size_t requestSize) {
+  size_t blockSize;
+  if (requestSize <= MAX_BLOCK_SIZE) {
+    blockSize = blocks.empty() ? initBlockSize : NextBlockSize(blocks.back().size);
+    while (blockSize < requestSize) {
+      blockSize = NextBlockSize(blockSize);
+    }
+  } else {
+    // Allow allocating a block larger than MAX_BLOCK_SIZE if requested.
+    blockSize = requestSize;
   }
   blockSize = (blockSize + BLOCK_ALIGNMENT - 1) & ~(BLOCK_ALIGNMENT - 1);
   auto data = static_cast<uint8_t*>(malloc(blockSize));
   if (data == nullptr) {
-    LOGE("PlacementBuffer::allocateNewBlock() Failed to allocate memory block size: %zu",
-         blockSize);
+    LOGE("BlockBuffer::allocateNewBlock() Failed to allocate memory block size: %zu", blockSize);
     return false;
   }
   currentBlockIndex = blocks.size();

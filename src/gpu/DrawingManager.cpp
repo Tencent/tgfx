@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "core/utils/Profiling.h"
+#include "ProxyProvider.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
@@ -35,14 +35,13 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return false;
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  auto rectPaint = drawingBuffer->makeNode<RectPaint>(bounds, Matrix::I());
-  auto op = RectDrawOp::Make(renderTarget->getContext(), {std::move(rectPaint)}, true, AAType::None,
-                             renderFlags);
+  auto provider = RectsVertexProvider::MakeFrom(drawingBuffer, bounds, AAType::None);
+  auto op = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
-  PlacementList<Op> ops = {std::move(op)};
-  auto task = drawingBuffer->makeNode<OpsRenderTask>(renderTarget, std::move(ops));
-  renderTasks.append(std::move(task));
+  auto ops = drawingBuffer->makeArray<Op>(&op, 1);
+  auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
+  renderTasks.emplace_back(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
   return true;
 }
@@ -56,12 +55,12 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 }
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      PlacementList<Op> ops) {
+                                      PlacementArray<Op> ops) {
   if (renderTarget == nullptr || ops.empty()) {
     return;
   }
-  auto task = drawingBuffer->makeNode<OpsRenderTask>(renderTarget, std::move(ops));
-  renderTasks.append(std::move(task));
+  auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
+  renderTasks.emplace_back(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -72,9 +71,9 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  auto task = drawingBuffer->makeNode<RuntimeDrawTask>(renderTarget, std::move(inputs),
-                                                       std::move(effect), offset);
-  renderTasks.append(std::move(task));
+  auto task = drawingBuffer->make<RuntimeDrawTask>(renderTarget, std::move(inputs),
+                                                   std::move(effect), offset);
+  renderTasks.emplace_back(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
 }
 
@@ -83,8 +82,8 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> ta
   if (textureProxy == nullptr || (target->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
-  auto task = drawingBuffer->makeNode<TextureResolveTask>(std::move(target));
-  renderTasks.append(std::move(task));
+  auto task = drawingBuffer->make<TextureResolveTask>(std::move(target));
+  renderTasks.emplace_back(std::move(task));
 }
 
 void DrawingManager::addTextureFlattenTask(UniqueKey uniqueKey,
@@ -93,8 +92,8 @@ void DrawingManager::addTextureFlattenTask(UniqueKey uniqueKey,
     return;
   }
   auto task =
-      drawingBuffer->makeNode<TextureFlattenTask>(std::move(uniqueKey), std::move(textureProxy));
-  flattenTasks.append(std::move(task));
+      drawingBuffer->make<TextureFlattenTask>(std::move(uniqueKey), std::move(textureProxy));
+  flattenTasks.emplace_back(std::move(task));
 }
 
 void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
@@ -103,11 +102,11 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
     return;
   }
   DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
-  auto task = drawingBuffer->makeNode<RenderTargetCopyTask>(std::move(source), std::move(dest));
-  renderTasks.append(std::move(task));
+  auto task = drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest));
+  renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addResourceTask(PlacementNode<ResourceTask> resourceTask) {
+void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
   if (resourceTask == nullptr) {
     return;
   }
@@ -117,7 +116,7 @@ void DrawingManager::addResourceTask(PlacementNode<ResourceTask> resourceTask) {
     result->second->uniqueKey = {};
   } else {
     resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
-    resourceTasks.append(std::move(resourceTask));
+    resourceTasks.emplace_back(std::move(resourceTask));
   }
 }
 
@@ -127,16 +126,20 @@ bool DrawingManager::flush() {
     // The makeClosed() method may add more compositors to the list.
     compositor->makeClosed();
   }
+  auto proxyProvider = context->proxyProvider();
+  // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
+  proxyProvider->flushSharedVertexBuffer();
 
   if (resourceTasks.empty() && renderTasks.empty()) {
+    proxyProvider->clearSharedVertexBuffer();
     return false;
   }
   for (auto& task : resourceTasks) {
-    TRACE_EVENT_NAME("CreateResource");
-    task.execute(context);
+    task->execute(context);
   }
   resourceTasks.clear();
   resourceTaskMap = {};
+  proxyProvider->clearSharedVertexBuffer();
 
   if (renderPass == nullptr) {
     renderPass = RenderPass::Make(context);
@@ -144,8 +147,8 @@ bool DrawingManager::flush() {
   std::vector<TextureFlattenTask*> validFlattenTasks = {};
   validFlattenTasks.reserve(flattenTasks.size());
   for (auto& task : flattenTasks) {
-    if (task.prepare(context)) {
-      validFlattenTasks.push_back(&task);
+    if (task->prepare(context)) {
+      validFlattenTasks.push_back(task.get());
     }
   }
   for (auto& task : validFlattenTasks) {
@@ -153,7 +156,7 @@ bool DrawingManager::flush() {
   }
   flattenTasks.clear();
   for (auto& task : renderTasks) {
-    task.execute(renderPass.get());
+    task->execute(renderPass.get());
   }
   renderTasks.clear();
   return true;

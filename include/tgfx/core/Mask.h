@@ -138,7 +138,7 @@ class Mask {
                           const Matrix& matrix, bool antiAlias);
 
  private:
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
   bool antiAlias = true;
 
   bool fillText(const GlyphRunList* glyphRunList, const Stroke* stroke = nullptr);

@@ -260,7 +260,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
   auto midPointDistance = (srcPoints[0] - srcPoints[1]) * 0.5f;
 
   auto pointTransform = Matrix::MakeRotate(-xAxisRotate);
-  auto transformedMidPoint = Point::Zero();
+  Point transformedMidPoint = {};
   pointTransform.mapPoints(&transformedMidPoint, &midPointDistance, 1);
   auto squareRx = rx * rx;
   auto squareRy = ry * ry;
@@ -369,9 +369,6 @@ void Path::addRect(const Rect& rect, bool reversed, unsigned startIndex) {
 
 void Path::addRect(float left, float top, float right, float bottom, bool reversed,
                    unsigned startIndex) {
-  if (left >= right || top >= bottom) {
-    return;
-  }
   std::vector<Point> points = {};
   points.push_back({left, top});
   points.push_back({right, top});

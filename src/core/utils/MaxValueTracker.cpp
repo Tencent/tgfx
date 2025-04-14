@@ -16,45 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <stdint.h>
-#include <vector>
+#include "MaxValueTracker.h"
 
-class Tokenizer {
- public:
-  enum class TokenColor : uint8_t {
-    Default,
-    Comment,
-    Prprocessor,
-    String,
-    CharacterLiteral,
-    Keyword,
-    Number,
-    Punctuation,
-    Type,
-    Special,
-  };
+namespace tgfx {
 
-  struct Token {
-    const char* begin;
-    const char* end;
-    TokenColor color;
-  };
+MaxValueTracker::MaxValueTracker(size_t maxSize) : _maxSize(maxSize) {
+}
 
-  struct Line {
-    const char* begin;
-    const char* end;
-    std::vector<Token> tokens;
-  };
+void MaxValueTracker::addValue(size_t value) {
+  _values.push_back(value);
+  if (_values.size() > _maxSize) {
+    _values.pop_front();
+  }
+}
 
-  Tokenizer();
-  ~Tokenizer();
+size_t MaxValueTracker::getMaxValue() const {
+  size_t maxValue = 0;
+  for (size_t value : _values) {
+    if (value > maxValue) {
+      maxValue = value;
+    }
+  }
+  return maxValue;
+}
 
-  std::vector<Token> tokenize(const char* begin, const char* end);
-
- private:
-  TokenColor identifyToken(const char*& begin, const char* end);
-
-  bool isInComment;
-  bool isInPreprocessor;
-};
+}  // namespace tgfx
