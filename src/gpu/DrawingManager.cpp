@@ -35,12 +35,11 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return false;
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  auto provider = RectsVertexProvider::MakeFrom(context->drawingBuffer(), bounds, AAType::None);
+  auto provider = RectsVertexProvider::MakeFrom(drawingBuffer, bounds, AAType::None);
   auto op = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
-  std::vector<PlacementPtr<Op>> ops = {};
-  ops.emplace_back(std::move(op));
+  auto ops = drawingBuffer->makeArray<Op>(&op, 1);
   auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
   renderTasks.emplace_back(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
@@ -56,7 +55,7 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 }
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      std::vector<PlacementPtr<Op>> ops) {
+                                      PlacementArray<Op> ops) {
   if (renderTarget == nullptr || ops.empty()) {
     return;
   }

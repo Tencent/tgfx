@@ -20,11 +20,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <vector>
 #include "core/utils/PlacementArray.h"
-#include "core/utils/PlacementPtr.h"
 
 namespace tgfx {
 /**
@@ -75,40 +75,48 @@ class BlockBuffer {
   }
 
   /**
+   * Creates a new PlacementArray with the specified count, initializing all elements to nullptr.
+   * If the count is zero, an empty PlacementArray is returned.
+   */
+  template <typename T>
+  PlacementArray<T> makeArray(size_t count) {
+    if (count == 0) {
+      return {};
+    }
+    auto byteSize = sizeof(PlacementPtr<T>) * count;
+    void* memory = allocate(byteSize);
+    memset(memory, 0, byteSize);
+    return PlacementArray<T>(reinterpret_cast<PlacementPtr<T>*>(memory), count);
+  }
+
+  /**
+   * Moves a list of PlacementPtr pointers into a new PlacementArray. The original pointers are
+   * released, and the new array takes ownership of the elements. Returns a PlacementArray with the
+   * moved elements.
+   */
+  template <typename T, typename U>
+  PlacementArray<T> makeArray(PlacementPtr<U>* elements, size_t count) {
+    static_assert(std::is_base_of_v<T, U>, "U must be a subclass of T!");
+    if (count == 0) {
+      return {};
+    }
+    auto byteSize = sizeof(PlacementPtr<T>) * count;
+    void* memory = allocate(byteSize);
+    memcpy(memory, elements, byteSize);
+    memset(elements, 0, byteSize);
+    return PlacementArray<T>(reinterpret_cast<PlacementPtr<T>*>(memory), count);
+  }
+
+  /**
    * Moves the elements from the given PlacementPtr vector into a new PlacementArray. The original
    * pointers are released, and the new array takes ownership of the elements. Returns a
    * PlacementArray containing the moved elements.
    */
   template <typename T>
   PlacementArray<T> makeArray(std::vector<PlacementPtr<T>>&& vector) {
-    if (vector.empty()) {
-      return {};
-    }
-    auto count = vector.size();
-    auto byteSize = sizeof(T*) * count;
-    void* memory = allocate(byteSize);
-    memcpy(memory, vector.data(), byteSize);
-    memset(vector.data(), 0, byteSize);
+    auto array = makeArray<T>(vector.data(), vector.size());
     vector.clear();
-    return PlacementArray<T>(reinterpret_cast<T**>(memory), count);
-  }
-
-  /**
-   * Moves the elements from the given PlacementPtr array into a new PlacementArray. The original
-   * pointers are released, and the new array takes ownership of the elements. Returns a
-   * PlacementArray containing the moved elements.
-   */
-  template <typename T>
-  PlacementArray<T> makeArray(PlacementPtr<T>* elements, size_t count) {
-    if (count == 0) {
-      return {};
-    }
-    void* memory = allocate(sizeof(T*) * count);
-    auto data = reinterpret_cast<T**>(memory);
-    for (size_t i = 0; i < count; ++i) {
-      data[i] = elements[i].release();
-    }
-    return PlacementArray<T>(data, count);
+    return array;
   }
 
   /**

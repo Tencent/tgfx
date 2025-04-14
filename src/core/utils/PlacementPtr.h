@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstddef>
+#include <type_traits>
 
 namespace tgfx {
 /**
@@ -70,6 +71,7 @@ class PlacementPtr {
    */
   template <typename U>
   PlacementPtr(PlacementPtr<U>&& other) noexcept : pointer(other.pointer) {
+    static_assert(std::is_base_of_v<T, U>, "U must be derived from T!");
     other.pointer = nullptr;
   }
 

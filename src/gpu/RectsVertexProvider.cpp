@@ -124,7 +124,7 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buf
     return nullptr;
   }
   auto rectPaint = buffer->make<RectPaint>(rect, Matrix::I());
-  auto array = buffer->makeArray(&rectPaint, 1);
+  auto array = buffer->makeArray<RectPaint>(&rectPaint, 1);
   if (aaType == AAType::Coverage) {
     return buffer->make<AARectsVertexProvider>(std::move(array), aaType, false, false);
   }

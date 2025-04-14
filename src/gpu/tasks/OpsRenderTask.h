@@ -18,21 +18,20 @@
 
 #pragma once
 
-#include "core/utils/PlacementPtr.h"
+#include "core/utils/PlacementArray.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/tasks/RenderTask.h"
 
 namespace tgfx {
 class OpsRenderTask : public RenderTask {
  public:
-  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                std::vector<PlacementPtr<Op>> ops)
+  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy, PlacementArray<Op>&& ops)
       : RenderTask(std::move(renderTargetProxy)), ops(std::move(ops)) {
   }
 
   bool execute(RenderPass* renderPass) override;
 
  private:
-  std::vector<PlacementPtr<Op>> ops = {};
+  PlacementArray<Op> ops = {};
 };
 }  // namespace tgfx

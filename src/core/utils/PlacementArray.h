@@ -18,11 +18,12 @@
 
 #pragma once
 
-#include <cstddef>
+#include "core/utils/Log.h"
+#include "core/utils/PlacementPtr.h"
 
 namespace tgfx {
 /**
- * PlacementArray is a simple array-like container that uses placement new to construct objects in
+ * PlacementArray is a simple array-like container that holds a list of PlacementPtr pointers in
  * pre-allocated memory. It is similar to std::array, but does not manage the memory itself.
  */
 template <typename T>
@@ -44,8 +45,8 @@ class PlacementArray {
   /**
    * Constructs a PlacementArray by moving from another PlacementArray.
    */
-  PlacementArray(PlacementArray&& other) noexcept : data(other.data), _size(other._size) {
-    other.data = nullptr;
+  PlacementArray(PlacementArray&& other) noexcept : _data(other._data), _size(other._size) {
+    other._data = nullptr;
     other._size = 0;
   }
 
@@ -53,8 +54,9 @@ class PlacementArray {
    * Constructs a PlacementArray from another PlacementArray of a different type.
    */
   template <typename U>
-  PlacementArray(PlacementArray<U>&& other) noexcept : data(other.data), _size(other.size) {
-    other.data = nullptr;
+  PlacementArray(PlacementArray<U>&& other) noexcept : _data(other._data), _size(other.size) {
+    static_assert(std::is_base_of_v<T, U>, "U must be derived from T!");
+    other._data = nullptr;
     other._size = 0;
   }
 
@@ -64,9 +66,9 @@ class PlacementArray {
   PlacementArray& operator=(PlacementArray&& other) noexcept {
     if (this != &other) {
       clear();
-      data = other.data;
+      _data = other._data;
       _size = other._size;
-      other.data = nullptr;
+      other._data = nullptr;
       other._size = 0;
     }
     return *this;
@@ -92,9 +94,9 @@ class PlacementArray {
   void clear() {
     if (_size > 0) {
       for (size_t i = 0; i < _size; ++i) {
-        data[i]->~T();
+        _data[i].~PlacementPtr<T>();
       }
-      data = nullptr;
+      _data = nullptr;
       _size = 0;
     }
   }
@@ -102,81 +104,147 @@ class PlacementArray {
   /**
    * Returns a pointer to the element at the specified index.
    */
-  T* operator[](size_t index) const {
-    return data[index];
+  PlacementPtr<T>& operator[](size_t index) {
+    DEBUG_ASSERT(index < _size);
+    return _data[index];
+  }
+
+  /**
+   * Returns a pointer to the element at the specified index.
+   */
+  const PlacementPtr<T>& operator[](size_t index) const {
+    DEBUG_ASSERT(index < _size);
+    return _data[index];
   }
 
   /**
    * Returns a pointer to the element at the front of the PlacementArray.
    */
-  T* front() const {
-    return data[0];
+  PlacementPtr<T>& front() {
+    DEBUG_ASSERT(_size > 0);
+    return _data[0];
+  }
+
+  /**
+   * Returns a pointer to the element at the front of the PlacementArray.
+   */
+  const PlacementPtr<T>& front() const {
+    DEBUG_ASSERT(_size > 0);
+    return _data[0];
   }
 
   /**
    * Returns a pointer to the element at the back of the PlacementArray.
    */
-  T* back() const {
-    return data[_size - 1];
+  PlacementPtr<T>& back() {
+    DEBUG_ASSERT(_size > 0);
+    return _data[_size - 1];
   }
 
   /**
-   * The iterator class for the PlacementArray.
+   * Returns a pointer to the element at the back of the PlacementArray.
+   */
+  const PlacementPtr<T>& back() const {
+    DEBUG_ASSERT(_size > 0);
+    return _data[_size - 1];
+  }
+
+  /**
+   * Returns a pointer to the underlying data of the PlacementArray.
+   */
+  PlacementPtr<T>* data() {
+    return _data;
+  }
+
+  /**
+   * The iterator class for the PlacementArray. It allows iterating over the elements in the array.
    */
   class Iterator {
    public:
-    Iterator(T** data, size_t index) : data(data), index(index) {
+    Iterator(PlacementPtr<T>* data, size_t index) : data(data), index(index) {
     }
 
-    /**
-     * Dereferences the iterator to get the element at the current index.
-     */
-    T*& operator*() const {
-      return data[index];
-    }
-
-    /**
-     * Increments the iterator to the next element.
-     */
-    const Iterator& operator++() {
+    Iterator& operator++() {
       ++index;
       return *this;
     }
 
-    /**
-     * Compares two iterators for equality.
-     */
     bool operator!=(const Iterator& other) const {
       return index != other.index;
     }
 
+    PlacementPtr<T>& operator*() {
+      return data[index];
+    }
+
    private:
-    T** data;
-    size_t index;
+    PlacementPtr<T>* data = nullptr;
+    size_t index = 0;
   };
 
   /**
    * Returns an iterator to the beginning of the PlacementArray.
    */
-  Iterator begin() const {
-    return Iterator(data, 0);
+  Iterator begin() {
+    return Iterator(_data, 0);
   }
 
   /**
    * Returns an iterator to the end of the PlacementArray.
    */
-  Iterator end() const {
-    return Iterator(data, _size);
+  Iterator end() {
+    return Iterator(_data, _size);
+  }
+
+  /**
+   * The const iterator class for the PlacementArray. It allows iterating over the elements in the
+   * array.
+   */
+  class ConstIterator {
+   public:
+    ConstIterator(const PlacementPtr<T>* data, size_t index) : data(data), index(index) {
+    }
+
+    ConstIterator& operator++() {
+      ++index;
+      return *this;
+    }
+
+    bool operator!=(const ConstIterator& other) const {
+      return index != other.index;
+    }
+
+    const PlacementPtr<T>& operator*() const {
+      return data[index];
+    }
+
+   private:
+    const PlacementPtr<T>* data = nullptr;
+    size_t index = 0;
+  };
+
+  /**
+   * Returns a const iterator to the beginning of the PlacementArray.
+   */
+  ConstIterator begin() const {
+    return ConstIterator(_data, 0);
+  }
+
+  /**
+   * Returns a const iterator to the end of the PlacementArray.
+   */
+  ConstIterator end() const {
+    return ConstIterator(_data, _size);
   }
 
  private:
-  T** data = nullptr;
+  PlacementPtr<T>* _data = nullptr;
   size_t _size = 0;
 
   /**
    * Constructs a PlacementArray with the specified data and size.
    */
-  PlacementArray(T** data, size_t size) : data(data), _size(size) {
+  PlacementArray(PlacementPtr<T>* data, size_t size) : _data(data), _size(size) {
   }
 
   friend class BlockBuffer;

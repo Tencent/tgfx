@@ -343,7 +343,8 @@ void OpsCompositor::makeClosed() {
   }
   flushPendingOps();
   auto drawingManager = context->drawingManager();
-  drawingManager->addOpsRenderTask(std::move(renderTarget), std::move(ops));
+  auto opArray = drawingBuffer()->makeArray(std::move(ops));
+  drawingManager->addOpsRenderTask(std::move(renderTarget), std::move(opArray));
   // Remove the compositor from the list, so it won't be flushed again.
   drawingManager->compositors.erase(cachedPosition);
 }
@@ -428,9 +429,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     }
     clipTexture = clipRenderTarget->getTextureProxy();
     auto clearOp = ClearOp::Make(context, Color::Transparent(), clipRenderTarget->bounds());
-    std::vector<PlacementPtr<Op>> opList = {};
-    opList.emplace_back(std::move(clearOp));
-    opList.emplace_back(std::move(drawOp));
+    auto opList = drawingBuffer()->makeArray<Op>(2);
+    opList[0] = std::move(clearOp);
+    opList[1] = std::move(drawOp);
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList));
   } else {
     auto rasterizer =
