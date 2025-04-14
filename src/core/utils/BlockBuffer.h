@@ -103,7 +103,7 @@ class BlockBuffer {
     auto byteSize = sizeof(PlacementPtr<T>) * count;
     void* memory = allocate(byteSize);
     memcpy(memory, elements, byteSize);
-    memset(elements, 0, byteSize);
+    memset(static_cast<void*>(elements), 0, byteSize);
     return PlacementArray<T>(reinterpret_cast<PlacementPtr<T>*>(memory), count);
   }
 
