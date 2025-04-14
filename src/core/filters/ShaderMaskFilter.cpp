@@ -44,7 +44,7 @@ PlacementPtr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
   auto processor = FragmentProcessor::Make(shader, args, uvMatrix);
   auto drawingBuffer = args.context->drawingBuffer();
   if (processor == nullptr && inverted) {
-    return ConstColorProcessor::Make(drawingBuffer, Color::White(), InputMode::Ignore);
+    return ConstColorProcessor::Make(drawingBuffer, {}, InputMode::Ignore);
   }
   return FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor), inverted);
 }

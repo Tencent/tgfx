@@ -33,7 +33,7 @@ namespace tgfx {
 class SVGGradient : public SVGHiddenContainer {
  public:
   SVG_ATTR(Href, SVGIRI, SVGIRI())
-  SVG_ATTR(GradientTransform, SVGTransformType, SVGTransformType(Matrix::I()))
+  SVG_ATTR(GradientTransform, SVGTransformType, SVGTransformType())
   SVG_ATTR(SpreadMethod, SVGSpreadMethod, SVGSpreadMethod(SVGSpreadMethod::Type::Pad))
   SVG_ATTR(GradientUnits, SVGObjectBoundingBoxUnits,
            SVGObjectBoundingBoxUnits(SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox))

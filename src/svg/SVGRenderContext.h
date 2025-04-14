@@ -244,6 +244,6 @@ class SVGRenderContext {
   // Current object bounding box scope.
   const OBBScope scope;
 
-  Matrix _matrix = Matrix::I();
+  Matrix _matrix = {};
 };
 }  // namespace tgfx

@@ -29,15 +29,6 @@ namespace tgfx {
  */
 struct Point {
   /**
-   * x-axis value.
-   */
-  float x;
-  /**
-   * y-axis value.
-   */
-  float y;
-
-  /**
    * Creates a Point set to (0, 0).
    */
   static const Point& Zero() {
@@ -58,6 +49,27 @@ struct Point {
   static constexpr Point Make(int x, int y) {
     return {static_cast<float>(x), static_cast<float>(y)};
   }
+
+  /**
+   * Constructs a Point set to (0, 0).
+   */
+  constexpr Point() : x(0), y(0) {
+  }
+
+  /**
+   * Constructs a Point set to (x, y).
+   */
+  constexpr Point(float x, float y) : x(x), y(y) {
+  }
+
+  /**
+   * x-axis value.
+   */
+  float x;
+  /**
+   * y-axis value.
+   */
+  float y;
 
   /**
    * Returns true if x and y are both zero.

@@ -61,7 +61,7 @@ bool AppendShape::isInverseFillType() const {
 }
 
 Rect AppendShape::getBounds() const {
-  auto bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   for (const auto& shape : shapes) {
     bounds.join(shape->getBounds());
   }

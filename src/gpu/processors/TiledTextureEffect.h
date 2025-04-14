@@ -56,8 +56,8 @@ class TiledTextureEffect : public FragmentProcessor {
     SamplerState hwSampler;
     ShaderMode shaderModeX = ShaderMode::None;
     ShaderMode shaderModeY = ShaderMode::None;
-    Rect shaderSubset = Rect::MakeEmpty();
-    Rect shaderClamp = Rect::MakeEmpty();
+    Rect shaderSubset = {};
+    Rect shaderClamp = {};
   };
 
   TiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,

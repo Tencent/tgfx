@@ -54,7 +54,7 @@ bool MatrixShader::isEqual(const Shader* shader) const {
 
 PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args,
                                                                   const Matrix* uvMatrix) const {
-  auto totalMatrix = Matrix::I();
+  Matrix totalMatrix = {};
   if (!matrix.invert(&totalMatrix)) {
     return nullptr;
   }

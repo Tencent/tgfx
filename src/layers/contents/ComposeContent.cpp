@@ -31,7 +31,7 @@ std::unique_ptr<LayerContent> LayerContent::Compose(
 }
 
 Rect ComposeContent::getBounds() const {
-  auto bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   for (const auto& content : contents) {
     bounds.join(content->getBounds());
   }

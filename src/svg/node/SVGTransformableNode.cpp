@@ -27,7 +27,7 @@
 
 namespace tgfx {
 
-SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag), transform(Matrix::I()) {
+SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag) {
 }
 
 bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
@@ -50,8 +50,8 @@ bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
 void SVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   switch (attr) {
     case SVGAttribute::Transform:
-      if (const auto* transform = v.as<SVGTransformValue>()) {
-        this->setTransform(*transform);
+      if (const auto* matrix = v.as<SVGTransformValue>()) {
+        this->setTransform(*matrix);
       }
       break;
     default:

@@ -28,7 +28,7 @@
 namespace tgfx {
 struct DstTextureInfo {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  Point offset = Point::Zero();
+  Point offset = {};
   bool requiresBarrier = false;
 };
 

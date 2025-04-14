@@ -33,6 +33,6 @@ class RuntimeDrawTask : public RenderTask {
  private:
   std::vector<std::shared_ptr<TextureProxy>> inputs;
   std::shared_ptr<RuntimeEffect> effect = nullptr;
-  Point offset = Point::Zero();
+  Point offset = {};
 };
 }  // namespace tgfx

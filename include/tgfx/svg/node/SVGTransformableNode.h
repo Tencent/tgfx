@@ -51,7 +51,7 @@ class SVGTransformableNode : public SVGNode {
   void mapToParent(Rect* rect) const;
 
  private:
-  SVGTransformType transform;
+  SVGTransformType transform = {};
 
   using INHERITED = SVGNode;
 };

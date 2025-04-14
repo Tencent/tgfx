@@ -117,7 +117,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
     return false;
   }
   RenderContext renderContext(renderTarget, renderFlags, true);
-  auto totalMatrix = Matrix::I();
+  Matrix totalMatrix = {};
   if (offset) {
     totalMatrix.preTranslate(offset->x, offset->y);
   }

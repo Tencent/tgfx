@@ -25,16 +25,6 @@ namespace tgfx {
  * ISize holds two 32-bit integer dimensions.
  */
 struct ISize {
-  /**
-   * Span on the x-axis.
-   */
-  int width;
-
-  /**
-   * Span on the y-axis.
-   */
-  int height;
-
   static ISize Make(int w, int h) {
     return {w, h};
   }
@@ -46,6 +36,28 @@ struct ISize {
   static ISize MakeEmpty() {
     return {0, 0};
   }
+
+  /**
+   * Constructs an empty ISize.
+   */
+  constexpr ISize() : width(0), height(0) {
+  }
+
+  /**
+   * Constructs an ISize with the specified width and height.
+   */
+  constexpr ISize(int w, int h) : width(w), height(h) {
+  }
+
+  /**
+   * Span on the x-axis.
+   */
+  int width;
+
+  /**
+   * Span on the y-axis.
+   */
+  int height;
 
   void set(int w, int h) {
     *this = ISize{w, h};
@@ -91,16 +103,6 @@ struct ISize {
  * Size holds two 32-bit floating dimensions.
  */
 struct Size {
-  /**
-   * Span on the x-axis.
-   */
-  float width;
-
-  /**
-   * Span on the y-axis.
-   */
-  float height;
-
   static Size Make(float w, float h) {
     return {w, h};
   }
@@ -116,6 +118,28 @@ struct Size {
   static Size MakeEmpty() {
     return {0, 0};
   }
+
+  /**
+   * Constructs an empty Size.
+   */
+  constexpr Size() : width(0), height(0) {
+  }
+
+  /**
+   * Constructs a Size with the specified width and height.
+   */
+  constexpr Size(float w, float h) : width(w), height(h) {
+  }
+
+  /**
+   * Span on the x-axis.
+   */
+  float width;
+
+  /**
+   * Span on the y-axis.
+   */
+  float height;
 
   void set(float w, float h) {
     *this = Size{w, h};

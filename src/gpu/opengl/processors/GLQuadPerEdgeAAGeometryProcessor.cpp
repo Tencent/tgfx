@@ -20,15 +20,15 @@
 
 namespace tgfx {
 PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
-    BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> uniformColor,
-    bool useUVCoord) {
-  return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, uniformColor,
-                                                        useUVCoord);
+    BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
+    std::optional<Matrix> uvMatrix) {
+  return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix);
 }
 
-GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(
-    int width, int height, AAType aa, std::optional<Color> uniformColor, bool useUVCoord)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, uniformColor, useUVCoord) {
+GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
+                                                                   std::optional<Color> commonColor,
+                                                                   std::optional<Matrix> uvMatrix)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix) {
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -44,15 +44,15 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
                  args.fpCoordTransformHandler);
 
   if (aa == AAType::Coverage) {
-    auto coverage = varyingHandler->addVarying("coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s.z;", coverage.vsOut().c_str(), position.name().c_str());
+    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverage.fsIn().c_str());
+                             coverageVar.fsIn().c_str());
   } else {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
-  if (uniformColor.has_value()) {
+  if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
@@ -68,9 +68,9 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
 
 void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                                FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
-  if (uniformColor.has_value()) {
-    uniformBuffer->setData("Color", *uniformColor);
+  setTransformDataHelper(uvMatrix.value_or(Matrix::I()), uniformBuffer, transformIter);
+  if (commonColor.has_value()) {
+    uniformBuffer->setData("Color", *commonColor);
   }
 }
 }  // namespace tgfx

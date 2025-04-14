@@ -51,7 +51,7 @@ class MeasureContext : public DrawContext {
                  const MCState& state, const Fill& fill) override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
 
   void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
                       bool unbounded = false);

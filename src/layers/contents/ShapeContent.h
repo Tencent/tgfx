@@ -50,7 +50,7 @@ class ShapeContent : public LayerContent {
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   std::shared_ptr<Shape> fillShape = nullptr;
   std::shared_ptr<Shape> strokeShape = nullptr;
   std::vector<ShapePaint> paintList = {};

@@ -112,7 +112,7 @@ class SVGExportContext : public DrawContext {
 
   uint32_t exportFlags = {};
   Context* context = nullptr;
-  Rect viewBox = Rect::MakeEmpty();
+  Rect viewBox = {};
   Canvas* canvas = nullptr;
   const std::unique_ptr<XMLWriter> writer = nullptr;
   const std::unique_ptr<ResourceStore> resourceBucket = nullptr;

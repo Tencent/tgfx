@@ -37,7 +37,7 @@ class GlyphRasterizer : public Rasterizer {
  private:
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
   bool antiAlias = true;
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
   Stroke* stroke = nullptr;
 };
 }  // namespace tgfx

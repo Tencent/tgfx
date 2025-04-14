@@ -39,7 +39,7 @@ class MCState {
     clip.toggleInverseFillType();
   }
 
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
   Path clip = {};
 };
 }  // namespace tgfx

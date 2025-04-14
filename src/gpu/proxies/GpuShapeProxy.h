@@ -49,7 +49,7 @@ class GpuShapeProxy {
   }
 
  private:
-  Matrix drawingMatrix = Matrix::I();
+  Matrix drawingMatrix = {};
   std::shared_ptr<GpuBufferProxy> triangles = nullptr;
   std::shared_ptr<TextureProxy> texture = nullptr;
 };

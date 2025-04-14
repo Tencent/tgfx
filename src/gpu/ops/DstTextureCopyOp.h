@@ -30,13 +30,15 @@ class DstTextureCopyOp : public Op {
   static PlacementPtr<DstTextureCopyOp> Make(std::shared_ptr<TextureProxy> textureProxy, int srcX,
                                              int srcY);
 
-  DstTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, int srcX, int srcY);
-
   void execute(RenderPass* renderPass) override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   int srcX = 0;
   int srcY = 0;
+
+  DstTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, int srcX, int srcY);
+
+  friend class BlockBuffer;
 };
 }  // namespace tgfx

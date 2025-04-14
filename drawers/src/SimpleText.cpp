@@ -34,7 +34,7 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   auto bounds = textBlob->getBounds();
   auto textScale = screenWidth / bounds.width();
   tgfx::Point textStart = {(width - bounds.width()) / 2, height / 2 - bounds.bottom * 1.2f};
-  auto matrix = tgfx::Matrix::I();
+  tgfx::Matrix matrix = {};
   matrix.setScale(textScale, textScale, width / 2, height / 2);
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);

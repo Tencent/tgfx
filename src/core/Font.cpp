@@ -104,7 +104,7 @@ FontMetrics Font::getMetrics() const {
 
 Rect Font::getBounds(GlyphID glyphID) const {
   if (glyphID == 0) {
-    return Rect::MakeEmpty();
+    return {};
   }
   return scalerContext->getBounds(glyphID, fauxBold, fauxItalic);
 }
@@ -118,7 +118,7 @@ float Font::getAdvance(GlyphID glyphID, bool verticalText) const {
 
 Point Font::getVerticalOffset(GlyphID glyphID) const {
   if (glyphID == 0) {
-    return Point::Zero();
+    return {};
   }
   return scalerContext->getVerticalOffset(glyphID);
 }

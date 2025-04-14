@@ -123,7 +123,7 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
   auto transform = GetTransform(fauxItalic);
   cgBounds = CGRectApplyAffineTransform(cgBounds, transform);
   if (CGRectIsEmpty(cgBounds)) {
-    return Rect::MakeEmpty();
+    return {};
   }
   // Convert cgBounds to Glyph units (pixels, y down).
   auto bounds = Rect::MakeXYWH(static_cast<float>(cgBounds.origin.x),
@@ -264,7 +264,7 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   if (CGRectIsEmpty(cgBounds)) {
-    return Rect::MakeEmpty();
+    return {};
   }
   // Convert cgBounds to Glyph units (pixels, y down).
   auto bounds = Rect::MakeXYWH(static_cast<float>(cgBounds.origin.x),

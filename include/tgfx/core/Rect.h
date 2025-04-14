@@ -31,23 +31,6 @@ namespace tgfx {
  */
 struct Rect {
   /**
-   * smaller x-axis bounds.
-   */
-  float left;
-  /**
-   * smaller y-axis bounds.
-   */
-  float top;
-  /**
-   * larger x-axis bounds.
-   */
-  float right;
-  /**
-   * larger y-axis bounds.
-   */
-  float bottom;
-
-  /**
    * Returns constructed Rect set to (0, 0, 0, 0).
    */
   static constexpr Rect MakeEmpty() {
@@ -110,6 +93,40 @@ struct Rect {
   static constexpr Rect MakeSize(const Size& size) {
     return Rect{0, 0, size.width, size.height};
   }
+
+  /**
+   * Constructs an empty Rect.
+   */
+  constexpr Rect() : left(0), top(0), right(0), bottom(0) {
+  }
+
+  /**
+   * Constructs a Rect with the given left, top, right, and bottom values.
+   * @param left   left edge of the rectangle
+   * @param top    top edge of the rectangle
+   * @param right  right edge of the rectangle
+   * @param bottom bottom edge of the rectangle
+   */
+  constexpr Rect(float left, float top, float right, float bottom)
+      : left(left), top(top), right(right), bottom(bottom) {
+  }
+
+  /**
+   * smaller x-axis bounds.
+   */
+  float left;
+  /**
+   * smaller y-axis bounds.
+   */
+  float top;
+  /**
+   * larger x-axis bounds.
+   */
+  float right;
+  /**
+   * larger y-axis bounds.
+   */
+  float bottom;
 
   /**
    * Returns true if left is equal to or greater than right, or if top is equal to or greater
@@ -209,7 +226,7 @@ struct Rect {
    * Sets Rect to (0, 0, 0, 0).
    */
   void setEmpty() {
-    *this = MakeEmpty();
+    left = top = right = bottom = 0;
   }
 
   /**

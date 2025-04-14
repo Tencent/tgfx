@@ -142,7 +142,7 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(std::vector<GlyphRun> glyphRuns) {
 }
 
 Rect TextBlob::getBounds(float resolutionScale) const {
-  auto bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   for (auto& runList : glyphRunLists) {
     bounds.join(runList->getBounds(resolutionScale));
   }

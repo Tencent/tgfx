@@ -393,7 +393,7 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
                                        Resources* resources) {
   auto shaderDecomposer =
       [](const std::shared_ptr<Shader>& decomposedShader) -> std::pair<const Shader*, Matrix> {
-    auto matrix = Matrix::I();
+    Matrix matrix = {};
     const Shader* tempShader = decomposedShader.get();
 
     while (const auto* matrixShader = Caster::AsMatrixShader(tempShader)) {
@@ -767,7 +767,7 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
 void ElementWriter::addRenderImageMaskResources(const ImageShader* imageShader,
                                                 const std::string& filterID, Context* context) {
   Resources resources;
-  addImageShaderResources(imageShader, Matrix::I(), context, &resources);
+  addImageShaderResources(imageShader, {}, context, &resources);
 
   writer->startElement("rect");
   addAttribute("fill", resources.paintColor);

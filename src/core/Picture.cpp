@@ -126,11 +126,11 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   if (!imageMatrix.isTranslate()) {
     return nullptr;
   }
-  auto clipRect = Rect::MakeEmpty();
+  Rect clipRect = {};
   if (!GetClipRect(state.clip, matrix, &clipRect)) {
     return nullptr;
   }
-  auto subset = Rect::MakeEmpty();
+  Rect subset = {};
   if (clipSize != nullptr) {
     subset = Rect::MakeWH(clipSize->width, clipSize->height);
     if (!clipRect.isEmpty() && !clipRect.contains(subset)) {

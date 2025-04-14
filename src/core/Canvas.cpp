@@ -331,7 +331,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
   }
   auto imageFilter = paint ? paint->getImageFilter() : nullptr;
   if (imageFilter != nullptr) {
-    auto offset = Point::Zero();
+    Point offset = {};
     image = image->makeWithFilter(std::move(imageFilter), &offset);
     if (image == nullptr) {
       LOGE("Canvas::drawImage() Failed to apply filter to image!");

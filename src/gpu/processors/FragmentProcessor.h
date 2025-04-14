@@ -43,7 +43,7 @@ class FPArgs {
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
-  Rect drawRect = Rect::MakeEmpty();
+  Rect drawRect = {};
 };
 
 class FragmentProcessor : public Processor {

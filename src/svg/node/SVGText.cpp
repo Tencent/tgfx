@@ -157,8 +157,7 @@ void SVGText::onRender(const SVGRenderContext& context) const {
 }
 
 Rect SVGText::onObjectBoundingBox(const SVGRenderContext& context) const {
-  Rect bounds = Rect::MakeEmpty();
-
+  Rect bounds = {};
   auto boundCollector = [&bounds](const SVGRenderContext&,
                                   const std::shared_ptr<TextBlob>& textBlob) -> void {
     if (!textBlob) {
@@ -167,7 +166,6 @@ Rect SVGText::onObjectBoundingBox(const SVGRenderContext& context) const {
     auto textBound = textBlob->getBounds();
     bounds.join(textBound);
   };
-
   this->onShapeText(context, boundCollector);
   return bounds;
 }

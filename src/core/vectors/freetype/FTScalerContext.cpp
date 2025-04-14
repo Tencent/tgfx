@@ -454,7 +454,7 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  auto bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   if (setupSize(fauxItalic)) {
     return bounds;
   }
@@ -527,7 +527,7 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (glyphID == 0 || setupSize(false)) {
-    return Point::Zero();
+    return {};
   }
   FontMetrics metrics = {};
   getFontMetricsInternal(&metrics);
@@ -551,7 +551,7 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
   if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-    return Rect::MakeEmpty();
+    return {};
   }
   auto face = ftTypeface()->face;
   if (matrix) {

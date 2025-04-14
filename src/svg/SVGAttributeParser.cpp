@@ -728,7 +728,7 @@ bool SVGAttributeParser::parseSkewYToken(Matrix* matrix) {
 // https://www.w3.org/TR/SVG11/coords.html#TransformAttribute
 template <>
 bool SVGAttributeParser::parse(SVGTransformType* t) {
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
 
   bool parsed = false;
   while (true) {

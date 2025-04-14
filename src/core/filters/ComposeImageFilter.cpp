@@ -74,9 +74,9 @@ PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     const Matrix* uvMatrix) const {
   auto lastSource = source;
-  auto lastOffset = Point::Zero();
+  Point lastOffset = {};
   for (auto& filter : filters) {
-    auto offset = Point::Zero();
+    Point offset = {};
     lastSource = FilterImage::MakeFrom(std::move(lastSource), filter, &offset);
     if (!lastSource) {
       return nullptr;
