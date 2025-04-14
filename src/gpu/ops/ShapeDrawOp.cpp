@@ -54,7 +54,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     if (textureProxy == nullptr) {
       return;
     }
-    Matrix maskMatrix = Matrix::I();
+    Matrix maskMatrix = {};
     if (!realUVMatrix.invert(&maskMatrix)) {
       return;
     }

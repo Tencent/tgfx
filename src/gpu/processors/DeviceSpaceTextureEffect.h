@@ -43,6 +43,6 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   const TextureSampler* onTextureSampler(size_t) const override;
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  Matrix uvMatrix = Matrix::I();
+  Matrix uvMatrix = {};
 };
 }  // namespace tgfx

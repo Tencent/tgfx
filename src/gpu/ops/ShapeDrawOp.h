@@ -33,7 +33,7 @@ class ShapeDrawOp : public DrawOp {
  private:
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
   Color color = Color::Transparent();
-  Matrix uvMatrix = Matrix::I();
+  Matrix uvMatrix = {};
   std::vector<float> maskVertices = {};
 
   ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,

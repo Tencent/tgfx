@@ -21,7 +21,7 @@
 
 namespace tgfx {
 void MeasureContext::drawFill(const MCState& state, const Fill& fill) {
-  addDeviceBounds(state.clip, fill, Rect::MakeEmpty(), true);
+  addDeviceBounds(state.clip, fill, {}, true);
 }
 
 void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {

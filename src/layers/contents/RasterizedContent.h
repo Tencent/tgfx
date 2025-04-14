@@ -51,6 +51,6 @@ class RasterizedContent : public LayerContent {
  private:
   uint32_t _contextID = 0;
   std::shared_ptr<Image> image = nullptr;
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
 };
 }  // namespace tgfx

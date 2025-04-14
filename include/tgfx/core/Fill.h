@@ -42,9 +42,10 @@ class Fill {
   }
 
   /**
-   * The input color, unpremultiplied, as four floating point values.
+   * The input color, unpremultiplied, as four floating point values. The default value is opaque
+   * white.
    */
-  Color color = Color::White();
+  Color color = {};
 
   /**
    * The blend mode used to combine the fill with the destination pixels.

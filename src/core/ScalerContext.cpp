@@ -29,7 +29,7 @@ class EmptyScalerContext : public ScalerContext {
   }
 
   Rect getBounds(GlyphID, bool, bool) const override {
-    return Rect::MakeEmpty();
+    return {};
   }
 
   float getAdvance(GlyphID, bool) const override {
@@ -37,7 +37,7 @@ class EmptyScalerContext : public ScalerContext {
   }
 
   Point getVerticalOffset(GlyphID) const override {
-    return Point::Zero();
+    return {};
   }
 
   bool generatePath(GlyphID, bool, bool, Path*) const override {
@@ -45,7 +45,7 @@ class EmptyScalerContext : public ScalerContext {
   }
 
   Rect getImageTransform(GlyphID, Matrix*) const override {
-    return Rect::MakeEmpty();
+    return {};
   }
 
   std::shared_ptr<ImageBuffer> generateImage(GlyphID, bool) const override {

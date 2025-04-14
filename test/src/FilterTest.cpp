@@ -174,7 +174,7 @@ TGFX_TEST(FilterTest, Blur) {
   canvas->concat(Matrix::MakeTrans(-imageWidth - padding, imageHeight + padding));
   canvas->save();
   canvas->concat(imageMatrix);
-  Point filterOffset = Point::Zero();
+  Point filterOffset = {};
   auto cropRect = Rect::MakeXYWH(0, 0, image->width(), image->height());
   auto filterImage = image->makeWithFilter(ImageFilter::Blur(130, 130, TileMode::Repeat),
                                            &filterOffset, &cropRect);
@@ -252,7 +252,7 @@ TGFX_TEST(FilterTest, BlurLargePixel) {
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
-  auto imageMatrix = Matrix::I();
+  Matrix imageMatrix = {};
   image = image->makeRasterized(1.f);
   auto bounds = Rect::MakeWH(image->width(), image->height());
   imageMatrix.mapRect(&bounds);
@@ -398,7 +398,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   {
     auto imageFilter = ImageFilter::Blur(20, 30);
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
-    Size blurSize = imageFilter->filterBounds(Rect::MakeEmpty()).size();
+    Size blurSize = imageFilter->filterBounds({}).size();
     EXPECT_EQ(blurSize.width, 18.f);
     EXPECT_EQ(blurSize.height, 36.f);
   }
@@ -407,7 +407,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     auto imageFilter = ImageFilter::DropShadow(15.f, 15.f, 20.f, 30.f, Color::White());
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
     auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
-    Size blurSize = dropShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
     EXPECT_EQ(blurSize.width, 18.f);
     EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(dropShadowFilter->dx, 15.f);
@@ -420,7 +420,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     auto imageFilter = ImageFilter::DropShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
     auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
-    Size blurSize = dropShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
     EXPECT_EQ(blurSize.width, 18.f);
     EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(dropShadowFilter->dx, 15.f);
@@ -433,7 +433,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     auto imageFilter = ImageFilter::InnerShadow(15.f, 15.f, 20.f, 30.f, Color::White());
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
     auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
-    Size blurSize = innerShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
     EXPECT_EQ(blurSize.width, 18.f);
     EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(innerShadowFilter->dx, 15.f);
@@ -446,7 +446,7 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     auto imageFilter = ImageFilter::InnerShadowOnly(15.f, 15.f, 20.f, 30.f, Color::White());
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
     auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
-    Size blurSize = innerShadowFilter->blurFilter->filterBounds(Rect::MakeEmpty()).size();
+    Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
     EXPECT_EQ(blurSize.width, 18.f);
     EXPECT_EQ(blurSize.height, 36.f);
     EXPECT_EQ(innerShadowFilter->dx, 15.f);
@@ -489,7 +489,7 @@ TGFX_TEST(FilterTest, GetShaderProperties) {
     ASSERT_TRUE(colorShader != nullptr);
     EXPECT_EQ(colorShader->type(), Shader::Type::Color);
 
-    Color color = Color::White();
+    Color color = {};
     bool ret = colorShader->asColor(&color);
     EXPECT_TRUE(ret);
     EXPECT_EQ(color, Color::Red());

@@ -35,11 +35,11 @@ static std::atomic_bool AllowsGroupOpacity = false;
 struct LayerStyleSource {
   float contentScale = 1.0f;
   std::shared_ptr<Image> content = nullptr;
-  Point contentOffset = Point::Zero();
+  Point contentOffset = {};
   std::shared_ptr<Image> contour = nullptr;
-  Point contourOffset = Point::Zero();
+  Point contourOffset = {};
   std::shared_ptr<Image> background = nullptr;
-  Point backgroundOffset = Point::Zero();
+  Point backgroundOffset = {};
 };
 
 static std::shared_ptr<Picture> CreatePicture(
@@ -396,7 +396,7 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   auto content = getContent();
   if (content) {
     bounds.join(content->getBounds());
@@ -447,7 +447,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
   auto globalMatrix = getGlobalMatrix();
-  auto inverseMatrix = Matrix::I();
+  Matrix inverseMatrix = {};
   if (!globalMatrix.invert(&inverseMatrix)) {
     return Point::Make(0, 0);
   }
@@ -602,7 +602,7 @@ Matrix Layer::getGlobalMatrix() const {
   // The global matrix transforms the layer's local coordinate space to the coordinate space of its
   // top-level parent layer. This means the top-level parent layer's own matrix is not included in
   // the global matrix.
-  auto matrix = Matrix::I();
+  Matrix matrix = {};
   auto layer = this;
   while (layer->_parent) {
     matrix.postConcat(layer->getMatrixWithScrollRect());
@@ -664,7 +664,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   if (content && content->contextID() == contextID) {
     return content;
   }
-  auto drawingMatrix = Matrix::I();
+  Matrix drawingMatrix = {};
   auto image = getRasterizedImage(args, _rasterizationScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
@@ -690,14 +690,14 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (!picture) {
     return nullptr;
   }
-  Point offset = Point::Zero();
+  Point offset = {};
   auto image = CreatePictureImage(std::move(picture), &offset);
   if (image == nullptr) {
     return nullptr;
   }
   auto filter = getImageFilter(contentScale);
   if (filter) {
-    auto filterOffset = Point::Zero();
+    Point filterOffset = {};
     image = image->makeWithFilter(std::move(filter), &filterOffset);
     offset += filterOffset;
   }
@@ -725,12 +725,12 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
 
 Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
   if (targetCoordinateSpace == nullptr || targetCoordinateSpace == this) {
-    return Matrix::I();
+    return {};
   }
   auto targetLayerMatrix = targetCoordinateSpace->getGlobalMatrix();
-  Matrix targetLayerInverseMatrix = Matrix::I();
+  Matrix targetLayerInverseMatrix = {};
   if (!targetLayerMatrix.invert(&targetLayerInverseMatrix)) {
-    return Matrix::I();
+    return {};
   }
   Matrix relativeMatrix = getGlobalMatrix();
   relativeMatrix.postConcat(targetLayerInverseMatrix);
@@ -744,7 +744,7 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   if (maskPicture == nullptr) {
     return nullptr;
   }
-  auto maskImageOffset = Point::Zero();
+  Point maskImageOffset = {};
   auto maskContentImage = CreatePictureImage(std::move(maskPicture), &maskImageOffset);
   if (maskContentImage == nullptr) {
     return nullptr;
@@ -891,7 +891,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // null context prohibits the use of rasterizedCache during the drawing process.
   DrawArgs drawArgs(nullptr, false, bitFields.excludeChildEffectsInLayerStyle);
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
-  auto contentOffset = Point::Zero();
+  Point contentOffset = {};
   auto content = CreatePictureImage(std::move(contentPicture), &contentOffset);
   if (content == nullptr) {
     return nullptr;
@@ -926,7 +926,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       auto bounds = getBounds();
       canvas->clipRect(bounds);
       auto globalMatrix = getGlobalMatrix();
-      auto invertMatrix = Matrix::I();
+      Matrix invertMatrix = {};
       if (!globalMatrix.invert(&invertMatrix)) {
         return;
       }

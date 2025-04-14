@@ -62,7 +62,7 @@ class TextureEffect : public FragmentProcessor {
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
-  Point alphaStart = Point::Zero();
+  Point alphaStart = {};
   CoordTransform coordTransform;
 };
 }  // namespace tgfx

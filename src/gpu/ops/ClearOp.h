@@ -30,7 +30,7 @@ class ClearOp : public Op {
 
  private:
   Color color = Color::Transparent();
-  Rect scissor = Rect::MakeEmpty();
+  Rect scissor = {};
 
   ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
   }

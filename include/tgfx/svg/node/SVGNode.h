@@ -227,7 +227,7 @@ class SVGNode {
   virtual Path onAsPath(const SVGRenderContext& context) const = 0;
 
   virtual Rect onObjectBoundingBox(const SVGRenderContext& /*context*/) const {
-    return Rect::MakeEmpty();
+    return {};
   }
 
  private:

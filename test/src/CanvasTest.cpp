@@ -638,7 +638,7 @@ TGFX_TEST(CanvasTest, path) {
     canvas->drawPath(path, paint);
   }
 
-  auto latestPoint = Point::Zero();
+  Point latestPoint = {};
   path.getLastPoint(&latestPoint);
   EXPECT_EQ(latestPoint, Point::Make(45, 0));
 
@@ -1191,7 +1191,7 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas->drawPath(path, paint);
   path.reset();
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
-  auto matrix = Matrix::I();
+  Matrix matrix = {};
   matrix.postRotate(30, 50, 50);
   path.transform(matrix);
   canvas->resetMatrix();
@@ -1436,7 +1436,7 @@ TGFX_TEST(CanvasTest, Path_complex) {
   stroke.miterLimit = 4;
   stroke.applyToPath(&path);
 
-  auto invertMatrix = Matrix::I();
+  Matrix invertMatrix = {};
   strokeMatrix.invert(&invertMatrix);
   path.transform(invertMatrix);
   path.setFillType(PathFillType::Winding);
@@ -1472,7 +1472,7 @@ TGFX_TEST(CanvasTest, DrawPathProvider) {
 
     Rect getBounds() const override {
       if (points.size() < 2) {
-        return Rect::MakeEmpty();
+        return {};
       }
 
       float minX = points[0].x;

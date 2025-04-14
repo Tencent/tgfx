@@ -71,7 +71,7 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
   Matrix invertMatrix = {};
   if (!viewMatrix.invert(&invertMatrix)) {
-    return Rect::MakeEmpty();
+    return {};
   }
   auto localBounds = bounds;
   invertMatrix.mapRect(&localBounds);
@@ -140,7 +140,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   bounds.scale(maxScale, maxScale);
   auto rasterizeMatrix = Matrix::MakeScale(maxScale);
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto invert = Matrix::I();
+  Matrix invert = {};
   if (!rasterizeMatrix.invert(&invert)) {
     return;
   }
@@ -195,7 +195,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   }
   MCState drawState = state;
   if (filter) {
-    auto offset = Point::Zero();
+    Point offset = {};
     image = image->makeWithFilter(std::move(filter), &offset);
     if (image == nullptr) {
       return;
@@ -275,7 +275,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    Fill fill = {Color::White(), BlendMode::Src, false};
+    Fill fill = {{}, BlendMode::Src, false};
     opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill);
   }
 }
