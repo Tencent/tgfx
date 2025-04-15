@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "GeometryProcessor.h"
 
 namespace tgfx {
