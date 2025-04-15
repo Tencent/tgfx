@@ -65,6 +65,20 @@ class RRectsVertexProvider : public VertexProvider {
     return bitFields.useScale;
   }
 
+  /**
+   * Returns true if the provider generates colors.
+   */
+  bool hasColor() const {
+    return bitFields.hasColor;
+  }
+
+  /**
+   * Returns the first color in the provider. If no color record exists, a white color is returned.
+   */
+  const Color& firstColor() const {
+    return rects.front()->color;
+  }
+
   size_t vertexCount() const override;
 
   void getVertices(float* vertices) const override;
@@ -74,9 +88,11 @@ class RRectsVertexProvider : public VertexProvider {
   struct {
     uint8_t aaType : 2;
     bool useScale : 1;
+    bool hasColor : 1;
   } bitFields = {};
 
-  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale);
+  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
+                       bool hasColor);
 
   friend class BlockBuffer;
 };
