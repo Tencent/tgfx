@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 #pragma once
 #include <windows.h>
 #include "core/utils/Thread.h"
@@ -26,7 +25,8 @@ namespace tgfx {
 class WinThread : public Thread {
  public:
   explicit WinThread(std::function<void()> task, Priority priority)
-      : Thread(std::move(task), priority) {}
+      : Thread(std::move(task), priority) {
+  }
 
   ~WinThread() override;
 
@@ -41,4 +41,4 @@ class WinThread : public Thread {
   DWORD threadID = 0;
 };
 
-} // namespace tgfx
+}  // namespace tgfx

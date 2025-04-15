@@ -80,6 +80,7 @@ bool TaskGroup::checkThreads() {
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
     auto thread = Thread::Create([this]() { RunLoop(this); }, Thread::Priority::Highest);
     if (thread) {
+      thread->start();
       threads->enqueue(thread);
       totalThreads++;
     }

@@ -40,7 +40,7 @@ void PThread::onStart() {
   pthread_attr_t attr;
   pthread_attr_init(&attr);
   setPriorityAttributes(attr, priority);
-  pthread_create(&threadHandle, &attr, &ThreadProc, nullptr);
+  pthread_create(&threadHandle, &attr, &ThreadProc, this);
   pthread_attr_destroy(&attr);
 }
 
@@ -78,6 +78,5 @@ void PThread::setPriorityAttributes(pthread_attr_t& attr, Priority priority) {
 
   pthread_attr_setschedpolicy(&attr, policy);
   pthread_attr_setschedparam(&attr, &param);
-  pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 }
 }  // namespace tgfx

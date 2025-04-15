@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 #include "WinThread.h"
 #include <processthreadsapi.h>
 
@@ -36,15 +35,8 @@ WinThread::~WinThread() {
   }
 }
 
-
 void WinThread::onStart() {
-  threadHandle = CreateThread(
-      nullptr,
-      0,
-      ThreadProc,
-      this,
-      CREATE_SUSPENDED,
-      &threadID);
+  threadHandle = CreateThread(nullptr, 0, ThreadProc, this, CREATE_SUSPENDED, &threadID);
 
   if (threadHandle) {
     setThreadPriority();
@@ -68,11 +60,21 @@ bool WinThread::joinable() const {
 void WinThread::setThreadPriority() {
   int winPriority = THREAD_PRIORITY_NORMAL;
   switch (priority) {
-    case Priority::Lowest:  winPriority = THREAD_PRIORITY_LOWEST; break;
-    case Priority::Low:     winPriority = THREAD_PRIORITY_BELOW_NORMAL; break;
-    case Priority::Normal:  winPriority = THREAD_PRIORITY_NORMAL; break;
-    case Priority::High:    winPriority = THREAD_PRIORITY_ABOVE_NORMAL; break;
-    case Priority::Highest: winPriority = THREAD_PRIORITY_HIGHEST; break;
+    case Priority::Lowest:
+      winPriority = THREAD_PRIORITY_LOWEST;
+      break;
+    case Priority::Low:
+      winPriority = THREAD_PRIORITY_BELOW_NORMAL;
+      break;
+    case Priority::Normal:
+      winPriority = THREAD_PRIORITY_NORMAL;
+      break;
+    case Priority::High:
+      winPriority = THREAD_PRIORITY_ABOVE_NORMAL;
+      break;
+    case Priority::Highest:
+      winPriority = THREAD_PRIORITY_HIGHEST;
+      break;
   }
   SetThreadPriority(threadHandle, winPriority);
 }
@@ -81,4 +83,4 @@ Thread* Thread::Create(std::function<void()> task, Priority priority) {
   return new WinThread(std::move(task), priority);
 }
 
-} // namespace tgfx
+}  // namespace tgfx
