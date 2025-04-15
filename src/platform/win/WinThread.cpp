@@ -30,14 +30,21 @@ DWORD WINAPI WinThread::ThreadProc(LPVOID lpParameter) {
   return 0;
 }
 
+WinThread::~WinThread() {
+  if (WinThread::joinable()) {
+    CloseHandle(threadHandle);
+  }
+}
+
+
 void WinThread::onStart() {
   threadHandle = CreateThread(
-      nullptr,                   // 默认安全属性
-      0,                         // 默认堆栈大小
-      ThreadProc,                // 线程入口函数
-      this,                      // 传入当前对象指针
-      CREATE_SUSPENDED,          // 创建后暂停以设置优先级
-      &threadID);                // 线程ID
+      nullptr,
+      0,
+      ThreadProc,
+      this,
+      CREATE_SUSPENDED,
+      &threadID);
 
   if (threadHandle) {
     setThreadPriority();
@@ -70,7 +77,6 @@ void WinThread::setThreadPriority() {
   SetThreadPriority(threadHandle, winPriority);
 }
 
-// 工厂方法实现
 Thread* Thread::Create(std::function<void()> task, Priority priority) {
   return new WinThread(std::move(task), priority);
 }

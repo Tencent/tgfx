@@ -28,11 +28,7 @@ class WinThread : public Thread {
   explicit WinThread(std::function<void()> task, Priority priority)
       : Thread(std::move(task), priority) {}
 
-  ~WinThread() override {
-    if (joinable()) {
-      CloseHandle(threadHandle);
-    }
-  }
+  ~WinThread() override;
 
   void onStart() override;
   void onJoin() override;
@@ -46,4 +42,3 @@ class WinThread : public Thread {
 };
 
 } // namespace tgfx
-#endif //WINTHREAD_H
