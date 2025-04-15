@@ -57,8 +57,18 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   if (rects.empty()) {
     return nullptr;
   }
+  auto hasColor = false;
+  if (rects.size() > 1) {
+    auto& firstColor = rects.front()->color;
+    for (auto& record : rects) {
+      if (record->color != firstColor) {
+        hasColor = true;
+        break;
+      }
+    }
+  }
   auto array = buffer->makeArray(std::move(rects));
-  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale);
+  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale, hasColor);
 }
 
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
@@ -70,10 +80,11 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 }
 
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
-                                           bool useScale)
+                                           bool useScale, bool hasColor)
     : rects(std::move(rects)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.useScale = useScale;
+  bitFields.hasColor = hasColor;
 }
 
 size_t RRectsVertexProvider::vertexCount() const {
@@ -129,7 +140,9 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       viewMatrix.mapPoints(&point, 1);
       vertices[index++] = point.x;
       vertices[index++] = point.y;
-      WriteUByte4Color(vertices, index, color);
+      if (bitFields.hasColor) {
+        WriteUByte4Color(vertices, index, color);
+      }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
       if (bitFields.useScale) {
@@ -144,7 +157,9 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       viewMatrix.mapPoints(&point, 1);
       vertices[index++] = point.x;
       vertices[index++] = point.y;
-      WriteUByte4Color(vertices, index, color);
+      if (bitFields.hasColor) {
+        WriteUByte4Color(vertices, index, color);
+      }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
       if (bitFields.useScale) {
@@ -159,7 +174,9 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       viewMatrix.mapPoints(&point, 1);
       vertices[index++] = point.x;
       vertices[index++] = point.y;
-      WriteUByte4Color(vertices, index, color);
+      if (bitFields.hasColor) {
+        WriteUByte4Color(vertices, index, color);
+      }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
       if (bitFields.useScale) {
@@ -174,7 +191,9 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       viewMatrix.mapPoints(&point, 1);
       vertices[index++] = point.x;
       vertices[index++] = point.y;
-      WriteUByte4Color(vertices, index, color);
+      if (bitFields.hasColor) {
+        WriteUByte4Color(vertices, index, color);
+      }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
       if (bitFields.useScale) {
