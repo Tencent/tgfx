@@ -52,7 +52,7 @@ namespace tgfx {
 // vertical line).
 
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
-    BlockBuffer* buffer, std::vector<PlacementPtr<RRectPaint>>&& rects, AAType aaType,
+    BlockBuffer* buffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
     bool useScale) {
   if (rects.empty()) {
     return nullptr;
@@ -69,7 +69,7 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
   bytes[3] = static_cast<uint8_t>(color.alpha * 255);
 }
 
-RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectPaint>&& rects, AAType aaType,
+RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool useScale)
     : rects(std::move(rects)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
@@ -87,10 +87,10 @@ size_t RRectsVertexProvider::vertexCount() const {
 void RRectsVertexProvider::getVertices(float* vertices) const {
   auto index = 0;
   auto aaType = static_cast<AAType>(bitFields.aaType);
-  for (auto& rRectPaint : rects) {
-    auto viewMatrix = rRectPaint->viewMatrix;
-    auto rRect = rRectPaint->rRect;
-    auto& color = rRectPaint->color;
+  for (auto& record : rects) {
+    auto viewMatrix = record->viewMatrix;
+    auto rRect = record->rRect;
+    auto& color = record->color;
     auto scales = viewMatrix.getAxisScales();
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);
@@ -111,7 +111,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     float xMaxOffset = xOuterRadius;
     float yMaxOffset = yOuterRadius;
     //  if (!stroked) {
-    // For filled rRectPaints we map a unit circle in the vertex attributes rather than
+    // For filled RRectRecords we map a unit circle in the vertex attributes rather than
     // computing an ellipse and modifying that distance, so we normalize to 1.
     xMaxOffset /= rRect.radii.x;
     yMaxOffset /= rRect.radii.y;

@@ -25,8 +25,8 @@
 #include "tgfx/core/RRect.h"
 
 namespace tgfx {
-struct RRectPaint {
-  RRectPaint(const RRect& rRect, const Matrix& viewMatrix, Color color = {})
+struct RRectRecord {
+  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {})
       : rRect(rRect), viewMatrix(viewMatrix), color(color) {
   }
 
@@ -41,10 +41,10 @@ struct RRectPaint {
 class RRectsVertexProvider : public VertexProvider {
  public:
   /**
-   * Creates a new RRectsVertexProvider from a list of RRectPaint records.
+   * Creates a new RRectsVertexProvider from a list of RRect records.
    */
   static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
-                                                     std::vector<PlacementPtr<RRectPaint>>&& rects,
+                                                     std::vector<PlacementPtr<RRectRecord>>&& rects,
                                                      AAType aaType, bool useScale);
 
   /**
@@ -70,13 +70,13 @@ class RRectsVertexProvider : public VertexProvider {
   void getVertices(float* vertices) const override;
 
  private:
-  PlacementArray<RRectPaint> rects = {};
+  PlacementArray<RRectRecord> rects = {};
   struct {
     uint8_t aaType : 2;
     bool useScale : 1;
   } bitFields = {};
 
-  RRectsVertexProvider(PlacementArray<RRectPaint>&& rects, AAType aaType, bool useScale);
+  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale);
 
   friend class BlockBuffer;
 };

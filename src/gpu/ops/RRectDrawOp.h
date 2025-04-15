@@ -30,7 +30,7 @@ class RRectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
-   * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
+   * Create a new RRectDrawOp for a list of RRect records. Note that the returned RRectDrawOp is in
    * the device space.
    */
   static PlacementPtr<RRectDrawOp> Make(Context* context,
