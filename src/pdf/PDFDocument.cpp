@@ -430,6 +430,23 @@ void PDFDocument::waitForJobs() {
   // }
 }
 
+std::string PDFDocument::nextFontSubsetTag() {
+  // PDF 32000-1:2008 Section 9.6.4 FontSubsets "The tag shall consist of six uppercase letters"
+  // "followed by a plus sign" "different subsets in the same PDF file shall have different tags."
+  // There are 26^6 or 308,915,776 possible values. So start in range then increment and mod.
+  uint32_t thisFontSubsetTag = fNextFontSubsetTag;
+  fNextFontSubsetTag = (fNextFontSubsetTag + 1u) % 308915776u;
+
+  std::string subsetTag(7, ' ');
+  char* subsetTagData = subsetTag.data();
+  for (size_t i = 0; i < 6; ++i) {
+    subsetTagData[i] = 'A' + (thisFontSubsetTag % 26);
+    thisFontSubsetTag /= 26;
+  }
+  subsetTagData[6] = '+';
+  return subsetTag;
+}
+
 PDFIndirectReference PDFDocument::emit(const PDFObject& object, PDFIndirectReference ref) {
   std::lock_guard<std::mutex> autoLock(fMutex);
   object.emitObject(this->beginObject(ref));

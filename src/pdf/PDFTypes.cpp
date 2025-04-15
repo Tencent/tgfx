@@ -26,6 +26,7 @@
 #include "pdf/PDFDocument.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
@@ -253,6 +254,94 @@ void serialize_stream(PDFDictionary* origDict, Stream* stream, PDFSteamCompressi
   doc->emitStream(dict, writeStream, ref);
 }
 
+void write_literal_byte_string(const std::shared_ptr<WriteStream>& stream, const char* cin,
+                               size_t len) {
+  stream->writeText("(");
+  for (size_t i = 0; i < len; i++) {
+    auto c = static_cast<uint8_t>(cin[i]);
+    if (c < ' ' || '~' < c) {
+      uint8_t octal[4] = {'\\', static_cast<uint8_t>('0' | (c >> 6)),
+                          static_cast<uint8_t>('0' | ((c >> 3) & 0x07)),
+                          static_cast<uint8_t>('0' | (c & 0x07))};
+      stream->write(octal, 4);
+    } else {
+      if (c == '\\' || c == '(' || c == ')') {
+        stream->writeText("\\");
+      }
+      stream->write(&c, 1);
+    }
+  }
+  stream->writeText(")");
+}
+
+void write_hex_byte_string(const std::shared_ptr<WriteStream>& stream, const char* cin,
+                           size_t len) {
+
+  stream->writeText("<");
+  for (size_t i = 0; i < len; i++) {
+    auto c = static_cast<uint8_t>(cin[i]);
+    char hexValue[2] = {HexadecimalDigits::upper[c >> 4], HexadecimalDigits::upper[c & 0xF]};
+    stream->write(hexValue, 2);
+  }
+  stream->writeText(">");
+}
+
+void write_optimized_byte_string(const std::shared_ptr<WriteStream>& stream, const char* cin,
+                                 size_t len, size_t literalExtras) {
+  const size_t hexLength = 2 + (2 * len);
+  const size_t literalLength = 2 + len + literalExtras;
+  if (literalLength <= hexLength) {
+    write_literal_byte_string(stream, cin, len);
+  } else {
+    write_hex_byte_string(stream, cin, len);
+  }
+}
+
+void write_text_string(const std::shared_ptr<WriteStream>& stream, const char* cin, size_t len) {
+
+  bool inputIsValidUTF8 = true;
+  bool inputIsPDFDocEncoding = true;
+  size_t literalExtras = 0;
+  {
+    const char* textPtr = cin;
+    const char* textEnd = cin + len;
+    while (textPtr < textEnd) {
+      Unichar unichar = UTF::NextUTF8(&textPtr, textEnd);
+      if (unichar < 0) {
+        inputIsValidUTF8 = false;
+        break;
+      }
+      if ((0x15 < unichar && unichar < 0x20) || 0x7E < unichar) {
+        inputIsPDFDocEncoding = false;
+        break;
+      }
+      if (unichar < ' ' || '~' < unichar) {
+        literalExtras += 3;
+      } else if (unichar == '\\' || unichar == '(' || unichar == ')') {
+        ++literalExtras;
+      }
+    }
+  }
+
+  if (!inputIsValidUTF8) {
+    stream->writeText("<>");
+    return;
+  }
+
+  if (inputIsPDFDocEncoding) {
+    write_optimized_byte_string(stream, cin, len, literalExtras);
+    return;
+  }
+
+  stream->writeText("<FEFF");
+  const char* textPtr = cin;
+  const char* textEnd = cin + len;
+  while (textPtr < textEnd) {
+    Unichar unichar = UTF::NextUTF8(&textPtr, textEnd);
+    PDFUtils::WriteUTF16beHex(stream, unichar);
+  }
+  stream->writeText(">");
+}
 }  // namespace
 
 PDFIndirectReference PDFStreamOut(std::unique_ptr<PDFDictionary> dict,
@@ -261,6 +350,14 @@ PDFIndirectReference PDFStreamOut(std::unique_ptr<PDFDictionary> dict,
   PDFIndirectReference ref = doc->reserveRef();
   serialize_stream(dict.get(), stream.get(), compress, doc, ref);
   return ref;
+}
+
+void PDFWriteTextString(const std::shared_ptr<WriteStream>& stream, const std::string& text) {
+  write_text_string(stream, text.data(), text.size());
+}
+void PDFWriteByteString(const std::shared_ptr<WriteStream>& stream, const char* bytes,
+                        size_t length) {
+  write_text_string(stream, bytes, length);
 }
 
 }  // namespace tgfx

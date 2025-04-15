@@ -205,7 +205,7 @@ class PDFDocument : public Document {
   //   sk_sp<SkPDFDevice> fPageDevice;
   std::atomic<int> fNextObjectNumber = {1};
   // std::atomic<int> fJobCount = {0};
-  //   uint32_t fNextFontSubsetTag = {0};
+  uint32_t fNextFontSubsetTag = {0};
   UUID fUUID;
   PDFIndirectReference fInfoDict;
   PDFIndirectReference fXMP;

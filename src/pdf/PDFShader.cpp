@@ -124,7 +124,7 @@ PDFIndirectReference PDFShader::Make(PDFDocument* doc, const std::shared_ptr<Sha
                                      Color paintColor) {
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
-  if (const auto* gradientShader = Caster::AsGradientShader(shader.get())) {
+  if (Caster::AsGradientShader(shader.get())) {
     return PDFGradientShader::Make(doc, shader.get(), canvasTransform, surfaceBBox);
   }
   if (surfaceBBox.isEmpty()) {

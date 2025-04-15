@@ -286,18 +286,18 @@ PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec
 }
 }  // namespace
 
-void SkPDFEmitType1Font(const PDFFont& pdfFont, PDFDocument* doc) {
+void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
   auto font = pdfFont.strike().strikeSpec.font;
   auto typeface = font.getTypeface();
-  auto glyphNames = type_1_glyph_names(doc, typeface);
+  auto glyphNames = type_1_glyph_names(document, typeface);
   GlyphID firstGlyphID = pdfFont.firstGlyphID();
   GlyphID lastGlyphID = pdfFont.lastGlyphID();
 
   auto fontDictionary = PDFDictionary::Make("Font");
   fontDictionary->insertRef("FontDescriptor",
-                            type1_font_descriptor(doc, pdfFont.strike().strikeSpec));
+                            type1_font_descriptor(document, pdfFont.strike().strikeSpec));
   fontDictionary->insertName("Subtype", "Type1");
-  if (const TypefaceMetrics* info = PDFFont::GetMetrics(typeface, doc)) {
+  if (const TypefaceMetrics* info = PDFFont::GetMetrics(typeface, document)) {
     fontDictionary->insertName("BaseFont", info->postScriptName);
   }
 
@@ -339,7 +339,7 @@ void SkPDFEmitType1Font(const PDFFont& pdfFont, PDFDocument* doc) {
   encoding->insertObject("Differences", std::move(encDiffs));
   fontDictionary->insertObject("Encoding", std::move(encoding));
 
-  doc->emit(*fontDictionary, pdfFont.indirectReference());
+  document->emit(*fontDictionary, pdfFont.indirectReference());
 }
 
 }  // namespace tgfx

@@ -161,6 +161,10 @@ enum class PDFSteamCompressionEnabled : bool {
   Default = Yes,
 };
 
+void PDFWriteTextString(const std::shared_ptr<WriteStream>& stream, const std::string& text);
+void PDFWriteByteString(const std::shared_ptr<WriteStream>& stream, const char* bytes,
+                        size_t length);
+
 PDFIndirectReference PDFStreamOut(
     std::unique_ptr<PDFDictionary> dict, std::unique_ptr<Stream> stream, PDFDocument* doc,
     PDFSteamCompressionEnabled compress = PDFSteamCompressionEnabled::Default);

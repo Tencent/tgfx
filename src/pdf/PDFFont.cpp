@@ -185,6 +185,16 @@ const TypefaceMetrics* PDFFont::GetMetrics(std::shared_ptr<Typeface> typeface,
   return document->fTypefaceMetrics[id].get();
 }
 
+PDFFont::~PDFFont() = default;
+
+PDFFont::PDFFont(const PDFStrike* strike, GlyphID firstGlyphID, GlyphID lastGlyphID,
+                 TypefaceMetrics::FontType fontType, PDFIndirectReference indirectReference)
+    : fStrike(strike), fGlyphUsage(firstGlyphID, lastGlyphID),
+      fIndirectReference(indirectReference), fFontType(fontType) {
+  // Always include glyph 0
+  this->noteGlyphUsage(0);
+}
+
 void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor,
                                            const TypefaceMetrics& metrics, uint16_t emSize,
                                            int16_t defaultWidth) {
@@ -217,8 +227,8 @@ TypefaceMetrics::FontType PDFFont::FontType(const PDFStrike& /*pdfStrike*/,
   return metrics.type;
 }
 
-GlyphID first_nonzero_glyph_for_single_byte_encoding(GlyphID glyphID) {
-  return glyphID != 0 ? glyphID - (glyphID - 1) % 255 : 1;
+static GlyphID first_nonzero_glyph_for_single_byte_encoding(GlyphID glyphID) {
+  return glyphID != 0 ? glyphID - ((glyphID - 1) % 255) : 1;
 }
 
 PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
