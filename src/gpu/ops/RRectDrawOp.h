@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "DrawOp.h"
 #include "gpu/RRectsVertexProvider.h"
 
