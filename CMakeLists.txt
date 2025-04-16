@@ -66,12 +66,15 @@ if (TGFX_BUILD_SVG)
 endif ()
 
 if (TGFX_BUILD_TESTS)
-    set(TGFX_BUILD_LAYERS ON)
     set(TGFX_BUILD_SVG ON)
     set(TGFX_BUILD_DRAWERS ON)
     set(TGFX_USE_FREETYPE ON)
 else ()
     set(TGFX_BUILD_TESTS OFF)
+endif ()
+
+if (TGFX_BUILD_DRAWERS)
+    set(TGFX_BUILD_LAYERS ON)
 endif ()
 
 if (TGFX_USE_FREETYPE)
