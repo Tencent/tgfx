@@ -31,7 +31,7 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class AARectsVertexProvider : public RectsVertexProvider {
  public:
-  AARectsVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType, bool hasUVCoord,
+  AARectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
                         bool hasColor)
       : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor) {
   }
@@ -46,9 +46,9 @@ class AARectsVertexProvider : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     auto index = 0;
-    for (auto& rectPaint : rects) {
-      auto& viewMatrix = rectPaint->viewMatrix;
-      auto& rect = rectPaint->rect;
+    for (auto& record : rects) {
+      auto& viewMatrix = record->viewMatrix;
+      auto& rect = record->rect;
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
       // we want the new edge to be .5px away from the old line.
@@ -73,7 +73,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
             vertices[index++] = uvQuad.point(k).y;
           }
           if (bitFields.hasColor) {
-            WriteUByte4Color(vertices, index, rectPaint->color);
+            WriteUByte4Color(vertices, index, record->color);
           }
         }
       }
@@ -83,7 +83,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
 
 class NonAARectVertexProvider : public RectsVertexProvider {
  public:
-  NonAARectVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType, bool hasUVCoord,
+  NonAARectVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
                           bool hasColor)
       : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor) {
   }
@@ -98,9 +98,9 @@ class NonAARectVertexProvider : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     auto index = 0;
-    for (auto& rectPaint : rects) {
-      auto& viewMatrix = rectPaint->viewMatrix;
-      auto& rect = rectPaint->rect;
+    for (auto& record : rects) {
+      auto& viewMatrix = record->viewMatrix;
+      auto& rect = record->rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto uvQuad = Quad::MakeFrom(rect);
       for (size_t j = 4; j >= 1; --j) {
@@ -111,7 +111,7 @@ class NonAARectVertexProvider : public RectsVertexProvider {
           vertices[index++] = uvQuad.point(j - 1).y;
         }
         if (bitFields.hasColor) {
-          WriteUByte4Color(vertices, index, rectPaint->color);
+          WriteUByte4Color(vertices, index, record->color);
         }
       }
     }
@@ -123,36 +123,48 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buf
   if (rect.isEmpty()) {
     return nullptr;
   }
-  auto rectPaint = buffer->make<RectPaint>(rect, Matrix::I());
-  auto array = buffer->makeArray<RectPaint>(&rectPaint, 1);
+  auto record = buffer->make<RectRecord>(rect, Matrix::I());
+  auto rects = buffer->makeArray<RectRecord>(&record, 1);
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, false, false);
+    return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, false, false);
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, false, false);
+  return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, false, false);
 }
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
-    BlockBuffer* buffer, std::vector<PlacementPtr<RectPaint>>&& rects, AAType aaType,
+    BlockBuffer* buffer, std::vector<PlacementPtr<RectRecord>>&& rects, AAType aaType,
     bool needUVCoord) {
   if (rects.empty()) {
     return nullptr;
   }
   auto hasColor = false;
-  auto& firstColor = rects.front()->color;
-  for (auto& rectPaint : rects) {
-    if (rectPaint->color != firstColor) {
-      hasColor = true;
-      break;
+  auto hasUVCoord = false;
+  if (rects.size() > 1) {
+    auto& firstColor = rects.front()->color;
+    for (auto& record : rects) {
+      if (record->color != firstColor) {
+        hasColor = true;
+        break;
+      }
+    }
+    if (needUVCoord) {
+      auto& firstMatrix = rects.front()->viewMatrix;
+      for (auto& record : rects) {
+        if (record->viewMatrix != firstMatrix) {
+          hasUVCoord = true;
+          break;
+        }
+      }
     }
   }
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, needUVCoord, hasColor);
+    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, needUVCoord, hasColor);
+  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
 }
 
-RectsVertexProvider::RectsVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType,
+RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
                                          bool hasUVCoord, bool hasColor)
     : rects(std::move(rects)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);

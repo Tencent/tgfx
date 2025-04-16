@@ -46,6 +46,9 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
 
 RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
     : DrawOp(provider->aaType()), rectCount(provider->rectCount()), useScale(provider->useScale()) {
+  if (!provider->hasColor()) {
+    commonColor = provider->firstColor();
+  }
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
@@ -64,7 +67,7 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   auto renderTarget = renderPass->renderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp = EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                           renderTarget->height(), false, useScale);
+                                           renderTarget->height(), false, useScale, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);

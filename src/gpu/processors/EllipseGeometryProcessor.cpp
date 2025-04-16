@@ -20,11 +20,13 @@
 
 namespace tgfx {
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
-                                                   bool useScale)
+                                                   bool useScale, std::optional<Color> commonColor)
     : GeometryProcessor(ClassID()), width(width), height(height), stroke(stroke),
-      useScale(useScale) {
+      useScale(useScale), commonColor(commonColor) {
   inPosition = {"inPosition", SLType::Float2};
-  inColor = {"inColor", SLType::UByte4Color};
+  if (!commonColor.has_value()) {
+    inColor = {"inColor", SLType::UByte4Color};
+  }
   if (useScale) {
     inEllipseOffset = {"inEllipseOffset", SLType::Float3};
   } else {
@@ -36,6 +38,7 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
 
 void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = stroke ? 1 : 0;
+  flags = commonColor.has_value() ? 2 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

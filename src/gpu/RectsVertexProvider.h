@@ -25,8 +25,8 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-struct RectPaint {
-  RectPaint(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
+struct RectRecord {
+  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
       : rect(rect), viewMatrix(viewMatrix), color(color) {
   }
 
@@ -50,7 +50,7 @@ class RectsVertexProvider : public VertexProvider {
    * Creates a new RectsVertexProvider from a list of rect records.
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
-                                                    std::vector<PlacementPtr<RectPaint>>&& rects,
+                                                    std::vector<PlacementPtr<RectRecord>>&& rects,
                                                     AAType aaType, bool needUVCoord);
 
   /**
@@ -104,14 +104,14 @@ class RectsVertexProvider : public VertexProvider {
   }
 
  protected:
-  PlacementArray<RectPaint> rects = {};
+  PlacementArray<RectRecord> rects = {};
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
   } bitFields = {};
 
-  RectsVertexProvider(PlacementArray<RectPaint>&& rects, AAType aaType, bool hasUVCoord,
+  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
                       bool hasColor);
 };
 }  // namespace tgfx
