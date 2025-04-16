@@ -59,7 +59,7 @@ inline bool is_hex(char c) {
 
 namespace tgfx {
 
-SVGAttributeParser::SVGAttributeParser(std::string attributeString)
+SVGAttributeParser::SVGAttributeParser(const std::string& attributeString)
     : currentPos(attributeString.data()), endPos(currentPos + attributeString.size()) {
 }
 
@@ -568,7 +568,7 @@ bool SVGAttributeParser::parse(SVGLength* length) {
 }
 
 // https://www.w3.org/TR/SVG11/coords.html#ViewBoxAttribute
-bool SVGAttributeParser::parseViewBox(SVGViewBoxType* vb) {
+bool SVGAttributeParser::parseViewBox(SVGViewBoxType* viewbox) {
   float x = 0.0f;
   float y = 0.0f;
   float w = 0.0f;
@@ -580,7 +580,7 @@ bool SVGAttributeParser::parseViewBox(SVGViewBoxType* vb) {
       this->parseSepToken() && this->parseScalarToken(&w) && this->parseSepToken() &&
       this->parseScalarToken(&h)) {
 
-    *vb = static_cast<SVGViewBoxType>(Rect::MakeXYWH(x, y, w, h));
+    *viewbox = static_cast<SVGViewBoxType>(Rect::MakeXYWH(x, y, w, h));
     parsedValue = true;
     // consume trailing whitespace
     this->parseWSToken();

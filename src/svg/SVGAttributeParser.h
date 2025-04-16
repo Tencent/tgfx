@@ -32,11 +32,11 @@ namespace tgfx {
 
 class SVGAttributeParser {
  public:
-  explicit SVGAttributeParser(std::string);
+  explicit SVGAttributeParser(const std::string& attributeString);
 
-  bool parseInteger(SVGIntegerType*);
-  bool parseViewBox(SVGViewBoxType*);
-  bool parsePreserveAspectRatio(SVGPreserveAspectRatio*);
+  bool parseInteger(SVGIntegerType* number);
+  bool parseViewBox(SVGViewBoxType* viewbox);
+  bool parsePreserveAspectRatio(SVGPreserveAspectRatio* par);
 
   bool parse(SVGIntegerType* v) {
     return parseInteger(v);
