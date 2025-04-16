@@ -56,8 +56,8 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
     pendingImage = std::move(image);
     pendingSampling = sampling;
   }
-  auto rectPaint = drawingBuffer()->make<RectPaint>(rect, state.matrix, fill.color.premultiply());
-  pendingRects.emplace_back(std::move(rectPaint));
+  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  pendingRects.emplace_back(std::move(record));
 }
 
 void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -65,8 +65,8 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
   if (!canAppend(PendingOpType::Rect, state.clip, fill)) {
     flushPendingOps(PendingOpType::Rect, state.clip, fill);
   }
-  auto rectPaint = drawingBuffer()->make<RectPaint>(rect, state.matrix, fill.color.premultiply());
-  pendingRects.emplace_back(std::move(rectPaint));
+  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  pendingRects.emplace_back(std::move(record));
 }
 
 void OpsCompositor::fillRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
@@ -75,9 +75,9 @@ void OpsCompositor::fillRRect(const RRect& rRect, const MCState& state, const Fi
   if (!canAppend(PendingOpType::RRect, state.clip, rectFill)) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
   }
-  auto rectPaint =
-      drawingBuffer()->make<RRectPaint>(rRect, state.matrix, rectFill.color.premultiply());
-  pendingRRects.emplace_back(std::move(rectPaint));
+  auto record =
+      drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply());
+  pendingRRects.emplace_back(std::move(record));
 }
 
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
@@ -230,26 +230,14 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       }
     // fallthrough
     case PendingOpType::Image: {
-      if (aaType == AAType::Coverage) {
-        bool needCoverage = false;
-        for (auto& rectPaint : pendingRects) {
-          if (!rectPaint->viewMatrix.rectStaysRect() || !IsPixelAligned(rectPaint->rect)) {
-            needCoverage = true;
-            break;
-          }
-        }
-        if (!needCoverage) {
-          aaType = AAType::None;
-        }
-      }
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
           localBounds.join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
         }
       }
       if (needDeviceBounds) {
-        for (auto& rectPaint : pendingRects) {
-          auto rect = rectPaint->viewMatrix.mapRect(rectPaint->rect);
+        for (auto& record : pendingRects) {
+          auto rect = record->viewMatrix.mapRect(record->rect);
           deviceBounds.join(rect);
         }
       }
@@ -259,8 +247,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } break;
     case PendingOpType::RRect: {
       if (needLocalBounds || needDeviceBounds) {
-        for (auto& rRectPaint : pendingRRects) {
-          auto rect = rRectPaint->viewMatrix.mapRect(rRectPaint->rRect.rect);
+        for (auto& record : pendingRRects) {
+          auto rect = record->viewMatrix.mapRect(record->rRect.rect);
           deviceBounds.join(rect);
         }
         localBounds = deviceBounds;

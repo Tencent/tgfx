@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "DrawOp.h"
 #include "gpu/RRectsVertexProvider.h"
 
@@ -30,7 +31,7 @@ class RRectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
-   * Create a new RRectDrawOp for a list of RRectPaints. Note that the returned RRectDrawOp is in
+   * Create a new RRectDrawOp for a list of RRect records. Note that the returned RRectDrawOp is in
    * the device space.
    */
   static PlacementPtr<RRectDrawOp> Make(Context* context,
@@ -42,6 +43,7 @@ class RRectDrawOp : public DrawOp {
  private:
   size_t rectCount = 0;
   bool useScale = false;
+  std::optional<Color> commonColor = std::nullopt;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
