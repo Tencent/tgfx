@@ -10,8 +10,8 @@ cmake_policy(SET CMP0063 NEW)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building tgfx
-option(TGFX_BUILD_LAYERS "Enable building the layers module" OFF)
 option(TGFX_BUILD_SVG "Enable building the SVG module" OFF)
+option(TGFX_BUILD_LAYERS "Enable building the layers module" OFF)
 option(TGFX_BUILD_DRAWERS "Enable building the tgfx-drawers library for testing" OFF)
 option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
@@ -79,10 +79,14 @@ if (TGFX_USE_FREETYPE)
     set(TGFX_USE_PNG_DECODE ON)
 endif ()
 
+message("TGFX_BUILD_SVG: ${TGFX_BUILD_SVG}")
+message("TGFX_BUILD_LAYERS: ${TGFX_BUILD_LAYERS}")
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
 message("TGFX_USE_QT: ${TGFX_USE_QT}")
 message("TGFX_USE_SWIFTSHADER: ${TGFX_USE_SWIFTSHADER}")
 message("TGFX_USE_ANGLE: ${TGFX_USE_ANGLE}")
+message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
+message("TGFX_USE_THREADS: ${TGFX_USE_THREADS}")
 message("TGFX_USE_FREETYPE: ${TGFX_USE_FREETYPE}")
 message("TGFX_USE_PNG_DECODE: ${TGFX_USE_PNG_DECODE}")
 message("TGFX_USE_PNG_ENCODE: ${TGFX_USE_PNG_ENCODE}")
@@ -91,9 +95,7 @@ message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
-message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
 message("TGFX_USE_ASYNC_PROMISE: ${TGFX_USE_ASYNC_PROMISE}")
-message("TGFX_USE_THREADS: ${TGFX_USE_THREADS}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -119,8 +121,7 @@ file(GLOB_RECURSE SRC_FILES
         src/gpu/ops/*.*
         src/gpu/processors/*.*
         src/gpu/proxies/*.*
-        src/gpu/tasks/*.*
-        src/layers/*.*)
+        src/gpu/tasks/*.*)
 list(APPEND TGFX_FILES ${SRC_FILES})
 file(GLOB PLATFORM_COMMON_FILES
         src/core/*.*
@@ -134,6 +135,12 @@ if (TGFX_BUILD_SVG)
     file(GLOB_RECURSE SVG_FILES
             src/svg/*.*)
     list(APPEND TGFX_FILES ${SVG_FILES})
+endif ()
+
+if (TGFX_BUILD_LAYERS)
+    file(GLOB_RECURSE LAYERS_FILES
+            src/layers/*.*)
+    list(APPEND TGFX_FILES ${LAYERS_FILES})
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
