@@ -59,7 +59,7 @@ inline bool is_hex(char c) {
 
 namespace tgfx {
 
-SVGAttributeParser::SVGAttributeParser(std::string attributeString)
+SVGAttributeParser::SVGAttributeParser(const std::string& attributeString)
     : currentPos(attributeString.data()), endPos(currentPos + attributeString.size()) {
 }
 
