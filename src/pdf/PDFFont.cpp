@@ -24,6 +24,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include "core/ScalerContext.h"
 #include "core/TypefaceMetrics.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
@@ -122,7 +123,8 @@ std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
   // float imageStrikeEM = canonFont.getSize();
   // SkStrikeSpec imageStrikeSpec = SkStrikeSpec::MakeWithNoDevice(canonFont, &imagePaint);
 
-  auto strike = std::shared_ptr<PDFStrike>(new PDFStrike(PDFStrikeSpec(font, pathStrikeEM), doc));
+  auto strike = std::shared_ptr<PDFStrike>(
+      new PDFStrike(PDFStrikeSpec(font.getTypeface(), font.getSize(), pathStrikeEM), doc));
   // sk_sp<SkPDFStrike>
   //     strike(new SkPDFStrike(SkPDFStrikeSpec(pathStrikeSpec, pathStrikeEM),
   //                            SkPDFStrikeSpec(imageStrikeSpec, imageStrikeEM),
@@ -232,7 +234,7 @@ static GlyphID first_nonzero_glyph_for_single_byte_encoding(GlyphID glyphID) {
 }
 
 PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
-  auto typeface = strikeSpec.font.getTypeface();
+  auto typeface = strikeSpec.typeface;
   const auto* fontMetrics = PDFFont::GetMetrics(typeface, fDoc);
   DEBUG_ASSERT(fontMetrics);  // SkPDFDevice::internalDrawText ensures the typeface is good.
                               // GetMetrics only returns null to signify a bad typeface.
@@ -320,7 +322,7 @@ void setGlyphWidthAndBoundingBox(float width, Rect box,
 ///////////////////////////////////////////////////////////////////////////////
 
 void PDFFont::emitSubsetType0(PDFDocument* document) const {
-  auto typeface = strike().strikeSpec.font.getTypeface();
+  auto typeface = strike().strikeSpec.typeface;
   const auto* metricsPtr = PDFFont::GetMetrics(typeface, document);
   if (!metricsPtr) {
     return;
@@ -596,16 +598,21 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
   }
 
   float emSize = pdfStrike.strikeSpec.unitsPerEM;
-  const auto& pathFont = pdfStrike.strikeSpec.font;
-  auto glyphFace = GlyphFace::Wrap(pathFont);
-  if (!glyphFace) {
-    return;
-  }
+  auto typeface = pdfStrike.strikeSpec.typeface;
+  auto textSize = pdfStrike.strikeSpec.textSize;
+
+  // const auto& pathFont = pdfStrike.strikeSpec.font;
+  // auto glyphFace = GlyphFace::Wrap(pathFont);
+  // if (!glyphFace) {
+  //   return;
+  // }
 
   // auto strike = pdfStrike.strikeSpec.font.  fStrikeSpec.findOrCreateStrike();
   // SkASSERT(strike);
-  GlyphID xGlyphID = pathFont.getGlyphID('x');
-  float xHeight = pathFont.getBounds(xGlyphID).height();
+
+  GlyphID xGlyphID = typeface->getGlyphID('X');
+  auto scaleContext = ScalerContext::Make(typeface, textSize);
+  float xHeight = scaleContext->getBounds(xGlyphID, false, false).height();
   // SkBulkGlyphMetricsAndPaths metricsAndPaths((sk_sp<SkStrike>(strike)));
   // SkBulkGlyphMetricsAndDrawables metricsAndDrawables(std::move(strike));
 
@@ -659,11 +666,11 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
       std::snprintf(buffer, sizeof(buffer), "g%X", glyphID);
       characterName = buffer;
     }
-    advance = pathFont.getAdvance(glyphID);
+    advance = scaleContext->getAdvance(glyphID, false);
     encDiffs->appendName(characterName);
     widthArray->appendScalar(advance);
 
-    auto glyphBBox = pathFont.getBounds(glyphID);
+    auto glyphBBox = scaleContext->getBounds(glyphID, false, false);
     bbox.join(glyphBBox);
 
     // SkDrawable* drawable = drawableGlyph->drawable();
@@ -685,94 +692,98 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
     // } else
     Path glyphPath;
     Matrix glyphImageMatrix;
-    if (!pathFont.hasColor() && glyphFace->getPath(glyphID, &glyphPath)) {
+    if (!typeface->hasColor() && scaleContext->generatePath(glyphID, false, false, &glyphPath)) {
       setGlyphWidthAndBoundingBox(advance, glyphBBox, content);
       PDFUtils::EmitPath(glyphPath, true, content);
       PDFUtils::PaintPath(PathFillType::Winding, content);
-    } else if (auto glyphImage = glyphFace->getImage(glyphID, &glyphImageMatrix)) {
-      // auto bufferImage = Caster::AsBufferImage(glyphImage.get());
-      // if (!bufferImage || !bufferImage->imageBuffer) {
-      //   continue;
-      // }
-      // bufferImage->imageBuffer;
-      // if (glyphImage->colorType() != kGray_8_SkColorType) {
-      //   AppendScalar(pathGlyph->advanceX(), &content);
-      //   content.writeText(" 0 d0\n");
-      //   AppendScalar(pimg.fImage->width() * bitmapScale, &content);
-      //   content.writeText(" 0 0 ");
-      //   AppendScalar(-pimg.fImage->height() * bitmapScale, &content);
-      //   content.writeText(" ");
-      //   AppendScalar(pimg.fOffset.x() * bitmapScale, &content);
-      //   content.writeText(" ");
-      //   AppendScalar((pimg.fImage->height() + pimg.fOffset.y()) * bitmapScale, &content);
-      //   content.writeText(" cm\n");
-      //   content.writeText("/X");
-      //   content.write(characterName.c_str(), characterName.size());
-      //   content.writeText(" Do\n");
-      //   SkPDFIndirectReference image = SkPDFSerializeImage(pimg.fImage.get(), doc);
-      //   xobjects->insertRef(SkStringPrintf("Xg%X", gID), image);
-      // } else {}
-
-      // const SkGlyph* smallGlyph = smallGlyphs.glyph(SkPackedGlyphID{gID});
-      auto smallBBox = glyphFace->getBounds(glyphID);
-      smallBBox = Matrix::MakeScale(bitmapScale).mapRect(smallBBox);
-      smallBBox.roundOut();
-      bbox.join(smallBBox);
-      setGlyphWidthAndBoundingBox(advance, smallBBox, content);
-
-      PDFUtils::AppendFloat(bitmapScale, content);
-      content->writeText(" 0 0 ");
-      PDFUtils::AppendFloat(bitmapScale, content);
-      content->writeText(" ");
-      PDFUtils::AppendFloat(glyphImageMatrix.getTranslateX() * bitmapScale, content);
-      content->writeText(" ");
-      PDFUtils::AppendFloat(glyphImageMatrix.getTranslateY() * bitmapScale, content);
-      content->writeText(" cm\n");
-
-      // Convert Gray image to jpeg if needed
-      // if (pdfStrike.fHasMaskFilter) {
-      //   SkJpegEncoder::Options jpegOptions;
-      //   jpegOptions.fQuality = 50;  // SK_PDF_MASK_QUALITY
-      //   SkImage* image = pimg.fImage.get();
-      //   sk_sp<SkData> jpegData = SkJpegEncoder::Encode(nullptr, image, jpegOptions);
-      //   if (jpegData) {
-      //     sk_sp<SkImage> jpegImage = SkImages::DeferredFromEncodedData(jpegData);
-      //     SkASSERT(jpegImage);
-      //     if (jpegImage) {
-      //       pimg.fImage = jpegImage;
-      //     }
-      //   }
-      // }
-
-      // Draw image into a Form XObject
-      const auto imageSize = ISize::Make(glyphImage->width(), glyphImage->height());
-      PDFExportContext glyphDevice(imageSize, doc);
-      Canvas canvas(&glyphDevice);
-      canvas.drawImage(glyphImage);
-      PDFIndirectReference sMask =
-          MakePDFFormXObject(doc, glyphDevice.getContent(),
-                             MakePDFArray(0, 0, glyphImage->width(), glyphImage->height()),
-                             glyphDevice.makeResourceDictionary(), Matrix(), "DeviceGray");
-
-      // Use Form XObject as SMask (luminosity) on the graphics state
-      PDFIndirectReference smaskGraphicState = PDFGraphicState::GetSMaskGraphicState(
-          sMask, false, PDFGraphicState::SMaskMode::Luminosity, doc);
-      PDFUtils::ApplyGraphicState(smaskGraphicState.fValue, content);
-
-      // Draw a rectangle the size of the glyph (masked by SMask)
-      PDFUtils::AppendRectangle(Rect::MakeWH(glyphImage->width(), glyphImage->height()), content);
-      PDFUtils::PaintPath(PathFillType::Winding, content);
-
-      // Add glyph resources to font resource dict
-      char buffer[16];
-      std::snprintf(buffer, sizeof(buffer), "g%X", glyphID);
-      xObjects->insertRef(buffer, sMask);
-      std::snprintf(buffer, sizeof(buffer), "G%d", smaskGraphicState.fValue);
-      graphicStates->insertRef(buffer, smaskGraphicState);
-
     } else {
-      setGlyphWidthAndBoundingBox(advance, glyphBBox, content);
+      Font imageFont(typeface, textSize);
+      auto glyphImage = imageFont.getImage(glyphID, &glyphImageMatrix);
+      if (glyphImage) {
+        // auto bufferImage = Caster::AsBufferImage(glyphImage.get());
+        // if (!bufferImage || !bufferImage->imageBuffer) {
+        //   continue;
+        // }
+        // bufferImage->imageBuffer;
+        // if (glyphImage->colorType() != kGray_8_SkColorType) {
+        //   AppendScalar(pathGlyph->advanceX(), &content);
+        //   content.writeText(" 0 d0\n");
+        //   AppendScalar(pimg.fImage->width() * bitmapScale, &content);
+        //   content.writeText(" 0 0 ");
+        //   AppendScalar(-pimg.fImage->height() * bitmapScale, &content);
+        //   content.writeText(" ");
+        //   AppendScalar(pimg.fOffset.x() * bitmapScale, &content);
+        //   content.writeText(" ");
+        //   AppendScalar((pimg.fImage->height() + pimg.fOffset.y()) * bitmapScale, &content);
+        //   content.writeText(" cm\n");
+        //   content.writeText("/X");
+        //   content.write(characterName.c_str(), characterName.size());
+        //   content.writeText(" Do\n");
+        //   SkPDFIndirectReference image = SkPDFSerializeImage(pimg.fImage.get(), doc);
+        //   xobjects->insertRef(SkStringPrintf("Xg%X", gID), image);
+        // } else {}
+
+        // const SkGlyph* smallGlyph = smallGlyphs.glyph(SkPackedGlyphID{gID});
+        auto smallBBox = scaleContext->getBounds(glyphID, false, false);
+        smallBBox = Matrix::MakeScale(bitmapScale).mapRect(smallBBox);
+        smallBBox.roundOut();
+        bbox.join(smallBBox);
+        setGlyphWidthAndBoundingBox(advance, smallBBox, content);
+
+        PDFUtils::AppendFloat(bitmapScale, content);
+        content->writeText(" 0 0 ");
+        PDFUtils::AppendFloat(bitmapScale, content);
+        content->writeText(" ");
+        PDFUtils::AppendFloat(glyphImageMatrix.getTranslateX() * bitmapScale, content);
+        content->writeText(" ");
+        PDFUtils::AppendFloat(glyphImageMatrix.getTranslateY() * bitmapScale, content);
+        content->writeText(" cm\n");
+
+        // Convert Gray image to jpeg if needed
+        // if (pdfStrike.fHasMaskFilter) {
+        //   SkJpegEncoder::Options jpegOptions;
+        //   jpegOptions.fQuality = 50;  // SK_PDF_MASK_QUALITY
+        //   SkImage* image = pimg.fImage.get();
+        //   sk_sp<SkData> jpegData = SkJpegEncoder::Encode(nullptr, image, jpegOptions);
+        //   if (jpegData) {
+        //     sk_sp<SkImage> jpegImage = SkImages::DeferredFromEncodedData(jpegData);
+        //     SkASSERT(jpegImage);
+        //     if (jpegImage) {
+        //       pimg.fImage = jpegImage;
+        //     }
+        //   }
+        // }
+
+        // Draw image into a Form XObject
+        const auto imageSize = ISize::Make(glyphImage->width(), glyphImage->height());
+        PDFExportContext glyphDevice(imageSize, doc);
+        Canvas canvas(&glyphDevice);
+        canvas.drawImage(glyphImage);
+        PDFIndirectReference sMask =
+            MakePDFFormXObject(doc, glyphDevice.getContent(),
+                               MakePDFArray(0, 0, glyphImage->width(), glyphImage->height()),
+                               glyphDevice.makeResourceDictionary(), Matrix(), "DeviceGray");
+
+        // Use Form XObject as SMask (luminosity) on the graphics state
+        PDFIndirectReference smaskGraphicState = PDFGraphicState::GetSMaskGraphicState(
+            sMask, false, PDFGraphicState::SMaskMode::Luminosity, doc);
+        PDFUtils::ApplyGraphicState(smaskGraphicState.fValue, content);
+
+        // Draw a rectangle the size of the glyph (masked by SMask)
+        PDFUtils::AppendRectangle(Rect::MakeWH(glyphImage->width(), glyphImage->height()), content);
+        PDFUtils::PaintPath(PathFillType::Winding, content);
+
+        // Add glyph resources to font resource dict
+        char buffer[16];
+        std::snprintf(buffer, sizeof(buffer), "g%X", glyphID);
+        xObjects->insertRef(buffer, sMask);
+        std::snprintf(buffer, sizeof(buffer), "G%d", smaskGraphicState.fValue);
+        graphicStates->insertRef(buffer, smaskGraphicState);
+      } else {
+        setGlyphWidthAndBoundingBox(advance, glyphBBox, content);
+      }
     }
+
     auto stream = Stream::MakeFromData(content->readData());
     charProcs->insertRef(std::move(characterName), PDFStreamOut(nullptr, std::move(stream), doc));
   }
@@ -800,7 +811,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
 
   font.insertName("CIDToGIDMap", "Identity");
 
-  auto pathTypeface = pdfStrike.strikeSpec.font.getTypeface();
+  auto pathTypeface = pdfStrike.strikeSpec.typeface;
   const std::vector<Unichar>& glyphToUnicode = PDFFont::GetUnicodeMap(*pathTypeface, doc);
   DEBUG_ASSERT(glyphToUnicode.size() == static_cast<size_t>(pathTypeface->glyphsCount()));
   auto toUnicodeCmap =

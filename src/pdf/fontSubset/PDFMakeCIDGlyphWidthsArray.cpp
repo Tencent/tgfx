@@ -19,6 +19,7 @@
 #include "PDFMakeCIDGlyphWidthsArray.h"
 #include <cstddef>
 #include <vector>
+#include "core/ScalerContext.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFGlyphUse.h"
 #include "pdf/PDFTypes.h"
@@ -95,7 +96,8 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
   //     rule: end range for 3+ repeats
 
   auto emSize = static_cast<uint16_t>(pdfStrikeSpec.unitsPerEM);
-  auto pathFont = pdfStrikeSpec.font;
+  // auto pathFont = pdfStrikeSpec.typeface;
+  auto scaleContext = ScalerContext::Make(pdfStrikeSpec.typeface, pdfStrikeSpec.textSize);
   // SkBulkGlyphMetricsAndPaths paths{pdfStrikeSpec.fStrikeSpec};
 
   auto result = MakePDFArray();
@@ -113,7 +115,7 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
   size_t numIntAdvances = 0;
   std::vector<float> advances(glyphIDs.size());
   for (auto glyphID : glyphIDs) {
-    float currentAdvance = from_font_units(pathFont.getAdvance(glyphID), emSize);
+    float currentAdvance = from_font_units(scaleContext->getAdvance(glyphID, false), emSize);
     if (static_cast<int32_t>(currentAdvance) == currentAdvance) {
       advances[numIntAdvances++] = currentAdvance;
     }
@@ -124,7 +126,7 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
 
   // Pre-convert to pdf advances.
   for (size_t i = 0; i < glyphIDs.size(); ++i) {
-    advances[i] = from_font_units(pathFont.getAdvance(glyphIDs[i]), emSize);
+    advances[i] = from_font_units(scaleContext->getAdvance(glyphIDs[i], false), emSize);
   }
 
   for (size_t i = 0; i < glyphIDs.size(); ++i) {

@@ -23,7 +23,6 @@
 #include "core/DrawContext.h"
 #include "core/MCState.h"
 #include "core/Records.h"
-#include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "pdf/PDFGraphicStackState.h"
@@ -36,7 +35,6 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
-#include "tgfx/core/Stream.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/WriteStream.h"
 

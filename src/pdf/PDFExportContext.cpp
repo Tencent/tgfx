@@ -28,6 +28,7 @@
 #include "core/MCState.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
+#include "core/ScalerContext.h"
 #include "core/TypefaceMetrics.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
@@ -239,7 +240,7 @@ enum class BlendFastPath {
   SkipDrawing  //< draw nothing
 };
 
-static bool just_solid_color(const Fill& fill) {
+bool just_solid_color(const Fill& fill) {
   return fill.isOpaque() && !fill.colorFilter && !fill.shader;
 }
 
@@ -310,7 +311,7 @@ namespace {
 class GlyphPositioner {
  public:
   GlyphPositioner(std::shared_ptr<MemoryWriteStream> content, float textSkewX, Point origin)
-      : fContent(content), fCurrentMatrixOrigin(origin), fTextSkewX(textSkewX) {
+      : fContent(std::move(content)), fCurrentMatrixOrigin(origin), fTextSkewX(textSkewX) {
   }
   ~GlyphPositioner() {
     this->flush();
@@ -347,7 +348,7 @@ class GlyphPositioner {
     Point position = xy - fCurrentMatrixOrigin;
     if (!fViewersAgreeOnXAdvance || position != Point{fXAdvance, 0}) {
       this->flush();
-      PDFUtils::AppendFloat(position.x - position.y * fTextSkewX, fContent);
+      PDFUtils::AppendFloat(position.x - (position.y * fTextSkewX), fContent);
       fContent->writeText(" ");
       PDFUtils::AppendFloat(-position.y, fContent);
       fContent->writeText(" Td ");
@@ -394,7 +395,9 @@ bool needs_new_font(PDFFont* font, GlyphID glyphID, TypefaceMetrics::FontType in
     return false;
   }
 
-  bool hasUnmodifiedPath = font->strike().strikeSpec.font.getPath(glyphID, nullptr);
+  auto scaleContext =
+      ScalerContext::Make(font->strike().strikeSpec.typeface, font->strike().strikeSpec.textSize);
+  bool hasUnmodifiedPath = scaleContext->generatePath(glyphID, false, false, nullptr);
   bool convertedToType3 = font->getType() == TypefaceMetrics::FontType::Other;
   return convertedToType3 == hasUnmodifiedPath;
 }
@@ -423,7 +426,7 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
     return;
   }
 
-  auto typeface = pdfStrike->strikeSpec.font.getTypeface();
+  auto typeface = pdfStrike->strikeSpec.typeface;
 
   const auto* metrics = PDFFont::GetMetrics(typeface, document);
   if (!metrics) {
@@ -445,7 +448,12 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
   float textScaleY = textSize / pdfStrike->strikeSpec.unitsPerEM;
   float textScaleX = advanceScale;
 
-  auto clipStackBounds = state.clip.getBounds();
+  auto clipStackBounds = Rect::MakeEmpty();
+  if (state.clip.isEmpty()) {
+    clipStackBounds = Rect::MakeSize(_pageSize);
+  } else {
+    clipStackBounds = state.clip.getBounds();
+  }
 
   // Clear everything from the runPaint that will be applied by the strike.
   Fill fillPaint(fill);

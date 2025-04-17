@@ -136,7 +136,7 @@ PDFIndirectReference generate_page_tree(PDFDocument* doc,
       static constexpr size_t kMaxNodeSize = 8;
       const size_t n = vec.size();
       DEBUG_ASSERT(n >= 1);
-      const size_t result_len = (n - 1) / kMaxNodeSize + 1;
+      const size_t result_len = ((n - 1) / kMaxNodeSize) + 1;
       DEBUG_ASSERT(result_len >= 1);
       DEBUG_ASSERT((n == 1 || result_len < n));
       result.reserve(result_len);
@@ -244,6 +244,21 @@ void begin_indirect_object(PDFOffsetMap* offsetMap, PDFIndirectReference ref,
 
 void end_indirect_object(const std::shared_ptr<WriteStream>& stream) {
   stream->writeText("\nendobj\n");
+}
+
+std::vector<const PDFFont*> get_fonts(const PDFDocument& canon) {
+  std::vector<const PDFFont*> fonts;
+  for (const auto& [_, strike] : canon.fStrikes) {
+    for (const auto& [unused, font] : strike->fFontMap) {
+      fonts.push_back(font.get());
+    }
+  }
+
+  // Sort so the output PDF is reproducible.
+  std::sort(fonts.begin(), fonts.end(), [](const PDFFont* a, const PDFFont* b) {
+    return a->indirectReference().fValue < b->indirectReference().fValue;
+  });
+  return fonts;
 }
 
 }  // namespace
@@ -408,9 +423,9 @@ void PDFDocument::onClose() {
 
   auto docCatalogRef = this->emit(*docCatalog);
 
-  // for (const SkPDFFont* f : get_fonts(*this)) {
-  //   f->emitSubset(this);
-  // }
+  for (const auto* f : get_fonts(*this)) {
+    f->emitSubset(this);
+  }
 
   this->waitForJobs();
   {

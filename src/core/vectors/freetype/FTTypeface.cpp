@@ -21,8 +21,10 @@
 #include <array>
 #include <cstddef>
 #include <cstring>
+#include <memory>
 #include "FTLibrary.h"
 #include "core/TypefaceMetrics.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
@@ -232,7 +234,14 @@ TypefaceMetrics::FontType get_font_type(FT_Face face) {
 bool FTTypeface::isOpentypeFontDataStandardFormat() const {
   // FreeType reports TrueType for any data that can be decoded to TrueType or OpenType.
   // However, there are alternate data formats for OpenType, like wOFF and wOF2.
-  auto stream = Stream::MakeFromData(data.data);
+  std::unique_ptr<Stream> stream = nullptr;
+  if (data.data) {
+    stream = Stream::MakeFromData(data.data);
+  } else if (!data.path.empty()) {
+    stream = Stream::MakeFromFile(data.path);
+  } else {
+    return false;
+  }
   std::array<char, 4> buffer;
   if (stream->read(buffer.data(), 4) < 4) {
     return false;
@@ -317,7 +326,12 @@ std::unique_ptr<TypefaceMetrics> FTTypeface::onGetMetrics() const {
 }
 
 std::shared_ptr<Data> FTTypeface::openData() const {
-  return data.data;
+  if (data.data) {
+    return data.data;
+  } else if (!data.path.empty()) {
+    return Data::MakeFromFile(data.path);
+  }
+  return nullptr;
 }
 
 }  // namespace tgfx

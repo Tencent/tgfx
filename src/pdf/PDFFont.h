@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include "core/TypefaceMetrics.h"
 #include "pdf/PDFGlyphUse.h"
 #include "pdf/PDFTypes.h"
@@ -35,9 +36,11 @@ class PDFFont;
 
 class PDFStrikeSpec {
  public:
-  PDFStrikeSpec(const Font& font, float em) : font(font), unitsPerEM(em){};
+  PDFStrikeSpec(std::shared_ptr<Typeface> typeface, float size, float em)
+      : typeface(std::move(typeface)), textSize(size), unitsPerEM(em) {};
 
-  const Font& font;
+  std::shared_ptr<Typeface> typeface;
+  const float textSize;
   const float unitsPerEM;
 };
 

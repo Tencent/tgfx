@@ -16,11 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "PDFType1Font.h"
 #include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
-#include "PDFType1Font.h"
+#include "core/ScalerContext.h"
 #include "core/TypefaceMetrics.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFDocument.h"
@@ -243,7 +244,7 @@ PDFIndirectReference make_type1_font_descriptor(PDFDocument* doc,
       size_t header = 0;
       size_t data = 0;
       size_t trailer = 0;
-      auto typeface = pdfStrikeSpec.font.getTypeface();
+      auto typeface = pdfStrikeSpec.typeface;
       auto rawFontData = PDFFont::GetTypefaceData(typeface);
       auto fontData = convert_type1_font_stream(std::move(rawFontData), &header, &data, &trailer);
       if (fontData) {
@@ -273,7 +274,7 @@ const std::vector<std::string>& type_1_glyph_names(PDFDocument* canon,
 }
 
 PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec& pdfStrikeSpec) {
-  auto typeface = pdfStrikeSpec.font.getTypeface();
+  auto typeface = pdfStrikeSpec.typeface;
   auto typefaceID = typeface->uniqueID();
   auto iter = doc->fFontDescriptors.find(typefaceID);
   if (iter != doc->fFontDescriptors.end()) {
@@ -287,9 +288,10 @@ PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec
 }  // namespace
 
 void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
-  auto font = pdfFont.strike().strikeSpec.font;
-  auto typeface = font.getTypeface();
+  auto typeface = pdfFont.strike().strikeSpec.typeface;
   auto glyphNames = type_1_glyph_names(document, typeface);
+  auto scaleContext = ScalerContext::Make(typeface, pdfFont.strike().strikeSpec.textSize);
+
   GlyphID firstGlyphID = pdfFont.firstGlyphID();
   GlyphID lastGlyphID = pdfFont.lastGlyphID();
 
@@ -319,8 +321,8 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
     // SkBulkGlyphMetrics metrics{pdfFont.strike().fPath.fStrikeSpec};
     // auto glyphs = metrics.glyphs(SkSpan(glyphIDs.get(), glyphRangeSize));
     for (size_t i = 0; i < glyphRangeSize; ++i) {
-      widths->appendScalar(
-          from_font_units(font.getAdvance(glyphIDs[i]), static_cast<uint16_t>(emSize)));
+      widths->appendScalar(from_font_units(scaleContext->getAdvance(glyphIDs[i], false),
+                                           static_cast<uint16_t>(emSize)));
     }
     fontDictionary->insertObject("Widths", std::move(widths));
   }

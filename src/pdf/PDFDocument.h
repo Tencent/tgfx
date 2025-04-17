@@ -25,7 +25,6 @@
 #include <unordered_map>
 #include <utility>
 #include "core/TypefaceMetrics.h"
-#include "core/utils/UniqueID.h"
 #include "pdf/PDFExportContext.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFGraphicState.h"
