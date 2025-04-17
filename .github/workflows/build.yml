@@ -302,6 +302,14 @@ jobs:
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-qt-
 
+      - name: Get QT SDK Cache
+        id: qt-sdk-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{github.workspace}}/qt
+          key: qt-sdk-cache
+
       - uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Run depsync
@@ -311,6 +319,7 @@ jobs:
         shell: bash
 
       - name: Install Qt
+        if: ${{ (steps.qt-sdk-restore.outputs.cache-hit != 'true') }}
         uses: jurplel/install-qt-action@v4
         with:
           host: 'linux'
@@ -318,13 +327,11 @@ jobs:
           version: '6.8.3'
           dir: '${{github.workspace}}/qt/'
           install-deps: 'true'
-          cache: 'true'
           aqtversion: '==3.2.1'
-          cache-key-prefix: 'install-qt-action'
 
       - name: Build QT
         run: |
-          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -o ./out/release/qt -a x64
+          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{github.workspace}}/qt/Qt/6.8.3/gcc_64/lib/cmake" -o ./out/release/qt -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -333,6 +340,14 @@ jobs:
           path: |
             third_party
           key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Save QT SDK Cache
+        if: ${{ (steps.qt-sdk-restore.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{github.workspace}}/qt
+          key: qt-sdk-cache
 
       - name: Job Failed
         if: ${{ failure() }}
