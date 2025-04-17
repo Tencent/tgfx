@@ -71,8 +71,7 @@ bool TextureFlattenTask::execute(RenderPass* renderPass) {
   }
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto geometryProcessor = DefaultGeometryProcessor::Make(
-      drawingBuffer, Color::White(), renderTarget->width(), renderTarget->height(), AAType::None,
-      Matrix::I(), Matrix::I());
+      drawingBuffer, {}, renderTarget->width(), renderTarget->height(), AAType::None, {}, {});
   auto format = renderPass->renderTarget()->format();
   auto caps = renderPass->getContext()->caps();
   const auto& swizzle = caps->getWriteSwizzle(format);
@@ -83,7 +82,7 @@ bool TextureFlattenTask::execute(RenderPass* renderPass) {
                                  nullptr, BlendMode::Src, &swizzle);
   auto quad = Quad::MakeFrom(Rect::MakeWH(renderTarget->width(), renderTarget->height()));
   auto vertexData = quad.toTriangleStrips();
-  renderPass->bindProgramAndScissorClip(pipeline.get(), Rect::MakeEmpty());
+  renderPass->bindProgramAndScissorClip(pipeline.get(), {});
   renderPass->bindBuffers(nullptr, vertexData);
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();

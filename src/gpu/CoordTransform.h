@@ -26,15 +26,15 @@ struct CoordTransform {
   CoordTransform() = default;
 
   explicit CoordTransform(Matrix matrix, const TextureProxy* proxy = nullptr,
-                          const Point& alphaStart = Point::Zero())
+                          const Point& alphaStart = {})
       : matrix(matrix), textureProxy(proxy), alphaStart(alphaStart) {
   }
 
   Matrix getTotalMatrix() const;
 
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
   const TextureProxy* textureProxy = nullptr;
   // The alpha start point of the RGBAAA layout.
-  Point alphaStart = Point::Zero();
+  Point alphaStart = {};
 };
 }  // namespace tgfx

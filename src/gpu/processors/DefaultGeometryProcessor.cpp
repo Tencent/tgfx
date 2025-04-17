@@ -24,12 +24,10 @@ DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int h
     : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
       viewMatrix(viewMatrix), uvMatrix(uvMatrix) {
   position = {"aPosition", SLType::Float2};
-  int attributeCount = 1;
   if (aa == AAType::Coverage) {
-    attributeCount = 2;
     coverage = {"inCoverage", SLType::Float};
   }
-  setVertexAttributes(&position, attributeCount);
+  setVertexAttributes(&position, 2);
 }
 
 void DefaultGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

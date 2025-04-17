@@ -27,7 +27,7 @@
 
 namespace tgfx {
 Rect ImageFilter::filterBounds(const Rect& rect) const {
-  auto dstBounds = Rect::MakeEmpty();
+  Rect dstBounds = {};
   applyCropRect(rect, &dstBounds);
   return dstBounds;
 }
@@ -77,7 +77,7 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(std::shared_
   if (uvMatrix) {
     clipBounds = uvMatrix->mapRect(clipBounds);
   }
-  Rect dstBounds = Rect::MakeEmpty();
+  Rect dstBounds = {};
   if (!applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }

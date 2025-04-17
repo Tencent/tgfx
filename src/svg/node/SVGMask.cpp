@@ -49,7 +49,7 @@ Rect SVGMask::bounds(const SVGRenderContext& context) const {
                                          Y.value_or(SVGLength(0, SVGLength::Unit::Number)),
                                          Width.value(), Height.value(), MaskUnits);
   }
-  return Rect::MakeEmpty();
+  return {};
 }
 
 /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/

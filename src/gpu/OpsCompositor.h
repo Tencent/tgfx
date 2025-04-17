@@ -95,8 +95,8 @@ class OpsCompositor {
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
-  std::vector<PlacementPtr<RectPaint>> pendingRects = {};
-  std::vector<PlacementPtr<RRectPaint>> pendingRRects = {};
+  std::vector<PlacementPtr<RectRecord>> pendingRects = {};
+  std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Op>> ops = {};
 
   BlockBuffer* drawingBuffer() const {

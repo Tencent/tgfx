@@ -140,7 +140,7 @@ std::string ToSVGBlendMode(BlendMode mode) {
 }
 
 std::string ToSVGPath(const Path& path, PathEncoding encoding) {
-  Point currentPoint = Point::Zero();
+  Point currentPoint = {};
   const int relSelector = encoding == PathEncoding::Relative ? 1 : 0;
 
   const auto appendCommand = [&](std::string& inputString, char commandChar, const Point points[],
@@ -460,9 +460,9 @@ std::tuple<bool, std::shared_ptr<Path>> PathMakeFromSVGString(const std::string&
   // We will write all data to this local path and only write it
   // to result if the whole parsing succeeds.
   auto path = std::make_shared<Path>();
-  auto first = Point::Zero();
-  auto opOrigin = Point::Zero();
-  auto lastOpOrigin = Point::Zero();
+  Point first = {};
+  Point opOrigin = {};
+  Point lastOpOrigin = {};
 
   // We will use find_points and find_scalar to read into these.
   // There might not be enough data to fill them, so to avoid
@@ -560,7 +560,7 @@ std::tuple<bool, std::shared_ptr<Path>> PathMakeFromSVGString(const std::string&
         opOrigin = points[1];
         break;
       case 'A': {  // Arc (Elliptical)
-        auto xyRadii = Point::Zero();
+        Point xyRadii = {};
         float angle = 0.0f;
         bool largeArc = true;
         bool sweep = true;

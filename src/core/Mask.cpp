@@ -26,7 +26,7 @@ void Mask::fillPath(const Path& path, const Stroke* stroke) {
     if (path.isInverseFillType()) {
       Path tempPath = {};
       tempPath.addRect(Rect::MakeWH(width(), height()));
-      onFillPath(tempPath, Matrix::I());
+      onFillPath(tempPath, {});
     }
     return;
   }
@@ -64,7 +64,7 @@ bool Mask::fillText(const GlyphRunList* glyphRunList, const Stroke* stroke) {
     stroke->applyToPath(&path);
   }
   path.transform(matrix);
-  onFillPath(path, Matrix::I(), antiAlias, true);
+  onFillPath(path, {}, antiAlias, true);
   return true;
 }
 

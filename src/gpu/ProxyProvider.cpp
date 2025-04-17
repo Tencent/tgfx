@@ -75,7 +75,7 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
 }
 
 std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVertexBuffer(
-    std::unique_ptr<VertexProvider> provider, uint32_t renderFlags) {
+    PlacementPtr<VertexProvider> provider, uint32_t renderFlags) {
   if (provider == nullptr) {
     return {nullptr, 0};
   }
@@ -159,7 +159,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   if (shape == nullptr) {
     return nullptr;
   }
-  auto drawingMatrix = Matrix::I();
+  Matrix drawingMatrix = {};
   auto isInverseFillType = shape->isInverseFillType();
   if (shape->type() == Shape::Type::Matrix && !isInverseFillType) {
     auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
