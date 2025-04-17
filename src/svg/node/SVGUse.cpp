@@ -56,7 +56,7 @@ void SVGUse::onRender(const SVGRenderContext& context) const {
   }
 
   auto lengthContext = context.lengthContext();
-  lengthContext.clearPatternUnits();
+  lengthContext.clearBoundingBoxUnits();
   SVGRenderContext localContext(context, lengthContext);
   ref->render(localContext);
 }
@@ -68,7 +68,7 @@ Path SVGUse::onAsPath(const SVGRenderContext& context) const {
   }
 
   auto lengthContext = context.lengthContext();
-  lengthContext.clearPatternUnits();
+  lengthContext.clearBoundingBoxUnits();
   SVGRenderContext localContext(context, lengthContext);
   return ref->asPath(localContext);
 }
@@ -79,7 +79,7 @@ Rect SVGUse::onObjectBoundingBox(const SVGRenderContext& context) const {
     return {};
   }
   auto lengthContext = context.lengthContext();
-  lengthContext.clearPatternUnits();
+  lengthContext.clearBoundingBoxUnits();
   float x = lengthContext.resolve(X, SVGLengthContext::LengthType::Horizontal);
   float y = lengthContext.resolve(Y, SVGLengthContext::LengthType::Vertical);
   Rect bounds = ref->objectBoundingBox(context);

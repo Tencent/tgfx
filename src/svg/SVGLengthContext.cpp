@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SVGLengthContext.h"
+#include "tgfx/svg/SVGLengthContext.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -53,8 +53,8 @@ constexpr float CMMultiplier = MMMultiplier * 10;
 float SVGLengthContext::resolve(const SVGLength& length, LengthType type) const {
   switch (length.unit()) {
     case SVGLength::Unit::Number: {
-      if (patternUnit.has_value()) {
-        if (patternUnit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+      if (unit.has_value()) {
+        if (unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
           return length.value() * length_size_for_type(_viewPort, type);
         } else {
           return length.value();

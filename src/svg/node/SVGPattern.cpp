@@ -132,7 +132,7 @@ bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const 
   PatternAttributes attrs;
   const auto* contentNode = this->resolveHref(context, &attrs);
   auto lengthContext = context.lengthContext();
-  lengthContext.setPatternUnits(PatternUnits);
+  lengthContext.setBoundingBoxUnits(PatternUnits);
   Rect tile = lengthContext.resolveRect(attrs.x.has_value() ? *attrs.x : SVGLength(0),
                                         attrs.y.has_value() ? *attrs.y : SVGLength(0),
                                         attrs.width.has_value() ? *attrs.width : SVGLength(0),
