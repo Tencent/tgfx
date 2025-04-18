@@ -130,7 +130,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 
 void TaskGroup::exit() {
   exited = true;
-  releaseResourceInternal();
+  releaseResourcesInternal();
   delete tasks;
   delete threads;
 }
@@ -141,7 +141,7 @@ void TaskGroup::releaseResources() {
   }
   // stop accepting new tasks before clearing threads
   exited = true;
-  releaseResourceInternal();
+  releaseResourcesInternal();
   // continue to accept new tasks
   exited = false;
 }
